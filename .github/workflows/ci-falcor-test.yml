@@ -1,0 +1,144 @@
+name: CI Falcor Test Workflow
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  test-falcor:
+    name: Test (Falcor)
+    timeout-minutes: 100
+    runs-on: [Windows, self-hosted, falcor]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Add Git Bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "false"
+          fetch-depth: "1"
+      - name: Download Slang build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-windows-x86_64-cl-release
+          path: slang-bin
+      - name: setup-falcor
+        run: |
+          set -euo pipefail
+          mkdir -p FalcorBin/build/windows-vs2022
+          cp -r 'C:/Falcor/build/windows-vs2022/bin' 'FalcorBin/build/windows-vs2022/bin'
+          find 'FalcorBin/build/windows-vs2022/bin' -name '*.pdb' -delete
+          cp -r 'C:/Falcor/tests' 'FalcorBin/tests'
+          cp -r 'C:/Falcor/tools' 'FalcorBin/tools'
+          cp -r 'C:/Falcor/media' 'FalcorBin/media'
+          cp -r 'C:/Falcor/media_internal' 'FalcorBin/media_internal'
+          cp -r 'C:/Falcor/scripts' 'FalcorBin/scripts'
+      - name: Copy Slang to Falcor
+        run: |
+          set -euo pipefail
+          TARGET="./FalcorBin/build/windows-vs2022/bin/Release"
+          SRC="slang-bin/Release/bin"
+          # Copy only Slang core DLLs and executables — the full CI artifact also
+          # contains gfx.dll, platform.dll, dawn.dll, and test-tool DLLs that
+          # Falcor provides its own versions of; overwriting those breaks FalcorTest.
+          # slang-rt.dll must be copied alongside slang.dll: it is a version-matched
+          # runtime peer, and leaving C:\Falcor's older copy in place while replacing
+          # slang.dll causes FalcorTest.exe to crash during DLL initialization.
+          # D3D12/ (D3D12 Agility SDK DLLs) and optix/ are intentionally NOT copied
+          # from the CI artifact: the old Falcor-specific build did not produce these
+          # directories, so the versions already present from C:\Falcor (copied during
+          # setup-falcor) are correct for FalcorTest.exe. Overwriting them with the CI
+          # artifact's versions would break FalcorTest.exe at startup.
+          for name in slang.dll slang-rt.dll slang-compiler.dll slang-llvm.dll slang-glslang.dll slang-glsl-module.dll dxcompiler.dll dxil.dll slangc.exe; do
+            [[ -f "$SRC/$name" ]] || { echo "Missing required file: $SRC/$name" >&2; exit 1; }
+            cp --verbose "$SRC/$name" "$TARGET/"
+          done
+          shopt -s nullglob
+          modules=( "$SRC"/slang-standard-module-*/ )
+          (( ${#modules[@]} > 0 )) || { echo "Missing slang-standard-module-* in $SRC" >&2; exit 1; }
+          for d in "${modules[@]}"; do
+            cp --verbose -r "$d" "$TARGET/"
+          done
+      - name: falcor-unit-test
+        run: |
+          set -euo pipefail
+          cd FalcorBin/tests
+          python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
+      - name: falcor-image-test
+        run: |
+          set -euo pipefail
+          cd FalcorBin/tests
+          python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
+
+  test-falcor-perf:
+    name: Test (Falcor Perf)
+    timeout-minutes: 100
+    runs-on: [Windows, self-hosted, perf]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Add Git Bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "false"
+          fetch-depth: "1"
+      - name: Download Slang build
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-windows-x86_64-cl-release
+          path: build
+
+      - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # v1.13
+        id: download
+        with:
+          # The source repository path.
+          # Expected format {owner}/{repo}
+          # Default: ${{ github.repository }}
+          repository: "shader-slang/falcor-compile-perf-test"
+
+          # A flag to set the download target as latest release
+          # The default value is 'false'
+          latest: true
+
+          # The name of the file to download.
+          # Use this field only to specify filenames other than tarball or zipball, if any.
+          # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
+          fileName: "falcor_perf_test-*-win-64.zip"
+
+          # Relative path under $GITHUB_WORKSPACE to place the downloaded file(s)
+          # It will create the target directory automatically if not present
+          # eg: out-file-path: "my-downloads" => It will create directory $GITHUB_WORKSPACE/my-downloads
+          out-file-path: "falcor-perf-test"
+
+          # Somehow there is a bug in this flag, the executable extracted is not runnable. We have to
+          # extract ourselves.
+          extract: false
+
+      - name: run falcor-compiler-perf-test
+        env:
+          DOWNLOADED_FILE: ${{ fromJson(steps.download.outputs.downloaded_files)[0] }}
+        run: |
+          set -euo pipefail
+          filename="$DOWNLOADED_FILE"
+          [[ -f "$filename" ]] || { echo "Downloaded file not found: $filename" >&2; exit 1; }
+          python -m zipfile -e "$filename" ./falcor-perf-test
+          export PATH="./build/Release/bin:$PATH"
+          echo "PATH is $PATH"
+          echo "Running falcor performance test..."
+          ./falcor-perf-test/bin/Release/falcor_perftest.exe
+          echo "falcor performance test completed successfully"

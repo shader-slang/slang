@@ -4,11 +4,11 @@
 #pragma once
 
 // Include cpp files directly to access internal symbols not exported from slang DLL
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/slang-record-replay/proxy/proxy-base.h"
-#include "../../source/slang-record-replay/proxy/proxy-global-session.h"
-#include "../../source/slang-record-replay/replay-context.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-global-session.h"
+#include "slang-record-replay/replay-context.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstring>
@@ -30,16 +30,10 @@ public:
 };
 
 
-// Replays tests can't run single threaded or they reset their own
-// streams so disable for first PR
-#define REPLAY_TEST                      \
-    if (ReplayContext::get().isActive()) \
-    {                                    \
-        SLANG_IGNORE_TEST;               \
-    }                                    \
-    ScopedReplayContext _scopedReplayContext;
-
-// #define REPLAY_TEST SLANG_IGNORE_TEST
+// Force the singleton ReplayContext back to a clean state on entry and exit so
+// the test sees Mode::Idle regardless of how the previous test in this process
+// finished (including aborts or assertion paths that skipped the dtor).
+#define REPLAY_TEST ScopedReplayContext _scopedReplayContext;
 
 // =============================================================================
 // Helper: Round-trip test template

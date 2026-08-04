@@ -62,6 +62,10 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 Save the source file dependency list in a file. 
 
+Uses Makefile dependency syntax: &lt;output&gt;: &lt;dep&gt; &lt;dep...&gt; 
+
+When no [-o](#o) is given, - is used as the make target (output goes to stdout). 
+
 
 <a id="entry"></a>
 ### -entry
@@ -121,7 +125,7 @@ Add a path to be used in resolving '#include' and 'import' operations.
 
 **-lang &lt;[language](#language)&gt;**
 
-Set the language for the following input files. 
+Set the language for the following input files. Required when an input is '-' (standard input), because stdin has no file extension. 
 
 
 <a id="matrix-layout-column-major"></a>
@@ -174,7 +178,7 @@ Set the module name to use when compiling multiple .slang source files into a si
 
 Specify a path where generated output should be written. 
 
-If no [-target](#target-2) or [-stage](#stage-1) is specified, one may be inferred from file extension (see [&lt;file-extension&gt;](#file-extension)). If multiple [-target](#target-2) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-2) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-2) that matches the one inferred from &lt;path&gt;. 
+Use `-` to write generated output to stdout. If no [-target](#target-2) or [-stage](#stage-1) is specified, one may be inferred from file extension (see [&lt;file-extension&gt;](#file-extension)). If multiple [-target](#target-2) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-2) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-2) that matches the one inferred from &lt;path&gt;. 
 
 
 <a id="profile"></a>
@@ -188,7 +192,7 @@ Accepted profiles are:
 
 * sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10} 
 
-* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460} 
+* glsl_{150,330,400,410,420,430,440,450,460} 
 
 Additional profiles that include [-stage](#stage-1) information: 
 
@@ -254,6 +258,14 @@ all - Treat all warnings as errors.
 Disable specific warning ids. 
 
 
+<a id="wall"></a>
+### -Wall, -Wextra, -Wpedantic
+
+**-Wall | -Wextra | -Wpedantic**
+
+Enable the corresponding group of warnings (additive). The groups are independent: [-Wextra](#wall-1) is on by default, while [-Wall](#wall) and [-Wpedantic](#wall-2) are off by default. 
+
+
 <a id="w"></a>
 ### -W
 
@@ -277,7 +289,7 @@ Dump to output list of warning diagnostic numeric and name ids.
 
 <a id="id"></a>
 ### --
-Treat the rest of the command line as input files. 
+Treat the rest of the command line as input files. Use '-' once to read from standard input; [-lang](#lang) is required, stdin is limited to 256 MiB, and diagnostics use `&lt;stdin&gt;`. 
 
 
 <a id="report-downstream-time"></a>
@@ -302,7 +314,22 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement execution counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-mapping.json` mapping counter slots to source positions. 
+Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
+
+
+<a id="trace-function-coverage"></a>
+### -trace-function-coverage
+Instrument the shader with per-function-entry coverage counters. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+
+
+<a id="trace-branch-coverage"></a>
+### -trace-branch-coverage
+Instrument the shader with per-branch-arm coverage counters for if/else, loop-condition, switch case/default arms, and switch no-match default paths. Expression-level short-circuit and ternary branches are not instrumented by this mode yet. Shares the synthesized `__slang_coverage` buffer and coverage metadata path. 
+
+
+<a id="trace-coverage-boolean"></a>
+### -trace-coverage-boolean
+Record boolean coverage instead of exact execution counts: each counter slot is written with 1 (via a plain non-atomic store) whenever its entry executes, rather than atomically incremented per execution. This removes all atomic contention, so coverage is dramatically faster and avoids the GPU watchdog timeouts that heavy per-execution counting can trigger, at the cost of exact counts (the counter is 0 or non-zero). Off by default. Ignored when no coverage mode is enabled. 
 
 
 <a id="trace-coverage-binding"></a>
@@ -310,7 +337,31 @@ Instrument the shader with per-statement execution counters. When writing compil
 
 **-trace-coverage-binding &lt;index&gt; &lt;space&gt;**
 
-Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time (e.g. for a pre-built D3D12 root signature). Implies `-trace-coverage`. 
+Bind the synthesized `__slang_coverage` buffer at an explicit (register index, space) instead of auto-allocating a slot. Useful when the host needs the binding fixed at compile time before any host metadata reads run. Implies `-trace-coverage`. 
+
+
+<a id="trace-coverage-reserved-space"></a>
+### -trace-coverage-reserved-space
+
+**-trace-coverage-reserved-space &lt;space&gt;**
+
+Reserve a descriptor set when auto-allocating the synthesized `__slang_coverage` buffer. Use this when the host pipeline layout owns descriptor sets that are not visible in the compiled shader IR. Repeat for multiple spaces; duplicates are idempotent. Applies to Khronos descriptor-set targets. 
+
+
+<a id="coverage-manifest-output"></a>
+### -coverage-manifest-output
+
+**-coverage-manifest-output &lt;path&gt;**
+
+Write shader coverage manifest metadata to an explicit JSON sidecar path. Use this when compiled output is written to stdout or when the build needs a stable manifest path instead of the default `&lt;output&gt;.coverage-manifest.json` sidecar. Requires at least one coverage tracing mode, is not supported for container outputs, and is valid only when exactly one compiled artifact carries coverage metadata. The path must not overlap any emitted artifact path. 
+
+
+<a id="trace-coverage-counter-width"></a>
+### -trace-coverage-counter-width
+
+**-trace-coverage-counter-width &lt;bits&gt;**
+
+Per-slot bit width of the synthesized `__slang_coverage` buffer. Accepts `64` (default) or `32`. uint64 counters effectively cannot wrap within any practical run; uint32 counters wrap silently at 2^32 hits per slot. Use `32` when targeting a runtime driver that does not support 64-bit shader atomic add (notably MoltenVK on Apple Silicon, which exposes `shaderBufferInt64Atomics = false`). Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode counters are capped to 32 bits; an explicitly requested `64` is capped with warning E45115. Boolean coverage (`-trace-coverage-boolean`) writes plain non-atomic stores and honors the requested width on all targets. Implies `-trace-coverage` is meaningful; ignored when no coverage mode is enabled. 
 
 
 <a id="report-dynamic-dispatch-sites"></a>
@@ -360,7 +411,7 @@ Disable short-circuiting for "&amp;&amp;" and "||" operations
 
 <a id="unscoped-enum"></a>
 ### -unscoped-enum
-Treat enums types as unscoped by default. 
+Treat enum types as unscoped by default. (Note: enum class remains scoped.) 
 
 
 <a id="preserve-params"></a>
@@ -590,7 +641,7 @@ Specify the space index for the system defined global bindless resource array.
 
 **-spirv-resource-heap-stride &lt;stride&gt;**
 
-Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType). 
+Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType); for RaytracingAccelerationStructure entries, the 0 default emits a literal 8-byte ArrayStride for the uint64 device address elements. An explicit stride value still overrides these defaults; for acceleration-structure entries it must be at least 8 bytes. 
 
 
 <a id="spirv-sampler-heap-stride"></a>
@@ -601,9 +652,27 @@ Specify the byte stride for the resource descriptor heap when generating SPIRV w
 Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
 
 
+<a id="spirv-unified-descriptor-heap-stride"></a>
+### -spirv-unified-descriptor-heap-stride
+When generating SPIRV with spvDescriptorHeapEXT, emit each resource descriptor-heap runtime array's ArrayStride as the maximum of image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default OpConstantSizeOfEXT path (used when [-spirv-resource-heap-stride](#spirv-resource-heap-stride) is 0); mutually exclusive with a non-zero [-spirv-resource-heap-stride](#spirv-resource-heap-stride) (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. 
+
+
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
-Emit debug data to a separate file, and strip it from the main output file. 
+Emit debug data to a separate file, and strip it from the main output file. By default, the debug file path is derived from the main `-o &lt;path&gt;` output as a fallback. Use `-separate-debug-info-output &lt;path&gt;` to override it or when the main artifact is written to stdout. 
+
+
+<a id="separate-debug-info-output"></a>
+### -separate-debug-info-output
+
+**-separate-debug-info-output &lt;path&gt;**
+
+Write separate debug information to an explicit sidecar path, overriding the fallback path derived from `-o &lt;path&gt;`. Requires `-separate-debug-info` and allows the main artifact to be written to stdout. Use `-` to write the separate debug information to stdout when the main artifact is written to a file. 
+
+
+<a id="debug-info-include-source"></a>
+### -debug-info-include-source
+Embed the shader source text into the debug information, independently of the `-g` debug level. At `-g1` the source is embedded via the core SPIR-V `OpSource` instruction (no NonSemantic extension required); at `-g2`/`-g3` the source is already embedded so this is a no-op. Requires debug information: using it with `-g0`, or without any `-g` option, is an error. Only affects SPIR-V output. 
 
 
 <a id="emit-cpu-via-cpp"></a>
@@ -652,6 +721,16 @@ Downstream compiler options
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 
 Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library. 
+
+
+
+
+<a id="none-version"></a>
+### -&lt;compiler&gt;-version
+
+**-&lt;[compiler](#compiler)&gt;-version**
+
+Print the version of the downstream [&lt;compiler&gt;](#compiler) that Slang would load for that pass-through, then continue. Reports "not found" if the compiler cannot be located. Takes no value. 
 
 
 
@@ -913,7 +992,7 @@ Embed downstream IR into emitted slang IR
 
 <a id="experimental-feature"></a>
 ### -experimental-feature
-Enable experimental features (loading builtin neural module) 
+Enable experimental language and module features 
 
 
 <a id="enable-experimental-rich-diagnostics"></a>
@@ -1160,7 +1239,7 @@ Optimization Level
 
 Debug Level 
 
-* `0`, `none` : Don't emit debug information at all. 
+* `0`, `none` : Don't emit debug information. This is the default. For SPIR-V, OpSource, OpName and OpMemberName are still emitted. 
 * `1`, `minimal` : Emit as little debug information as possible, while still supporting stack traces. 
 * `2`, `standard` : Emit whatever is the standard level of debug information for each target. 
 * `3`, `maximal` : Emit as much debug information as possible for each target. 
@@ -1249,6 +1328,7 @@ Stage
 * `mesh` 
 * `amplification`, `task` 
 * `dispatch` 
+* `node` 
 
 <a id="vulkan-shift"></a>
 ## vulkan-shift
@@ -1288,6 +1368,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_2_4` 
 * `metallib_3_0` 
 * `metallib_3_1` 
+* `metallib_3_2` 
 * `metallib_4_0` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
@@ -1302,6 +1383,7 @@ A capability describes an optional feature that a target may or may not support.
 * `dispatch` 
 * `SPV_EXT_fragment_shader_interlock` : enables the SPV_EXT_fragment_shader_interlock extension 
 * `SPV_EXT_physical_storage_buffer` : enables the SPV_EXT_physical_storage_buffer extension 
+* `SPV_KHR_physical_storage_buffer` : enables the SPV_KHR_physical_storage_buffer extension 
 * `SPV_EXT_fragment_fully_covered` : enables the SPV_EXT_fragment_fully_covered extension 
 * `SPV_EXT_descriptor_indexing` : enables the SPV_EXT_descriptor_indexing extension 
 * `SPV_EXT_shader_atomic_float_add` : enables the SPV_EXT_shader_atomic_float_add extension 
@@ -1313,6 +1395,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_quad_control` : enables the SPV_KHR_quad_control extension 
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
+* `SPV_KHR_abort` : enables the SPV_KHR_abort extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
 * `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
@@ -1340,6 +1423,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
 * `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
 * `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
+* `SPV_EXT_shader_64bit_indexing` : enables the SPV_EXT_shader_64bit_indexing extension 
+* `spvAbort` 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1379,6 +1464,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
+* `spvRayTracingSpheresGeometryNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1400,6 +1486,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
 * `spvDescriptorHeapEXT` 
+* `spvShader64BitIndexingEXT` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
@@ -1437,6 +1524,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_glsl_hlsl_metal_spirv_wgsl` 
 * `cpp_hlsl` 
 * `cuda_glsl_hlsl` 
+* `cuda_glsl_nvapi` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
 * `cuda_glsl_hlsl_spirv_llvm` 
@@ -1464,6 +1552,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
+* `GL_EXT_shader_abort` : enables the GL_EXT_shader_abort extension 
 * `GL_EXT_demote_to_helper_invocation` : enables the GL_EXT_demote_to_helper_invocation extension 
 * `GL_EXT_maximal_reconvergence` : enables the GL_EXT_maximal_reconvergence extension 
 * `GL_EXT_shader_quad_control` : enables the GL_EXT_shader_quad_control extension 
@@ -1515,6 +1604,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_compute_shader_derivatives` : enables the GL_NV_compute_shader_derivatives extension 
 * `GL_NV_fragment_shader_barycentric` : enables the GL_NV_fragment_shader_barycentric extension 
 * `GL_NV_gpu_shader5` : enables the GL_NV_gpu_shader5 extension 
+* `GL_NV_linear_swept_spheres` : enables the GL_NV_linear_swept_spheres extension 
 * `GL_NV_ray_tracing` : enables the GL_NV_ray_tracing extension 
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
@@ -1573,6 +1663,7 @@ A capability describes an optional feature that a target may or may not support.
 * `mesh` 
 * `task` 
 * `amplification` 
+* `node` 
 * `any_stage` 
 * `amplification_mesh` 
 * `raytracing_stages` 
@@ -1632,6 +1723,7 @@ A capability describes an optional feature that a target may or may not support.
 * `sm_6_9` 
 * `sm_6_10_version` 
 * `sm_6_10` 
+* `sm_latest` 
 * `DX_4_0` 
 * `DX_4_1` 
 * `DX_5_0` 
@@ -1658,6 +1750,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GLSL_440` : enables the GLSL_440 extension 
 * `GLSL_450` : enables the GLSL_450 extension 
 * `GLSL_460` : enables the GLSL_460 extension 
+* `GLSL_latest` : enables the GLSL_latest extension 
 * `GLSL_410_SPIRV_1_0` : enables the GLSL_410_SPIRV_1_0 extension 
 * `GLSL_420_SPIRV_1_0` : enables the GLSL_420_SPIRV_1_0 extension 
 * `GLSL_430_SPIRV_1_0` : enables the GLSL_430_SPIRV_1_0 extension 
@@ -1706,8 +1799,11 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_size` 
 * `texture_querylod` 
 * `texture_querylevels` 
+* `texture_shadow` 
 * `texture_shadowlod` 
+* `texture_shadowlod_ext` 
 * `texture_shadowgrad` 
+* `texture_shadowbias` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
 * `atomic_glsl_halfvec` 
@@ -1717,12 +1813,14 @@ A capability describes an optional feature that a target may or may not support.
 * `image_loadstore` 
 * `nonuniformqualifier` 
 * `printf` 
+* `abort` 
 * `texturefootprint` 
 * `texturefootprintclamp` 
 * `shader5_sm_4_0` 
 * `shader5_sm_5_0` 
 * `pack_vector` 
 * `subgroup_basic` 
+* `subgroup_workgroup_index` 
 * `subgroup_ballot` 
 * `subgroup_ballot_activemask` 
 * `subgroup_basic_ballot` 
@@ -1749,6 +1847,8 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
 * `raytracing_lss` 
+* `rayquery_sphere_nv` 
+* `rayquery_lss_nv` 
 * `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_object_space_ray` 

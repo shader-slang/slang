@@ -1,0 +1,699 @@
+# Slang diagnostic catalog (auto-extracted from source).
+# Total codes: 695; covered by tests-agentic: 82; uncovered: 613
+# Columns: code	covered	severity	name	source	message
+#
+0	covered	err	token-name-expected-but-eof	slang-diagnostics.lua	unexpected end of file
+1	UNCOVERED	err	cannot-open-file	slang-diagnostics.lua	cannot open file '~path'
+2	UNCOVERED	err	cannot-find-file	slang-diagnostics.lua	cannot find file '~path'
+3	UNCOVERED	err	token-type-expected-but-eof	slang-diagnostics.lua	unexpected end of file
+4	UNCOVERED	err	cannot-write-output-file	slang-diagnostics.lua	cannot write output file '~path'
+5	UNCOVERED	err	failed-to-load-dynamic-library	slang-diagnostics.lua	failed to load dynamic library '~path'
+6	UNCOVERED	err	too-many-output-paths-specified	slang-diagnostics.lua	too many output paths specified
+12	UNCOVERED	err	cannot-deduce-source-language	slang-diagnostics.lua	can't deduce language for input file '~path'
+13	covered	err	unknown-code-generation-target	slang-diagnostics.lua	unknown code generation target '~target'
+14	covered	err	unknown-profile	slang-diagnostics.lua	unknown profile '~profile'
+15	UNCOVERED	err	unknown-stage	slang-diagnostics.lua	unknown stage '~stageName'
+16	UNCOVERED	err	unknown-pass-through-target	slang-diagnostics.lua	unknown pass-through target '~target'
+17	UNCOVERED	err	unknown-command-line-option	slang-diagnostics.lua	unknown command-line option '~option'
+18	UNCOVERED	warning	separate-debug-info-unsupported-for-target	slang-diagnostics.lua	'-separate-debug-info' is not supported for target '~target'
+19	UNCOVERED	err	unknown-source-language	slang-diagnostics.lua	unknown source language '~language'
+20	UNCOVERED	err	entry-points-need-to-be-associated-with-translation-units	slang-diagnostics.lua	when using multiple source files, entry points must be specified after their corresponding source file(s)
+22	UNCOVERED	err	unknown-downstream-compiler	slang-diagnostics.lua	unknown downstream compiler '~compiler'
+28	UNCOVERED	err	unable-to-generate-code-for-target	slang-diagnostics.lua	unable to generate code for target '~target'
+30	UNCOVERED	warning	same-stage-specified-more-than-once	slang-diagnostics.lua	the stage '~stage' was specified more than once for entry point '~entryPoint'
+31	covered	err	conflicting-stages-for-entry-point	slang-diagnostics.lua	conflicting stages have been specified for entry point '~entryPoint'
+32	UNCOVERED	warning	explicit-stage-doesnt-match-implied-stage	slang-diagnostics.lua	the stage specified for entry point '~entryPoint' ('~specifiedStage') does not match the stage implied by the source file name ('~impliedStage')
+33	UNCOVERED	err	stage-specification-ignored-because-no-entry-points	slang-diagnostics.lua	one or more stages were specified, but no entry points were specified with '-entry'
+34	UNCOVERED	err	stage-specification-ignored-because-before-all-entry-points	slang-diagnostics.lua	when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to
+35	UNCOVERED	err	no-stage-specified-in-pass-through-mode	slang-diagnostics.lua	no stage was specified for entry point '~entryPoint'; when using the '-pass-through' option, stages must be fully specified on the command line
+36	UNCOVERED	err	expecting-an-integer	slang-diagnostics.lua	expecting an integer value
+37	UNCOVERED	err	expecting-a-unsigned-integer	slang-diagnostics.lua	expecting an unsigned integer value
+40	UNCOVERED	warning	same-profile-specified-more-than-once	slang-diagnostics.lua	the '~profile' was specified more than once for target '~target'
+41	UNCOVERED	err	conflicting-profiles-specified-for-target	slang-diagnostics.lua	conflicting profiles have been specified for target '~target'
+42	UNCOVERED	err	profile-specification-ignored-because-no-targets	slang-diagnostics.lua	a '-profile' option was specified, but no target was specified with '-target'
+43	UNCOVERED	err	profile-specification-ignored-because-before-all-targets	slang-diagnostics.lua	when using multiple targets, any '-profile' option must follow the '-target' it applies to
+44	UNCOVERED	err	target-flags-ignored-because-no-targets	slang-diagnostics.lua	target options were specified, but no target was specified with '-target'
+45	UNCOVERED	err	target-flags-ignored-because-before-all-targets	slang-diagnostics.lua	when using multiple targets, any target options must follow the '-target' they apply to
+50	UNCOVERED	err	duplicate-targets	slang-diagnostics.lua	the target '~target' has been specified more than once
+51	UNCOVERED	err	unhandled-language-for-source-embedding	slang-diagnostics.lua	unhandled source language for source embedding
+60	UNCOVERED	err	cannot-deduce-output-format-from-path	slang-diagnostics.lua	cannot infer an output format from the output path '~path'
+61	UNCOVERED	err	cannot-match-output-file-to-target	slang-diagnostics.lua	no specified '-target' option matches the output path '~path', which implies the '~format' format
+62	UNCOVERED	err	unknown-command-line-value	slang-diagnostics.lua	unknown value for option '~option'. Valid values are '~validValues'
+63	UNCOVERED	err	unknown-help-category	slang-diagnostics.lua	unknown help category
+70	UNCOVERED	err	cannot-match-output-file-to-entry-point	slang-diagnostics.lua	the output path '~path' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point
+71	UNCOVERED	err	invalid-type-conformance-option-string	slang-diagnostics.lua	syntax error in type conformance option '~option'.
+72	UNCOVERED	err	invalid-type-conformance-option-no-type	slang-diagnostics.lua	invalid conformance option '~option', type '~typeName' is not found.
+73	UNCOVERED	err	cannot-create-type-conformance	slang-diagnostics.lua	cannot create type conformance '~conformance'.
+80	UNCOVERED	err	duplicate-output-paths-for-entry-point-and-target	slang-diagnostics.lua	multiple output paths have been specified entry point '~entryPoint:Name' on target '~target'
+81	UNCOVERED	err	duplicate-output-paths-for-target	slang-diagnostics.lua	multiple output paths have been specified for target '~target'
+82	UNCOVERED	err	duplicate-dependency-output-paths	slang-diagnostics.lua	the -dep argument can only be specified once
+83	UNCOVERED	err	unable-to-write-repro-file	slang-diagnostics.lua	unable to write repro file '~path'
+86	UNCOVERED	err	unable-to-create-module-container	slang-diagnostics.lua	unable to create module container
+87	UNCOVERED	err	unable-to-set-default-downstream-compiler	slang-diagnostics.lua	unable to set default downstream compiler for source language '~language' to '~compiler'
+89	UNCOVERED	err	expecting-slang-riff-container	slang-diagnostics.lua	expecting a slang riff container
+90	UNCOVERED	err	incompatible-riff-semantic-version	slang-diagnostics.lua	incompatible riff semantic version ~actualVersion expecting ~expectedVersion
+91	UNCOVERED	err	riff-hash-mismatch	slang-diagnostics.lua	riff hash mismatch - incompatible riff
+92	UNCOVERED	err	unable-to-create-directory	slang-diagnostics.lua	unable to create directory '~path'
+93	UNCOVERED	err	unable-to-extract-repro-to-directory	slang-diagnostics.lua	unable to extract repro to directory '~path'
+94	UNCOVERED	err	unable-to-read-riff	slang-diagnostics.lua	unable to read as 'riff'/not a 'riff' file
+95	UNCOVERED	err	unknown-library-kind	slang-diagnostics.lua	unknown library kind '~kind'
+96	UNCOVERED	err	kind-not-linkable	slang-diagnostics.lua	not a known linkable kind '~kind'
+97	UNCOVERED	err	library-does-not-exist	slang-diagnostics.lua	library '~path' does not exist
+98	UNCOVERED	err	cannot-access-as-blob	slang-diagnostics.lua	cannot access as a blob
+100	UNCOVERED	err	failed-to-load-downstream-compiler	slang-diagnostics.lua	failed to load downstream compiler '~compiler'
+101	UNCOVERED	err	downstream-compiler-doesnt-support-whole-program-compilation	slang-diagnostics.lua	downstream compiler '~compiler' doesn't support whole program compilation
+102	UNCOVERED	note	downstream-compile-time	slang-diagnostics.lua	downstream compile time: ~time
+103	UNCOVERED	note	performance-benchmark-result	slang-diagnostics.lua	compiler performance benchmark:\\n~benchmarkOutput
+104	UNCOVERED	err	need-to-enable-experiment-feature	slang-diagnostics.lua	'~module' is an experimental module, need to enable '-experimental-feature' to load this module
+105	UNCOVERED	err	null-component-type	slang-diagnostics.lua	componentTypes[~index:Int] is `nullptr`
+10000	UNCOVERED	error	illegalCharacterHex	slang-lexer-diagnostic-defs.h	illegal character (0x$0)
+10001	UNCOVERED	error	illegalCharacterLiteral	slang-lexer-diagnostic-defs.h	illegal character literal
+10002	UNCOVERED	warning	octalLiteral	slang-lexer-diagnostic-defs.h	'0' prefix indicates octal literal
+10003	UNCOVERED	error	invalidDigitForBase	slang-lexer-diagnostic-defs.h	invalid digit for base-$1 literal: '$0'
+10004	UNCOVERED	error	endOfFileInLiteral	slang-lexer-diagnostic-defs.h	end of file in literal
+10005	UNCOVERED	error	newlineInLiteral	slang-lexer-diagnostic-defs.h	newline in literal
+10010	UNCOVERED	error	quoteCannotBeDelimiter	slang-lexer-diagnostic-defs.h	'\
+10011	UNCOVERED	error	unexpectedEndOfInput	slang-lexer-diagnostic-defs.h	unexpected end of input
+10012	UNCOVERED	error	integerLiteralTooLargeForAnyType	slang-lexer-diagnostic-defs.h	integer literal is too large to be represented in any integer type
+15000	covered	err	end-of-file-in-preprocessor-conditional	slang-diagnostics.lua	end of file encountered during preprocessor conditional
+15001	covered	err	directive-without-if	slang-diagnostics.lua	'~directive' directive without '#if'
+15002	UNCOVERED	err	directive-after-else	slang-diagnostics.lua	'~directive' directive after '#else'
+15100	UNCOVERED	err	expected-preprocessor-directive-name	slang-diagnostics.lua	expected preprocessor directive name
+15101	covered	err	unknown-preprocessor-directive	slang-diagnostics.lua	unknown directive
+15102	UNCOVERED	err	expected-token-in-preprocessor-directive	slang-diagnostics.lua	preprocessor parse error
+15103	UNCOVERED	err	unexpected-tokens-after-directive	slang-diagnostics.lua	unexpected tokens after directive
+15104	UNCOVERED	err	expected-2-tokens-in-preprocessor-directive	slang-diagnostics.lua	preprocessor parse error
+15200	UNCOVERED	err	expected-token-in-preprocessor-expression	slang-diagnostics.lua	preprocessor parse error
+15201	UNCOVERED	err	syntax-error-in-preprocessor-expression	slang-diagnostics.lua	preprocessor parse error
+15202	covered	err	divide-by-zero-in-preprocessor-expression	slang-diagnostics.lua	division by zero
+15203	UNCOVERED	err	expected-token-in-defined-expression	slang-diagnostics.lua	preprocessor parse error
+15204	UNCOVERED	warning	directive-expects-expression	slang-diagnostics.lua	missing expression
+15205	covered	warning	undefined-identifier-in-preprocessor-expression	slang-diagnostics.lua	undefined identifier in preprocessor
+15206	UNCOVERED	err	expected-integral-version-number	slang-diagnostics.lua	expected integer version
+15207	UNCOVERED	err	unknown-language-version	slang-diagnostics.lua	unknown language version
+15208	UNCOVERED	err	unknown-language	slang-diagnostics.lua	unknown language
+15209	UNCOVERED	err	language-version-differs-from-including-module	slang-diagnostics.lua	language version mismatch
+15300	covered	err	include-failed	slang-diagnostics.lua	include file not found
+15301	UNCOVERED	err	import-failed	slang-diagnostics.lua	import file not found
+15302	covered	err	cyclic-include	slang-diagnostics.lua	cyclic include
+15303	UNCOVERED	err	cannot-resolve-imported-decl	slang-diagnostics.lua	cannot resolve imported declaration '~declName' from precompiled module '~moduleName'. Make sure module '~moduleName' is up-to-date. If you suspect this to be a compiler bug, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for assistance
+15304	UNCOVERED	err	no-unique-identity	slang-diagnostics.lua	no unique file identity
+15400	covered	warning	macro-redefinition	slang-diagnostics.lua	macro redefined
+15401	covered	warning	macro-not-defined	slang-diagnostics.lua	undefined macro
+15403	UNCOVERED	err	expected-token-in-macro-parameters	slang-diagnostics.lua	preprocessor parse error
+15404	UNCOVERED	warning	builtin-macro-redefinition	slang-diagnostics.lua	builtin macro redefined
+15405	UNCOVERED	err	token-paste-at-start	slang-diagnostics.lua	invalid '##' position
+15406	UNCOVERED	err	token-paste-at-end	slang-diagnostics.lua	invalid '##' position
+15407	UNCOVERED	err	expected-macro-parameter-after-stringize	slang-diagnostics.lua	invalid '#' usage
+15408	UNCOVERED	err	duplicate-macro-parameter-name	slang-diagnostics.lua	duplicate parameter
+15409	UNCOVERED	err	variadic-macro-parameter-must-be-last	slang-diagnostics.lua	variadic parameter must be last
+15500	UNCOVERED	warning	expected-token-in-macro-arguments	slang-diagnostics.lua	macro invocation syntax error
+15501	UNCOVERED	err	wrong-number-of-arguments-to-macro	slang-diagnostics.lua	wrong macro argument count
+15502	UNCOVERED	err	error-parsing-to-macro-invocation-argument	slang-diagnostics.lua	macro argument parse error
+15503	UNCOVERED	warning	invalid-token-paste-result	slang-diagnostics.lua	token paste failure
+15600	UNCOVERED	err	expected-pragma-directive-name	slang-diagnostics.lua	expected pragma name
+15601	UNCOVERED	warning	unknown-pragma-directive-ignored	slang-diagnostics.lua	unknown pragma ignored
+15602	UNCOVERED	warning	pragma-once-ignored	slang-diagnostics.lua	pragma once ignored
+15611	covered	warning	pragma-warning-pop-empty	slang-diagnostics.lua	unmatched pop
+15612	covered	warning	pragma-warning-push-not-popped	slang-diagnostics.lua	unmatched push
+15613	covered	warning	pragma-warning-unknown-specifier	slang-diagnostics.lua	unknown specifier
+15614	UNCOVERED	warning	pragma-warning-suppress-cannot-identify-next-line	slang-diagnostics.lua	cannot identify suppress target
+15615	UNCOVERED	warning	pragma-warning-cannot-insert-here	slang-diagnostics.lua	cannot insert pragma here
+15616	UNCOVERED	note	pragma-warning-point-suppress	slang-diagnostics.lua	#pragma warning for id '~id' was suppressed here
+15900	covered	err	user-defined-error	slang-diagnostics.lua	preprocessor error
+15901	covered	warning	user-defined-warning	slang-diagnostics.lua	preprocessor warning
+20000	UNCOVERED	error	unexpectedCharacter	slang-json-diagnostic-defs.h	unexpected character '$0'
+20001	covered	error	endOfFileInLiteral	slang-json-diagnostic-defs.h	end of file in literal
+20002	UNCOVERED	error	newlineInLiteral	slang-json-diagnostic-defs.h	newline in literal
+20003	UNCOVERED	error	endOfFileInComment	slang-json-diagnostic-defs.h	end of file in comment
+20004	UNCOVERED	error	expectingAHexDigit	slang-json-diagnostic-defs.h	expecting a hex digit
+20005	UNCOVERED	error	expectingADigit	slang-json-diagnostic-defs.h	expecting a digit
+20006	UNCOVERED	error	expectingValueName	slang-json-diagnostic-defs.h	expecting value name [null, true, false]
+20007	UNCOVERED	error	unexpectedTokenExpectedTokenType	slang-json-diagnostic-defs.h	unexpected '$0', expected '$1'
+20008	UNCOVERED	error	unexpectedToken	slang-json-diagnostic-defs.h	unexpected '$0'
+20009	UNCOVERED	error	unableToConvertField	slang-json-diagnostic-defs.h	unable to convert field '$0' in type '$1'
+20010	UNCOVERED	error	fieldNotFound	slang-json-diagnostic-defs.h	field '$0' not found in type '$1'
+20011	UNCOVERED	error	fieldRequiredOnType	slang-json-diagnostic-defs.h	field '$0' required on '$1'
+20012	UNCOVERED	error	tooManyElementsForArray	slang-json-diagnostic-defs.h	too many elements ($0) for array array. Max allowed is $1
+20013	UNCOVERED	err	invalid-cuda-sm-version	slang-diagnostics.lua	invalid CUDA SM version
+20014	UNCOVERED	err	type-name-expected-but-eof	slang-diagnostics.lua	expected type name
+20015	UNCOVERED	err	unexpected-eof	slang-diagnostics.lua	unexpected end of file
+20016	UNCOVERED	err	missing-layout-binding-modifier	slang-diagnostics.lua	missing 'binding' modifier
+20017	UNCOVERED	err	const-not-allowed-on-c-style-ptr-decl	slang-diagnostics.lua	'const' not allowed on C-style pointer declaration
+20018	UNCOVERED	err	const-not-allowed-on-type	slang-diagnostics.lua	invalid 'const' usage
+20019	UNCOVERED	err	volatile-not-allowed-on-type	slang-diagnostics.lua	invalid 'volatile' usage
+20101	UNCOVERED	warning	unintended-empty-statement	slang-diagnostics.lua	potentially unintended empty statement
+20102	UNCOVERED	err	unexpected-body-after-semicolon	slang-diagnostics.lua	unexpected function body after semicolon
+29000	UNCOVERED	err	snippet-parsing-failed	slang-diagnostics.lua	snippet parsing failed
+29100	UNCOVERED	err	unrecognized-spirv-opcode	slang-diagnostics.lua	unrecognized SPIR-V opcode
+29101	UNCOVERED	err	misplaced-result-id-marker	slang-diagnostics.lua	misplaced result-id marker
+29102	UNCOVERED	note	consider-op-copy-object	slang-diagnostics.lua	consider adding an OpCopyObject instruction to the end of the spirv_asm expression
+29103	UNCOVERED	note	no-such-address	slang-diagnostics.lua	unable to take the address of this address-of asm operand
+29104	UNCOVERED	error	spirvCoreGrammarJSONParseFailure	slang-misc-diagnostic-defs.h	unexpected JSON in spirv core grammar file: $0
+29105	UNCOVERED	err	spirv-instruction-without-result-type-id	slang-diagnostics.lua	instruction has no result-type-id operand
+29106	UNCOVERED	warning	spirv-instruction-with-too-many-operands	slang-diagnostics.lua	too many operands
+29107	UNCOVERED	err	spirv-unable-to-resolve-name	slang-diagnostics.lua	unknown SPIR-V identifier
+29108	UNCOVERED	err	spirv-non-constant-bitwise-or	slang-diagnostics.lua	invalid bitwise or operand
+29109	UNCOVERED	err	spirv-operand-range	slang-diagnostics.lua	literal integer out of range
+29110	UNCOVERED	err	unknown-target-name	slang-diagnostics.lua	unknown target name
+29111	UNCOVERED	err	spirv-invalid-truncate	slang-diagnostics.lua	invalid truncate operation
+29112	UNCOVERED	err	spirv-instruction-with-not-enough-operands	slang-diagnostics.lua	not enough operands
+29113	UNCOVERED	err	spirv-id-redefinition	slang-diagnostics.lua	SPIR-V id redefinition
+29114	UNCOVERED	err	spirv-undefined-id	slang-diagnostics.lua	undefined SPIR-V id
+29115	UNCOVERED	err	target-switch-case-cannot-be-a-stage	slang-diagnostics.lua	cannot use stage name in __target_switch
+29116	UNCOVERED	warning	spirv-layout-sensitive-type-in-asm	slang-diagnostics.lua	layout-sensitive SPIR-V type declaration in spirv_asm
+30000	UNCOVERED	error	argsAreInvalid	slang-json-diagnostic-defs.h	Args for '%0' are invalid
+30002	covered	err	divide-by-zero	slang-diagnostics.lua	divide by zero
+30003	covered	err	break-outside-loop	slang-diagnostics.lua	'break' must appear inside loop or switch constructs
+30004	covered	err	continue-outside-loop	slang-diagnostics.lua	'continue' must appear inside loop constructs
+30006	covered	err	return-needs-expression	slang-diagnostics.lua	'return' should have an expression
+30009	covered	err	invalid-type-void	slang-diagnostics.lua	invalid type 'void'
+30011	covered	err	assign-non-lvalue	slang-diagnostics.lua	left of '=' is not an l-value
+30013	covered	err	subscript-non-array	slang-diagnostics.lua	invalid subscript expression
+30015	covered	err	undefined-identifier	slang-diagnostics.lua	undefined identifier
+30016	covered	err	call-operator-not-found	slang-diagnostics.lua	no call operation found for type
+30019	covered	err	type-mismatch	slang-diagnostics.lua	type mismatch in expression
+30020	UNCOVERED	err	expected-array-expression	slang-diagnostics.lua	expected an array expression
+30021	UNCOVERED	note	this-type-mismatch-after-erasure	slang-diagnostics.lua	the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead
+30024	UNCOVERED	err	cannot-convert-array-of-smaller-to-larger-size	slang-diagnostics.lua	array size mismatch prevents conversion
+30025	covered	err	invalid-array-size	slang-diagnostics.lua	array size must be non-negative
+30027	covered	err	no-member-of-name-in-type	slang-diagnostics.lua	member not found
+30028	UNCOVERED	err	disallowed-array-of-non-addressable-type	slang-diagnostics.lua	arrays of non-addressable type not allowed
+30029	covered	err	array-index-out-of-bounds	slang-diagnostics.lua	array index out of bounds
+30030	UNCOVERED	err	reference-type-as-struct-field	slang-diagnostics.lua	reference type cannot be used as struct field
+30031	UNCOVERED	err	non-addressable-type-in-structured-buffer	slang-diagnostics.lua	non-addressable type cannot be used in StructuredBuffer
+30047	covered	err	argument-expected-lvalue	slang-diagnostics.lua	argument must be l-value
+30048	UNCOVERED	err	argument-has-more-memory-qualifiers-than-param	slang-diagnostics.lua	memory qualifier mismatch
+30049	UNCOVERED	note	attempting-to-assign-to-const-variable	slang-diagnostics.lua	attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+30050	covered	err	mutating-method-on-immutable-value	slang-diagnostics.lua	mutating method cannot be called on immutable value
+30052	UNCOVERED	err	invalid-swizzle-expr	slang-diagnostics.lua	invalid swizzle expression
+30053	UNCOVERED	err	break-label-not-found	slang-diagnostics.lua	break label not found
+30054	UNCOVERED	err	target-label-does-not-mark-breakable-stmt	slang-diagnostics.lua	invalid break target
+30055	UNCOVERED	err	use-of-non-short-circuiting-operator-in-diff-func	slang-diagnostics.lua	non-short-circuiting `?:` not allowed in differentiable function
+30056	covered	warning	use-of-non-short-circuiting-operator	slang-diagnostics.lua	non-short-circuiting `?:` is deprecated
+30057	covered	err	assignment-in-predicate-expr	slang-diagnostics.lua	assignment in predicate expression not allowed
+30058	UNCOVERED	warning	dangling-equality-expr	slang-diagnostics.lua	result of '==' not used
+30060	covered	err	expected-a-type	slang-diagnostics.lua	expected a type
+30061	UNCOVERED	err	expected-a-namespace	slang-diagnostics.lua	expected a namespace
+30062	UNCOVERED	note	implicit-cast-used-as-lvalue-ref	slang-diagnostics.lua	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value with a reference
+30063	UNCOVERED	note	implicit-cast-used-as-lvalue-type	slang-diagnostics.lua	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value with this type
+30064	UNCOVERED	note	implicit-cast-used-as-lvalue	slang-diagnostics.lua	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value for this usage
+30065	covered	err	new-can-only-be-used-to-initialize-a-class	slang-diagnostics.lua	`new` can only be used to initialize a class
+30066	covered	err	class-can-only-be-initialized-with-new	slang-diagnostics.lua	class can only be initialized by `new`
+30067	UNCOVERED	err	mutating-method-on-function-input-parameter-error	slang-diagnostics.lua	mutating method called on `in` parameter
+30068	UNCOVERED	warning	mutating-method-on-function-input-parameter-warning	slang-diagnostics.lua	mutating method called on `in` parameter
+30070	covered	err	unsized-member-must-appear-last	slang-diagnostics.lua	unsized member must be last
+30071	UNCOVERED	err	var-cannot-be-unsized	slang-diagnostics.lua	cannot instantiate unsized type
+30072	UNCOVERED	err	param-cannot-be-unsized	slang-diagnostics.lua	function parameter cannot be unsized
+30075	UNCOVERED	err	cannot-specialize-generic	slang-diagnostics.lua	cannot specialize generic
+30076	covered	err	global-var-cannot-have-opaque-type	slang-diagnostics.lua	global variable cannot have opaque type
+30077	UNCOVERED	err	concrete-argument-to-output-interface	slang-diagnostics.lua	concrete type passed to interface-typed output parameter
+30078	UNCOVERED	err	coherent-keyword-on-a-pointer	slang-diagnostics.lua	cannot have coherent qualifier on pointer
+30079	UNCOVERED	err	cannot-take-constant-pointers	slang-diagnostics.lua	cannot take address of immutable object
+30080	UNCOVERED	err	ambiguous-conversion	slang-diagnostics.lua	ambiguous conversion
+30081	UNCOVERED	warning	unrecommended-implicit-conversion	slang-diagnostics.lua	implicit conversion not recommended
+30082	UNCOVERED	warning	implicit-conversion-to-double	slang-diagnostics.lua	implicit float-to-double conversion
+30083	UNCOVERED	err	count-of-argument-is-invalid	slang-diagnostics.lua	invalid countof argument
+30084	UNCOVERED	err	float-bit-cast-type-mismatch	slang-diagnostics.lua	bit cast type mismatch
+30085	UNCOVERED	err	float-bit-cast-requires-constant	slang-diagnostics.lua	bit cast requires constant
+30086	UNCOVERED	err	size-of-data-layout-is-invalid	slang-diagnostics.lua	invalid data layout for sizeof/alignof
+30090	covered	err	try-clause-must-apply-to-invoke-expr	slang-diagnostics.lua	expression in 'try' must be a call
+30091	UNCOVERED	err	try-invoke-callee-should-throw	slang-diagnostics.lua	callee in 'try' does not throw
+30092	UNCOVERED	err	callee-of-try-call-must-be-func	slang-diagnostics.lua	callee in 'try' must be a function
+30093	covered	err	uncaught-try-call-in-non-throw-func	slang-diagnostics.lua	uncaught 'try' in non-throwing function
+30094	UNCOVERED	err	must-use-try-clause-to-call-a-throw-func	slang-diagnostics.lua	callee may throw, use 'try'
+30095	UNCOVERED	err	error-type-of-callee-incompatible-with-caller	slang-diagnostics.lua	incompatible error types
+30096	UNCOVERED	err	differential-type-should-serve-as-its-own-differential-type	slang-diagnostics.lua	invalid differential type
+30097	UNCOVERED	err	function-not-marked-as-differentiable	slang-diagnostics.lua	function not differentiable
+30098	UNCOVERED	err	non-static-member-function-not-allowed-as-diff-operand	slang-diagnostics.lua	non-static function reference not allowed
+30099	UNCOVERED	err	size-of-argument-is-invalid	slang-diagnostics.lua	invalid sizeof argument
+30100	UNCOVERED	err	static-ref-to-non-static-member	slang-diagnostics.lua	type cannot refer to non-static member
+30101	UNCOVERED	err	cannot-dereference-type	slang-diagnostics.lua	cannot dereference type
+30102	UNCOVERED	err	decl-not-allowed	slang-diagnostics.lua	declaration not allowed here
+30103	UNCOVERED	err	expect-type-pack-after-each	slang-diagnostics.lua	expected type pack after 'each'
+30104	UNCOVERED	err	each-expr-must-be-inside-expand-expr	slang-diagnostics.lua	'each' must be inside 'expand'
+30105	UNCOVERED	err	expand-term-captures-no-type-packs	slang-diagnostics.lua	'expand' captures no type packs
+30106	UNCOVERED	err	improper-use-of-type	slang-diagnostics.lua	type cannot be used in this context
+30107	UNCOVERED	err	parameter-pack-must-be-const	slang-diagnostics.lua	parameter pack must be 'const'
+30108	covered	err	break-inside-defer	slang-diagnostics.lua	'break' inside defer
+30109	covered	err	continue-inside-defer	slang-diagnostics.lua	'continue' inside defer
+30110	covered	err	return-inside-defer	slang-diagnostics.lua	'return' inside defer
+30111	UNCOVERED	err	return-type-mismatch-inside-lambda	slang-diagnostics.lua	lambda return type mismatch
+30112	UNCOVERED	err	non-copyable-type-captured-in-lambda	slang-diagnostics.lua	non-copyable type captured
+30113	UNCOVERED	err	uncaught-throw-inside-defer	slang-diagnostics.lua	'throw' requires 'catch' inside defer
+30114	UNCOVERED	err	uncaught-try-inside-defer	slang-diagnostics.lua	'try' requires 'catch' inside defer
+30115	UNCOVERED	err	uncaught-throw-in-non-throw-func	slang-diagnostics.lua	uncaught 'throw' in non-throwing function
+30116	UNCOVERED	err	throw-type-incompatible-with-error-type	slang-diagnostics.lua	throw type incompatible with error type
+30117	UNCOVERED	err	forward-reference-in-generic-constraint	slang-diagnostics.lua	forward reference in generic constraint
+30118	UNCOVERED	err	cannot-mix-differentiable-value-and-ptr-outputs	slang-diagnostics.lua	cannot mix differentiable value types with differentiable pointer outputs
+30119	UNCOVERED	err	reading-from-write-only	slang-diagnostics.lua	cannot read from writeonly
+30120	UNCOVERED	err	static-ref-to-this	slang-diagnostics.lua	static function cannot refer to non-static member via `this`
+30121	UNCOVERED	err	differentiable-member-should-have-corresponding-field-in-diff-type	slang-diagnostics.lua	missing field in differential type
+30122	UNCOVERED	err	forward-reference-in-generic-default-initializer	slang-diagnostics.lua	forward reference in generic default initializer
+30123	UNCOVERED	warning	cannot-synthesize-dadd-dzero-for-custom-differential	slang-diagnostics.lua	cannot synthesize complete differential method
+30200	covered	err	redeclaration	slang-diagnostics.lua	conflicting declaration
+30201	covered	err	function-redefinition	slang-diagnostics.lua	function '~function' already has a body
+30202	covered	err	function-redeclaration-with-different-return-type	slang-diagnostics.lua	function return type mismatch
+30300	UNCOVERED	err	is-operator-value-must-be-interface-type	slang-diagnostics.lua	'is'/'as' operator requires interface-typed expression
+30301	UNCOVERED	err	is-operator-cannot-use-interface-as-rhs	slang-diagnostics.lua	cannot use 'is' with interface on right-hand side
+30302	UNCOVERED	err	as-operator-cannot-use-interface-as-rhs	slang-diagnostics.lua	cannot use 'as' with interface on right-hand side
+30303	UNCOVERED	err	value-requirement-must-be-compile-time-const	slang-diagnostics.lua	value requirement requires static const
+30304	UNCOVERED	err	is-as-on-unrelated-concrete-types	slang-diagnostics.lua	'is'/'as' on unrelated concrete types
+30305	UNCOVERED	err	global-gen-param-in-global-scope-only	slang-diagnostics.lua	type_param outside global scope
+30306	UNCOVERED	err	static-const-requirement-must-be-int-or-bool	slang-diagnostics.lua	invalid static const requirement type
+30310	UNCOVERED	err	type-is-not-differentiable	slang-diagnostics.lua	type is not differentiable
+30311	UNCOVERED	err	type-cannot-conform-to-both-value-and-pointer-diff-interfaces	slang-diagnostics.lua	type cannot conform to both value and pointer differentiation interfaces
+30312	UNCOVERED	err	interface-requirement-cannot-be-override	slang-diagnostics.lua	interface requirement cannot override
+30313	UNCOVERED	err	treat-as-differentiable-on-interface-requirement	slang-diagnostics.lua	[TreatAsDifferentiable] cannot be applied to interface requirement
+30314	UNCOVERED	err	maybe-differentiable-on-non-interface-requirement	slang-diagnostics.lua	[MaybeDifferentiable] cannot be applied to non-interface requirement
+30315	UNCOVERED	err	optional-has-diff-type-info-constraint-is-invalid	slang-diagnostics.lua	optional __hasDiffTypeInfo constraint invalid
+30316	UNCOVERED	err	type-does-not-have-diff-type-info	slang-diagnostics.lua	type does not have diff type info
+30317	UNCOVERED	err	non-method-interface-requirement-cannot-have-body	slang-diagnostics.lua	interface requirement has body
+30400	UNCOVERED	err	cannot-define-ptr-type-to-managed-resource	slang-diagnostics.lua	pointer to managed resource invalid
+30401	covered	err	invalid-type-for-constraint	slang-diagnostics.lua	type '~type:Type' cannot be used as a constraint
+30402	UNCOVERED	err	invalid-constraint-sub-type	slang-diagnostics.lua	type '~type:Type' is not a valid left hand side of a type constraint
+30403	UNCOVERED	err	required-constraint-is-not-checked	slang-diagnostics.lua	the constraint providing '~decl:Decl' is optional and must be checked with an 'is' statement before usage
+30404	UNCOVERED	err	invalid-equality-constraint-sup-type	slang-diagnostics.lua	type '~type:Type' is not a proper type to use in a generic equality constraint
+30405	UNCOVERED	err	no-valid-equality-constraint-sub-type	slang-diagnostics.lua	generic equality constraint requires at least one operand to be dependant on the generic declaration
+30406	UNCOVERED	note	invalid-equality-constraint-sub-type	slang-diagnostics.lua	type '~type:Type' cannot be constrained by a type equality
+30407	UNCOVERED	warning	failed-equality-constraint-canonical-order	slang-diagnostics.lua	failed to resolve canonical order of generic equality constraint
+30408	covered	err	generic-type-needs-args	slang-diagnostics.lua	generic type '~type:Type' used without argument
+30410	UNCOVERED	err	pack-query-argument-is-invalid	slang-diagnostics.lua	invalid ~queryName argument
+30411	UNCOVERED	err	empty-pack-query-is-invalid	slang-diagnostics.lua	cannot apply ~queryName to an empty pack
+30412	UNCOVERED	err	pack-query-requires-non-empty-pack	slang-diagnostics.lua	cannot apply ~queryName to a pack that may be empty
+30413	UNCOVERED	err	invalid-non-empty-pack-constraint-target	slang-diagnostics.lua	`nonempty(...)` requires a generic type pack or value pack parameter
+30414	UNCOVERED	err	empty-pack-does-not-satisfy-non-empty-constraint	slang-diagnostics.lua	empty pack does not satisfy `nonempty(...)` constraint
+30415	UNCOVERED	err	optional-non-empty-pack-constraint-is-invalid	slang-diagnostics.lua	`optional nonempty(...)` is not meaningful
+30416	UNCOVERED	err	non-empty-pack-constraint-target-must-be-from-current-generic	slang-diagnostics.lua	`nonempty(...)` target must be a generic pack parameter declared in the current generic
+30417	UNCOVERED	err	shape-pack-argument-is-invalid	slang-diagnostics.lua	invalid ~opName argument
+30418	UNCOVERED	err	shape-pack-rank-mismatch	slang-diagnostics.lua	~opName requires packs of the same rank
+30419	UNCOVERED	err	shape-pack-axis-out-of-range	slang-diagnostics.lua	~opName axis is out of range
+30420	UNCOVERED	err	shape-concat-non-axis-mismatch	slang-diagnostics.lua	__shapeConcat requires non-axis dimensions to match
+30421	UNCOVERED	err	shape-permute-order-length-mismatch	slang-diagnostics.lua	__shapePermute requires an order pack with matching rank
+30422	UNCOVERED	err	shape-permute-index-out-of-range	slang-diagnostics.lua	__shapePermute index is out of range
+30423	UNCOVERED	err	shape-permute-duplicate-index	slang-diagnostics.lua	__shapePermute order contains a duplicate index
+30424	UNCOVERED	err	shape-pack-no-valid-axis	slang-diagnostics.lua	~opName has no valid axis
+30425	UNCOVERED	err	shape-concat-no-valid-axis	slang-diagnostics.lua	__shapeConcat has no valid axis
+30426	UNCOVERED	err	shape-permute-duplicate-equivalent-index	slang-diagnostics.lua	__shapePermute order contains a duplicate index
+30499	UNCOVERED	note	use-let-for-generic-value-param	slang-diagnostics.lua	use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'
+30500	UNCOVERED	err	included-file-missing-implementing	slang-diagnostics.lua	missing 'implementing' declaration
+30501	UNCOVERED	err	included-file-missing-implementing-do-you-mean-import	slang-diagnostics.lua	missing 'implementing' declaration
+30502	UNCOVERED	err	included-file-does-not-implement-current-module	slang-diagnostics.lua	module name mismatch in included file
+30503	UNCOVERED	err	primary-module-file-cannot-start-with-implementing-decl	slang-diagnostics.lua	primary module file cannot start with 'implementing'
+30504	UNCOVERED	warning	primary-module-file-must-start-with-module-decl	slang-diagnostics.lua	primary module file should start with 'module'
+30505	UNCOVERED	err	implementing-must-reference-primary-module-file	slang-diagnostics.lua	'implementing' must reference primary module file
+30506	UNCOVERED	warning	module-implementation-has-file-extension	slang-diagnostics.lua	file extension in module name
+30507	UNCOVERED	warning	for-loop-side-effect-changing-different-var	slang-diagnostics.lua	for loop modifies wrong variable
+30508	UNCOVERED	warning	for-loop-predicate-checking-different-var	slang-diagnostics.lua	for loop predicate checks wrong variable
+30509	UNCOVERED	note	use-let-each-for-generic-value-pack-param	slang-diagnostics.lua	use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'
+30510	UNCOVERED	err	loop-in-diff-func-require-unroll-or-max-iters	slang-diagnostics.lua	loop in differentiable function needs attributes
+30511	UNCOVERED	warning	for-loop-changing-iteration-variable-in-oppsoite-direction	slang-diagnostics.lua	for loop modifies variable in wrong direction
+30512	UNCOVERED	warning	for-loop-not-modifying-iteration-variable	slang-diagnostics.lua	for loop step is zero
+30513	UNCOVERED	err	cannot-use-initializer-list-for-type	slang-diagnostics.lua	cannot use initializer list for type '~type:Type'
+30514	covered	warning	loop-runs-for-zero-iterations	slang-diagnostics.lua	loop runs zero times
+30515	UNCOVERED	warning	generic-param-shadows-outer-generic	slang-diagnostics.lua	generic parameter '~param:Decl' shadows a generic parameter from an enclosing scope
+30516	UNCOVERED	note	initializer-list-member-visibility-mismatch	slang-diagnostics.lua	member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list
+30517	UNCOVERED	err	cannot-use-initializer-list-for-vector-of-unknown-size	slang-diagnostics.lua	cannot use initializer list for vector of statically unknown size '~elementCount:Val'
+30518	UNCOVERED	err	cannot-use-initializer-list-for-matrix-of-unknown-size	slang-diagnostics.lua	cannot use initializer list for matrix of statically unknown size '~rowCount:Val' rows
+30519	UNCOVERED	warning	for-loop-terminates-in-fewer-iterations-than-max-iters	slang-diagnostics.lua	MaxIters exceeds actual iterations
+30520	UNCOVERED	err	cannot-use-initializer-list-for-coop-vector-of-unknown-size	slang-diagnostics.lua	cannot use initializer list for CoopVector of statically unknown size '~elementCount:Val'
+30521	UNCOVERED	warning	interface-default-initializer	slang-diagnostics.lua	initializing an interface variable with defaults is deprecated and may cause unexpected behavior
+30522	covered	err	pack-param-must-be-last	slang-diagnostics.lua	generic parameter after a variadic pack parameter is not allowed
+30523	covered	err	too-many-initializers	slang-diagnostics.lua	too many initializers in initializer list
+30524	UNCOVERED	err	interface-default-initializer-error	slang-diagnostics.lua	cannot initialize an interface variable with defaults
+30600	covered	err	decl-is-not-visible	slang-diagnostics.lua	declaration not accessible
+30601	covered	err	decl-cannot-have-higher-visibility	slang-diagnostics.lua	visibility higher than parent
+30602	covered	err	switch-multiple-default	slang-diagnostics.lua	multiple default cases in switch
+30603	covered	err	invalid-use-of-private-visibility	slang-diagnostics.lua	invalid private visibility
+30604	covered	err	use-of-less-visible-type	slang-diagnostics.lua	references less visible type
+30605	covered	err	switch-duplicate-cases	slang-diagnostics.lua	duplicate cases in switch
+30620	UNCOVERED	err	var-without-type-must-have-initializer	slang-diagnostics.lua	a variable declaration without an initial-value expression must be given an explicit type
+30621	UNCOVERED	err	param-without-type-must-have-initializer	slang-diagnostics.lua	a parameter declaration without an initial-value expression must be given an explicit type
+30622	UNCOVERED	err	ambiguous-default-initializer-for-type	slang-diagnostics.lua	more than one default initializer was found for type '~type:Type'
+30623	UNCOVERED	err	cannot-have-initializer	slang-diagnostics.lua	'~decl:Decl' cannot have an initializer because it is ~reason
+30624	covered	err	generic-value-parameter-type-not-supported	slang-diagnostics.lua	generic value parameter type '~type:Type' is not supported; only integer and enum types are allowed
+30625	UNCOVERED	err	generic-value-parameter-must-have-type	slang-diagnostics.lua	a generic value parameter must be given an explicit type
+30700	UNCOVERED	err	output-parameter-cannot-have-default-value	slang-diagnostics.lua	an 'out' or 'inout' parameter cannot have a default-value expression
+30701	UNCOVERED	err	system-value-semantic-invalid-type	slang-diagnostics.lua	type '~type:Type' is not valid for system value semantic '~semantic'; expected '~expectedTypes'
+30702	UNCOVERED	err	system-value-semantic-invalid-direction	slang-diagnostics.lua	system value semantic '~semantic' cannot be used as ~direction in '~stage' shader stage
+30703	UNCOVERED	err	per-primitive-semantic-in-vertex-output	slang-diagnostics.lua	per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output
+30704	UNCOVERED	err	parameter-without-default-after-parameter-with-default	slang-diagnostics.lua	parameter '~param:Decl' does not have a default value, but follows a parameter that does
+30810	UNCOVERED	err	base-of-interface-must-be-interface	slang-diagnostics.lua	interface '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'
+30811	UNCOVERED	err	base-of-struct-must-be-interface	slang-diagnostics.lua	struct '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'
+30812	UNCOVERED	err	base-of-enum-must-be-integer-or-interface	slang-diagnostics.lua	enum '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither an interface not a builtin integer type
+30813	UNCOVERED	err	base-of-extension-must-be-interface	slang-diagnostics.lua	extension cannot inherit from non-interface type '~baseType:Type'
+30814	UNCOVERED	err	base-of-class-must-be-class-or-interface	slang-diagnostics.lua	class '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither a class nor an interface
+30815	UNCOVERED	err	circularity-in-extension	slang-diagnostics.lua	circular extension is not allowed
+30816	UNCOVERED	warning	inheritance-unstable	slang-diagnostics.lua	support for inheritance is unstable and will be removed in future language versions, consider using composition instead
+30820	UNCOVERED	err	base-struct-must-be-listed-first	slang-diagnostics.lua	a struct type may only inherit from one other struct type, and that type must appear first in the list of bases
+30821	UNCOVERED	err	tag-type-must-be-listed-first	slang-diagnostics.lua	an enum type may only have a single tag type, and that type must be listed first in the list of bases
+30822	UNCOVERED	err	base-class-must-be-listed-first	slang-diagnostics.lua	a class type may only inherit from one other class type, and that type must appear first in the list of bases
+30830	UNCOVERED	err	cannot-inherit-from-explicitly-sealed-declaration-in-another-module	slang-diagnostics.lua	cannot inherit from type '~baseType:Type' marked 'sealed' in module '~moduleName:Name'
+30831	UNCOVERED	err	cannot-inherit-from-implicitly-sealed-declaration-in-another-module	slang-diagnostics.lua	cannot inherit from type '~baseType:Type' in module '~moduleName:Name' because it is implicitly 'sealed'
+30832	UNCOVERED	err	invalid-type-for-inheritance	slang-diagnostics.lua	type '~type:Type' cannot be used for inheritance
+30850	UNCOVERED	err	invalid-extension-on-type	slang-diagnostics.lua	type '~type:Type' cannot be extended
+30851	UNCOVERED	err	invalid-member-type-in-extension	slang-diagnostics.lua	~nodeType cannot be a part of an `extension`
+30852	covered	err	invalid-extension-on-interface	slang-diagnostics.lua	cannot extend interface type '~type:Type'
+30853	covered	err	missing-override	slang-diagnostics.lua	missing 'override' keyword for methods that overrides the default implementation in the interface
+30854	UNCOVERED	err	override-modifier-not-overriding-base-decl	slang-diagnostics.lua	'~decl:Decl' marked as 'override' is not overriding any base declarations
+30855	UNCOVERED	err	unreferenced-generic-param-in-extension	slang-diagnostics.lua	generic parameter '~paramName:Name' is not referenced by extension target type '~targetType:Type'
+30856	UNCOVERED	warning	generic-param-in-extension-not-referenced-by-target-type	slang-diagnostics.lua	the extension is non-standard and may not work as intended because the generic parameter '~paramName:Name' is not referenced by extension target type '~targetType:Type'
+30900	UNCOVERED	err	multi-dimensional-array-not-supported	slang-diagnostics.lua	multi-dimensional array is not supported
+30901	UNCOVERED	err	subscript-must-have-return-type	slang-diagnostics.lua	__subscript declaration must have a return type specified after '->'
+30902	UNCOVERED	err	optional-cannot-wrap-resource-type	slang-diagnostics.lua	'Optional<T>' cannot wrap a resource or opaque type
+31000	UNCOVERED	warning	unknown-attribute-name	slang-diagnostics.lua	unknown attribute
+31001	covered	err	attribute-argument-count-mismatch	slang-diagnostics.lua	wrong number of attribute arguments
+31002	covered	err	attribute-not-applicable	slang-diagnostics.lua	invalid attribute placement
+31003	UNCOVERED	err	badly-defined-patch-constant-func	slang-diagnostics.lua	invalid 'patchconstantfunc' attribute
+31004	UNCOVERED	err	expected-single-int-arg	slang-diagnostics.lua	expected single int argument
+31005	UNCOVERED	err	expected-single-string-arg	slang-diagnostics.lua	expected single string argument
+31006	UNCOVERED	err	attribute-function-not-found	slang-diagnostics.lua	function not found for attribute
+31007	UNCOVERED	err	attribute-expected-int-arg	slang-diagnostics.lua	expected int argument
+31008	UNCOVERED	err	attribute-expected-string-arg	slang-diagnostics.lua	expected string argument
+31009	UNCOVERED	err	expected-single-float-arg	slang-diagnostics.lua	expected single float argument
+31010	UNCOVERED	warning	link-time-constant-array-size	slang-diagnostics.lua	Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+31100	UNCOVERED	err	unknown-stage-name	slang-diagnostics.lua	unknown stage name
+31101	UNCOVERED	err	unknown-image-format-name	slang-diagnostics.lua	unknown image format
+31102	covered	err	non-positive-num-threads	slang-diagnostics.lua	invalid 'numthreads' value
+31103	covered	err	invalid-wave-size	slang-diagnostics.lua	invalid 'WaveSize' value
+31104	UNCOVERED	warning	explicit-uniform-location	slang-diagnostics.lua	explicit binding of uniform discouraged
+31105	UNCOVERED	warning	image-format-unsupported-by-backend	slang-diagnostics.lua	Image format '~format' is not explicitly supported by the ~backend backend, using supported format '~replacement' instead.
+31106	UNCOVERED	warning	special-type-leaks-from-parameter-group	slang-diagnostics.lua	Parameter group type includes some members with types which cannot be included in the same binding. These types will be moved into another parameter binding slot.
+31107	UNCOVERED	warning	special-type-member-leaks-from-parameter-group	slang-diagnostics.lua	This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.
+31108	UNCOVERED	err	set-accessor-may-not-have-more-than-one-param	slang-diagnostics.lua	a 'set' accessor may not have more than one parameter
+31109	UNCOVERED	err	set-accessor-param-wrong-type	slang-diagnostics.lua	'set' parameter type mismatch
+31110	UNCOVERED	err	accessor-does-not-satisfy-type-constraint-requirements	slang-diagnostics.lua	accessor does not satisfy type constraint requirements
+31111	UNCOVERED	err	unknown-diagnostic-name	slang-diagnostics.lua	unknown diagnostic
+31112	UNCOVERED	err	non-set-accessor-must-not-have-params	slang-diagnostics.lua	accessors other than 'set' must not have parameters
+31120	UNCOVERED	err	invalid-attribute-target	slang-diagnostics.lua	invalid syntax target for user defined attribute
+31121	UNCOVERED	err	any-value-size-exceeds-limit	slang-diagnostics.lua	'anyValueSize' exceeds limit
+31122	UNCOVERED	err	associated-type-not-allowed-in-com-interface	slang-diagnostics.lua	associatedtype not allowed in [COM] interface
+31123	UNCOVERED	err	invalid-guid	slang-diagnostics.lua	invalid GUID
+31124	UNCOVERED	err	struct-cannot-implement-com-interface	slang-diagnostics.lua	struct types cannot implement COM interfaces
+31125	UNCOVERED	err	attribute-usage-attribute-must-be-on-non-generic-struct	slang-diagnostics.lua	[__AttributeUsage] requires non-generic struct
+31126	UNCOVERED	err	interface-inheriting-com-must-be-com	slang-diagnostics.lua	non-COM interface inheriting from COM interface
+31130	UNCOVERED	err	derivative-member-attribute-must-name-a-member-in-expected-differential-type	slang-diagnostics.lua	invalid DerivativeMember target
+31131	UNCOVERED	err	invalid-use-of-derivative-member-attribute-parent-type-is-not-differentiable	slang-diagnostics.lua	DerivativeMember on non-differentiable type
+31132	UNCOVERED	err	derivative-member-attribute-can-only-be-used-on-members	slang-diagnostics.lua	DerivativeMember on non-member
+31140	UNCOVERED	err	type-of-extern-decl-mismatches-original-definition	slang-diagnostics.lua	extern decl type mismatch
+31141	UNCOVERED	err	definition-of-extern-decl-mismatches-original-definition	slang-diagnostics.lua	extern decl definition mismatch
+31142	UNCOVERED	err	ambiguous-original-defintion-of-extern-decl	slang-diagnostics.lua	ambiguous extern decl target
+31143	UNCOVERED	err	missing-original-defintion-of-extern-decl	slang-diagnostics.lua	no original definition for extern decl
+31146	UNCOVERED	err	decl-already-has-attribute	slang-diagnostics.lua	duplicate attribute
+31147	UNCOVERED	err	cannot-resolve-original-function-for-derivative	slang-diagnostics.lua	cannot resolve original function for derivative
+31148	UNCOVERED	err	cannot-resolve-derivative-function	slang-diagnostics.lua	cannot resolve derivative function
+31149	UNCOVERED	err	custom-derivative-signature-mismatch-at-position	slang-diagnostics.lua	custom derivative parameter type mismatch
+31150	UNCOVERED	err	custom-derivative-signature-mismatch	slang-diagnostics.lua	custom derivative signature mismatch
+31151	UNCOVERED	err	cannot-resolve-generic-argument-for-derivative-function	slang-diagnostics.lua	cannot deduce generic arguments for derivative
+31152	UNCOVERED	err	cannot-associate-interface-requirement-with-derivative	slang-diagnostics.lua	interface requirement cannot have derivative
+31153	UNCOVERED	err	cannot-use-interface-requirement-as-derivative	slang-diagnostics.lua	interface requirement cannot be used as derivative
+31154	UNCOVERED	err	custom-derivative-signature-this-param-mismatch	slang-diagnostics.lua	custom derivative 'this' type mismatch
+31156	UNCOVERED	err	custom-derivative-expected-static	slang-diagnostics.lua	expected static custom derivative
+31157	UNCOVERED	err	overloaded-func-used-with-derivative-of-attributes	slang-diagnostics.lua	overloaded function in derivative-of attribute
+31158	UNCOVERED	err	primal-substitute-target-must-have-higher-differentiability-level	slang-diagnostics.lua	primal substitute requires differentiable target
+31159	UNCOVERED	warning	no-derivative-on-non-differentiable-this-type	slang-diagnostics.lua	no derivative for member on non-differentiable struct
+31160	UNCOVERED	err	invalid-address-of	slang-diagnostics.lua	invalid __getAddress usage
+31161	UNCOVERED	err	interface-missing-function-interface-attribute	slang-diagnostics.lua	interface missing [__FunctionInterface]
+31162	UNCOVERED	err	public-custom-derivative-uses-non-exported-import	slang-diagnostics.lua	custom derivative uses non-exported import
+31200	UNCOVERED	warning	deprecated-usage	slang-diagnostics.lua	use of deprecated declaration
+31201	UNCOVERED	err	modifier-not-allowed	slang-diagnostics.lua	modifier not allowed
+31202	covered	err	duplicate-modifier	slang-diagnostics.lua	duplicate modifier
+31203	UNCOVERED	err	cannot-export-incomplete-type	slang-diagnostics.lua	cannot export incomplete type
+31204	UNCOVERED	warning	deprecated-bracket-attributes-placement	slang-diagnostics.lua	deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.
+31205	UNCOVERED	err	invalid-bracket-attributes-placement	slang-diagnostics.lua	invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.
+31206	UNCOVERED	err	memory-qualifier-not-allowed-on-a-non-image-type-parameter	slang-diagnostics.lua	invalid memory qualifier
+31207	UNCOVERED	err	removed-usage	slang-diagnostics.lua	use of removed declaration
+31208	UNCOVERED	err	require-input-decorated-var-for-parameter	slang-diagnostics.lua	shader input required
+31209	UNCOVERED	err	removed-since-bad-version	slang-diagnostics.lua	'RemovedSince' argument 'version' is outside allowed range
+31210	UNCOVERED	err	derivative-group-quad-must-be-multiple-2-for-xy-threads	slang-diagnostics.lua	derivative group quad thread count error
+31211	UNCOVERED	err	derivative-group-linear-must-be-multiple-4-for-total-thread-count	slang-diagnostics.lua	derivative group linear thread count error
+31212	UNCOVERED	err	only-one-of-derivative-group-linear-or-quad-can-be-set	slang-diagnostics.lua	conflicting derivative group settings
+31213	UNCOVERED	err	cuda-kernel-must-return-void	slang-diagnostics.lua	CUDA kernel return type error
+31214	UNCOVERED	err	differentiable-kernel-entry-point-cannot-have-differentiable-params	slang-diagnostics.lua	differentiable kernel param restriction
+31215	UNCOVERED	err	cannot-use-unsized-type-in-constant-buffer	slang-diagnostics.lua	unsized type in constant buffer
+31216	UNCOVERED	err	unrecognized-glsl-layout-qualifier	slang-diagnostics.lua	unrecognized GLSL layout qualifier
+31217	UNCOVERED	err	unrecognized-glsl-layout-qualifier-or-requires-assignment	slang-diagnostics.lua	unrecognized GLSL layout qualifier
+31218	covered	err	specialization-constant-must-be-scalar-or-enum	slang-diagnostics.lua	specialization constant type error
+31219	UNCOVERED	err	push-or-specialization-constant-cannot-be-static	slang-diagnostics.lua	push/specialization constant storage class error
+31220	UNCOVERED	err	variable-cannot-be-push-and-specialization-constant	slang-diagnostics.lua	conflicting constant qualifiers
+31221	UNCOVERED	err	invalid-hlsl-register-name	slang-diagnostics.lua	invalid HLSL register name
+31222	UNCOVERED	err	invalid-hlsl-register-name-for-type	slang-diagnostics.lua	invalid HLSL register name for type
+31223	UNCOVERED	err	extern-and-export-var-decl-must-be-const	slang-diagnostics.lua	extern/export requires static const
+31224	UNCOVERED	err	const-global-var-with-init-requires-static	slang-diagnostics.lua	global const requires static
+31225	UNCOVERED	err	static-const-variable-requires-initializer	slang-diagnostics.lua	missing initializer for static const
+31226	UNCOVERED	err	static-const-global-non-constant-init	slang-diagnostics.lua	static const global initializer must be a compile-time constant
+31230	UNCOVERED	err	removed-modifier-usage	slang-diagnostics.lua	use of removed modifier
+31231	UNCOVERED	warning	deprecated-modifier-usage	slang-diagnostics.lua	use of deprecated modifier
+31300	covered	err	bit-field-too-wide	slang-diagnostics.lua	bit-field size exceeds type width
+31301	covered	err	bit-field-non-integral	slang-diagnostics.lua	bit-field type must be integral
+31400	UNCOVERED	err	decl-not-allowed-in-context	slang-diagnostics.lua	declaration not allowed in this context
+32000	UNCOVERED	err	invalid-enum-tag-type	slang-diagnostics.lua	invalid enum tag type
+32003	UNCOVERED	err	unexpected-enum-tag-expr	slang-diagnostics.lua	unexpected enum tag expression
+32006	UNCOVERED	warning	enum-case-implicit-tag-value-overflow	slang-diagnostics.lua	implicit enum case value overflows underlying tag type
+33070	UNCOVERED	err	expected-function	slang-diagnostics.lua	expected a function
+33071	covered	err	expected-a-string-literal	slang-diagnostics.lua	expected a string literal
+33072	UNCOVERED	err	cannot-have-generic-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot be generic
+33073	UNCOVERED	err	cannot-have-associated-type-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have associatedType members
+33074	UNCOVERED	err	cannot-have-generic-method-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have generic methods
+33075	UNCOVERED	err	cannot-have-mutating-method-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have [mutating] methods
+33076	UNCOVERED	err	cannot-have-differentiable-method-in-dyn-interface	slang-diagnostics.lua	dyn interfaces cannot have [Differentiable] methods
+33077	UNCOVERED	err	dyn-interface-cannot-inherit-non-dyn-interface	slang-diagnostics.lua	dyn interface inheritance error
+33078	UNCOVERED	err	cannot-use-extension-to-make-type-conform-to-dyn-interface	slang-diagnostics.lua	extension cannot conform to dyn interface
+33079	UNCOVERED	err	cannot-have-unsized-member-when-inheriting-dyn-interface	slang-diagnostics.lua	unsized member with dyn interface inheritance
+33080	UNCOVERED	err	cannot-have-opaque-member-when-inheriting-dyn-interface	slang-diagnostics.lua	opaque member with dyn interface inheritance
+33081	UNCOVERED	err	cannot-have-non-copyable-member-when-inheriting-dyn-interface	slang-diagnostics.lua	non-copyable member with dyn interface inheritance
+33082	UNCOVERED	err	cannot-conform-generic-to-dyn-interface	slang-diagnostics.lua	generic type cannot conform to dyn interface
+33180	UNCOVERED	err	cannot-specialize-generic-with-existential	slang-diagnostics.lua	cannot specialize generic with existential type
+36005	UNCOVERED	err	invalid-visibility-modifier-on-type-of-decl	slang-diagnostics.lua	visibility modifier not allowed
+36100	UNCOVERED	err	conflicting-capability-due-to-use-of-decl	slang-diagnostics.lua	conflicting capability requirement
+36101	UNCOVERED	err	conflicting-capability-due-to-statement	slang-diagnostics.lua	conflicting capability requirement
+36102	UNCOVERED	err	conflicting-capability-due-to-statement-enclosing-func	slang-diagnostics.lua	conflicting capability requirement
+36104	UNCOVERED	err	use-of-undeclared-capability	slang-diagnostics.lua	undeclared capability used
+36105	UNCOVERED	err	unknown-capability	slang-diagnostics.lua	unknown capability
+36106	UNCOVERED	err	expect-capability	slang-diagnostics.lua	expect a capability name
+36107	covered	err	entry-point-uses-unavailable-capability	slang-diagnostics.lua	unavailable features in entry point
+36108	UNCOVERED	err	decl-has-dependencies-not-compatible-on-target	slang-diagnostics.lua	dependencies not compatible on target
+36109	UNCOVERED	err	invalid-target-switch-case	slang-diagnostics.lua	invalid target_switch case
+36110	UNCOVERED	err	use-of-undeclared-capability-of-interface-requirement	slang-diagnostics.lua	capability incompatible with interface
+36111	covered	err	unexpected-capability	slang-diagnostics.lua	disallowed capability
+36112	UNCOVERED	warning	entry-point-and-profile-are-incompatible	slang-diagnostics.lua	entry point incompatible with profile
+36113	UNCOVERED	warning	using-internal-capability-name	slang-diagnostics.lua	using internal capability name
+36114	UNCOVERED	err	use-of-undeclared-capability-of-inheritance-decl	slang-diagnostics.lua	capability incompatible with supertype
+36116	UNCOVERED	err	capability-has-multiple-stages	slang-diagnostics.lua	capability targets multiple stages
+36117	UNCOVERED	err	decl-has-dependencies-not-compatible-on-stage	slang-diagnostics.lua	dependencies not compatible on stage
+36118	UNCOVERED	err	sub-type-has-subset-of-abstract-atoms-to-super-type	slang-diagnostics.lua	subtype missing target/stage support
+36119	UNCOVERED	err	requirment-has-subset-of-abstract-atoms-to-implementation	slang-diagnostics.lua	requirement missing target/stage support
+36120	UNCOVERED	err	target-switch-cap-cases-conflict	slang-diagnostics.lua	capability cases conflict in target_switch
+38000	UNCOVERED	err	entry-point-function-not-found	slang-diagnostics.lua	no function found matching entry point name '~name'
+38005	UNCOVERED	err	expected-type-for-specialization-arg	slang-diagnostics.lua	expected a type as argument for specialization parameter
+38006	UNCOVERED	warning	specified-stage-doesnt-match-attribute	slang-diagnostics.lua	entry point stage mismatch
+38007	covered	err	entry-point-has-no-stage	slang-diagnostics.lua	no stage specified for entry point
+38008	UNCOVERED	err	specialization-parameter-of-name-not-specialized	slang-diagnostics.lua	no specialization argument was provided for specialization parameter
+38009	UNCOVERED	err	expected-value-of-type-for-specialization-arg	slang-diagnostics.lua	expected a constant value for specialization parameter
+38010	UNCOVERED	warning	unhandled-mod-on-entry-point-parameter	slang-diagnostics.lua	modifier on entry point parameter is unsupported
+38011	UNCOVERED	err	entry-point-cannot-return-resource-type	slang-diagnostics.lua	entry point cannot return type that contains resource types
+38012	UNCOVERED	err	entry-point-cannot-return-array-type	slang-diagnostics.lua	entry point cannot return array type
+38013	UNCOVERED	err	specialization-parameter-not-specialized	slang-diagnostics.lua	no specialization argument was provided for specialization parameter
+38021	UNCOVERED	err	type-argument-for-generic-parameter-does-not-conform-to-interface	slang-diagnostics.lua	type argument doesn't conform to interface
+38022	UNCOVERED	err	cannot-specialize-global-generic-to-itself	slang-diagnostics.lua	cannot specialize global type parameter to itself
+38023	UNCOVERED	err	cannot-specialize-global-generic-to-another-generic-param	slang-diagnostics.lua	cannot specialize using another global type parameter
+38024	UNCOVERED	err	invalid-dispatch-thread-id-type	slang-diagnostics.lua	invalid SV_DispatchThreadID type
+38025	UNCOVERED	err	mismatch-specialization-arguments	slang-diagnostics.lua	wrong number of specialization arguments
+38028	UNCOVERED	err	invalid-form-of-specialization-arg	slang-diagnostics.lua	invalid specialization argument form
+38029	UNCOVERED	err	type-argument-does-not-conform-to-interface	slang-diagnostics.lua	type argument doesn't conform to interface
+38031	UNCOVERED	err	invalid-use-of-no-diff	slang-diagnostics.lua	invalid 'no_diff' usage
+38032	UNCOVERED	warning	use-of-no-diff-on-differentiable-func	slang-diagnostics.lua	'no_diff' on differentiable function has no meaning
+38033	UNCOVERED	err	cannot-use-no-diff-in-non-differentiable-func	slang-diagnostics.lua	'no_diff' in non-differentiable function
+38034	UNCOVERED	err	cannot-use-borrow-in-on-differentiable-parameter	slang-diagnostics.lua	'borrow in' on differentiable parameter
+38035	UNCOVERED	err	encountered-non-differentiable-function-during-higher-order-diff	slang-diagnostics.lua	cannot propagate through non-differentiable function
+38036	UNCOVERED	err	cannot-use-constref-on-differentiable-member-method	slang-diagnostics.lua	'[constref]' on differentiable member method
+38040	UNCOVERED	warning	non-uniform-entry-point-parameter-treated-as-uniform	slang-diagnostics.lua	entry point parameter treated as uniform
+38041	UNCOVERED	err	int-val-from-non-int-spec-const-encountered	slang-diagnostics.lua	cannot cast non-integer specialization constant to integer
+38042	UNCOVERED	err	implicit-type-coerce-constraint-with-non-implicit-conversion	slang-diagnostics.lua	implicit conversion constraint not satisfied
+38043	UNCOVERED	err	type-coerce-constraint-missing-conversion	slang-diagnostics.lua	type coerce constraint not satisfied
+38045	UNCOVERED	err	geometry-shader-missing-output-stream	slang-diagnostics.lua	geometry shader missing output stream parameter
+38046	UNCOVERED	err	geometry-shader-missing-max-vertex-count	slang-diagnostics.lua	geometry shader missing [maxvertexcount] attribute
+38047	UNCOVERED	err	mesh-shader-missing-output-topology	slang-diagnostics.lua	mesh shader missing [outputtopology] attribute
+38048	UNCOVERED	err	mesh-shader-missing-outputs	slang-diagnostics.lua	mesh shader missing OutputVertices/OutputIndices output
+38050	UNCOVERED	err	invalid-entry-point-varying-type	slang-diagnostics.lua	type cannot be used as entry-point varying parameter or return type
+38051	UNCOVERED	err	invalid-entry-point-varying-type-for-target	slang-diagnostics.lua	type cannot be used as entry-point varying for this target
+38052	UNCOVERED	warning	vertex-shader-missing-sv-position	slang-diagnostics.lua	vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic
+38100	UNCOVERED	err	type-doesnt-implement-interface-requirement	slang-diagnostics.lua	missing interface member
+38101	UNCOVERED	err	this-expression-outside-of-type-decl	slang-diagnostics.lua	'this' used outside aggregate type
+38103	UNCOVERED	err	this-type-outside-of-type-decl	slang-diagnostics.lua	'This' used outside aggregate type
+38104	UNCOVERED	err	return-val-not-available	slang-diagnostics.lua	'__return_val' not available
+38105	UNCOVERED	err	member-does-not-match-requirement-signature	slang-diagnostics.lua	interface requirement mismatch
+38106	UNCOVERED	err	member-return-type-mismatch	slang-diagnostics.lua	return type mismatch
+38107	UNCOVERED	err	generic-signature-does-not-match-requirement	slang-diagnostics.lua	generic signature mismatch
+38108	UNCOVERED	err	parameter-direction-does-not-match-requirement	slang-diagnostics.lua	parameter direction mismatch
+38109	UNCOVERED	warning	non-copyable-type-cannot-conform-to-interface	slang-diagnostics.lua	non-copyable interface conformance is not fully supported
+38200	UNCOVERED	err	recursive-module-import	slang-diagnostics.lua	recursive module import
+38201	UNCOVERED	err	glsl-module-not-available	slang-diagnostics.lua	'glsl' module not available
+38203	UNCOVERED	err	vector-with-disallowed-element-type-encountered	slang-diagnostics.lua	disallowed vector element type
+38204	UNCOVERED	err	cannot-use-resource-type-in-structured-buffer	slang-diagnostics.lua	resource type in StructuredBuffer
+38205	UNCOVERED	err	recursive-types-found-in-structured-buffer	slang-diagnostics.lua	recursive type in structured buffer
+38206	UNCOVERED	err	vector-with-invalid-element-count-encountered	slang-diagnostics.lua	invalid vector element count
+39000	UNCOVERED	err	conflicting-explicit-bindings-for-parameter	slang-diagnostics.lua	conflicting explicit bindings
+39001	UNCOVERED	warning	parameter-bindings-overlap	slang-diagnostics.lua	explicit binding overlap
+39007	UNCOVERED	err	unknown-register-class	slang-diagnostics.lua	unknown register class
+39008	UNCOVERED	err	expected-a-register-index	slang-diagnostics.lua	expected a register index
+39009	UNCOVERED	err	expected-space	slang-diagnostics.lua	expected 'space'
+39010	UNCOVERED	err	expected-space-index	slang-diagnostics.lua	expected a register space index after 'space'
+39011	UNCOVERED	err	invalid-component-mask	slang-diagnostics.lua	invalid register component mask
+39012	UNCOVERED	warning	requested-bindless-space-index-unavailable	slang-diagnostics.lua	bindless space index unavailable
+39013	UNCOVERED	warning	register-modifier-but-no-vulkan-layout	slang-diagnostics.lua	D3D register without Vulkan binding
+39014	UNCOVERED	err	unexpected-specifier-after-space	slang-diagnostics.lua	unexpected specifier after register space
+39015	UNCOVERED	err	whole-space-parameter-requires-zero-binding	slang-diagnostics.lua	whole descriptor set requires binding 0
+39017	UNCOVERED	err	dont-expect-out-parameters-for-stage	slang-diagnostics.lua	stage does not support out/inout parameters
+39018	UNCOVERED	err	dont-expect-in-parameters-for-stage	slang-diagnostics.lua	stage does not support in parameters
+39019	UNCOVERED	warning	global-uniform-not-expected	slang-diagnostics.lua	implicit global shader parameter
+39020	UNCOVERED	err	too-many-shader-record-constant-buffers	slang-diagnostics.lua	too many shader record constant buffers
+39022	UNCOVERED	warning	vk-index-without-vk-location	slang-diagnostics.lua	vk::index without vk::location
+39023	UNCOVERED	err	mixing-implicit-and-explicit-binding-for-varying-params	slang-diagnostics.lua	mixing implicit and explicit varying bindings
+39025	UNCOVERED	err	conflicting-vulkan-inferred-binding-for-parameter	slang-diagnostics.lua	conflicting Vulkan inferred binding
+39026	UNCOVERED	err	matrix-layout-modifier-on-non-matrix-type	slang-diagnostics.lua	matrix layout modifier on non-matrix type
+39027	UNCOVERED	err	get-attribute-at-vertex-must-refer-to-per-vertex-input	slang-diagnostics.lua	'GetAttributeAtVertex' must reference vertex input
+39028	UNCOVERED	err	not-valid-varying-parameter	slang-diagnostics.lua	not a valid varying parameter
+39029	UNCOVERED	warning	register-modifier-but-no-vk-binding-nor-shift	slang-diagnostics.lua	D3D register without Vulkan binding or shift
+39030	UNCOVERED	err	target-does-not-support-descriptor-handle	slang-diagnostics.lua	target does not support 'DescriptorHandle' types
+39031	UNCOVERED	err	class-type-not-supported	slang-diagnostics.lua	class types are not supported in type layout
+39071	UNCOVERED	warning	binding-attribute-ignored-on-uniform	slang-diagnostics.lua	binding attribute ignored
+39998	UNCOVERED	err	generic-evaluation-recursion-limit-exceeded	slang-diagnostics.lua	recursive generic evaluation exceeded maximum depth
+39999	covered	err	error-in-imported-module	slang-diagnostics.lua	import failed due to compilation error
+40000	UNCOVERED	err	ray-payload-field-missing-access-qualifiers	slang-diagnostics.lua	ray payload field missing access qualifiers
+40001	UNCOVERED	err	ray-payload-invalid-stage-in-access-qualifier	slang-diagnostics.lua	invalid stage name in ray payload access qualifier
+40004	UNCOVERED	warning	integer-literal-too-large	slang-diagnostics.lua	integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+40005	UNCOVERED	warning	integer-literal-truncated	slang-diagnostics.lua	integer literal truncated
+40006	UNCOVERED	err	unimplemented-system-value-semantic	slang-diagnostics.lua	unknown system-value semantic
+40008	UNCOVERED	err	invalid-l-value-for-ref-parameter	slang-diagnostics.lua	the form of this l-value argument is not valid for a `ref` parameter
+40009	UNCOVERED	warning	float-literal-unrepresentable	slang-diagnostics.lua	floating-point literal unrepresentable
+40010	UNCOVERED	warning	float-literal-too-small	slang-diagnostics.lua	floating-point literal too small
+40011	UNCOVERED	note	overload-candidate	slang-diagnostics.lua	candidate: ~candidate
+40012	UNCOVERED	err	need-compile-time-constant	slang-diagnostics.lua	expected a compile-time constant
+40013	UNCOVERED	err	arg-is-not-constexpr	slang-diagnostics.lua	argument is not a compile-time constant
+40014	UNCOVERED	note	invisible-overload-candidate	slang-diagnostics.lua	candidate (invisible): ~candidate
+40015	UNCOVERED	note	more-overload-candidates	slang-diagnostics.lua	~count:Int more overload candidates
+40016	UNCOVERED	warning	integer-constant-overflow	slang-diagnostics.lua	integer constant overflow in conversion
+40020	UNCOVERED	err	cannot-unroll-loop	slang-diagnostics.lua	loop unrolling failed
+40100	covered	warning	main-entry-point-renamed	slang-diagnostics.lua	entry point '~oldName' has been renamed to '~newName'
+41000	UNCOVERED	warning	unreachable-code	slang-diagnostics.lua	unreachable code detected
+41001	UNCOVERED	err	recursive-type	slang-diagnostics.lua	type contains cyclic reference
+41002	UNCOVERED	err	cyclic-interface-dependency	slang-diagnostics.lua	interface has cyclic dependency on itself
+41003	UNCOVERED	err	circular-conformance	slang-diagnostics.lua	type contains circular reference through conforming interface
+41009	UNCOVERED	err	missing-return-error	slang-diagnostics.lua	non-void function must return
+41010	covered	warning	missing-return	slang-diagnostics.lua	non-void function does not return in all cases
+41011	UNCOVERED	err	profile-incompatible-with-target-switch	slang-diagnostics.lua	__target_switch has no compatible target
+41012	UNCOVERED	warning	profile-implicitly-upgraded	slang-diagnostics.lua	profile implicitly upgraded
+41013	covered	err	profile-implicitly-upgraded-restrictive	slang-diagnostics.lua	entry point uses capabilities not in specified profile
+41014	UNCOVERED	err	type-cannot-be-packed-into-any-value	slang-diagnostics.lua	type cannot be packed for dynamic dispatch
+41015	UNCOVERED	warning	using-uninitialized-out	slang-diagnostics.lua	use of uninitialized out parameter
+41016	UNCOVERED	warning	using-uninitialized-variable	slang-diagnostics.lua	use of uninitialized variable
+41017	UNCOVERED	warning	using-uninitialized-global-variable	slang-diagnostics.lua	use of uninitialized global variable
+41018	UNCOVERED	warning	returning-with-uninitialized-out	slang-diagnostics.lua	returning without initializing out parameter
+41019	UNCOVERED	err	type-does-not-fit-any-value-size	slang-diagnostics.lua	type does not fit in size required by interface
+41020	UNCOVERED	warning	constructor-uninitialized-field	slang-diagnostics.lua	exiting constructor without initializing field
+41021	UNCOVERED	warning	field-not-default-initialized	slang-diagnostics.lua	default initializer will not initialize field
+41022	UNCOVERED	err	loss-of-derivative-due-to-call-of-non-differentiable-function	slang-diagnostics.lua	derivative cannot be propagated through non-differentiable call
+41023	UNCOVERED	err	get-string-hash-must-be-on-string-literal	slang-diagnostics.lua	getStringHash requires string literal
+41024	covered	warning	comma-operator-used-in-expression	slang-diagnostics.lua	comma operator used in expression
+41025	UNCOVERED	err	loss-of-derivative-using-non-differentiable-location-as-out-arg	slang-diagnostics.lua	derivative is lost passing non-differentiable location
+41026	UNCOVERED	warning	switch-fallthrough-restructured	slang-diagnostics.lua	switch fall-through will be restructured
+41027	UNCOVERED	err	accessing-value-of-none-optional	slang-diagnostics.lua	accessing .value on an Optional that is always none
+41028	UNCOVERED	err	cannot-default-initialize-struct-with-uninitialized-resource	slang-diagnostics.lua	cannot default-initialize struct with uninitialized resource
+41029	UNCOVERED	err	cannot-default-initialize-struct-containing-resources	slang-diagnostics.lua	cannot default-initialize struct containing resource fields
+41030	covered	warning	operator-shift-left-overflow	slang-diagnostics.lua	left shift overflow
+41031	UNCOVERED	err	loss-of-derivative-assigning-to-non-differentiable-location	slang-diagnostics.lua	derivative is lost during assignment
+41032	UNCOVERED	err	cannot-default-initialize-resource	slang-diagnostics.lua	cannot default-initialize resource type
+41033	UNCOVERED	warning	using-uninitialized-value	slang-diagnostics.lua	use of uninitialized value
+41034	UNCOVERED	warning	operator-shift-on-narrow-type	slang-diagnostics.lua	left shift on narrow integer type
+41201	UNCOVERED	warning	expect-dynamic-uniform-argument	slang-diagnostics.lua	argument might not be dynamic uniform
+41202	UNCOVERED	err	not-equal-bit-cast-size	slang-diagnostics.lua	bit_cast size mismatch
+41203	UNCOVERED	warning	expect-dynamic-uniform-value	slang-diagnostics.lua	value must be dynamic uniform
+41204	UNCOVERED	err	bit-cast-to-non-concrete-type	slang-diagnostics.lua	cannot bit-cast to existential (non-concrete) type
+41300	UNCOVERED	err	byte-address-buffer-unaligned	slang-diagnostics.lua	invalid byte address buffer alignment
+41400	UNCOVERED	err	static-assertion-failure	slang-diagnostics.lua	static assertion failed
+41401	UNCOVERED	err	static-assertion-failure-without-message	slang-diagnostics.lua	static assertion failed
+41402	UNCOVERED	err	static-assertion-condition-not-constant	slang-diagnostics.lua	static assertion condition not compile-time constant
+41403	UNCOVERED	err	invalid-atomic-destination-pointer	slang-diagnostics.lua	invalid atomic destination
+41404	UNCOVERED	err	multi-sampled-texture-does-not-allow-writes	slang-diagnostics.lua	cannot write to multisampled texture
+41901	UNCOVERED	err	unsupported-use-of-l-value-for-auto-diff	slang-diagnostics.lua	unsupported L-value for auto differentiation
+42001	UNCOVERED	err	invalid-use-of-torch-tensor-type-in-device-func	slang-diagnostics.lua	TorchTensor not allowed in device functions
+42050	UNCOVERED	warning	potential-issues-with-prefer-recompute-on-side-effect-method	slang-diagnostics.lua	[PreferRecompute] on function with side effects
+45001	UNCOVERED	err	unresolved-symbol	slang-diagnostics.lua	unresolved external symbol
+45100	UNCOVERED	warning	coverage-buffer-reserved-name	slang-diagnostics.lua	`__slang_coverage` is reserved by `-trace-coverage`
+45101	UNCOVERED	err	coverage-binding-collision	slang-diagnostics.lua	`-trace-coverage-binding` collides with an existing parameter
+45102	UNCOVERED	warning	coverage-target-not-supported	slang-diagnostics.lua	`-trace-coverage` is not supported on this target; coverage instrumentation skipped
+45103	UNCOVERED	err	coverage-binding-exhausted	slang-diagnostics.lua	could not allocate a free binding slot for `__slang_coverage` — existing global parameters occupy too many slots in space 0
+45104	UNCOVERED	err	coverage-pass-through-incompatible	slang-diagnostics.lua	`-trace-coverage` cannot be combined with `-pass-through`; pass-through bypasses the Slang IR pipeline and cannot emit coverage instrumentation
+45105	UNCOVERED	err	coverage-uniform-layout-unavailable	slang-diagnostics.lua	could not resolve the CPU/CUDA uniform layout for `__slang_coverage`
+45106	UNCOVERED	err	coverage-binding-option-out-of-range	slang-diagnostics.lua	coverage binding option value is out of range
+45107	UNCOVERED	warning	coverage-reserved-space-ignored	slang-diagnostics.lua	`-trace-coverage-reserved-space` does not apply to this target; ignoring reserved spaces
+49999	UNCOVERED	err	unknown-system-value-semantic	slang-diagnostics.lua	unknown system-value semantic
+50000	UNCOVERED	err	cooperative-matrix-unsupported-element-type	slang-diagnostics.lua	unsupported element type for cooperative matrix
+50001	UNCOVERED	err	cooperative-matrix-invalid-shape	slang-diagnostics.lua	invalid shape for cooperative matrix
+50002	UNCOVERED	err	cooperative-matrix-invalid-mma-type-combination	slang-diagnostics.lua	invalid type combination for cooperative matrix multiply-add
+50011	UNCOVERED	warning	spirv-version-not-supported	slang-diagnostics.lua	SPIR-V version too old
+50060	UNCOVERED	err	invalid-mesh-stage-output-topology	slang-diagnostics.lua	invalid mesh output topology
+50100	UNCOVERED	err	no-type-conformances-found-for-interface	slang-diagnostics.lua	no type conformances found
+50101	UNCOVERED	err	dynamic-dispatch-on-potentially-uninitialized-existential	slang-diagnostics.lua	cannot dispatch on uninitialized interface
+50102	UNCOVERED	note	dynamic-dispatch-code-generated-here	slang-diagnostics.lua	generated dynamic dispatch code for this site. ~count:Int possible types: '~types'
+50103	UNCOVERED	note	specialized-dynamic-dispatch-code-generated-here	slang-diagnostics.lua	generated specialized dynamic dispatch code for this site. ~count:Int possible types: '~types'. specialization arguments: '~specArgs'.
+50104	UNCOVERED	err	interface-typed-entry-point-param-not-supported	slang-diagnostics.lua	interface-typed entry point parameter not supported
+52000	UNCOVERED	err	multi-level-break-unsupported	slang-diagnostics.lua	multi-level break not supported
+52001	UNCOVERED	warning	dxil-not-found	slang-diagnostics.lua	dxil library not found
+52002	UNCOVERED	err	pass-through-compiler-not-found	slang-diagnostics.lua	pass-through compiler not found
+52003	UNCOVERED	err	cannot-disassemble	slang-diagnostics.lua	cannot disassemble
+52004	UNCOVERED	err	unable-to-write-file	slang-diagnostics.lua	unable to write file
+52005	UNCOVERED	err	unable-to-read-file	slang-diagnostics.lua	unable to read file
+52006	UNCOVERED	err	compiler-not-defined-for-transition	slang-diagnostics.lua	compiler not defined for transition
+52008	UNCOVERED	err	dynamic-dispatch-on-specialize-only-interface	slang-diagnostics.lua	dynamic dispatch on specialize-only type
+52009	UNCOVERED	err	cannot-emit-reflection-without-target	slang-diagnostics.lua	cannot emit reflection JSON
+52010	UNCOVERED	err	ref-param-with-interface-type-in-dynamic-dispatch	slang-diagnostics.lua	ref parameter incompatible with dynamic dispatch
+52012	UNCOVERED	err	ref-accessor-with-interface-type-in-dynamic-dispatch	slang-diagnostics.lua	ref accessor incompatible with dynamic dispatch
+54001	UNCOVERED	warning	mesh-output-must-be-out	slang-diagnostics.lua	mesh output must be out
+54002	UNCOVERED	err	mesh-output-must-be-array	slang-diagnostics.lua	mesh output must be array
+54003	UNCOVERED	err	mesh-output-array-must-have-size	slang-diagnostics.lua	mesh output array must have size
+54004	UNCOVERED	warning	unnecessary-hlsl-mesh-output-modifier	slang-diagnostics.lua	unnecessary mesh output modifier
+54005	UNCOVERED	err	cannot-read-from-mesh-shader-output	slang-diagnostics.lua	cannot read values from mesh shader outputs
+54006	UNCOVERED	err	invalid-parameter-passing-mode-for-write-only-reference	slang-diagnostics.lua	Parameter passing mode requires reading a write-only value.
+55101	UNCOVERED	err	invalid-torch-kernel-return-type	slang-diagnostics.lua	invalid pytorch kernel return type
+55102	UNCOVERED	err	invalid-torch-kernel-param-type	slang-diagnostics.lua	invalid pytorch kernel parameter type
+55200	UNCOVERED	err	unsupported-builtin-type	slang-diagnostics.lua	unsupported builtin type
+55201	covered	err	unsupported-recursion	slang-diagnostics.lua	recursion not allowed
+55202	UNCOVERED	err	system-value-attribute-not-supported	slang-diagnostics.lua	system value semantic not supported
+55203	UNCOVERED	err	system-value-type-incompatible	slang-diagnostics.lua	system value type mismatch
+55204	UNCOVERED	err	unsupported-target-intrinsic	slang-diagnostics.lua	unsupported intrinsic operation
+55205	UNCOVERED	err	unsupported-specialization-constant-for-num-threads	slang-diagnostics.lua	specialization constants not supported for numthreads
+55208	UNCOVERED	err	unsupported-coop-mat-element-type-for-hlsl	slang-diagnostics.lua	unsupported cooperative matrix element type for HLSL
+55209	UNCOVERED	err	unsupported-coop-mat-scope-for-hlsl	slang-diagnostics.lua	unsupported cooperative matrix scope for HLSL
+56001	UNCOVERED	err	unable-to-auto-map-cuda-type-to-host-type	slang-diagnostics.lua	CUDA type mapping failed
+56002	UNCOVERED	err	attempt-to-query-size-of-unsized-array	slang-diagnostics.lua	cannot get size of unsized array
+56101	UNCOVERED	err	resource-types-in-constant-buffer-in-parameter-block-not-allowed-on-metal	slang-diagnostics.lua	ConstantBuffer with resource types in ParameterBlock not supported on Metal
+56102	UNCOVERED	err	division-by-matrix-not-supported	slang-diagnostics.lua	division by matrix not supported
+56103	UNCOVERED	err	int16-not-supported-in-wgsl	slang-diagnostics.lua	16-bit integers not supported in WGSL
+56104	UNCOVERED	err	assign-to-ref-not-supported	slang-diagnostics.lua	mesh output must be assigned as whole struct
+56105	UNCOVERED	err	array-of-resource-type-not-supported-in-wgsl	slang-diagnostics.lua	array of resource types not supported in WGSL
+56106	UNCOVERED	err	storage-texture-access-mode-not-supported-in-wgsl	slang-diagnostics.lua	texture format '~format' does not support '~accessMode' access for storage textures in WGSL
+56107	UNCOVERED	warning	multisampled-subpass-input-not-supported-on-metal	slang-diagnostics.lua	Metal does not support per-sample SubpassLoad; the sample index will be ignored
+56108	UNCOVERED	err	subpass-input-used-outside-entry-point	slang-diagnostics.lua	SubpassInput used outside of the fragment entry point function
+56109	UNCOVERED	err	subpass-input-in-parameter-block-not-allowed-on-metal	slang-diagnostics.lua	SubpassInput in ParameterBlock not supported on Metal
+57001	UNCOVERED	warning	spirv-opt-failed	slang-diagnostics.lua	spirv-opt optimization failed
+57002	UNCOVERED	err	unknown-patch-constant-parameter	slang-diagnostics.lua	unknown patch constant parameter
+57003	UNCOVERED	err	unknown-tess-partitioning	slang-diagnostics.lua	unknown tessellation partitioning
+57004	UNCOVERED	err	output-spv-is-empty	slang-diagnostics.lua	SPIR-V output contains no exported symbols
+58001	UNCOVERED	err	entry-point-must-return-void-when-global-output-present	slang-diagnostics.lua	entry point must return void with global outputs
+58002	UNCOVERED	err	unhandled-glsl-ssbo-type	slang-diagnostics.lua	unhandled GLSL SSBO contents
+58003	UNCOVERED	err	inconsistent-pointer-address-space	slang-diagnostics.lua	inconsistent pointer address space
+81110	UNCOVERED	err	nvapi-macro-mismatch	slang-diagnostics.lua	conflicting NVAPI macro definitions
+81111	UNCOVERED	err	opaque-reference-must-resolve-to-global	slang-diagnostics.lua	cannot determine register/space for NVAPI resource
+90001	UNCOVERED	warning	ignored-documentation-on-overload-candidate	slang-diagnostics.lua	documentation comment on overload candidate ignored
+99996	UNCOVERED	note	note-failed-to-load-dynamic-library	slang-diagnostics.lua	failed to load dynamic library '~path'
+99997	UNCOVERED	err	compilation-aborted-due-to-exception	slang-diagnostics.lua	Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)
+99998	UNCOVERED	err	compilation-aborted	slang-diagnostics.lua	Slang compilation aborted due to internal error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)
+99999	UNCOVERED	note	noteLocationOfInternalError	slang-misc-diagnostic-defs.h	an internal error threw an exception while working on code near this location
+100000	UNCOVERED	error	downstreamNameNotKnown	slang-misc-diagnostic-defs.h	downstream tool name not known, allowed names are $0
+100001	UNCOVERED	error	expectedArgumentForOption	slang-misc-diagnostic-defs.h	expected an argument for command-line option '$0'
+100002	UNCOVERED	error	unbalancedDownstreamArguments	slang-misc-diagnostic-defs.h	unbalanced downstream arguments
+100003	UNCOVERED	error	closeOfUnopenDownstreamArgs	slang-misc-diagnostic-defs.h	close of an unopen downstream argument scope
+100004	UNCOVERED	error	downstreamToolNameNotDefined	slang-misc-diagnostic-defs.h	downstream tool name not defined
+100005	UNCOVERED	error	invalidArgumentForOption	slang-misc-diagnostic-defs.h	invalid argument format for command-line option '$0'

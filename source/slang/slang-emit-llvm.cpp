@@ -168,6 +168,8 @@ private:
     Dictionary<IRTypeLayoutRules*, Dictionary<IRType*, LLVMDebugNode*>> debugTypeMap;
 
 public:
+    Dictionary<LLVMDebugNode*, LLVMDebugNode*> forwardDeclaredDebugTypes;
+
     LLVMTypeTranslator(
         ILLVMBuilder* builder,
         TargetRequest* targetReq,
@@ -453,6 +455,20 @@ public:
                 int line;
                 findDebugLocation(*instToDebugLLVM, structType, file, line);
 
+                CharSlice linkageName, prettyName;
+                maybeGetName(&linkageName, &prettyName, type);
+
+                LLVMDebugNode* forwardDeclaredType = nullptr;
+                {
+                    // We forward-declare the type itself initially, so that
+                    // self-referential structs get some useful debug data as
+                    // well. These get replaced later with the final type.
+                    auto& types = debugTypeMap[rules];
+                    forwardDeclaredType =
+                        builder->getDebugForwardDeclareType(prettyName, file, line);
+                    types[type] = forwardDeclaredType;
+                }
+
                 List<LLVMDebugNode*> types;
                 for (auto field : structType->getFields())
                 {
@@ -466,20 +482,18 @@ public:
                     IRIntegerValue offset = getOffset(field, rules);
 
                     IRStructKey* key = field->getKey();
-                    CharSlice linkageName, prettyName;
-                    maybeGetName(&linkageName, &prettyName, key);
+                    CharSlice fieldLinkageName, fieldPrettyName;
+                    maybeGetName(&fieldLinkageName, &fieldPrettyName, key);
 
                     types.add(builder->getDebugStructField(
                         debugType,
-                        prettyName,
+                        fieldPrettyName,
                         offset,
                         fieldSizeAndAlignment.size,
                         fieldSizeAndAlignment.alignment,
                         file,
                         line));
                 }
-                CharSlice linkageName, prettyName;
-                maybeGetName(&linkageName, &prettyName, type);
                 sizeAndAlignment.size = align(sizeAndAlignment.size, sizeAndAlignment.alignment);
 
                 llvmType = builder->getDebugStructType(
@@ -489,6 +503,7 @@ public:
                     sizeAndAlignment.alignment,
                     file,
                     line);
+                forwardDeclaredDebugTypes[forwardDeclaredType] = llvmType;
             }
             break;
 
@@ -688,13 +703,13 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        using BuilderFuncV2 = SlangResult (*)(
+        using BuilderFuncV3 = SlangResult (*)(
             const SlangUUID& intfGuid,
             Slang::ILLVMBuilder** out,
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV2)library->findFuncByName("createLLVMBuilder_V2");
+        auto builderFunc = (BuilderFuncV3)library->findFuncByName("createLLVMBuilder_V3");
         if (!builderFunc)
             return SLANG_FAIL;
 
@@ -1450,6 +1465,52 @@ struct LLVMEmitter
         SLANG_UNIMPLEMENTED_X("Unexpected terminator in global scope!");
     }
 
+    void emitDecomposedStructValues(
+        LLVMInst* inst,
+        IRType* type,
+        List<LLVMInst*>& args,
+        List<bool>& argIsSigned)
+    {
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (IRStructField* f : structType->getFields())
+            {
+                LLVMInst* ptr = emitStructGetElementPtr(inst, f, defaultPointerRules);
+                LLVMInst* op = emitLoad(ptr, f->getFieldType(), defaultPointerRules);
+                emitDecomposedStructValues(op, f->getFieldType(), args, argIsSigned);
+            }
+        }
+        else if (as<IRVoidType>(type))
+            return;
+        else
+        {
+            args.add(inst);
+            argIsSigned.add(isSignedType(type));
+        }
+    }
+
+    void emitDecomposedStructValues(IRInst* inst, List<LLVMInst*>& args, List<bool>& argIsSigned)
+    {
+        auto type = inst->getDataType();
+        if (auto makeStruct = as<IRMakeStruct>(inst))
+        {
+            // Easy & common case, we can just pick the entries from the
+            // MakeStruct.
+            for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
+            {
+                auto op = makeStruct->getOperand(bb);
+                emitDecomposedStructValues(op, args, argIsSigned);
+            }
+        }
+        else
+        {
+            // Unfortunate & rare situation where some compiler optimization
+            // hid the MakeStruct behind some load/store/whatever operation.
+            LLVMInst* llvmStruct = findValue(inst);
+            emitDecomposedStructValues(llvmStruct, type, args, argIsSigned);
+        }
+    }
+
     // Caution! This is only for emitting things which are considered
     // instructions in LLVM! It won't work for IRBlocks, IRFuncs & such.
     LLVMInst* emitLLVMInstruction(
@@ -2090,19 +2151,7 @@ struct LLVMEmitter
                 if (inst->getOperandCount() == 2)
                 {
                     auto operand = inst->getOperand(1);
-                    if (auto makeStruct = as<IRMakeStruct>(operand))
-                    {
-                        // Flatten the tuple resulting from the variadic pack.
-                        for (UInt bb = 0; bb < makeStruct->getOperandCount(); ++bb)
-                        {
-                            auto op = makeStruct->getOperand(bb);
-                            op->getDataType();
-                            auto llvmValue = findValue(op);
-
-                            args.add(llvmValue);
-                            argIsSigned.add(isSigned(op));
-                        }
-                    }
+                    emitDecomposedStructValues(operand, args, argIsSigned);
                 }
 
                 llvmInst = builder->emitPrintf(
@@ -2862,6 +2911,12 @@ struct LLVMEmitter
         emitGlobalDeclarations(irModule);
         emitGlobalFunctions(irModule);
         emitGlobalInstructionCtor();
+
+        // Some debug types may have been left as forward declared if they
+        // were self-referential (e.g., struct containing a pointer to itself).
+        // We have to resolve these last.
+        for (auto [fwdDecl, concrete] : types->forwardDeclaredDebugTypes)
+            builder->replaceDebugForwardDeclareType(fwdDecl, concrete);
     }
 };
 

@@ -1,0 +1,24 @@
+schema_version: 1
+id: dead-diagnostic-codes-umbrella
+bundle: cross-cutting/diagnostics-catalog
+suspected_kind: catalog-drift
+observed_at: 2026-05-28T10:30:00+00:00
+evidence:
+  command: "for code in E15602 E15615 E15616 E20016 E30524 E30623 E30815 E30850 E30856 E31004 E31005 E31007 E31008 E31009 E31111 E31146 E38032 E41034 E100005; do echo -n \"$code: \"; grep -rl \"$code\\|$(echo $code | sed 's/^E//')\" source/ | wc -l; done"
+  source_slang: docs/generated/tests/cross-cutting/diagnostics-catalog/dead-codes-static-check.slang
+  observed_summary: A bootstrap sweep against the diagnostic catalog identified ~16 codes declared in slang-diagnostics.lua but with zero emission sites in compiled source. Each is either retired-but-not-removed, or genuinely never reached from any code path. Spot-verified that E38032 (use-of-no-diff-on-differentiable-func) has zero references under source/.
+  exit_code: 0
+  stderr_tail: "Spot-verified examples: E15602 pragma-once-ignored; E15615/E15616 pragma-warning-*; E20016 missing-layout-binding-modifier; E30524 E30623 E30815 E30850 E30856; E31004 E31005 E31007 E31008 E31009 E31111 E31146; E38032 use-of-no-diff-on-differentiable-func; E41034 operator-shift-on-narrow-type; E100005 invalidArgumentForOption."
+expected:
+  claim: Every diagnostic code declared in slang-diagnostics.lua must have at least one emission site in compiled source. Catalog drift (declared but unreachable codes) is a maintenance bug, not a functional one, but it inflates the catalog and confuses round-trip tools.
+  citation_kind: doc
+  citation: docs/generated/design/cross-cutting/diagnostics.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: fa86e5a04
+  doc_anchor: docs/generated/design/cross-cutting/diagnostics.md
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Some codes may be reached only via release-build paths or guarded by macros not active in current build; a deeper sweep with multiple build configurations would harden the list."
+    - "Bootstrap claimed E41034 was active and is now inactive — that subset is a regression rather than long-standing drift; worth splitting from the others when filing."

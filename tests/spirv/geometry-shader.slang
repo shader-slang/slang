@@ -17,9 +17,11 @@ struct GsOut
 // CHECK-DAG: OpExecutionMode %gsMain Triangles
 // CHECK-DAG: OpExecutionMode %gsMain OutputVertices 15
 
-// CHECK: OpStore %gl_Position
-// CHECK: OpEmitVertex
-// CHECK: OpEndPrimitive
+// Optimized SPIR-V can serialize the inner loop's exit block, which contains
+// OpEndPrimitive, before the loop body even though the branches execute it afterward.
+// CHECK-DAG: OpStore %gl_Position
+// CHECK-DAG: OpEmitVertex
+// CHECK-DAG: OpEndPrimitive
 
 [maxvertexcount(15)]
 void gsMain(uint triIdx : SV_PrimitiveID, inout TriangleStream<GsOut> outStream)

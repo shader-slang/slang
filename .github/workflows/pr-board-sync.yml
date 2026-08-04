@@ -1,0 +1,1887 @@
+name: PR Board Sync (reusable)
+
+# Reusable workflow that drives an open PR one event-step toward its correct
+# state on the shared "Slang PR Tracking" ProjectsV2 board:
+#   - adds the PR to the board (idempotent),
+#   - classifies + sets its Source (Internal / Community / Bot),
+#   - advances its Status (In Review / Revising / Snagged / Approved / Done)
+#     on the event-driven happy path,
+#   - backfills the assignee + reviewers (an Internal PR's author; otherwise a
+#     linked-issue owner, else the top committer-signal owner, else the
+#     maintainer) and requests reviewers,
+#   - when a PR has an owner, assigns any still-unassigned linked (closing)
+#     issues to that same owner (the PR's primary assignee, not the co-assigned
+#     community author), and
+#   - unrequests auto-assigned reviewers that cannot approve (e.g. bmillsNV).
+#
+# Status state machine (two variants that differ ONLY on a CI failure):
+#   - In Review  - default for an open PR; also re-set whenever a new commit
+#                  arrives (the commit has no review feedback yet). A Bot PR's
+#                  draft lands here too, so a human owner can see/shepherd it
+#                  (unless a reviewer requested changes, which wins -> Revising).
+#   - Revising   - the author is still working: a human draft, or a reviewer
+#                  requested changes (not yet superseded by a newer commit). A Bot
+#                  PR's CI failure also lands here.
+#   - Snagged    - needs a human's attention: a human PR's CI failed, or an
+#                  approved PR has green CI but is not in the merge queue (it fell
+#                  out, or needs a human to enqueue/merge it).
+#   - Approved   - not a draft, already has an approving review, and is still
+#                  waiting on something automated: CI is pending, or it is sitting
+#                  in the merge queue.
+#   - Done       - the PR is closed (merged or otherwise); terminal. Once the
+#                  board Status is Done, this workflow never changes it again,
+#                  so a late event (CI completion, review relay, etc.) cannot
+#                  overwrite Done set earlier by merge automation.
+# Bot vs. human: on a CI failure a Bot PR goes to Revising (the bot fixes it
+# itself); a human PR (Internal/Community) goes to Snagged. The merge-queue drop
+# is Snagged for both, since a human assignee always resolves that.
+#
+# This is the event-driven half of the PR maintenance state machine; sweep mode
+# (pr-sweep-nightly.yml) runs the same per-PR engine over every open PR. Full
+# architecture, state machine, assignment rules, and caller map:
+#   .github/workflows/pr-board-sync.md
+#
+# The inlined committer-signal + assignee block is unit-tested by
+# .github/scripts/{pr-signal,pr-assign}.test.js, and the Source-classification
+# and team-roster blocks by pr-classify.test.js (via extract-workflow-js.js).
+#
+# Cross-repo reuse: any shader-slang repo adds a thin caller workflow that
+# declares the PR event triggers and calls this one, mapping the single required
+# secret explicitly (no `secrets: inherit`; callers should set `permissions: {}`
+# because this workflow uses the PAT for everything, not the GITHUB_TOKEN):
+#
+#   jobs:
+#     board-sync:
+#       uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+#       secrets:
+#         SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}
+#
+# All shader-slang repos feed the SAME board, so every input below already
+# defaults to the shared board's values; callers pass only the one secret.
+#
+# Required secret (a shader-slang **org-level** secret, shared org-wide):
+#   SLANG_PR_BOT_TOKEN - a dedicated bot PAT used for EVERY GitHub call this
+#     workflow makes (so growing its capabilities never changes the caller
+#     contract — you widen this PAT's scopes centrally, callers are untouched).
+#     Scopes needed: org Projects read+write (board) and Members read; repo
+#     Contents read, Pull requests write, Issues write, Metadata read. Members
+#     read is what Source classification needs; when a team roster remains
+#     unreadable after bounded retries, no Source is written and a later
+#     workflow run retries with a fresh in-memory cache.
+#
+# Safety: every job runs only on PR metadata / API calls and never checks out or
+# executes PR code, so `pull_request_target` (secrets available for fork PRs) is
+# safe here. This is also why the privileged `workflow_run` path (below) is safe.
+#
+# Triggers and fork secrets (PUBLIC repo): callers drive this via privileged
+# events that DO receive the secret for fork PRs -- `pull_request_target` (PR
+# lifecycle/commits), `workflow_run` (CI completion + the fork-review relay),
+# `status` (external commit statuses), and `schedule` (the sweep).
+# `pull_request_review` only receives the secret for ORIGIN PRs; a fork review
+# runs the fork head with no secret, so the caller routes fork reviews through an
+# unprivileged bridge whose completion fires a privileged `workflow_run` here
+# (see the dispatch's `workflow_run` branch). When no token is delivered, every
+# privileged step is gated off (HAS_TOKEN) and the run skips cleanly; the sweep
+# is the backstop.
+#
+# Why CI/check results come via `workflow_run` and `status`, NOT `check_suite`:
+# GitHub deliberately does not deliver `check_suite`/`check_run` events for suites
+# created by GitHub Actions (recursion prevention), so a `check_suite` trigger
+# never fires for this repo's Actions-based CI. `workflow_run` IS delivered for
+# Actions runs, so it carries "an Actions workflow finished" -- a CI failure (or
+# recovery) that lands after a PR's last push reaches the board in real time
+# instead of waiting for the nightly sweep. External, non-Actions checks instead
+# post a commit `status` (e.g. "SlangPy Tests", "license/cla", "CodeRabbit"),
+# which `computeTarget` folds into the CI rollup; the `status` event is the only
+# signal that carries those. A caller may still subscribe to `check_suite` for
+# any non-Actions, GitHub-App-created suites; the dispatch handles it.
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: "event (default): reconcile the single PR from the triggering event. sweep: reconcile every open PR in this repo (for a scheduled cadence run), the periodic backstop for events the per-event path cannot see."
+        type: string
+        default: "event"
+      project_id:
+        description: "ProjectsV2 board node id (the 'Slang PR Tracking' board)."
+        type: string
+        default: "PVT_kwDOAb2kZs4BSJKy"
+      status_field:
+        description: "Single-select field name for the board Status."
+        type: string
+        default: "Status"
+      status_inreview:
+        type: string
+        default: "In Review"
+      status_revising:
+        type: string
+        default: "Revising"
+      status_snagged:
+        type: string
+        default: "Snagged"
+      status_approved:
+        type: string
+        default: "Approved"
+      status_done:
+        type: string
+        default: "Done"
+      source_field:
+        description: "Single-select field name for the PR Source."
+        type: string
+        default: "Source"
+      source_internal:
+        type: string
+        default: "Internal"
+      source_community:
+        type: string
+        default: "Community"
+      source_bot:
+        type: string
+        default: "Bot"
+      source_internal_team:
+        description: "Base org/team-slug for Source Internal (default shader-slang/source-internal). Also includes sibling teams whose slug starts with that slug plus '-' (e.g. source-internal-*) when their description has 'Scope: [repo1, repo2]' listing repositories (bare short names or owner/repo; matching is by short name). Scope authoring: label is case-insensitive, first Scope: wins, write 'Scope: [...]' with no space before the colon."
+        type: string
+        default: "shader-slang/source-internal"
+      bot_authors:
+        description: "Comma-separated logins always treated as bots."
+        type: string
+        default: "nv-slang-bot,slang-coworker-nanoclaw,Copilot,copilot-swe-agent"
+      ignored_reviewers:
+        description: "Comma-separated auto-assigned reviewers that cannot approve; unrequested on the PR."
+        type: string
+        default: "bmillsNV"
+      owners_team:
+        description: "org/team-slug whose members may be inherited as a Community PR's assignee from a linked issue."
+        type: string
+        default: "shader-slang/pr-owners"
+      bot_owners_team:
+        description: "org/team-slug whose members may be inherited as a Bot PR's assignee from a linked issue."
+        type: string
+        default: "shader-slang/bot-pr-owners"
+      maintainer_team:
+        description: "org/team-slug tracking the current maintainer(s); the fallback assignee when a non-Internal PR has no linked-issue or committer-signal owner."
+        type: string
+        default: "shader-slang/slang-maintainer"
+      fallback_assignee:
+        description: "Last-resort assignee for a non-Internal PR when maintainer_team is empty/unset/unreadable and no linked-issue or committer-signal owner is found, so PRs are never left unassigned. Never requested as a reviewer (it is typically an ignored non-approver). Empty disables this fallback (the PR is left to the sweep)."
+        type: string
+        default: "bmillsNV"
+    secrets:
+      SLANG_PR_BOT_TOKEN:
+        description: "Dedicated bot PAT used for every GitHub call this workflow makes (org Projects RW + Members read; repo Contents read, Pull requests write, Issues write, Metadata read)."
+        required: true
+
+# Every step authenticates with SLANG_PR_BOT_TOKEN, so the GITHUB_TOKEN is unused;
+# deny it entirely. (Callers therefore need no permissions block.)
+permissions: {}
+
+jobs:
+  board-sync:
+    runs-on: ubuntu-latest
+    # Serialize events for the same PR so two near-simultaneous events (e.g.
+    # opened + a fast synchronize) cannot double-write; cancel-in-progress: false
+    # lets the in-flight run finish and queues the next. The commit-scoped events
+    # (check_suite / workflow_run / status) key on their head SHA rather than a PR
+    # number, so they serialize against each other for the same commit -- which
+    # matters now that pr-ci-complete fans out to several gating workflows whose
+    # completions for one commit would otherwise run concurrently. They can still
+    # overlap a PR-number-keyed event, but that is benign: the assignment pick is
+    # deterministic and the Status writes are idempotent recomputes.
+    concurrency:
+      group: pr-board-sync-${{ github.event.pull_request.number || github.event.check_suite.head_sha || github.event.workflow_run.head_sha || github.event.sha || github.run_id }}
+      cancel-in-progress: false
+    # HAS_TOKEN is false when SLANG_PR_BOT_TOKEN is not delivered to the run. On a
+    # PUBLIC repo, GitHub withholds secrets from fork-PR head-context events
+    # (pull_request_review / pull_request); it also fails to resolve for a repo
+    # that has not configured the secret. github-script hard-errors on an empty
+    # github-token, so every privileged step is gated on this and skips cleanly --
+    # the nightly sweep, a later pull_request_target event, or (for fork reviews)
+    # the workflow_run path reconciles instead. pull_request_target, check_suite,
+    # workflow_run, and schedule are privileged and DO receive the secret for forks.
+    env:
+      HAS_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN != '' }}
+    steps:
+      # --- No-token breadcrumb: explain a skipped run -------------------------
+      - name: Note skipped (no token)
+        if: ${{ env.HAS_TOKEN != 'true' }}
+        run: |
+          echo "Skipping board sync: SLANG_PR_BOT_TOKEN is not available to this run."
+          echo "(Fork-PR head-context event on a public repo, or unconfigured repo.)"
+          echo "The nightly sweep / a later pull_request_target / the workflow_run path will reconcile."
+
+      # --- Classify Source (source-internal team; opened/reopened only) --------
+      - name: Classify PR Source
+        id: classify
+        if: >-
+          env.HAS_TOKEN == 'true' &&
+          github.event_name == 'pull_request_target' &&
+          (github.event.action == 'opened' || github.event.action == 'reopened')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          BOT_AUTHORS: ${{ inputs.bot_authors }}
+          SOURCE_INTERNAL: ${{ inputs.source_internal }}
+          SOURCE_COMMUNITY: ${{ inputs.source_community }}
+          SOURCE_BOT: ${{ inputs.source_bot }}
+          SOURCE_INTERNAL_TEAM: ${{ inputs.source_internal_team }}
+        with:
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
+          script: |
+            const user = context.payload.pull_request.user;
+            const login = user.login;
+            const botAuthors = (process.env.BOT_AUTHORS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+            const isBot = user.type === "Bot" ||
+              botAuthors.includes((login || "").toLowerCase());
+
+            // Shared Source-classification helpers, copied VERBATIM from the
+            // reconcile step's extract-js blocks (that copy is the unit-tested
+            // source of truth). This is a separate github-script invocation, so
+            // it cannot share heap state with reconcile -- but pr-classify.test.js
+            // asserts every extracted function here is byte-identical to the
+            // tested reconcile copy, so drift fails CI.
+            // ----- extract-js:team-roster-onboarding:begin -----
+            const DEFAULT_MAX_TEAM_READ_ATTEMPTS = 3;
+            const DEFAULT_TEAM_READ_BACKOFF_MS = 1000;
+
+            // Build the per-run team-read cache used by Source classification and
+            // by the owners/maintainer pools. paginateTeams({org}) and
+            // paginateMembers({org, team_slug}) return arrays; throw {status}
+            // on failure. warn(message) records a warning. sleep(ms) is injectable
+            // so tests can observe the exponential backoff without actually waiting.
+            //
+            // tryListTeamMembers return shapes:
+            //   - empty Set — bare/blank teamSpec (definitely nobody)
+            //   - null — all retry attempts failed (also "unknown": do not guess
+            //     Source). This settled failure is cached for the rest of the run;
+            //     the next workflow run starts with a fresh cache and retries.
+            //   - non-empty Set — successful read (cached for the run)
+            function createTeamReadCache({
+              paginateTeams, paginateMembers, warn,
+              sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+              maxAttempts = DEFAULT_MAX_TEAM_READ_ATTEMPTS,
+              baseDelayMs = DEFAULT_TEAM_READ_BACKOFF_MS,
+            }) {
+              const warned = {};
+              function warnOnce(message) {
+                if (warned[message]) return;
+                warned[message] = true;
+                warn(message);
+              }
+              async function readWithBackoff(label, read) {
+                let lastError;
+                for (let attempt = 1; attempt <= maxAttempts; ++attempt) {
+                  try {
+                    return await read();
+                  } catch (error) {
+                    lastError = error;
+                    if (attempt === maxAttempts) break;
+                    const delayMs = baseDelayMs * (2 ** (attempt - 1));
+                    warn(
+                      `${label} (${error.status}); retrying in ${delayMs}ms ` +
+                      `(${attempt}/${maxAttempts})`);
+                    await sleep(delayMs);
+                  }
+                }
+                warn(
+                  `${label} after ${maxAttempts} attempts (${lastError?.status})`);
+                return null;
+              }
+              let orgTeams; // undefined = unread; null = retries exhausted
+              async function listOrgTeams(org) {
+                if (orgTeams !== undefined) return orgTeams;
+                orgTeams = await readWithBackoff(
+                  `could not list teams in ${org}`,
+                  () => paginateTeams({ org }));
+                return orgTeams;
+              }
+              const teamCache = {};
+              async function tryListTeamMembers(teamSpec) {
+                if (!teamSpec || !teamSpec.includes("/")) return new Set();
+                if (Object.hasOwn(teamCache, teamSpec)) return teamCache[teamSpec];
+                const slash = teamSpec.indexOf("/");
+                const org = teamSpec.slice(0, slash);
+                const slug = teamSpec.slice(slash + 1);
+                const data = await readWithBackoff(
+                  `could not list team ${teamSpec}`,
+                  () => paginateMembers({ org, team_slug: slug }));
+                teamCache[teamSpec] = data
+                  ? new Set(data.map(m => m.login))
+                  : null;
+                return teamCache[teamSpec];
+              }
+              // Empty on any read error — for owners/maintainer pools, where an
+              // unreadable team just means no pick from it.
+              async function listTeamMembers(teamSpec) {
+                return (await tryListTeamMembers(teamSpec)) || new Set();
+              }
+              return {
+                warnOnce, listOrgTeams, tryListTeamMembers, listTeamMembers,
+                readWithBackoff, maxAttempts,
+              };
+            }
+            // ----- extract-js:team-roster-onboarding:end -----
+            // ----- extract-js:classify-onboarding:begin -----
+            // Short repo name (lowercased), from "owner/name" or a bare name.
+            function repoShortName(repo) {
+              if (!repo) return "";
+              const slash = String(repo).lastIndexOf("/");
+              return (slash >= 0 ? String(repo).slice(slash + 1) : String(repo)).toLowerCase();
+            }
+
+            // Parse "Scope: [repo1, repo2]" from a team description into short
+            // repo names (lowercased). Bare names and owner/name forms are both
+            // accepted; the owner is stripped, so Scope: [otherorg/slangpy]
+            // matches shader-slang/slangpy (short names are unique in practice).
+            // Returns [] when Scope: [...] is absent. The brackets delimit the
+            // list so other description text can follow. The label is
+            // case-insensitive; a space before the colon (e.g. "Scope :") is
+            // not accepted — write `Scope: [...]` exactly.
+            function parseTeamScopeRepos(description) {
+              if (!description) return [];
+              const match = String(description).match(/\bScope:\s*\[([^\]]*)\]/i);
+              if (!match) return [];
+              return match[1].split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+                const slash = s.lastIndexOf("/");
+                return (slash >= 0 ? s.slice(slash + 1) : s).toLowerCase();
+              });
+            }
+
+            // True when teamSlug is the base source-internal team or a sibling
+            // whose slug starts with "<base>-" (e.g. source-internal-slangpy).
+            function isSourceInternalFamilySlug(baseSlug, teamSlug) {
+              if (!baseSlug || !teamSlug) return false;
+              return teamSlug === baseSlug || teamSlug.startsWith(baseSlug + "-");
+            }
+
+            // True when login is in the member set (case-insensitive).
+            function isInternalLogin(login, members) {
+              if (!login || !members) return false;
+              const lower = login.toLowerCase();
+              for (const m of members) {
+                if ((m || "").toLowerCase() === lower) return true;
+              }
+              return false;
+            }
+
+            // Effective Internal member set for a repo, from the source-internal
+            // team family: one entry per team, { repos, members }, where
+            // repos === null marks the base team (it covers every repo) and any
+            // other entry covers just the repos its Scope: lists.
+            //
+            // Returns null -- meaning "membership is unknown for this repo" --
+            // when the family is null (the org team list was unreadable) or when
+            // a team that covers this repo has a falsy members (null/undefined;
+            // its roster was unreadable). Relies on loadSourceInternalIndex
+            // always including the base entry (repos === null) in a non-null
+            // family; without that, a repo covered by nothing would look like
+            // Community instead of unknown. Callers must not treat null as
+            // "not a member": a transient API error would then be persisted as
+            // Community.
+            function internalMembersForRepo(repo, teams) {
+              if (!teams) return null;
+              const short = repoShortName(repo);
+              const out = new Set();
+              for (const t of teams) {
+                if (t.repos) {
+                  let hit = false;
+                  for (const r of t.repos) {
+                    if ((r || "").toLowerCase() === short) { hit = true; break; }
+                  }
+                  if (!hit) continue;
+                }
+                if (!t.members) return null;
+                for (const m of t.members) if (m) out.add(m);
+              }
+              return out;
+            }
+
+            // Classify Source from bot flag + resolved team membership, or null
+            // when membership could not be determined so the caller leaves Source
+            // unset. Any falsy members (null/undefined) is that unknown; an
+            // EMPTY set is a successful read of a family nobody is on, hence
+            // Community.
+            function classifyAuthorSource({ isBot, login, members,
+                                           sourceBot, sourceInternal, sourceCommunity }) {
+              if (isBot) return sourceBot;
+              if (!members) return null;
+              return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
+            }
+            // ----- extract-js:classify-onboarding:end -----
+            // ----- extract-js:source-internal-index-onboarding:begin -----
+            async function loadSourceInternalIndex({
+              teamSpec, listOrgTeams, tryListTeamMembers, warnOnce,
+              parseTeamScopeRepos, isSourceInternalFamilySlug,
+            }) {
+              if (!teamSpec || !teamSpec.includes("/")) return [];
+              const slash = teamSpec.indexOf("/");
+              const org = teamSpec.slice(0, slash);
+              const baseSlug = teamSpec.slice(slash + 1);
+              const teams = await listOrgTeams(org);
+              if (!teams) return null;
+              const family = [];
+              for (const team of teams) {
+                const slug = team.slug || "";
+                if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
+                const members = await tryListTeamMembers(`${org}/${slug}`);
+                if (slug === baseSlug) {
+                  family.push({ repos: null, members });
+                } else {
+                  const repos = parseTeamScopeRepos(team.description || "");
+                  // A sibling with no parseable Scope: [...] contributes nobody, so
+                  // its members would silently look Community. Name it in the log
+                  // rather than letting the misconfiguration pass as a plausible
+                  // Source.
+                  if (repos.length) family.push({ repos, members });
+                  else warnOnce(
+                    `team ${org}/${slug} has no 'Scope: [repo, ...]'; ignoring it`);
+                }
+              }
+              // A configured base team that is absent from the listing (renamed,
+              // deleted, or invisible to this token) would silently make every
+              // author Community, so treat it as unreadable instead.
+              if (!family.some(t => t.repos === null)) {
+                warnOnce(`team ${teamSpec} not found in ${org}; leaving Source unset`);
+                return null;
+              }
+              return family;
+            }
+            // ----- extract-js:source-internal-index-onboarding:end -----
+
+            // Wire the shared helpers to Actions github/core. Same wiring as
+            // reconcile; a one-PR onboarding run still benefits from in-call
+            // backoff retries and caches the settled result for this step.
+            const {
+              warnOnce, listOrgTeams, tryListTeamMembers,
+            } = createTeamReadCache({
+              paginateTeams: ({ org }) => github.paginate(
+                github.rest.teams.list, { org, per_page: 100 }),
+              paginateMembers: ({ org, team_slug }) => github.paginate(
+                github.rest.teams.listMembersInOrg,
+                { org, team_slug, per_page: 100 }),
+              warn: (message) => core.warning(message),
+            });
+
+            // Internal iff the author is on the base source_internal_team or on a
+            // sibling source-internal-* team whose Scope: includes this repo. Any
+            // roster we could not read leaves membership unknown, and we then set
+            // no output at all: the board's Source is authoritative once written,
+            // so a transient API error must not land there as Community. The
+            // reconcile step / sweep fills it in instead.
+            const teamSpec = process.env.SOURCE_INTERNAL_TEAM || "";
+            const repoName = context.repo.repo;
+            const members = isBot
+              ? null
+              : internalMembersForRepo(
+                  repoName, await loadSourceInternalIndex({
+                    teamSpec,
+                    listOrgTeams,
+                    tryListTeamMembers,
+                    warnOnce,
+                    parseTeamScopeRepos,
+                    isSourceInternalFamilySlug,
+                  }));
+            const source = classifyAuthorSource({
+              isBot, login, members,
+              sourceBot: process.env.SOURCE_BOT,
+              sourceInternal: process.env.SOURCE_INTERNAL,
+              sourceCommunity: process.env.SOURCE_COMMUNITY,
+            });
+            if (source) {
+              if (isBot) {
+                console.log(`PR author ${login}; classified as Bot`);
+              } else {
+                console.log(
+                  `PR author ${login}; source-internal for ${repoName}: ${isInternalLogin(login, members)}`);
+              }
+              core.setOutput("source", source);
+            } else {
+              core.warning(
+                `could not determine Source for ${login}; leaving it to the sweep`);
+            }
+
+      # --- Board writes: add + Source + Status (ProjectsV2 PAT) ---------------
+      - name: Reconcile board (add, Source, Status)
+        if: ${{ env.HAS_TOKEN == 'true' }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          MODE: ${{ inputs.mode }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          STATUS_FIELD: ${{ inputs.status_field }}
+          STATUS_INREVIEW: ${{ inputs.status_inreview }}
+          STATUS_REVISING: ${{ inputs.status_revising }}
+          STATUS_SNAGGED: ${{ inputs.status_snagged }}
+          STATUS_APPROVED: ${{ inputs.status_approved }}
+          STATUS_DONE: ${{ inputs.status_done }}
+          SOURCE_FIELD: ${{ inputs.source_field }}
+          SOURCE_VALUE: ${{ steps.classify.outputs.source }}
+          SOURCE_INTERNAL: ${{ inputs.source_internal }}
+          SOURCE_COMMUNITY: ${{ inputs.source_community }}
+          SOURCE_BOT: ${{ inputs.source_bot }}
+          SOURCE_INTERNAL_TEAM: ${{ inputs.source_internal_team }}
+          BOT_AUTHORS: ${{ inputs.bot_authors }}
+          IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
+          OWNERS_TEAM: ${{ inputs.owners_team }}
+          BOT_OWNERS_TEAM: ${{ inputs.bot_owners_team }}
+          MAINTAINER_TEAM: ${{ inputs.maintainer_team }}
+          FALLBACK_ASSIGNEE: ${{ inputs.fallback_assignee }}
+        with:
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
+          script: |
+            const PROJECT_ID = process.env.PROJECT_ID;
+            const STATUS = {
+              field: process.env.STATUS_FIELD,
+              inreview: process.env.STATUS_INREVIEW,
+              revising: process.env.STATUS_REVISING,
+              snagged: process.env.STATUS_SNAGGED,
+              approved: process.env.STATUS_APPROVED,
+              done: process.env.STATUS_DONE,
+            };
+            const SOURCE_FIELD = process.env.SOURCE_FIELD;
+            const SOURCE_INTERNAL = process.env.SOURCE_INTERNAL;
+            const SOURCE_COMMUNITY = process.env.SOURCE_COMMUNITY;
+            const SWEEP = process.env.MODE === "sweep";
+            const BOT_AUTHORS = (process.env.BOT_AUTHORS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+            const IGNORED = new Set((process.env.IGNORED_REVIEWERS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean));
+            const OWNERS_TEAM = process.env.OWNERS_TEAM || "";
+            const BOT_OWNERS_TEAM = process.env.BOT_OWNERS_TEAM || "";
+            const MAINTAINER_TEAM = process.env.MAINTAINER_TEAM || "";
+            const SOURCE_INTERNAL_TEAM = process.env.SOURCE_INTERNAL_TEAM || "";
+            const FALLBACK_ASSIGNEE = process.env.FALLBACK_ASSIGNEE || "";
+
+            // Committer-signal ranking + assignee/reviewer selection, inlined so
+            // this reusable workflow needs NO checkout when called cross-repo
+            // (a checkout in a reusable workflow lands the CALLER's repo, not this
+            // one). This block is the single source of truth; the unit tests
+            // (.github/scripts/pr-signal.test.js, pr-assign.test.js) extract THIS
+            // block from the YAML at run time via extract-workflow-js.js.
+            // ----- extract-js:assignment:begin -----
+            const DEFAULT_SIGNAL_FINALISTS = 6; // top candidates re-scored by true per-file LOC
+            const DEFAULT_SIGNAL_CLEAR_MARGIN = 1.5; // skip the tiebreak when #1 leads #2 by this factor
+
+            // --- Run-scoped cache ------------------------------------------------------
+            // Holds ONLY raw, PR-independent source data so a file's history or a commit's
+            // per-file stats are fetched once per run no matter how many PRs touch them.
+            // Per-PR weighting/attribution is always recomputed.
+            function makeCache() {
+              return {
+                fileHistory: new Map(), // `${repo}\x00${path}` -> cheap-pass commit rows
+                commitFiles: new Map(), // `${repo}\x00${sha}`  -> {path: max(add, del)}
+              };
+            }
+
+            // --- Pure helpers ----------------------------------------------------------
+
+            // True when an author should be treated as a bot (matches 'name', 'name[bot]',
+            // or 'app/name' against the configured bot authors).
+            function classifyIsBot(author, botAuthors) {
+              const a = (author || "").toLowerCase();
+              for (let b of botAuthors || []) {
+                b = (b || "").trim().toLowerCase();
+                if (!b) continue;
+                const base = a.replace("[bot]", "").replace("app/", "");
+                if (base === b || a === b) return true;
+              }
+              return false;
+            }
+
+            // A login that should never be credited with committer signal: any GitHub App
+            // ([bot] suffix), an unmapped/empty login, or a configured bot author.
+            function isBotLogin(login, botAuthors) {
+              if (!login) return true;
+              return login.toLowerCase().endsWith("[bot]") || classifyIsBot(login, botAuthors);
+            }
+
+            // Who a past commit's signal counts for. Prefer the commit author; but when the
+            // author is a bot, unmapped, OR the current PR's author, fall back to the last
+            // approver of the PR that introduced the commit. The PR author and bots are
+            // never credited, so the commit is dropped if no eligible approver remains.
+            function attributeCommit(authorLogin, lastApprover, prAuthor, botAuthors) {
+              const author = authorLogin || "";
+              if (author && !isBotLogin(author, botAuthors)
+                  && author.toLowerCase() !== prAuthor.toLowerCase()) {
+                return author;
+              }
+              if (!lastApprover || lastApprover.toLowerCase() === prAuthor.toLowerCase()
+                  || isBotLogin(lastApprover, botAuthors)) {
+                return null;
+              }
+              return lastApprover;
+            }
+
+            // Translate an fnmatch-style glob to an anchored RegExp (`*` and `**`
+            // match any chars incl. '/'; `?` matches one char).
+            function _globToRegExp(glob) {
+              let re = "";
+              for (let i = 0; i < glob.length; i++) {
+                const c = glob[i];
+                if (c === "*") {
+                  re += ".*";
+                } else if (c === "?") {
+                  re += ".";
+                } else if (c === "[") {
+                  let j = i + 1;
+                  if (j < glob.length && (glob[j] === "!" || glob[j] === "^")) j++;
+                  if (j < glob.length && glob[j] === "]") j++;
+                  while (j < glob.length && glob[j] !== "]") j++;
+                  if (j >= glob.length) {
+                    re += "\\["; // unterminated class -> literal '['
+                  } else {
+                    let inner = glob.slice(i + 1, j).replace(/\\/g, "\\\\");
+                    if (inner[0] === "!") inner = "^" + inner.slice(1);
+                    re += "[" + inner + "]";
+                    i = j;
+                  }
+                } else {
+                  re += c.replace(/[.+^${}()|\\\/]/g, "\\$&");
+                }
+              }
+              return new RegExp("^" + re + "$", "s");
+            }
+
+            // Multiplier for `path`: the longest (most specific) matching directory glob
+            // wins; `default` if none match.
+            function matchFileMultiplier(path, table, dflt) {
+              let bestLen = -1;
+              let bestMult = dflt;
+              for (const [glob, mult] of table) {
+                if (_globToRegExp(glob).test(path) && glob.length > bestLen) {
+                  bestLen = glob.length;
+                  bestMult = mult;
+                }
+              }
+              return bestMult;
+            }
+
+            // Per-file signal = LOC * file_multiplier, for every changed file.
+            function perFileSignals(locByFile, table, dflt) {
+              const out = {};
+              for (const [path, loc] of Object.entries(locByFile)) {
+                out[path] = loc * matchFileMultiplier(path, table, dflt);
+              }
+              return out;
+            }
+
+            // Keep the top-`k` files by signal and normalize them into weights summing to 1.
+            // Files with non-positive total contribute nothing.
+            function topKWeights(signals, k) {
+              const ranked = Object.entries(signals)
+                .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+                .slice(0, k);
+              let total = 0;
+              for (const [, s] of ranked) if (s > 0) total += s;
+              if (total <= 0) return {};
+              const out = {};
+              for (const [path, s] of ranked) if (s > 0) out[path] = s / total;
+              return out;
+            }
+
+            // Per-committer overall signal = sum over files of weight * LOC-in-file.
+            function overallSignal(fileWeights, locByFileLogin) {
+              const out = {};
+              for (const [path, weight] of Object.entries(fileWeights)) {
+                const perLogin = locByFileLogin[path] || {};
+                for (const [login, loc] of Object.entries(perLogin)) {
+                  out[login] = (out[login] || 0) + weight * loc;
+                }
+              }
+              return out;
+            }
+
+            // Logins ordered by overall signal (largest first); tie-break by login.
+            function rankLogins(overall) {
+              return Object.entries(overall)
+                .sort((a, b) => (b[1] - a[1]) || (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+                .map(([login]) => login);
+            }
+
+            // Whether the cheap (total-LOC) top two are close enough to warrant the
+            // per-file-LOC tiebreak. False on a clear winner (or <2 candidates).
+            function needsTiebreak(cheapOverall, ranked, clearMargin) {
+              if (ranked.length < 2) return false;
+              const top = cheapOverall[ranked[0]] || 0;
+              const second = cheapOverall[ranked[1]] || 0;
+              if (second <= 0) return false;
+              return top < clearMargin * second;
+            }
+
+            // Re-order the top-`n` finalists by their refined (per-file-LOC) score, keeping
+            // the remaining tail in cheap order.
+            function mergeRefined(ranked, n, refinedOverall) {
+              const finalists = ranked.slice(0, n);
+              finalists.sort((a, b) => {
+                const sa = refinedOverall[a] || 0;
+                const sb = refinedOverall[b] || 0;
+                return (sb - sa) || (a < b ? 1 : a > b ? -1 : 0);
+              });
+              return finalists.concat(ranked.slice(n));
+            }
+
+            // --- GraphQL: batched per-file history (cheap pass) ------------------------
+
+            const _HISTORY_QUERY_HEAD = `
+            query($owner: String!, $name: String!, $since: GitTimestamp!, $n: Int!) {
+              repository(owner: $owner, name: $name) {
+                defaultBranchRef { target { ... on Commit {
+            `;
+            const _HISTORY_QUERY_TAIL = `
+                } } }
+              }
+            }
+            `;
+            function _historyFileField(i, path) {
+              return `
+                  f${i}: history(path: ${JSON.stringify(path)}, since: $since, first: $n) {
+                    nodes {
+                      oid
+                      additions
+                      deletions
+                      author { user { login } }
+                      associatedPullRequests(first: 1) { nodes {
+                        reviews(first: 20, states: [APPROVED]) { nodes {
+                          submittedAt
+                          author { login }
+                        } }
+                      } }
+                    }
+                  }
+            `;
+            }
+
+            // Login of the latest APPROVED review on the commit's associated PR.
+            function lastApprover(commitNode) {
+              const prs = ((commitNode.associatedPullRequests || {}).nodes) || [];
+              if (!prs.length) return null;
+              const reviews = ((prs[0].reviews || {}).nodes) || [];
+              const dated = reviews.filter((r) => r.submittedAt);
+              if (!dated.length) return null;
+              dated.sort((a, b) => (a.submittedAt < b.submittedAt ? -1 : a.submittedAt > b.submittedAt ? 1 : 0));
+              return ((dated[dated.length - 1].author || {}).login) || null;
+            }
+
+            // Per path, the last `commits` default-branch commits since `since`, as
+            // path -> [{oid, author, loc(total), lastApprover}]. A file's default-branch
+            // history is PR-independent, so results are cached by (repo, path) in
+            // `historyCache` (run-scoped). Only uncached paths are fetched, in one batched
+            // query; if all are cached, no request is made.
+            async function fetchFileHistories(gh, repo, paths, since, commits, historyCache) {
+              if (!historyCache) historyCache = new Map();
+              const key = (p) => `${repo}\x00${p}`;
+              const uncached = paths.filter((p) => !historyCache.has(key(p)));
+              if (uncached.length) {
+                const [owner, name] = repo.split("/", 2);
+                const fields = uncached.map((path, i) => _historyFileField(i, path)).join("");
+                const query = _HISTORY_QUERY_HEAD + fields + _HISTORY_QUERY_TAIL;
+                const data = await gh.graphql(query, { owner, name, since, n: commits });
+                const target = (((((data || {}).repository) || {}).defaultBranchRef) || {}).target || {};
+                uncached.forEach((path, i) => {
+                  const nodes = ((target[`f${i}`] || {}).nodes) || [];
+                  const commitList = [];
+                  for (const node of nodes) {
+                    const author = ((((node.author || {}).user) || {}).login) || "";
+                    const loc = Math.max(node.additions || 0, node.deletions || 0);
+                    commitList.push({
+                      oid: node.oid || "",
+                      author,
+                      loc,
+                      lastApprover: lastApprover(node),
+                    });
+                  }
+                  historyCache.set(key(path), commitList);
+                });
+              }
+              const out = {};
+              for (const p of paths) out[p] = historyCache.get(key(p));
+              return out;
+            }
+
+            // max(additions, deletions) that commit `sha` changed in `path`. Caches the
+            // whole commit's per-file stats by (repo, sha) so a commit touching several
+            // files — or shared across PRs — is fetched once (run-scoped dedup).
+            async function commitFileLoc(gh, repo, sha, path, cache) {
+              const key = `${repo}\x00${sha}`;
+              let detail = cache.get(key);
+              if (detail === undefined) {
+                detail = {};
+                const files = (await gh.commitFiles(repo, sha)) || [];
+                for (const rec of files) {
+                  const filename = rec.filename;
+                  if (filename) detail[filename] = Math.max(rec.additions || 0, rec.deletions || 0);
+                }
+                cache.set(key, detail);
+              }
+              return detail[path] || 0;
+            }
+
+            // --- Top-level ranking -----------------------------------------------------
+
+            // The GraphQL `since` timestamp for the signal horizon. Computed once per run so
+            // cache keys are stable across PRs.
+            function horizonSince(horizonDays, now) {
+              const base = now ? new Date(now) : new Date();
+              const t = new Date(base.getTime() - horizonDays * 24 * 60 * 60 * 1000);
+              return t.toISOString().replace(/\.\d{3}Z$/, "Z");
+            }
+
+            // Attribute each file's commit-TOTAL LOC to a login, returning per-file
+            // (login -> LOC) and (login -> [oid]). The oids let the tiebreak fetch true
+            // per-file LOC for only the commits that matter.
+            function _cheapPass(history, prAuthor, botAuthors) {
+              const cheapLoc = {};
+              const oidsByFileLogin = {};
+              for (const [path, commitList] of Object.entries(history)) {
+                const perLogin = {};
+                const perOids = {};
+                for (const commit of commitList) {
+                  const attributed = attributeCommit(
+                    commit.author, commit.lastApprover, prAuthor, botAuthors);
+                  if (!attributed || commit.loc <= 0) continue;
+                  perLogin[attributed] = (perLogin[attributed] || 0) + commit.loc;
+                  if (commit.oid) (perOids[attributed] = perOids[attributed] || []).push(commit.oid);
+                }
+                if (Object.keys(perLogin).length) {
+                  cheapLoc[path] = perLogin;
+                  oidsByFileLogin[path] = perOids;
+                }
+              }
+              return { cheapLoc, oidsByFileLogin };
+            }
+
+            // Re-score the finalists with TRUE per-file LOC, deduped via the run-scoped
+            // commit cache so shared commits are fetched once.
+            async function _refineFinalists(gh, repo, weights, oidsByFileLogin, finalistSet, cache) {
+              const refinedLoc = {};
+              for (const path of Object.keys(weights)) {
+                const refinedPerLogin = {};
+                const perOids = oidsByFileLogin[path] || {};
+                for (const [login, oids] of Object.entries(perOids)) {
+                  if (!finalistSet.has(login)) continue;
+                  let total = 0;
+                  for (const oid of oids) total += await commitFileLoc(gh, repo, oid, path, cache.commitFiles);
+                  if (total > 0) refinedPerLogin[login] = total;
+                }
+                if (Object.keys(refinedPerLogin).length) refinedLoc[path] = refinedPerLogin;
+              }
+              return refinedLoc;
+            }
+
+            // Ranked candidate committer logins for the PR (highest signal first), excluding
+            // the PR author and bots: a cheap total-LOC pass, then a per-file-LOC tiebreak
+            // over the top `finalists` only when they are close.
+            async function computeCommitterRanking(gh, repo, prAuthor, opts) {
+              const {
+                locByFile,
+                fileMultipliers,
+                defaultMultiplier,
+                topFiles,
+                commits,
+                horizonDays,
+                botAuthors,
+                finalists = DEFAULT_SIGNAL_FINALISTS,
+                clearMargin = DEFAULT_SIGNAL_CLEAR_MARGIN,
+              } = opts;
+              const cache = opts.cache || makeCache();
+              const since = opts.since || horizonSince(horizonDays);
+
+              const weights = topKWeights(
+                perFileSignals(locByFile, fileMultipliers, defaultMultiplier), topFiles);
+              if (!Object.keys(weights).length) return [];
+
+              const history = await fetchFileHistories(
+                gh, repo, Object.keys(weights), since, commits, cache.fileHistory);
+              const { cheapLoc, oidsByFileLogin } = _cheapPass(history, prAuthor, botAuthors);
+              const cheapOverall = overallSignal(weights, cheapLoc);
+              const cheapRanked = rankLogins(cheapOverall);
+
+              if (!needsTiebreak(cheapOverall, cheapRanked, clearMargin)) {
+                return cheapRanked; // clear winner (or <2 candidates): cheap pass suffices
+              }
+
+              const finalistSet = new Set(cheapRanked.slice(0, finalists));
+              const refinedLoc = await _refineFinalists(gh, repo, weights, oidsByFileLogin, finalistSet, cache);
+              const refinedOverall = overallSignal(weights, refinedLoc);
+              return mergeRefined(cheapRanked, finalists, refinedOverall);
+            }
+
+            function _toSet(x) {
+              return x instanceof Set ? x : new Set(x || []);
+            }
+
+            function selectAssigneeAndReviewers(opts) {
+              const {
+                issueAssignees = [],
+                committersBySignal = [],
+                author,
+                maintainer,
+                existingReviewers = [],
+                botAuthors = [],
+              } = opts;
+              const owners = _toSet(opts.owners);
+              const collaborators = _toSet(opts.collaborators);
+              const ignoredLower = new Set([..._toSet(opts.ignoredReviewers)].map((r) => r.toLowerCase()));
+              const excluded = (author || "").toLowerCase();
+
+              const issueOwnerAssignees = issueAssignees.filter(
+                (a) => owners.has(a) && a.toLowerCase() !== excluded && !a.toLowerCase().endsWith("[bot]"));
+              const ownerCommitters = committersBySignal.filter((c) => owners.has(c));
+
+              let assignee;
+              if (issueOwnerAssignees.length) assignee = issueOwnerAssignees[0];
+              else if (ownerCommitters.length) assignee = ownerCommitters[0];
+              else assignee = maintainer;
+
+              // A reviewer who can actually approve already requested? Then add no more.
+              const realExisting = existingReviewers.filter(
+                (r) => r && !ignoredLower.has(r.toLowerCase())
+                  && !classifyIsBot(r, botAuthors) && !r.toLowerCase().endsWith("[bot]"));
+              if (realExisting.length) return { assignee, reviewers: [] };
+
+              const reviewers = [assignee];
+              const extra = committersBySignal.filter((c) => collaborators.has(c) && !owners.has(c));
+              if (extra.length && extra[0] !== assignee) reviewers.push(extra[0]);
+
+              // GitHub rejects requesting review from the PR author; then dedupe (order-preserving).
+              const seen = new Set();
+              const deduped = [];
+              for (const r of reviewers) {
+                if (!r || r.toLowerCase() === excluded) continue;
+                if (!seen.has(r.toLowerCase())) {
+                  seen.add(r.toLowerCase());
+                  deduped.push(r);
+                }
+              }
+              return { assignee, reviewers: deduped };
+            }
+            // ----- extract-js:assignment:end -----
+
+            // Committer-signal weighting defaults (file multipliers, top-files,
+            // commit sample, horizon). Event and sweep mode share these constants.
+            const FILE_MULTIPLIERS = [
+              ["source/slang/**", 3.0],
+              ["source/**", 2.0],
+              ["tools/**", 1.5],
+              ["tests/**", 1.0],
+              ["docs/**", 0.5],
+            ];
+            const DEFAULT_MULTIPLIER = 1.0;
+            const SIGNAL_TOP_FILES = 10;
+            const SIGNAL_COMMITS = 5;
+            const SIGNAL_HORIZON_DAYS = 180;
+            const SIGNAL_FINALISTS = 6;
+            const SIGNAL_CLEAR_MARGIN = 1.5;
+            // Run-scoped signal caches (raw, PR-independent source data) so a sweep
+            // fetches each file's history / commit stats once across all PRs, not
+            // once per PR. `since` is computed once for stable cache keys.
+            const SIGNAL_CACHE = makeCache();
+            const SIGNAL_SINCE = horizonSince(SIGNAL_HORIZON_DAYS);
+
+            // `gh` client the signal modules expect: octokit-shaped graphql plus a
+            // commitFiles(repo, sha) -> [{filename, additions, deletions}] helper.
+            const ghAdapter = {
+              graphql: (query, variables) => github.graphql(query, variables),
+              commitFiles: async (repo, sha) => {
+                const [o, n] = repo.split("/");
+                const r = await github.rest.repos.getCommit({ owner: o, repo: n, ref: sha });
+                return (r.data.files || []).map(f => ({
+                  filename: f.filename, additions: f.additions, deletions: f.deletions }));
+              },
+            };
+
+            // --- ProjectsV2 helpers ------------------------------------------
+            const fieldCache = {};
+            async function field(name) {
+              if (fieldCache[name]) return fieldCache[name];
+              const data = await github.graphql(`
+                query($project: ID!, $name: String!) {
+                  node(id: $project) {
+                    ... on ProjectV2 {
+                      field(name: $name) {
+                        ... on ProjectV2SingleSelectField { id options { id name } }
+                      }
+                    }
+                  }
+                }`, { project: PROJECT_ID, name });
+              const f = data?.node?.field || {};
+              const options = {};
+              for (const o of (f.options || [])) options[o.name] = o.id;
+              fieldCache[name] = { id: f.id, options };
+              return fieldCache[name];
+            }
+
+            // addProjectV2ItemById is idempotent: returns the existing item id
+            // when the PR is already on the board.
+            async function ensureItem(contentId) {
+              if (!contentId) return null;
+              const r = await github.graphql(`
+                mutation($project: ID!, $content: ID!) {
+                  addProjectV2ItemById(input: {projectId: $project, contentId: $content}) {
+                    item { id }
+                  }
+                }`, { project: PROJECT_ID, content: contentId });
+              return r?.addProjectV2ItemById?.item?.id || null;
+            }
+
+            async function setSingleSelect(itemId, fieldName, optionName) {
+              if (!itemId || !optionName) return;
+              const f = await field(fieldName);
+              const optionId = (f.options || {})[optionName];
+              if (!f.id || !optionId) {
+                core.warning(`field ${fieldName} option ${optionName} not found on board`);
+                return;
+              }
+              await github.graphql(`
+                mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $project, itemId: $item, fieldId: $field,
+                    value: { singleSelectOptionId: $option }
+                  }) { projectV2Item { id } }
+                }`, { project: PROJECT_ID, item: itemId, field: f.id, option: optionId });
+              console.log(`set ${fieldName} = ${optionName}`);
+            }
+
+            // Read a single-select field's current value name on a board item
+            // (e.g. the PR's Source), or null when unset.
+            async function itemSingleSelect(itemId, fieldName) {
+              const data = await github.graphql(`
+                query($item: ID!, $name: String!) {
+                  node(id: $item) {
+                    ... on ProjectV2Item {
+                      fieldValueByName(name: $name) {
+                        ... on ProjectV2ItemFieldSingleSelectValue { name }
+                      }
+                    }
+                  }
+                }`, { item: itemId, name: fieldName });
+              return data?.node?.fieldValueByName?.name || null;
+            }
+
+            // Done is terminal on the board: once set (by this workflow's closed
+            // handler or other merge automation), never move the card back into
+            // the live state machine on a late-arriving event.
+            async function isBoardStatusDone(itemId) {
+              return (await itemSingleSelect(itemId, STATUS.field)) === STATUS.done;
+            }
+
+            // --- CI rollup (mirror summarize_ci / ci_state_from_rollup) -------
+            function summarizeCi(runs) {
+              if (!runs.length) return "none";
+              let pending = false, failed = false;
+              for (const r of runs) {
+                if (r.conclusion === "action_required") return "action_required";
+                if (r.status !== "completed") { pending = true; continue; }
+                if (!["success", "neutral", "skipped"].includes(r.conclusion)) failed = true;
+              }
+              if (pending) return "pending";
+              if (failed) return "failed";
+              return "passed";
+            }
+
+            // One query per PR: everything computeTarget needs - draft, author
+            // (bot), merge-queue membership, CI rollup, and each reviewer's latest
+            // opinionated review with the commit it was made on (so we can tell
+            // whether the feedback is on the *current* head commit).
+            async function prInfo(number) {
+              const data = await github.graphql(`
+                query($owner: String!, $name: String!, $n: Int!) {
+                  repository(owner: $owner, name: $name) {
+                    pullRequest(number: $n) {
+                      id isDraft state
+                      author { login __typename }
+                      assignees(first: 10) { nodes { login } }
+                      reviewRequests(first: 20) { nodes { requestedReviewer { __typename ... on User { login } } } }
+                      closingIssuesReferences(first: 10) { nodes { number assignees(first: 20) { nodes { login } } } }
+                      files(first: 100) { nodes { path additions deletions } }
+                      mergeQueueEntry { id }
+                      latestOpinionatedReviews(first: 100) { nodes { state commit { oid } } }
+                      commits(last: 1) { nodes { commit { oid statusCheckRollup {
+                        contexts(first: 100) { nodes {
+                          __typename
+                          ... on CheckRun { status conclusion }
+                          ... on StatusContext { state }
+                        } }
+                      } } } }
+                    }
+                  }
+                }`, { owner: context.repo.owner, name: context.repo.repo, n: number });
+              const pr = data?.repository?.pullRequest;
+              if (!pr) return null;
+              const headCommit = pr.commits?.nodes?.[0]?.commit || {};
+              const contexts = headCommit.statusCheckRollup?.contexts?.nodes || [];
+              const runs = [];
+              for (const c of contexts) {
+                if (c.__typename === "CheckRun") {
+                  runs.push({
+                    status: (c.status || "").toLowerCase(),
+                    conclusion: (c.conclusion || "").toLowerCase(),
+                  });
+                } else {
+                  const state = (c.state || "").toUpperCase();
+                  if (state === "SUCCESS") runs.push({ status: "completed", conclusion: "success" });
+                  else if (state === "FAILURE" || state === "ERROR") runs.push({ status: "completed", conclusion: "failure" });
+                  else runs.push({ status: "in_progress", conclusion: null });
+                }
+              }
+              const login = (pr.author?.login || "").toLowerCase();
+              const isBot = pr.author?.__typename === "Bot" || BOT_AUTHORS.includes(login);
+              // A reviewer's opinion counts only if it was made on the CURRENT head
+              // commit; an opinion on an earlier commit was superseded by a newer
+              // push (so the PR is back to In Review until re-reviewed). This is
+              // commit-identity, not timestamps - a later comment-only review or a
+              // late-pushed older commit can't revive stale feedback.
+              const headOid = headCommit.oid;
+              const states = (pr.latestOpinionatedReviews?.nodes || [])
+                .filter(r => r.commit && r.commit.oid === headOid)
+                .map(r => r.state);
+              const changeRequested = states.includes("CHANGES_REQUESTED");
+              const approved = states.includes("APPROVED") && !changeRequested;
+              // Assignment inputs: who is assigned, which real reviewers are
+              // requested, and the assignees of the PR's linked (closing) issues.
+              const authorLogin = pr.author?.login || "";
+              const assignees = (pr.assignees?.nodes || [])
+                .map(n => n.login).filter(Boolean);
+              const requestedReviewers = (pr.reviewRequests?.nodes || [])
+                .map(n => n.requestedReviewer)
+                .filter(r => r && r.__typename === "User" && r.login)
+                .map(r => r.login);
+              const linkedIssues = [];
+              const issueAssignees = [];
+              for (const iss of (pr.closingIssuesReferences?.nodes || [])) {
+                const issAssignees = (iss.assignees?.nodes || [])
+                  .map(a => a.login).filter(Boolean);
+                if (iss.number) {
+                  linkedIssues.push({ number: iss.number, assignees: issAssignees });
+                }
+                for (const login of issAssignees) {
+                  if (!issueAssignees.includes(login)) issueAssignees.push(login);
+                }
+              }
+              // PR's own changed-file LOC (path -> max(add, del)) for the
+              // committer-signal ranking.
+              const changedFiles = {};
+              for (const f of (pr.files?.nodes || [])) {
+                if (f.path)
+                  changedFiles[f.path] = Math.max(f.additions || 0, f.deletions || 0);
+              }
+              return {
+                nodeId: pr.id, isDraft: pr.isDraft, isBot,
+                ci: summarizeCi(runs), approved, changeRequested,
+                inMergeQueue: pr.mergeQueueEntry != null,
+                authorLogin, assignees, requestedReviewers, issueAssignees,
+                linkedIssues, changedFiles,
+              };
+            }
+
+            // The Status an OPEN PR should currently carry, from observed state.
+            // Shared by event mode and sweep mode. Priority (first match wins):
+            //   1. A current changes-request -> Revising (must revise; ranked above
+            //      the draft rule so even a Bot draft with a changes-request is
+            //      Revising). "Current" = the review was made on the head commit;
+            //      an opinion on an earlier commit is superseded by a newer push.
+            //   2. Draft -> a human draft is Revising (author still working); a Bot
+            //      draft is In Review, since bot PRs arrive as drafts and a human
+            //      owner must see/shepherd them. (Ranked above CI, so a Bot draft
+            //      with merely failing CI still shows In Review.)
+            //   3. CI needs approval (action_required, e.g. a fork PR awaiting a
+            //      maintainer to approve the run) -> Snagged (always; a human gates
+            //      it). CI failed -> Revising (Bot, fixes itself) / Snagged (human).
+            //   4. Approved + not stale: Approved while still waiting on something
+            //      automated (CI pending, or in the merge queue); Snagged once CI
+            //      is green and it is NOT queued (nothing automated left - a human
+            //      must enqueue/merge it; also how a merge-queue drop reads).
+            //   5. Otherwise -> In Review (awaiting review, CI pending, or a fresh
+            //      commit with no feedback yet).
+            function computeTarget(info) {
+              if (info.changeRequested) return STATUS.revising;
+              if (info.isDraft) return info.isBot ? STATUS.inreview : STATUS.revising;
+              if (info.ci === "action_required") return STATUS.snagged;
+              if (info.ci === "failed") return info.isBot ? STATUS.revising : STATUS.snagged;
+              if (info.approved) {
+                return (info.ci === "passed" && !info.inMergeQueue)
+                  ? STATUS.snagged : STATUS.approved;
+              }
+              return STATUS.inreview;
+            }
+
+            // Team-roster caching helpers. Extracted so unit tests can inject a
+            // fake paginate (see pr-classify.test.js), matching the pr-signal
+            // countingGh pattern.
+            // ----- extract-js:team-roster:begin -----
+            const DEFAULT_MAX_TEAM_READ_ATTEMPTS = 3;
+            const DEFAULT_TEAM_READ_BACKOFF_MS = 1000;
+
+            // Build the per-run team-read cache used by Source classification and
+            // by the owners/maintainer pools. paginateTeams({org}) and
+            // paginateMembers({org, team_slug}) return arrays; throw {status}
+            // on failure. warn(message) records a warning. sleep(ms) is injectable
+            // so tests can observe the exponential backoff without actually waiting.
+            //
+            // tryListTeamMembers return shapes:
+            //   - empty Set — bare/blank teamSpec (definitely nobody)
+            //   - null — all retry attempts failed (also "unknown": do not guess
+            //     Source). This settled failure is cached for the rest of the run;
+            //     the next workflow run starts with a fresh cache and retries.
+            //   - non-empty Set — successful read (cached for the run)
+            function createTeamReadCache({
+              paginateTeams, paginateMembers, warn,
+              sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+              maxAttempts = DEFAULT_MAX_TEAM_READ_ATTEMPTS,
+              baseDelayMs = DEFAULT_TEAM_READ_BACKOFF_MS,
+            }) {
+              const warned = {};
+              function warnOnce(message) {
+                if (warned[message]) return;
+                warned[message] = true;
+                warn(message);
+              }
+              async function readWithBackoff(label, read) {
+                let lastError;
+                for (let attempt = 1; attempt <= maxAttempts; ++attempt) {
+                  try {
+                    return await read();
+                  } catch (error) {
+                    lastError = error;
+                    if (attempt === maxAttempts) break;
+                    const delayMs = baseDelayMs * (2 ** (attempt - 1));
+                    warn(
+                      `${label} (${error.status}); retrying in ${delayMs}ms ` +
+                      `(${attempt}/${maxAttempts})`);
+                    await sleep(delayMs);
+                  }
+                }
+                warn(
+                  `${label} after ${maxAttempts} attempts (${lastError?.status})`);
+                return null;
+              }
+              let orgTeams; // undefined = unread; null = retries exhausted
+              async function listOrgTeams(org) {
+                if (orgTeams !== undefined) return orgTeams;
+                orgTeams = await readWithBackoff(
+                  `could not list teams in ${org}`,
+                  () => paginateTeams({ org }));
+                return orgTeams;
+              }
+              const teamCache = {};
+              async function tryListTeamMembers(teamSpec) {
+                if (!teamSpec || !teamSpec.includes("/")) return new Set();
+                if (Object.hasOwn(teamCache, teamSpec)) return teamCache[teamSpec];
+                const slash = teamSpec.indexOf("/");
+                const org = teamSpec.slice(0, slash);
+                const slug = teamSpec.slice(slash + 1);
+                const data = await readWithBackoff(
+                  `could not list team ${teamSpec}`,
+                  () => paginateMembers({ org, team_slug: slug }));
+                teamCache[teamSpec] = data
+                  ? new Set(data.map(m => m.login))
+                  : null;
+                return teamCache[teamSpec];
+              }
+              // Empty on any read error — for owners/maintainer pools, where an
+              // unreadable team just means no pick from it.
+              async function listTeamMembers(teamSpec) {
+                return (await tryListTeamMembers(teamSpec)) || new Set();
+              }
+              return {
+                warnOnce, listOrgTeams, tryListTeamMembers, listTeamMembers,
+                readWithBackoff, maxAttempts,
+              };
+            }
+            // ----- extract-js:team-roster:end -----
+
+            // Wire the extracted helpers to the Actions github/core objects.
+            // Team metadata (listOrgTeams) is always safe to cache once read;
+            // that keeps loadSourceInternalIndex a pure in-memory rebuild per PR.
+            const {
+              warnOnce, listOrgTeams, tryListTeamMembers, listTeamMembers,
+            } = createTeamReadCache({
+              paginateTeams: ({ org }) => github.paginate(
+                github.rest.teams.list, { org, per_page: 100 }),
+              paginateMembers: ({ org, team_slug }) => github.paginate(
+                github.rest.teams.listMembersInOrg,
+                { org, team_slug, per_page: 100 }),
+              warn: (message) => core.warning(message),
+            });
+
+            // Logins with write+ access to this repo (the extra-reviewer pool).
+            // Empty on access error (listing collaborators needs repo admin/push),
+            // so the extra reviewer is simply skipped -- never a hard failure.
+            // Cached per run.
+            let _collabCache;
+            async function repoCollaborators() {
+              if (_collabCache) return _collabCache;
+              try {
+                const data = await github.paginate(
+                  github.rest.repos.listCollaborators,
+                  { owner: context.repo.owner, repo: context.repo.repo,
+                    affiliation: "all", per_page: 100 });
+                _collabCache = new Set(
+                  data.filter(c => c.permissions && c.permissions.push).map(c => c.login));
+              } catch (error) {
+                core.warning(`could not list collaborators (${error.status}); no extra reviewer`);
+                _collabCache = new Set();
+              }
+              return _collabCache;
+            }
+
+            // The fallback assignee for a non-Internal PR that has no linked-issue
+            // or committer-signal owner: the (sorted-first) member of the
+            // maintainer team, else FALLBACK_ASSIGNEE (e.g. bmillsNV) when that
+            // team is unset/empty/unreadable, so a PR is never left unassigned.
+            // Only "" if both are unset, in which case selectAssigneeAndReviewers
+            // yields no pick and we leave it to the sweep. Cached per run.
+            let _maintainer;
+            async function resolveMaintainer() {
+              if (_maintainer !== undefined) return _maintainer;
+              const members = [...await listTeamMembers(MAINTAINER_TEAM)].sort();
+              if (members.length > 1)
+                core.warning(
+                  `maintainer team ${MAINTAINER_TEAM} has ${members.length} members; using ${members[0]}`);
+              _maintainer = members[0] || FALLBACK_ASSIGNEE;
+              return _maintainer;
+            }
+
+            // The PR's primary owner assignee when it is already assigned. For a
+            // Community PR the owner is the assignee who is not the author (the
+            // co-assigned contributor); for Internal/Bot PRs it is the sole owner.
+            function primaryOwnerAssignee(info, source) {
+              if (!info.assignees.length) return null;
+              if (source === SOURCE_COMMUNITY && info.authorLogin) {
+                const owner = info.assignees.find(
+                  a => a.toLowerCase() !== info.authorLogin.toLowerCase());
+                if (owner) return owner;
+              }
+              return info.assignees[0];
+            }
+
+            // Assign each still-unassigned linked (closing) issue to the PR's owner.
+            // Idempotent: issues that already have an assignee are left alone.
+            async function syncLinkedIssueAssignees(ownerLogin, linkedIssues) {
+              if (!ownerLogin || !linkedIssues?.length) return;
+              for (const iss of linkedIssues) {
+                if (iss.assignees?.length) continue;
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    issue_number: iss.number, assignees: [ownerLogin],
+                  });
+                  console.log(`assigned issue #${iss.number} -> ${ownerLogin}`);
+                } catch (error) {
+                  core.warning(
+                    `could not assign issue #${iss.number} (${error.status})`);
+                }
+              }
+            }
+
+            // Backfill a PR's assignee + reviewers (issue-owner -> committer-signal
+            // owner -> maintainer; reviewers = assignee + top dev-not-owner unless a
+            // real reviewer is already requested). Internal PRs go to the author with
+            // no requested reviewer. PR assignment is idempotent: only ever touches an
+            // UNASSIGNED PR. Linked-issue assignment is also idempotent: only unassigned
+            // issues are updated, including when the PR was assigned earlier or the
+            // issue was linked later.
+            async function reconcileAssignment(info, source, number) {
+              if (!source) return;                     // Source unknown -> leave to sweep
+              if (info.assignees.length) {
+                await syncLinkedIssueAssignees(
+                  primaryOwnerAssignee(info, source), info.linkedIssues);
+                return;                                  // PR already assigned
+              }
+              if (info.inMergeQueue) return;            // far enough along
+              if (info.isDraft && !info.isBot) return;  // human draft: author's "not ready"
+
+              let assignee, reviewers;
+              if (source === SOURCE_INTERNAL) {
+                // Internal: the author drives; assign them, request no reviewers.
+                assignee = info.authorLogin;
+                reviewers = [];
+              } else {
+                // Community/Bot: full committer-signal selection against the
+                // relevant owners pool, with the maintainer as the final fallback.
+                const ownersTeam =
+                  (source === process.env.SOURCE_BOT) ? BOT_OWNERS_TEAM : OWNERS_TEAM;
+                const [owners, collaborators, maintainer] = await Promise.all([
+                  listTeamMembers(ownersTeam),
+                  repoCollaborators(),
+                  resolveMaintainer(),
+                ]);
+                const ranking = await computeCommitterRanking(
+                  ghAdapter, `${context.repo.owner}/${context.repo.repo}`, info.authorLogin, {
+                    locByFile: info.changedFiles,
+                    fileMultipliers: FILE_MULTIPLIERS,
+                    defaultMultiplier: DEFAULT_MULTIPLIER,
+                    topFiles: SIGNAL_TOP_FILES,
+                    commits: SIGNAL_COMMITS,
+                    horizonDays: SIGNAL_HORIZON_DAYS,
+                    botAuthors: BOT_AUTHORS,
+                    finalists: SIGNAL_FINALISTS,
+                    clearMargin: SIGNAL_CLEAR_MARGIN,
+                    cache: SIGNAL_CACHE,
+                    since: SIGNAL_SINCE,
+                  });
+                ({ assignee, reviewers } = selectAssigneeAndReviewers({
+                  issueAssignees: info.issueAssignees,
+                  committersBySignal: ranking,
+                  owners,
+                  collaborators,
+                  author: info.authorLogin,
+                  maintainer,
+                  existingReviewers: info.requestedReviewers,
+                  botAuthors: BOT_AUTHORS,
+                  ignoredReviewers: [...IGNORED],
+                }));
+              }
+              if (!assignee) return;                    // no owner and no maintainer
+
+              await github.rest.issues.addAssignees({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: number, assignees: [assignee],
+              });
+              console.log(`assigned ${assignee} (source ${source})`);
+
+              // For a Community PR, also co-assign the original author. ProjectsV2
+              // has no people-typed custom field, so the built-in Assignees column
+              // is the only place an external contributor renders as a real,
+              // linked identity on the board -- co-assigning them is how we surface
+              // "who wrote it" alongside the owner. This is best-effort and runs
+              // after the owner assignment so an unassignable author cannot block
+              // ownership or reviewer setup. Bot/Internal PRs are unaffected -- a
+              // bot author is noise, and an Internal author is already the assignee.
+              if (source === SOURCE_COMMUNITY && info.authorLogin &&
+                  info.authorLogin.toLowerCase() !== assignee.toLowerCase()) {
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    issue_number: number, assignees: [info.authorLogin],
+                  });
+                  console.log(`co-assigned community author ${info.authorLogin}`);
+                } catch (error) {
+                  core.warning(
+                    `could not co-assign community author ${info.authorLogin} (${error.status})`);
+                }
+              }
+
+              // Unrequest auto-assigned non-approvers (e.g. bmillsNV), coupled to
+              // assignment exactly as the sweep does.
+              const toRemove =
+                info.requestedReviewers.filter(r => IGNORED.has(r.toLowerCase()));
+              if (toRemove.length) {
+                await github.rest.pulls.removeRequestedReviewers({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  pull_number: number, reviewers: toRemove,
+                });
+              }
+
+              // Request the selected reviewers (assignee + top dev-not-owner). The
+              // selection already drops the author and the case where a real
+              // reviewer is present. Also never request an ignored non-approver
+              // (e.g. the bmillsNV fallback assignee), which can legitimately leave
+              // the reviewer set empty -- that is fine.
+              const toRequest = reviewers.filter(r => !IGNORED.has(r.toLowerCase()));
+              if (toRequest.length) {
+                try {
+                  await github.rest.pulls.requestReviewers({
+                    owner: context.repo.owner, repo: context.repo.repo,
+                    pull_number: number, reviewers: toRequest,
+                  });
+                } catch (error) {
+                  core.warning(
+                    `could not request reviewers ${toRequest.join(", ")} (${error.status})`);
+                }
+              }
+
+              await syncLinkedIssueAssignees(assignee, info.linkedIssues);
+            }
+
+            // Classify a PR's Source from observed state: Bot for a bot author,
+            // else Internal iff the author is in source_internal_team (org-wide)
+            // or a sibling source-internal-* team whose description Scope:
+            // includes this repo, else Community. Used when the board has no
+            // Source yet and no freshly-classified value is available (sweep mode
+            // or a non-onboarding event). Yields no Source at all when the team
+            // rosters cannot be read, since the value we write becomes
+            // authoritative and is never re-derived.
+            //
+            // Pure helpers below are the unit-tested source of truth
+            // (.github/scripts/pr-classify.test.js extracts this block). The
+            // opened/reopened Classify PR Source step mirrors them.
+            // ----- extract-js:classify:begin -----
+            // Short repo name (lowercased), from "owner/name" or a bare name.
+            function repoShortName(repo) {
+              if (!repo) return "";
+              const slash = String(repo).lastIndexOf("/");
+              return (slash >= 0 ? String(repo).slice(slash + 1) : String(repo)).toLowerCase();
+            }
+
+            // Parse "Scope: [repo1, repo2]" from a team description into short
+            // repo names (lowercased). Bare names and owner/name forms are both
+            // accepted; the owner is stripped, so Scope: [otherorg/slangpy]
+            // matches shader-slang/slangpy (short names are unique in practice).
+            // Returns [] when Scope: [...] is absent. The brackets delimit the
+            // list so other description text can follow. The label is
+            // case-insensitive; a space before the colon (e.g. "Scope :") is
+            // not accepted — write `Scope: [...]` exactly.
+            function parseTeamScopeRepos(description) {
+              if (!description) return [];
+              const match = String(description).match(/\bScope:\s*\[([^\]]*)\]/i);
+              if (!match) return [];
+              return match[1].split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
+                const slash = s.lastIndexOf("/");
+                return (slash >= 0 ? s.slice(slash + 1) : s).toLowerCase();
+              });
+            }
+
+            // True when teamSlug is the base source-internal team or a sibling
+            // whose slug starts with "<base>-" (e.g. source-internal-slangpy).
+            function isSourceInternalFamilySlug(baseSlug, teamSlug) {
+              if (!baseSlug || !teamSlug) return false;
+              return teamSlug === baseSlug || teamSlug.startsWith(baseSlug + "-");
+            }
+
+            // True when login is in the member set (case-insensitive).
+            function isInternalLogin(login, members) {
+              if (!login || !members) return false;
+              const lower = login.toLowerCase();
+              for (const m of members) {
+                if ((m || "").toLowerCase() === lower) return true;
+              }
+              return false;
+            }
+
+            // Effective Internal member set for a repo, from the source-internal
+            // team family: one entry per team, { repos, members }, where
+            // repos === null marks the base team (it covers every repo) and any
+            // other entry covers just the repos its Scope: lists.
+            //
+            // Returns null -- meaning "membership is unknown for this repo" --
+            // when the family is null (the org team list was unreadable) or when
+            // a team that covers this repo has a falsy members (null/undefined;
+            // its roster was unreadable). Relies on loadSourceInternalIndex
+            // always including the base entry (repos === null) in a non-null
+            // family; without that, a repo covered by nothing would look like
+            // Community instead of unknown. Callers must not treat null as
+            // "not a member": a transient API error would then be persisted as
+            // Community.
+            function internalMembersForRepo(repo, teams) {
+              if (!teams) return null;
+              const short = repoShortName(repo);
+              const out = new Set();
+              for (const t of teams) {
+                if (t.repos) {
+                  let hit = false;
+                  for (const r of t.repos) {
+                    if ((r || "").toLowerCase() === short) { hit = true; break; }
+                  }
+                  if (!hit) continue;
+                }
+                if (!t.members) return null;
+                for (const m of t.members) if (m) out.add(m);
+              }
+              return out;
+            }
+
+            // Classify Source from bot flag + resolved team membership, or null
+            // when membership could not be determined so the caller leaves Source
+            // unset. Any falsy members (null/undefined) is that unknown; an
+            // EMPTY set is a successful read of a family nobody is on, hence
+            // Community.
+            function classifyAuthorSource({ isBot, login, members,
+                                           sourceBot, sourceInternal, sourceCommunity }) {
+              if (isBot) return sourceBot;
+              if (!members) return null;
+              return isInternalLogin(login, members) ? sourceInternal : sourceCommunity;
+            }
+            // ----- extract-js:classify:end -----
+
+            // The source-internal team family in this org, as the { repos, members }
+            // entries internalMembersForRepo consumes: the base team (repos null,
+            // covering every repo) plus each sibling with a parseable Scope:.
+            // null means the family is unusable (see below).
+            //
+            // Both API reads this needs are cached by their own helpers -- the org
+            // team listing in listOrgTeams, each roster in tryListTeamMembers -- so
+            // for a sweep this is one enumeration for the whole run and a pure
+            // in-memory rebuild per PR after that. A read retries with exponential
+            // backoff before returning; its settled success or failure is cached
+            // for the rest of this run. A new workflow run starts with a fresh
+            // cache. An empty family (no team configured) is a successful read:
+            // every non-bot author is then Community.
+            // Inject API and parsing dependencies so tests exercise the exact
+            // family-assembly code used by both event and sweep reconciliation.
+            // ----- extract-js:source-internal-index:begin -----
+            async function loadSourceInternalIndex({
+              teamSpec, listOrgTeams, tryListTeamMembers, warnOnce,
+              parseTeamScopeRepos, isSourceInternalFamilySlug,
+            }) {
+              if (!teamSpec || !teamSpec.includes("/")) return [];
+              const slash = teamSpec.indexOf("/");
+              const org = teamSpec.slice(0, slash);
+              const baseSlug = teamSpec.slice(slash + 1);
+              const teams = await listOrgTeams(org);
+              if (!teams) return null;
+              const family = [];
+              for (const team of teams) {
+                const slug = team.slug || "";
+                if (!isSourceInternalFamilySlug(baseSlug, slug)) continue;
+                const members = await tryListTeamMembers(`${org}/${slug}`);
+                if (slug === baseSlug) {
+                  family.push({ repos: null, members });
+                } else {
+                  const repos = parseTeamScopeRepos(team.description || "");
+                  // A sibling with no parseable Scope: [...] contributes nobody, so
+                  // its members would silently look Community. Name it in the log
+                  // rather than letting the misconfiguration pass as a plausible
+                  // Source.
+                  if (repos.length) family.push({ repos, members });
+                  else warnOnce(
+                    `team ${org}/${slug} has no 'Scope: [repo, ...]'; ignoring it`);
+                }
+              }
+              // A configured base team that is absent from the listing (renamed,
+              // deleted, or invisible to this token) would silently make every
+              // author Community, so treat it as unreadable instead.
+              if (!family.some(t => t.repos === null)) {
+                warnOnce(`team ${teamSpec} not found in ${org}; leaving Source unset`);
+                return null;
+              }
+              return family;
+            }
+            // ----- extract-js:source-internal-index:end -----
+
+            // Classify a PR's Source, or null when membership for this repo could
+            // not be read -- reconcileStatus then leaves Source unset for a later
+            // run rather than persisting a transient error as Community.
+            async function classifySource(info) {
+              const members = info.isBot
+                ? null
+                : internalMembersForRepo(
+                    context.repo.repo, await loadSourceInternalIndex({
+                      teamSpec: SOURCE_INTERNAL_TEAM,
+                      listOrgTeams,
+                      tryListTeamMembers,
+                      warnOnce,
+                      parseTeamScopeRepos,
+                      isSourceInternalFamilySlug,
+                    }));
+              return classifyAuthorSource({
+                isBot: info.isBot, login: info.authorLogin, members,
+                sourceBot: process.env.SOURCE_BOT,
+                sourceInternal: SOURCE_INTERNAL,
+                sourceCommunity: SOURCE_COMMUNITY,
+              });
+            }
+
+            // Numbers of every open PR in this repo (paginated). The sweep's outer
+            // enumeration; the per-PR engine below is shared with the event path.
+            async function listOpenPullRequests() {
+              const numbers = [];
+              let cursor = null;
+              for (;;) {
+                const data = await github.graphql(`
+                  query($owner: String!, $name: String!, $cursor: String) {
+                    repository(owner: $owner, name: $name) {
+                      pullRequests(states: OPEN, first: 100, after: $cursor,
+                                   orderBy: {field: UPDATED_AT, direction: DESC}) {
+                        pageInfo { hasNextPage endCursor }
+                        nodes { number }
+                      }
+                    }
+                  }`, { owner: context.repo.owner, name: context.repo.repo, cursor });
+                const conn = data?.repository?.pullRequests;
+                for (const n of (conn?.nodes || [])) numbers.push(n.number);
+                if (!conn?.pageInfo?.hasNextPage) break;
+                cursor = conn.pageInfo.endCursor;
+              }
+              return numbers;
+            }
+
+            // Reconcile a PR's board Source + Status to its observed state, then
+            // backfill its assignee. Used by every event that can change the lattice
+            // state AND by the sweep, so each just recomputes the whole target rather
+            // than hard-coding a transition.
+            async function reconcileStatus(number, nodeId, itemId) {
+              const info = await prInfo(number);
+              if (!info) return;
+              itemId = itemId || await ensureItem(nodeId || info.nodeId);
+              if (!itemId) return;
+              if (await isBoardStatusDone(itemId)) {
+                console.log(`#${number} already Done; skipping reconcile`);
+                return;
+              }
+              // Resolve Source: the board value when set (authoritative; honors a
+              // manual override), else the freshly-classified value (opened/reopened),
+              // else classify now (sweep mode or an event without the classify step).
+              // Backfill the board when it had none. is_bot is then "Source == Bot".
+              // Classification yields nothing when the source-internal rosters were
+              // unreadable; we then write no Source (and skip assignment, which
+              // depends on it) and leave both to a later sweep.
+              let resolvedSource = await itemSingleSelect(itemId, SOURCE_FIELD);
+              if (!resolvedSource) {
+                resolvedSource = process.env.SOURCE_VALUE || await classifySource(info);
+                if (resolvedSource) await setSingleSelect(itemId, SOURCE_FIELD, resolvedSource);
+              }
+              if (resolvedSource) info.isBot = (resolvedSource === process.env.SOURCE_BOT);
+              // Only write Status when it actually changes, so a sweep over every PR
+              // does not rewrite (and re-timeline) unchanged cards every night.
+              const target = computeTarget(info);
+              if ((await itemSingleSelect(itemId, STATUS.field)) !== target) {
+                await setSingleSelect(itemId, STATUS.field, target);
+              }
+              // Assignment is best-effort: a failure here (e.g. an unrequestable
+              // reviewer, or a transient API error in the signal ranking) must not
+              // undo the Status write or fail the run -- the sweep will reconcile.
+              try {
+                await reconcileAssignment(info, resolvedSource, number);
+              } catch (error) {
+                core.warning(`assignment failed for #${number}: ${error.message || error}`);
+              }
+            }
+
+            // Resolve a commit SHA (and any pre-listed PRs) to its open PR(s) and
+            // reconcile each. check_suite and workflow_run are both commit-scoped
+            // and their pull_requests array is empty for fork PRs, so resolve via
+            // the API too. (One commit can head several PRs, hence a set.)
+            async function reconcileByCommit(headSha, prNodes) {
+              const numbers = new Set();
+              for (const p of (prNodes || [])) {
+                if (!p.state || p.state === "open") numbers.add(p.number);
+              }
+              if (headSha) {
+                try {
+                  const assoc = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                    owner: context.repo.owner, repo: context.repo.repo, commit_sha: headSha });
+                  for (const p of (assoc.data || [])) {
+                    if (p.state === "open") numbers.add(p.number);
+                  }
+                } catch (error) {
+                  core.warning(`could not resolve PRs for ${headSha} (${error.status})`);
+                }
+              }
+              for (const number of numbers) await reconcileStatus(number, null);
+            }
+
+            // --- Dispatch on the triggering event ----------------------------
+            const ev = context.eventName;
+            const action = context.payload.action;
+
+            if (SWEEP) {
+              // Cadence sweep: reconcile every open PR in this repo. The per-PR
+              // engine (Source/Status/assignment) is shared with the event path;
+              // only this enumeration differs. The idempotency guards in
+              // reconcileStatus / reconcileAssignment keep an unchanged PR a no-op.
+              const numbers = await listOpenPullRequests();
+              console.log(`sweep: reconciling ${numbers.length} open PR(s)`);
+              for (const number of numbers) {
+                await reconcileStatus(number, null);
+              }
+            } else if (ev === "pull_request_target") {
+              const pr = context.payload.pull_request;
+              const itemId = await ensureItem(pr.node_id);
+              if (!itemId) { core.warning("could not add PR to board"); return; }
+
+              if (action === "opened" || action === "reopened") {
+                // Set the classified Source only when the board has none yet, so
+                // an existing value (incl. a manual override, e.g. on reopen) is
+                // authoritative -- only backfill when the board has none yet.
+                const source = process.env.SOURCE_VALUE;
+                if (source && !(await itemSingleSelect(itemId, SOURCE_FIELD))) {
+                  await setSingleSelect(itemId, SOURCE_FIELD, source);
+                }
+              }
+
+              if (action === "closed") {
+                // Closed (merged or otherwise) -> Done; terminal, and the only
+                // state not derived from computeTarget (a closed PR is not open).
+                // Skip when already Done so merge automation's earlier write is
+                // not duplicated on the timeline.
+                if (!(await isBoardStatusDone(itemId))) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.done);
+                }
+              } else if (action === "dequeued") {
+                // Fell out of the merge queue -> Snagged (a human re-queues/merges).
+                // The cadence sweep agrees: a dequeue does not change the head
+                // commit, and a PR needs green CI to have been enqueued, so the
+                // dropped PR reads approved + green + un-queued, which computeTarget
+                // also maps to Snagged. (A new commit is the one thing that makes
+                // head CI pending, but that dequeues via `synchronize` -> In Review.)
+                if (!(await isBoardStatusDone(itemId))) {
+                  await setSingleSelect(itemId, STATUS.field, STATUS.snagged);
+                }
+              } else {
+                // opened / reopened / edited / synchronize / enqueued /
+                // ready_for_review / converted_to_draft: recompute the whole target
+                // from current state.
+                await reconcileStatus(pr.number, pr.node_id, itemId);
+              }
+            } else if (ev === "pull_request_review") {
+              // Any review (approve / changes-request / dismiss) -> recompute.
+              const pr = context.payload.pull_request;
+              const itemId = await ensureItem(pr.node_id);
+              if (itemId) await reconcileStatus(pr.number, pr.node_id, itemId);
+            } else if (ev === "check_suite") {
+              // check_suite is commit-scoped: a CI completion recomputes the
+              // target, so a green run also recovers a Snagged/Revising PR. Its
+              // pull_requests array is empty for fork PRs, so resolve by head SHA.
+              const suite = context.payload.check_suite || {};
+              await reconcileByCommit(suite.head_sha, suite.pull_requests);
+            } else if (ev === "workflow_run") {
+              // Two privileged uses, both resolved the same way (by the upstream
+              // run's head SHA, since its pull_requests array is empty for fork
+              // PRs):
+              //   1. Gating-check completion: GitHub does not deliver check_suite
+              //      for Actions-created suites (recursion prevention), so a caller
+              //      relays a gating Actions workflow's completion (CI and the
+              //      lighter PR checks) here to recompute the target -- a failed
+              //      check goes to Snagged, a green run recovers it.
+              //   2. Stage 2 of the fork-review relay (see header): a fork PR's
+              //      review can't get secrets, so an unprivileged caller bridge
+              //      fires on the review and completes; this privileged run picks
+              //      that up.
+              // Metadata only -- NEVER add a checkout here (the upstream may have
+              // run in a fork-controlled context).
+              const wr = context.payload.workflow_run || {};
+              await reconcileByCommit(wr.head_sha, wr.pull_requests);
+            } else if (ev === "status") {
+              // A commit status posted by an external, non-Actions integration --
+              // e.g. "SlangPy Tests", "license/cla", or "CodeRabbit". computeTarget
+              // folds StatusContext results into the CI rollup (a failure -> the PR
+              // is Snagged), but these are NOT Actions check suites, so neither
+              // check_suite nor workflow_run ever carries them; the status event is
+              // the only signal. It is commit-scoped, so resolve the PR(s) by SHA.
+              await reconcileByCommit(context.payload.sha, null);
+            }
+
+      # --- Unrequest auto-assigned non-approver reviewers --------------------
+      # Runs only at onboarding (opened/reopened) to strip an auto-assigned
+      # non-approver (e.g. bmillsNV) that repo automation requests on a new PR. It
+      # deliberately does NOT run on review_requested, so a maintainer manually
+      # requesting that reviewer is never undone. reconcileAssignment also unrequests
+      # these when it freshly assigns an owner; this onboarding step covers PRs
+      # assignment skips (Source not yet known, a human draft, merge-queued, or no
+      # maintainer resolved). Already-assigned PRs are not re-scanned on sweep.
+      - name: Unrequest ignored reviewers
+        if: >-
+          env.HAS_TOKEN == 'true' &&
+          github.event_name == 'pull_request_target' &&
+          (github.event.action == 'opened' || github.event.action == 'reopened')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          IGNORED_REVIEWERS: ${{ inputs.ignored_reviewers }}
+        with:
+          github-token: ${{ secrets.SLANG_PR_BOT_TOKEN }}
+          script: |
+            const ignored = (process.env.IGNORED_REVIEWERS || "")
+              .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+            if (!ignored.length) return;
+            const pr = context.payload.pull_request;
+            if (!pr) return;
+            const requested = (pr.requested_reviewers || []).map(r => r.login);
+            const toRemove = requested.filter(l => ignored.includes((l || "").toLowerCase()));
+            if (!toRemove.length) return;
+            await github.rest.pulls.removeRequestedReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              reviewers: toRemove,
+            });
+            console.log(`unrequested: ${toRemove.join(", ")}`);

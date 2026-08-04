@@ -7,11 +7,11 @@ struct HasResource
 
 StructuredBuffer<HasResource> bufferArray[4];
 //CHECK:                      ^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                      ^^^^^^^^^^^ StructuredBuffer element type 'HasResource' cannot contain resource or opaque handle types
+//CHECK:                      ^^^^^^^^^^^ StructuredBuffer element type 'HasResource' must not be a resource type or contain an opaque handle type
 
 RWStructuredBuffer<Texture2D> rwBufferArray[2];
 //CHECK:                      ^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                      ^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' cannot contain resource or opaque handle types
+//CHECK:                      ^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' must not be a resource type or contain an opaque handle type
 
 SamplerState sampler;
 RWStructuredBuffer<float> output;

@@ -1,10 +1,9 @@
 // slang-emit-torch.cpp
 #include "slang-emit-torch.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -29,6 +28,9 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
         break;
     case kIROp_HalfType:
         m_writer->emit("kFloat16");
+        break;
+    case kIROp_BFloat16Type:
+        m_writer->emit("kBFloat16");
         break;
     case kIROp_DoubleType:
         m_writer->emit("kFloat64");

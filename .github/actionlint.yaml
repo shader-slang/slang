@@ -1,0 +1,14 @@
+self-hosted-runner:
+  labels:
+    - analytics
+    - benchmark
+    - build
+    - falcor
+    - GCP
+    - GCP-T4
+    - GPU
+    - nvrgfx-perf-kernelvm-bridge
+    - perf
+    - regression-test
+    - SM80Plus
+    - vulkancts

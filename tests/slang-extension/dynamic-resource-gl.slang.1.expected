@@ -11,8 +11,14 @@ standard output = {
                 "kind": "array",
                 "elementCount": 0,
                 "elementType": {
-                    "kind": "DynamicResource"
-                }
+                    "kind": "DynamicResource",
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         },
         {
@@ -22,29 +28,44 @@ standard output = {
                 "kind": "array",
                 "elementCount": 0,
                 "elementType": {
-                    "kind": "DynamicResource"
-                }
+                    "kind": "DynamicResource",
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         },
         {
             "name": "g_SingleDynamicResourceA",
             "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0},
             "type": {
-                "kind": "DynamicResource"
+                "kind": "DynamicResource",
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         },
         {
             "name": "g_SingleDynamicResourceB",
             "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1},
             "type": {
-                "kind": "DynamicResource"
+                "kind": "DynamicResource",
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         },
         {
             "name": "g_SingleDynamicResourceC",
             "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2},
             "type": {
-                "kind": "DynamicResource"
+                "kind": "DynamicResource",
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         }
     ],
@@ -62,7 +83,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "int32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

@@ -25,6 +25,47 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
+# On MSVC with ASAN, /fsanitize=address embeds annotate_string /
+# annotate_vector markers per object file. The linker rejects a mix of
+# instrumented and non-instrumented objects with LNK2038, so every external
+# subproject must be compiled with the same flag.
+#
+# BUILDSYSTEM_TARGETS only lists targets defined directly in a directory, not
+# in subdirectories. slang_apply_asan_to_dir() recurses into SUBDIRECTORIES
+# so every library target (e.g. SPIRV-Tools.lib under spirv-tools/source/) is
+# covered. Call it after each add_subdirectory() that needs ASAN propagation.
+if(SLANG_ENABLE_ASAN AND MSVC)
+    function(slang_get_all_targets result_var dir)
+        get_directory_property(_targets DIRECTORY "${dir}" BUILDSYSTEM_TARGETS)
+        get_directory_property(_subdirs DIRECTORY "${dir}" SUBDIRECTORIES)
+        set(_all ${_targets})
+        foreach(_subdir ${_subdirs})
+            slang_get_all_targets(_sub "${_subdir}")
+            list(APPEND _all ${_sub})
+        endforeach()
+        set(${result_var} ${_all} PARENT_SCOPE)
+    endfunction()
+
+    function(slang_apply_asan_to_dir dir)
+        slang_get_all_targets(_targets "${dir}")
+        foreach(_t ${_targets})
+            get_target_property(_type ${_t} TYPE)
+            if(
+                _type STREQUAL "STATIC_LIBRARY"
+                OR _type STREQUAL "SHARED_LIBRARY"
+                OR _type STREQUAL "MODULE_LIBRARY"
+                OR _type STREQUAL "OBJECT_LIBRARY"
+                OR _type STREQUAL "EXECUTABLE"
+            )
+                # /wd5072 suppresses "ASAN enabled without debug information
+                # emission" — external Release builds have no /Zi, and their
+                # /WX would turn C5072 into a fatal error otherwise.
+                target_compile_options(${_t} PRIVATE /fsanitize=address /wd5072)
+            endif()
+        endforeach()
+    endfunction()
+endif()
+
 # Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     if(NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH)
@@ -117,12 +158,93 @@ if(NOT TARGET Vulkan::Headers)
     endif()
 endif()
 
+# Reuse Slang's Vulkan-Headers checkout when slang-rhi requests the same dependency through
+# FetchContent. Callers can still provide their own FetchContent source directory explicitly.
+if(
+    NOT DEFINED FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS
+    AND NOT SLANG_USE_SYSTEM_VULKAN_HEADERS
+)
+    if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
+        set(FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS
+            "${CMAKE_CURRENT_SOURCE_DIR}/vulkan"
+        )
+    else()
+        set(FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS
+            "${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan"
+        )
+    endif()
+endif()
+
 # metal-cpp headers
 add_library(metal-cpp INTERFACE)
 target_include_directories(
     metal-cpp
     INTERFACE "${CMAKE_CURRENT_LIST_DIR}/metal-cpp"
 )
+
+# fast_float headers (header-only). Mark as a system include so the bundled
+# (or override-supplied) headers don't trip Slang's extra warnings / -Werror.
+add_library(fast_float INTERFACE)
+if(NOT SLANG_OVERRIDE_FAST_FLOAT_PATH)
+    set(_fast_float_include "${CMAKE_CURRENT_LIST_DIR}/fast_float/include")
+else()
+    set(_fast_float_include
+        "${SLANG_OVERRIDE_FAST_FLOAT_PATH}/fast_float/include"
+    )
+    # The add_subdirectory-based overrides fail at configure time on a bad path
+    # because CMake errors on a missing source directory. A header-only override
+    # is just an include-dir string, so validate the user-supplied path here to
+    # fail loudly at configure time rather than as an opaque "header not found"
+    # compile error later.
+    if(NOT EXISTS "${_fast_float_include}")
+        message(
+            FATAL_ERROR
+            "SLANG_OVERRIDE_FAST_FLOAT_PATH is set to '${SLANG_OVERRIDE_FAST_FLOAT_PATH}' but '${_fast_float_include}' does not exist"
+        )
+    endif()
+endif()
+target_include_directories(
+    fast_float
+    ${system}
+    INTERFACE "${_fast_float_include}"
+)
+
+# Slang and SPIRV-Tools share one mimalloc target. Resolve the checkout before either consumer is
+# configured so slang-compiler can use mimalloc even when SPIRV-Tools is disabled or provided by
+# the system.
+set(SLANG_BUILD_MIMALLOC OFF)
+if(SLANG_ENABLE_MIMALLOC)
+    set(SLANG_BUILD_MIMALLOC ON)
+elseif(
+    SLANG_ENABLE_SLANG_GLSLANG
+    AND NOT SLANG_USE_SYSTEM_SPIRV_TOOLS
+    AND SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+)
+    set(SLANG_BUILD_MIMALLOC ON)
+endif()
+
+set(SLANG_MIMALLOC_AVAILABLE OFF)
+if(SLANG_BUILD_MIMALLOC)
+    if(NOT SLANG_OVERRIDE_MIMALLOC_PATH)
+        # Place mimalloc in slang/external instead of spirv-tools/external for better organization.
+        set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
+    else()
+        set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
+    endif()
+
+    # mimalloc is vendored as a submodule under external/mimalloc. A missing
+    # checkout means submodules were not initialized, so fail loudly at configure
+    # time, mirroring the fast_float override validation earlier in this file.
+    if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
+        message(
+            FATAL_ERROR
+            "mimalloc source not found at ${MIMALLOC_PATH}. Run 'git submodule update --init --recursive', or set SLANG_OVERRIDE_MIMALLOC_PATH to a directory containing a 'mimalloc' checkout."
+        )
+    endif()
+
+    set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
+    set(SLANG_MIMALLOC_AVAILABLE ON)
+endif()
 
 # SPIRV-Headers
 # Avoid using ${system} intentionally in `add_subdirectory`, because if we do, it will end up using
@@ -171,56 +293,20 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
 
         # Enable mimalloc for SPIRV-Tools to improve compilation performance
         # Based on SPIRV-Tools PR #6267: https://github.com/KhronosGroup/SPIRV-Tools/pull/6267
-        if(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
-            if(NOT SLANG_OVERRIDE_MIMALLOC_PATH)
-                # Place mimalloc in slang/external instead of spirv-tools/external for better organization
-                set(MIMALLOC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/mimalloc")
-            else()
-                set(MIMALLOC_PATH "${SLANG_OVERRIDE_MIMALLOC_PATH}/mimalloc")
-            endif()
-
-            # Download mimalloc if it's not available
-            if(NOT EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
-                message(
-                    STATUS
-                    "mimalloc not found at ${MIMALLOC_PATH} - downloading..."
-                )
-                execute_process(
-                    COMMAND
-                        ${GIT_EXECUTABLE} clone --depth 1 --branch v2.1.7
-                        https://github.com/microsoft/mimalloc.git
-                        "${MIMALLOC_PATH}"
-                    RESULT_VARIABLE git_result
-                    OUTPUT_QUIET
-                    ERROR_QUIET
-                )
-                if(git_result EQUAL 0)
-                    # Point SPIRV-Tools to our mimalloc location
-                    set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
-                    set(SPIRV_TOOLS_USE_MIMALLOC ON)
-                    set(SPIRV_TOOLS_USE_MIMALLOC_IN_STATIC_BUILD ON)
-                    # set(MI_INSTALL_TOPLEVEL OFF)
-                    message(
-                        STATUS
-                        "Successfully downloaded and enabled mimalloc for SPIRV-Tools at ${MIMALLOC_PATH}"
-                    )
-                else()
-                    message(
-                        WARNING
-                        "Failed to download mimalloc. Building SPIRV-Tools without mimalloc support."
-                    )
-                endif()
-            endif()
-
-            # Check if mimalloc is available now
-            if(EXISTS "${MIMALLOC_PATH}/CMakeLists.txt")
-                # Point SPIRV-Tools to our mimalloc location
-                set(mimalloc_SOURCE_DIR "${MIMALLOC_PATH}")
-                set(SPIRV_TOOLS_USE_MIMALLOC ON)
-                # Also enable mimalloc in static builds for better performance
-                set(SPIRV_TOOLS_USE_MIMALLOC_IN_STATIC_BUILD ON)
-                # Disable mimalloc installation to avoid install target conflicts
-                # set(MI_INSTALL_TOPLEVEL OFF)
+        if(SLANG_MIMALLOC_AVAILABLE)
+            set(SPIRV_TOOLS_USE_MIMALLOC
+                ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC}
+                CACHE BOOL
+                "Executables and shared libraries use mimalloc instead of the default allocator"
+                FORCE
+            )
+            set(SPIRV_TOOLS_USE_MIMALLOC_IN_STATIC_BUILD
+                ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC}
+                CACHE BOOL
+                "Static SPIRV-Tools libraries use mimalloc instead of the default allocator"
+                FORCE
+            )
+            if(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC)
                 message(
                     STATUS
                     "Enabling mimalloc for SPIRV-Tools (including static builds) from ${MIMALLOC_PATH}"
@@ -259,6 +345,30 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     endif()
 endif()
 
+# SPIRV-Tools normally creates mimalloc-static. Create it here when slang-compiler needs it and
+# SPIRV-Tools did not, while keeping the global allocation override in Slang-owned source code.
+if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
+    function(_slang_add_mimalloc_target)
+        set(MI_OVERRIDE OFF)
+        set(MI_BUILD_SHARED OFF)
+        set(MI_BUILD_STATIC ON)
+        set(MI_BUILD_OBJECT OFF)
+        set(MI_BUILD_TESTS OFF)
+        set(MI_INSTALL_TOPLEVEL OFF)
+        add_subdirectory("${mimalloc_SOURCE_DIR}" mimalloc EXCLUDE_FROM_ALL)
+    endfunction()
+    _slang_add_mimalloc_target()
+endif()
+
+# Mimalloc defaults to level 2 in Debug builds, which enables additional internal assertions.
+# Reduce this to level 1 to retain basic heap diagnostics while improving Debug execution time.
+if(SLANG_ENABLE_MIMALLOC AND TARGET mimalloc-static AND NOT MI_DEBUG_FULL)
+    target_compile_definitions(
+        mimalloc-static
+        PRIVATE $<$<CONFIG:Debug>:MI_DEBUG=1>
+    )
+endif()
+
 if(
     SLANG_ENABLE_GFX
     OR (SLANG_ENABLE_SLANG_RHI AND (SLANG_ENABLE_TESTS OR SLANG_ENABLE_EXAMPLES))
@@ -278,6 +388,7 @@ if(
             INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
         )
     endif()
+    add_supported_cxx_flags(imgui INTERFACE -Wno-nontrivial-memcall)
 
     # stb
     add_library(stb INTERFACE)
@@ -299,6 +410,12 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_SLANG_INCLUDE_DIR ${slang_SOURCE_DIR}/include)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
+    set(SLANG_RHI_ENABLE_WGPU ${SLANG_HAS_WEBGPU_SUPPORT})
+    if(SLANG_ENABLE_DXIL AND NOT DEFINED SLANG_RHI_FETCH_DXC)
+        # Slang's FetchDXC.cmake owns DXC download/build/deployment in this
+        # configuration, so prevent slang-rhi from fetching its own copy.
+        set(SLANG_RHI_FETCH_DXC OFF)
+    endif()
 
     # CoopVec requires the preview Agility SDK that supports SM 6.10
     #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
@@ -308,9 +425,6 @@ if(SLANG_ENABLE_SLANG_RHI)
 
     if(SLANG_ENABLE_DX_ON_VK)
         set(SLANG_RHI_HAS_D3D12 ON)
-    endif()
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(SLANG_RHI_ENABLE_WGPU OFF)
     endif()
     if(MINGW)
         set(SLANG_RHI_ENABLE_D3D11 OFF)
@@ -325,6 +439,10 @@ if(SLANG_ENABLE_SLANG_RHI)
             EXCLUDE_FROM_ALL
             ${system}
         )
+    endif()
+
+    if(SLANG_ENABLE_ASAN AND MSVC)
+        slang_apply_asan_to_dir("${CMAKE_CURRENT_SOURCE_DIR}/slang-rhi")
     endif()
 
     # Output slang-rhi-tests to the bin directory so we can run it easily.

@@ -3,6 +3,8 @@
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -stage fragment -entry main -allow-glsl
 
 // CHECK_SPV-DAG: OpEntryPoint
+// CHECK_SPV-DAG: OpCapability InputAttachment
+// CHECK_SPV-DAG: OpCapability StorageImageReadWithoutFormat
 // CHECK_SPV-DAG: InputAttachmentIndex 3
 // CHECK_SPV-DAG: InputAttachmentIndex
 

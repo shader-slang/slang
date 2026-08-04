@@ -1,6 +1,6 @@
 // unit-test-path.cpp
 
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-string-util.h"
 #include "unit-test/slang-unit-test.h"
 
 // #include <math.h>

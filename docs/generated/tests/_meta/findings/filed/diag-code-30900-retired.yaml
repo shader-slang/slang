@@ -1,0 +1,21 @@
+schema_version: 1
+id: diag-code-30900-retired
+bundle: cross-cutting/diagnostics-catalog
+suspected_kind: catalog-drift
+observed_at: 2026-05-28T10:30:00+00:00
+evidence:
+  command: grep -n "30900\|multi-dimensional-array-not-supported" source/slang/slang-diagnostics.lua
+  source_slang: docs/generated/tests/cross-cutting/diagnostics-catalog/code-30900-retired-check.slang
+  observed_summary: Diagnostic code 30900 (`multi-dimensional-array-not-supported`) is still present in slang-diagnostics.lua but is functionally retired — Slang now supports multi-dimensional arrays, so the diagnostic no longer fires for the construct it was created to flag.
+  exit_code: 0
+  stderr_tail: "source/slang/slang-diagnostics.lua:3547: \"multi-dimensional-array-not-supported\",\\nsource/slang/slang-diagnostics.lua:3548:    30900,"
+expected:
+  claim: Diagnostic codes whose error condition is no longer reachable should either be removed from the catalog or renamed/repurposed; leaving them in place is catalog drift.
+  citation_kind: doc
+  citation: docs/generated/design/cross-cutting/diagnostics.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: fa86e5a04
+  doc_anchor: docs/generated/design/cross-cutting/diagnostics.md
+agent_self_assessment:
+  confidence: high

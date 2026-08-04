@@ -23,7 +23,7 @@ public IS f() {}
 
 public struct PS
 //CHECK:      ^^ references less visible type
-//CHECK:      ^^ '$init' references less visible type 'IS'.
+//CHECK:      ^^ 'PS.init' references less visible type 'IS'.
 {
     // Error: public member of internal type
     public IS ii;

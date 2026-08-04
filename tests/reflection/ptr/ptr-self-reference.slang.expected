@@ -19,7 +19,10 @@ standard output = {
                             "name": "payload",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "int32"
+                                "scalarType": "int32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
@@ -27,12 +30,21 @@ standard output = {
                             "name": "next",
                             "type": {
                                 "kind": "pointer",
-                                "valueType": "SomeStruct"
+                                "valueType": "SomeStruct",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 8}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 16, "alignment": 8}
                     ]
-                }
+                },
+                "sizes": [
+                    {"kind": "uniform", "value": 16, "alignment": 8}
+                ]
             }
         },
         {
@@ -44,8 +56,14 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "int32"
-                }
+                    "scalarType": "int32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "uniform", "value": 16, "alignment": 8}
+                ]
             }
         }
     ],
@@ -63,7 +81,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -preserve-embedded-source
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -preserve-embedded-source
 // Tests generation of DebugFunction and DebugLine with #line preprocessor directive specifying different files
 
 // Get the IDs for the Source argument in DebugFunction/DebugLine
@@ -20,12 +20,12 @@
 
 //CHECK:; Function a
 //CHECK: DebugLine [[DEBUGINFOLINE_SOURCE]] %uint_[[#@LINE+1]]
-int a() { return 0; }
+[noinline] int a() { return 0; }
 
 //CHECK:; Function b
 //CHECK: DebugLine [[B_SOURCE]] %uint_99
 #line 99 "b.slang"
-int b()
+[noinline] int b()
 {
     return 0;
 }
@@ -33,7 +33,7 @@ int b()
 //CHECK:; Function c
 //CHECK: DebugLine [[DEBUGINFOLINE_SOURCE]] %uint_[[#@LINE+2]]
 #line default
-int c()
+[noinline] int c()
 {
     return 0;
 }
@@ -41,12 +41,12 @@ int c()
 //CHECK:; Function d
 //CHECK: DebugLine [[D_SOURCE]] %uint_603
 #line 603 "d.slang"
-int d() { return 0; }
+[noinline] int d() { return 0; }
 
 //CHECK:; Function e
 //CHECK: DebugLine [[D_SOURCE]] %uint_40
 #line 40
-int e()
+[noinline] int e()
 {
     return 0;
 }
@@ -54,7 +54,7 @@ int e()
 //CHECK:; Function f
 //CHECK: DebugLine [[DEBUGINFOLINE_SOURCE]] %uint_[[#@LINE+2]]
 #line
-int f() { return 0; }
+[noinline] int f() { return 0; }
 
 RWStructuredBuffer<int> out;
 [shader("compute")]

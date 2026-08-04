@@ -73,20 +73,23 @@ static SlangResult locateMetalCompiler(const String& path, DownstreamCompilerSet
     String metalSDKPath = path;
 
 #if SLANG_APPLE_FAMILY
-    // Use xcrun command to find the metal compiler.
-    CommandLine xcrunCmdLine;
-    ExecutableLocation xcrunLocation("xcrun");
-    xcrunCmdLine.setExecutableLocation(xcrunLocation);
-    xcrunCmdLine.addArg("--sdk");
-    xcrunCmdLine.addArg("macosx");
-    xcrunCmdLine.addArg("--find");
-    xcrunCmdLine.addArg("metal");
-    ExecuteResult exeRes;
-    if (SLANG_SUCCEEDED(ProcessUtil::execute(xcrunCmdLine, exeRes)))
+    if (metalSDKPath.getLength() == 0)
     {
-        String metalPath = exeRes.standardOutput.trim();
-        metalcLocation = ExecutableLocation(ExecutableLocation::Type::Path, metalPath);
-        metalSDKPath = Path::getParentDirectory(metalcLocation.m_pathOrName);
+        // Use xcrun command to find the metal compiler.
+        CommandLine xcrunCmdLine;
+        ExecutableLocation xcrunLocation("xcrun");
+        xcrunCmdLine.setExecutableLocation(xcrunLocation);
+        xcrunCmdLine.addArg("--sdk");
+        xcrunCmdLine.addArg("macosx");
+        xcrunCmdLine.addArg("--find");
+        xcrunCmdLine.addArg("metal");
+        ExecuteResult exeRes;
+        if (SLANG_SUCCEEDED(ProcessUtil::execute(xcrunCmdLine, exeRes)))
+        {
+            String metalPath = exeRes.standardOutput.trim();
+            metalcLocation = ExecutableLocation(ExecutableLocation::Type::Path, metalPath);
+            metalSDKPath = Path::getParentDirectory(metalcLocation.m_pathOrName);
+        }
     }
 #endif
 

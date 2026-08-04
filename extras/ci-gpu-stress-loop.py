@@ -43,7 +43,7 @@ VM_PREFIX = "gpu-stress"
 # cleanup_orphan_vms() to this run only — prevents Ctrl-C in one run from
 # deleting another concurrent operator's VMs in the shared GCP project.
 RUN_ID = f"{os.getpid()}-{int(time.time())}"
-CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1"
+CONTAINER_IMAGE = "ghcr.io/shader-slang/slang-linux-gpu-ci:v1.6.1"
 def run_cmd(cmd, *, timeout=600, capture=True):
     """Run a command, return (returncode, stdout, stderr)."""
     try:

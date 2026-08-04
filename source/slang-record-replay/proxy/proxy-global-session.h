@@ -1,7 +1,7 @@
 #ifndef SLANG_PROXY_GLOBAL_SESSION_H
 #define SLANG_PROXY_GLOBAL_SESSION_H
 
-#include "../../core/slang-file-system.h"
+#include "core/slang-file-system.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
 #include "proxy-mutable-file-system.h"
@@ -254,6 +254,34 @@ public:
         RECORD_CALL();
         RECORD_INPUT(passThrough);
         auto result = getActual<slang::IGlobalSession>()->checkPassThroughSupport(passThrough);
+        RECORD_RETURN(result);
+    }
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerVersion(
+        SlangPassThrough passThrough,
+        int* outMajor,
+        int* outMinor) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT(passThrough);
+        PREPARE_POINTER_OUTPUT(outMajor);
+        PREPARE_POINTER_OUTPUT(outMinor);
+        auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerVersion(
+            passThrough,
+            outMajor,
+            outMinor);
+        // On failure the actual API returns without writing *outMajor/*outMinor. The record
+        // stream has a fixed schema and must still serialize both output slots, so redirect to the
+        // zero-initialized temporaries created by PREPARE_POINTER_OUTPUT above and record a defined
+        // 0 instead of reading the caller's uninitialized memory (see issue #11865). The caller's
+        // memory is left untouched.
+        if (SLANG_FAILED(result))
+        {
+            outMajor = &_temp_outMajor;
+            outMinor = &_temp_outMinor;
+        }
+        RECORD_OUTPUT(outMajor);
+        RECORD_OUTPUT(outMinor);
         RECORD_RETURN(result);
     }
 

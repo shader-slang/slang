@@ -351,7 +351,8 @@ List<Token> TokenizeText(const String& fileName, const String& text)
     String file = fileName;
     State state = State::Start;
     StringBuilder tokenBuilder;
-    int tokenLine, tokenCol;
+    int tokenLine = 0;
+    int tokenCol = 0;
     List<Token> tokenList;
     LexDerivative derivative = LexDerivative::None;
     TokenFlags tokenFlags = TokenFlag::AtStartOfLine;

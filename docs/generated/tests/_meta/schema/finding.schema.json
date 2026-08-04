@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/shader-slang/slang/docs/generated/tests/_meta/schema/finding.schema.json",
+  "title": "Test Agent finding",
+  "description": "Schema for docs/generated/tests/_meta/findings/<slug>.yaml. A generation agent writes one of these when it observes suspect compiler behavior while authoring a test. The structured record lets a separate triage pass render an issue body and file it via `regenerate.py findings file`. Generation agents never file directly.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "bundle",
+    "suspected_kind",
+    "observed_at",
+    "evidence",
+    "expected",
+    "provenance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Stable slug. Must match the filename (without .yaml) so state lookups are unambiguous."
+    },
+    "bundle": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(/[a-z0-9][a-z0-9-]*)*$",
+      "description": "Bundle key in docs/generated/tests/_meta/manifest.yaml that surfaced the finding."
+    },
+    "suspected_kind": {
+      "enum": [
+        "sigsegv",
+        "wrong-diagnostic",
+        "wrong-codegen",
+        "regression",
+        "catalog-drift",
+        "doc-claim-overstated"
+      ],
+      "description": "Agent's classification at observation time. Triage may override before filing."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Target / subsystem hint (spirv, hlsl, metal, wgsl, cuda, cpp, diagnostics, parser, ir, core-module). Drives the issue title prefix and conditional labels. Optional; omitted if not applicable."
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 80,
+      "description": "Optional issue title. When absent, `regenerate.py findings file` derives one from scope + observed_summary. Operators may set or override before filing."
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the original observation."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["command", "source_slang", "observed_summary"],
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "Exact slangc / slang-test invocation that triggers the failure."
+        },
+        "source_slang": {
+          "type": "string",
+          "description": "Workspace-relative path to the .slang test file the agent was writing when it noticed the failure."
+        },
+        "observed_summary": {
+          "type": "string",
+          "description": "Single-line summary of what was observed (segfault, wrong codegen, missing diagnostic, ...)."
+        },
+        "exit_code": {
+          "type": "integer",
+          "description": "Process exit code, when relevant (139 for SIGSEGV under POSIX, etc.)."
+        },
+        "stderr_tail": {
+          "type": "string",
+          "description": "Last lines of stderr (single line, may contain literal \\n escapes). Optional; operator may add more during triage."
+        },
+        "minimized_repro": {
+          "type": "string",
+          "description": "Operator-supplied minimized version of the .slang source. When set, takes precedence over reading source_slang for the issue body. Empty by default."
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "required": ["claim", "citation_kind", "citation"],
+      "additionalProperties": false,
+      "properties": {
+        "claim": {
+          "type": "string",
+          "description": "One-sentence statement of the correct behavior."
+        },
+        "citation_kind": {
+          "enum": ["spec", "sibling-test", "older-slangc", "doc"],
+          "description": "Strength of grounding. Triage treats kind=doc as weak; design docs are themselves LLM-generated and cannot be sole ground truth."
+        },
+        "citation": {
+          "type": "string",
+          "description": "Path / commit ref / spec section locating the cited source of truth."
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["agent_model", "source_commit", "doc_anchor"],
+      "additionalProperties": false,
+      "properties": {
+        "agent_model": {
+          "type": "string",
+          "description": "Model identifier of the generation agent (e.g. claude-opus-4-7)."
+        },
+        "source_commit": {
+          "type": "string",
+          "description": "slangc git SHA at the time of observation."
+        },
+        "doc_anchor": {
+          "type": "string",
+          "description": "docs/generated/design/<file>.md#<section> the test was anchored to."
+        }
+      }
+    },
+    "agent_self_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional. Agent's own confidence and what it considered. Not used by triage gating; useful for operator review.",
+      "properties": {
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "alternatives_considered": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

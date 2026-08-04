@@ -1,0 +1,49 @@
+name: Check Workflow Scripts
+
+# Lightweight unit tests for the JavaScript used by our GitHub workflows
+# (committer-signal ranking + assignee/reviewer selection inlined into
+# pr-board-sync.yml, extracted at test time). This is the single home for
+# workflow-JS test coverage: any new .github/scripts/*.test.js is picked up
+# automatically by the run step below -- no edit here needed.
+#
+# `paths` intentionally covers ALL of .github/workflows and .github/scripts so a
+# change to any workflow (a test may extract inlined JS from one) or any script
+# re-runs the tests. The job is a ~1s no-setup Node run, so running it on
+# unrelated workflow edits is cheap and avoids the footgun of having to remember
+# to list each tested workflow here.
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/scripts/**"
+      - ".github/workflows/**"
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  check-workflow-scripts:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-24.04
+    name: Unit-test workflow JavaScript
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Run all workflow-script unit tests
+        run: |
+          node --version
+          status=0
+          shopt -s nullglob
+          found=0
+          for t in .github/scripts/*.test.js; do
+            found=1
+            echo "::group::$t"
+            node "$t" || status=1
+            echo "::endgroup::"
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "No .github/scripts/*.test.js found"
+            exit 1
+          fi
+          exit $status

@@ -244,9 +244,4 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
     getModule()->getIncludedSourceFileMap().add(sourceFile, nullptr);
 }
 
-List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
-{
-    return m_sourceFiles;
-}
-
 } // namespace Slang

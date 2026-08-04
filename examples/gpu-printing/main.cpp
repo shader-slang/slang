@@ -17,6 +17,51 @@ using namespace rhi;
 
 static const ExampleResources resourceBase("gpu-printing");
 
+// Forward slang-rhi's device/pipeline-creation diagnostics (validation layer and
+// driver-forwarded messages) to stdout so a failing CI run is diagnosable rather than a
+// silent exit. gpu-printing runs headless without a device debug layer of its own, so
+// without this an RHI call that returns null (e.g. Metal device creation on the
+// virtualized hosted-macOS runners, see issue 11999) produces no output at all. Each
+// example defines its own callback because slang-rhi has no shared exported one.
+class DebugCallback : public rhi::IDebugCallback
+{
+public:
+    virtual SLANG_NO_THROW void SLANG_MCALL handleMessage(
+        rhi::DebugMessageType type,
+        rhi::DebugMessageSource source,
+        const char* message) override
+    {
+        const char* typeStr = "";
+        switch (type)
+        {
+        case rhi::DebugMessageType::Info:
+            typeStr = "INFO: ";
+            break;
+        case rhi::DebugMessageType::Warning:
+            typeStr = "WARNING: ";
+            break;
+        case rhi::DebugMessageType::Error:
+            typeStr = "ERROR: ";
+            break;
+        default:
+            break;
+        }
+        const char* sourceStr = "[GraphicsLayer]: ";
+        switch (source)
+        {
+        case rhi::DebugMessageSource::Slang:
+            sourceStr = "[Slang]: ";
+            break;
+        case rhi::DebugMessageSource::Driver:
+            sourceStr = "[Driver]: ";
+            break;
+        default:
+            break;
+        }
+        reportError("%s%s%s\n", sourceStr, typeStr, message);
+    }
+};
+
 ComPtr<slang::ISession> createSlangSession(IDevice* device)
 {
     ComPtr<slang::ISession> slangSession = device->getSlangSession();
@@ -82,26 +127,46 @@ struct ExampleProgram : public TestBase
     {
         parseOption(argc, argv);
         DeviceDesc deviceDesc;
+        // Route slang-rhi validation and driver-forwarded diagnostics to stdout so that a
+        // failing headless run reports where and why it failed (see issue 11999). The
+        // callback is only consulted when validation is enabled.
+        deviceDesc.enableValidation = true;
+        static DebugCallback debugCallback;
+        deviceDesc.debugCallback = &debugCallback;
         gDevice = getRHI()->createDevice(deviceDesc);
         if (!gDevice)
+        {
+            reportError("%s", "error: failed to create device\n");
             return SLANG_FAIL;
+        }
 
         Slang::String path = resourceBase.resolveResource("kernels.slang");
 
         gSlangSession = createSlangSession(gDevice);
         gSlangModule = compileShaderModuleFromFile(gSlangSession, path.getBuffer());
         if (!gSlangModule)
+        {
+            reportError("error: failed to compile shader module '%s'\n", path.getBuffer());
             return SLANG_FAIL;
+        }
 
         gProgram = loadComputeProgram(gSlangModule, "computeMain");
         if (!gProgram)
+        {
+            reportError(
+                "%s",
+                "error: failed to create shader program for entry point 'computeMain'\n");
             return SLANG_FAIL;
+        }
 
         ComputePipelineDesc desc;
         desc.program = gProgram;
         auto pipelineState = gDevice->createComputePipeline(desc);
         if (!pipelineState)
+        {
+            reportError("%s", "error: failed to create compute pipeline\n");
             return SLANG_FAIL;
+        }
 
         gPipelineState = pipelineState;
 

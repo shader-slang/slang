@@ -1,3 +1,5 @@
+// Used as example in docs/user-guide/03-convenience-features.md ("Lambda Expressions - Interaction with generic type inference")
+
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

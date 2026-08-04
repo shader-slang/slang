@@ -1,0 +1,29 @@
+//META: generated=true
+//META: model=claude-opus-4-7
+//META: generated_at=2026-05-21T08:30:00Z
+//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: doc_ref=source/slang/slang-diagnostics.lua
+//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: purpose=Fires diagnostic E38206 (vector-with-invalid-element-count-encountered) - invalid vector element count
+//META: intent=negative
+//META: pipeline_stage=ir-pass
+//META: catalog_code=38206
+//META: catalog_name=vector-with-invalid-element-count-encountered
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// A vector with element count > 4 is rejected by IR validation
+// when lowering to a backend that supports only 1..4-element
+// vectors.
+
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -emit-spirv-directly -skip-spirv-validation
+
+RWStructuredBuffer<float> outputBuffer;
+
+[numthreads(1,1,1)]
+void main(uint v : SV_DispatchThreadID)
+{
+    vector<float, 8> big = { 1, 2, 3, 4, 5, 6, 7, 8 };
+    outputBuffer[0] = big[0];
+}
+
+// CHECK: E38206

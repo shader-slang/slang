@@ -40,8 +40,8 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
     ASTBuilder* builder,
     DeclRef<ContainerDecl> genericDecl);
 
-// General utility function to collect all referenced declarations from a value
-void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls);
+// General utility function to collect all referenced declarations from a syntax node
+void collectReferencedDecls(SemanticsVisitor* context, NodeBase* node, HashSet<Decl*>& outDecls);
 
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef);
 } // namespace Slang

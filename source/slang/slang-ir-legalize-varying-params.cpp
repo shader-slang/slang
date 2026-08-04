@@ -2,6 +2,7 @@
 #include "slang-ir-legalize-varying-params.h"
 
 #include "slang-ir-clone.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-lower-out-parameters.h"
@@ -412,6 +413,14 @@ protected:
     void processEntryPoint(IRFunc* entryPointFunc, IREntryPointDecoration* entryPointDecor)
     {
         m_entryPointFunc = entryPointFunc;
+
+        // Reset per-parameter scratch before legalizing this entry point's
+        // result (done below, before the parameter loop sets `m_param`). A
+        // stale `m_param` from a prior entry point may already be freed, and
+        // result-position diagnostics read it via
+        // `getUnsupportedVaryingDiagnosticLoc` (#11659).
+        m_param = nullptr;
+        m_paramLayout = nullptr;
 
         // Before diving into the work of processing an entry point, we start by
         // extracting a bunch of information about the entry point that will
@@ -1039,13 +1048,23 @@ protected:
     // to diagnose the case of a system-value semantic that isn't
     // understood by the target.
 
+    // Location for an unsupported-varying diagnostic. Normally the parameter
+    // being processed, but the entry-point result is legalized before the
+    // parameter loop sets `m_param`, so fall back to the entry-point function
+    // when `m_param` is null to avoid a null dereference (#11659).
+    SourceLoc getUnsupportedVaryingDiagnosticLoc() const
+    {
+        SLANG_ASSERT(m_entryPointFunc);
+        return m_param ? m_param->sourceLoc : m_entryPointFunc->sourceLoc;
+    }
+
     LegalizedVaryingVal diagnoseUnsupportedSystemVal(VaryingParamInfo const& info)
     {
         SLANG_UNUSED(info);
 
         m_sink->diagnose(Diagnostics::Unimplemented{
             .feature = "this target doesn't support this system-defined varying parameter",
-            .location = m_param->sourceLoc});
+            .location = getUnsupportedVaryingDiagnosticLoc()});
 
         return LegalizedVaryingVal();
     }
@@ -1056,7 +1075,7 @@ protected:
 
         m_sink->diagnose(Diagnostics::Unimplemented{
             .feature = "this target doesn't support this user-defined varying parameter",
-            .location = m_param->sourceLoc});
+            .location = getUnsupportedVaryingDiagnosticLoc()});
 
         return LegalizedVaryingVal();
     }
@@ -1718,6 +1737,267 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return nullptr;
     }
 
+    // Resolve the callee of a call to the concrete IR function it targets, unwrapping a
+    // `specialize` wrapper around a function. Returns null for indirect calls (e.g. a call
+    // through a function value) where the callee is not a known function. This is the single
+    // resolver shared by emitPayloadWritebacks() and the terminate-reaching analysis below.
+    //
+    // Resolution boundary (the contract the analysis below relies on): by this point in the
+    // pipeline generics are specialized and witness lookups resolved, so every call that reaches
+    // the CUDA legalizer targets a concrete function. The only callee this returns null for is a
+    // genuinely indirect call (a call through a function value); a terminating intrinsic reached
+    // only through such a call is therefore not detectable here, but those calls are resolved away
+    // before this stage, so the terminate-reaching analysis covers every case that can actually
+    // occur.
+    static IRFunc* getResolvedCalleeFunc(IRCall* call)
+    {
+        auto callee = call->getCallee();
+        if (auto func = as<IRFunc>(callee))
+            return func;
+        if (auto specialize = as<IRSpecialize>(callee))
+            return as<IRFunc>(specialize->getBase());
+        return nullptr;
+    }
+
+    // Return true if `func` itself calls, or transitively reaches through resolvable direct
+    // calls, a shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch). This decides which
+    // callees must be inlined into a ray entry point so that the payload write-back is emitted
+    // before the ray terminates.
+    //
+    // `visited` is recursion-internal scratch: callers must pass a freshly-constructed empty set.
+    // It only guards against call-graph cycles — a `func` already in `visited` short-circuits to
+    // false regardless of whether it reaches a terminating intrinsic, so the set is NOT a memo of
+    // the predicate and must not be shared across separate top-level queries.
+    bool funcReachesShaderTerminatingIntrinsic(IRFunc* func, HashSet<IRFunc*>& visited)
+    {
+        if (!func || !visited.add(func))
+            return false;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+                auto callee = getResolvedCalleeFunc(call);
+                if (isShaderTerminatingIntrinsic(callee))
+                    return true;
+                // Only recurse into callees with a body; intrinsics and external declarations
+                // cannot themselves contain a terminating call.
+                if (callee && callee->getFirstBlock() &&
+                    funcReachesShaderTerminatingIntrinsic(callee, visited))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Return true if the terminate-reaching call subgraph reachable from `func` contains a cycle.
+    // A recursive helper that terminates the ray cannot be flattened by inlining (inlining a
+    // recursive call chain would not terminate), so the caller must skip inlining and diagnose
+    // instead. Standard DFS back-edge detection restricted to functions in `terminateReaching`.
+    //
+    // `terminateReaching` is a real input (the set the search is restricted to). `onStack` (the
+    // current DFS path) and `done` (fully-explored functions) are recursion-internal scratch:
+    // callers must pass freshly-constructed empty sets, and on the early `return true` they are
+    // left indeterminate (the unwinding `onStack.remove`/`done.add` are skipped).
+    bool terminateSubgraphHasCycle(
+        IRFunc* func,
+        HashSet<IRFunc*>& terminateReaching,
+        HashSet<IRFunc*>& onStack,
+        HashSet<IRFunc*>& done)
+    {
+        onStack.add(func);
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+                auto callee = getResolvedCalleeFunc(call);
+                if (!callee || !terminateReaching.contains(callee))
+                    continue;
+                if (onStack.contains(callee))
+                    return true;
+                if (!done.contains(callee) &&
+                    terminateSubgraphHasCycle(callee, terminateReaching, onStack, done))
+                    return true;
+            }
+        }
+        onStack.remove(func);
+        done.add(func);
+        return false;
+    }
+
+    // Inline, into each ray entry point, every callee that transitively reaches a
+    // shader-terminating intrinsic (IgnoreHit/AcceptHitAndEndSearch).
+    //
+    // This must run before the entry point is legalized: emitPayloadWritebacks() inserts the
+    // OptiX payload write-back before terminating calls, but it scans only the entry point's own
+    // blocks. A terminating call buried in a non-[ForceInline] callee is therefore missed, and the
+    // ray terminates before the entry-point epilogue writes the payload back, silently dropping
+    // the caller's payload mutations (issue #11658). Inlining the terminating call into the entry
+    // point reproduces exactly the codegen already produced when the callee is marked
+    // [ForceInline] (the maintainer's documented workaround), where the write-back lands before
+    // the terminate.
+    //
+    // On the rare path where a terminate-reaching callee cannot be flattened (a recursive chain,
+    // or a callee inlineCall cannot inline), the write-back cannot be guaranteed, so this pass
+    // emits an error (Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee) via `sink`
+    // rather than silently miscompiling.
+    void inlineShaderTerminatingCalleesForRayEntryPoints(IRModule* module, DiagnosticSink* sink)
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto entryPoint = as<IRFunc>(globalInst);
+            if (!entryPoint)
+                continue;
+            auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
+            if (!entryPointDecor || !entryPoint->getFirstBlock())
+                continue;
+
+            // IgnoreHit/AcceptHitAndEndSearch are any-hit-only intrinsics (declared
+            // `[require(..., raytracing_anyhit)]` in the core module), so a terminating call can
+            // only legitimately appear in an `anyhit` entry point. Gating on Stage::AnyHit keeps
+            // every other entry point (including non-ray CUDA kernels) a strict no-op, and ensures
+            // an unrelated function that merely shares the name "IgnoreHit"/"AcceptHitAndEndSearch"
+            // — which isShaderTerminatingIntrinsic matches via name hint — is never disturbed.
+            if (entryPointDecor->getProfile().getStage() != Stage::AnyHit)
+                continue;
+
+            // Collect every defined function reachable from the entry point via resolvable
+            // direct calls.
+            HashSet<IRFunc*> reachable;
+            List<IRFunc*> workList;
+            reachable.add(entryPoint);
+            workList.add(entryPoint);
+            while (workList.getCount())
+            {
+                auto func = workList.getLast();
+                workList.removeLast();
+                for (auto block : func->getBlocks())
+                    for (auto inst : block->getChildren())
+                        if (auto call = as<IRCall>(inst))
+                        {
+                            auto callee = getResolvedCalleeFunc(call);
+                            if (callee && callee->getFirstBlock() && reachable.add(callee))
+                                workList.add(callee);
+                        }
+            }
+
+            // From the reachable set, compute `terminateReaching`: the functions (keyed on their
+            // pre-inlining identity) that reach a terminating intrinsic. This set is authoritative
+            // for exactly two decisions made before any IR is mutated: the `contains(entryPoint)`
+            // "is there anything to do" early-out, and the acyclicity check. The inlining loop and
+            // residual scan below deliberately do NOT consult it — they re-derive "reaches a
+            // terminating intrinsic" against the entry point's *current* blocks, because inlining
+            // mutates those blocks and a set keyed on the original functions would be stale.
+            HashSet<IRFunc*> terminateReaching;
+            for (auto func : reachable)
+            {
+                HashSet<IRFunc*> visited;
+                if (funcReachesShaderTerminatingIntrinsic(func, visited))
+                    terminateReaching.add(func);
+            }
+
+            // If no terminating intrinsic is reachable from this entry point (e.g. a non-ray
+            // kernel, or a ray shader that never terminates), there is nothing to do. If the only
+            // terminating calls are direct in the entry point's own blocks, no *callee* is
+            // terminate-reaching and the inlining loop below is a no-op, leaving the existing
+            // direct-call handling in emitPayloadWritebacks() untouched.
+            if (!terminateReaching.contains(entryPoint))
+                continue;
+
+            // A recursive terminate-reaching call chain cannot be flattened by inlining (the
+            // inline loop below would not terminate); skip inlining and let the diagnostic report
+            // it. In practice such recursion is already rejected upstream (E55201, "recursion not
+            // allowed"), so this guard primarily guarantees the pass itself always terminates.
+            HashSet<IRFunc*> onStack, done;
+            bool hasCycle = terminateSubgraphHasCycle(entryPoint, terminateReaching, onStack, done);
+
+            if (!hasCycle)
+            {
+                // Inline into the entry point every call that transitively reaches a terminating
+                // intrinsic, until none remain. We inline exactly these calls (rather than marking
+                // callees [ForceInline] and running the module-wide force-inliner) so unrelated
+                // callees are left untouched. The result is the same flattened entry point that a
+                // [ForceInline] callee produces, so emitPayloadWritebacks() then inserts the
+                // payload write-back before each terminating call.
+                //
+                // Termination (decreasing measure): each iteration inlines *all* terminate-reaching
+                // calls currently in the entry point, so the maximum entry-point-to-terminate call
+                // nesting depth strictly decreases by one per iteration. The terminate-reaching
+                // subgraph is acyclic (checked above), so that depth is finite and bounded by the
+                // number of reachable functions; the loop therefore converges in at most
+                // `reachable.getCount()` real passes plus one final no-op pass. `maxIterations` is
+                // a deliberately generous cap, not a tight bound: the assertion exists only to turn
+                // a hypothetical non-terminating loop into a debug-build failure, never to fire on
+                // a valid input.
+                Index maxIterations = reachable.getCount() + 1;
+                Index iterationCount = 0;
+                for (bool changed = true; changed;)
+                {
+                    SLANG_ASSERT(iterationCount++ <= maxIterations);
+                    changed = false;
+                    List<IRCall*> terminatingCalls;
+                    for (auto block : entryPoint->getBlocks())
+                        for (auto inst : block->getChildren())
+                            if (auto call = as<IRCall>(inst))
+                            {
+                                auto callee = getResolvedCalleeFunc(call);
+                                if (!callee || !callee->getFirstBlock())
+                                    continue;
+                                HashSet<IRFunc*> visited;
+                                if (funcReachesShaderTerminatingIntrinsic(callee, visited))
+                                    terminatingCalls.add(call);
+                            }
+                    for (auto call : terminatingCalls)
+                        if (inlineCall(call))
+                            changed = true;
+                }
+            }
+
+            // After inlining, a terminating intrinsic should only be reachable as a *direct* call
+            // in the entry point's own blocks (which emitPayloadWritebacks() handles). If a
+            // resolvable callee that reaches one is still present (a recursive chain skipped
+            // above, or a callee that inlineCall could not flatten), the payload write-back before
+            // ray termination cannot be guaranteed; diagnose rather than silently miscompile. (The
+            // only residual shape this cannot see is a terminating call reached through a genuinely
+            // indirect callee — see the resolution-boundary contract on getResolvedCalleeFunc; such
+            // calls are resolved away before this stage.)
+            IRCall* residualCall = nullptr;
+            for (auto block : entryPoint->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    auto call = as<IRCall>(inst);
+                    if (!call)
+                        continue;
+                    auto callee = getResolvedCalleeFunc(call);
+                    if (!callee || !callee->getFirstBlock())
+                        continue;
+                    HashSet<IRFunc*> visited;
+                    if (funcReachesShaderTerminatingIntrinsic(callee, visited))
+                    {
+                        residualCall = call;
+                        break;
+                    }
+                }
+                if (residualCall)
+                    break;
+            }
+            if (residualCall)
+            {
+                // A dedicated `err`-severity diagnostic (not the internal-error `Unimplemented`,
+                // code 99999): this is a user-correctable limitation with an actionable workaround,
+                // not a compiler bug to "file an issue" about.
+                sink->diagnose(Diagnostics::ShaderTerminatingIntrinsicInNoninlinableCallee{
+                    .location = residualCall->sourceLoc});
+            }
+        }
+    }
+
     // Emit payload write-backs before return instructions and shader-terminating calls
     void emitPayloadWritebacks()
     {
@@ -1752,14 +2032,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     if (auto call = as<IRCall>(inst))
                     {
-                        auto callee = call->getCallee();
-                        auto calleeFunc = as<IRFunc>(callee);
-                        if (!calleeFunc)
-                        {
-                            if (auto specialize = as<IRSpecialize>(callee))
-                                calleeFunc = as<IRFunc>(specialize->getBase());
-                        }
-
+                        auto calleeFunc = getResolvedCalleeFunc(call);
                         if (isShaderTerminatingIntrinsic(calleeFunc))
                         {
                             builder.setInsertBefore(call);
@@ -2105,6 +2378,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*the builder in use*/ &builder);
                 if (ioBaseAttributeIndex > 8)
                 {
+                    // A hit attribute is always a parameter, never a result, so
+                    // `m_param` is set here; guard the deref in release too.
+                    SLANG_RELEASE_ASSERT(m_param);
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "the supplied hit attribute exceeds the maximum hit attribute "
                                    "structure "
@@ -2294,6 +2570,10 @@ void legalizeEntryPointVaryingParamsForCPU(
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink)
 {
     CUDAEntryPointVaryingParamLegalizeContext context;
+    // Hoist shader-terminating intrinsics (IgnoreHit/AcceptHitAndEndSearch) buried in callees
+    // into ray entry points before legalization, so the payload write-back is emitted before the
+    // ray terminates (issue #11658).
+    context.inlineShaderTerminatingCalleesForRayEntryPoints(module, sink);
     context.processModule(module, sink);
 }
 
@@ -4050,6 +4330,13 @@ protected:
                 result.permittedTypes.add(builder.getUInt16Type());
                 break;
             }
+        case SystemValueSemanticName::WaveIndex:
+            {
+                result.systemValueName = toSlice("simdgroup_index_in_threadgroup");
+                result.permittedTypes.add(builder.getUIntType());
+                result.permittedTypes.add(builder.getUInt16Type());
+                break;
+            }
         case SystemValueSemanticName::QuadLaneIndex:
             {
                 result.systemValueName = toSlice("thread_index_in_quadgroup");
@@ -4680,6 +4967,13 @@ protected:
                 break;
             }
 
+        case SystemValueSemanticName::WaveIndex:
+            {
+                result.systemValueName = toSlice("subgroup_id");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
         case SystemValueSemanticName::ViewID:
         case SystemValueSemanticName::ViewportArrayIndex:
         case SystemValueSemanticName::StartVertexLocation:
@@ -4759,7 +5053,44 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
-void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
+// Re-point at `newFunc` every `IREntryPointParamDecoration` that currently names `oldFunc` as
+// its originating entry point. When entry-point `uniform` parameters are hoisted to global scope
+// (moveEntryPointUniformParamsToGlobalScope), each resulting global param is tagged with an
+// IREntryPointParamDecoration recording the entry-point function it came from. If a later pass
+// replaces the entry point with a wrapper (as lowerOutParameters does below), those tags still
+// reference the old function; introduceExplicitGlobalContext binds a global uniform to an entry
+// point only when this decoration names that entry point, so without re-pointing the uniform is
+// silently dropped — on Metal a struct-returning vertex shader's `uniform T*` gets no [[buffer]]
+// argument and reads uninitialized memory.
+static void retargetEntryPointParamDecorations(IRFunc* oldFunc, IRFunc* newFunc)
+{
+    List<IREntryPointParamDecoration*> decorationsToRetarget;
+    for (auto use = oldFunc->firstUse; use; use = use->nextUse)
+    {
+        if (auto decor = as<IREntryPointParamDecoration>(use->getUser()))
+            decorationsToRetarget.add(decor);
+    }
+    for (auto decor : decorationsToRetarget)
+        decor->setOperand(0, newFunc);
+}
+
+// Convert an entry point's `out`/`inout` parameters (and, for a vertex shader, a struct return)
+// into a single return struct whose fields carry the original stage-output semantics. Metal models
+// stage outputs as return-struct fields (e.g. `[[color(N)]]`, `[[position]]`), so a pointer-typed
+// `out` parameter cannot survive to emit. This runs for the graphics output stages (vertex and
+// fragment); the downstream `wrapReturnValueInStruct`/`fixFieldSemanticsOfFlatStruct` path then
+// maps the field semantics to the Metal attributes (e.g. `SV_Target` -> `[[color(N)]]`).
+//
+// The trigger differs by stage. An `out`/`inout` parameter must be lowered on either stage (that is
+// the #11969 crash: a fragment `out float4 : SV_Target` otherwise reaches emit as a pointer with an
+// unmapped address space). A by-value struct return, however, only needs this explicit lowering for
+// vertex — a fragment that already returns its outputs by value (e.g. `FragOut { float4 :
+// SV_Target; float : SV_Depth; }`) is handled correctly downstream, and re-wrapping it here would
+// strip the field semantics. So the struct-return trigger is gated on the vertex stage.
+void legalizeShaderOutputParamsForMetal(
+    DiagnosticSink* sink,
+    EntryPointInfo& entryPoint,
+    Stage stage)
 {
     const auto oldFunc = entryPoint.entryPointFunc;
 
@@ -4770,7 +5101,9 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
         [](auto param) { return as<IROutParamTypeBase>(param->getFullType()); });
 
     auto returnType = oldFunc->getResultType();
-    if (!as<IRStructType>(returnType) && !hasOutParameters)
+    const bool hasStructReturn = as<IRStructType>(returnType) != nullptr;
+    const bool triggerOnStructReturn = hasStructReturn && stage == Stage::Vertex;
+    if (!triggerOnStructReturn && !hasOutParameters)
         return;
 
     const bool alwaysUseReturnStruct = true;
@@ -4778,6 +5111,10 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
 
     if (oldFunc == entryPoint.entryPointFunc)
         return;
+
+    // The wrapper is now the entry point, so global uniform params that recorded `oldFunc` as
+    // their originating entry point must follow it (see retargetEntryPointParamDecorations).
+    retargetEntryPointParamDecorations(oldFunc, entryPoint.entryPointFunc);
 
     // Since this will no longer be the entry point function, remove those decorations
     List<IRDecoration*> ds;
@@ -4803,9 +5140,22 @@ void legalizeEntryPointVaryingParamsForMetal(
 {
     for (auto& e : entryPoints)
     {
-        if (e.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+        // Both vertex and fragment stages produce varying outputs that Metal models as
+        // return-struct fields, so an `out`/`inout` output parameter on either stage must be
+        // lowered into the return struct rather than surviving as a pointer-typed parameter (see
+        // issue #11969, where a fragment `out float4 : SV_Target` reached Metal emit as a pointer
+        // and hit an unmapped address space). The function itself decides, per stage, whether a
+        // by-value struct return also triggers the lowering (vertex only) — see
+        // legalizeShaderOutputParamsForMetal.
+        const auto stage = e.entryPointDecor->getProfile().getStage();
+        switch (stage)
         {
-            legalizeVertexShaderOutputParamsForMetal(sink, e);
+        case Stage::Vertex:
+        case Stage::Fragment:
+            legalizeShaderOutputParamsForMetal(sink, e, stage);
+            break;
+        default:
+            break;
         }
     }
     LegalizeMetalEntryPointContext context(module, sink);

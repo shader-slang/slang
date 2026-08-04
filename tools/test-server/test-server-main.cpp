@@ -1,17 +1,17 @@
 // test-server.cpp
 
-#include "../../source/compiler-core/slang-json-rpc-connection.h"
-#include "../../source/compiler-core/slang-test-server-protocol.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-secure-crt.h"
-#include "../../source/core/slang-shared-library.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-test-tool-util.h"
-#include "../../source/core/slang-writer.h"
-#include "../render-test/slang-support.h"
+#include "compiler-core/slang-json-rpc-connection.h"
+#include "compiler-core/slang-test-server-protocol.h"
+#include "core/slang-io.h"
+#include "core/slang-process-util.h"
+#include "core/slang-secure-crt.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
+#include "core/slang-test-tool-util.h"
+#include "core/slang-writer.h"
 #include "gfx-unit-test/gfx-test-util.h"
+#include "render-test/slang-support.h"
 #include "slang-com-helper.h"
 #include "slang-rhi.h"
 #include "test-server-diagnostics.h"
@@ -27,12 +27,116 @@
 
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
+#include <windows.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 namespace TestServer
 {
 using namespace Slang;
+
+#if defined(_WIN32)
+static const UINT kParentMonitorFailedExitCode = 1;
+
+// This monitor is Windows-only because issue #10109 is specifically about orphaned test-server
+// processes holding DLLs open after slang-test crashes. Unix platforms do not prevent loaded
+// shared libraries from being replaced in the same way.
+static DWORD WINAPI _parentMonitorThreadProc(void* data)
+{
+    HANDLE parentProcess = (HANDLE)data;
+    DWORD waitResult = WaitForSingleObject(parentProcess, INFINITE);
+    CloseHandle(parentProcess);
+
+    if (waitResult == WAIT_OBJECT_0)
+    {
+        // The RPC peer is gone, so graceful shutdown cannot be coordinated. Exit hard to release
+        // DLL file handles promptly; Windows will reclaim the process resources.
+        TerminateProcess(GetCurrentProcess(), 0);
+    }
+
+    return 0;
+}
+
+static void _signalParentMonitorReady(const char* readyEventName)
+{
+    if (!readyEventName || !readyEventName[0])
+        return;
+
+    OSString readyEventNameString = String(readyEventName).toWString();
+    HANDLE readyEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, readyEventNameString.begin());
+    if (readyEvent)
+    {
+        SetEvent(readyEvent);
+        CloseHandle(readyEvent);
+    }
+}
+
+static void _startParentMonitor(DWORD parentProcessId, const char* readyEventName)
+{
+    // Keep this scoped to test-server instead of changing shared process-launch plumbing. A
+    // duplicated inheritable parent handle would remove PID reuse entirely, but Process::create
+    // does not currently expose selective handle inheritance. The PID is captured immediately
+    // before spawning this process and consumed during init, so the reuse window is tiny; if we
+    // cannot open it at all, avoid leaving an unmonitored orphan.
+    HANDLE parentProcess = OpenProcess(SYNCHRONIZE, FALSE, parentProcessId);
+    if (!parentProcess)
+    {
+        TerminateProcess(GetCurrentProcess(), kParentMonitorFailedExitCode);
+        return;
+    }
+
+    HANDLE thread = CreateThread(nullptr, 0, _parentMonitorThreadProc, parentProcess, 0, nullptr);
+    if (!thread)
+    {
+        CloseHandle(parentProcess);
+        TerminateProcess(GetCurrentProcess(), kParentMonitorFailedExitCode);
+        return;
+    }
+    CloseHandle(thread);
+    _signalParentMonitorReady(readyEventName);
+}
+
+static void _startParentMonitorFromArgs(int argc, const char* const* argv)
+{
+    bool hasParentProcessId = false;
+    const char* parentProcessIdArg = nullptr;
+    const char* readyEventName = nullptr;
+
+    for (int i = 1; i < argc; ++i)
+    {
+        if (strcmp(argv[i], "-parent-pid") == 0)
+        {
+            hasParentProcessId = true;
+            if (i + 1 >= argc)
+                break;
+            parentProcessIdArg = argv[++i];
+            continue;
+        }
+        if (strcmp(argv[i], "-parent-monitor-ready-event") == 0)
+        {
+            if (i + 1 >= argc)
+                break;
+            readyEventName = argv[++i];
+            continue;
+        }
+    }
+
+    if (!hasParentProcessId)
+        return;
+
+    Int parentProcessId = 0;
+    if (parentProcessIdArg &&
+        SLANG_SUCCEEDED(
+            StringUtil::parseInt(UnownedStringSlice(parentProcessIdArg), parentProcessId)) &&
+        parentProcessId > 0 && parentProcessId <= Int(MAXDWORD))
+    {
+        _startParentMonitor(DWORD(parentProcessId), readyEventName);
+        return;
+    }
+
+    TerminateProcess(GetCurrentProcess(), kParentMonitorFailedExitCode);
+}
+#endif
 
 class TestReporter : public ITestReporter
 {
@@ -187,13 +291,17 @@ SlangResult innerMain(
 } // namespace SlangCTool
 
 // SlangITool
-#include "../slang-test/slangi-tool-impl.h"
+#include "slang-test/slangi-tool-impl.h"
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SlangResult TestServer::init(int argc, const char* const* argv)
 {
     m_exePath = argv[0];
+
+#if defined(_WIN32)
+    _startParentMonitorFromArgs(argc, argv);
+#endif
 
 #if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
     // Suppress the modal abort() dialog in unattended/LLM-driven builds.
@@ -435,8 +543,10 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
 
     TestReporter testReporter;
     renderer_test::CoreDebugCallback coreDebugCallback;
-    renderer_test::CoreToRHIDebugBridge rhiDebugCallback;
-    rhiDebugCallback.setCoreCallback(&coreDebugCallback);
+    auto rhiDebugCallback = renderer_test::createRetainedCoreToRHIDebugBridge();
+    renderer_test::ScopedCoreDebugCallback scopedDebugCallback(
+        *rhiDebugCallback,
+        &coreDebugCallback);
 
     testModule->setTestReporter(&testReporter);
 
@@ -453,7 +563,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
     unitTestContext.enableDebugLayers = args.enableDebugLayers;
-    unitTestContext.debugCallback = &rhiDebugCallback;
+    unitTestContext.debugCallback = rhiDebugCallback.Ptr();
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);
