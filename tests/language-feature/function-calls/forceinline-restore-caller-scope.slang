@@ -3,11 +3,9 @@ RWStructuredBuffer<int> outputBuffer;
 
 // Regression test for shader-slang/slang#11616.
 //
-// When a [ForceInline] callee is inlined back into its caller, the SPIR-V debug
-// info must restore the caller function's own DebugScope before emitting debug
-// records for caller locals. Previously the inliner emitted a DebugNoScope here,
-// clearing the active scope, so the caller-local `result` DebugValue landed under
-// no enclosing scope.
+// When a [ForceInline] callee is inlined back into its caller, the SPIR-V debug info must restore
+// the caller function's own DebugScope before emitting debug records for caller locals — otherwise
+// the caller-local `result` DebugValue lands under no enclosing scope.
 
 [ForceInline]
 int inlineSingleBasicBlock1(int value1, int value2)

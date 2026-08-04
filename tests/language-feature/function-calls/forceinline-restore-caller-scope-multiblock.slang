@@ -46,12 +46,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // computeMain's own entry scope is a one-operand DebugScope.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[CALLER]]{{$}}
 
-// The multi-block callee is inlined with inline depth: its scope appears only as a *two-operand*
-// DebugScope (scope + DebugInlinedAt) under computeMain's inline context — both the per-block scopes
-// and the intermediate restore left after the nested leafInline region returns. The multi-block
-// clone loop's debugScopeToUpgrade step re-attaches the outer call's DebugInlinedAt to that restore;
-// if it were dropped, the restore would collapse to a one-operand DebugScope %[[MULTI]], which the
-// CHECK-NOT below rejects across the whole inlined region (up to computeMain's own restore).
+// Every scope inside the inlined region carries inline depth: the multi-block callee's scope appears
+// only as a *two-operand* DebugScope (scope + DebugInlinedAt), covering both the per-block scopes and
+// the intermediate restore after the nested leafInline region returns. The CHECK-NOT enforces that
+// across the whole region, up to computeMain's own restore below.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]] %{{[0-9]+}}{{$}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[MULTI]]{{$}}
 
