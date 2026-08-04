@@ -15,6 +15,9 @@ void readHash(__ref String s, __ref uint result)
     result = getStringHash(s);
 }
 
+// The `NOT` checks bracket the positive one so the callee is absent from the whole output, not
+// just from the text following it.
+//HLSL-NOT: readHash
 //HLSL: buf_0[int(0)] = uint(684824882);
 //HLSL-NOT: readHash
 
