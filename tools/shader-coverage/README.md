@@ -20,6 +20,10 @@ Related documentation and examples:
   and
   [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
   runnable end-to-end example programs (see Quick start below).
+- [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/) —
+  one shader dispatched with `--backend=cpu|cuda|vulkan|metal`,
+  implementing each backend's binding recipe from the host-interface
+  doc.
 
 Not to be confused with `tools/coverage/`, which measures C++ coverage
 of the Slang compiler itself.
@@ -62,7 +66,7 @@ directly or convert the snapshot to LCOV `.info` via
 [`slang-coverage-to-lcov.py`](./slang-coverage-to-lcov.py). LCOV is
 consumable by `genhtml`, Codecov, VS Code Coverage Gutters, etc.
 
-Two runnable example programs demonstrate the workflow — compile
+Three runnable example programs demonstrate the workflow — compile
 with coverage, bind the counter buffer, dispatch, read back, and
 render a report:
 
@@ -73,6 +77,11 @@ render a report:
 - [`examples/shader-coverage-bvh-traversal`](../../examples/shader-coverage-bvh-traversal/) —
   a software BVH ray-traversal kernel showing how coverage exposes
   input-shape gaps in test data (rare-case paths that never run).
+- [`examples/shader-coverage-backends`](../../examples/shader-coverage-backends/) —
+  a variant of the user-guide tutorial's kernel dispatched with
+  `--backend=cpu|cuda|vulkan|metal`, showing that only the
+  binding step differs per backend and that all four produce
+  identical counters.
 
 ## Pinning the coverage buffer at an explicit slot
 
@@ -317,7 +326,12 @@ reported by `manifest.buffer.element_stride` /
 `CoverageBufferInfo::elementByteWidth`. Indexed by
 `CoverageEntryInfo::counterIndex` / manifest `counter`. uint64 slots
 effectively never wrap; uint32 slots wrap silently at 2^32 hits per
-slot.
+slot and read back as small numbers.
+
+Counter slot indices are per-compile: slot `K` does not identify the
+same source location across two compiles or shader variants. Aggregate
+by the source attribution in the manifest or metadata, never by slot
+index.
 
 ---
 

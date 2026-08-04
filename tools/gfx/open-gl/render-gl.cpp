@@ -1,12 +1,12 @@
 // render-gl.cpp
 #include "render-gl.h"
 
-#include "../immediate-renderer-base.h"
-#include "../mutable-shader-object.h"
-#include "../nvapi/nvapi-util.h"
 #include "core/slang-basic.h"
 #include "core/slang-blob.h"
 #include "core/slang-secure-crt.h"
+#include "gfx/immediate-renderer-base.h"
+#include "gfx/mutable-shader-object.h"
+#include "gfx/nvapi/nvapi-util.h"
 #include "stb_image_write.h"
 
 #if SLANG_WIN64 || SLANG_WIN64
@@ -1815,7 +1815,7 @@ void GLDevice::debugCallback(
     switch (format)
     {
     default:
-        assert(!"unexpected");
+        SLANG_ASSERT_FAILURE("unexpected");
         return VertexAttributeFormat();
 
 #define CASE(NAME, COUNT, TYPE, NORMALIZED)                           \
@@ -1848,7 +1848,7 @@ void GLDevice::bindBufferImpl(
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[ii]);
         GLuint bufferID = buffer ? buffer->m_handle : 0;
 
-        assert(!offsets || !offsets[ii]);
+        SLANG_ASSERT(!offsets || !offsets[ii]);
 
         glBindBufferBase(target, (GLuint)slot, bufferID);
     }
@@ -2831,7 +2831,7 @@ void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offse
 
 void GLDevice::setViewports(GfxCount count, Viewport const* viewports)
 {
-    assert(count == 1);
+    SLANG_ASSERT(count == 1);
     auto viewport = viewports[0];
     glViewport(
         (GLint)viewport.originX,
@@ -2843,7 +2843,7 @@ void GLDevice::setViewports(GfxCount count, Viewport const* viewports)
 
 void GLDevice::setScissorRects(GfxCount count, ScissorRect const* rects)
 {
-    assert(count <= 1);
+    SLANG_ASSERT(count <= 1);
     if (count)
     {
         // TODO: this isn't goign to be quite right because of the

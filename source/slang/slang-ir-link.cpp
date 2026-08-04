@@ -1,8 +1,8 @@
 // slang-ir-link.cpp
 #include "slang-ir-link.h"
 
-#include "../compiler-core/slang-artifact.h"
-#include "../core/slang-performance-profiler.h"
+#include "compiler-core/slang-artifact.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-capability.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-insts.h"

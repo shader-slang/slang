@@ -1,6 +1,6 @@
 #include "slang-ir-any-value-marshalling.h"
 
-#include "../core/slang-math.h"
+#include "core/slang-math.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"

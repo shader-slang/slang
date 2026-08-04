@@ -2,7 +2,7 @@
 #ifndef SLANG_EMIT_LLVM_H
 #define SLANG_EMIT_LLVM_H
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-ir-link.h"
 
 namespace Slang

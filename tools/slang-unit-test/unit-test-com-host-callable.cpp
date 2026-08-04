@@ -1,7 +1,7 @@
 // unit-test-com-host-callable.cpp
 
-#include "../../source/core/slang-byte-encode-util.h"
-#include "../../source/core/slang-list.h"
+#include "core/slang-byte-encode-util.h"
+#include "core/slang-list.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

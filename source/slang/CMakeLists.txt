@@ -111,7 +111,7 @@ add_custom_command(
     COMMAND
         slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
         ${SLANG_CAPABILITY_OUTPUT_DIR} --doc
-        "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
+        "${slang_SOURCE_DIR}/docs/user-guide/a4-02-reference-capability-atoms.md"
     DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
@@ -250,6 +250,7 @@ set(slang_build_args
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
+    ${slang_SOURCE_DIR}/tools
     EXPORT_MACRO_PREFIX
     SLANG
     EXPORT_TYPE_AS
@@ -261,7 +262,10 @@ set(slang_build_args
     generate_standard_module_config_header
     PRECOMPILE_HEADERS
     ${slang_SOURCE_DIR}/source/core/slang-basic.h
-    ${slang_SOURCE_DIR}/source/slang/slang-compiler.h
+    # slang-compiler.h transitively includes generated .fiddle headers whose macros are keyed on
+    # __LINE__. GCC can restore inconsistent FIDDLE macro state from its PCH even in a clean build,
+    # so keep those headers out of the GCC PCH. See #12227.
+    "$<$<NOT:$<CXX_COMPILER_ID:GNU>>:${slang_SOURCE_DIR}/source/slang/slang-compiler.h>"
 )
 set(slang_link_args
     LINK_WITH_PRIVATE

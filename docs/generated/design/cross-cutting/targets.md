@@ -143,7 +143,7 @@ document does not duplicate it.
 A `///` doc-comment immediately preceding a `def` or `alias` in the
 `.capdef` is harvested into the auto-generated capability reference
 mentioned at the top of the file
-(`a3-02-reference-capability-atoms.md`). Comments interrupted by a
+(`a4-02-reference-capability-atoms.md`). Comments interrupted by a
 plain `//` line are dropped (per the rules near the top of
 [slang-capabilities.capdef](../../../../source/slang/slang-capabilities.capdef)).
 

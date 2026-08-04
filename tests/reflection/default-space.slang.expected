@@ -17,7 +17,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -41,10 +44,16 @@ standard output = {
                                         "kind": "scalar",
                                         "scalarType": "float32"
                                     }
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "shaderResource", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "shaderResource", "index": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
                     ]
                 },
                 "containerVarLayout": {
@@ -67,14 +76,23 @@ standard output = {
                                             "kind": "scalar",
                                             "scalarType": "float32"
                                         }
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
                                 },
                                 "binding": {"kind": "shaderResource", "index": 0}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 1}
                         ]
                     },
                     "binding": {"kind": "shaderResource", "index": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "subElementRegisterSpace", "value": 1}
+                ]
             }
         }
     ],
@@ -92,7 +110,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

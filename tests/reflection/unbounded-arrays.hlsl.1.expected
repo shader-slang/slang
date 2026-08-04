@@ -11,8 +11,14 @@ standard output = {
                 "kind": "array",
                 "elementCount": 0,
                 "elementType": {
-                    "kind": "samplerState"
-                }
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "samplerState", "value": "unbounded"}
+                ]
             }
         },
         {
@@ -31,8 +37,14 @@ standard output = {
                             "kind": "scalar",
                             "scalarType": "float32"
                         }
-                    }
-                }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": "unbounded"}
+                ]
             }
         },
         {
@@ -48,7 +60,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -64,7 +79,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -83,8 +101,14 @@ standard output = {
                             "kind": "scalar",
                             "scalarType": "float32"
                         }
-                    }
-                }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": "unbounded"}
+                ]
             }
         },
         {
@@ -100,7 +124,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -125,19 +152,32 @@ standard output = {
                                         "kind": "scalar",
                                         "scalarType": "float32"
                                     }
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "shaderResource", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "shaderResource", "index": 0}
                         },
                         {
                             "name": "s",
                             "type": {
-                                "kind": "samplerState"
+                                "kind": "samplerState",
+                                "sizes": [
+                                    {"kind": "samplerState", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "samplerState", "space": 1, "index": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1},
+                        {"kind": "samplerState", "value": 1}
                     ]
-                }
+                },
+                "sizes": [
+                    {"kind": "subElementRegisterSpace", "value": 2}
+                ]
             }
         },
         {
@@ -153,8 +193,14 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
-                }
+                    },
+                    "sizes": [
+                        {"kind": "uniform", "value": 16, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         }
     ],
@@ -172,7 +218,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

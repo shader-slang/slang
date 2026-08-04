@@ -1,5 +1,4 @@
-//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-// See https://github.com/shader-slang/slang/issues/11996
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 // Note: HLSL does not have 8-bit integer types, so dx12 is not tested here
 

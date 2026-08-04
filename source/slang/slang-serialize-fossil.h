@@ -8,11 +8,11 @@
 // format defined in `slang-fossil.h`.
 //
 
-#include "../core/slang-blob-builder.h"
-#include "../core/slang-internally-linked-list.h"
-#include "../core/slang-io.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-relative-ptr.h"
+#include "core/slang-blob-builder.h"
+#include "core/slang-internally-linked-list.h"
+#include "core/slang-io.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-relative-ptr.h"
 #include "slang-fossil.h"
 #include "slang-serialize.h"
 
