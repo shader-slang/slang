@@ -2268,21 +2268,7 @@ Result linkAndOptimizeIR(
             // whole-array copy that #10641 exists to remove. Inlining first makes the callee and
             // its parameter disappear, so the shared accesses land directly on the `workgroup`
             // global. Reuse the GLSL resource-return fallback pass restricted to that single case.
-            // WGSL cannot keep a `[noinline]` groupshared-parameter boundary; that conflict is
-            // normally FE-diagnosed, and the pass reports it as a backstop if one survives to here.
-            auto errorCountBeforeInlining = sink->getErrorCount();
-            SLANG_PASS(
-                performGLSLResourceReturnFunctionInlining,
-                targetProgram,
-                sink,
-                true,
-                GroupSharedNoInlinePolicy::NoInlineBoundaryIllegal);
-
-            // Abort if this pass reported an illegal `[noinline]` groupshared boundary, before
-            // `legalizeIRForWGSL` runs on IR it cannot legalize. Compare against the pre-pass count
-            // so an unrelated earlier diagnostic does not suppress the WGSL legalization pass.
-            if (sink->getErrorCount() != errorCountBeforeInlining)
-                return SLANG_FAIL;
+            SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, sink, true);
 
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
@@ -2448,31 +2434,7 @@ Result linkAndOptimizeIR(
         // parameters, we will inline the functions in question to make sure we can produce
         // valid GLSL.
         //
-        // Direct SPIR-V (SPIR-V output emitted directly, not via GLSL) can keep a `[noinline]`
-        // groupshared-parameter boundary -- emit declares `SPV_KHR_variable_pointers` for the
-        // surviving Workgroup-pointer signature -- so it must not force-inline such a callee. GLSL
-        // and SPIR-V-via-GLSL require the callee to be inlined; when that combination is illegal
-        // the pass reports it (the front end normally does, but link-time option changes can bypass
-        // the front-end check). (`shouldEmitSPIRVDirectly()` alone is true for a GLSL target too,
-        // hence the explicit `isSPIRV` guard.)
-        bool isDirectSpirv =
-            isSPIRV(target) && targetProgram->getOptionSet().shouldEmitSPIRVDirectly();
-        auto noInlinePolicy = isDirectSpirv ? GroupSharedNoInlinePolicy::AllowNoInlineBoundary
-                                            : GroupSharedNoInlinePolicy::NoInlineBoundaryIllegal;
-        auto errorCountBeforeInlining = sink->getErrorCount();
-        SLANG_PASS(
-            performGLSLResourceReturnFunctionInlining,
-            targetProgram,
-            sink,
-            false,
-            noInlinePolicy);
-
-        // If this pass reported an illegal `[noinline]` groupshared boundary, stop before later
-        // passes run on IR they cannot legalize. Compare against the count taken just above rather
-        // than testing for any error, so an unrelated earlier diagnostic does not suppress the
-        // later diagnostic passes (which a diagnostic test may also expect to fire).
-        if (sink->getErrorCount() != errorCountBeforeInlining)
-            return SLANG_FAIL;
+        SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, sink, false);
     }
     validateIRModuleIfEnabled(codeGenContext, irModule);
 

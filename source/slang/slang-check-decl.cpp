@@ -15598,24 +15598,14 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     addModifier(decl, prefixModifier);
 }
 
-// A bare `groupshared` parameter is passed by reference (#10641), which lowers to a pointer into
-// the thread-group-shared address space. Whether a function can keep that pointer across a real
-// call boundary is target-specific, so a function that both declares a `groupshared` parameter and
-// forbids inlining (`[noinline]`, or `export` for HLSL) may be legal on some targets and not on
-// others. Diagnose the illegal target(s) here, once, at the producer. This front-end check uses the
-// target options present at semantic-checking time; the IR inlining/emit path re-diagnoses (error
-// 30710) as a backstop only for the case the front end could not see -- a link-time option change
-// (e.g. `linkWithOptions` selecting SPIR-V-via-GLSL after this check) that makes a boundary
-// illegal.
+// A bare `groupshared` parameter is passed by reference (#10641), which lowers to a pointer into the
+// thread-group-shared address space. HLSL cannot pass that across a function boundary at all -- DXC
+// rejects it with error 0043 -- so a `groupshared` parameter is rejected whenever the function forces
+// a boundary, which both `[noinline]` and `export` do (an exported function is a separately compiled
+// entry the caller reaches by call, so its parameter is never inlined away).
 //
-//   - HLSL: cannot pass thread-group-shared memory across a function boundary at all (DXC rejects
-//     it with error 0043), so a `groupshared` parameter is rejected whenever the function forces a
-//     boundary -- both `[noinline]` and `export` do (an exported function is a separately compiled
-//     entry the caller reaches by call, so its parameter is never inlined away).
-//   - GLSL / SPIR-V-via-GLSL / WGSL: require the helper to be inlined away, so `[noinline]` on a
-//     `groupshared`-parameter function is rejected.
-//   - Direct SPIR-V / Metal / CUDA: allowed -- the boundary is kept (direct SPIR-V declares
-//     `SPV_KHR_variable_pointers` for the surviving Workgroup-pointer signature).
+// Other targets are not diagnosed here: they either keep the boundary or have the parameter inlined
+// away as ordinary legalization.
 void SemanticsDeclHeaderVisitor::checkGroupSharedParameterTargetPolicy(CallableDecl* decl)
 {
     auto noInlineModifier = decl->findModifier<NoInlineAttribute>();
@@ -15635,42 +15625,18 @@ void SemanticsDeclHeaderVisitor::checkGroupSharedParameterTargetPolicy(CallableD
     if (!groupSharedParam)
         return;
 
-    // Diagnose once per offending target class so the same conflict is not reported repeatedly.
-    bool reportedHLSL = false;
+    // Diagnose once so the same conflict is not reported for every D3D target in the list.
     for (auto target : getLinkage()->targets)
     {
+        // HLSL cannot pass groupshared memory across a boundary regardless of the reason the
+        // boundary exists, so both `[noinline]` and `export` trigger this (DXC 0043).
         if (isD3DTarget(target))
         {
-            // HLSL cannot pass groupshared memory across a boundary regardless of the reason the
-            // boundary exists, so both `[noinline]` and `export` trigger this.
-            if (!reportedHLSL)
-            {
-                getSink()->diagnose(Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{
-                    .modifierName = noInlineModifier ? UnownedStringSlice("[noinline]")
-                                                     : UnownedStringSlice("export"),
-                    .paramDecl = groupSharedParam});
-                reportedHLSL = true;
-            }
-            continue;
-        }
-
-        // The remaining diagnosed targets are the ones that must inline the helper; only
-        // `[noinline]` prevents that (`export` alone does not force a surviving boundary here).
-        // Direct SPIR-V (SPIR-V output emitted directly) keeps the boundary and is allowed;
-        // everything else Khronos -- GLSL and SPIR-V-via-GLSL -- plus WGSL requires inlining.
-        // `shouldEmitSPIRVDirectly()` is also true for a GLSL target, so guard with `isSPIRV`.
-        if (!noInlineModifier)
-            continue;
-
-        bool isDirectSpirv =
-            isSPIRV(target->getTarget()) && target->getOptionSet().shouldEmitSPIRVDirectly();
-        bool requiresInlining = isWGPUTarget(target) || (isKhronosTarget(target) && !isDirectSpirv);
-        if (requiresInlining)
-        {
-            getSink()->diagnose(Diagnostics::GroupsharedParameterRequiresInliningOnTarget{
-                .targetName =
-                    TypeTextUtil::getCompileTargetName(SlangCompileTarget(target->getTarget())),
+            getSink()->diagnose(Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{
+                .modifierName = noInlineModifier ? UnownedStringSlice("[noinline]")
+                                                 : UnownedStringSlice("export"),
                 .paramDecl = groupSharedParam});
+            break;
         }
     }
 }

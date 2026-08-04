@@ -1060,17 +1060,7 @@ struct TypeInliningPass : InliningPassBase
         {
         case kIROp_RefParamType:
             {
-                // Force-inlining a `__ref` parameter is a preference -- it spares the target from
-                // expressing the reference as a pointer across a call boundary -- so `[noinline]`
-                // may decline it, as the narrower `[noRefInline]` already may. For the referenced
-                // type it can instead be a requirement: this pass is what reduces
-                // `getStringHash(s)` to the hash of a string *literal*, so a `String` must inline
-                // either way. Ask the referenced type first.
-                auto refType = cast<IRRefParamType>(type);
-                if (doesTypeRequireInline(refType->getValueType(), arg, callee))
-                    return true;
-                if (callee->findDecoration<IRNoRefInlineDecoration>() ||
-                    callee->findDecoration<IRNoInlineDecoration>())
+                if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
                 return true;
             }
@@ -1311,27 +1301,8 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     {
     }
 
-    static bool hasGroupSharedParam(IRFunc* func)
-    {
-        for (auto param : func->getParams())
-        {
-            if (as<IRGroupSharedRate>(param->getRate()))
-                return true;
-        }
-        return false;
-    }
-
     bool shouldInline(CallSiteInfo const& info)
     {
-        // Never inline past `[noinline]` on a callee that carries a bare `groupshared`
-        // (by-reference) parameter -- checked before every other trigger below, since a resource
-        // result or an illegal-GLSL parameter type on the *same* callee would otherwise inline it
-        // anyway. Direct SPIR-V keeps this boundary and emits a valid Workgroup-pointer signature;
-        // the targets that cannot keep it have the combination reported up front by
-        // `diagnoseIllegalNoInlineGroupSharedFuncs`, so no inlining decision is needed here.
-        if (info.callee->findDecoration<IRNoInlineDecoration>() && hasGroupSharedParam(info.callee))
-            return false;
-
         if (!m_groupSharedByRefOnly && isResourceType(info.callee->getResultType()))
         {
             return true;
@@ -1364,32 +1335,13 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-// Report the illegal `[noinline]` + `groupshared`-parameter combination for a target that requires
-// inlining. The front end diagnoses this at the producer, but link-time option changes (e.g.
-// `linkWithOptions` selecting SPIR-V-via-GLSL after semantic checking) can select this policy for a
-// module the front end accepted under a different option set, so this is the codegen backstop that
-// yields a clean error instead of emitting invalid code.
-static void diagnoseIllegalNoInlineGroupSharedFuncs(IRModule* module, DiagnosticSink* sink)
-{
-    for (auto inst : module->getGlobalInsts())
-    {
-        auto func = as<IRFunc>(inst);
-        if (!func || !func->findDecoration<IRNoInlineDecoration>())
-            continue;
-        if (GLSLResourceReturnFunctionInliningPass::hasGroupSharedParam(func))
-            sink->diagnose(Diagnostics::GroupsharedParameterRequiresInliningOnTargetIr{func});
-    }
-}
-
 void performGLSLResourceReturnFunctionInlining(
     IRModule* module,
     TargetProgram* targetProgram,
     DiagnosticSink* sink,
-    bool groupSharedByRefOnly,
-    GroupSharedNoInlinePolicy noInlinePolicy)
+    bool groupSharedByRefOnly)
 {
-    if (noInlinePolicy == GroupSharedNoInlinePolicy::NoInlineBoundaryIllegal)
-        diagnoseIllegalNoInlineGroupSharedFuncs(module, sink);
+    SLANG_UNUSED(sink);
 
     GLSLResourceReturnFunctionInliningPass pass(module, groupSharedByRefOnly);
     bool changed = true;
