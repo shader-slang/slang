@@ -469,3 +469,42 @@ if(SLANG_ENABLE_REPLAYER)
         FOLDER test
     )
 endif()
+
+#
+# Unit tests for `source/slang` internals.
+#
+# These are separate from `slang-unit-test` because they call internal compiler
+# entry points directly. `slang-unit-test` is a shared library loaded by
+# `slang-test`, so it can only reach symbols exported from libslang-compiler,
+# and internal symbols in `source/slang` carry no export annotation. Linking the
+# compiler statically into an executable makes them resolve at link time with no
+# annotation and no change to `source/slang`.
+#
+# The target is therefore only defined for a static build. Under
+# SLANG_LIB_TYPE=SHARED the link would fail by design, so guarding the
+# definition here — rather than marking it EXCLUDE_FROM_ALL — means it is part
+# of `all` exactly where it can work.
+#
+if(SLANG_ENABLE_TESTS AND SLANG_LIB_TYPE STREQUAL "STATIC")
+    slang_add_target(
+        slang-internals-test
+        EXECUTABLE
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/tools
+        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
+        FOLDER test
+    )
+    # The tests include internal slang headers that transitively pull in the
+    # FIDDLE and capability generated headers. The `slang` target consumes those
+    # as PRIVATE link dependencies so their include directories do not
+    # propagate; expose them here, as `slang-unit-test` does.
+    target_include_directories(
+        slang-internals-test
+        PRIVATE
+            $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+endif()

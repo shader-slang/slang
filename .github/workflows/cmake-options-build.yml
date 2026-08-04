@@ -191,6 +191,25 @@ jobs:
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64')
         run: cmake --build build --config "$cmake_config"
 
+      # slang-internals-test only exists when SLANG_LIB_TYPE=STATIC, which is
+      # exactly this matrix entry. The windows-aarch64 entries cross-compile on
+      # an x64 runner and cannot execute what they build, so they are excluded
+      # with the same guard the slangc version check uses.
+      - name: Run slang-internals-test (${{ matrix.option }})
+        if: matrix.option == 'SLANG_LIB_TYPE' && !(inputs.os == 'windows' && inputs.arch != '')
+        run: |
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+            test_path="$bin_dir/slang-internals-test.exe"
+          else
+            test_path="$bin_dir/slang-internals-test"
+          fi
+          if [[ ! -f "$test_path" ]]; then
+            echo "ERROR: expected slang-internals-test at $test_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+          "$test_path"
+
       - name: Verify slangc version (${{ matrix.option }})
         if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '')
         run: |
