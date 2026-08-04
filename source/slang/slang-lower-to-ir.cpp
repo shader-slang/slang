@@ -15462,35 +15462,41 @@ static SourceFile* findIncludingNonIncludedSourceFile(
     const HashSet<SourceFile*>& tuFiles,
     SourceFile* sourceFile)
 {
-    // Guard against a cyclic initiating-location graph, which real include expansion never
-    // produces, so a malformed source manager cannot spin this loop forever.
+    // Every include chain reaching `sourceFile` is followed to the non-included file it terminates
+    // in, and those terminal files are collected. Chains can diverge, when two files of the
+    // translation unit include one header, and can then reconverge on a single outer file; so the
+    // decision of whether an owner is determined belongs at the terminals, not at each intermediate
+    // level, where divergence alone says nothing about the answer.
+    //
+    // A single terminal file is the owner. Several mean the owner is not determined: a declaration
+    // records the source file it came from, not the include occurrence, so when a header is expanded
+    // under more than one outer file nothing here says which expansion declared any given function.
+    // Selecting one anyway would scope conditionally-declared functions to a file that did not
+    // declare them, and a scope naming the wrong real file misleads a debugger more than the
+    // module-global fallback the caller keeps when this returns null.
+    //
+    // The view scan cannot stop at its first match: every occurrence feeds the traversal, so an early
+    // exit would hide chains and make a shared header look singly-included.
+    HashSet<SourceFile*> owners;
     HashSet<SourceFile*> visited;
-    SourceFile* current = sourceFile;
-    while (current && current->isIncludedFile())
+    List<SourceFile*> pending;
+    pending.add(sourceFile);
+    while (pending.getCount())
     {
-        if (!visited.add(current))
-            return nullptr;
+        SourceFile* current = pending.getLast();
+        pending.removeLast();
 
-        // Collect every occurrence of `current` whose chain lands in this translation unit.
-        // Restricting to this translation unit distinguishes occurrences belonging to modules that
-        // share a header through a common source manager.
-        //
-        // Several occurrences can still qualify, when two files of one translation unit include the
-        // same header. Which of them declared any particular function is not recoverable here: the
-        // declaration records its source file, not the occurrence it was parsed from. So rather
-        // than guess, resolve nothing, and let the caller leave the pre-existing module-global
-        // scope in place.
-        //
-        // Do not "complete" this by picking the first qualifying occurrence. That was measured
-        // against a build without this bail-out: given two files that include one header under
-        // different macros, so that each expansion declares a different function, the function
-        // declared by the second file was scoped to the first file's compilation unit — a plausible
-        // but wrong file, where the fallback had been right. A wrong scope pointing at a real file
-        // is worse for a debugger than a generic fallback, because nothing about it signals doubt.
-        // Every view is examined rather than stopping at the first match, because the number of
-        // distinct includers is the point: stopping early would report a single includer for a file
-        // that has several.
-        HashSet<SourceFile*> includers;
+        // Also guards against a cyclic initiating-location graph, which real include expansion never
+        // produces, so a malformed source manager cannot spin this loop forever.
+        if (!visited.add(current))
+            continue;
+
+        if (!current->isIncludedFile())
+        {
+            owners.add(current);
+            continue;
+        }
+
         for (SourceManager* mgr = tuSourceManager; mgr; mgr = mgr->getParent())
         {
             for (SourceView* view : mgr->getSourceViews())
@@ -15503,16 +15509,18 @@ static SourceFile* findIncludingNonIncludedSourceFile(
                 if (!includerView)
                     continue;
 
+                // Restricting to this translation unit's files is what separates its own include
+                // occurrences from those of another module that shares a header through a common
+                // source manager.
                 SourceFile* includer = includerView->getSourceFile();
                 if (tuFiles.contains(includer))
-                    includers.add(includer);
+                    pending.add(includer);
             }
         }
-        if (includers.getCount() != 1)
-            return nullptr;
-        current = *includers.begin();
     }
-    return current;
+    if (owners.getCount() != 1)
+        return nullptr;
+    return *owners.begin();
 }
 
 RefPtr<IRModule> generateIRForTranslationUnit(

@@ -5,8 +5,8 @@
 // one source file. The resolution deliberately binds nothing in that case, leaving the pre-existing
 // module-global scope, which is pinned to the entry point's compilation unit.
 //
-// This test asserts that fallback is *preserved*. It is the negative side of the feature: binding a
-// plausible but wrong compilation unit here was measured to be worse than not binding at all.
+// This test asserts that fallback is *preserved*. It is the negative side of the feature: a scope
+// naming a real but wrong file misleads a debugger more than a generic fallback does.
 //
 // Two placements make a wrong binding observable, and both are load-bearing:
 //   - Each file defines a different macro before including the header, so each expansion declares a
@@ -43,7 +43,7 @@ float ambiguousWrapB(float x)
 
 // The assertion that pins the fallback: ambiguousFromB was declared by this file's expansion, but with
 // the owning unit unrecoverable it keeps the module-global scope [[CU_ENTRY]] rather than [[CU_FIRST]].
-// Remove the ambiguity gate and the resolution binds [[CU_FIRST]] instead, so this CHECK is what
-// distinguishes a deliberate fallback from a guess.
+// Binding [[CU_FIRST]] is what arbitrary first-occurrence selection produces, so this CHECK is what
+// distinguishes the deliberate fallback from a guess.
 // CHECK-DAG: [[FN_B:%[0-9]+]] = OpString "ambiguousFromB"
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunction [[FN_B]] %{{[0-9]+}} [[SOURCE_INC]] %uint_{{[0-9]+}} %uint_{{[0-9]+}} [[CU_ENTRY]]
