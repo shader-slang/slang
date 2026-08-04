@@ -433,7 +433,7 @@ with its exact gate expression.
 | 66 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
 | 67 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
 | 68 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct helper call (line ~1794), not a `SLANG_PASS`; evaluates `static_assert` after specialization. |
-| 69 | `wrapCBufferElementsForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | `target == Metal || target == MetalLib` (line ~1815) | **`MetalLibAssembly` is omitted from the case list.** |
+| 69 | `wrapCBufferElementsForMetal` | [slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp) | `target == Metal \|\| target == MetalLib` (line ~1815) | **`MetalLibAssembly` is omitted from the case list.** |
 
 Filtered out for Metal in this phase: the
 `CUDASource / CUDAHeader / PyTorchCppBinding` derivative-wrapper
@@ -545,7 +545,7 @@ flowchart TD
 | 8 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isMetalTarget` (in the four-way arm at line ~2079) | |
 | 9 | `legalizeImageSubscript` | [slang-ir-legalize-image-subscript.cpp](../../../../source/slang/slang-ir-legalize-image-subscript.cpp) | (`Metal` / `MetalLib` / `MetalLibAssembly` / `GLSL` / `SPIRV` / `SPIRVAssembly` arm at line ~2095) | Metal needs this because MSL uses Metal-specific texture access patterns. |
 | 10 | `undoParameterCopy` | [slang-ir-undo-param-copy.cpp](../../../../source/slang/slang-ir-undo-param-copy.cpp) | (CPU / CUDA / Metal arm at line ~2142) | |
-| 11 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | `isCPUTarget || isCUDATarget || isMetalTarget` (line ~2147) | |
+| 11 | `transformParamsToConstRef` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | `isCPUTarget \|\| isCUDATarget \|\| isMetalTarget` (line ~2147) | |
 | 12 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | (via `[[fallthrough]]` from Metal arm into ShaderLLVMIR arm at line ~2154) | |
 | 13 | `introduceExplicitGlobalContext` | [slang-ir-explicit-global-context.cpp](../../../../source/slang/slang-ir-explicit-global-context.cpp) | (same fallthrough) | `target = Metal`. |
 | 14 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | |
@@ -664,7 +664,7 @@ flowchart TD
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ overrides in `slang-emit-metal.cpp`) | (always) | Walks IR and writes Metal text; Metal prelude comes from `slang-emit-metal-prelude.cpp`. |
 | 7 | `createArtifactFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Wraps the Metal text as an `IArtifact`. |
-| 8 | `compile` (Apple `metal`, `MetalC`) | (downstream) | `target == MetalLib || target == MetalLibAssembly` | `Metal` → `MetalLib` transition; compiles the Metal text into a `.metallib`. |
+| 8 | `compile` (Apple `metal`, `MetalC`) | (downstream) | `target == MetalLib \|\| target == MetalLibAssembly` | `Metal` → `MetalLib` transition; compiles the Metal text into a `.metallib`. |
 | 9 | `metal-objdump --disassemble` | [slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp) | `target == MetalLibAssembly` | `MetalLib` → `MetalLibAssembly` transition; disassembles the intermediate `.metallib`. |
 
 The bare `Metal` target stops at the text artifact; `MetalLib`

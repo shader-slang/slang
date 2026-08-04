@@ -292,7 +292,7 @@ flowchart TD
 | 51 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
 | 52 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | |
 | 53 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `shouldLegalizeExistentialAndResourceTypes` (default `true`) | |
-| 54 | `legalizeEmptyRayPayloadsForHLSL` | [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp) | `isD3DTarget || isSPIRV` (HLSL is `isD3DTarget`) | Adds dummy fields to empty ray payloads for DXIL + NVAPI compatibility. |
+| 54 | `legalizeEmptyRayPayloadsForHLSL` | [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp) | `isD3DTarget \|\| isSPIRV` (HLSL is `isD3DTarget`) | Adds dummy fields to empty ray payloads for DXIL + NVAPI compatibility. |
 | 55 | `legalizeNonStructParameterToStructForHLSL` | [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp) | `isD3DTarget` (line ~1684) | **HLSL/DXIL only.** |
 | 56 | `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `reqSet.existentialTypeLayout` | |
 | 57 | `validateStructuredBufferResourceTypes` | [slang-ir-validate.cpp](../../../../source/slang/slang-ir-validate.cpp) | (always) | Direct call. |
@@ -429,9 +429,9 @@ flowchart TD
 | 15 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | |
 | 16 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
 | 17 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (true for HLSL) | DXC disallows array return values. |
-| 18 | `legalizeUniformBufferLoad` | [slang-ir-legalize-uniform-buffer-load.cpp](../../../../source/slang/slang-ir-legalize-uniform-buffer-load.cpp) | `isKhronosTarget || target == HLSL` (line ~2249) | |
-| 19 | `invertYOfPositionOutput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `isKhronosTarget || HLSL` and `VulkanInvertY` | Rare for HLSL; for cross-API porting workflows. |
-| 20 | `rcpWOfPositionInput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `isKhronosTarget || HLSL` and `VulkanUseDxPositionW` | |
+| 18 | `legalizeUniformBufferLoad` | [slang-ir-legalize-uniform-buffer-load.cpp](../../../../source/slang/slang-ir-legalize-uniform-buffer-load.cpp) | `isKhronosTarget \|\| target == HLSL` (line ~2249) | |
+| 19 | `invertYOfPositionOutput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `isKhronosTarget \|\| HLSL` and `VulkanInvertY` | Rare for HLSL; for cross-API porting workflows. |
+| 20 | `rcpWOfPositionInput` | [slang-ir-vk-invert-y.cpp](../../../../source/slang/slang-ir-vk-invert-y.cpp) | `isKhronosTarget \|\| HLSL` and `VulkanUseDxPositionW` | |
 | 21 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = Default` (HLSL is not WGPU or Khronos). |
 | 22 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 23 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
@@ -520,8 +520,8 @@ flowchart TD
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ HLSL overrides in `slang-emit-hlsl.cpp`) | (always) | Walks IR and writes HLSL text; prelude comes from `slang-emit-hlsl-prelude.cpp`. |
 | 7 | `createArtifactForCompileTarget` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | At line ~2766 of `emitEntryPointsSourceFromIR`; wraps the HLSL text as an `IArtifact`. (`createArtifactFromIR` is the SPIR-V-direct helper and is not on the HLSL path.) |
-| 8 | `compile` (DXC) | (downstream) | `target == DXIL || target == DXILAssembly` | Reached via `emitWithDownstreamForEntryPoints` after `_getDefaultSourceForTarget` maps the target to `CodeGenTarget::HLSL`. DXC is the default for SM 6.0+; output is DXIL bytecode (or its disassembly). |
-| 9 | `compile` (fxc) | (downstream) | `target == DXBytecode || target == DXBytecodeAssembly` | Reached via `emitWithDownstreamForEntryPoints`. Legacy path; fxc compiles HLSL into D3D bytecode (or its disassembly) for SM 5.x. |
+| 8 | `compile` (DXC) | (downstream) | `target == DXIL \|\| target == DXILAssembly` | Reached via `emitWithDownstreamForEntryPoints` after `_getDefaultSourceForTarget` maps the target to `CodeGenTarget::HLSL`. DXC is the default for SM 6.0+; output is DXIL bytecode (or its disassembly). |
+| 9 | `compile` (fxc) | (downstream) | `target == DXBytecode \|\| target == DXBytecodeAssembly` | Reached via `emitWithDownstreamForEntryPoints`. Legacy path; fxc compiles HLSL into D3D bytecode (or its disassembly) for SM 5.x. |
 
 Neither spirv-link nor spirv-val nor spirv-opt apply to HLSL; all
 validation and optimization is delegated to DXC or fxc.
