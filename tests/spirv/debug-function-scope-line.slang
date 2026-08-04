@@ -8,8 +8,7 @@
 // This file holds only the entry point; debug-function-scope-line-other.slang holds the
 // `#line`-remapped function. The separation is load-bearing: the module-global fallback is pinned to
 // the *entry point's* compilation unit, so with the remapped function in this same file the fallback
-// would coincide with the correct answer and the test would pass while the feature is broken — which
-// is what it did before being restructured.
+// would coincide with the correct answer and the test could pass while the feature is broken.
 
 float remappedHelper(float x);
 

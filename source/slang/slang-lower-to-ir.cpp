@@ -15472,14 +15472,16 @@ static SourceFile* findIncludingNonIncludedSourceFile(
             return nullptr;
 
         // Follow every recorded occurrence of `current` and keep the first whose chain lands in
-        // this translation unit.
+        // this translation unit. Restricting to this translation unit is what distinguishes
+        // occurrences belonging to modules that share a header through a common source manager.
         //
-        // More than one occurrence can qualify, when two files of the same module include the same
-        // header. First-in-view-order is the intended answer rather than an artifact of iteration:
-        // views are registered in the order the preprocessor expanded them, and a header that
-        // declares anything is guarded (or it would be a redefinition error), so only the earliest
-        // expansion actually contributed the text a declaration was parsed from. That expansion is
-        // the one whose compilation unit owns the resulting functions.
+        // Two files of one translation unit including the same header still leaves several
+        // qualifying occurrences, and this resolves to the earliest. That is exact for an
+        // include-guarded header, where only one expansion contributes declarations. It is not
+        // exact when conditional compilation lets separate expansions declare different functions:
+        // each is then scoped to the first includer rather than to the file whose expansion
+        // declared it. Distinguishing those needs per-occurrence provenance on the declaration
+        // itself, which source views do not carry.
         SourceFile* resolved = nullptr;
         for (SourceManager* mgr = tuSourceManager; mgr && !resolved; mgr = mgr->getParent())
         {

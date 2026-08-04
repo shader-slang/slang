@@ -7,10 +7,9 @@
 // owning compilation unit cannot be resolved, SPIR-V emission falls back to a module-global scope
 // pinned to the *entry point's* compilation unit. If the entry point lived in the same file that does
 // the #include, the includer's compilation unit would BE the entry point's, the broken fallback would
-// coincide with the correct answer, and this test would pass while the feature is broken — which is
-// exactly what happened before this file was restructured. Keeping the entry point here and the
-// #include in the other file makes includer-CU and entry-CU distinct, so only real resolution can
-// satisfy the final assertion below.
+// coincide with the correct answer, and this test could pass while the feature is broken. Keeping the
+// entry point here and the #include in the other file makes includer-CU and entry-CU distinct, so
+// only real resolution can satisfy the final assertion below.
 
 //TEST:SIMPLE(filecheck=CHECK): tests/spirv/debug-function-scope-multifile-other.slang -target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly
 

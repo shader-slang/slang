@@ -12,8 +12,7 @@
 // DebugCompilationUnit. That separation is load-bearing rather than incidental: when the owning
 // compilation unit cannot be resolved, emission falls back to a module-global scope pinned to the
 // *entry point's* compilation unit. If the __include lived in this file, that fallback would
-// coincide with the correct answer and this test would pass while the feature is broken — which is
-// what it did before being restructured this way.
+// coincide with the correct answer and this test could pass while the feature is broken.
 
 import debug_function_scope_include_mod;
 
