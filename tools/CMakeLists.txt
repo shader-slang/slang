@@ -308,9 +308,9 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
     )
     add_dependencies(slang-test slang-neural-module slang-workgraph-module)
 
-    # generator() marks the checker EXCLUDE_FROM_ALL, so without this the CI
-    # enforce step finds no binary and fails closed on every PR. Cross-compiled
-    # generators are imported and prebuilt, so there is nothing to depend on.
+    # generator() marks the checker EXCLUDE_FROM_ALL, so without this the enforce
+    # step added by the CI workflow patch would find no binary and fail closed on
+    # every PR. Cross-compiled generators are imported and prebuilt.
     if(TARGET slang-ir-version-check AND NOT SLANG_GENERATORS_PATH)
         add_dependencies(slang-test slang-ir-version-check)
     endif()

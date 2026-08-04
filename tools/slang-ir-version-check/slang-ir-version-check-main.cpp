@@ -1,10 +1,12 @@
 // slang-ir-version-check-main.cpp
 //
-// CI gate that enforces the IR module version-bump policy documented in
-// docs/design/ir-instruction-definition.md. Given the base (pre-change) and new
-// (post-change) versions of the IR instruction stable-names table and of
-// slang-ir.h, it decides whether the change requires a version bump and whether
-// that bump is present.
+// Checker for the CI gate that enforces the IR module version-bump policy
+// documented in docs/design/ir-instruction-definition.md. A workflow step runs it
+// per pull request via extras/run-ir-version-check.sh.
+//
+// Given the base (pre-change) and new (post-change) versions of the IR
+// instruction stable-names table and of slang-ir.h, it decides whether the change
+// requires a version bump and whether that bump is present.
 //
 // The stable-names table (source/slang/slang-ir-insts-stable-names.lua) is the
 // signal: it is machine-generated, and the separate required "Check Stable Names
