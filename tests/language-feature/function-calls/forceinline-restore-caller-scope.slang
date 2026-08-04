@@ -41,20 +41,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // computeMain's own entry scope is a one-operand DebugScope referencing that DebugFunction.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[CALLER]]{{$}}
 
-// Cascading fix #4 (intermediate-restore inline depth). inlineSingleBasicBlock2's scope appears as a
-// *two-operand* DebugScope twice under computeMain's inline context: once opening its own inlined
-// body, and once as the intermediate restore after the nested inlineSingleBasicBlock1 region returns
-// (immediately before result1's DebugValue). Both carry inlineSingleBasicBlock2's DebugInlinedAt, so
-// the restore keeps its inline depth. If the clone-loop upgrade that re-attaches the outer call's
-// DebugInlinedAt to a cloned one-operand restore were dropped, the intermediate restore would
-// collapse to one operand and this count would fall to 1.
+// inlineSingleBasicBlock2's scope appears twice under computeMain's inline context: once opening
+// its own inlined body, once restoring it after the nested inlineSingleBasicBlock1 region returns.
+// Both must stay two-operand — a restore nested inside an inlined region keeps that region's
+// DebugInlinedAt, so only the outermost restore is one-operand.
 // CHECK-COUNT-2: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[BB2]] %{{[0-9]+}}{{$}}
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugValue %result1
 
-// After the inlined callee's debug records, the caller (computeMain) function scope is restored
-// as a one-operand DebugScope referencing that same DebugFunction, immediately before the
-// caller-local `result` DebugValue. Previously a DebugNoScope was emitted here instead, leaving
-// `result` with no enclosing scope.
+// The caller-local `result` DebugValue must sit under computeMain's own scope, so the restore has
+// to land immediately before it — hence the CHECK-NEXT rather than a plain CHECK.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[CALLER]]{{$}}
 // CHECK-NEXT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugValue %result
 
