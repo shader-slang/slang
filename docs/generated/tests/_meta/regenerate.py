@@ -87,6 +87,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
@@ -177,7 +178,16 @@ _ALLOWED_OOS_REASONS = (
 
 
 def _rel_to_repo(path: Path) -> str:
-    return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    """Return `path` relative to the repo root, for use in messages.
+
+    A path outside the repo is returned unchanged rather than raising:
+    this only labels diagnostics, so a caller reporting on a file
+    elsewhere should still get a readable message.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except ValueError:
+        return str(path)
 
 
 # --------------------------------------------------------------------------
@@ -1276,8 +1286,20 @@ def lint_markdown_links(md_path: Path) -> list[LintIssue]:
 # the floor and render it as a wall of pipe characters.
 # --------------------------------------------------------------------------
 
-_TABLE_DELIM_RE = re.compile(r"^\s*\|?(?:\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$")
 _UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+_DELIM_CELL_RE = re.compile(r"^:?-+:?$")
+
+
+def _is_delimiter_row(line: str) -> bool:
+    """Return whether `line` is a table's delimiter row.
+
+    GFM accepts a single dash per cell (`| - | - |`) and a one-column
+    table, so this tests each cell rather than matching the row against
+    one pattern -- a stricter pattern would skip such a table entirely
+    and quietly leave it unvalidated.
+    """
+    cells = _row_cells(line)
+    return bool(cells) and all(_DELIM_CELL_RE.match(c.strip()) for c in cells)
 
 
 def _row_cells(line: str) -> list[str]:
@@ -1305,6 +1327,10 @@ def lint_markdown_tables(md_path: Path) -> list[LintIssue]:
     header is also an error: GitHub pads or truncates it, so a claim
     containing an unescaped `|` silently loses its trailing columns --
     which is how a coverage row can end up with no Tests link.
+
+    Fenced code blocks are skipped, the same way `heading_slugs` skips
+    them: a bundle README quotes example tables inside ``` fences, and
+    those are illustrations rather than tables GitHub will render.
     """
     issues: list[LintIssue] = []
     rel = _rel_to_repo(md_path)
@@ -1313,12 +1339,18 @@ def lint_markdown_tables(md_path: Path) -> list[LintIssue]:
     except OSError:
         return issues
     i = 0
+    in_fence = False
     while i < len(lines):
-        header = lines[i]
-        if not header.lstrip().startswith("|") or i + 1 >= len(lines):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
             i += 1
             continue
-        if not _TABLE_DELIM_RE.match(lines[i + 1]):
+        header = lines[i]
+        if in_fence or not header.lstrip().startswith("|") or i + 1 >= len(lines):
+            i += 1
+            continue
+        if not _is_delimiter_row(lines[i + 1]):
             i += 1
             continue
         width = len(_row_cells(header))
@@ -2356,24 +2388,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------
 
 
-def _gh_slug(heading_text: str) -> str:
-    """Compute a GitHub-flavored markdown heading anchor.
-
-    Approximation of the algorithm GitHub uses to render `## Foo Bar`
-    as `#foo-bar`:
-    - lowercase
-    - replace runs of whitespace with `-`
-    - strip characters outside [a-z0-9-_]
-    - leading hyphens kept, but consecutive hyphens collapsed
-    """
-    s = heading_text.strip().lower()
-    s = re.sub(r"[`*_~]", "", s)  # strip markdown emphasis
-    s = re.sub(r"\s+", "-", s)
-    s = re.sub(r"[^a-z0-9\-_]", "", s)
-    s = re.sub(r"-+", "-", s)
-    return s
-
-
 def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
     """Walk docs/language-reference/*.md. For each file, return a list
     of (lineno, level, anchor_id) tuples — one per heading.
@@ -2404,18 +2418,18 @@ def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
                     aid = m2.group(1).lower()
                     txt = re.sub(r"\s*\{#[\w\-]+\}\s*$", "", txt)
                 else:
-                    aid = _gh_slug(txt)
+                    aid = _github_slug(txt)
                 anchors.append((i + 1, level, aid))
             else:
                 # Setext-style: a non-blank line followed by ==== or ----
                 if i + 1 < len(lines):
                     nxt = lines[i + 1]
                     if ln.strip() and re.match(r"^=+\s*$", nxt):
-                        anchors.append((i + 1, "#", _gh_slug(ln)))
+                        anchors.append((i + 1, "#", _github_slug(ln)))
                         i += 2
                         continue
                     if ln.strip() and re.match(r"^-+\s*$", nxt) and not ln.startswith("-"):
-                        anchors.append((i + 1, "##", _gh_slug(ln)))
+                        anchors.append((i + 1, "##", _github_slug(ln)))
                         i += 2
                         continue
             i += 1
@@ -3275,6 +3289,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_dg.set_defaults(func=cmd_doc_gaps)
 
+    p_st = sub.add_parser(
+        "selftest",
+        help="unit-check the slug / link / table helpers used by lint",
+    )
+    p_st.set_defaults(func=cmd_selftest)
+
     p_rs = sub.add_parser(
         "review-status",
         help="(Phase D) per-bundle review/remediation freshness",
@@ -3352,6 +3372,86 @@ def _build_parser() -> argparse.ArgumentParser:
     p_fd.set_defaults(func=cmd_findings_dup)
 
     return p
+
+
+def cmd_selftest(args: argparse.Namespace) -> int:
+    """Unit-check the helpers `lint` depends on, on inputs the corpus does
+    not contain.
+
+    `lint` itself only ever exercises these against the committed corpus,
+    which is kept clean -- so it proves the happy path and nothing else.
+    The cases below are the edge ones: the punctuation rule that made
+    every anchor in this corpus wrong, the escaped pipe that decides
+    whether a row is well-formed, and the GFM spellings (single-dash
+    delimiter, one-column table) that a stricter reader would skip
+    without reporting anything.
+    """
+    failures: list[str] = []
+
+    def check(what: str, got, want) -> None:
+        if got != want:
+            failures.append(f"{what}: got {got!r}, want {want!r}")
+
+    # Punctuation is deleted, not replaced, so each surrounding space
+    # still yields a hyphen. This is the rule the old `_gh_slug`
+    # collapsed away, and collapsing it is what made the corpus's
+    # anchors miss.
+    check("slug plain", _github_slug("Basic scalar types"), "basic-scalar-types")
+    check(
+        "slug slashes",
+        _github_slug("CUDA / Python / FFI attributes"),
+        "cuda--python--ffi-attributes",
+    )
+    check("slug code span", _github_slug("The `IRFunc` type"), "the-irfunc-type")
+    check("slug trailing punct", _github_slug("What now?"), "what-now")
+
+    # Repeated headings get -1, -2; fenced `# comment` lines are not
+    # headings.
+    with tempfile.TemporaryDirectory() as td:
+        doc = Path(td) / "d.md"
+        doc.write_text(
+            "# Title\n## Dup\n## Dup\nSetext\n------\n"
+            "```sh\n# not a heading\n```\n",
+            encoding="utf-8",
+        )
+        check(
+            "heading slugs",
+            heading_slugs(doc),
+            {"title", "dup", "dup-1", "setext"},
+        )
+
+    # Only a bare pipe separates cells.
+    check("row plain", _row_cells("| a | b | c |"), [" a ", " b ", " c "])
+    check("row escaped", len(_row_cells(r"| a | `x \|\| y` | c |")), 3)
+    check("row extra", len(_row_cells("| a | b | c | d |")), 4)
+
+    # GFM spellings a stricter delimiter test would silently skip.
+    check("delim single dash", _is_delimiter_row("| - | - |"), True)
+    check("delim one column", _is_delimiter_row("| --- |"), True)
+    check("delim aligned", _is_delimiter_row("| :--- | ---: | :---: |"), True)
+    check("delim not a delim", _is_delimiter_row("| a | b |"), False)
+
+    # A malformed row is reported, and a table inside a fence is not.
+    with tempfile.TemporaryDirectory() as td:
+        md = Path(td) / "README.md"
+        md.write_text(
+            "| h1 | h2 |\n| --- | --- |\n| a | b | c |\n\n"
+            "```markdown\n| bad |\n| --- | --- |\n```\n",
+            encoding="utf-8",
+        )
+        found = [i.message for i in lint_markdown_tables(md)]
+        check("table one issue", len(found), 1)
+        check("table names the row", "line 3" in found[0] if found else False, True)
+        check(
+            "table blames the pipe",
+            "escape a literal pipe" in found[0] if found else False,
+            True,
+        )
+
+    for f in failures:
+        print(f"FAIL {f}")
+    print(f"selftest: {len(failures)} failure(s)")
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:
