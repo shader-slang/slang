@@ -24,6 +24,41 @@
 namespace Slang
 {
 
+// Deserializing data is an important place where security issues
+// can arise, so it is usually important to perform validation
+// checks throughout the process, and fail fast rather than
+// risk reading mal-formed data.
+//
+// However, validation typically comes at a performance cost,
+// and one of the key cases for serialization in Slang is loading
+// the core module from the `slang.dll` binary itself. In order
+// to measure how much performance is being lost to validation
+// checks, we provide a define that is intended to enable or
+// disable validation during deserialization.
+//
+// Validation defaults to enabled; the guard lets a build turn it off
+// for measurement without editing this file, e.g. by passing
+// `-DSLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS=0`.
+//
+// It is defined here rather than in `slang-serialize-fossil.h` because
+// the reader for the format itself (`Fossil::getRootValue`) needs it
+// too, and sits below the serializer in the include graph.
+//
+#ifndef SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#define SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS 1
+#endif
+
+#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
+    do                                                                         \
+    {                                                                          \
+        if (!(CONDITION))                                                      \
+            SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
+    } while (0)
+#else
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
+#endif
+
 struct FossilizedPtrLikeLayout;
 struct FossilizedRecordLayout;
 struct FossilizedValLayout;
