@@ -35,9 +35,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-NOT:  %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
 // CHECK-COUNT-3: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
-// After the inlined region the caller's own function scope is restored as a one-operand
-// DebugScope (instead of the previous scope-clearing DebugNoScope). See shader-slang/slang#11616.
+// computeMain is not itself inlined, so the scope restored after the inlined region carries no
+// InlinedAt; the {{$}} anchors match that one-operand form only, not the scopes checked above.
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}}{{$}}
-// Exactly one top-level one-operand restore is expected; a spurious second would be a bug.
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}}{{$}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
