@@ -1,6 +1,6 @@
 // Disabled: an `__include`'d file's source view carries no initiating location, so the include chain
 // that resolves an owning compilation unit does not exist for it. Enabling this test requires
-// `__include` to record that location the way `#include` does — see shader-slang/slang#12150.
+// `__include` to record that location the way `#include` does — see shader-slang/slang#12339.
 //DISABLE_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly -I tests/spirv
 
 // A function defined in an __include'd file has no compilation unit of its own — an __include is

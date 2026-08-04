@@ -521,12 +521,13 @@ struct SharedIRGenContext
 
     // Maps a source's DebugSource to the compilation unit that owns it, so a DebugFunction can be
     // scoped to the unit its source belongs to. A non-included source maps to its own compilation
-    // unit; an #include'd source maps to that of the file which included it. Populated in
-    // generateIRForTranslationUnit before any function is lowered.
+    // unit; an #include'd source maps to the unit of the non-included file its include chains
+    // terminate in, which for a nested include is an outer file rather than the immediate includer.
+    // Populated in generateIRForTranslationUnit before any function is lowered.
     //
     // Sources reached only through `#line` are absent, having no compilation unit of their own, and
-    // so are those whose includer cannot be determined; the creation site resolves the former from
-    // the function's physical location and leaves the latter with a null parent scope.
+    // so are those reachable from more than one terminal owner; the creation site resolves the former
+    // from the function's physical location and leaves the latter with a null parent scope.
     Dictionary<IRDebugSource*, IRDebugCompilationUnit*> mapDebugSourceToCompilationUnit;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
@@ -15607,8 +15608,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             }
         }
 
-        // Give each #include'd file's DebugSource the compilation unit of the non-included file
-        // that included it, so a function defined in an included file is scoped to the compilation
+        // Give each #include'd file's DebugSource the compilation unit of the non-included file its
+        // include chains terminate in, so a function defined in an included file is scoped to the
         // unit that owns it rather than falling back to the module-global scope. This runs as a
         // second pass so that every non-included file's compilation unit is already recorded above,
         // whichever order the source files appear in.
