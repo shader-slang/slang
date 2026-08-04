@@ -3822,14 +3822,8 @@ struct IRTypeLegalizationPass
             //
             List<IRInst*> workListCopy = _Move(workList);
 
-            // Clear the "currently on the work list" bit for this batch so its instructions can be
-            // re-queued in later rounds. `kHasBeenAddedScratchBitIndex` is set only in
-            // `addToWorkList`, in the same step that appends to `workList`, so it is set on exactly
-            // the instructions we just moved into `workListCopy` and nowhere else — clearing it
-            // over the batch is equivalent to (and O(batch) instead of O(module) per round,
-            // avoiding the #12040 quadratic reset) walking the whole module. We clear the entire
-            // batch up front, before processing any item, because processing an earlier item may
-            // re-queue a later one in this same batch.
+            // Clear the "on the work list" bit for the whole batch before processing any of it,
+            // since processing one item may re-queue a later one in this same batch.
             for (auto inst : workListCopy)
                 inst->scratchData &= ~(1ULL << kHasBeenAddedScratchBitIndex);
 
@@ -4006,23 +4000,17 @@ struct IRTypeLegalizationPass
 };
 
 // Return true if the module has any work for `legalizeEmptyTypes`, by scanning module-scope globals
-// for a shape the pass rewrites. The scan is deliberately conservative: over-detection just runs a
-// pass that then no-ops, while under-detection would skip a real rewrite.
+// for a shape the pass rewrites. Over-detection is safe (the pass then no-ops); under-detection
+// would skip a real rewrite.
 //
-// Only the *immediate* element of an array and the *direct* type for `PseudoPtr` are tested, with
-// no walk to an array-stripped leaf. Array element types, `PseudoPtr`, and `void` are all
-// hoisted/interned, so a nested `T[a][b]` has its inner `T[b]` as its own global that this loop
-// visits directly; one level is a sound superset and avoids O(depth^2) work over array suffixes.
-// Testing the immediate element also keeps a bare `void` — ubiquitous, e.g. a `void`-returning
-// entry point — from reading as empty and defeating the early-out.
+// Only the immediate array element is tested, not an array-stripped leaf: element types are
+// hoisted, so a nested `T[a][b]` has its inner `T[b]` as its own global that this loop visits.
+// This also keeps a bare `void` — ubiquitous, e.g. a `void`-returning entry point — from reading
+// as empty and defeating the early-out.
 //
-// Any global `IRGeneric` forces the pass to run. A type appearing only inside a generic body is not
-// hoisted to global scope (`addGlobalValue` stops hoisting at the enclosing generic), so this scan
-// cannot see it, yet the legalizer descends into generic bodies and *would* rewrite it. That
-// normally does not fire, since generics are specialized away before this pass runs; it is
-// reachable under `-disable-specialization`. Testing only direct global children suffices, because
-// a generic nested in another generic is still enclosed by an outermost one that is a direct global
-// child.
+// Any global `IRGeneric` forces the pass to run: a type used only inside a generic body is not
+// hoisted to global scope, so this scan cannot see it, yet the legalizer would rewrite it.
+// Reachable under `-disable-specialization`.
 static bool hasEmptyTypeLegalizationWork(IRModule* module)
 {
     for (auto inst : module->getGlobalInsts())
@@ -4036,25 +4024,18 @@ static bool hasEmptyTypeLegalizationWork(IRModule* module)
 
         if (auto structType = as<IRStructType>(type))
         {
-            // A `struct` with no fields legalizes to nothing (see `TupleTypeBuilder::getResult`,
-            // which yields an empty `LegalType` when a struct contributed no parts). Iterating
-            // `getFields()` mirrors that pass, so a struct carrying only non-field children reads
-            // as empty here too. `IRInstListBase::Iterator` defines only `operator!=`, hence the
-            // negated form.
+            // `IRInstListBase::Iterator` defines only `operator!=`, hence the negated form.
             auto fields = structType->getFields();
             if (!(fields.begin() != fields.end()))
                 return true;
         }
         else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
-            // An array whose element is `void` legalizes to nothing (see the array case in
-            // `legalizeTypeImpl`).
             if (arrayType->getElementType()->getOp() == kIROp_VoidType)
                 return true;
         }
         else if (as<IRPseudoPtrType>(type))
         {
-            // `legalizeTypeImpl` collapses `PseudoPtr<T>` to its legalized `T`.
             return true;
         }
     }
@@ -4225,11 +4206,8 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
 
 void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
-    // When the module has no empty-type shape to rewrite, the whole-module walk is a pure no-op, so
-    // skip it after one cheap scan over module-scope globals. The other two entry points above get
-    // their speedup from the per-batch worklist reset in `processModule` instead: their type
-    // changes propagate through function signatures, calls, returns, and locals, so a globals-scope
-    // scan could not soundly gate them.
+    // A globals-scope scan can gate this entry point but not the two above, whose type changes
+    // propagate through function signatures, calls, returns and locals.
     if (!hasEmptyTypeLegalizationWork(module))
         return;
 

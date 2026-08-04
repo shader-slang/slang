@@ -7,9 +7,8 @@
 // empty structs, `PseudoPtr`s, or generics, so that branch is the only thing that keeps the pass from
 // early-outing.
 //
-// `-o -` is needed so the backend pipeline runs (the pass, and thus `-dump-ir-after`, only fires when
-// an output is requested) — the `export` function has no entry point of its own. Writing to stdout
-// rather than a null device keeps the invocation valid on every host platform.
+// No entry point here, so an explicit whole-program output is what causes the
+// backend (and therefore the IR dump) to run.
 
 //TEST:SIMPLE(filecheck=IR):-target cpp -o - -dump-ir-before legalizeEmptyTypes -dump-ir-after legalizeEmptyTypes
 
