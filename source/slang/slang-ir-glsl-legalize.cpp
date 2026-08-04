@@ -5094,6 +5094,59 @@ void legalizeEntryPointsForGLSL(
     decorateModuleWithSPIRVVersion(module, glslExtensionTracker->getSPIRVVersion());
 }
 
+// Rewrite a single `switch` on a `bool` condition into the equivalent integer switch:
+// cast the condition bool->int (Khronos emitters lower this to an OpSelect) and replace
+// each case value with the matching `IRIntLit` (`true`->1, `false`->0).
+//
+// A case value on a bool-conditioned switch is a bool-typed compile-time constant, but it
+// may be spelled as either an `IRBoolLit` (a literal `case true:`/`case false:`) or an
+// `IRIntLit` of bool type: a switch on an `enum : bool` lowers its case labels at the enum
+// type, and the enum-type-erasing `lowerEnumType` pass rewrites only the type, leaving an
+// `IRIntLit` of bool type. Both store the value in `IRConstant::value.intVal`, so the value
+// is read from there once the invariant below is checked.
+static void legalizeBoolSwitch(IRSwitch* switchInst)
+{
+    if (!as<IRBoolType>(switchInst->getCondition()->getDataType()))
+        return;
+
+    IRBuilder builder(switchInst);
+    auto intType = builder.getIntType();
+
+    builder.setInsertBefore(switchInst);
+    auto intCondition = builder.emitCast(intType, switchInst->getCondition());
+    switchInst->condition.set(intCondition);
+
+    for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+    {
+        // Invariant: matching the bool condition, the case value is a bool-typed `IRBoolLit`
+        // or `IRIntLit`. The bool-type check rejects an int-typed literal (whose value would
+        // not be a 0/1 boolean), and the opcode check confirms `value.intVal` is the live
+        // union member (not, say, a float or string constant).
+        auto caseValue = switchInst->getCaseValue(i);
+        auto caseConstant = as<IRConstant>(caseValue);
+        SLANG_RELEASE_ASSERT(
+            caseConstant && as<IRBoolType>(caseValue->getDataType()) &&
+            (caseConstant->getOp() == kIROp_BoolLit || caseConstant->getOp() == kIROp_IntLit));
+        auto intLit = builder.getIntValue(intType, caseConstant->value.intVal != 0 ? 1 : 0);
+        switchInst->getCaseValueUse(i)->set(intLit);
+    }
+}
+
+void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRGlobalValueWithCode>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            if (auto switchInst = as<IRSwitch>(block->getTerminator()))
+                legalizeBoolSwitch(switchInst);
+        }
+    }
+}
+
 void legalizeConstantBufferLoadForGLSL(IRModule* module)
 {
     // Constant buffers and parameter blocks are represented as `uniform` blocks

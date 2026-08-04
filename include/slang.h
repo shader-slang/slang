@@ -463,25 +463,76 @@ convention for interface methods.
 #define SLANG_PROCESSOR_FAMILY_ARM (SLANG_PROCESSOR_ARM | SLANG_PROCESSOR_ARM_64)
 #define SLANG_PROCESSOR_FAMILY_POWER_PC (SLANG_PROCESSOR_POWER_PC_64 | SLANG_PROCESSOR_POWER_PC)
 
-// Pointer size
-#define SLANG_PTR_IS_64 \
-    (SLANG_PROCESSOR_ARM_64 | SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_POWER_PC_64)
+// Pointer size: prefer the compiler's own width macros, which are correct on every target
+// (including architectures outside the SLANG_PROCESSOR_* whitelist below); the whitelist is only a
+// fallback for toolchains that predefine none of them. MSVC exposes only _WIN64/_WIN32, and 64-bit
+// Windows defines both, so _WIN64 is tested first.
+#ifndef SLANG_PTR_IS_64
+    #if defined(__LP64__) || defined(_LP64) || defined(_WIN64) || \
+        (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 8))
+        #define SLANG_PTR_IS_64 1
+    #elif defined(_WIN32) || (defined(__SIZEOF_POINTER__) && (__SIZEOF_POINTER__ == 4))
+        #define SLANG_PTR_IS_64 0
+    #elif (SLANG_PROCESSOR_ARM_64 | SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_POWER_PC_64)
+        #define SLANG_PTR_IS_64 1
+    #elif (                                                                    \
+        SLANG_PROCESSOR_ARM | SLANG_PROCESSOR_X86 | SLANG_PROCESSOR_POWER_PC | \
+        SLANG_PROCESSOR_WASM)
+        #define SLANG_PTR_IS_64 0
+    #endif
+#endif
+
+// Fail loudly on an unresolved pointer size rather than silently choosing a 32-bit layout, which
+// would corrupt SlangInt/SlangUInt and every struct laid out under SLANG_PTR_IS_32.
+#ifndef SLANG_PTR_IS_64
+    #error "Couldn't determine pointer size; define SLANG_PTR_IS_64 (0 or 1) via SLANG_USER_CONFIG."
+#endif
+
+// SLANG_PTR_IS_32 is derived as the boolean negation, so SLANG_PTR_IS_64 must be exactly 0 or 1;
+// any other value (e.g. a stray user override of 2) would make both macros truthy.
+#if (SLANG_PTR_IS_64 != 0) && (SLANG_PTR_IS_64 != 1)
+    #error "SLANG_PTR_IS_64 must be defined to exactly 0 or 1."
+#endif
+
 #define SLANG_PTR_IS_32 (SLANG_PTR_IS_64 ^ 1)
 
-// Processor features
-#if SLANG_PROCESSOR_FAMILY_X86
-    #define SLANG_LITTLE_ENDIAN 1
-    #define SLANG_UNALIGNED_ACCESS 1
-#elif SLANG_PROCESSOR_FAMILY_ARM
-    #if defined(__ARMEB__)
+#ifdef __cplusplus
+// Cross-check the derived pointer size against what the compiler actually uses, so a wrong value
+// fails at compile time instead of silently corrupting the ABI.
+SLANG_COMPILE_TIME_ASSERT((SLANG_PTR_IS_64 ? 8 : 4) == sizeof(void*));
+#endif
+
+// Endianness: prefer the compiler's own byte-order macros, correct on every target (including
+// those outside the SLANG_PROCESSOR_* whitelist); MSVC predefines no __BYTE_ORDER__ but every
+// Windows target is little-endian, so _WIN32 is special-cased, and the whitelist is only a
+// fallback. Runs only when the user has forced neither macro.
+#if !defined(SLANG_LITTLE_ENDIAN) && !defined(SLANG_BIG_ENDIAN)
+    #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+        (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+        #define SLANG_LITTLE_ENDIAN 1
+    #elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
+        (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
         #define SLANG_BIG_ENDIAN 1
-    #else
+    #elif defined(_WIN32)
+        #define SLANG_LITTLE_ENDIAN 1
+    #elif SLANG_PROCESSOR_FAMILY_X86
+        #define SLANG_LITTLE_ENDIAN 1
+    #elif SLANG_PROCESSOR_FAMILY_ARM
+        #if defined(__ARMEB__)
+            #define SLANG_BIG_ENDIAN 1
+        #else
+            #define SLANG_LITTLE_ENDIAN 1
+        #endif
+    #elif SLANG_PROCESSOR_FAMILY_POWER_PC
+        #define SLANG_BIG_ENDIAN 1
+    #elif SLANG_WASM
         #define SLANG_LITTLE_ENDIAN 1
     #endif
-#elif SLANG_PROCESSOR_FAMILY_POWER_PC
-    #define SLANG_BIG_ENDIAN 1
-#elif SLANG_WASM
-    #define SLANG_LITTLE_ENDIAN 1
+#endif
+
+// Unaligned memory access is a processor feature independent of byte order; only x86/x64 permit it.
+#if SLANG_PROCESSOR_FAMILY_X86
+    #define SLANG_UNALIGNED_ACCESS 1
 #endif
 
 #ifndef SLANG_LITTLE_ENDIAN
@@ -508,9 +559,13 @@ convention for interface methods.
     #define SLANG_HAS_BACKTRACE 0
 #endif
 
-// One endianness must be set
-#if ((SLANG_BIG_ENDIAN | SLANG_LITTLE_ENDIAN) == 0)
+// Exactly one endianness must be set: neither means an undetected target, both means a
+// contradictory user override that would leave consumers disagreeing.
+#if !SLANG_BIG_ENDIAN && !SLANG_LITTLE_ENDIAN
     #error "Couldn't determine endianness"
+#endif
+#if SLANG_BIG_ENDIAN && SLANG_LITTLE_ENDIAN
+    #error "Both SLANG_BIG_ENDIAN and SLANG_LITTLE_ENDIAN are set"
 #endif
 
 #ifndef SLANG_NO_INTTYPES
@@ -1243,6 +1298,14 @@ typedef uint32_t SlangSizeT;
                  //   It requires EmitSeparateDebug and permits the main artifact to be written to
                  //   stdout. A value of "-" writes the separate debug information to stdout when
                  //   the main artifact is written to a file. Query/set with the string option APIs.
+
+        DebugInfoIncludeSource =
+            157, // bool: embed the shader source text into the debug information independently of
+                 //   the overall `-g` debug level. At `-g1` (Minimal) the source is embedded via
+                 //   the core `OpSource` File+Source operands (no NonSemantic extension); at
+                 //   `-g2`/`-g3` source is already embedded so the option is a no-op. Requires
+                 //   debug information: using it with `-g0`, or without any `-g` option (both
+                 //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

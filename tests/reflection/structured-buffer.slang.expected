@@ -12,8 +12,14 @@ standard output = {
                 "baseShape": "structuredBuffer",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "uint32"
-                }
+                    "scalarType": "uint32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -28,8 +34,14 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
-                }
+                    },
+                    "sizes": [
+                        {"kind": "uniform", "value": 8, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -50,7 +62,10 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "float32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 4}
                         },
@@ -58,7 +73,10 @@ standard output = {
                             "name": "b",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "float32"
+                                "scalarType": "float32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 8, "size": 4, "elementStride": 0}
                         },
@@ -66,12 +84,21 @@ standard output = {
                             "name": "c",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "uint32"
+                                "scalarType": "uint32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 16, "alignment": 4}
                     ]
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         }
     ],
@@ -89,7 +116,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

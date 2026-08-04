@@ -211,6 +211,12 @@ warning(
     "'-separate-debug-info' is not supported for target '~target'"
 )
 
+warning(
+    "debug-info-include-source-unsupported-for-target",
+    21,
+    "'-debug-info-include-source' is not supported for target '~target'; it only affects SPIR-V output"
+)
+
 err(
     "separate-debug-info-requires-output-path",
     109,
@@ -3375,6 +3381,13 @@ err(
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
 )
 
+err(
+    "switch-condition-not-integer",
+    30607,
+    "switch condition must be an integer or enum type",
+    span { loc = "expr:Expr", message = "'switch' condition must be of an integer or enum type, but is of type '~type:Type'" }
+)
+
 -- 310xx: link time specialization
 -- (definitions moved to slang-diagnostics-semantic-checking-7.lua)
 
@@ -4778,6 +4791,13 @@ err(
     span { loc = "location", message = "the current compilation target does not support 'DescriptorHandle' types." }
 )
 
+err(
+    "target-does-not-support-ray-tracing-parameters",
+    39032,
+    "target does not support ray tracing entry point parameters",
+    span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,
@@ -5663,6 +5683,12 @@ err(
     span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
+warning(
+    "precise-qualifier-unsupported-on-target",
+    56005,
+    "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
+    span { loc = "location" }
+)
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
@@ -5732,7 +5758,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57005)
+-- SPIRV (57001-57007)
 
 warning(
     "spirv-opt-failed",
@@ -5772,6 +5798,12 @@ err(
     "spirv-conflicting-descriptor-heap-stride-options",
     57006,
     "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
+)
+
+err(
+    "debug-info-include-source-requires-debug-info",
+    57007,
+    "'-debug-info-include-source' cannot be used with '-g0' or when no debug information is enabled; enable at least '-g1'."
 )
 
 -- GLSL Compatibility (58001-58003)

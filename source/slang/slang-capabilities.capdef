@@ -199,9 +199,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 3.2.
+/// [Version]
+def metallib_3_2 : metallib_3_1;
+
 /// Represents MetalLib 4.0.
 /// [Version]
-def metallib_4_0 : metallib_3_1;
+def metallib_4_0 : metallib_3_2;
 
 /// Represents the latest MetalLib version.
 /// [Version]
@@ -2417,6 +2421,10 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 /// Capabilities required to query texture level info
 /// [Compound]
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
+/// Capabilities required for plain shadow-comparison texture sampling that takes
+/// no explicit LOD (SampleCmp, SampleCmpLevelZero).
+/// [Compound]
+alias texture_shadow = texture_sm_4_1;
 /// Capabilities required for shadow texture LOD sampling on types
 /// natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
 /// sampler2DShadow).
@@ -2431,6 +2439,10 @@ alias texture_shadowlod_ext = texture_sm_4_1 | GL_EXT_texture_shadow_lod;
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
 alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
+/// Capabilities required for shadow-comparison texture sampling with an LOD bias
+/// (SampleCmpBias). New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+/// [Compound]
+alias texture_shadowbias = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
 
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-1 float-atomic operations
 /// [Compound]
@@ -2458,7 +2470,7 @@ alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
-alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
+alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | metallib_3_2 | cpp | llvm;
 /// Capabilities required to use 'abort'
 /// [Compound]
 alias abort = GL_EXT_shader_abort;

@@ -650,7 +650,10 @@ static IRVarLayout* createCoverageBufferVarLayout(
     // are unaffected.
     if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
     {
+        // The field is a pointer. On the CPU/CUDA targets this path serves, it is
+        // laid out at its own size and aligned to that same size.
         typeLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, sizeof(void*));
+        typeLayoutBuilder.addAlignment(LayoutResourceKind::Uniform, sizeof(void*));
     }
     auto typeLayout = typeLayoutBuilder.build();
 

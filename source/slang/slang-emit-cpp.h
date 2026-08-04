@@ -65,6 +65,7 @@ protected:
         SLANG_OVERRIDE;
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitTempModifiers(IRInst* temp) SLANG_OVERRIDE;
 
     virtual void emitPreModuleImpl() SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* value) SLANG_OVERRIDE;
@@ -114,11 +115,19 @@ protected:
 
     SlangResult _calcCPPTextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
+    void _emitEntryPointSignature(
+        IRFunc* func,
+        const String& funcName,
+        const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionStart(
         IRFunc* func,
         const String& funcName,
         const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointDefinitionEnd(IRFunc* func);
+    void _emitEntryPointPrototype(
+        IRFunc* func,
+        const String& funcName,
+        const UnownedStringSlice& varyingTypeName);
     void _emitEntryPointGroup(
         const Int sizeAlongAxis[kThreadGroupAxisCount],
         const String& funcName);

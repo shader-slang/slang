@@ -1,5 +1,6 @@
 #include "slang-compiler-options.h"
 
+#include "core/slang-type-text-util.h"
 #include "core/slang-writer.h"
 #include "slang-compiler.h"
 
@@ -45,15 +46,21 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
 {
     for (auto& option : options)
     {
-        auto optionInfoIndex = globalSession->m_commandOptions.findOptionByUserValue(
-            CommandOptions::UserValue(option.key));
-        if (optionInfoIndex == -1)
-            continue;
-        auto optionInfo = globalSession->m_commandOptions.getOptionAt(optionInfoIndex);
-        auto nameCommaIndex = optionInfo.names.indexOf(',');
-        if (nameCommaIndex == -1)
-            nameCommaIndex = optionInfo.names.getLength();
-        auto name = optionInfo.names.head(nameCommaIndex);
+        // Most emitted options resolve their flag name from the command-option catalog; a few keys
+        // that are not registered as their own command option (e.g. DebugInformationFormat,
+        // EmitSpirvMethod) build the flag inline in their case below, so a missing registration is
+        // not itself a reason to skip.
+        UnownedStringSlice name;
+        if (auto optionInfoIndex = globalSession->m_commandOptions.findOptionByUserValue(
+                CommandOptions::UserValue(option.key));
+            optionInfoIndex != -1)
+        {
+            auto optionInfo = globalSession->m_commandOptions.getOptionAt(optionInfoIndex);
+            auto nameCommaIndex = optionInfo.names.indexOf(',');
+            if (nameCommaIndex == -1)
+                nameCommaIndex = optionInfo.names.getLength();
+            name = optionInfo.names.head(nameCommaIndex);
+        }
         switch (option.key)
         {
         case CompilerOptionName::Capability:
@@ -69,7 +76,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                         subBuilder << v.stringValue;
                 }
                 if (subBuilder.getLength())
-                    sb << " " << optionInfo.names << " " << subBuilder.produceString();
+                    sb << " " << name << " " << subBuilder.produceString();
                 break;
             }
         case CompilerOptionName::Include:
@@ -114,16 +121,36 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << shift << " " << set;
             }
             break;
-        case CompilerOptionName::VulkanBindShiftAll: // intValue0: set; intValue1: shift
+        case CompilerOptionName::VulkanBindShiftAll: // intValue0: kind; intValue1: shift
+            // Produced by `-fvk-<kind>-shift <shift> all`, where the `all` keyword replaces the
+            // per-space operand of the regular VulkanBindShift form; round-trip to that spelling
+            // (there is no `-fvk-all-shift` flag).
             for (auto v : option.value)
             {
-                sb << " -fvk-all-shift " << v.intValue2 << " " << v.intValue;
+                switch ((HLSLToVulkanLayoutOptions::Kind)v.intValue)
+                {
+                case HLSLToVulkanLayoutOptions::Kind::UnorderedAccess:
+                    sb << " -fvk-u-shift";
+                    break;
+                case HLSLToVulkanLayoutOptions::Kind::Sampler:
+                    sb << " -fvk-s-shift";
+                    break;
+                case HLSLToVulkanLayoutOptions::Kind::ShaderResource:
+                    sb << " -fvk-t-shift";
+                    break;
+                case HLSLToVulkanLayoutOptions::Kind::ConstantBuffer:
+                    sb << " -fvk-b-shift";
+                    break;
+                default:
+                    continue;
+                }
+                sb << " " << v.intValue2 << " all";
             }
             break;
         case CompilerOptionName::VulkanBindGlobals: // intValue0: index; intValue1: set
             for (auto v : option.value)
             {
-                sb << " " << name << v.intValue << " " << v.intValue2;
+                sb << " " << name << " " << v.intValue << " " << v.intValue2;
             }
             break;
         case CompilerOptionName::TraceCoverageBinding: // intValue0: index; intValue1: space
@@ -151,11 +178,142 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 StringUtil::split(v.stringValue2.getUnownedSlice(), '\n', lines);
                 for (auto l : lines)
                 {
-                    sb << " -x" << v.stringValue << " " << l.trim();
+                    sb << " -X" << v.stringValue << " " << l.trim();
                 }
             }
             break;
-        case CompilerOptionName::EmitSpirvDirectly:
+        case CompilerOptionName::DebugInformation:
+            // The `-g` flag's registered name is the placeholder "-g..." (it accepts a level and/or
+            // a format suffix), so the flag is built inline rather than from the resolved `name`.
+            for (auto v : option.value)
+            {
+                sb << " -g" << v.intValue;
+            }
+            break;
+        case CompilerOptionName::DebugInformationFormat:
+            // The debug format is the second half of the `-g` flag (`-gdwarf` etc.). It is stored
+            // under its own key and emitted independently of the level so a format supplied without
+            // a level still appears; a bare `-gdwarf` sets only this key (see
+            // `_parseDebugInformation`).
+            for (auto v : option.value)
+            {
+                if (v.intValue != SLANG_DEBUG_INFO_FORMAT_DEFAULT)
+                    sb << " -g"
+                       << TypeTextUtil::getDebugInfoFormatName((SlangDebugInfoFormat)v.intValue);
+            }
+            break;
+        case CompilerOptionName::Language:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " "
+                   << NameValueUtil::findName(
+                          TypeTextUtil::getLanguageInfos(),
+                          v.intValue,
+                          toSlice("unknown"));
+            }
+            break;
+        case CompilerOptionName::Profile:
+            for (auto v : option.value)
+            {
+                Profile profile((Profile::RawVal)v.intValue);
+                if (profile.raw != Profile::Unknown)
+                    sb << " " << name << " " << profile.getName();
+            }
+            break;
+        case CompilerOptionName::LineDirectiveMode:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " "
+                   << NameValueUtil::findName(
+                          TypeTextUtil::getLineDirectiveInfos(),
+                          v.intValue,
+                          toSlice("default"));
+            }
+            break;
+        case CompilerOptionName::FloatingPointMode:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " "
+                   << NameValueUtil::findName(
+                          TypeTextUtil::getFloatingPointModeInfos(),
+                          v.intValue,
+                          toSlice("precise"));
+            }
+            break;
+        case CompilerOptionName::DenormalModeFp16:
+        case CompilerOptionName::DenormalModeFp32:
+        case CompilerOptionName::DenormalModeFp64:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " "
+                   << NameValueUtil::findName(
+                          TypeTextUtil::getFpDenormalModeInfos(),
+                          v.intValue,
+                          toSlice("any"));
+            }
+            break;
+        case CompilerOptionName::LanguageVersion:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " "
+                   << NameValueUtil::findName(
+                          TypeTextUtil::getLanguageVersionInfos(),
+                          v.intValue,
+                          toSlice("latest"));
+            }
+            break;
+        case CompilerOptionName::PassThrough:
+            for (auto v : option.value)
+            {
+                if (v.intValue != SLANG_PASS_THROUGH_NONE)
+                    sb << " " << name << " "
+                       << TypeTextUtil::getPassThroughName((SlangPassThrough)v.intValue);
+            }
+            break;
+        case CompilerOptionName::TypeConformance:
+        case CompilerOptionName::LLVMTargetTriple:
+        case CompilerOptionName::LLVMCPU:
+        case CompilerOptionName::LLVMFeatures:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.stringValue;
+            }
+            break;
+        case CompilerOptionName::EmitSpirvMethod:
+            // `-emit-spirv-directly` / `-emit-spirv-via-glsl` parse into this derived enum, so map
+            // the stored value back to whichever source flag produced it (the default is implicit).
+            for (auto v : option.value)
+            {
+                if (v.intValue == SLANG_EMIT_SPIRV_DIRECTLY)
+                    sb << " -emit-spirv-directly";
+                else if (v.intValue == SLANG_EMIT_SPIRV_VIA_GLSL)
+                    sb << " -emit-spirv-via-glsl";
+            }
+            break;
+        case CompilerOptionName::EmitCPUMethod:
+            for (auto v : option.value)
+            {
+                if (v.intValue == SLANG_EMIT_CPU_VIA_LLVM)
+                    sb << " -emit-cpu-via-llvm";
+                else if (v.intValue == SLANG_EMIT_CPU_VIA_CPP)
+                    sb << " -emit-cpu-via-cpp";
+            }
+            break;
+        case CompilerOptionName::BindlessSpaceIndex:
+        case CompilerOptionName::SPIRVResourceHeapStride:
+        case CompilerOptionName::SPIRVSamplerHeapStride:
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << v.intValue;
+            }
+            break;
+        case CompilerOptionName::TraceCoverageCounterByteWidth:
+            // Stored as a byte width (4 or 8); the CLI flag takes a bit count, so convert back.
+            for (auto v : option.value)
+            {
+                sb << " " << name << " " << (v.intValue * 8);
+            }
+            break;
         case CompilerOptionName::GLSLForceScalarLayout:
         case CompilerOptionName::ForceDXLayout:
         case CompilerOptionName::ForceCLayout:
@@ -171,24 +329,74 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::DisableDynamicDispatch:
         case CompilerOptionName::DisableSpecialization:
         case CompilerOptionName::DumpIntermediates:
+        case CompilerOptionName::MinimumSlangOptimization:
         case CompilerOptionName::SkipSPIRVValidation:
+        case CompilerOptionName::ZeroInitialize:
+        case CompilerOptionName::IgnoreCapabilities:
+        case CompilerOptionName::RestrictiveCapabilityCheck:
+        case CompilerOptionName::DisableShortCircuit:
+        case CompilerOptionName::DisableNonEssentialValidations:
+        case CompilerOptionName::DisableSourceMap:
+        case CompilerOptionName::UnscopedEnum:
+        case CompilerOptionName::PreserveParameters:
+        case CompilerOptionName::Obfuscate:
+        case CompilerOptionName::IncompleteLibrary:
+        case CompilerOptionName::EnableExperimentalDynamicDispatch:
+        case CompilerOptionName::GenerateWholeProgram:
+        case CompilerOptionName::UseMSVCStyleBitfieldPacking:
+        case CompilerOptionName::ExperimentalFeature:
+        case CompilerOptionName::EmitSeparateDebug:
+        case CompilerOptionName::TraceCoverage:
+        case CompilerOptionName::TraceFunctionCoverage:
+        case CompilerOptionName::TraceBranchCoverage:
+        case CompilerOptionName::TraceCoverageBoolean:
+        case CompilerOptionName::SPIRVUnifiedDescriptorHeapStride:
+        case CompilerOptionName::DebugInfoIncludeSource:
+        case CompilerOptionName::EmbedDownstreamIR:
+        case CompilerOptionName::NoMangle:
+        case CompilerOptionName::NoHLSLBinding:
+        case CompilerOptionName::NoHLSLPackConstantBufferElements:
+        case CompilerOptionName::EnableExperimentalPasses:
+        case CompilerOptionName::TrackLiveness:
+        case CompilerOptionName::LoopInversion:
+        case CompilerOptionName::AllowGLSL:
             if (option.value.getCount() && option.value[0].intValue != 0)
                 sb << " " << name;
+            break;
+        default:
+            // Other option kinds are currently omitted.
             break;
         }
     }
 }
 
+// Append a string to the digest with a length prefix so it is self-delimiting. Without the prefix,
+// concatenated strings are ambiguous: MacroDefine("AB","C") and MacroDefine("A","BC") both feed the
+// byte stream "ABC" and would collide.
+static void appendDelimitedString(DigestBuilder<SHA1>& builder, const String& str)
+{
+    builder.append(str.getLength());
+    builder.append(str);
+}
+
 void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
 {
+    // Hash keys in a fixed (sorted-by-enum) order so the digest depends only on the option set, not
+    // on the order options happened to be inserted; otherwise the same logical options assembled in
+    // a different order would produce a spurious cache miss.
+    List<CompilerOptionName> keys;
     for (auto& kv : options)
+        keys.add(kv.key);
+    keys.sort();
+
+    for (auto key : keys)
     {
         // These are output-policy sidecar paths, not generated shader code. Locked by
         // _testCoverageManifestOutputDoesNotAffectCompilerOptionHash and
         // _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash; re-including them would
         // invalidate persistent module caches on every sidecar-path change.
-        if (kv.key == CompilerOptionName::CoverageManifestOutput ||
-            kv.key == CompilerOptionName::SeparateDebugInfoOutput)
+        if (key == CompilerOptionName::CoverageManifestOutput ||
+            key == CompilerOptionName::SeparateDebugInfoOutput)
             continue;
 
         // This is a load-time acceptance-policy knob, not generated shader code: it only decides
@@ -197,21 +405,24 @@ void CompilerOptionSet::buildHash(DigestBuilder<SHA1>& builder)
         // enables it (its sole purpose) would otherwise fold it into the recompute and never match
         // that baked digest, making the freshness check unable to accept any default-compiled
         // module (issue #6557). Excluding it keeps the write/read digest symmetric.
-        if (kv.key == CompilerOptionName::UseUpToDateBinaryModule)
+        if (key == CompilerOptionName::UseUpToDateBinaryModule)
             continue;
 
-        builder.append(kv.key);
-        builder.append(kv.value.getCount());
-        for (auto& v : kv.value)
+        auto values = options.tryGetValue(key);
+        builder.append(key);
+        builder.append(values->getCount());
+        for (auto& v : *values)
         {
+            builder.append(v.kind);
             if (v.kind == CompilerOptionValueKind::Int)
             {
                 builder.append(v.intValue);
+                builder.append(v.intValue2);
             }
             else
             {
-                builder.append(v.stringValue);
-                builder.append(v.stringValue2);
+                appendDelimitedString(builder, v.stringValue);
+                appendDelimitedString(builder, v.stringValue2);
             }
         }
     }
