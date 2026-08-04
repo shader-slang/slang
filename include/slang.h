@@ -5764,6 +5764,8 @@ enum SlangLanguageVersion
     SLANG_LANGUAGE_VERSION_202B = 2026,
     SLANG_LANGUAGE_VERSION_2026 = 2026,
 
+    // Note: the numeric value may change when the language version is given an
+    // official name. For now, it's one past the latest stable version.
     SLANG_LANGUAGE_VERSION_202C = 2027,
 
     /* Deprecated: retained for source compatibility; prefer SLANG_LANGUAGE_VERSION_DEFAULT. */

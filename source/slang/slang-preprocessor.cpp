@@ -12,6 +12,7 @@
 // to another.
 
 #include "compiler-core/slang-lexer.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
 #include "slang-rich-diagnostics.h"
@@ -4525,29 +4526,6 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     }
 }
 
-// Translates a language token (TokenType::IntegerLiteral or
-// TokenType::Identifier) to SlangLanguageVersion. Returns
-// SLANG_LANGUAGE_VERSION_UNKNOWN on error.
-static int TranslateSlangLanguageVersionToken(const Token& token)
-{
-    if (token.getContent() == "latest")
-        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_LATEST;
-    else if (token.getContent() == "legacy")
-        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_LEGACY;
-    else if (token.getContent() == "next")
-        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_NEXT;
-    else if (token.getContent().caseInsensitiveEquals(toSlice("202a")))
-        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202A;
-    else if (token.getContent().caseInsensitiveEquals(toSlice("202b")))
-        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202B;
-    else if (token.getContent().caseInsensitiveEquals(toSlice("202c")))
-        return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_202C;
-    else if (token.type == TokenType::IntegerLiteral)
-        return stringToInt(token.getContent());
-
-    return SlangLanguageVersion::SLANG_LANGUAGE_VERSION_UNKNOWN;
-}
-
 // Handle language directive. The syntax is:
 //
 //     "#lang" ["slang"] <version>
@@ -4590,7 +4568,9 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 
     if (hasVersionToken)
     {
-        int version = TranslateSlangLanguageVersionToken(versionToken);
+        // Note: Returns SLANG_LANGUAGE_VERSION_UNKNOWN if the language version
+        // is not found.
+        int version = TypeTextUtil::findLanguageVersion(versionToken.getContent());
 
         if (isValidSlangLanguageVersion(version))
         {
