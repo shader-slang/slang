@@ -39,8 +39,9 @@ Subcommands
                                present + valid, every .slang file has a
                                //META block, doc_ref resolves, README
                                links resolve and their anchors name real
-                               headings, size cap respected) on the given
-                               bundles (default: all).
+                               headings, README tables are well-formed,
+                               size cap respected) on the given bundles
+                               (default: all).
     expansion-candidates [--from <report.json>]
                                Rank bundles by how lightly their
                                coverage_targets are exercised by the
@@ -1264,6 +1265,100 @@ def lint_markdown_links(md_path: Path) -> list[LintIssue]:
     return issues
 
 
+# --------------------------------------------------------------------------
+# Markdown table shape
+#
+# A bundle README is almost entirely tables, and a claim is free text that
+# can contain a `|` -- an operator (`isKhronosTarget || HLSL`), a union
+# type, a shell pipe. Unescaped, it opens a new cell. GitHub only renders
+# a table at all when its delimiter row has exactly as many cells as its
+# header, so one stray `|` in a claim can drop a 30-row coverage table on
+# the floor and render it as a wall of pipe characters.
+# --------------------------------------------------------------------------
+
+_TABLE_DELIM_RE = re.compile(r"^\s*\|?(?:\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?\s*$")
+_UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+
+
+def _row_cells(line: str) -> list[str]:
+    """Split one markdown table row into cells on its unescaped pipes.
+
+    A `\\|` is content rather than a cell boundary, which is how a claim
+    spells a literal pipe, so only bare `|` separates. The leading and
+    trailing pipes that delimit the row are not separators and are
+    dropped.
+    """
+    parts = _UNESCAPED_PIPE_RE.split(line.strip())
+    if parts and not parts[0].strip():
+        parts = parts[1:]
+    if parts and not parts[-1].strip():
+        parts = parts[:-1]
+    return parts
+
+
+def lint_markdown_tables(md_path: Path) -> list[LintIssue]:
+    """Check that every markdown table in `md_path` renders on GitHub.
+
+    A delimiter row whose cell count differs from its header's is an
+    error, because GitHub then does not recognize the block as a table
+    at all and renders the raw pipes. A body row that disagrees with the
+    header is also an error: GitHub pads or truncates it, so a claim
+    containing an unescaped `|` silently loses its trailing columns --
+    which is how a coverage row can end up with no Tests link.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        lines = md_path.read_text(encoding="utf-8").split("\n")
+    except OSError:
+        return issues
+    i = 0
+    while i < len(lines):
+        header = lines[i]
+        if not header.lstrip().startswith("|") or i + 1 >= len(lines):
+            i += 1
+            continue
+        if not _TABLE_DELIM_RE.match(lines[i + 1]):
+            i += 1
+            continue
+        width = len(_row_cells(header))
+        delim_width = len(_row_cells(lines[i + 1]))
+        if delim_width != width:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"table at line {i + 1} does not render: header has"
+                    f" {width} cells but its delimiter row has {delim_width}",
+                )
+            )
+        i += 2
+        while i < len(lines) and lines[i].lstrip().startswith("|"):
+            cells = _row_cells(lines[i])
+            if len(cells) != width:
+                # An extra cell that carries text came from a `|` inside
+                # the content; an extra empty one is just a stray
+                # delimiter. Naming the right cause saves the reader a
+                # hunt through a 400-character claim.
+                hint = ""
+                if len(cells) > width:
+                    hint = (
+                        " (escape a literal pipe in cell text as `\\|`)"
+                        if any(c.strip() for c in cells[width:])
+                        else " (stray trailing delimiter)"
+                    )
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "error",
+                        f"table row at line {i + 1} has {len(cells)} cells,"
+                        f" expected {width}{hint}",
+                    )
+                )
+            i += 1
+    return issues
+
+
 _REQUIRED_BUNDLE_FM_KEYS = (
     "generated",
     "model",
@@ -1327,6 +1422,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
             )
 
     issues.extend(lint_markdown_links(bundle_md))
+    issues.extend(lint_markdown_tables(bundle_md))
 
     test_files = sorted(bdir.glob("*.slang"))
     if len(test_files) > spec.size_cap_files:

@@ -265,9 +265,16 @@ negative | expansion | regression` and matches the test's
   row.
 - Rows are sorted by anchor, then by claim text, so claims under the
   same doc section cluster.
+- A literal `|` inside any cell must be escaped as `\|`, including
+  inside backticks. Claims often need one — a `||` operator in a gate
+  condition, a union, a shell pipe — and an unescaped one opens a new
+  cell, so the row grows a column and GitHub drops the trailing ones.
+  Write `` `gated on isKhronosTarget \|\| HLSL` ``, not `` `... || ...` ``.
+  Every row must have exactly as many cells as the header.
 
 The lint pass verifies that every `.slang` file in the bundle directory
-appears in the Functional coverage table's Tests column.
+appears in the Functional coverage table's Tests column, and fails on
+any table whose rows disagree with its header on cell count.
 
 **Doc-gap table rules:**
 
