@@ -7,10 +7,10 @@
 // empty structs, `PseudoPtr`s, or generics, so that branch is the only thing that keeps the pass from
 // early-outing.
 //
-// No entry point here, so an explicit whole-program output is what causes the
-// backend (and therefore the IR dump) to run.
+// No entry point here, so `-whole-program` is what causes the backend (and
+// therefore the IR dump) to run.
 
-//TEST:SIMPLE(filecheck=IR):-target cpp -o - -dump-ir-before legalizeEmptyTypes -dump-ir-after legalizeEmptyTypes
+//TEST:SIMPLE(filecheck=IR):-target cpp -whole-program -dump-ir-before legalizeEmptyTypes -dump-ir-after legalizeEmptyTypes
 
 // `int[0][2]` is `Array(Array(Int, 0), 2)`; `legalizeEmptyArray` rewrites the zero-length `int[0]` to
 // `void`, leaving the immediate array-of-void `Array(Void, 2)` as the parameter type the pass drops.
