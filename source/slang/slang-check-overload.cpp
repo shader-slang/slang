@@ -30,6 +30,15 @@ static bool _isStorageOnlyFloatType(Type* type)
 // On any overload-resolution failure whose arguments include a storage-only float
 // (BFloat16 / FP8), point the user at the fp32-roundtrip pattern. This covers
 // operators and math functions alike — hence "misuse" rather than "arithmetic".
+//
+// Intentionally a broad, best-effort hint: it keys only on the *presence* of a
+// storage-only-float argument, not on whether that argument is the operand that
+// actually caused resolution to fail. So a call that fails for an unrelated reason
+// but happens to pass a bf16/FP8 argument may still get the note, even though
+// converting that argument would not resolve the failure. This keeps the helper
+// decoupled from per-candidate mismatch bookkeeping (argMismatchArgIndex etc.), and
+// the dominant case — bf16/FP8 operands of a built-in operator or math function — is
+// exactly the case the hint is meant to explain.
 static void _maybeDiagnoseStorageOnlyFloatMisuse(DiagnosticSink* sink, InvokeExpr* expr)
 {
     for (auto arg : expr->arguments)
