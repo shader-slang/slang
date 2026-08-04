@@ -1,0 +1,30 @@
+name: PR Review Fork Bridge
+
+# Stage 1 of the fork-review relay (optional, for fully real-time fork-PR review
+# handling). Copy to `.github/workflows/pr-review-fork-bridge.yml`.
+#
+# On a PUBLIC repo, a pull_request_review on a PR from a FORK runs the fork's head
+# with no secrets, so it cannot update the board directly. This unprivileged
+# workflow does nothing but complete successfully for fork-PR reviews, which lets
+# the privileged workflow_run workflow (example-pr-review-fork-apply.yml) fire and
+# do the board update with secrets. It runs NO board logic and checks out NO code.
+# Origin-PR reviews are handled directly by pr-maintenance.yml, so this is gated
+# to forks.
+
+on:
+  pull_request_review:
+    # Relay both submitted and dismissed: dismissing a fork PR's CHANGES_REQUESTED
+    # review should recompute its Status, same as a new review.
+    types: [submitted, dismissed]
+
+permissions: {}
+
+jobs:
+  bridge:
+    if: ${{ github.event.pull_request.head.repo.fork == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Relay fork PR review to the privileged apply workflow
+        run: |
+          echo "Fork PR #${{ github.event.pull_request.number }} review event."
+          echo "Completing so pr-review-fork-apply.yml (workflow_run) can reconcile with secrets."

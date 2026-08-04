@@ -11,9 +11,9 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
-#include "../core/slang-math.h"
-#include "../core/slang-string-util.h"
 #include "core/slang-char-util.h"
+#include "core/slang-math.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-ast-print.h"
@@ -330,6 +330,24 @@ void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, Cont
     destScope->nextSibling = subScope;
 }
 
+bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* moduleDecl)
+{
+    // The module's own scope, or one of its own `__include`d files (a `FileDecl`
+    // whose parent is this module). Everything else on the module's sibling chain is
+    // excluded from re-export: a `using`-spliced namespace (lookup-local, not part of
+    // the imported surface), or a *foreign* module's `FileDecl` that a plain,
+    // non-`__exported` transitive `import` put on the chain (its `parentDecl` is that
+    // other module — `import` is non-transitive; only `__exported import` re-exports).
+    // The `parentDecl == moduleDecl` conjunct is load-bearing: any foreign module's
+    // `FileDecl` that lands on this chain has its `parentDecl` pointing at that other
+    // module, so it is dropped regardless of how it arrived. Dropping the conjunct
+    // would re-export those foreign files and make plain `import` transitive.
+    // See shader-slang/slang#11443.
+    if (containerDecl == moduleDecl)
+        return true;
+    return as<FileDecl>(containerDecl) && containerDecl->parentDecl == moduleDecl;
+}
+
 ContainerDecl* isStaticScopeDecl(Decl* decl)
 {
     if (as<NamespaceDeclBase>(decl) || as<FileDecl>(decl))
@@ -369,10 +387,19 @@ void SemanticsVisitor::diagnoseDeprecatedAndRemovedDeclRefUsage(
     // What we do instead is see if there's already been a declRef
     // constructed for this expression and rest assured that it's already
     // had a diagnostic emitted.
+    //
+    // The already-resolved declRef must refer to the *same* declaration we are
+    // about to diagnose. For a constructor call such as `int4(int2(1,2), 3)` the
+    // invoke's `functionExpr` is a reference to the *type* `int4`, which always
+    // carries a declRef (to the type, not the constructor). Without the
+    // same-decl check we would treat the type reference as "already diagnosed"
+    // and silently skip the constructor's own `[deprecated]` / `[RemovedSince]`
+    // diagnostic.
     auto originalAppExpr = as<AppExprBase>(originalExpr);
     auto originalAppFunDecl =
         originalAppExpr ? as<DeclRefExpr>(originalAppExpr->functionExpr) : nullptr;
-    if (originalAppFunDecl && originalAppFunDecl->declRef)
+    if (originalAppFunDecl && originalAppFunDecl->declRef &&
+        originalAppFunDecl->declRef.getDecl() == declRef.getDecl())
     {
         return;
     }
@@ -1073,20 +1100,37 @@ Expr* SemanticsVisitor::createLookupResultExpr(
     }
 }
 
-DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+static DeclVisibility _getTypeVisibility(
+    Type* type,
+    Dictionary<Type*, DeclVisibility>& typeVisibilityCache)
 {
+    if (auto cachedVisibility = typeVisibilityCache.tryGetValue(type))
+        return *cachedVisibility;
+
+    DeclVisibility visibility = DeclVisibility::Public;
     if (auto declRefType = as<DeclRefType>(type))
     {
-        auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
+        visibility = getDeclVisibility(declRefType->getDeclRef().getDecl());
         auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
         for (auto arg : args)
         {
             if (auto typeArg = as<DeclRefType>(arg))
-                v = Math::Min(v, getTypeVisibility(typeArg));
+                visibility =
+                    Math::Min(visibility, _getTypeVisibility(typeArg, typeVisibilityCache));
         }
-        return v;
     }
-    return DeclVisibility::Public;
+
+    // Cache only completed results. Consider `Pair<T, T>`: both arguments point to the same
+    // canonical type DAG, so the second edge should reuse the visibility collected through the
+    // first instead of traversing the entire DAG again.
+    typeVisibilityCache.add(type, visibility);
+    return visibility;
+}
+
+DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
+{
+    Dictionary<Type*, DeclVisibility> typeVisibilityCache;
+    return _getTypeVisibility(type, typeVisibilityCache);
 }
 
 bool SemanticsVisitor::isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope)

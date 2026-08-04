@@ -383,6 +383,23 @@ local insts = {
 						},
 					},
 					{
+						SPIRVUntypedPtr = {
+							-- A pointer that keeps its logical pointee type and layout in the IR
+							-- (like `PtrType`) but is emitted as an untyped SPIR-V pointer
+							-- (`OpTypeUntypedPointerKHR`), with field/element addresses lowered to
+							-- `OpUntypedAccessChainKHR`. Used for a `ConstantBuffer<T>` fetched from a
+							-- descriptor heap so its uniform-buffer descriptor kind is preserved while
+							-- nested arrays are addressed logically (no pointer-type `ArrayStride`).
+							struct_name = "SPIRVUntypedPtrType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
 						OutParamTypeBase = {
 							{ OutParam = { struct_name = "OutParamType", operands = { { "valueType", "IRType" } } } },
 							{
@@ -1284,6 +1301,15 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Gather four texels from a sampled image at a coordinate, offset by a texel offset.
+	-- The offset may be a compile-time constant or a runtime value; the SPIR-V backend
+	-- inspects the offset operand and selects the `ConstOffset` image operand (no capability)
+	-- for a constant offset, or `Offset` + `ImageGatherExtended` for a runtime offset.
+	{
+		imageGatherOffset = {
+			operands = { { "sampledImage" }, { "location" }, { "component" }, { "offset" } },
+		},
+	},
 	-- Form a pointer to a texel of an image for atomic operations.
 	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
@@ -1344,6 +1370,7 @@ local insts = {
 	-- Resource qualifiers for dynamically varying index
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
+	{ getNaturalAlignment = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
 	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },
@@ -2923,6 +2950,9 @@ local insts = {
 					{ offset = { struct_name = "VarOffsetAttr", min_operands = 2 } },
 				},
 			},
+			-- Alignment is stored alignment-first (operand 0), unit second and optional,
+			-- so it does not fit the kind-first `LayoutResourceInfoAttr` shape.
+			{ TypeAlignment = { struct_name = "TypeAlignmentAttr", min_operands = 1 } },
 			{ FuncThrowType = { struct_name = "FuncThrowTypeAttr", operands = { { "errorType", "IRType" } } } },
 		},
 	},

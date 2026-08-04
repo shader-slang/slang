@@ -1,9 +1,9 @@
 // slang-win-process-util.cpp
-#include "../slang-process-util.h"
-#include "../slang-process.h"
-#include "../slang-string-escape-util.h"
-#include "../slang-string-util.h"
-#include "../slang-string.h"
+#include "core/slang-process-util.h"
+#include "core/slang-process.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
+#include "core/slang-string.h"
 #include "slang-com-helper.h"
 
 #ifdef _WIN32

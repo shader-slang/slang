@@ -360,6 +360,15 @@ if(SLANG_ENABLE_MIMALLOC AND NOT TARGET mimalloc-static)
     _slang_add_mimalloc_target()
 endif()
 
+# Mimalloc defaults to level 2 in Debug builds, which enables additional internal assertions.
+# Reduce this to level 1 to retain basic heap diagnostics while improving Debug execution time.
+if(SLANG_ENABLE_MIMALLOC AND TARGET mimalloc-static AND NOT MI_DEBUG_FULL)
+    target_compile_definitions(
+        mimalloc-static
+        PRIVATE $<$<CONFIG:Debug>:MI_DEBUG=1>
+    )
+endif()
+
 if(
     SLANG_ENABLE_GFX
     OR (SLANG_ENABLE_SLANG_RHI AND (SLANG_ENABLE_TESTS OR SLANG_ENABLE_EXAMPLES))

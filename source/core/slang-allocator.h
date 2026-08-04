@@ -7,50 +7,83 @@
 #if SLANG_WINDOWS_FAMILY
 #include <malloc.h>
 #endif
+#if defined(SLANG_ENABLE_MIMALLOC)
+#include <mimalloc.h>
+#endif
 
 #include <type_traits>
 
 namespace Slang
 {
-inline void* alignedAllocate(size_t size, size_t alignment)
-{
-#if SLANG_WINDOWS_FAMILY
-    return _aligned_malloc(size, alignment);
-#elif defined(__CYGWIN__)
-    return aligned_alloc(alignment, size);
-#else
-    void* rs = nullptr;
-    int succ = posix_memalign(&rs, alignment, size);
-    return (succ == 0) ? rs : nullptr;
-#endif
-}
-
-inline void alignedDeallocate(void* ptr)
-{
-#if SLANG_WINDOWS_FAMILY
-    _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
-}
-
 class StandardAllocator
 {
 public:
-    // not really called
-    void* allocate(size_t size) { return ::malloc(size); }
+    /// Allocates memory with the configured allocator for Slang-owned allocations.
+    static void* allocate(size_t size)
+    {
+#if defined(SLANG_ENABLE_MIMALLOC)
+        return mi_malloc(size);
+#else
+        return ::malloc(size);
+#endif
+    }
+
+    /// Reallocates memory that was returned by `allocate`.
+    static void* reallocate(void* ptr, size_t size)
+    {
+#if defined(SLANG_ENABLE_MIMALLOC)
+        return mi_realloc(ptr, size);
+#else
+        return ::realloc(ptr, size);
+#endif
+    }
+
     // Marked SLANG_NO_INLINE: GCC 13 inlines this through long destructor chains
     // and then falsely reports that the freed pointer may be uninitialized
     // (-Wmaybe-uninitialized). Preventing inlining breaks the chain.
-    SLANG_NO_INLINE void deallocate(void* ptr) { return ::free(ptr); }
+#if SLANG_GCC
+    static SLANG_NO_INLINE void deallocate(void* ptr)
+#else
+    static void deallocate(void* ptr)
+#endif
+    {
+#if defined(SLANG_ENABLE_MIMALLOC)
+        mi_free(ptr);
+#else
+        ::free(ptr);
+#endif
+    }
 };
 
 template<int ALIGNMENT>
 class AlignedAllocator
 {
 public:
-    void* allocate(size_t size) { return alignedAllocate(size, ALIGNMENT); }
-    void deallocate(void* ptr) { return alignedDeallocate(ptr); }
+    static void* allocate(size_t size)
+    {
+#if defined(SLANG_ENABLE_MIMALLOC)
+        return mi_malloc_aligned(size, ALIGNMENT);
+#elif SLANG_WINDOWS_FAMILY
+        return _aligned_malloc(size, ALIGNMENT);
+#elif defined(__CYGWIN__)
+        return aligned_alloc(ALIGNMENT, size);
+#else
+        void* rs = nullptr;
+        int succ = posix_memalign(&rs, ALIGNMENT, size);
+        return (succ == 0) ? rs : nullptr;
+#endif
+    }
+
+    static void deallocate(void* ptr)
+    {
+#if defined(SLANG_ENABLE_MIMALLOC)
+        mi_free(ptr);
+#elif SLANG_WINDOWS_FAMILY
+        _aligned_free(ptr);
+#else
+        free(ptr);
+#endif
+    }
 };
 
 template<typename T, typename TAllocator>
@@ -71,7 +104,11 @@ public:
     // Marked SLANG_NO_INLINE: GCC 13 inlines this through long destructor chains
     // into callers and then falsely reports the pointer argument as potentially
     // uninitialized (-Wmaybe-uninitialized). Preventing inlining breaks the chain.
+#if SLANG_GCC
     static SLANG_NO_INLINE void deallocateArray(T* ptr, Index count)
+#else
+    static void deallocateArray(T* ptr, Index count)
+#endif
     {
         TAllocator allocator;
         if (!std::is_trivially_destructible<T>::value)
