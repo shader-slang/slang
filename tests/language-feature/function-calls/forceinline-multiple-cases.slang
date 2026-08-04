@@ -136,5 +136,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-COUNT-28: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 
-// NOSCOPE-COUNT-14: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
+// The caller's own function scope is restored after an inlined region, so at the -O0 that this
+// test is pinned to, no DebugNoScope is emitted at all. See shader-slang/slang#11616.
 // NOSCOPE-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
