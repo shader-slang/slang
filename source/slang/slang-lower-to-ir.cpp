@@ -15471,19 +15471,27 @@ static SourceFile* findIncludingNonIncludedSourceFile(
         if (!visited.add(current))
             return nullptr;
 
-        // Follow every recorded occurrence of `current` and keep the first whose chain lands in
-        // this translation unit. Restricting to this translation unit is what distinguishes
-        // occurrences belonging to modules that share a header through a common source manager.
+        // Collect every occurrence of `current` whose chain lands in this translation unit.
+        // Restricting to this translation unit distinguishes occurrences belonging to modules that
+        // share a header through a common source manager.
         //
-        // Two files of one translation unit including the same header still leaves several
-        // qualifying occurrences, and this resolves to the earliest. That is exact for an
-        // include-guarded header, where only one expansion contributes declarations. It is not
-        // exact when conditional compilation lets separate expansions declare different functions:
-        // each is then scoped to the first includer rather than to the file whose expansion
-        // declared it. Distinguishing those needs per-occurrence provenance on the declaration
-        // itself, which source views do not carry.
-        SourceFile* resolved = nullptr;
-        for (SourceManager* mgr = tuSourceManager; mgr && !resolved; mgr = mgr->getParent())
+        // Several occurrences can still qualify, when two files of one translation unit include the
+        // same header. Which of them declared any particular function is not recoverable here: the
+        // declaration records its source file, not the occurrence it was parsed from. So rather
+        // than guess, resolve nothing, and let the caller leave the pre-existing module-global
+        // scope in place.
+        //
+        // Do not "complete" this by picking the first qualifying occurrence. That was measured
+        // against a build without this bail-out: given two files that include one header under
+        // different macros, so that each expansion declares a different function, the function
+        // declared by the second file was scoped to the first file's compilation unit — a plausible
+        // but wrong file, where the fallback had been right. A wrong scope pointing at a real file
+        // is worse for a debugger than a generic fallback, because nothing about it signals doubt.
+        // Every view is examined rather than stopping at the first match, because the number of
+        // distinct includers is the point: stopping early would report a single includer for a file
+        // that has several.
+        HashSet<SourceFile*> includers;
+        for (SourceManager* mgr = tuSourceManager; mgr; mgr = mgr->getParent())
         {
             for (SourceView* view : mgr->getSourceViews())
             {
@@ -15497,15 +15505,12 @@ static SourceFile* findIncludingNonIncludedSourceFile(
 
                 SourceFile* includer = includerView->getSourceFile();
                 if (tuFiles.contains(includer))
-                {
-                    resolved = includer;
-                    break;
-                }
+                    includers.add(includer);
             }
         }
-        if (!resolved)
+        if (includers.getCount() != 1)
             return nullptr;
-        current = resolved;
+        current = *includers.begin();
     }
     return current;
 }
