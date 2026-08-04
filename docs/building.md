@@ -95,9 +95,9 @@ necessary to keep debug info in the build, and `-DNDEBUG` in a release configura
 re-enable `assert()`. The C and C++ variables are also independent: overriding only
 `CMAKE_CXX_FLAGS_DEBUG` leaves the bundled C code (e.g., miniz and lz4) building at `-Og`.
 
-The `CXXFLAGS`, `CFLAGS` and `LDFLAGS` environment variables can also be used, but only when a build directory
-is first configured. They are ignored when reconfiguring an existing one, so prefer the `-D` form in scripts
-and CI.
+The `CXXFLAGS`, `CFLAGS` and `LDFLAGS` environment variables can also be used to set up the base flags, but
+only when a build directory is first configured. They are ignored when reconfiguring an existing one, so
+prefer the `-D` form in scripts and CI.
 
 If configuration changes don't seem to take effect, delete the build directory and try again. The exact
 compiler invocations can be seen by adding the `--verbose` flag to the `cmake --build ...` command line.

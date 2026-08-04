@@ -50,15 +50,20 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # the closest available proxy. A side effect is that MinGW builds do not get
 # `-Og` by default. Those users can pass `-DCMAKE_CXX_FLAGS_DEBUG="-Og -g"`
 # explicitly.
+#
+# Note: We use `string(PREPEND ...)` rather than `set(...)`: a
+# toolchain file is processed by the `project()` call above, and some
+# toolchains seed these same `_INIT` variables. Prepending keeps
+# whatever the toolchain asked for, giving precedence to the toolchain
+# option definitions (e.g., optimization level).
 if(NOT WIN32)
-    set(CMAKE_C_FLAGS_DEBUG_INIT "-Og")
-    set(CMAKE_CXX_FLAGS_DEBUG_INIT "-Og")
+    string(PREPEND CMAKE_C_FLAGS_DEBUG_INIT "-Og ")
+    string(PREPEND CMAKE_CXX_FLAGS_DEBUG_INIT "-Og ")
 endif()
 
 #
 # CMake-supplied modules and our utils
 #
-
 enable_language(C CXX)
 
 include(FindPackageHandleStandardArgs)
