@@ -158,7 +158,7 @@ struct CompilerOptionSet
                 {
                     if (replaceDuplicate)
                     {
-                        (*v)[index].intValue2 = element.intValue;
+                        (*v)[index].intValue2 = element.intValue2;
                         (*v)[index].stringValue2 = element.stringValue2;
                     }
                 }

@@ -569,7 +569,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -4536,6 +4536,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case hlsl:
             __intrinsic_asm ".Load";
 		case cuda:
+            // The 'tex*fetch_int<T>' prelude templates below have no half implementation
+            // (specialized only for float/uint/int, and the 1D template's body is a stub),
+            // so a half texel produces broken CUDA. Reject it here; the shape catch-all
+            // below does not.
+            static_assert(!__isHalf<T>(),
+                "'Load' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
             if (isArray != 0)
             {
                 switch(Shape.flavor)

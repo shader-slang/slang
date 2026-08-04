@@ -34,7 +34,7 @@ void FreeList::_init(size_t elementSize, size_t alignment, size_t elemsPerBlock)
     alignment = (alignment < sizeof(void*)) ? sizeof(void*) : alignment;
 
     // Alignment must be a power of 2
-    assert(((alignment - 1) & alignment) == 0);
+    SLANG_ASSERT(((alignment - 1) & alignment) == 0);
 
     // The elementSize must at least be at least the same size as the alignment
     elementSize = (elementSize >= alignment) ? elementSize : alignment;

@@ -2337,6 +2337,22 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     return typeLayout;
 }
 
+// Diagnose that the current target provides no type-layout rules for a
+// ray-tracing entry-point parameter (payload or hit attributes) of `stage`.
+// Some targets do not support ray tracing at all (e.g. Metal, whose payload,
+// callable-payload, and hit-attribute rules are all null) or lack rules for a
+// specific parameter kind (e.g. CUDA callable payload); reporting this keeps
+// callers from dereferencing a null rules pointer during type layout.
+static void diagnoseUnsupportedRayTracingParameter(
+    ParameterBindingContext* context,
+    Stage stage,
+    SourceLoc loc)
+{
+    getSink(context)->diagnose(Diagnostics::TargetDoesNotSupportRayTracingParameters{
+        .stage = getStageName(stage),
+        .location = loc});
+}
+
 // Returns nullptr when `type` is not valid in a varying parameter position
 // (e.g. interface types, textures, samplers, constant buffers).
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
@@ -2422,17 +2438,17 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::ClosestHit:
         case Stage::Miss:
             // `in out` or `out` parameter is payload
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getRayPayloadParameterRules(),
-                type);
+            if (auto rules = context->getRulesFamily()->getRayPayloadParameterRules())
+                return createTypeLayoutWith(context->layoutContext, rules, type);
+            diagnoseUnsupportedRayTracingParameter(context, state.stage, state.loc);
+            break;
 
         case Stage::Callable:
             // `in out` or `out` parameter is payload
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getCallablePayloadParameterRules(),
-                type);
+            if (auto rules = context->getRulesFamily()->getCallablePayloadParameterRules())
+                return createTypeLayoutWith(context->layoutContext, rules, type);
+            diagnoseUnsupportedRayTracingParameter(context, state.stage, state.loc);
+            break;
         }
     }
     else
@@ -2461,10 +2477,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::AnyHit:
         case Stage::ClosestHit:
             // `in` parameter is hit attributes
-            return createTypeLayoutWith(
-                context->layoutContext,
-                context->getRulesFamily()->getHitAttributesParameterRules(),
-                type);
+            if (auto rules = context->getRulesFamily()->getHitAttributesParameterRules())
+                return createTypeLayoutWith(context->layoutContext, rules, type);
+            diagnoseUnsupportedRayTracingParameter(context, state.stage, state.loc);
+            break;
         }
     }
 

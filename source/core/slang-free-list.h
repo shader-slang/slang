@@ -144,7 +144,7 @@ SLANG_FORCE_INLINE void* FreeList::allocate()
 // --------------------------------------------------------------------------
 SLANG_FORCE_INLINE void FreeList::deallocate(void* data)
 {
-    assert(isValidAllocation(data));
+    SLANG_ASSERT(isValidAllocation(data));
 
     SLANG_FREE_LIST_INIT_DEALLOCATE(data)
 

@@ -1,5 +1,6 @@
 #include "slang-emit-wgsl.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
@@ -57,6 +58,17 @@ WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     m_extensionTracker =
         dynamicCast<ShaderExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_extensionTracker);
+}
+
+void WGSLSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // WGSL has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
+    }
 }
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
