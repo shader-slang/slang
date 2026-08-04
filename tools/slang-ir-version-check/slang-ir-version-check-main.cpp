@@ -15,14 +15,13 @@
 // leaves the key set unchanged and is therefore never mistaken for either.
 //
 // Policy (docs/design/ir-instruction-definition.md):
-//   - Additive (a new instruction) requires bumping k_maxSupportedModuleVersion.
-//     This is mechanically unambiguous, so it is ENFORCED: a new key without a
-//     k_maxSupportedModuleVersion increase fails the check (exit 1).
-//   - Breaking (a removed or renamed instruction) is documented to bump both
-//     k_minSupportedModuleVersion and k_maxSupportedModuleVersion. Whether that
-//     is operationally required is an open design question (k_min is advisory
-//     documentation today — nothing on the load path reads it), so this is only
-//     DETECTED and RECOMMENDED, never enforced (exit 0).
+//   - Adding an instruction bumps k_maxSupportedModuleVersion; removing one bumps
+//     both k_minSupportedModuleVersion and k_maxSupportedModuleVersion. Since
+//     k_max moves either way, ANY change to the key set is ENFORCED against it:
+//     a changed key set without a k_max increase fails the check (exit 1).
+//   - The additional k_min bump expected of a removal is only RECOMMENDED, not
+//     enforced: k_min is advisory documentation today, as nothing on the module
+//     load path reads it.
 //
 // The existing advisory PR comment (posted by check-ir-version.yml) remains the
 // fallback for changes this tool cannot decide from names alone (a pure semantic
@@ -59,9 +58,11 @@ void printUsage()
         "         --base-stable-names <file> --new-stable-names <file>\n"
         "         --base-ir-h <file> --new-ir-h <file>\n"
         "\n"
-        "Enforces the IR module version-bump policy: a new instruction (a new\n"
-        "entry in the stable-names table) requires bumping\n"
-        "k_maxSupportedModuleVersion in slang-ir.h.\n"
+        "Enforces the IR module version-bump policy: any change to the\n"
+        "stable-names instruction set -- an addition, a removal, or a rename --\n"
+        "requires bumping k_maxSupportedModuleVersion in slang-ir.h. A removal is\n"
+        "additionally advised to bump k_minSupportedModuleVersion, which is\n"
+        "reported but not enforced.\n"
         "\n"
         "Known gap: this tool keys on the stable-names key set, so it does not\n"
         "detect an operand-count/type change to an EXISTING instruction (a\n"
@@ -371,12 +372,32 @@ int main(int argc, char const* const* argv)
 
     bool maxBumped = newMax > baseMax;
 
-    // A removed key means an instruction was removed or renamed (a rename shows
-    // up as a removed key alongside an added one). Both are breaking changes,
-    // which are detected and recommended but NOT enforced: whether they must
-    // also bump k_min is an open design question. Because a rename also adds a
-    // key, this case is handled first so it is never treated as a pure addition
-    // by the enforced gate below.
+    if (addedKeys.getCount() == 0 && removedKeys.getCount() == 0)
+        return 0;
+
+    // Adding an instruction bumps k_max; removing one bumps k_max and k_min. As
+    // k_max moves either way, any key-set change is enforced against it. Treating
+    // removals as exempt would also let a new instruction ride along unbumped
+    // beside an unrelated removal.
+    if (!maxBumped)
+    {
+        StringBuilder message;
+        message << "::error::the IR instruction set in "
+                   "source/slang/slang-ir-insts-stable-names.lua changed but "
+                   "k_maxSupportedModuleVersion in source/slang/slang-ir.h was not bumped:\n";
+        for (auto& k : addedKeys)
+            message << "  - added: " << k << "\n";
+        for (auto& k : removedKeys)
+            message << "  - removed: " << k << "\n";
+        message << "Increment k_maxSupportedModuleVersion when the instruction set changes (see "
+                   "docs/design/ir-instruction-definition.md).\n";
+        fprintf(stderr, "%s", message.getBuffer());
+        return 1;
+    }
+
+    // Whether a removal must ALSO bump k_minSupportedModuleVersion is left as a
+    // recommendation rather than enforced: k_min is advisory documentation today,
+    // since nothing on the module load path reads it.
     if (removedKeys.getCount() > 0)
     {
         StringBuilder message;
@@ -384,36 +405,16 @@ int main(int argc, char const* const* argv)
         for (auto& k : removedKeys)
             message << "  - " << k << "\n";
         message << "Per docs/design/ir-instruction-definition.md this is a breaking change and "
-                   "should bump both k_minSupportedModuleVersion and k_maxSupportedModuleVersion "
-                   "in source/slang/slang-ir.h.\n";
+                   "should also bump k_minSupportedModuleVersion in source/slang/slang-ir.h.\n";
         fprintf(stderr, "%s", message.getBuffer());
-        return 0;
-    }
-
-    if (addedKeys.getCount() == 0)
-        return 0;
-
-    // A pure addition (new keys, none removed) requires a k_maxSupportedModuleVersion
-    // bump; this is the mechanically unambiguous rule that is enforced.
-    if (!maxBumped)
-    {
-        StringBuilder message;
-        message << "::error::" << addedKeys.getCount()
-                << " new IR instruction(s) were added to "
-                   "source/slang/slang-ir-insts-stable-names.lua but "
-                   "k_maxSupportedModuleVersion in source/slang/slang-ir.h was not bumped:\n";
-        for (auto& k : addedKeys)
-            message << "  - " << k << "\n";
-        message << "Increment k_maxSupportedModuleVersion when adding an IR instruction (see "
-                   "docs/design/ir-instruction-definition.md).\n";
-        fprintf(stderr, "%s", message.getBuffer());
-        return 1;
     }
 
     fprintf(
         stderr,
-        "note: %d new IR instruction(s); k_maxSupportedModuleVersion bumped %d -> %d.\n",
+        "note: instruction set changed (%d added, %d removed); k_maxSupportedModuleVersion bumped "
+        "%d -> %d.\n",
         (int)addedKeys.getCount(),
+        (int)removedKeys.getCount(),
         (int)baseMax,
         (int)newMax);
     return 0;
