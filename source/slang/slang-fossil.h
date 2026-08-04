@@ -1199,6 +1199,19 @@ struct Header
 
 static_assert(sizeof(Header) == 32);
 
+#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+
+/// Validate that everything reachable from the root value of the blob at `data`
+/// (of `size` bytes) lies within that blob.
+///
+/// The fossil format is navigated in place, following relative pointers taken
+/// directly from the data, so this walk is what lets the rest of the reader
+/// dereference them without bounds checks of its own.
+///
+void validateRootValue(void const* data, Size size, FossilizedVariantObj* rootValueVariant);
+
+#endif
+
 /// Get the root object from a fossilized blob.
 ///
 /// This operation performs some basic validation on the blob to
