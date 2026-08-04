@@ -22,11 +22,16 @@ and similar.
 - Use one `## Opcodes` table or a small number of sub-tables grouped
   by purpose (e.g. "pack / unpack helpers", "binding queries",
   "platform-launch", "value packs / each", "string hashing").
-- For each opcode in this page, the `AST origin` is often either
-  `(synthesized)` (an IR-pass artefact) or a specific lowering helper
-  in
-  [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp).
-  Trace explicitly — do not guess.
+- For each opcode in this page, the `AST origin` is often a specific
+  lowering helper in
+  [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
+  an IR pass, or an `__intrinsic_op` declaration in the core module.
+  **Name the actual producer** — the retired catch-all `(synthesized)`
+  is not acceptable, and an opcode nothing in `source/` constructs is
+  marked **no producer at HEAD** (see the column contract in
+  [_common.md](_common.md)). Trace explicitly; do not guess. As the
+  catch-all page this one inherits the most unproduced opcodes, so
+  expect several genuine **no producer at HEAD** rows.
 - Cross-link to the sibling family pages whenever a misc opcode
   closely relates to one (e.g. `MakeWitnessPack` -> witness tables in
   [structure.md](structure.md)).

@@ -4,7 +4,6 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <float.h>
 
 

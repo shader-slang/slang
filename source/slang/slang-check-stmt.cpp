@@ -403,8 +403,19 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     generateUniqueIDForStmt(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    // TODO(tfoley): need to coerce condition to an integral type...
     stmt->condition = CheckExpr(stmt->condition);
+
+    // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
+    // lowering; skip when the condition already failed to check to avoid a cascade.
+    auto conditionType = stmt->condition->type.type;
+    if (conditionType && !as<ErrorType>(conditionType) &&
+        !isValidCompileTimeConstantType(conditionType))
+    {
+        getSink()->diagnose(
+            Diagnostics::SwitchConditionNotInteger{.type = conditionType, .expr = stmt->condition});
+        return;
+    }
+
     subContext.checkStmt(stmt->body);
 
     // check the case value exits within the switch

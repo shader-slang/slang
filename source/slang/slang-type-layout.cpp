@@ -7,7 +7,6 @@
 #include "slang-mangle.h"
 #include "slang-syntax.h"
 
-#include <assert.h>
 
 namespace Slang
 {
