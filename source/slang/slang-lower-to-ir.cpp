@@ -14694,29 +14694,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
-                // Parent the function to the compilation unit that owns it. The usual case is a
-                // direct lookup of the function's own DebugSource: a non-included file has its own
-                // compilation unit, and an #include'd file's DebugSource was mapped to its
-                // includer's above.
-                IRDebugCompilationUnit* parentScope = nullptr;
-                if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
-                {
-                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
-                        debugSource,
-                        parentScope);
-                }
-
-                // A `#line` directive remaps locations to a presumed path, and the DebugSource
-                // emitted for that path is not one of the translation unit's source files, so it
-                // has no compilation unit. The function is still physically defined in a real file,
-                // though, so resolve through the raw SourceLoc — which is unaffected by `#line` —
-                // to that file and use its compilation unit.
+                // Parent the function to the compilation unit that compiled it, which is a different
+                // question from the source it reports. The two deliberately differ: a function from
+                // an #include'd header reports the header as its source while belonging to the
+                // includer's compilation unit, and a `#line`-remapped function reports its presumed
+                // path while belonging to the file that physically holds it.
                 //
-                // Consider a generated file that contains `#line 1 "original.slang"` before a
-                // function: the function reports `original.slang` as its source, which is what
-                // `#line` is for, but it belongs to the compilation unit of the file physically
-                // holding it.
-                if (!parentScope && irFunc->sourceLoc.isValid())
+                // Consider a generated file containing `#line 1 "original.slang"` before a function.
+                // Its reported source is `original.slang`, which is what `#line` is for, but the
+                // compilation unit that owns it is the generated file's. Resolving from the raw
+                // SourceLoc, which `#line` does not affect, answers the ownership question directly.
+                // Doing this first also covers the case where the presumed path happens to name
+                // another of the translation unit's files: that file has a compilation unit of its
+                // own, so a lookup keyed on the reported source would find it and bind a unit that
+                // never compiled this function.
+                IRDebugCompilationUnit* parentScope = nullptr;
+                if (irFunc->sourceLoc.isValid())
                 {
                     auto sourceManager = context->getLinkage()->getSourceManager();
                     if (auto sourceView =
@@ -14731,6 +14724,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                                 as<IRDebugSource>(physicalDebugSource),
                                 parentScope);
                         }
+                    }
+                }
+
+                // A function without a usable physical location — a synthesized declaration, or one
+                // whose SourceLoc does not resolve to a file of this translation unit — still has a
+                // reported source, so fall back to that. For everything other than `#line` the two
+                // agree anyway, since the reported source is the physical file.
+                if (!parentScope)
+                {
+                    if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+                    {
+                        context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                            debugSource,
+                            parentScope);
                     }
                 }
 
