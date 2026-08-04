@@ -519,10 +519,14 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
-    // Lets a DebugFunction be scoped to the compilation unit of its own source file. Only
-    // non-included sources have a compilation unit; a function defined in an #include'd or
-    // #line-remapped source has no entry here and is left with a null parent scope (see the
-    // creation site). Populated in generateIRForTranslationUnit before any function is lowered.
+    // Maps a source's DebugSource to the compilation unit that owns it, so a DebugFunction can be
+    // scoped to the unit its source belongs to. A non-included source maps to its own compilation
+    // unit; an #include'd source maps to that of the file which included it. Populated in
+    // generateIRForTranslationUnit before any function is lowered.
+    //
+    // Sources reached only through `#line` are absent, having no compilation unit of their own, and
+    // so are those whose includer cannot be determined; the creation site resolves the former from
+    // the function's physical location and leaves the latter with a null parent scope.
     Dictionary<IRDebugSource*, IRDebugCompilationUnit*> mapDebugSourceToCompilationUnit;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
@@ -15443,13 +15447,19 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
 //
 // Resolution is anchored to `tuSourceManager`, the translation unit's source manager, rather than
 // to each file's own manager: an `#include`'d file can be a `SourceFile` owned by a parent manager
-// (reused via `findSourceFileRecursively`) while the `SourceView` that represents *this*
-// translation unit's include of it — the one carrying the initiating location back to the includer
-// — lives in the TU's manager. Searching the TU's views therefore finds the includer for the
-// current compilation deterministically, rather than an unrelated include of the same path from
-// another module.
+// (reused via `findSourceFileRecursively`) while the `SourceView` that represents an include of it
+// lives in a descendant manager.
+//
+// A physical header can be included by several modules that share a linkage-wide source manager,
+// which holds one initiating view per include *occurrence*. A `SourceFile` therefore does not have
+// "an includer" — an occurrence does. Matching on the file alone would take whichever occurrence
+// happened to be registered first, so a header included by both `a.slang` and `b.slang` would
+// resolve to `a.slang` even while lowering `b`. `tuFiles` is the set of files in the translation
+// unit being lowered, and a candidate chain is accepted only when it terminates in that set, which
+// selects this translation unit's own occurrence.
 static SourceFile* findIncludingNonIncludedSourceFile(
     SourceManager* tuSourceManager,
+    const HashSet<SourceFile*>& tuFiles,
     SourceFile* sourceFile)
 {
     // Guard against a cyclic initiating-location graph, which real include expansion never
@@ -15461,26 +15471,39 @@ static SourceFile* findIncludingNonIncludedSourceFile(
         if (!visited.add(current))
             return nullptr;
 
-        SourceLoc initiatingLoc;
-        for (SourceManager* mgr = tuSourceManager; mgr && !initiatingLoc.isValid();
-             mgr = mgr->getParent())
+        // Follow every recorded occurrence of `current` and keep the first whose chain lands in
+        // this translation unit.
+        //
+        // More than one occurrence can qualify, when two files of the same module include the same
+        // header. First-in-view-order is the intended answer rather than an artifact of iteration:
+        // views are registered in the order the preprocessor expanded them, and a header that
+        // declares anything is guarded (or it would be a redefinition error), so only the earliest
+        // expansion actually contributed the text a declaration was parsed from. That expansion is
+        // the one whose compilation unit owns the resulting functions.
+        SourceFile* resolved = nullptr;
+        for (SourceManager* mgr = tuSourceManager; mgr && !resolved; mgr = mgr->getParent())
         {
             for (SourceView* view : mgr->getSourceViews())
             {
-                if (view->getSourceFile() == current && view->getInitiatingSourceLoc().isValid())
+                if (view->getSourceFile() != current || !view->getInitiatingSourceLoc().isValid())
+                    continue;
+
+                SourceView* includerView =
+                    tuSourceManager->findSourceViewRecursively(view->getInitiatingSourceLoc());
+                if (!includerView)
+                    continue;
+
+                SourceFile* includer = includerView->getSourceFile();
+                if (tuFiles.contains(includer))
                 {
-                    initiatingLoc = view->getInitiatingSourceLoc();
+                    resolved = includer;
                     break;
                 }
             }
         }
-        if (!initiatingLoc.isValid())
+        if (!resolved)
             return nullptr;
-
-        SourceView* includerView = tuSourceManager->findSourceViewRecursively(initiatingLoc);
-        if (!includerView)
-            return nullptr;
-        current = includerView->getSourceFile();
+        current = resolved;
     }
     return current;
 }
@@ -15570,12 +15593,18 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         if (context->debugInfoLevel >= DebugInfoLevel::Standard)
         {
             SourceManager* tuSourceManager = context->getLinkage()->getSourceManager();
+
+            HashSet<SourceFile*> tuFiles;
+            for (auto source : translationUnit->getSourceFiles())
+                tuFiles.add(source);
+
             for (auto source : translationUnit->getSourceFiles())
             {
                 if (!source->isIncludedFile())
                     continue;
 
-                auto includer = findIncludingNonIncludedSourceFile(tuSourceManager, source);
+                auto includer =
+                    findIncludingNonIncludedSourceFile(tuSourceManager, tuFiles, source);
                 if (!includer)
                     continue;
 

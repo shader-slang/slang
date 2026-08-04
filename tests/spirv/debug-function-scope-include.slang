@@ -1,16 +1,6 @@
-// DISABLED — this asserts the __include case, which is not yet resolved. Do not delete it: it is a
-// verified repro, and it is enabled by the follow-up work rather than rewritten.
-//
-// Root cause, traced: __include's source views are created without an initiating source location, so
-// the includer chain this resolution walks does not exist for them. `#include` records one
-// (slang-preprocessor.cpp:3728 passes `directiveLoc` to `createSourceView`), while the __include path
-// in slang-session.cpp receives the directive location but never threads it into view creation.
-// Instrumenting the resolution pass over this test shows `views=27 matchFile=1 withInitLoc=0`: the
-// view for the __include'd file is present, but carries no initiating location to walk back from.
-//
-// Fixing that means threading the directive location into view creation, which changes provenance
-// that diagnostics also consume — a larger blast radius than debug info, so it is deferred rather
-// than bundled here. Re-enable by restoring the `//TEST:` directive below once that lands.
+// Disabled: an `__include`'d file's source view carries no initiating location, so the include chain
+// that resolves an owning compilation unit does not exist for it. Enabling this test requires
+// `__include` to record that location the way `#include` does — see shader-slang/slang#12150.
 //DISABLE_TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage fragment -g2 -emit-spirv-directly -I tests/spirv
 
 // A function defined in an __include'd file has no compilation unit of its own — an __include is
