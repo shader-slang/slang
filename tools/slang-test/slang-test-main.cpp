@@ -29,7 +29,6 @@
 #include "options.h"
 #include "parse-diagnostic-util.h"
 #include "render-test/slang-support.h"
-#include "slang-test-backend-requirements.h"
 #include "slang-test-optimization-options.h"
 #include "slangc-tool.h"
 #include "slangi-tool.h"
@@ -1289,21 +1288,6 @@ static bool _hasOption(const List<String>& args, const String& argName)
     return args.indexOf(argName) != Index(-1);
 }
 
-// Records backend dependencies that a command line forces regardless of its `-target`, so the
-// harness can ignore (rather than fail) a test on a runner that lacks the backend. See
-// `SlangTest::getForcedDownstreamBackend` for why, e.g., `-emit-cpu-via-llvm` implies the LLVM
-// backend even for a target that alone would only imply a generic C/C++ compiler.
-static void _addForcedBackendRequirements(
-    const List<String>& args,
-    TestRequirements* ioRequirements)
-{
-    const SlangPassThrough forcedBackend = SlangTest::getForcedDownstreamBackend(args);
-    if (forcedBackend != SLANG_PASS_THROUGH_NONE)
-    {
-        ioRequirements->addUsedBackEnd(forcedBackend);
-    }
-}
-
 static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
 {
     switch (target)
@@ -1542,7 +1526,12 @@ static SlangResult _extractSlangCTestRequirements(
         }
     }
 
-    _addForcedBackendRequirements(cmdLine.m_args, ioRequirements);
+    // `-emit-cpu-via-llvm` routes CPU/host-callable code generation through the slang-llvm
+    // backend regardless of the `-target`, so a test using it depends on that backend.
+    if (_hasOption(cmdLine.m_args, "-emit-cpu-via-llvm"))
+    {
+        ioRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_LLVM);
+    }
 
     return SLANG_OK;
 }
@@ -4656,14 +4645,16 @@ TestResult runTest(
     TestOptions const& testOptions)
 {
     // Diagnostic tests validate front-end diagnostics that slangc emits before any backend
-    // runs, so they normally need no backend and run everywhere. The exception is a flag that
-    // forces a backend before the diagnostic is reached; capture that one dependency here too
-    // (see `_addForcedBackendRequirements`). A diagnostic test returns below before reaching the
-    // general `_extractSlangCTestRequirements` path, so these two capture sites are disjoint and
-    // never double-count.
+    // runs, so they normally need no backend and run everywhere. The exception is
+    // `-emit-cpu-via-llvm`, which forces the slang-llvm backend before the diagnostic is
+    // reached; capture that here too. This branch returns before the general
+    // `_extractSlangCTestRequirements` path runs, so the two checks stay disjoint.
     if (context->isCollectingRequirements() && testOptions.type == TestOptions::Diagnostic)
     {
-        _addForcedBackendRequirements(testOptions.args, context->getTestRequirements());
+        if (_hasOption(testOptions.args, "-emit-cpu-via-llvm"))
+        {
+            context->getTestRequirements()->addUsedBackEnd(SLANG_PASS_THROUGH_LLVM);
+        }
         return TestResult::Pass;
     }
 
