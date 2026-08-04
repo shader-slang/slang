@@ -37,9 +37,10 @@ Subcommands
                                --commit / --model to override.
     lint [<bundle>...]         Structural linter (README.md front-matter
                                present + valid, every .slang file has a
-                               //META block, doc_ref resolves, size cap
-                               respected) on the given bundles (default:
-                               all).
+                               //META block, doc_ref resolves, README
+                               links resolve and their anchors name real
+                               headings, size cap respected) on the given
+                               bundles (default: all).
     expansion-candidates [--from <report.json>]
                                Rank bundles by how lightly their
                                coverage_targets are exercised by the
@@ -88,6 +89,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote
 
 # --------------------------------------------------------------------------
 # Repo + path helpers
@@ -1132,6 +1134,136 @@ class LintIssue:
     message: str
 
 
+# --------------------------------------------------------------------------
+# Markdown link / anchor resolution
+#
+# Bundle READMEs and //META doc_ref fields both cite documentation as
+# `<path>#<anchor>`. Both halves have to hold up on GitHub: the path has
+# to resolve relative to the file that spells it (a bundle nested one
+# level deeper than the prompt template's example otherwise silently
+# loses a `../`), and the anchor has to match a heading slug in the
+# target document.
+# --------------------------------------------------------------------------
+
+_MD_LINK_RE = re.compile(r"\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+_ATX_HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.*?)\s*#*\s*$")
+_SETEXT_UNDERLINE_RE = re.compile(r"^(?:=+|-+)\s*$")
+
+
+def _github_slug(title: str) -> str:
+    """Return the fragment GitHub generates for a markdown heading.
+
+    GitHub lowercases the text, drops everything that is neither a word
+    character, a hyphen, nor a space, and then turns each remaining space
+    into a hyphen. Note that the punctuation is dropped rather than
+    replaced, so `A / B` becomes `a--b` (two hyphens, one per space) --
+    the most common way a hand-written anchor ends up not resolving.
+    """
+    title = re.sub(r"`([^`]*)`", r"\1", title)
+    title = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", title)
+    title = re.sub(r"[*_~]", "", title)
+    slug = re.sub(r"[^\w\- ]", "", title.strip().lower(), flags=re.UNICODE)
+    return slug.replace(" ", "-")
+
+
+_HEADING_SLUG_CACHE: dict[Path, set[str]] = {}
+
+
+def heading_slugs(doc: Path) -> set[str]:
+    """Return every anchor GitHub would generate for `doc`'s headings.
+
+    Handles both ATX (`## Title`) and setext (`Title` over `-----`)
+    headings, skips fenced code blocks, and appends `-1`, `-2`, ... to
+    repeated slugs the way GitHub disambiguates them.
+    """
+    cached = _HEADING_SLUG_CACHE.get(doc)
+    if cached is not None:
+        return cached
+    slugs: set[str] = set()
+    counts: dict[str, int] = {}
+    try:
+        lines = doc.read_text(encoding="utf-8").split("\n")
+    except OSError:
+        _HEADING_SLUG_CACHE[doc] = slugs
+        return slugs
+    in_fence = False
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _ATX_HEADING_RE.match(line)
+        if m:
+            title = m.group("title")
+        elif (
+            _SETEXT_UNDERLINE_RE.match(line)
+            and i > 0
+            and lines[i - 1].strip()
+            and lines[i - 1].lstrip()[:1] not in ("|", ">", "#", "-", "=")
+        ):
+            title = lines[i - 1].strip()
+        else:
+            continue
+        slug = _github_slug(title)
+        if not slug:
+            continue
+        n = counts.get(slug, 0)
+        counts[slug] = n + 1
+        slugs.add(slug if n == 0 else f"{slug}-{n}")
+    _HEADING_SLUG_CACHE[doc] = slugs
+    return slugs
+
+
+def lint_markdown_links(md_path: Path) -> list[LintIssue]:
+    """Check that every relative link in `md_path` resolves.
+
+    A link whose path does not exist is an error: it renders as a dead
+    link on GitHub, and the usual cause is a `../` miscount, which no
+    other check catches. A link whose path resolves but whose `#anchor`
+    matches no heading in the target is a warning -- it lands the reader
+    on the right document but the wrong place, and repairing it needs a
+    judgement call about which section was meant.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    # A coverage table cites the same anchor once per claim row, so report
+    # each distinct problem once rather than once per citation.
+    reported: set[str] = set()
+    for m in _MD_LINK_RE.finditer(text):
+        url = m.group("url")
+        if url.startswith(("http://", "https://", "mailto:", "#", "<")):
+            continue
+        path, _, fragment = url.partition("#")
+        if not path:
+            continue
+        if url in reported:
+            continue
+        target = (md_path.parent / unquote(path)).resolve()
+        if not target.exists():
+            reported.add(url)
+            issues.append(
+                LintIssue(rel, "error", f"link path does not resolve: {url}")
+            )
+            continue
+        if fragment and target.suffix == ".md":
+            if unquote(fragment) not in heading_slugs(target):
+                reported.add(url)
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "warning",
+                        f"link anchor matches no heading in {path}: #{fragment}",
+                    )
+                )
+    return issues
+
+
 _REQUIRED_BUNDLE_FM_KEYS = (
     "generated",
     "model",
@@ -1193,6 +1325,8 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                     f" {spec.source_doc!r}",
                 )
             )
+
+    issues.extend(lint_markdown_links(bundle_md))
 
     test_files = sorted(bdir.glob("*.slang"))
     if len(test_files) > spec.size_cap_files:
@@ -1390,7 +1524,7 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             )
     doc_ref = meta.get("doc_ref", "")
     if doc_ref:
-        target = doc_ref.split("#", 1)[0]
+        target, _, anchor = doc_ref.partition("#")
         if not target:
             issues.append(LintIssue(rel, "error", "//META doc_ref has empty path"))
         else:
@@ -1403,6 +1537,16 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                         f"//META doc_ref path does not resolve: {target}",
                     )
                 )
+            elif anchor and candidate.suffix == ".md":
+                if anchor not in heading_slugs(candidate):
+                    issues.append(
+                        LintIssue(
+                            rel,
+                            "warning",
+                            f"//META doc_ref anchor matches no heading in"
+                            f" {target}: #{anchor}",
+                        )
+                    )
     # Every test file must contain at least one //TEST or //DIAGNOSTIC_TEST
     # directive — otherwise slang-test will silently skip it.
     if "//TEST" not in text and "//DIAGNOSTIC_TEST" not in text:

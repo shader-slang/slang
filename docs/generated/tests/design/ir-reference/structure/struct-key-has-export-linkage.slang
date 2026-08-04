@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T19:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
-//META: doc_ref=docs/generated/design/ir-reference/structure.md#key-structkey
+//META: doc_ref=docs/generated/design/ir-reference/structure.md#key--structkey
 //META: doc_section_digest=2117d4dbe3c230380c22066ed6bf928ab2ce23e921d10d25ad32ec7e6e134733
 //META: purpose=A field-name key is a top-level let with an export-linkage decoration so the same field compares equal across compilation units.
 //META: intent=functional
