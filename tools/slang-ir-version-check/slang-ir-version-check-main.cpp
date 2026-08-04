@@ -1,8 +1,8 @@
 // slang-ir-version-check-main.cpp
 //
 // Checker for the CI gate that enforces the IR module version-bump policy
-// documented in docs/design/ir-instruction-definition.md. A workflow step runs it
-// per pull request via extras/run-ir-version-check.sh.
+// documented in docs/design/ir-instruction-definition.md. Its intended entry
+// point is extras/run-ir-version-check.sh, from a per-pull-request workflow step.
 //
 // Given the base (pre-change) and new (post-change) versions of the IR
 // instruction stable-names table and of slang-ir.h, it decides whether the change
