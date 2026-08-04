@@ -9,9 +9,10 @@
 // The stable-names table (source/slang/slang-ir-insts-stable-names.lua) is the
 // signal: it is machine-generated, and the separate required "Check Stable Names
 // Table" CI job fails unless every instruction in slang-ir-insts.lua has an entry
-// here. So a key present in the new table but not the base one is a genuinely new
-// instruction, while a reorder or comment-only edit leaves the key set unchanged
-// and is never mistaken for one.
+// here. That invariant holds one way only -- a new instruction cannot avoid
+// producing a new key, but an added key is not by itself proof of a new
+// instruction. A reorder or comment-only edit leaves the key set unchanged and so
+// is never mistaken for a change at all.
 //
 // Policy (docs/design/ir-instruction-definition.md): adding an instruction bumps
 // k_maxSupportedModuleVersion. Since a removal is documented to bump k_max as
