@@ -410,8 +410,8 @@ struct InliningPassBase
         // the caller's subsequent debug records (e.g. a `DebugValue` for a caller local) would be
         // emitted under `DebugNoScope` with no enclosing scope. `callDebugInlinedAt` is null for a
         // top-level caller, yielding a one-operand `DebugScope %callerDebugFunc`. Reserve
-        // `DebugNoScope` for the genuine no-debug-info case where the caller has no
-        // `DebugFunction`. See shader-slang/slang#11616.
+        // `DebugNoScope` for a caller with no `DebugFunction`, where there is no scope to restore.
+        // See shader-slang/slang#11616.
         if (!callDebugScope)
         {
             if (callerDebugFunc)

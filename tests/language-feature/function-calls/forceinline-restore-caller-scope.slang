@@ -51,5 +51,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %[[CALLER]]{{$}}
 // CHECK-NEXT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugValue %result
 
-// The scope-clearing DebugNoScope is never emitted.
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
