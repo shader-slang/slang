@@ -1,0 +1,43 @@
+[Unit]
+Description=GCP Runner Scaler (Linux x86_64 builds, no GPU)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scaler
+Group=scaler
+
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStart=/opt/scaler/scaler \
+    --url=https://github.com/shader-slang/slang \
+    --name=linux-build-runners \
+    --labels=Linux,self-hosted,build,GCP \
+    --platform=linux \
+    --max-runners=16 \
+    --min-runners=0 \
+    --gcp-project=slang-runners \
+    --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a,us-west1-b \
+    --gcp-instance-template=linux-build-runner \
+    --gcp-gpu-type=none \
+    --vm-prefix=linux-build \
+    --session-max-age=2h
+
+EnvironmentFile=/opt/scaler/scaler.env
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scaler-linux-build
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/scaler
+
+[Install]
+WantedBy=multi-user.target

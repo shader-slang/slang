@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#torch
-//META: doc_section_digest=ef5cfd163a728cc46ca4433bc278ab9ed4d15e8a9bf778e3f189b3818e2edee9
+//META: doc_section_digest=8227cade9ef68c5f48d368e90a912753f599253d9279a8ab11f21380ee0a347b
 //META: purpose=The Torch backend emits the PyTorch C++ glue for a `[TorchEntryPoint]` function — including a `SLANG_PRELUDE_EXPORT` declaration and a `pybind11`-style `m.def(...)` binding — and references the slang-torch-prelude.h header.
 //META: intent=expansion
 //META: pipeline_stage=emit

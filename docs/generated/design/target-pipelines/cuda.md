@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:28:00Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 7274909025eca0a18bb6ccaa2a1ad7cbbbbebe01136637c939696e0458eecc22
+generated_at: 2026-06-29T20:13:22Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 14e144c55f95a3a6bcf4a07633067a3feb34968de49ae572e8b9c5be07287d5b
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,18 +12,24 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 This page documents the ordered IR-pass and downstream-binary
 sequence executed when Slang compiles for the CUDA target family.
 The corresponding `CodeGenTarget` values are `CUDASource`,
-`CUDAHeader`, and `PTX`. All three share most of the IR pipeline
-inside `linkAndOptimizeIR` via `isCUDATarget(targetRequest)`, but
-`PTX` already diverges from `CUDASource` / `CUDAHeader` inside
-`linkAndOptimizeIR`: in the Phase-A entry-point-uniform switches
-it falls through the `default` arms and runs
-`collectEntryPointUniformParams`,
-`moveEntryPointUniformParamsToGlobalScope`, and
-`removeTorchAndCUDAEntryPoints`, whereas `CUDASource` /
-`CUDAHeader` take the OptiX-uniform and skip arms. After
-`linkAndOptimizeIR`, the `PTX` downstream-compile dispatch hands
-the emitted CUDA C++ source to nvrtc (or the runtime CUDA
-compiler) for PTX generation.
+`CUDAHeader`, and `PTX`. A final `PTX` request does **not** drive
+`linkAndOptimizeIR` or the emit pipeline with `CodeGenTarget::PTX`
+directly: `emitWithDownstreamForEntryPoints` first maps `PTX` to
+its source target via `_getDefaultSourceForTarget`, which returns
+`CodeGenTarget::CUDASource`
+([slang-code-gen.cpp line 261-262](../../../../source/slang/slang-code-gen.cpp)),
+then runs `emitEntryPointsSource` on a `CodeGenContext` built with
+that `CUDASource` target
+([slang-code-gen.cpp line 527-531](../../../../source/slang/slang-code-gen.cpp)).
+The whole IR pipeline described below therefore sees
+`CUDASource`, and the resulting CUDA C++ source is handed to nvrtc
+(or the runtime CUDA compiler) for PTX generation as a separate
+downstream step. `CUDAHeader` is emitted the same way through the
+`CUDASource` IR pipeline; the only switch arms that name `PTX`
+explicitly are `linkAndOptimizeIR`'s `synthesizeActiveMask` switch
+(line ~1969-1971), which would not be reached with `PTX` under the
+ordinary downstream path. All three targets share most of the IR
+pipeline via `isCUDATarget(targetRequest)`.
 
 This page complements
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md), which
@@ -39,8 +45,8 @@ documented on their own pages.
 ## Source
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) —
-  `linkAndOptimizeIR` (line ~895) is the orchestrator;
-  `emitEntryPointsSourceFromIR` (line ~2526) constructs the
+  `linkAndOptimizeIR` (line ~896) is the orchestrator;
+  `emitEntryPointsSourceFromIR` (line ~2540) constructs the
   `CUDASourceEmitter` and emits CUDA C++ text.
 - [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
   — `CUDASourceEmitter` implementation.
@@ -77,7 +83,7 @@ flowchart TD
   phaseD --> artifact[CUDA source / header / PTX]
 ```
 
-A defining feature of the CUDA pipeline: at line 2666 of
+A defining feature of the CUDA pipeline: at line ~2680 of
 `slang-emit.cpp`, `emitEntryPointsSourceFromIR` sets
 `shouldLegalizeExistentialAndResourceTypes = false` for the CUDA
 arm, which causes several Phase-B passes inside
@@ -89,24 +95,26 @@ Spans roughly lines 931-1255 of
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp). CUDA has
 two arms it hits in this phase that other shader targets do not:
 
+Because a final `PTX` request runs this pipeline with
+`CodeGenTarget::CUDASource` (see the intro), the `CUDASource` arms
+below describe the behavior for all three CUDA targets in the
+ordinary downstream path; `PTX` never reaches these switches as
+`CodeGenTarget::PTX`.
+
 - `collectOptiXEntryPointUniformParams` runs at line ~1165
   (`case CUDASource: case CUDAHeader:`) instead of
   `collectEntryPointUniformParams`. This handles OptiX's
   Shader Binding Table (SBT) entry-point uniform parameters
-  through a CUDA/OptiX-specific scheme. **`PTX` is not in this
-  case list**: it falls through the `default` arm and runs
-  `collectEntryPointUniformParams` like the other shader targets.
+  through a CUDA/OptiX-specific scheme.
 - `moveEntryPointUniformParamsToGlobalScope` is **skipped** for
   `CUDASource` / `CUDAHeader` (they are in the explicit case list
   that breaks before reaching the `default`-arm
   `moveEntryPointUniformParamsToGlobalScope` at line ~1186).
-  **`PTX` runs it** via the `default` arm.
 
 `CUDASource` / `CUDAHeader` are also in the explicit case list for
 the `removeTorchAndCUDAEntryPoints` switch and thus **skip** that
-pass too — their entry points are valid CUDA kernels. **`PTX` runs
-`removeTorchAndCUDAEntryPoints`** via the `default` arm (line
-~1212).
+pass too — their entry points are valid CUDA kernels (line
+~1207-1210).
 
 ```mermaid
 flowchart TD
@@ -122,19 +130,15 @@ flowchart TD
   cGUP[collectGlobalUniformParameters]
   cEPD[checkEntryPointDecorations]
   aDMD[addDenormalModeDecorations]
-  epuSwitch{"CodeGenTarget"}
   cOEPUP["collectOptiXEntryPointUniformParams<br/>(CUDASource/CUDAHeader)"]
-  cEPUP_ptx["collectEntryPointUniformParams<br/>(PTX, default arm)"]
-  skip_mEPUP["(skipped for CUDASource/CUDAHeader)<br/>moveEntryPointUniformParamsToGlobalScope<br/>(PTX runs it via default arm)"]
-  skip_rTCEP["(skipped for CUDASource/CUDAHeader)<br/>removeTorchAndCUDAEntryPoints<br/>(PTX runs it via default arm)"]
+  skip_mEPUP["(skipped for CUDASource/CUDAHeader)<br/>moveEntryPointUniformParamsToGlobalScope"]
+  skip_rTCEP["(skipped for CUDASource/CUDAHeader)<br/>removeTorchAndCUDAEntryPoints"]
   fCIM["finalizeCoverageInstrumentationMetadata<br/>(reqSet.coverageTracing)"]
   lLVC[lowerLValueCast]
   lET[lowerEnumType]
 
-  linkIRn --> vaaaCuda --> reqSet1 --> stripDI --> ssbo --> tEPInBorrow --> rGC --> bES --> iC --> cGUP --> cEPD --> aDMD --> epuSwitch
-  epuSwitch -->|"CUDASource/CUDAHeader"| cOEPUP --> skip_mEPUP
-  epuSwitch -->|PTX| cEPUP_ptx --> skip_mEPUP
-  skip_mEPUP --> skip_rTCEP --> fCIM --> lLVC --> lET
+  linkIRn --> vaaaCuda --> reqSet1 --> stripDI --> ssbo --> tEPInBorrow --> rGC --> bES --> iC --> cGUP --> cEPD --> aDMD --> cOEPUP
+  cOEPUP --> skip_mEPUP --> skip_rTCEP --> fCIM --> lLVC --> lET
 ```
 
 | # | Pass | File | Gate | Notes |
@@ -150,10 +154,7 @@ flowchart TD
 | 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
 | 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
 | 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper. |
-| 12 | `collectOptiXEntryPointUniformParams` | [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp) | `case CUDASource / CUDAHeader` (line ~1165) | **`CUDASource`/`CUDAHeader` only.** Replaces `collectEntryPointUniformParams`; `PTX` instead runs `collectEntryPointUniformParams` via the `default` arm. |
-| 12 (PTX) | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | `default` arm (line ~1177) | **`PTX` only.** `PTX` is not in the `CUDASource`/`CUDAHeader` case, so it runs this in place of `collectOptiXEntryPointUniformParams`. |
-| 13 (PTX) | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | `default` arm (line ~1186) | **`PTX` only.** `CUDASource`/`CUDAHeader` are in the skip list (their params remain on the entry point); `PTX` runs it via the `default` arm. |
-| 14 (PTX) | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | `default` arm (line ~1212) | **`PTX` only.** `CUDASource`/`CUDAHeader` skip (their entry points are valid CUDA kernels); `PTX` runs it via the `default` arm. |
+| 12 | `collectOptiXEntryPointUniformParams` | [slang-ir-optix-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-optix-entry-point-uniforms.cpp) | `case CUDASource / CUDAHeader` (line ~1165) | All CUDA targets (incl. final `PTX`, which runs as `CUDASource`). Replaces `collectEntryPointUniformParams`; `moveEntryPointUniformParamsToGlobalScope` and `removeTorchAndCUDAEntryPoints` are both skipped for these arms. |
 | 13 | `finalizeCoverageInstrumentationMetadata` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | **Material on CUDA.** Runs after entry-point uniform packing (where the coverage buffer is folded into `GlobalParams`) to fill `coverageBufferUniformOffset`/`coverageBufferUniformSize` on `ArtifactPostEmitMetadata`. The CUDA host runtime reads those fields to bind the coverage buffer at dispatch time. |
 | 14 | `lowerLValueCast` | [slang-ir-lower-l-value-cast.cpp](../../../../source/slang/slang-ir-lower-l-value-cast.cpp) | (always) | |
 | 15 | `lowerEnumType` | [slang-ir-lower-enum-type.cpp](../../../../source/slang/slang-ir-lower-enum-type.cpp) | `reqSet.enumType` | |
@@ -176,8 +177,10 @@ visible here:
 2. `lowerCooperativeVectors`: for `CUDASource` it runs **only** if
    the target caps do not imply `optix_coopvec` (line ~1541),
    so on OptiX targets with hardware cooperative-vector support
-   Slang preserves the IR-level instruction. `CUDAHeader` and
-   `PTX` fall through the `default` arm (line ~1545) and run
+   Slang preserves the IR-level instruction. A final `PTX`
+   request runs this switch as `CUDASource` and so takes that
+   gated arm. Only `CUDAHeader`, which is not a named case, falls
+   through the `default` arm (line ~1545) and runs
    `lowerCooperativeVectors` unconditionally.
 3. `lowerBuiltinTypesForKernelEntryPoints`, `removeTorchKernels`,
    and `handleAutoBindNames` run for CUDA at line ~1400-1402
@@ -193,7 +196,7 @@ visible here:
    CPU-like for the purposes of this switch).
 6. The Slang-emit caller (`emitEntryPointsSourceFromIR`) sets
    `options.shouldLegalizeExistentialAndResourceTypes = false`
-   for CUDA at line 2666. Inside `linkAndOptimizeIR`, this
+   for CUDA at line ~2680. Inside `linkAndOptimizeIR`, this
    causes:
    - `legalizeExistentialTypeLayout` to skip.
    - `legalizeResourceTypes` to skip.
@@ -202,11 +205,13 @@ visible here:
    - The CPU/CUDA fallback `legalizeEmptyTypes` (line ~1728)
      runs instead.
 7. `inlineGlobalConstantsForLegalization` is forced for
-   `CUDASource` at line ~1627 (`target == CUDASource ||
+   `CUDASource` at line ~1624 (`target == CUDASource ||
    (isCPUTarget && isKernelTarget) ||
-   shouldLegalizeExistentialAndResourceTypes`). Because
+   shouldLegalizeExistentialAndResourceTypes`). A final `PTX`
+   request runs this as `CUDASource` and so takes the
+   short-circuit. Because
    `shouldLegalizeExistentialAndResourceTypes` is `false` for the
-   CUDA source language (line ~2666), `CUDAHeader` and `PTX` do
+   CUDA source language (line ~2680), only `CUDAHeader` does
    **not** run this pass.
 8. `wrapStructuredBuffersOfMatrices` and
    `wrapCBufferElementsForMetal` are both **skipped** (HLSL /
@@ -259,7 +264,7 @@ flowchart TD
   lTu[lowerTuples]
   gAVMF[generateAnyValueMarshallingFunctions]
   sSS[specializeStageSwitch]
-  lCV["lowerCooperativeVectors<br/>(CUDASource if !optix_coopvec; CUDAHeader/PTX always)"]
+  lCV["lowerCooperativeVectors<br/>(CUDASource if !optix_coopvec; CUDAHeader always)"]
   pFI1[performForceInlining]
   minOptGate{fastIRSimplificationOptions.minimalOptimization}
   sccp[applySparseConditionalConstantPropagation]
@@ -270,7 +275,7 @@ flowchart TD
   aUTHD["addUserTypeHintDecorations<br/>(VulkanEmitReflection)"]
   lEA[legalizeEmptyArray]
   lVT[legalizeVectorTypes]
-  iGC["inlineGlobalConstantsForLegalization<br/>(CUDASource only; line 1627)"]
+  iGC["inlineGlobalConstantsForLegalization<br/>(CUDASource only; line 1624)"]
   skipETL["(skipped) legalizeExistentialTypeLayout<br/>shouldLegalizeExistentialAndResourceTypes=false"]
   skipRT["(skipped) legalizeResourceTypes<br/>shouldLegalizeExistentialAndResourceTypes=false"]
   lET_cpu["legalizeEmptyTypes<br/>(CPU/CUDA else branch, line 1728)"]
@@ -342,7 +347,7 @@ see the conditional-gates table.)
 | 44 | `lowerTuples` | [slang-ir-lower-tuple-types.cpp](../../../../source/slang/slang-ir-lower-tuple-types.cpp) | (always) | |
 | 45 | `generateAnyValueMarshallingFunctions` | [slang-ir-any-value-marshalling.cpp](../../../../source/slang/slang-ir-any-value-marshalling.cpp) | (always) | |
 | 46 | `specializeStageSwitch` | [slang-ir-specialize-stage-switch.cpp](../../../../source/slang/slang-ir-specialize-stage-switch.cpp) | `reqSet.specializeStageSwitch` | |
-| 47 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | `case CUDASource && !targetCaps.implies(optix_coopvec)` (line ~1541); **`CUDAHeader`/`PTX` run it unconditionally via the `default` arm (line ~1545)** | For `CUDASource` it fires only when OptiX hardware cooperative-vector support is absent; `CUDAHeader` and `PTX` always run it. |
+| 47 | `lowerCooperativeVectors` | [slang-ir-lower-coopvec.cpp](../../../../source/slang/slang-ir-lower-coopvec.cpp) | `case CUDASource && !targetCaps.implies(optix_coopvec)` (line ~1541); **`CUDAHeader` runs it unconditionally via the `default` arm (line ~1545)** | For `CUDASource` (and final `PTX`, which runs as `CUDASource`) it fires only when OptiX hardware cooperative-vector support is absent; `CUDAHeader` always runs it. |
 | 48 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 49a | `applySparseConditionalConstantPropagation` | [slang-ir-sccp.cpp](../../../../source/slang/slang-ir-sccp.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line ~1555) | Minimal-optimization arm: cleans up dead branches revealed by force-inlining so dead `static_assert`s do not falsely fire. |
 | 49b | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `fastIRSimplificationOptions.minimalOptimization` (line ~1567) | Paired with `applySparseConditionalConstantPropagation` in the minimal-optimization arm. |
@@ -352,7 +357,7 @@ see the conditional-gates table.)
 | 51b | `addUserTypeHintDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `getBoolOption(CompilerOptionName::VulkanEmitReflection)` (line ~1606) | No CUDA-excluding gate: runs for CUDA whenever `VulkanEmitReflection` is set. Static helper. |
 | 52 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
 | 53 | `legalizeVectorTypes` | [slang-ir-legalize-vector-types.cpp](../../../../source/slang/slang-ir-legalize-vector-types.cpp) | (always) | |
-| 54 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `target == CUDASource \|\| (isCPUTarget && isKernelTarget) \|\| shouldLegalizeExistentialAndResourceTypes` (line ~1627) | **Forced for `CUDASource`** to avoid dynamic `__device__` initialization (rejected by nvrtc); `CUDAHeader`/`PTX` skip it because `shouldLegalizeExistentialAndResourceTypes` is `false` for CUDA. |
+| 54 | `inlineGlobalConstantsForLegalization` | [slang-ir-legalize-global-values.cpp](../../../../source/slang/slang-ir-legalize-global-values.cpp) | `target == CUDASource \|\| (isCPUTarget && isKernelTarget) \|\| shouldLegalizeExistentialAndResourceTypes` (line ~1624) | **Forced for `CUDASource`** (and final `PTX`, which runs as `CUDASource`) to avoid dynamic `__device__` initialization (rejected by nvrtc); `CUDAHeader` skips it because `shouldLegalizeExistentialAndResourceTypes` is `false` for CUDA. |
 | - | *(skip)* `legalizeExistentialTypeLayout` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | CUDA's C++ template system handles existentials. |
 | - | *(skip)* `legalizeResourceTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `shouldLegalizeExistentialAndResourceTypes = false` | CUDA's resource handles are direct CUDA types. |
 | 55 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | `!shouldLegalizeExistentialAndResourceTypes` (else branch at line ~1728) | Eliminates empty types not part of the public interface. |
@@ -363,6 +368,7 @@ see the conditional-gates table.)
 | 60 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always) | |
 | 61 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
 | 62 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
+| 63 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call (line ~1795), not `SLANG_PASS`. Processes `static_assert` after specialization, when the information it needs is available. |
 
 Filtered out for CUDA in this phase: the
 `legalizeNonVectorCompositeSelect` HLSL-only arm; the CPP /
@@ -490,7 +496,7 @@ flowchart TD
 | 19 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | Rare for CUDA. |
 | 20 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
 | 21 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (true for CUDA) | |
-| 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = Default` (CUDA is not WGPU or Khronos). |
+| 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = Default` for CUDA. The policy is selected by a four-way branch at line ~2258: `WGSL` (WGPU), `KhronosTarget`, `Metal` (added when `isMetalTarget`), else `Default`. CUDA matches none of the named branches and falls through to `Default`. |
 | 23 | `lowerImmutableBufferLoadForCUDA` | [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) | `isCUDATarget` (line ~2304) | **CUDA-only.** Translates immutable buffer loads to use `__ldg` for cache-hint performance. |
 | 24 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 25 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
@@ -503,7 +509,7 @@ flowchart TD
 | 32 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` (true for CUDA) | |
 | 33 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | OptiX cooperative-vector capability fires this. |
 | 34 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 35 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | |
+| 35 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Now called as `collectMetadata(targetProgram, *metadata)` (line ~2530); it receives the `TargetProgram` so metadata collection can consult the layout. When the target caps imply `descriptor_handle` (and `target != PyTorchCppBinding`), the immediately preceding block at line ~2520 forces `targetProgram->getOrCreateLayout(sink)` so a layout exists before collection; an ordinary CUDA target without `descriptor_handle` skips that forcing step. |
 | 36 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for CUDA in this phase: `lowerCPUResourceTypes` (CPU
@@ -536,7 +542,7 @@ only); `applyGLSLLiveness` (Khronos only);
 
 Phase D begins immediately after `linkAndOptimizeIR` returns. The
 emitter dispatched here is `CUDASourceEmitter` (constructed at
-line ~2621 of `slang-emit.cpp`), which inherits from
+line ~2635 of `slang-emit.cpp`), which inherits from
 `CPPSourceEmitter` ([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp))
 because CUDA source is a superset of C++. The emitter walks the
 IR and writes CUDA C++ text. For `PTX`, the downstream chain
@@ -546,7 +552,7 @@ runtime CUDA compiler to produce PTX assembly.
 ```mermaid
 flowchart TD
   ent[emitEntryPointsSourceFromIR]
-  setFlag["set shouldLegalizeExistentialAndResourceTypes = false (CUDA arm at line 2666)"]
+  setFlag["set shouldLegalizeExistentialAndResourceTypes = false (CUDA arm at line 2680)"]
   newEmit[new CUDASourceEmitter]
   linkOpt2["linkAndOptimizeIR (Phases A-C)"]
   simpForEmit[simplifyForEmit]
@@ -564,13 +570,13 @@ flowchart TD
 
 | # | Pass | File | Gate | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Sets `shouldLegalizeExistentialAndResourceTypes = false` for the CUDA arm at line ~2666. |
-| 2 | `new CUDASourceEmitter` | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) | `case SourceLanguage::CUDA` | Constructed at line ~2621. |
+| 1 | `emitEntryPointsSourceFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (entry point) | Sets `shouldLegalizeExistentialAndResourceTypes = false` for the CUDA arm at line ~2680. |
+| 2 | `new CUDASourceEmitter` | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) | `case SourceLanguage::CUDA` | Constructed at line ~2635. |
 | 3 | `sourceEmitter->init` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) | (always) | |
 | 4 | `linkAndOptimizeIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Runs Phases A-C. |
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp) (overriding `slang-emit-cpp.cpp` and `slang-emit-c-like.cpp`) | (always) | Walks IR and writes CUDA C++ text. |
-| 7 | wrap text in artifact (`ArtifactUtil::createArtifactForCompileTarget` + `StringBlob::moveCreate`) | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Inside `emitEntryPointsSourceFromIR` (line ~2752): wraps the emitted CUDA C++ text directly as an `IArtifact`. Not the SPIR-V-only `createArtifactFromIR` helper. |
+| 7 | wrap text in artifact (`ArtifactUtil::createArtifactForCompileTarget` + `StringBlob::moveCreate`) | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Inside `emitEntryPointsSourceFromIR` (line ~2766): wraps the emitted CUDA C++ text directly as an `IArtifact`. Not the SPIR-V-only `createArtifactFromIR` helper. |
 | 8 | `compile` (nvrtc) | (downstream) | `target == PTX` | Downstream-compile path invokes nvrtc to translate the CUDA C++ source into PTX assembly. |
 
 The `CUDASource` and `CUDAHeader` targets stop at the text
@@ -670,7 +676,7 @@ Flags that exist but **never gate a CUDA pass**:
 | `shouldRunNonEssentialValidation()` | `checkForOptionalNoneUsage`, `checkForRecursive*`, `checkForOutOfBoundAccess`, `checkForInvalidShaderParameterType`. |
 | `shouldPerformMinimumOptimizations()` | Gates `fuseCallsToSaturatedCooperation` and `checkUnsupportedInst`. |
 | `fastIRSimplificationOptions.minimalOptimization` | Selects between full `simplifyIR` and minimal SCCP+DCE. |
-| **`options.shouldLegalizeExistentialAndResourceTypes`** | Set to `false` for CUDA at line ~2666 of `slang-emit.cpp`. Skips `legalizeExistentialTypeLayout`, `legalizeResourceTypes`, and the Metal-only `legalizeEmptyTypes` arm inside the conditional block; routes Phase B through the `else` branch which still runs `legalizeEmptyTypes`. |
+| **`options.shouldLegalizeExistentialAndResourceTypes`** | Set to `false` for CUDA at line ~2680 of `slang-emit.cpp`. Skips `legalizeExistentialTypeLayout`, `legalizeResourceTypes`, and the Metal-only `legalizeEmptyTypes` arm inside the conditional block; routes Phase B through the `else` branch which still runs `legalizeEmptyTypes`. |
 
 ### Context predicates and capability gates
 
@@ -680,14 +686,14 @@ Flags that exist but **never gate a CUDA pass**:
 | `codeGenContext->shouldTrackLiveness()` | `LivenessUtil::addVariableRangeStarts/addRangeEnds`. |
 | `codeGenContext->removeAvailableInDownstreamIR` | `removeAvailableInDownstreamModuleDecorations`. |
 | `targetCaps` implies `cooperative_matrix` or `cooperative_vector` | `collectCooperativeMetadata`. |
-| `targetCaps` implies `optix_coopvec` | Negated: gates `lowerCooperativeVectors` for `CUDASource` only; `CUDAHeader` and `PTX` run that pass unconditionally via the `default` arm. |
+| `targetCaps` implies `optix_coopvec` | Negated: gates `lowerCooperativeVectors` for `CUDASource` only (final `PTX` runs as `CUDASource`); only `CUDAHeader` runs that pass unconditionally via the `default` arm. |
 
 ### CUDA-specific runtime predicates
 
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
-| `isCUDATarget(targetRequest)` | Multiple sites (line ~964, ~1627, ~2147, ~2304) | Selects CUDA-specific arms: skip of `validateAndRemoveAssumeAddress` validation, always-on `inlineGlobalConstantsForLegalization`, share `transformParamsToConstRef` with CPU/Metal, `lowerImmutableBufferLoadForCUDA`. |
-| `target == CUDASource` (singled out) | Line ~1541, ~1627 | Gates the conditional `lowerCooperativeVectors` arm; gates the always-on `inlineGlobalConstantsForLegalization` short-circuit. |
+| `isCUDATarget(targetRequest)` | Multiple sites (line ~964, ~1624, ~2147, ~2304) | Selects CUDA-specific arms: skip of `validateAndRemoveAssumeAddress` validation, always-on `inlineGlobalConstantsForLegalization`, share `transformParamsToConstRef` with CPU/Metal, `lowerImmutableBufferLoadForCUDA`. |
+| `target == CUDASource` (singled out) | Line ~1541, ~1624 | Gates the conditional `lowerCooperativeVectors` arm; gates the always-on `inlineGlobalConstantsForLegalization` short-circuit. Final `PTX` runs as `CUDASource` and so matches both. |
 | `target == CUDASource / CUDAHeader` | Line ~1165, ~1212, ~1400, ~1972, ~2056 | Gates `collectOptiXEntryPointUniformParams`, the `removeTorchAndCUDAEntryPoints` skip, the `lowerBuiltinTypesForKernelEntryPoints / removeTorchKernels / handleAutoBindNames` cluster, `synthesizeActiveMask`, and `legalizeEntryPointVaryingParamsForCUDA`. |
 | `target == PTX` (singled out) | `synthesizeActiveMask` switch (line ~1972) | PTX also fires `synthesizeActiveMask`. |
 | `target == PTX` | Downstream compile | Triggers nvrtc invocation. |
@@ -768,7 +774,7 @@ const-references for performance.
 
 ### Effect of `shouldLegalizeExistentialAndResourceTypes = false`
 
-Line 2666 of `slang-emit.cpp`. CUDA's C++-based type system
+Line ~2680 of `slang-emit.cpp`. CUDA's C++-based type system
 handles existential (interface-typed) values and resource types
 directly through templates and CUDA primitive types; Slang's
 generic legalization (`legalizeExistentialTypeLayout`,
@@ -777,8 +783,9 @@ not need and that the CUDA emitter is not prepared to handle.
 The skipped passes are:
 
 - `inlineGlobalConstantsForLegalization` — `CUDASource` still runs
-  it via the `target == CUDASource` short-circuit at line ~1627;
-  `CUDAHeader` and `PTX` skip it.
+  it via the `target == CUDASource` short-circuit at line ~1624
+  (final `PTX` runs as `CUDASource` and so runs it too); only
+  `CUDAHeader` skips it.
 - `legalizeExistentialTypeLayout` — skipped.
 - `legalizeResourceTypes` — skipped.
 - The Metal-only `legalizeEmptyTypes` arm inside the conditional
@@ -799,16 +806,17 @@ variables; nvrtc applies its own SSA optimizations downstream.
 
 ### `inlineGlobalConstantsForLegalization` for CUDA
 
-Line ~1627 contains an explicit short-circuit:
+Line ~1624 contains an explicit short-circuit:
 `target == CUDASource ||
 (isCPUTarget && isKernelTarget) ||
 shouldLegalizeExistentialAndResourceTypes`. `CUDASource` always
 runs the inline-global-constants pass because nvrtc rejects
 dynamic initialization of `__device__` variables; the constants
-must be inlined at every use site before emit. `CUDAHeader` and
-`PTX` do not match the short-circuit and, because
+must be inlined at every use site before emit. A final `PTX`
+request runs this pipeline as `CUDASource` and so runs it too.
+Only `CUDAHeader` does not match the short-circuit and, because
 `shouldLegalizeExistentialAndResourceTypes` is `false` for CUDA,
-skip the pass.
+skips the pass.
 
 ### Downstream nvrtc
 

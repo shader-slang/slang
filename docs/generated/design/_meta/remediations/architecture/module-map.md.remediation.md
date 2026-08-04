@@ -1,26 +1,26 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:13:59Z
+remediated_at: 2026-06-30T13:58:20Z
 target_doc: architecture/module-map.md
 review_report: ../../reviews/architecture/module-map.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-actions: { fixed: 0, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 1, escalated: 0 }
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+actions:
+  fixed: 2
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated: 0
 ---
 
 # Remediation report for architecture/module-map.md
 
 ## Summary
-
-The review contained one major finding (F-001). It is factually correct
-and in-contract, so it is neither rejected-bogus nor rejected-out-of-scope;
-however, a clean resolution requires expanding the manifest watched paths,
-which is beyond this remediation cycle. The finding is therefore deferred,
-and the target document was not edited.
+Both findings were valid and in-scope: the per-doc prompt requires a mechanical, exhaustive decomposition of the watched `source/*/*.{h,cpp}` files, and two file families were absent from the map. I fixed both by adding compact rows/subgroups for the omitted logical units, every cited file confirmed present in the resolved watched-path set. The document grew from 20.6 KB to 22.4 KB, still under the 32 KB cap.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | deferred | Verified correct: the rows in `## source/slang-llvm/` through `## source/slangc/` link concrete `.cpp`/`.h` files (e.g. `source/slang-llvm/slang-llvm.cpp`, `source/slangc/main.cpp`) that exist on disk but are NOT in the resolved watched set — `regenerate.py show` resolves only each sibling subproject's `CMakeLists.txt` (via `source/*/CMakeLists.txt`), and the module-map prompt checklist (`prompts/architecture-module-map.md:60`) requires every table file path to be in the watched paths. The recommendation's primary option is manifest watched-paths expansion, an explicit deferred trigger. Its alternative (revise rows to cite only watched files) cannot fully resolve the finding: `source/slang-llvm/` and `source/slang-record-replay/` have NO `CMakeLists.txt` at HEAD (confirmed via `git ls-files`), so no file under them is in the watched set, yet prompt checklist line 67 still requires a level-2 section per overview logical-unit group; a partial in-doc rewrite would degrade those sections without satisfying the checklist. Blocker: the manifest `watched_paths` for `architecture/module-map.md` must add the sibling-subproject `.cpp`/`.h` sources, then regenerate. Follow-up: expand `manifest.yaml:37-46` and re-run the generation stage. | — |
+| F-001 | fixed | `source/compiler-core/slang-json-{parser,value,native,rpc,rpc-connection,source-map-util}.*`, `slang-language-server-protocol.*`, `slang-rich-diagnostics-render.*`, `slang-source-map.*`, `slang-nvrtc-compiler.*`, and `slang-llvm-compiler.*` are all in the resolved watched paths but unrepresented. | Added compiler-core rows for JSON tokenizer/parser, JSON value model, JSON-RPC, LSP protocol types, rich diagnostic rendering, and source maps; folded NVRTC/LLVM into the per-vendor compilers row and dropped the stray `slang-json-lexer.cpp` from it. |
+| F-002 | fixed | `source/slang/slang-language-server*.{h,cpp}` and `slang-reflection-api.cpp` / `slang-reflection-json.*` are watched but had no row; confirmed at `source/slang/slang-language-server.cpp:3` and `source/slang/slang-reflection-api.cpp:27`. | Added a `### Reflection API` subsection (2 rows) and a `### Language server` subsection (server core plus per-feature helpers) under `source/slang/`. |

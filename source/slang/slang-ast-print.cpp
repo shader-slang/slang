@@ -711,6 +711,12 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto castOptionalExpr = as<CastOptionalExpr>(expr))
+    {
+        sb << "CastOptional(";
+        addExpr(castOptionalExpr->valueArg);
+        sb << ")";
+    }
     else if (const auto makeOptionalExpr = as<MakeOptionalExpr>(expr))
     {
         if (makeOptionalExpr->value)
@@ -1793,6 +1799,67 @@ void ASTPrinter::addDeclResultType(const DeclRef<Decl>& inDeclRef)
     ASTBuilder* astBuilder)
 {
     return getDeclSignatureString(item.declRef, astBuilder);
+}
+
+void ASTPrinter::addGenericConstraint(Decl* constraintDecl)
+{
+    StringBuilder& sb = m_builder;
+    if (auto typeConstraint = as<GenericTypeConstraintDecl>(constraintDecl))
+    {
+        addType(typeConstraint->sub.type);
+        sb << (typeConstraint->isEqualityConstraint ? " == " : " : ");
+        addType(typeConstraint->sup.type);
+    }
+    else if (auto coercion = as<TypeCoercionConstraintDecl>(constraintDecl))
+    {
+        // A coercion constraint is written `where To(From)` in Slang, requiring
+        // `From` to be convertible to `To`; render it the same way so the
+        // diagnostic echoes the source syntax.
+        addType(coercion->toType.type);
+        sb << "(";
+        addType(coercion->fromType.type);
+        sb << ")";
+    }
+    else if (auto nonEmpty = as<NonEmptyPackConstraintDecl>(constraintDecl))
+    {
+        sb << "nonempty(";
+        if (auto packVar = as<DeclRefExpr>(nonEmpty->packExpr))
+            sb << getText(packVar->name);
+        sb << ")";
+    }
+    else if (auto packCount = as<GenericVariadicPackCountConstraintDecl>(constraintDecl))
+    {
+        // A variadic pack-count constraint is written `where countof(P) == N`,
+        // requiring the pack `P` to have exactly `N` elements; echo that form.
+        sb << "countof(";
+        addExpr(packCount->packExpr);
+        sb << ") == ";
+        if (packCount->expectedCountExpr)
+            addExpr(packCount->expectedCountExpr);
+        else if (packCount->expectedCountVal)
+            addVal(packCount->expectedCountVal);
+    }
+    else if (auto hasDiffTypeInfo = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+    {
+        // A differentiable-type-info constraint is written `where
+        // __hasDiffTypeInfo(T)`; echo that form.
+        sb << "__hasDiffTypeInfo(";
+        addType(hasDiffTypeInfo->type.type);
+        sb << ")";
+    }
+    else if (constraintDecl && constraintDecl->getName())
+    {
+        sb << getText(constraintDecl->getName());
+    }
+}
+
+/* static */ String ASTPrinter::getGenericConstraintString(
+    Decl* constraintDecl,
+    ASTBuilder* astBuilder)
+{
+    ASTPrinter astPrinter(astBuilder);
+    astPrinter.addGenericConstraint(constraintDecl);
+    return astPrinter.getString();
 }
 
 /* static */ UnownedStringSlice ASTPrinter::getPart(

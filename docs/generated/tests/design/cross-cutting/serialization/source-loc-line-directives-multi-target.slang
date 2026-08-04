@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:14:10Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#source-location-serialization
-//META: doc_section_digest=a7785d3d0d63d41c707dce8b6259552b48fc0294b3f0028ba5ef1269c5af67e6
+//META: doc_section_digest=55c014b9f8b8d8577ae45cd742d91a9a5bd7995aef490be8dd213262e93a5aee
 //META: purpose=Source locations survive the compile and reappear in emitted text as #line directives on C-family targets and as OpSource/OpLine markers on SPIR-V.
 //META: intent=functional
 //META: pipeline_stage=emit

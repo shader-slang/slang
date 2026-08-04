@@ -514,7 +514,7 @@ bool isGlobalInst(IRInst* inst)
 // accept the refinement (this is useful in cases like `UnsizedArrayType`, where
 // we only want to refine it if we can determine a concrete size).
 //
-static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
+bool isConcreteType(IRInst* inst)
 {
     if (!inst)
         return false;
@@ -542,10 +542,10 @@ static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
                                // methods that do use this
         return false;
     case kIROp_ArrayType:
-        return isConcreteTypeImpl(cast<IRArrayType>(inst)->getElementType(), visiting) &&
+        return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
-        return isConcreteTypeImpl(cast<IROptionalType>(inst)->getValueType(), visiting);
+        return isConcreteType(cast<IROptionalType>(inst)->getValueType());
     case kIROp_ConditionalType:
         {
             auto conditionalType = cast<IRConditionalType>(inst);
@@ -554,51 +554,34 @@ static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
             {
                 if (!boolLit->getValue())
                     return true;
-                return isConcreteTypeImpl(conditionalType->getValueType(), visiting);
+                return isConcreteType(conditionalType->getValueType());
             }
             else if (auto intLit = as<IRIntLit>(hasValueInst))
             {
                 if (getIntVal(intLit) == 0)
                     return true;
-                return isConcreteTypeImpl(conditionalType->getValueType(), visiting);
+                return isConcreteType(conditionalType->getValueType());
             }
             return false;
         }
     case kIROp_DifferentialPairType:
-        return isConcreteTypeImpl(cast<IRDifferentialPairTypeBase>(inst)->getValueType(), visiting);
+        return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
     case kIROp_AttributedType:
-        return isConcreteTypeImpl(cast<IRAttributedType>(inst)->getBaseType(), visiting);
+        return isConcreteType(cast<IRAttributedType>(inst)->getBaseType());
     case kIROp_TupleType:
         {
             // Tuple is concrete if all element types are concrete
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
-                if (!isConcreteTypeImpl(inst->getOperand(i), visiting))
+                if (!isConcreteType(inst->getOperand(i)))
                     return false;
             }
             return true;
         }
     case kIROp_StructType:
-        {
-            // Struct is concrete only if all field types are concrete.
-            // A struct containing an interface-typed field is non-concrete
-            // and needs type-flow specialization.
-            // Use a visited set to guard against cyclic types (e.g. pack-branch
-            // types that resolve back to the same struct).
-            HashSet<IRInst*> localVisiting;
-            if (!visiting)
-                visiting = &localVisiting;
-            if (visiting->contains(inst))
-                return true; // Cycle detected: conservatively treat as concrete
-            visiting->add(inst);
-            auto structType = cast<IRStructType>(inst);
-            for (auto field : structType->getFields())
-            {
-                if (!isConcreteTypeImpl(field->getFieldType(), visiting))
-                    return false;
-            }
-            return true;
-        }
+        // Structs are nominal, so type-flow cannot refine their fields in place as it can for
+        // structural types such as tuples.
+        return true;
     default:
         break;
     }
@@ -607,7 +590,7 @@ static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
     {
         if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
             return true; // Don't refine user pointers (for now)
-        return isConcreteTypeImpl(ptrType->getValueType(), visiting);
+        return isConcreteType(ptrType->getValueType());
     }
 
     if (auto generic = as<IRGeneric>(inst))
@@ -617,11 +600,6 @@ static bool isConcreteTypeImpl(IRInst* inst, HashSet<IRInst*>* visiting)
     }
 
     return true;
-}
-
-bool isConcreteType(IRInst* inst)
-{
-    return isConcreteTypeImpl(inst, nullptr);
 }
 
 // Create info for a concrete type, using `paramType` as a union mask to determine
@@ -1159,33 +1137,28 @@ struct TypeFlowSpecializationContext
     //
     IRInst* flatUnionPropagationInfo(IRInst* info1, IRInst* info2)
     {
-        if (as<IRTaggedUnionType>(info1) && as<IRTaggedUnionType>(info2))
-        {
-            return makeTaggedUnionType(unionSet<IRWitnessTableSet>(
-                as<IRTaggedUnionType>(info1)->getWitnessTableSet(),
-                as<IRTaggedUnionType>(info2)->getWitnessTableSet()));
-        }
+        // `as<>` can unwrap `IRAttributedType`, so read operands from the matched type instead of
+        // the attributed wrapper.
+        if (auto taggedUnion1 = as<IRTaggedUnionType>(info1))
+            if (auto taggedUnion2 = as<IRTaggedUnionType>(info2))
+                return makeTaggedUnionType(unionSet<IRWitnessTableSet>(
+                    taggedUnion1->getWitnessTableSet(),
+                    taggedUnion2->getWitnessTableSet()));
 
-        if (as<IRSetTagType>(info1) && as<IRSetTagType>(info2))
-        {
-            return makeTagType(unionSet<IRSetBase>(
-                cast<IRSetBase>(info1->getOperand(0)),
-                cast<IRSetBase>(info2->getOperand(0))));
-        }
+        if (auto setTag1 = as<IRSetTagType>(info1))
+            if (auto setTag2 = as<IRSetTagType>(info2))
+                return makeTagType(unionSet<IRSetBase>(setTag1->getSet(), setTag2->getSet()));
 
-        if (as<IRElementOfSetType>(info1) && as<IRElementOfSetType>(info2))
-        {
-            return makeElementOfSetType(unionSet<IRSetBase>(
-                cast<IRSetBase>(info1->getOperand(0)),
-                cast<IRSetBase>(info2->getOperand(0))));
-        }
+        if (auto elementOf1 = as<IRElementOfSetType>(info1))
+            if (auto elementOf2 = as<IRElementOfSetType>(info2))
+                return makeElementOfSetType(
+                    unionSet<IRSetBase>(elementOf1->getSet(), elementOf2->getSet()));
 
-        if (as<IRUntaggedUnionType>(info1) && as<IRUntaggedUnionType>(info2))
-        {
-            return makeUntaggedUnionType(unionSet<IRTypeSet>(
-                cast<IRTypeSet>(info1->getOperand(0)),
-                cast<IRTypeSet>(info2->getOperand(0))));
-        }
+        if (auto untaggedUnion1 = as<IRUntaggedUnionType>(info1))
+            if (auto untaggedUnion2 = as<IRUntaggedUnionType>(info2))
+                return makeUntaggedUnionType(unionSet<IRTypeSet>(
+                    cast<IRTypeSet>(untaggedUnion1->getSet()),
+                    cast<IRTypeSet>(untaggedUnion2->getSet())));
 
         if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
             return info1;
@@ -4311,27 +4284,10 @@ struct TypeFlowSpecializationContext
 
     IRFuncType* maybeExpandFuncType(IRFuncType* funcType)
     {
-        List<IRType*> newArgTypes;
-
-        for (auto paramType : funcType->getParamTypes())
-        {
-            if (auto typePack = as<IRTypePack>(paramType))
-            {
-                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount();
-                     elementIndex++)
-                {
-                    newArgTypes.add((IRType*)typePack->getOperand(elementIndex));
-                }
-            }
-            else
-            {
-                newArgTypes.add(paramType);
-            }
-        }
-
         IRBuilder builder(module);
-        return as<IRFuncType>(
-            builder.getFuncType(newArgTypes.getArrayView(), funcType->getResultType()));
+        // Keep typeflow call-site analysis on the same concrete-pack expansion helper used by
+        // autodiff, so both paths flatten only already-specialized `IRTypePack` parameters.
+        return maybeExpandConcreteFuncTypePacks(&builder, funcType);
     }
 
     void expandPacksInFunc(IRFunc* func)
@@ -5749,6 +5705,10 @@ struct TypeFlowSpecializationContext
             return specializeGetElementFromTag(context, as<IRGetElementFromTag>(inst));
         case kIROp_Load:
             return specializeLoad(context, inst);
+        case kIROp_FieldExtract:
+            return specializeFieldExtract(context, as<IRFieldExtract>(inst));
+        case kIROp_Var:
+            return specializeVar(context, inst);
         case kIROp_Store:
             return specializeStore(context, as<IRStore>(inst));
         case kIROp_SwizzledStore:
@@ -7684,6 +7644,86 @@ struct TypeFlowSpecializationContext
         return false;
     }
 
+    // Returns true if this extract already has an interface-to-tagged-union bridge. This prevents
+    // fixpoint iterations from introducing duplicate bridges.
+    static bool isBridgedInterfaceFieldExtract(IRInst* fieldExtract)
+    {
+        for (auto use = fieldExtract->firstUse; use; use = use->nextUse)
+        {
+            auto store = as<IRStore>(use->getUser());
+            if (!store || store->getVal() != fieldExtract)
+                continue;
+            for (auto ptrUse = store->getPtr()->firstUse; ptrUse; ptrUse = ptrUse->nextUse)
+                if (as<IRCastInterfaceToTaggedUnionPtr>(ptrUse->getUser()))
+                    return true;
+        }
+        return false;
+    }
+
+    bool specializeFieldExtract(IRInst* context, IRFieldExtract* inst)
+    {
+        // The refined result of `analyzeFieldExtract` may still be stored as an existential box.
+        // Bridge that representation through `CastInterfaceToTaggedUnionPtr`, as `specializeLoad`
+        // does, instead of retyping the extract and misreading the box as its payload.
+        auto valInfo = tryGetInfo(context, inst);
+        if (!valInfo)
+            return false;
+
+        auto fieldType = (IRType*)inst->getDataType();
+        auto specializedType = (IRType*)getLoweredType(valInfo);
+        if (fieldType == specializedType)
+            return false;
+
+        // `fieldInfo` means the producer already specialized the field's physical type. Only the
+        // witness-table fallback needs the bridge.
+        auto taggedUnionType = as<IRTaggedUnionType>(specializedType);
+        auto structType = as<IRStructType>(inst->getBase()->getDataType());
+        auto structField =
+            structType ? findStructField(structType, as<IRStructKey>(inst->getField())) : nullptr;
+        bool needsBridge = taggedUnionType && as<IRInterfaceType>(fieldType) &&
+                           !isComInterfaceType(fieldType) && !isBuiltin(fieldType) && structField &&
+                           !this->fieldInfo.containsKey(structField);
+        if (!needsBridge)
+            return replaceType(context, inst);
+
+        if (isBridgedInterfaceFieldExtract(inst))
+            return false; // already bridged on a prior iteration
+
+        IRBuilder builder(inst);
+        builder.setInsertAfter(inst);
+
+        auto tempVar = builder.emitVar(fieldType);
+        auto store = cast<IRStore>(builder.emitStore(tempVar, inst));
+
+        IRInst* castArgs[] = {
+            tempVar,
+            taggedUnionType->getWitnessTableSet(),
+            taggedUnionType->getTypeSet()};
+        auto castPtr = builder.emitIntrinsicInst(
+            builder.getPtrType(specializedType),
+            kIROp_CastInterfaceToTaggedUnionPtr,
+            3,
+            castArgs);
+        auto newVal = builder.emitLoad(specializedType, castPtr);
+
+        inst->replaceUsesWith(newVal);
+        // Keep the bridge's store pointed at the original interface value.
+        builder.replaceOperand(store->getValUse(), inst);
+        return true;
+    }
+
+    bool specializeVar(IRInst* context, IRInst* inst)
+    {
+        if (!tryGetInfo(context, inst))
+            return false;
+
+        // Keep bridge temporaries as `Ptr<Interface>` for `lowerCastInterfaceToTaggedUnionPtr`.
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+            if (as<IRCastInterfaceToTaggedUnionPtr>(use->getUser()))
+                return false;
+        return replaceType(context, inst);
+    }
+
     bool handleDefaultStore(IRInst* context, IRStore* inst)
     {
         // This handles a rare case in the compiler, where we
@@ -8146,14 +8186,15 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        // If the target witness table type was found, gather all witness tables using it
+        // `getSet` requires global operands, so exclude block-local tables synthesized by autodiff.
         if (targetTableType)
         {
             for (auto use = targetTableType->firstUse; use; use = use->nextUse)
             {
                 if (auto witnessTable = as<IRWitnessTable>(use->getUser()))
                 {
-                    if (witnessTable->getDataType() == targetTableType)
+                    if (witnessTable->getDataType() == targetTableType &&
+                        isGlobalInst(witnessTable))
                     {
                         outTables.add(witnessTable);
                     }

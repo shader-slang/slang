@@ -1,36 +1,34 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/language-reference/generics.md#description
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A generic type parameter with a default type `T = int` can be used without an explicit type argument; the default is used when omitted.
+//META: doc_section_digest=06568c8014909b1a1fe61ae1dd314428312f177b6412e33a4e643d370a1fc6d9
+//META: purpose=A generic type parameter with a default type (`T = int`) can be specialized without an explicit type argument.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc grammar shows `generic-type-param-decl` as `[typename] identifier [: simple-type-spec] [= simple-type-spec]`.
-// The `= simple-type-spec` part is an optional default type.
+// Verifies the description claim that a type parameter may carry a default type
+// via `= simple-type-spec`. `struct Box<T = int>` is used as `Box<>` with no
+// argument, so T falls back to the default int. CHECK asserts the stored int
+// (42) is readable, proving the default type filled the omitted argument.
 
-//TEST:INTERPRET(filecheck=CHECK):
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 struct Box<T = int>
 {
-    T value;
+    T v;
 }
 
-void main()
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
+RWStructuredBuffer<int> outputBuffer;
+
+[numthreads(1, 1, 1)]
+void computeMain()
 {
-    // Use the default (int)
-    Box<> defaultBox;
-    defaultBox.value = 55;
-
-    // Explicit override
-    Box<float> floatBox;
-    floatBox.value = 2.0;
-
-    // CHECK: 55
-    printf("%d\n", defaultBox.value);
-    // CHECK: 2
-    printf("%d\n", (int)floatBox.value);
+    Box<> b;
+    b.v = 42;
+    outputBuffer[0] = b.v;
 }
+// CHECK: 42

@@ -1,9 +1,10 @@
 // unit-test-stdin-compile.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process-util.h"
-#include "../../source/slang/slang-internal.h"
+#include "core/slang-io.h"
+#include "core/slang-process-util.h"
 #include "slang-com-ptr.h"
+#include "slang/slang-compiler-options.h"
+#include "slang/slang-internal.h"
 #include "unit-test/slang-unit-test.h"
 
 #ifdef _WIN32
@@ -608,8 +609,12 @@ struct TempCoverageCliFiles
     String disassemblyManifestPath;
     String metalDisassemblyOutputPath;
     String metalDisassemblyManifestPath;
+    String hlslOutputPath;
     String wgslOutputPath;
     String explicitManifestPath;
+    String explicitDebugPath;
+    String reflectionPath;
+    String dependencyPath;
     String containerOutputPath;
 
     ~TempCoverageCliFiles()
@@ -622,8 +627,12 @@ struct TempCoverageCliFiles
         File::remove(disassemblyManifestPath);
         File::remove(metalDisassemblyOutputPath);
         File::remove(metalDisassemblyManifestPath);
+        File::remove(hlslOutputPath);
         File::remove(wgslOutputPath);
         File::remove(explicitManifestPath);
+        File::remove(explicitDebugPath);
+        File::remove(reflectionPath);
+        File::remove(dependencyPath);
         File::remove(containerOutputPath);
     }
 };
@@ -640,8 +649,12 @@ static SlangResult _createTempCoverageCliFiles(
     out.disassemblyManifestPath = out.disassemblyOutputPath + ".coverage-manifest.json";
     out.metalDisassemblyOutputPath = out.basePath + ".metallib-asm";
     out.metalDisassemblyManifestPath = out.metalDisassemblyOutputPath + ".coverage-manifest.json";
+    out.hlslOutputPath = out.basePath + ".hlsl";
     out.wgslOutputPath = out.basePath + ".wgsl";
     out.explicitManifestPath = out.basePath + ".coverage-manifest.json";
+    out.explicitDebugPath = out.basePath + ".explicit.dbg.spv";
+    out.reflectionPath = out.basePath + ".reflection.json";
+    out.dependencyPath = out.basePath + ".d";
     out.containerOutputPath = out.basePath + ".slang-module";
     return File::writeAllText(out.sourcePath, source);
 }
@@ -689,24 +702,15 @@ static bool _containsDiagnostic(
            _contains(result.standardError, expectedText);
 }
 
-enum class CoverageManifestCheck
-{
-    // Require line, function, and branch entry kinds — the full set produced
-    // by -trace-coverage -trace-function-coverage -trace-branch-coverage on
-    // most targets.
-    Full,
-    // Require only the structural fields (version, counter_count, entries,
-    // buffer) and the coverage variable name. Used for the metallib-asm path
-    // where function/branch entries are currently missing from the manifest
-    // even though the IR coverage pass runs with all three flags enabled.
-    // TODO: investigate whether this is a metadata-propagation bug in the
-    // metallib-asm downstream-compilation artifact path (#11610).
-    StructureOnly,
-};
-
-static SlangResult _checkCoverageManifest(
-    const String& path,
-    CoverageManifestCheck check = CoverageManifestCheck::Full)
+// Check that the coverage manifest at `path` carries the structural fields
+// (version, counter_count, entries, buffer), the coverage variable name, and
+// all three entry kinds produced by
+// `-trace-coverage -trace-function-coverage -trace-branch-coverage`. This
+// full check applies to every target, including the metallib-asm downstream
+// path: once the Metal counter width is capped to 32-bit so the downstream
+// metal compile succeeds, its manifest contains the same complete entry set
+// as direct source targets (verified on macOS with Metal Toolchain v17.6).
+static SlangResult _checkCoverageManifest(const String& path)
 {
     if (!File::exists(path))
         return SLANG_FAIL;
@@ -716,15 +720,12 @@ static SlangResult _checkCoverageManifest(
     if (!_contains(manifest, "\"version\"") || !_contains(manifest, "\"counter_count\"") ||
         !_contains(manifest, "\"entries\"") || !_contains(manifest, "\"buffer\""))
         return SLANG_FAIL;
-    if (check == CoverageManifestCheck::Full)
-    {
-        // "kind\": \"line\"" matches the entry-kind field, not the per-entry
-        // source-location "line": <n> field which appears in all entry kinds.
-        if (!_contains(manifest, "\"kind\": \"line\"") ||
-            !_contains(manifest, "\"kind\": \"function\"") ||
-            !_contains(manifest, "\"kind\": \"branch\""))
-            return SLANG_FAIL;
-    }
+    // "kind\": \"line\"" matches the entry-kind field, not the per-entry
+    // source-location "line": <n> field which appears in all entry kinds.
+    if (!_contains(manifest, "\"kind\": \"line\"") ||
+        !_contains(manifest, "\"kind\": \"function\"") ||
+        !_contains(manifest, "\"kind\": \"branch\""))
+        return SLANG_FAIL;
     if (!_contains(manifest, "__slang_coverage"))
         return SLANG_FAIL;
 
@@ -794,9 +795,7 @@ static SlangResult _testCoverageAutoSidecarForMetalLibDisassembly(UnitTestContex
         return SLANG_FAIL;
     if (!File::exists(files.metalDisassemblyOutputPath))
         return SLANG_FAIL;
-    return _checkCoverageManifest(
-        files.metalDisassemblyManifestPath,
-        CoverageManifestCheck::StructureOnly);
+    return _checkCoverageManifest(files.metalDisassemblyManifestPath);
 #else
     SLANG_UNUSED(context);
     return SLANG_OK;
@@ -872,7 +871,7 @@ static SlangResult _testCoverageExplicitSidecarForMetalLibDisassembly(UnitTestCo
         return SLANG_FAIL;
     if (File::exists(files.metalDisassemblyManifestPath))
         return SLANG_FAIL;
-    return _checkCoverageManifest(files.explicitManifestPath, CoverageManifestCheck::StructureOnly);
+    return _checkCoverageManifest(files.explicitManifestPath);
 #else
     SLANG_UNUSED(context);
     return SLANG_OK;
@@ -1185,7 +1184,6 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
     ScopedDebugArtifactFile debugArtifact;
     debugArtifact.path = debugArtifactCandidates[0];
     String debugArtifactPath = debugArtifact.path;
-
     File::remove(files.outputPath);
     File::remove(files.autoManifestPath);
     File::remove(debugArtifactPath);
@@ -1213,6 +1211,413 @@ static SlangResult _testCoverageExplicitSidecarCannotOverwriteDebugArtifact(
         return SLANG_FAIL;
 
     return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(
+    UnitTestContext* context,
+    bool useExplicitStdout)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesBefore));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0)
+        return SLANG_FAIL;
+
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+            return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
+    UnitTestContext* context,
+    bool useExplicitStdout)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> debugFilesBefore;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesBefore));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-whole-program");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00109", "requires an output file path"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0)
+        return SLANG_FAIL;
+
+    List<String> debugFilesAfter;
+    SLANG_RETURN_ON_FAIL(_collectDebugSpvFiles(debugFilesAfter));
+    for (const auto& file : debugFilesAfter)
+    {
+        if (!_containsFileName(debugFilesBefore, file))
+            return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoStdoutWritesExplicitSidecar(
+    UnitTestContext* context,
+    bool wholeProgram,
+    bool useExplicitStdout)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    if (wholeProgram)
+        args.add("-whole-program");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitDebugPath);
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0 || result.standardOutput.getLength() == 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.explicitDebugPath) || File::exists(files.outputPath))
+        return SLANG_FAIL;
+
+    List<unsigned char> debugBytes;
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(files.explicitDebugPath, debugBytes));
+    return debugBytes.getCount() != 0 ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testSeparateDebugInfoOutputRequiresSeparateDebugInfo(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitDebugPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00110", "requires `-separate-debug-info`"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0 || File::exists(files.explicitDebugPath))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoOutputRejectsArtifactCollision(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.outputPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
+        return SLANG_FAIL;
+    return !File::exists(files.outputPath) ? SLANG_OK : SLANG_FAIL;
+}
+
+// Verifies that a debug sidecar cannot overwrite an output from a target without debug data.
+static SlangResult _testSeparateDebugInfoOutputRejectsOtherTargetCollision(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-target");
+    args.add("hlsl");
+    args.add("-o");
+    args.add(files.hlslOutputPath);
+    args.add("-target");
+    args.add("spirv");
+    args.add("-o");
+    args.add(files.outputPath);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.hlslOutputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.hlslOutputPath) || File::exists(files.outputPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Verifies that debug and coverage sidecars cannot claim the same destination.
+static SlangResult _testSeparateDebugInfoOutputRejectsCoverageManifestCollision(
+    UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, true);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitManifestPath);
+    args.add("-coverage-manifest-output");
+    args.add(files.explicitManifestPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath) || File::exists(files.explicitManifestPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Verifies that outputs written outside the artifact loop are part of the same output namespace.
+static SlangResult _testSeparateDebugInfoOutputRejectsAuxiliaryOutputCollision(
+    UnitTestContext* context,
+    bool useReflectionOutput)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    const String collisionPath = useReflectionOutput ? files.reflectionPath : files.dependencyPath;
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(collisionPath);
+    args.add(useReflectionOutput ? "-reflection-json" : "-depfile");
+    args.add(collisionPath);
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
+        return SLANG_FAIL;
+    if (File::exists(files.outputPath) || File::exists(files.explicitDebugPath) ||
+        File::exists(collisionPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Verifies that one explicit path cannot claim multiple per-entry-point debug artifacts.
+static SlangResult _testSeparateDebugInfoOutputRejectsMultipleArtifacts(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files, kCoverageCliTwoEntryShader));
+
+    List<String> args;
+    args.add(files.sourcePath);
+    args.add("-target");
+    args.add("spirv");
+    args.add("-target");
+    args.add("glsl");
+    args.add("-entry");
+    args.add("main");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-entry");
+    args.add("main2");
+    args.add("-stage");
+    args.add("compute");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitDebugPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00114", "cannot receive multiple"))
+        return SLANG_FAIL;
+    if (result.standardOutput.getLength() != 0 || File::exists(files.explicitDebugPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoOutputRejectsContainer(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitDebugPath);
+    args.add("-o");
+    args.add(files.containerOutputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00112", "not supported when writing a container output"))
+        return SLANG_FAIL;
+    if (File::exists(files.containerOutputPath) || File::exists(files.explicitDebugPath))
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+static SlangResult _testSeparateDebugInfoOutputRejectsMissingDebugData(UnitTestContext* context)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false, "hlsl");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add(files.explicitDebugPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00113", "did not produce separate debug information"))
+        return SLANG_FAIL;
+    return !File::exists(files.explicitDebugPath) ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testSeparateDebugInfoOutputWritesToStdout(
+    UnitTestContext* context,
+    bool wholeProgram)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    if (wholeProgram)
+        args.add("-whole-program");
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add("-");
+    args.add("-o");
+    args.add(files.outputPath);
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode != 0 || result.standardOutput.getLength() == 0)
+        return SLANG_FAIL;
+    if (!File::exists(files.outputPath) || File::exists(files.explicitDebugPath))
+        return SLANG_FAIL;
+
+    List<unsigned char> mainOutputBytes;
+    SLANG_RETURN_ON_FAIL(File::readAllBytes(files.outputPath, mainOutputBytes));
+    return mainOutputBytes.getCount() != 0 ? SLANG_OK : SLANG_FAIL;
+}
+
+static SlangResult _testSeparateDebugInfoOutputRejectsStdoutCollision(
+    UnitTestContext* context,
+    bool useExplicitStdout)
+{
+    TempCoverageCliFiles files;
+    SLANG_RETURN_ON_FAIL(_createTempCoverageCliFiles(files));
+
+    List<String> args;
+    _addCoverageCliCompileArgs(args, files.sourcePath, false);
+    args.add("-g2");
+    args.add("-emit-spirv-directly");
+    args.add("-separate-debug-info");
+    args.add("-separate-debug-info-output");
+    args.add("-");
+    if (useExplicitStdout)
+    {
+        args.add("-o");
+        args.add("-");
+    }
+
+    ExecuteResult result;
+    SLANG_RETURN_ON_FAIL(_runSlangc(context, args, result));
+    if (result.resultCode == 0)
+        return SLANG_FAIL;
+    if (!_containsDiagnostic(result, "E00111", "must differ from output path"))
+        return SLANG_FAIL;
+    return result.standardOutput.getLength() == 0 ? SLANG_OK : SLANG_FAIL;
 }
 
 static SlangResult _testCoverageExplicitSidecarRejectsWholeProgramCollision(
@@ -1496,6 +1901,19 @@ static slang::CompilerOptionEntry _makeStringCompilerOption(
     return entry;
 }
 
+static slang::CompilerOptionEntry _makeInt2CompilerOption(
+    slang::CompilerOptionName name,
+    int value0,
+    int value1)
+{
+    slang::CompilerOptionEntry entry = {};
+    entry.name = name;
+    entry.value.kind = slang::CompilerOptionValueKind::Int;
+    entry.value.intValue0 = value0;
+    entry.value.intValue1 = value1;
+    return entry;
+}
+
 static bool _blobContentEquals(ISlangBlob* left, ISlangBlob* right)
 {
     if (!left || !right || left->getBufferSize() != right->getBufferSize())
@@ -1504,18 +1922,12 @@ static bool _blobContentEquals(ISlangBlob* left, ISlangBlob* right)
            0;
 }
 
-static SlangResult _getCoverageOptionEntryPointHash(
-    const char* coverageManifestOutput,
-    bool traceCoverage,
+static SlangResult _getOptionEntryPointHash(
+    const slang::CompilerOptionEntry* options,
+    SlangInt optionCount,
+    const char* moduleName,
     ComPtr<ISlangBlob>& outHash)
 {
-    slang::CompilerOptionEntry options[] = {
-        _makeBoolCompilerOption(slang::CompilerOptionName::TraceCoverage, traceCoverage),
-        _makeStringCompilerOption(
-            slang::CompilerOptionName::CoverageManifestOutput,
-            coverageManifestOutput),
-    };
-
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()));
 
@@ -1525,7 +1937,7 @@ static SlangResult _getCoverageOptionEntryPointHash(
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
-    sessionDesc.compilerOptionEntryCount = SLANG_COUNT_OF(options);
+    sessionDesc.compilerOptionEntryCount = optionCount;
     sessionDesc.compilerOptionEntries = options;
 
     ComPtr<slang::ISession> session;
@@ -1534,8 +1946,8 @@ static SlangResult _getCoverageOptionEntryPointHash(
     ComPtr<slang::IBlob> diagnostics;
     ComPtr<slang::IModule> module;
     module = session->loadModuleFromSourceString(
-        "coverageHash",
-        "coverage-hash.slang",
+        moduleName,
+        "option-hash.slang",
         kCoverageCliShader,
         diagnostics.writeRef());
     if (!module)
@@ -1563,6 +1975,20 @@ static SlangResult _getCoverageOptionEntryPointHash(
     return outHash ? SLANG_OK : SLANG_FAIL;
 }
 
+static SlangResult _getCoverageOptionEntryPointHash(
+    const char* coverageManifestOutput,
+    bool traceCoverage,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeBoolCompilerOption(slang::CompilerOptionName::TraceCoverage, traceCoverage),
+        _makeStringCompilerOption(
+            slang::CompilerOptionName::CoverageManifestOutput,
+            coverageManifestOutput),
+    };
+    return _getOptionEntryPointHash(options, SLANG_COUNT_OF(options), "coverageHash", outHash);
+}
+
 static SlangResult _testCoverageManifestOutputDoesNotAffectCompilerOptionHash()
 {
     ComPtr<ISlangBlob> explicitManifestAHash;
@@ -1578,6 +2004,161 @@ static SlangResult _testCoverageManifestOutputDoesNotAffectCompilerOptionHash()
     SLANG_RETURN_ON_FAIL(
         _getCoverageOptionEntryPointHash("a.json", false, traceCoverageDisabledHash));
     if (_blobContentEquals(explicitManifestAHash, traceCoverageDisabledHash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _getSeparateDebugOptionEntryPointHash(
+    const char* separateDebugOutput,
+    bool emitSeparateDebug,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeBoolCompilerOption(slang::CompilerOptionName::EmitSeparateDebug, emitSeparateDebug),
+        _makeStringCompilerOption(
+            slang::CompilerOptionName::SeparateDebugInfoOutput,
+            separateDebugOutput),
+    };
+    return _getOptionEntryPointHash(options, SLANG_COUNT_OF(options), "separateDebugHash", outHash);
+}
+
+static SlangResult _testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash()
+{
+    ComPtr<ISlangBlob> explicitDebugAHash;
+    SLANG_RETURN_ON_FAIL(
+        _getSeparateDebugOptionEntryPointHash("a.dbg.spv", true, explicitDebugAHash));
+
+    ComPtr<ISlangBlob> explicitDebugBHash;
+    SLANG_RETURN_ON_FAIL(
+        _getSeparateDebugOptionEntryPointHash("b.dbg.spv", true, explicitDebugBHash));
+
+    if (!_blobContentEquals(explicitDebugAHash, explicitDebugBHash))
+        return SLANG_FAIL;
+
+    ComPtr<ISlangBlob> separateDebugDisabledHash;
+    SLANG_RETURN_ON_FAIL(
+        _getSeparateDebugOptionEntryPointHash("a.dbg.spv", false, separateDebugDisabledHash));
+    if (_blobContentEquals(explicitDebugAHash, separateDebugDisabledHash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _getBindGlobalsOptionEntryPointHash(
+    int index,
+    int set,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeInt2CompilerOption(slang::CompilerOptionName::VulkanBindGlobals, index, set),
+    };
+    return _getOptionEntryPointHash(options, SLANG_COUNT_OF(options), "bindGlobalsHash", outHash);
+}
+
+static SlangResult _testVulkanBindGlobalsSetAffectsCompilerOptionHash()
+{
+    ComPtr<ISlangBlob> set0Hash;
+    SLANG_RETURN_ON_FAIL(_getBindGlobalsOptionEntryPointHash(0, 0, set0Hash));
+
+    ComPtr<ISlangBlob> set1Hash;
+    SLANG_RETURN_ON_FAIL(_getBindGlobalsOptionEntryPointHash(0, 1, set1Hash));
+
+    if (_blobContentEquals(set0Hash, set1Hash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static SlangResult _testDuplicateIntOptionReplacesSecondOperand()
+{
+    Slang::CompilerOptionSet base;
+    base.add(
+        Slang::CompilerOptionName::VulkanBindGlobals,
+        List<Slang::CompilerOptionValue>{Slang::CompilerOptionValue::fromInt2(5, 0)});
+
+    base.add(
+        Slang::CompilerOptionName::VulkanBindGlobals,
+        List<Slang::CompilerOptionValue>{Slang::CompilerOptionValue::fromInt2(5, 1)},
+        /* replaceDuplicate */ true);
+
+    auto values = base.getArray(Slang::CompilerOptionName::VulkanBindGlobals);
+    if (values.getCount() != 1)
+        return SLANG_FAIL;
+    if (values[0].intValue != 5 || values[0].intValue2 != 1)
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+static slang::CompilerOptionEntry _makeString2CompilerOption(
+    slang::CompilerOptionName name,
+    const char* value0,
+    const char* value1)
+{
+    slang::CompilerOptionEntry entry = {};
+    entry.name = name;
+    entry.value.kind = slang::CompilerOptionValueKind::String;
+    entry.value.stringValue0 = value0;
+    entry.value.stringValue1 = value1;
+    return entry;
+}
+
+static SlangResult _getMacroDefineOptionEntryPointHash(
+    const char* name,
+    const char* value,
+    ComPtr<ISlangBlob>& outHash)
+{
+    slang::CompilerOptionEntry options[] = {
+        _makeString2CompilerOption(slang::CompilerOptionName::MacroDefine, name, value),
+    };
+    return _getOptionEntryPointHash(options, SLANG_COUNT_OF(options), "macroDefineHash", outHash);
+}
+
+// The two strings of a multi-string option must be delimited in the digest. Without a length
+// prefix, MacroDefine("AB","C") and MacroDefine("A","BC") both flatten to the bytes "ABC" and would
+// collide even though they define different macros.
+static SlangResult _testMultiStringOptionHashIsDelimited()
+{
+    ComPtr<ISlangBlob> abcHash;
+    SLANG_RETURN_ON_FAIL(_getMacroDefineOptionEntryPointHash("AB", "C", abcHash));
+
+    ComPtr<ISlangBlob> aBcHash;
+    SLANG_RETURN_ON_FAIL(_getMacroDefineOptionEntryPointHash("A", "BC", aBcHash));
+
+    if (_blobContentEquals(abcHash, aBcHash))
+        return SLANG_FAIL;
+
+    return SLANG_OK;
+}
+
+// The digest must depend only on the option set, not on the order options were inserted, so the
+// same two options supplied in either order produce the same hash (avoids spurious cache misses).
+static SlangResult _testCompilerOptionHashIsInsertionOrderIndependent()
+{
+    slang::CompilerOptionEntry forwardOptions[] = {
+        _makeBoolCompilerOption(slang::CompilerOptionName::VulkanUseEntryPointName, true),
+        _makeBoolCompilerOption(slang::CompilerOptionName::GLSLForceScalarLayout, true),
+    };
+    ComPtr<ISlangBlob> forwardHash;
+    SLANG_RETURN_ON_FAIL(_getOptionEntryPointHash(
+        forwardOptions,
+        SLANG_COUNT_OF(forwardOptions),
+        "orderHash",
+        forwardHash));
+
+    slang::CompilerOptionEntry reverseOptions[] = {
+        _makeBoolCompilerOption(slang::CompilerOptionName::GLSLForceScalarLayout, true),
+        _makeBoolCompilerOption(slang::CompilerOptionName::VulkanUseEntryPointName, true),
+    };
+    ComPtr<ISlangBlob> reverseHash;
+    SLANG_RETURN_ON_FAIL(_getOptionEntryPointHash(
+        reverseOptions,
+        SLANG_COUNT_OF(reverseOptions),
+        "orderHash",
+        reverseHash));
+
+    if (!_blobContentEquals(forwardHash, reverseHash))
         return SLANG_FAIL;
 
     return SLANG_OK;
@@ -1605,17 +2186,71 @@ SLANG_UNIT_TEST(SlangcReadFromStdin)
     SLANG_CHECK(SLANG_SUCCEEDED(_testInputTooLargeDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCannotReadFromStdinDiagnostic(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testHelpMentionsStdin(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testVulkanBindGlobalsSetAffectsCompilerOptionHash()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testDuplicateIntOptionReplacesSecondOperand()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testMultiStringOptionHashIsDelimited()));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCompilerOptionHashIsInsertionOrderIndependent()));
+}
+
+SLANG_UNIT_TEST(SlangcCoverageManifestOutputMetalLib)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
+}
+
+SLANG_UNIT_TEST(SlangcSeparateDebugInfoOutput)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutFailsWithoutWritingSidecar(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(
+        unitTestContext,
+        false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWholeProgramFailsWithoutWritingSidecar(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWritesExplicitSidecar(unitTestContext, false, false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWritesExplicitSidecar(unitTestContext, false, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWritesExplicitSidecar(unitTestContext, true, false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoStdoutWritesExplicitSidecar(unitTestContext, true, true)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRequiresSeparateDebugInfo(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsArtifactCollision(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsOtherTargetCollision(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsCoverageManifestCollision(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsAuxiliaryOutputCollision(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsAuxiliaryOutputCollision(unitTestContext, false)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsMultipleArtifacts(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsContainer(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsMissingDebugData(unitTestContext)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputWritesToStdout(unitTestContext, false)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoOutputWritesToStdout(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        _testSeparateDebugInfoOutputRejectsStdoutCollision(unitTestContext, false)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(_testSeparateDebugInfoOutputRejectsStdoutCollision(unitTestContext, true)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_testSeparateDebugInfoOutputDoesNotAffectCompilerOptionHash()));
 }
 
 SLANG_UNIT_TEST(SlangcCoverageManifestOutput)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForDisassembly(unitTestContext)));
-    SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageAutoSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecar(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarForDisassembly(unitTestContext)));
-    SLANG_CHECK(
-        SLANG_SUCCEEDED(_testCoverageExplicitSidecarForMetalLibDisassembly(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_testCoverageExplicitSidecarWithStdoutArtifact(unitTestContext)));
     SLANG_CHECK(
         SLANG_SUCCEEDED(_testCoverageExplicitSidecarCannotOverwriteArtifact(unitTestContext)));

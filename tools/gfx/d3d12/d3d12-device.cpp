@@ -1,7 +1,6 @@
 // d3d12-device.cpp
 #include "d3d12-device.h"
 
-#include "../nvapi/nvapi-util.h"
 #include "d3d12-buffer.h"
 #include "d3d12-fence.h"
 #include "d3d12-framebuffer.h"
@@ -16,9 +15,10 @@
 #include "d3d12-shader-table.h"
 #include "d3d12-swap-chain.h"
 #include "d3d12-vertex-layout.h"
+#include "gfx/nvapi/nvapi-util.h"
 
 #ifdef GFX_NVAPI
-#include "../nvapi/nvapi-include.h"
+#include "gfx/nvapi/nvapi-include.h"
 #endif
 
 #ifdef GFX_NV_AFTERMATH
@@ -57,9 +57,33 @@ static ShaderModelInfo kKnownShaderModels[] = {
     }
     SHADER_MODEL_INFO_DXBC(5, 1),
 #undef SHADER_MODEL_INFO_DXBC
-#define SHADER_MODEL_INFO_DXIL(major, minor)                                    \
-    {                                                                           \
-        (D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor \
+// Minor versions >= 10 must be encoded as a hex digit (D3D_SHADER_MODEL_6_10 == 0x6a),
+// so we run the minor through a lookup table before token-pasting. Two-level indirection
+// is required because `##` does not expand its operands.
+#define SM_HEX_DIGIT_0 0
+#define SM_HEX_DIGIT_1 1
+#define SM_HEX_DIGIT_2 2
+#define SM_HEX_DIGIT_3 3
+#define SM_HEX_DIGIT_4 4
+#define SM_HEX_DIGIT_5 5
+#define SM_HEX_DIGIT_6 6
+#define SM_HEX_DIGIT_7 7
+#define SM_HEX_DIGIT_8 8
+#define SM_HEX_DIGIT_9 9
+#define SM_HEX_DIGIT_10 a
+#define SM_HEX_DIGIT_11 b
+#define SM_HEX_DIGIT_12 c
+#define SM_HEX_DIGIT_13 d
+#define SM_HEX_DIGIT_14 e
+#define SM_HEX_DIGIT_15 f
+#define SM_HEX_DIGIT_INDIRECT(x) SM_HEX_DIGIT_##x
+#define SM_HEX_DIGIT(x) SM_HEX_DIGIT_INDIRECT(x)
+#define SM_CONCAT_PASTE(a, b, c) a##b##c
+#define SM_CONCAT(a, b, c) SM_CONCAT_PASTE(a, b, c)
+#define SHADER_MODEL_INFO_DXIL(major, minor)                                      \
+    {                                                                             \
+        (D3D_SHADER_MODEL) SM_CONCAT(0x, major, SM_HEX_DIGIT(minor)), SLANG_DXIL, \
+            "sm_" #major "_" #minor                                               \
     }
     SHADER_MODEL_INFO_DXIL(6, 0),
     SHADER_MODEL_INFO_DXIL(6, 1),
@@ -70,8 +94,29 @@ static ShaderModelInfo kKnownShaderModels[] = {
     SHADER_MODEL_INFO_DXIL(6, 6),
     SHADER_MODEL_INFO_DXIL(6, 7),
     SHADER_MODEL_INFO_DXIL(6, 8),
-    SHADER_MODEL_INFO_DXIL(6, 9)
+    SHADER_MODEL_INFO_DXIL(6, 9),
+    SHADER_MODEL_INFO_DXIL(6, 10)
 #undef SHADER_MODEL_INFO_DXIL
+#undef SM_CONCAT
+#undef SM_CONCAT_PASTE
+#undef SM_HEX_DIGIT
+#undef SM_HEX_DIGIT_INDIRECT
+#undef SM_HEX_DIGIT_15
+#undef SM_HEX_DIGIT_14
+#undef SM_HEX_DIGIT_13
+#undef SM_HEX_DIGIT_12
+#undef SM_HEX_DIGIT_11
+#undef SM_HEX_DIGIT_10
+#undef SM_HEX_DIGIT_9
+#undef SM_HEX_DIGIT_8
+#undef SM_HEX_DIGIT_7
+#undef SM_HEX_DIGIT_6
+#undef SM_HEX_DIGIT_5
+#undef SM_HEX_DIGIT_4
+#undef SM_HEX_DIGIT_3
+#undef SM_HEX_DIGIT_2
+#undef SM_HEX_DIGIT_1
+#undef SM_HEX_DIGIT_0
 };
 
 Result DeviceImpl::createBuffer(
@@ -103,7 +148,7 @@ Result DeviceImpl::createBuffer(
     switch (memoryType)
     {
     case MemoryType::ReadBack:
-        assert(!srcData);
+        SLANG_ASSERT(!srcData);
 
         heapProps.Type = D3D12_HEAP_TYPE_READBACK;
         desc.Flags = D3D12_RESOURCE_FLAG_NONE;
@@ -1222,7 +1267,7 @@ Result DeviceImpl::createTextureResource(
                     mipSize.height = int(D3DUtil::calcAligned(mipSize.height, 4));
                 }
 
-                assert(
+                SLANG_ASSERT(
                     footprint.Width == mipSize.width && footprint.Height == mipSize.height &&
                     footprint.Depth == mipSize.depth);
 
@@ -2224,7 +2269,7 @@ Result DeviceImpl::createAccelerationStructure(
     IAccelerationStructure** outAS)
 {
 #if SLANG_GFX_HAS_DXR_SUPPORT
-    assert(desc.buffer != nullptr);
+    SLANG_ASSERT(desc.buffer != nullptr);
     RefPtr<AccelerationStructureImpl> result = new AccelerationStructureImpl();
     result->m_device5 = m_device5;
     result->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);

@@ -1,11 +1,11 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T12:06:22+00:00
+reviewed_at: 2026-06-30T13:27:15+00:00
 target_doc: ir-reference/misc.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -24,18 +24,23 @@ severity_breakdown:
 # Review report for ir-reference/misc.md
 
 ## Summary
-The page has valid front matter and its relative links resolve. I found two material issues: the catch-all coverage misses concrete capability-set opcodes, and the kernel-launch rows describe operand shapes that do not match the builder and emitter code that actually creates and consumes those instructions.
+The misc page has two actionable issues. The most important one is that `CudaKernelLaunch` is documented with the five-operand `IRBuilder` helper shape, while the Lua opcode declaration that the reference tables are supposed to follow declares six named operands.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/misc.md`.
-- Read `_common.md`, `ir-reference-misc.md`, the target document including front matter, dependency docs, and watched source files.
-- Resolved the document's relative Markdown links and checked peer generated-doc links against the `docs/generated/design` tree.
-- Verified required sections, table columns, front-matter keys, target source commit, and watched-path digest format.
-- Spot-checked more than 10 source-alignment claims across `nop`, `Unrecognized`, `Expand`, `Each`, `MakeWitnessPack`, `PackBranch`, `IsType`, `sizeOf`, `alignOf`, `CastStorageToLogical`, `MakeStorageTypeLoweringConfig`, `liveRangeStart`, `getStringHash`, `DispatchKernel`, and `CudaKernelLaunch`.
+- Ran `regenerate.py show ir-reference/misc.md` and reviewed the target document, `_common.md`, `ir-reference-misc.md`, `cross-cutting/ir-instructions.md`, and `pipeline/04-ast-to-ir.md`.
+- Checked front matter for all required generated-doc keys, the target source commit, the warning string, and a 64-character hex watched-path digest.
+- Resolved the relative links in the document body to watched source files and generated peer docs, including all sibling IR-reference links and `../pipeline/04-ast-to-ir.md`.
+- Verified the required IR-reference sections: `## Source`, `## Family hierarchy`, `## Opcodes`, `## Notable opcodes`, and `## See also`.
+- Spot-checked more than 10 claims against watched files, including `PackBranch`, `MakeWitnessPack`, `Each`, `getStringHash`, `IsType`, `sizeOf`, `alignOf`, `countOf`, `CastStorageToLogicalBase`, `LiveRangeMarker`, `CudaKernelLaunch`, and `IRBuilder::emitCudaKernelLaunch`.
+- Checked representative "typical inhabitant" opcodes from the per-doc prompt and confirmed several are intentionally documented on sibling pages, including binding queries, cooperative-vector helpers, and descriptor-heap opcodes.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Opcodes` | The catch-all page omits the concrete `capabilityConjunction` and `capabilityDisjunction` opcodes. These are concrete stable opcodes under the top-level `CapabilitySet` group, are not listed on another assigned page, and fit the misc prompt's catch-all rule for unclaimed concrete Lua entries. | `source/slang/slang-ir-insts.lua:871` declares `CapabilitySet` with `capabilityConjunction` and `capabilityDisjunction`; `source/slang/slang-ir-insts-stable-names.lua:155-156` assigns stable names to both concrete opcodes. | Add a small capability-set sub-table with rows for `capabilityConjunction` and `capabilityDisjunction`, or explicitly move them to the owning family page and cross-link from misc. |
-| F-002 | major | `### Kernel launch` and `### CudaKernelLaunch` | The `DispatchKernel` and `CudaKernelLaunch` rows/callout do not match the IR shape used by the builder and Torch emitter. The document lists `CudaKernelLaunch` as separate grid/block dimension operands and omits `DispatchKernel`'s trailing call arguments, but source creates `CudaKernelLaunch` with `baseFn, gridDim, blockDim, argsArray, cudaStream` and `DispatchKernel` with `baseFn, threadGroupSize, dispatchSize, args...`. | `source/slang/slang-ir.cpp:3618-3619` appends variadic call arguments to `DispatchKernel`; `source/slang/slang-ir.cpp:3630-3638` creates `CudaKernelLaunch` with five operands; `source/slang/slang-emit-torch.cpp:73-99` consumes operands 0-4 as function, grid dim, block dim, args, and stream. | Update the two kernel-launch rows and the `CudaKernelLaunch` notable callout to describe the actual builder/emitter operand shapes, and note the Lua declaration mismatch if the table still derives from `slang-ir-insts.lua`. |
+| F-001 | major | `### Kernel launch`, lines 239-242; `### CudaKernelLaunch`, lines 296-305 | The page says `CudaKernelLaunch` has `baseFn, gridDim, blockDim, argsArray, cudaStream` and "exactly five operands". The IR-reference contract says the operand column should come from the Lua entry, but the Lua declaration for `CudaKernelLaunch` names six operands: `kernel`, `gridDimX`, `gridDimY`, `gridDimZ`, `blockDimX`, and `blockDimY`. The watched `IRBuilder` helper does emit five operands, so the page should not present that helper shape as the opcode schema without explaining the source discrepancy. | `source/slang/slang-ir-insts.lua:2684` declares the `CudaKernelLaunch` opcode with six operands; `source/slang/slang-ir.cpp:3676` defines the five-argument `IRBuilder::emitCudaKernelLaunch` helper that currently emits the opcode. | Change the table's operand column to reflect the Lua declaration, and revise the notable callout to distinguish the Lua opcode schema from the five-argument builder helper. If the helper shape is the intended truth, call out the Lua mismatch for source remediation rather than documenting the helper as the opcode operand list. |
+| F-002 | major | `## Notable opcodes`, lines 244-316 | The per-doc prompt requires a notable-opcode callout for `getStringHash`, but the section has callouts for `Each`, `PackBranch`, `MakeWitnessPack`, `IsType`, storage/logical casts, `CudaKernelLaunch`, and `Annotation` only. The opcode appears in the table, but the required notable discussion of its operand layout and stable-hash semantics is missing. | `docs/generated/design/_meta/prompts/ir-reference-misc.md:44` lists `getStringHash` under "Cover at least"; `source/slang/slang-ir-insts.lua:1530` declares the opcode with `stringLit: IRStringLit`. | Add a `### getStringHash` callout under `## Notable opcodes` that describes the `stringLit: IRStringLit` operand and the stable string-hash role, citing the Lua declaration and the relevant watched lowering/source helper if available. |
+
+## No-issues notes
+- The page correctly links `../pipeline/04-ast-to-ir.md` from `## See also`.
+- The pack/expansion, type-query, storage-cast, annotation, liveness, and string-hash table rows checked against Lua are otherwise aligned.
+- The prompt's no-duplicate concern is handled for sampled related opcodes: binding queries, descriptor heaps, cooperative-vector helpers, and per-vertex input are documented on sibling pages rather than duplicated here.

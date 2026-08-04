@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL):-target spirv -entry main -stage compute -emit-spirv-directly -O0 -enable-experimental-passes
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK_EXPERIMENTAL):-target spirv -entry main -stage compute -emit-spirv-directly -enable-experimental-passes
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -emit-spirv-directly
 
 // Test that we can pass arguments in different address space to an `inout` parameter, and have
 // the callee specialized to the address space of the argument.
@@ -17,12 +17,14 @@ groupshared int gArray1[2];
 // CHECK: %array = OpFunctionParameter %_ptr_Private__arr_int_int_2
 // CHECK: %array_0 = OpFunctionParameter %_ptr_Workgroup__arr_int_int_2
 
+[noinline]
 void modify(inout int array[2])
 {
     array[0] = 1;
     array[1] = 2;
 }
 
+[noinline]
 void atomicOp(inout int array[2])
 {
     InterlockedAdd(array[0], 1);

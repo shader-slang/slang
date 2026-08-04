@@ -1,29 +1,29 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
-//META: doc_ref=docs/generated/design/ast-reference/types.md#buffer-types
-//META: doc_section_digest=c25174867f65b28674f6e50925bd9f916f322862f95fe848ae8bb96cd35ce36b
-//META: purpose=An HLSLByteAddressBufferType uniform reaches the HLSL backend as `ByteAddressBuffer` and `RWByteAddressBuffer`.
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
+//META: doc_section_digest=0acf92c990c51e23e6b949538b0504562447e6a609a849cd20f331b1ba8f82e3
+//META: purpose=An HLSLByteAddressBufferType / HLSLRWByteAddressBufferType is accepted at a uniform and bytes are addressable by Load/Store; the HLSL emit renders the ByteAddressBuffer spelling.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `HLSLByteAddressBufferType` and `HLSLRWByteAddressBufferType` are
-// the `UntypedBufferResourceType` leaves for `ByteAddressBuffer` /
-// `RWByteAddressBuffer`. The user-facing claim: each spelling lowers
-// to its HLSL surface form.
+// Verifies the untyped byte-address buffer family: a ByteAddressBuffer
+// is read via Load and an RWByteAddressBuffer written via Store, and
+// the HLSL backend renders both spellings. CHECK matches the two
+// buffer type spellings in the emitted HLSL.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 
 ByteAddressBuffer g_in;
 RWByteAddressBuffer g_out;
 
-//CHECK: ByteAddressBuffer
-//CHECK: RWByteAddressBuffer
+//CHECK-DAG: ByteAddressBuffer
+//CHECK-DAG: RWByteAddressBuffer
 [numthreads(1, 1, 1)]
 void main()
 {
     uint v = g_in.Load(0);
-    g_out.Store(0, v);
+    g_out.Store(0, v + 1);
 }

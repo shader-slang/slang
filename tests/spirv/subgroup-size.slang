@@ -1,16 +1,17 @@
 import "glsl";
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=OUTPUT):-vk -compute -shaderobj
+//CHECK: OpExecutionMode %computeMain LocalSize 1 2 3
 
-// CHECK-DAG: %[[CONST:[A-Za-z0-9_]+]] = OpConstantComposite %v3int %int_1 %int_2 %int_3
-// CHECK: OpBitcast %v3uint %[[CONST]]
-
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [shader("compute")]
 [numthreads(1u, 2u, 3)]
-void compute()
+void computeMain()
 {
     const int x = gl_WorkGroupSize.x;
     outputBuffer[0] = x;
+    // OUTPUT: 1
 }

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#genericdecl
-//META: doc_section_digest=821d70752ab2fb0ab927aca034dc6d1ab1bf2642184d0e87594d63c182097322
+//META: doc_section_digest=72472a48bac619938006bb23a0e1ce51075ed1e262b7eb32a455b8764ff2fc94
 //META: purpose=A GenericDecl wraps an inner decl with a parameter list; the same inner decl specializes differently at distinct type arguments.
 //META: intent=functional
 //META: pipeline_stage=check

@@ -2,11 +2,11 @@
 
 #include "core/slang-exception.h"
 #include "core/slang-offset-container.h"
+#include "scoped-env-var.h"
 #include "unit-test/slang-unit-test.h"
 
-#include <stdlib.h>
-
 using namespace Slang;
+using SlangUnitTest::ScopedEnvVar;
 
 static void _checkEncodeDecode(uint32_t size)
 {
@@ -48,70 +48,6 @@ struct Root
     Offset32Array<Offset32Ptr<OffsetString>> dirs;
     Offset32Ptr<OffsetString> name;
     float value;
-};
-
-static int _writeEnvironmentVariable(const char* key, const char* val)
-{
-#ifdef _WIN32
-    String var = String(key) + "=" + val;
-    return _putenv(var.getBuffer());
-#else
-    return setenv(key, val, 1);
-#endif
-}
-
-static int _unsetEnvironmentVariable(const char* key)
-{
-#ifdef _WIN32
-    String var = String(key) + "=";
-    return _putenv(var.getBuffer());
-#else
-    return unsetenv(key);
-#endif
-}
-
-struct ScopedEnvVar
-{
-    const char* key;
-    bool hadOldValue = false;
-    String oldValue;
-
-    ScopedEnvVar(const char* inKey, const char* inVal)
-        : key(inKey)
-    {
-#ifdef _WIN32
-        char* value = nullptr;
-        size_t valueLength = 0;
-        if (_dupenv_s(&value, &valueLength, key) == 0 && value)
-        {
-            hadOldValue = true;
-            oldValue = value;
-            free(value);
-        }
-#else
-        if (const char* value = getenv(key))
-        {
-            hadOldValue = true;
-            oldValue = value;
-        }
-#endif
-        _writeEnvironmentVariable(key, inVal);
-    }
-
-    ScopedEnvVar(const ScopedEnvVar&) = delete;
-    ScopedEnvVar& operator=(const ScopedEnvVar&) = delete;
-
-    ~ScopedEnvVar()
-    {
-        if (hadOldValue)
-        {
-            _writeEnvironmentVariable(key, oldValue.getBuffer());
-        }
-        else
-        {
-            _unsetEnvironmentVariable(key);
-        }
-    }
 };
 
 } // namespace

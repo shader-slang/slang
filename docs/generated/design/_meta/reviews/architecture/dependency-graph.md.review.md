@@ -1,39 +1,44 @@
 ---
 review_report: true
 reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:11:45+00:00
+reviewed_at: 2026-06-30T13:26:46+00:00
 target_doc: architecture/dependency-graph.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: d562c492ff7426404fd8fcd584e73aade50ea9e87ab0386d9d3448c420d06cb9
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_watched_paths_digest: 02fa669b99e0a73ba4301f994b3212b5f9667ac9bffda7a1669c8780fdb96800
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: pass
+  completeness: partial
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 2
+finding_count: 1
 severity_breakdown:
   critical: 0
-  major: 0
-  minor: 2
+  major: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for architecture/dependency-graph.md
 
 ## Summary
-The page satisfies the required dependency-graph structure and all relative links resolve. I found two minor factual issues: the external-dependency notes omit dependencies visible in the recorded CMake files, and one approximate line citation is stale.
+The page is mostly aligned with the scoped CMake inputs, but the wasm dependency set is incomplete. `source/slang-wasm/CMakeLists.txt` links the wasm target with `slang-lookup-tables`, yet the diagram and edge-citation row omit that internal edge.
 
 ## Items checked
-- Ran `regenerate.py show architecture/dependency-graph.md` and reviewed the manifest prompt, watched files, and `depends_on` peer `architecture/module-map.md`.
-- Verified front matter, required sections, mermaid node style, all 32 markdown links, and all body line-number citations.
-- Spot-checked 16 CMake-backed claims across `source/core`, `source/compiler-core`, `source/slang`, `source/slang-core-module`, `source/slang-glsl-module`, `source/slangc`, `source/slang-wasm`, `source/slang-rt`, `source/slang-glslang`, and `source/standard-modules` at commit `52339028a2aa703271533454c6b9528a534bac31`.
+- Ran `regenerate.py show architecture/dependency-graph.md` and reviewed the target document, `_common.md`, `architecture-dependency-graph.md`, the dependency document `architecture/module-map.md`, and all 11 resolved `source/*/CMakeLists.txt` files.
+- Checked front matter for all required keys, the recorded target source commit, the warning string, and a 64-character hex watched-path digest copied from the target document.
+- Spot-checked the diagram and edge table against `LINK_WITH_PRIVATE` / `LINK_WITH_PUBLIC` clauses for `compiler-core`, `core`, `slang`, `slang-core-module`, `slang-glsl-module`, `slang-dispatcher`, `slang-glslang`, `slang-rt`, `slang-wasm`, `slangc`, and `standard-modules`.
+- Verified the special-case notes for `standard-modules`, `slang-record-replay`, `slang-llvm`, `slang-common-objects`, and the optional embedded core-module targets against the scoped CMake inputs where those claims touch watched files.
+- Checked the relative links used for source files and generated peer documents; no dangling relative links were found in the checked set.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Edges (intra-project only)`, lines 26-30 and `External dependencies`, lines 131-147 | The page says omitted external dependencies “are listed in the notes per node,” but the notes omit at least `libcmark-gfm` for `slang` and `Threads::Threads` / `${SLANG_GLSL_MODULE_DEPENDENCY}` for `slangc`. | `source/slang/CMakeLists.txt:265-276` includes `SPIRV-Headers::SPIRV-Headers` and `libcmark-gfm` in `slang_link_args`; `source/slangc/CMakeLists.txt:13-17` links `core`, `slang`, `Threads::Threads`, and `${SLANG_GLSL_MODULE_DEPENDENCY}`. | Add the missing external dependencies to the notes, or narrow the claim so it no longer promises that every omitted external dependency is listed per node. |
-| F-002 | minor | `## Edges (intra-project only)`, lines 100-103 | The note says `SLANG_SLANG_LLVM_FLAVOR` is in root `CMakeLists.txt` “around line 355,” but at the reviewed commit the option begins at line 365 and the symbol itself is on line 366. | `CMakeLists.txt:365-369` contains `enum_option(` followed by `SLANG_SLANG_LLVM_FLAVOR`. | Update the citation to “around line 366” or remove the approximate line number. |
+| F-001 | major | `## Edges (intra-project only)` and `## Edge citations`, lines 80-85 and 123-125 | The wasm target's internal dependency list is incomplete. The document shows `slang-wasm` depending on `slang`, `core`, `compiler-core`, `slang-capability-defs`, `slang-capability-lookup`, and `slang-fiddle-output`, but omits the `slang-lookup-tables` edge. | `source/slang-wasm/CMakeLists.txt:12-21` lists `LINK_WITH_PRIVATE ... slang-lookup-tables` in the wasm target. | Add `slangWasm --> lookupTables` to the mermaid diagram and include `slang-lookup-tables` in the wasm edge-citation row. |
+
+## No-issues notes
+- The document's front matter is structurally valid and uses the target document's recorded source commit and digest.
+- The `source/slang-record-replay/` dashed edge is correctly described as source inclusion through `SLANG_RECORD_REPLAY_SYSTEM`, not a `LINK_WITH_*` edge.
+- The `standard-modules` note correctly reflects that the watched `source/standard-modules/CMakeLists.txt` configures a header and adds the `neural` subdirectory rather than declaring a top-level link target.

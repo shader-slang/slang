@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T13:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=0621b76c92d5c66950f6bf752610276ae5f48c99c52c396b6035b11ef340daa4
+//META: doc_section_digest=adbc9f62b2b56295371ba0ea74f7f7385925be80ae5d4b3005d64a60b8337c56
 //META: purpose=Texture2DArray.SampleGrad dispatches via OpImageSampleExplicitLod with Grad on a 2D Arrayed=1 OpTypeImage; gradients are float2 because the layer axis is integer.
 //META: intent=expansion
 //META: pipeline_stage=emit

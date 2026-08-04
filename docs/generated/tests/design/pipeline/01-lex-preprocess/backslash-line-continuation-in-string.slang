@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T12:00:00+00:00
 //META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#lexer-flags-and-special-case-rules
-//META: doc_section_digest=ab0cf5e019a8433b239b8a025cd2c3014f7a03ebec00c3c2c6d172456d9b0e3c
+//META: doc_section_digest=985233c46234213afed8132ab11d4517c81072d3e1defdce12326cae0fbf4fb0
 //META: purpose=Boundary probe of backslash line continuation: a `\<newline>` inside a string literal is folded out, so the two physical lines become one logical literal.
 //META: intent=boundary
 //META: pipeline_stage=lex

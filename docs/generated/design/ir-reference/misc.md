@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:17:31Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 50a5584b2851342292d4b982e8c4767f3127bd44d5e4d4de95333b7b3e0e7fa5
+generated_at: 2026-06-29T15:31:29Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: e27926ca78614bca20d3b57a5268d5884f642e04074ed66afbbed157eadbfdd7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -239,7 +239,7 @@ CPU-side launch opcodes produced by the host-shader / CUDA backends.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `DispatchKernel` | — | `baseFn, threadGroupSize, dispatchSize, args...` | | (synthesized) | Generic kernel-dispatch op produced by the host-side lowering; trailing variadic operands are the call arguments. |
-| `CudaKernelLaunch` | — | `baseFn, gridDim, blockDim, argsArray, cudaStream` | | (synthesized) | CUDA-specific kernel-launch op consumed by the Torch emitter [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp). |
+| `CudaKernelLaunch` | — | `kernel, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY` | | (synthesized) | CUDA-specific kernel-launch op consumed by the Torch emitter [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp). See the callout for the builder-vs-Lua operand discrepancy. |
 
 ## Notable opcodes
 
@@ -271,6 +271,17 @@ dispatch through generics rely on witness packs to keep the
 parameter list of a generic compact when several conformance witnesses
 need to travel together.
 
+### `getStringHash`
+
+`getStringHash` takes a single `stringLit: IRStringLit` operand — the
+operand list in [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+declares exactly one operand, typed `IRStringLit`. Because the operand
+must be a string-literal inst rather than an arbitrary value, the result
+is a compile-time-stable hash of that literal's bytes. This lets
+reflection and capability code key on a string by its hash without
+carrying the string bytes through to the backend, where the emitters
+fold the inst to its constant hash value.
+
 ### `IsType`
 
 The IR encoding of the user-level `is` operator on existentials and
@@ -298,12 +309,17 @@ intermediate passes treat them as opaque conversions.
 The CUDA-specific kernel-launch opcode produced by
 `IRBuilder::emitCudaKernelLaunch` in
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) when a Slang
-program targets the Torch/CUDA host path. It has exactly five operands
-— `baseFn, gridDim, blockDim, argsArray, cudaStream` — which the
-emitter maps onto a `cudaLaunchKernel` call: operand 0 is the function,
-operands 1-2 are bit-cast to `dim3` grid/block dimensions, operand 3 is
-the packed argument array, and operand 4 is the stream. The opcode is
-consumed by
+program targets the Torch/CUDA host path. The Lua declaration in
+[slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+names six operands — `kernel, gridDimX, gridDimY, gridDimZ, blockDimX,
+blockDimY` (the Operands column follows this declaration) — but the
+`emitCudaKernelLaunch` builder helper and the Torch emitter both use a
+**five**-operand encoding: operand 0 is the function, operands 1-2 are
+bit-cast to `dim3` grid/block dimensions, operand 3 is the packed
+argument array, and operand 4 is the stream. This is a source-level
+mismatch between the Lua operand names and the builder/emitter shape;
+the builder shape is the one actually constructed and consumed. The
+opcode is consumed by
 [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp);
 no IR pass introspects it.
 

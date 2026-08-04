@@ -19,7 +19,7 @@ fi
 
 # Note: this script makes no GitHub API calls — it only inspects the diff with
 # `git` and writes an artifact (pr-number.txt + comment-body.txt) for the
-# privileged `comment-ir-version-check.yml` workflow_run job to consume and post
+# privileged `check-ir-version.yml` workflow_run job to consume and post
 # (via SLANGBOT_PAT). It therefore must not require `gh` or an authenticated
 # token. Requiring `gh auth status` here used to hard-fail on fork PRs, which
 # only get a restricted GITHUB_TOKEN with no `gh` auth — exactly the PRs this

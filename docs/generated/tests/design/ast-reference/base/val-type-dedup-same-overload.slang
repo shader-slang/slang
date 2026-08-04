@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/base.md#val-nodebase
-//META: doc_section_digest=da2cf169dd5b15686dcd86869a63242dc8a98cf55184ac9bd91ffc7b49b41e55
+//META: doc_section_digest=17754b4ad55bb3bbeb3b934dd617e4a3120a865a281a81848bf3fc5ab03948d7
 //META: purpose=Vals (including Types) are deduplicated by the ASTBuilder; two textually identical type expressions denote the same Val, so an overload set keyed on the type resolves identically at each use.
 //META: intent=functional
 //META: pipeline_stage=check
@@ -13,8 +13,7 @@
 // `vector<int,3>` must denote the same Type Val and select the same
 // overload at each site. If the types were distinct values, overload
 // resolution at the second call could pick a different overload or
-// fail to find one — the test fails to print the expected `kind=3`
-// twice.
+// fail to find one — the test fails to print the expected `3` twice.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

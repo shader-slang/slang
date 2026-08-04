@@ -1,24 +1,28 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:14:52Z
+remediated_at: 2026-06-30T14:04:47Z
 target_doc: name-resolution/visibility.md
 review_report: ../../reviews/name-resolution/visibility.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-actions: { fixed: 3, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+actions:
+  fixed: 0
+  rejected_bogus: 2
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated: 0
 ---
 
 # Remediation report for name-resolution/visibility.md
 
 ## Summary
 
-All three review findings were verified against the source at `eb9403ef595a99c2ff6def1d538dbd7a792d9371` and fixed. F-001 corrected the API surface for the `minLanguageVersion` default field; F-002 added the prompt-required `using`/re-export edge case, naming the actual source-backed rejection path; F-003 corrected the diagnostic attribution for duplicated visibility modifiers. No findings were rejected, deferred, or escalated.
+Both findings were verified against the watched sources and rejected as bogus: the prose each finding quotes as the document's "current" text is not present in the target document at `source_commit` c21ead2, and the existing text already states the source-backed position the reviewer recommends. The reviewer appears to have evaluated an earlier revision. No edits were made, so `target_doc_source_commit_after` equals `_before`. The action counts (2 rejected-bogus) sum to the review's finding_count of 2.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed: `include/slang.h:5574` declares `minLanguageVersion = SLANG_LANGUAGE_VERSION_2025` inside `struct SlangGlobalSessionDesc` (line 5565); `struct SessionDesc` (line 4244) has no such field. | Renamed the cited field to `SlangGlobalSessionDesc::minLanguageVersion` in the `SlangLanguageVersion` concept bullet. |
-| F-002 | fixed | Prompt line 93 requires this edge case and the doc omitted it. Verified `visitUsingDecl` (slang-check-decl.cpp:16419) only accepts a namespace argument (`ExpectedANamespace` otherwise) and does not re-export individual members; the actual less-visible-alias rejection is `validatePublicCallableOperandVisibility`'s `FuncAliasDecl` branch (slang-check-decl.cpp:9012-9037) emitting `public-custom-derivative-uses-non-exported-import` (slang-diagnostics.lua:2652, code 31162). | Added a "Re-exporting a non-exported decl through an alias" edge-case bullet stating the absence of a `using`-specific path and citing the `FuncAliasDecl` rejection path and diagnostic. |
-| F-003 | fixed | Confirmed: `InvalidVisibilityModifierOnTypeOfDecl` fires for `private`/`internal` on a `NamespaceDeclBase` (slang-check-modifier.cpp:1998,2018), not for `public public`. Duplicate visibility modifiers are caught by the `VisibilityModifier` conflict group (slang-check-modifier.cpp:1500) and emit `DuplicateModifier` (slang-check-modifier.cpp:2306, `duplicate-modifier` code 31202). | Replaced the `public public ...` example with the namespace `private`/`internal` case and noted that repeated modifiers emit `duplicate-modifier` from the conflict-group check. |
+| F-001 | rejected-bogus | The quoted claim ("New sessions therefore reject modules whose declared version is older than 2025 by default") is absent (verified by grep for "reject" near the language-version section). Lines 72-77 already state `SlangGlobalSessionDesc::minLanguageVersion` defaults to `SLANG_LANGUAGE_VERSION_2025` and "records a preferred floor and is not consulted by the visibility-classification path in the watched sources" — the source-backed framing F-001 recommends. Consistent with `include/slang.h:5654-5655` (comment: "oldest Slang language version that any sessions will use"). The cited counter-evidence files `slang-compiler.cpp`/`slang-preprocessor.cpp` are also outside this page's `watched_paths`. | — |
+| F-002 | rejected-bogus | The quoted framing ("constructed without an explicit visibility modifier and inherit the parent's default") is absent (verified by grep). Lines 254-278 already state synthesized members are "assigned a visibility at their synthesis site rather than relying on the module default," citing `addVisibilityModifier(synthesized, Math::Min(parentVisibility, requirementVisibility))` at `source/slang/slang-check-decl.cpp` 7442-7451, 8523-8531, 8902-8910, and `addVisibilityModifier(decl, getDeclVisibility(parent))` at lines 3873-3878, 3933-3937, plus `slang-check-expr.cpp` line 817. All cited sites verified accurate against source — this is exactly the rewrite F-002 asks for. | — |

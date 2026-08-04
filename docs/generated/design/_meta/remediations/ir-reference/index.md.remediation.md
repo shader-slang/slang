@@ -1,11 +1,11 @@
 ---
 remediation_report: true
 remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:14:56Z
+remediated_at: 2026-06-30T13:59:56Z
 target_doc: ir-reference/index.md
 review_report: ../../reviews/ir-reference/index.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
 actions:
   fixed: 0
   rejected_bogus: 0
@@ -18,10 +18,12 @@ actions:
 
 ## Summary
 
-The review report recorded no findings (finding_count 0), so there was
-nothing to remediate. No edits were applied to the target document, and
-all five action counts are zero. The document is unchanged at source
-commit eb9403ef595a99c2ff6def1d538dbd7a792d9371.
+The review report (`reviewer_model: gpt-5.5`) recorded `finding_count: 0`
+with all six checklist axes passing and an empty `## Findings` queue, so
+there was nothing to remediate. No edits were applied to the target
+document, and all five action counts are zero (summing to the review's
+finding count of 0). The document is unchanged at source commit
+c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8.
 
 ## Actions
 

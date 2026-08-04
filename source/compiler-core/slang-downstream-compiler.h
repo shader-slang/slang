@@ -1,12 +1,12 @@
 #ifndef SLANG_DOWNSTREAM_COMPILER_H
 #define SLANG_DOWNSTREAM_COMPILER_H
 
-#include "../core/slang-common.h"
-#include "../core/slang-io.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-process-util.h"
-#include "../core/slang-semantic-version.h"
-#include "../core/slang-string.h"
+#include "core/slang-common.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
+#include "core/slang-process-util.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-string.h"
 #include "slang-artifact-associated.h"
 #include "slang-artifact.h"
 #include "slang-com-ptr.h"
@@ -172,7 +172,7 @@ struct DownstreamCompileOptions
             EnableFloat16 = 0x08,        ///< If set compiles with support for float16/half
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
-
+            EnableLogging = 0x40,        ///< If set compiles with support for shader logging
         };
     };
 
@@ -276,6 +276,12 @@ struct DownstreamCompileOptions
 
     /// The stage being compiled for
     SlangStage stage = SLANG_STAGE_NONE;
+
+    /// For Metal (MetalAIR) compiles, the Metal language standard to request via `-std=metalX.Y`.
+    /// Left unset (all-zero) for every other target and for Metal targets that do not opt into a
+    /// specific version; in that case the downstream Metal compile falls back to its historical
+    /// default standard (`-std=metal3.1`).
+    SemanticVersion metalLanguageVersion;
 
     /// Arguments that are specific to a particular compiler implementation.
     Slice<TerminatedCharSlice> compilerSpecificArguments;

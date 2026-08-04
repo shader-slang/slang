@@ -295,6 +295,9 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         SemanticsContext sideEffectContext = withInForLoopSideEffect();
         SemanticsExprVisitor subExprVisitor(sideEffectContext);
         stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
+
+        // A `for` loop's side-effect expression also discards its result.
+        maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
     }
     subContext.checkStmt(stmt->statement);
 
@@ -690,6 +693,89 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     }
     if (isDanglingEquality)
         getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
+
+    maybeDiagnoseDiscardedNoDiscardResult(stmt->expression);
+}
+
+void SemanticsStmtVisitor::maybeDiagnoseDiscardedNoDiscardResult(Expr* expr)
+{
+    // Peel transparent wrappers that don't change whether the result is discarded: a call
+    // wrapped in parentheses (`(t.load());`) still discards the call's result.
+    while (auto paren = as<ParenExpr>(expr))
+    {
+        expr = paren->base;
+    }
+
+    // A comma operator in a discarded context discards each of its operands, so recurse
+    // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
+    if (auto operatorExpr = as<OperatorExpr>(expr))
+    {
+        if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+        {
+            if (getText(func->name) == ",")
+            {
+                for (auto arg : operatorExpr->arguments)
+                    maybeDiagnoseDiscardedNoDiscardResult(arg);
+                return;
+            }
+        }
+    }
+
+    // A ternary `?:` and a short-circuiting `&&`/`||` both yield a chosen operand's result
+    // verbatim, so discarding the whole expression discards that operand's result. Recurse into
+    // the operands that can become the result:
+    //   - both arms of a ternary (`arguments[1]`/`arguments[2]`; the condition `arguments[0]` is
+    //     consumed to choose an arm, not passed through), and
+    //   - the right-hand operand of `&&`/`||` (`arguments[1]`; the left operand is consumed to
+    //     decide whether the right is evaluated, not passed through).
+    if (auto select = as<SelectExpr>(expr))
+    {
+        if (select->arguments.getCount() == 3)
+        {
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[1]);
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[2]);
+        }
+        return;
+    }
+    if (auto shortCircuit = as<LogicOperatorShortCircuitExpr>(expr))
+    {
+        if (shortCircuit->arguments.getCount() == 2)
+            maybeDiagnoseDiscardedNoDiscardResult(shortCircuit->arguments[1]);
+        return;
+    }
+
+    // If the discarded expression is a call to a function marked `[NoDiscard]`, report that
+    // the result is being ignored.
+    auto invokeExpr = as<InvokeExpr>(expr);
+    if (!invokeExpr)
+        return;
+
+    // `[NoDiscard]` on a `void`-returning function is already rejected at the declaration
+    // (see `NoDiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
+    // error but not fatal, so checking continues and calls to such a function still reach
+    // here; this guard suppresses an additional, nonsensical "result is discarded" error
+    // at every call site on top of the declaration error.
+    if (invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType()))
+        return;
+
+    auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return;
+
+    auto calleeDecl = funcDeclRefExpr->declRef.getDecl();
+    if (!calleeDecl)
+        return;
+
+    // Bare discarded construction is intentionally outside this diagnostic.
+    if (as<ConstructorDecl>(calleeDecl))
+        return;
+
+    if (calleeDecl->findModifier<NoDiscardAttribute>())
+    {
+        getSink()->diagnose(Diagnostics::DiscardedNoDiscardResult{
+            .name = calleeDecl->getName(),
+            .expr = invokeExpr});
+    }
 }
 
 void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)

@@ -32,8 +32,8 @@ void main(uint3 pixel_i : SV_DispatchThreadID)
         // expect error: trying to specialize RWTex, which has two arguments, with only one argument.
         RWTex<float3>::get(p.image_id);
 /*CHECK1:
-        ^^^^^ cannot specialize generic
-        ^^^^^ cannot specialize generic 'RWTex' with the provided arguments.
+        ^^^^^ wrong number of generic arguments
+        ^^^^^ generic 'RWTex' expects 2 generic argument(s) but 1 were provided
 */
 #else
         RWTex<float, 3>::get(p.image_id);

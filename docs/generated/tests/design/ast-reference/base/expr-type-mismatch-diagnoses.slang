@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/base.md#expr-syntaxnode
-//META: doc_section_digest=c12d63b7f58fbd104856d0dee2a7e19e6d3d409167fcd2db75867e9bf5b80bd5
+//META: doc_section_digest=369743522fa835d335b8cfc1d7160c48df288006a4cdb5149e41fdce6b476f7e
 //META: purpose=The checker fills in an Expr's QualType and then verifies it against the surrounding context; a mismatch is diagnosed at the expression's source location.
 //META: intent=negative
 //META: pipeline_stage=check
@@ -14,14 +14,13 @@
 // so the checker — which has already assigned a type to the string-
 // literal Expr — fails to match any overload and reports an error.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 void take(int v) {}
 void take(float v) {}
 
 void main()
 {
-    //CHECK: error
-// CHECK: E30019
     take("not-an-int-or-float");
+//CHECK:^ no overload for 'take' applicable to arguments of type (String)
 }

@@ -9,11 +9,11 @@
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names `__bwd_diff(...)` as the AST origin of the
-// reverse-mode differentiation operator. At LOWER-TO-IR, both
-// `__bwd_diff(f)` and the unprefixed alias `bwd_diff(f)` lower to
-// `LegacyBackwardDifferentiate(...)` (the modern opcode is
-// synthesized only later by the unzip pass).
+// At LOWER-TO-IR, both `__bwd_diff(f)` and the unprefixed alias
+// `bwd_diff(f)` lower to `LegacyBackwardDifferentiate(...)`. The
+// `__bwd_diff` expression form is resolved before IR lowering, so
+// the modern `BackwardDifferentiate` opcode is never emitted at this
+// stage (the unzip pass synthesizes it later).
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

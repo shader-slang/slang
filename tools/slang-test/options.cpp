@@ -1,8 +1,9 @@
 // options.cpp
 #include "options.h"
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-io.h"
+#include "core/slang-string-util.h"
+#include "slang-test-optimization-options.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,6 +87,8 @@ static bool _isSubCommand(const char* arg)
         "  -skip-api-detection            Skip API availability detection\n"
         "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
+        "  -OX                            Set the default slangc optimization level for tests,\n"
+        "                                 where X is between 0 and 3\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
@@ -373,6 +376,10 @@ static bool _isSubCommand(const char* arg)
                 optionsOut->serverCount = 1;
             }
         }
+        else if (SlangTest::isSlangTestOptimizationArg(UnownedStringSlice(arg)))
+        {
+            optionsOut->defaultOptimizationLevel = arg;
+        }
         else if (strcmp(arg, "-appveyor") == 0)
         {
             optionsOut->outputMode = TestOutputMode::AppVeyor;
@@ -575,7 +582,7 @@ static bool _isSubCommand(const char* arg)
                     fileEntryCount++;
                 }
             }
-            Options::ExpectedFailureFileInfo fileInfo;
+            Options::TestListFileInfo fileInfo;
             fileInfo.fileName = fileName;
             fileInfo.count = fileEntryCount;
             optionsOut->expectedFailureFiles.add(fileInfo);
@@ -593,6 +600,7 @@ static bool _isSubCommand(const char* arg)
             File::readAllText(fileName, text);
             List<UnownedStringSlice> lines;
             StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            int fileEntryCount = 0;
             for (auto line : lines)
             {
                 // Remove comments (everything after '#' character)
@@ -610,8 +618,13 @@ static bool _isSubCommand(const char* arg)
                     Slang::StringBuilder sb;
                     Slang::Path::simplify(trimmedLine, Slang::Path::SimplifyStyle::NoRoot, sb);
                     optionsOut->skipList.add(sb);
+                    fileEntryCount++;
                 }
             }
+            Options::TestListFileInfo fileInfo;
+            fileInfo.fileName = fileName;
+            fileInfo.count = fileEntryCount;
+            optionsOut->skipListFiles.add(fileInfo);
         }
         else if (strcmp(arg, "-test-dir") == 0)
         {
@@ -737,6 +750,15 @@ static bool _isSubCommand(const char* arg)
         for (const auto& fileInfo : optionsOut->expectedFailureFiles)
         {
             stdOut.print(" - %s : %d tests\n", fileInfo.fileName.getBuffer(), fileInfo.count);
+        }
+    }
+
+    if (optionsOut->verbosity >= VerbosityLevel::Info && optionsOut->skipListFiles.getCount() > 0)
+    {
+        stdOut.print("Skip lists:\n");
+        for (const auto& fileInfo : optionsOut->skipListFiles)
+        {
+            stdOut.print(" - %s : %d entries\n", fileInfo.fileName.getBuffer(), fileInfo.count);
         }
     }
 

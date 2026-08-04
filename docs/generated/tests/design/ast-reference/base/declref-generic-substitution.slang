@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/ast-reference/base.md#declrefbase-val
-//META: doc_section_digest=d2291ebf5df30d73489e8195c80420773e2998c18564f925e18ba7477ef08a77
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: doc_ref=docs/generated/design/ast-reference/base.md#val-nodebase
+//META: doc_section_digest=17754b4ad55bb3bbeb3b934dd617e4a3120a865a281a81848bf3fc5ab03948d7
 //META: purpose=A DeclRefBase references a declaration possibly with generic substitutions; a single generic function declaration can be referenced at two different substitutions and each reference resolves to the appropriate specialization.
 //META: intent=functional
 //META: pipeline_stage=check

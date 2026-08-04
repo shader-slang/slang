@@ -1,7 +1,7 @@
 // slang-ir-inline.cpp
 #include "slang-ir-inline.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
@@ -833,7 +833,8 @@ struct InliningPassBase
                     debugFunc->getLine(),
                     debugFunc->getCol(),
                     debugFunc->getFile(),
-                    newType);
+                    newType,
+                    debugFunc->getParentScope());
                 debugInlineInfo.calleeDebugFunc = newDebugFunc;
             }
         }

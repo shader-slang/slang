@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:28:01Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 9aaa443e91a52404f1e58afd1c1a28e07ed4703f76a534982a47c4696a8a4462
+generated_at: 2026-06-29T20:13:10Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 3bfc164e382505a7acce894d60950a1812eb10280d5da247c705758df95dccb7
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -14,12 +14,17 @@ sequence executed when Slang compiles for the Metal target family.
 The corresponding `CodeGenTarget` values are `Metal`, `MetalLib`,
 and `MetalLibAssembly`. All three share most of the Metal
 legalization pipeline and differ mainly in the downstream tool
-that consumes the emitted Metal text, but the IR pipeline is not
-byte-for-byte identical: `MetalLibAssembly` skips
-`wrapCBufferElementsForMetal` in `linkAndOptimizeIR` (its case is
-omitted from the `Metal` / `MetalLib` switch arm at
+that consumes the emitted Metal text. On the normal public
+emission path the IR pipeline is identical for all three: a
+`MetalLibAssembly` request first emits an intermediate `MetalLib`,
+and a `MetalLib` request first emits intermediate `Metal` source
+(see `_getIntermediateTarget` / `_getDefaultSourceForTarget` in
+[slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)),
+so `linkAndOptimizeIR` always runs with `CodeGenTarget::Metal` and
+the `Metal` / `MetalLib` switch arm — including
+`wrapCBufferElementsForMetal` at
 [slang-emit.cpp](../../../../source/slang/slang-emit.cpp)
-line ~1811; see the Phase B note below). The shared predicate
+line ~1811 — fires for every Metal output. The shared predicate
 inside `linkAndOptimizeIR` is
 `isMetalTarget(targetRequest)` (see
 [slang-type-layout.cpp](../../../../source/slang/slang-type-layout.cpp)
@@ -176,10 +181,11 @@ Metal-specific decisions:
     `shouldLegalizeExistentialAndResourceTypes`).
   - The unconditional invocation later in Phase C.
 - `wrapCBufferElementsForMetal` fires (line ~1815).
-  Note that `MetalLibAssembly` is **not** in the case list;
-  only `Metal` and `MetalLib` are. This is a
-  minor inconsistency — `MetalLibAssembly` goes through the
-  default arm and skips this pass.
+  The case list at line ~1815 contains only `Metal` and
+  `MetalLib`, but `MetalLibAssembly` is never seen here directly:
+  on the public emission path it is produced by disassembling an
+  intermediate `MetalLib` artifact, so `linkAndOptimizeIR` runs
+  with `CodeGenTarget::Metal` and this pass always fires.
 
 ```mermaid
 flowchart TD
@@ -482,7 +488,7 @@ flowchart TD
   lMO[legalizeMeshOutputTypes]
   bcGate{reqSet.bitcast}
   lBC[lowerBitCast]
-  lBETST_def["lowerBufferElementTypeToStorageType<br/>(Default policy)"]
+  lBETST_def["lowerBufferElementTypeToStorageType<br/>(Metal policy)"]
   sASMetal[specializeAddressSpaceForMetal]
   pFI2[performForceInlining]
   eMB[eliminateMultiLevelBreak]
@@ -550,7 +556,7 @@ flowchart TD
 | 19 | `lowerBindingQueries` | [slang-ir-lower-binding-query.cpp](../../../../source/slang/slang-ir-lower-binding-query.cpp) | `reqSet.bindingQuery` | |
 | 20 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | |
 | 21 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
-| 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always) | `loweringPolicyKind = Default` for Metal (Metal is not WGPU or Khronos). |
+| 22 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | `isMetalTarget` selects the `Metal` policy (line ~2264) | `loweringPolicyKind = Metal` (the `MetalBufferElementTypeLoweringPolicy`); lowers matrices in `device` buffers to arrays of `packed_T<N>` (`MetalPackedVectorType`) using Metal's natural scalar-aligned layout. Previously used the generic `Default` policy. |
 | 23 | `specializeAddressSpaceForMetal` | [slang-ir-specialize-address-space.cpp](../../../../source/slang/slang-ir-specialize-address-space.cpp) | `isMetalTarget` (line ~2281) | |
 | 24 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 25 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
@@ -567,7 +573,7 @@ flowchart TD
 | 36 | `applyVariableScopeCorrection` | [slang-ir-variable-scope-correction.cpp](../../../../source/slang/slang-ir-variable-scope-correction.cpp) | `target != SPIRV && target != SPIRVAssembly` | |
 | 37 | `collectCooperativeMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | `targetCaps implies cooperative_matrix or cooperative_vector` | |
 | 38 | `unexportNonEmbeddableIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `EmbedDownstreamIR` | |
-| 39 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | |
+| 39 | `collectMetadata` | [slang-ir-metadata.cpp](../../../../source/slang/slang-ir-metadata.cpp) | (always) | Now takes `targetProgram` (line ~2530). When `targetCaps` implies `descriptor_handle`, `linkAndOptimizeIR` first forces `targetProgram->getOrCreateLayout(sink)` so the layout exists before metadata collection. |
 | 40 | `checkUnsupportedInst` | [slang-ir-check-unsupported-inst.cpp](../../../../source/slang/slang-ir-check-unsupported-inst.cpp) | `!shouldPerformMinimumOptimizations()` | |
 
 Filtered out for Metal in this phase: `lowerCPUResourceTypes`
@@ -610,13 +616,23 @@ For an unlayout-decorated parameter that carries a
 through to `maybeEmitSystemSemantic`, which is what emits the
 `[[color(N)]]` attribute for the fragment parameters
 synthesized by `legalizeSubpassInputsForMetal`.
+`MetalSourceEmitter::emitSimpleTypeImpl` renders the
+`kIROp_MetalPackedVectorType` introduced by the Phase-C `Metal`
+buffer-element policy as MSL `packed_T<N>` (e.g. `packed_float3`).
 `tryEmitInstStmtImpl` rejects any surviving `kIROp_SubpassLoad`
 with `SLANG_DIAGNOSE_UNEXPECTED("SubpassLoad should have been
 lowered before Metal emission")` — by the time emit runs, every
 `SubpassLoad` should already have been replaced by the lowering
-pass above. For `MetalLib` and `MetalLibAssembly` the text is then
-handed to Apple's `metal` command-line compiler to produce a
-`.metallib` (or its disassembly).
+pass above. The bare `Metal` target stops at this text artifact.
+For `MetalLib`, the text is handed to Apple's `metal` command-line
+compiler (the `Metal` → `MetalLib` `MetalC` transition) to produce
+a `.metallib`. For `MetalLibAssembly`, Slang first produces an
+intermediate `MetalLib` and then disassembles it with
+`metal-objdump --disassemble` (the `MetalLib` → `MetalLibAssembly`
+transition); see `_emitEntryPoints` in
+[slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)
+and the disassembler in
+[slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp).
 
 ```mermaid
 flowchart TD
@@ -627,13 +643,16 @@ flowchart TD
   emitModule[sourceEmitter->emitModule]
   textOut[Metal text]
   artifact[createArtifactFromIR]
-  libGate{target is MetalLib or MetalLibAssembly}
-  metalCC["(downstream) Apple metal compiler"]
+  libGate{"target?"}
+  metalCC["(downstream) Apple metal compiler (MetalC)"]
+  objdump["(downstream) metal-objdump --disassemble"]
+  lib[".metallib"]
   done[final artifact]
 
   ent --> newEmit --> linkOpt2 --> simpForEmit --> emitModule --> textOut --> artifact --> libGate
-  libGate -->|yes| metalCC --> done
-  libGate -->|no| done
+  libGate -->|Metal| done
+  libGate -->|MetalLib| metalCC --> done
+  libGate -->|MetalLibAssembly| metalCC --> lib --> objdump --> done
 ```
 
 | # | Pass / step | File | Gate | Notes |
@@ -645,10 +664,13 @@ flowchart TD
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ overrides in `slang-emit-metal.cpp`) | (always) | Walks IR and writes Metal text; Metal prelude comes from `slang-emit-metal-prelude.cpp`. |
 | 7 | `createArtifactFromIR` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Wraps the Metal text as an `IArtifact`. |
-| 8 | `compile` (Apple `metal`) | (downstream) | `target == MetalLib || target == MetalLibAssembly` | Downstream-compile path invokes Apple's `metal` command-line compiler. |
+| 8 | `compile` (Apple `metal`, `MetalC`) | (downstream) | `target == MetalLib || target == MetalLibAssembly` | `Metal` → `MetalLib` transition; compiles the Metal text into a `.metallib`. |
+| 9 | `metal-objdump --disassemble` | [slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp) | `target == MetalLibAssembly` | `MetalLib` → `MetalLibAssembly` transition; disassembles the intermediate `.metallib`. |
 
-The bare `Metal` target stops at the text artifact; the downstream
-compiler is required only for `MetalLib*`.
+The bare `Metal` target stops at the text artifact; `MetalLib`
+adds the Apple `metal` compile step, and `MetalLibAssembly` adds a
+further `metal-objdump --disassemble` step on the intermediate
+`.metallib`.
 
 ## Conditional gates
 
@@ -712,9 +734,9 @@ Flags that exist but **never gate a Metal pass**:
 | Gate | Where evaluated | Effect |
 | --- | --- | --- |
 | `isMetalTarget(targetRequest)` | Multiple sites (lines ~1646, ~2079, ~2147, ~2281) | Selects Metal-specific arms: `lowerBufferElementTypeToStorageType` with `MetalParameterBlock` policy in Phase B, `legalizeLogicalAndOr`, `transformParamsToConstRef`, `specializeAddressSpaceForMetal`. |
-| `target == Metal / MetalLib` (line ~1815) | `wrapCBufferElementsForMetal` switch | Only `Metal` and `MetalLib` fire this pass; `MetalLibAssembly` skips. |
+| `target == Metal / MetalLib` (line ~1815) | `wrapCBufferElementsForMetal` switch | Fires for every Metal output: `MetalLibAssembly` is produced from an intermediate `MetalLib`, which compiles intermediate `Metal` source, so `linkAndOptimizeIR` always sees `CodeGenTarget::Metal`. |
 | `target == Metal / MetalLib / MetalLibAssembly` (line ~1718) | `legalizeEmptyTypes` Metal arm inside existential/resource block | Distinct from the unconditional `legalizeEmptyTypes` later. |
-| `target == MetalLib / MetalLibAssembly` | Downstream compile | Triggers Apple `metal` compiler invocation. |
+| `target == MetalLib / MetalLibAssembly` | Downstream compile | Triggers the Apple `metal` (`MetalC`) compile to `.metallib`; `MetalLibAssembly` additionally runs `metal-objdump --disassemble` on that intermediate. |
 
 ## Loops in the pipeline
 
@@ -752,6 +774,17 @@ It walks the module once and performs:
 - Entry-point varying-param legalization via
   `legalizeEntryPointVaryingParamsForMetal` (defined in
   [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp)).
+  For a struct-returning vertex shader,
+  `legalizeVertexShaderOutputParamsForMetal` builds a wrapper that
+  becomes the new entry point. Because global `uniform` params
+  hoisted in Phase A carry an `IREntryPointParamDecoration` naming
+  the *original* function, the wrapper-swap calls
+  `retargetEntryPointParamDecorations(oldFunc, newFunc)` to
+  re-point those decorations at the wrapper. Without this,
+  `introduceExplicitGlobalContext` (which binds a global uniform
+  to an entry point only when the decoration names it) silently
+  drops the uniform, so a `uniform T*` parameter would receive no
+  `[[buffer(N)]]` argument and read uninitialized memory.
 - Restructuring of `[[buffer(N)]]`, `[[texture(N)]]`,
   `[[sampler(N)]]`, and `[[stage_in]]` annotations to match
   MSL conventions.
@@ -766,19 +799,51 @@ Runs at line ~2281 of `slang-emit.cpp`. Metal has explicit
 address spaces (`device`, `constant`, `threadgroup`, `thread`)
 that must annotate IR pointers before emit. Like WGSL, Metal does
 this in `linkAndOptimizeIR`, whereas SPIR-V defers it to
-`legalizeIRForSPIRV`.
+`legalizeIRForSPIRV`. The driver is `MetalAddressSpaceAssigner` in
+[slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp);
+its `getAddressSpaceFromVarType` maps the abstract
+`AddressSpace::StorageBuffer` (carried by buffer-element pointers
+created by `lowerBufferElementTypeToStorageType`) to
+`AddressSpace::Global`, because Metal has no distinct
+storage-buffer address space — such pointers live in `device`
+memory, which the emitter renders as `device*`.
 
-### Metal-specific `lowerBufferElementTypeToStorageType`
+### Metal's three `lowerBufferElementTypeToStorageType` invocations
 
-Inside the `shouldLegalizeExistentialAndResourceTypes` block at
-line ~1646, Metal alone runs an extra
-`lowerBufferElementTypeToStorageType` invocation with
-`MetalParameterBlock` policy **before** the general
-`legalizeResourceTypes`. This pre-translates resource-typed
-fields inside parameter blocks into descriptor handles so the
-subsequent resource legalization does not disturb them. Metal is
-modeled as "bindful for constant buffers, bindless for parameter
-blocks", and this two-step lowering implements that hybrid.
+Metal buffer-element-type lowering is split across **three**
+`lowerBufferElementTypeToStorageType` calls, each with a distinct
+`BufferElementTypeLoweringPolicyKind`
+([slang-ir-lower-buffer-element-type.h](../../../../source/slang/slang-ir-lower-buffer-element-type.h)).
+They target orthogonal field kinds within the same buffer-element
+struct types and so compose without conflict:
+
+1. **`MetalParameterBlock`** — inside the
+   `shouldLegalizeExistentialAndResourceTypes` block at
+   line ~1646 (Phase B), Metal alone runs this **before** the
+   general `legalizeResourceTypes`. It pre-translates
+   resource-typed fields inside parameter blocks into descriptor
+   handles so the subsequent resource legalization does not
+   disturb them. Metal is modeled as "bindful for constant
+   buffers, bindless for parameter blocks", and this implements
+   the bindless half (`MetalParameterBlockElementTypeLoweringPolicy`).
+2. **`Metal`** — the main invocation at line ~2270 (Phase C).
+   This is the `else if (isMetalTarget(targetRequest))` arm that
+   selects `BufferElementTypeLoweringPolicyKind::Metal` (the
+   policy a non-Metal target gets as plain `Default`). The
+   `MetalBufferElementTypeLoweringPolicy` lowers matrices stored
+   in `device` buffers into arrays of *packed* vectors —
+   `IRMetalPackedVectorType`, emitted as MSL `packed_T<N>` (e.g.
+   `packed_float3`, 12 bytes / 4-byte alignment) — and inserts
+   pack/unpack conversion helpers so loads and stores convert
+   between the native `float3` working form and the tightly
+   packed storage form. This realizes Metal's natural
+   (scalar-aligned) device-buffer layout, which the generic
+   `Default` policy did not produce.
+3. **`MetalPointerLowering`** — the late Metal-only block at
+   line ~2448 (Phase C). It converts pointer fields inside buffer
+   pointee types to `UIntPtr`, because Metal rejects
+   pointer-to-pointer (`device T* device*`) in buffer element
+   types.
 
 ### `wrapCBufferElementsForMetal`
 
@@ -788,10 +853,11 @@ Metal disallows
 This pass wraps such elements into a separate `struct` so that
 the emitted MSL is valid.
 **Note**: the case list at line ~1815 includes `Metal` and
-`MetalLib` but **omits** `MetalLibAssembly`. As a practical
-matter, `MetalLibAssembly` is the disassembled form of
-`MetalLib`, so the binary path always produces the wrapper; but
-a direct request for `MetalLibAssembly` would not get the wrap.
+`MetalLib` but not `MetalLibAssembly`. This is not a gap on the
+public path: `MetalLibAssembly` is produced by disassembling an
+intermediate `MetalLib`, which is itself emitted from intermediate
+`Metal` source, so `linkAndOptimizeIR` always runs with
+`CodeGenTarget::Metal` and the wrapper is always applied.
 
 ### `legalizeEmptyTypes` runs twice
 
@@ -842,11 +908,14 @@ identical to their bindful equivalents in the emitted MSL.
 
 ### Downstream Apple `metal` compiler
 
-For `MetalLib` and `MetalLibAssembly`, Slang's downstream compile
-path invokes Apple's `metal` command-line tool to translate the
-emitted Metal text into a `.metallib`. Slang does not validate
-the Metal source it emits; all MSL grammar checking and
-optimization is delegated to the Apple tool.
+For `MetalLib`, Slang's downstream compile path invokes Apple's
+`metal` command-line tool (`PassThroughMode::MetalC`) to translate
+the emitted Metal text into a `.metallib`. For `MetalLibAssembly`,
+that `.metallib` is produced first and then disassembled with
+`metal-objdump --disassemble` (implemented in
+[slang-metal-compiler.cpp](../../../../source/compiler-core/slang-metal-compiler.cpp)).
+Slang does not validate the Metal source it emits; all MSL grammar
+checking and optimization is delegated to the Apple tool.
 
 ## See also
 

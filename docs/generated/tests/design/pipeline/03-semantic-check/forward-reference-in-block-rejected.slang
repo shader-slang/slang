@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#block-local-shadowing
-//META: doc_section_digest=450ec1a2d3a7b9d03760ed100bf50469b13bfdf9baccdbbec743532c38c062c3
+//META: doc_section_digest=7314c916313330e05e1707c8796b7d952925703a5ac277526ee862347f9889d2
 //META: purpose=Block-local shadowing hides a local from lookup until its DeclStmt is reached; using `x` before its declaration produces an undefined-identifier diagnostic.
 //META: intent=negative
 //META: pipeline_stage=check

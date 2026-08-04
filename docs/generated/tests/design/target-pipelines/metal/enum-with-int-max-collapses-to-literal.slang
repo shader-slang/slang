@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=b5d7de72928d6c13745ebd9846b3776c3303adefe35d5b4109978f02477d4265
+//META: doc_section_digest=b2ff965a1c32917299c5e0ef14afe738fe74346646f6a636a4ebd2b31af21501
 //META: purpose=Boundary: an enum whose enumerator value is signed `int` MAX (2147483647) collapses through `lowerEnumType` to the integer literal in Metal text — the enumerator name (`MaxVal`) does not survive.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

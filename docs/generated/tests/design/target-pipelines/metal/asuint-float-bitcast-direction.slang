@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=de6a2b24718ef9344624fa3cfc660b5e13c913b28787d2b06b2db1085587ae5e
+//META: doc_section_digest=355a74cccddb8eb52d0513615291bc6d928b55d9bdd73146a80f6df81b210ae4
 //META: purpose=Boundary: chained `asfloat(asuint(...))` round-trip emits nested `as_type<uint>(as_type<float>(...))` wrappers — Slang preserves both directions through Metal lowering.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

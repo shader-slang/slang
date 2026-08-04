@@ -2,8 +2,8 @@
 #ifndef SLANG_ARTIFACT_ASSOCIATED_IMPL_H
 #define SLANG_ARTIFACT_ASSOCIATED_IMPL_H
 
-#include "../core/slang-com-object.h"
-#include "../core/slang-memory-arena.h"
+#include "core/slang-com-object.h"
+#include "core/slang-memory-arena.h"
 #include "slang-artifact-associated.h"
 #include "slang-artifact-diagnostic-util.h"
 #include "slang-artifact-util.h"
@@ -220,6 +220,7 @@ enum class SyntheticResourceKnownID : uint32_t
 
 class ArtifactPostEmitMetadata : public ComBaseObject,
                                  public IArtifactPostEmitMetadata,
+                                 public slang::IBindlessResourceMetadata,
                                  public slang::ICoverageTracingMetadata,
                                  public slang::ISyntheticResourceMetadata,
                                  public slang::ICooperativeTypesMetadata
@@ -248,6 +249,9 @@ public:
         bool& outUsed) SLANG_OVERRIDE;
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
+
+    // IBindlessResourceMetadata
+    SLANG_NO_THROW virtual bool SLANG_MCALL usesBindlessResourceHeap() SLANG_OVERRIDE;
 
     // ICoverageTracingMetadata
     SLANG_NO_THROW virtual uint32_t SLANG_MCALL getCounterCount() SLANG_OVERRIDE;
@@ -299,6 +303,7 @@ public:
     List<slang::CooperativeVectorTypeUsageInfo> m_cooperativeVectorTypes;
     List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
     String m_debugBuildIdentifier;
+    bool m_usesBindlessResourceHeap = false;
 
     // Coverage tracing data, populated by `instrumentCoverage` when
     // `-trace-coverage` is active. Empty otherwise.

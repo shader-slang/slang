@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#hlsl
-//META: doc_section_digest=be31c035a4983e8352a963da8245a71e0675d21c0124091e0f8e223068f3565f
+//META: doc_section_digest=68b0765d324468831c9bc5c6f0ecd5b00ac4379b32d4be88b4cfe501a835481d
 //META: purpose=The HLSL backend emits HLSL source text with [numthreads] and register(uN) annotations for resources.
 //META: intent=functional
 //META: pipeline_stage=emit

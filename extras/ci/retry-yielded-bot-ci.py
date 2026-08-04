@@ -4,9 +4,10 @@ Rerun bot CI runs that intentionally yielded to higher-priority CI.
 
 This script is designed for a short-lived workflow_run/scheduled workflow. It
 does not wait or poll. Each invocation checks whether the CI workflow is quiet;
-if so, it reruns at most one recent bot-triggered run (pull_request or
-workflow_dispatch) whose priority gate failed in the dedicated "Stop yielded
-bot CI" marker step.
+if so, it reruns at most one recent bot-triggered workflow_dispatch run whose
+priority gate failed in the dedicated "Stop yielded bot CI" marker step. Only
+the bot's workflow_dispatch (draft-testing) runs can yield; its ready-for-review
+PRs run at full priority and never need a rerun.
 """
 
 import argparse
@@ -17,80 +18,37 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gh_api import gh_api_list
-
-DEFAULT_REPO = "shader-slang/slang"
-DEFAULT_WORKFLOW = "ci.yml"
-
-DEFAULT_BOT_LOGINS = {
-    "nv-slang-bot",
-    "nv-slang-bot[bot]",
-}
-
-ACTIVE_STATUSES = {"queued", "in_progress", "waiting", "requested", "pending"}
-
+from ci_priority_common import (
+    ACTIVE_STATUSES,
+    DEFAULT_REPO,
+    DEFAULT_WORKFLOW,
+    fetch_active_runs,
+    is_bot,
+    normalize_bot_logins,
+    parse_github_time,
+    run_actor_login,
+)
 
 GATE_JOB_NAME = "wait-for-human-priority"
 YIELDED_STEP_NAME = "Stop yielded bot CI"
 CHECK_CI_JOB_NAME = "check-ci"
 RERUNNABLE_CONCLUSIONS = {"failure", "cancelled"}
 
-# Events the priority gate can yield, and so the events we may need to rerun.
-RETRYABLE_EVENTS = ("pull_request", "workflow_dispatch")
-
-
-def normalize_bot_logins(extra_logins=None):
-    bot_logins = {login.lower() for login in DEFAULT_BOT_LOGINS}
-    bot_logins.update((login or "").lower() for login in (extra_logins or []))
-    bot_logins.discard("")
-    return bot_logins
-
-
-def is_bot(login, bot_logins):
-    if not login:
-        return False
-    login = login.lower()
-    return login.endswith("[bot]") or login in bot_logins
-
-
-def run_actor_login(run):
-    for key in ("triggering_actor", "actor"):
-        actor = run.get(key) or {}
-        login = actor.get("login")
-        if login:
-            return login
-    return ""
-
-
-def fetch_active_runs(repo, workflow):
-    runs = {}
-    for status in sorted(ACTIVE_STATUSES):
-        items, err = gh_api_list(
-            f"/repos/{repo}/actions/workflows/{workflow}/runs"
-            f"?status={status}&per_page=100",
-            "workflow_runs",
-        )
-        if err:
-            raise RuntimeError(f"Failed to list {status} runs: {err}")
-        for run in items or []:
-            runs[run["id"]] = run
-    return list(runs.values())
+# Only the bot's workflow_dispatch runs can yield (see the wait-for-human-priority
+# gate in ci.yml), so they are the only runs we ever need to rerun.
+RETRYABLE_EVENTS = ("workflow_dispatch",)
 
 
 def any_active_ci(runs):
     return [run for run in runs if run.get("status") in ACTIVE_STATUSES]
 
 
-def parse_github_time(value):
-    if not value:
-        return None
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
-
-
 def fetch_recent_completed_runs(repo, workflow):
     """Return completed runs for events the priority gate can yield.
 
-    The gate runs for bot-authored pull requests and bot-triggered
-    workflow_dispatch runs, so both event types are candidates for rerun.
+    Only the bot's workflow_dispatch (draft-testing) runs are throttled and can
+    yield, so RETRYABLE_EVENTS holds just that event. The bot's ready-for-review
+    PRs run at full priority and never yield, so they are never rerun here.
     """
     runs = {}
     for event in RETRYABLE_EVENTS:
@@ -202,8 +160,19 @@ def main():
         "--repo", default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
     )
     parser.add_argument("--workflow", default=DEFAULT_WORKFLOW)
-    parser.add_argument("--lookback-hours", type=int, default=12)
-    parser.add_argument("--max-attempts", type=int, default=3)
+    parser.add_argument("--lookback-hours", type=int, default=16)
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=30,
+        help=(
+            "Safety backstop on total reruns of one yielded run. The real "
+            "terminator is wait-for-priority.py's aging: once a run is older "
+            "than its --max-yield-hours it escalates and succeeds, so it stops "
+            "being a candidate. Keep this high enough that it never cuts a run "
+            "off before that ceiling (reruns can fire faster than hourly)."
+        ),
+    )
     parser.add_argument("--max-reruns", type=int, default=1)
     parser.add_argument(
         "--bot-login",

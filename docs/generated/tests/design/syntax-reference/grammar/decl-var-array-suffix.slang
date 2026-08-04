@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:03:32+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#variable-binding-declarations
-//META: doc_section_digest=abe6aa9c9154b51a19afb3ed32690f7bbf63d03b221691bbff010e946951f92c
+//META: doc_section_digest=b0a9ef0c603cd408e940f93b864d2b441f72e4bf4f04f967c2f2f359024af70e
 //META: purpose=`VarDeclarator` accepts an `ArraySuffix` of the form `'[' Expr ']'`.
 //META: intent=functional
 //META: pipeline_stage=parse

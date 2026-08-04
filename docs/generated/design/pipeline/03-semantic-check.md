@@ -1,9 +1,9 @@
 ---
 generated: true
 model: claude-opus-4.8
-generated_at: 2026-06-12T10:13:34Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 21f5dc83dc20f0609dbafd71552d302702cd2815178dac8580c3b871e32d8834
+generated_at: 2026-06-29T13:53:20Z
+source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+watched_paths_digest: 028fc0023a149337cabae05a0de4a7ebf1eec342be28f4f423b6a59e178c6578
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -161,6 +161,26 @@ rather than a checked predicate) is rejected during checking in
 `visitGenericTypeConstraintDecl`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)).
 
+When a generic cannot be specialized for a call, the failure reason is
+captured eagerly but reported lazily. The constraint solver records a
+`GenericArgumentInferenceFailure`
+([slang-check-impl.h](../../../../source/slang/slang-check-impl.h)) — a
+tagged union whose `Kind` distinguishes a variadic pack-count mismatch,
+a generic arity mismatch, an ordinary type/value parameter that was
+never inferred, an unsatisfied interface conformance, a general
+constraint that could not be discharged, and a unification conflict
+where two arguments forced one parameter to disagree. Each `Kind`
+stores only the offending fields (counts, the parameter `Decl*`, or the
+substituted sub/super types); the expensive message formatting is
+deferred so that speculative candidates never pay for it. The failure
+is attached to the `OverloadCandidate` and turned into a focused
+diagnostic only if overload resolution selects that failed candidate —
+see the `switch` over `candidate.genericInferenceFailure.kind` in
+`CompleteOverloadCandidate`
+([slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)).
+Before this mechanism, every specialization failure collapsed into the
+catch-all `Diagnostics::GenericArgumentInferenceFailed`.
+
 The full conceptual model (interfaces, witness tables, existential
 types) is in
 [../../../design/interfaces.md](../../../design/interfaces.md) and
@@ -171,11 +191,17 @@ this document only points at the implementation.
 
 Some declarations gain members at check time rather than at parse
 time: default conformance witnesses, generated comparison /
-construction methods, and several built-in conformances are
-synthesized in
-[slang-ast-synthesis.cpp](../../../../source/slang/slang-ast-synthesis.cpp).
-The checker calls into the synthesis machinery whenever it needs a
-member that the user did not write but the language guarantees.
+construction methods, and several built-in conformances. The
+*decisions* about what to synthesize live primarily in
+[slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+— for example `_synthesizeCtorSignature` for default constructors and
+the `trySynthesize*RequirementWitness` routines for interface
+requirements — while
+[slang-ast-synthesis.cpp](../../../../source/slang/slang-ast-synthesis.cpp)
+supplies the `ASTSynthesizer` helpers (`emitBinaryExpr`, `emitVarExpr`,
+`emitInvokeExpr`, `emitVarDeclStmt`, ...) that build the AST fragments
+those routines emit. The checker calls into this machinery whenever it
+needs a member that the user did not write but the language guarantees.
 
 ## Modifier validation
 
@@ -195,6 +221,34 @@ type compatibility with the stage, and resource binding rules.
 Failures here surface as diagnostics that reference the
 `shader("...")` attribute or the entry-point signature.
 
+Two checks worth calling out are scoped specifically to entry-point
+validation rather than the general inference walk:
+
+- **Generic-struct capability requirements.**
+  `collectGenericStructTypeUses`
+  ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
+  recurses through an entry point's signature types to find every
+  user-defined generic struct (e.g. a `Foo<int>`, including nested
+  inside `Optional<...>`, arrays, or `ConstantBuffer<...>`) and
+  validates its `[require(...)]` against the target. The general
+  capability-inference walk (`SemanticsDeclReferenceVisitor`) records a
+  type's requirements only for a `DirectDeclRef`; a generic
+  specialization is a `GenericAppDeclRef` and is skipped, so the
+  requirement would otherwise be dropped. The check deliberately lives
+  here — not in the inference walk — to avoid forcing every library
+  function that names such a type to redeclare those capabilities.
+  Builtin generic types carrying `MagicTypeModifier`/
+  `IntrinsicTypeModifier` already have more specific diagnostics and are
+  filtered out (but still recursed *through*).
+- **Unspecialized generic entry points.** A generic entry point such as
+  `void main<T>(...)` left genuinely unspecialized lowers to an
+  `IRGeneric` rather than an `IRFunc` and used to crash at link time.
+  `createSpecializedGlobalAndEntryPointsComponentType`
+  ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp))
+  now uses `Linkage::isSpecialized` together with the presence of
+  specialization-argument strings to decide, and emits the diagnostic
+  only for the truly-unspecialized case.
+
 ## Failure modes
 
 All semantic-checking errors flow through the `DiagnosticSink`
@@ -206,8 +260,36 @@ to name the offending source construct: when `ExpectATypeRepr`
 ([slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp))
 finds an expression that does not denote a type, it builds the
 `Diagnostics::ExpectedAType` message from the expression's actual type
-and, when available, the referenced name. The diagnostic
-infrastructure is described in
+and, when available, the referenced name.
+
+Several diagnostics in this stage go beyond naming the construct and
+point the user at the likely fix:
+
+- **Per-candidate argument mismatch.** When a call matches no overload,
+  the diagnostic now lists each candidate signature *and* the specific
+  argument that rejected it. `slang-check-overload.cpp` records the
+  offending argument index and the expected/actual types on the
+  candidate, then emits a
+  `Diagnostics::OverloadCandidateArgumentTypeMismatch` note per
+  candidate. Candidates are deduplicated by their rendered signature
+  string (not by `Decl*`, which would wrongly collapse distinct
+  specializations such as `foo<float>` and `foo<int>`).
+- **"Did you mean ...?" on undefined identifiers.** When a name fails to
+  resolve, `slang-check-expr.cpp` walks the in-scope candidates and, via
+  `StringUtil::calcLevenshteinDistanceCaseInsensitive`, attaches a
+  conservative similar-name suggestion to the existing
+  `Diagnostics::UndefinedIdentifier` rather than emitting a detached
+  note. The allowed edit distance scales with identifier length and
+  core-module builtins are excluded to keep the suggestion from being
+  noisy.
+- **Discarded `[NoDiscard]` results.** `maybeDiagnoseDiscardedNoDiscardResult`
+  ([slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp))
+  fires when the result of a call to a `[NoDiscard]`-marked function is
+  thrown away (e.g. as a bare expression statement), recursing through
+  comma, ternary-select, and short-circuit forms to find the discarded
+  sub-expression.
+
+The diagnostic infrastructure is described in
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).
 
 When the checker completes, every `Decl` in the translation unit is
