@@ -13982,9 +13982,9 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     // modifiers `in`/`out`/`inout` are not applicable to it. Reject them here at the producer
     // rather than letting lowering silently reinterpret the shape: an `in groupshared` parameter,
     // for instance, would otherwise revert to a per-thread by-value copy -- exactly the #10641
-    // defect. Mutability is instead spelled with `__constref` (read-only) vs the bare read-write
-    // default. `InOutModifier` derives from `OutModifier`, so it is checked first to report the
-    // most specific keyword.
+    // defect. Mutability is instead spelled with `__constref` or `const` (read-only) vs the bare
+    // read-write default. `InOutModifier` derives from `OutModifier`, so it is checked first to
+    // report the most specific keyword.
     if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
         Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
@@ -13995,6 +13995,16 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         if (directionModifier)
             getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
                 .modifier = directionModifier});
+
+        // `getExplicitlyDeclaredParamPassingMode` never inspects `ConstModifier`, so without this
+        // a `const groupshared` parameter would reach the read-write default and lower to the same
+        // `BorrowInOutParam` as a bare one -- its read-only-ness staying in the AST only. Give it
+        // the `BorrowModifier` that `__constref` already carries so both yield `BorrowInParam`.
+        if (paramDecl->hasModifier<ConstModifier>() && !paramDecl->hasModifier<BorrowModifier>() &&
+            !paramDecl->hasModifier<RefModifier>())
+        {
+            addModifier(paramDecl, this->getASTBuilder()->create<BorrowModifier>());
+        }
     }
 
     // Only texture types are allowed to have memory qualifiers on parameters
