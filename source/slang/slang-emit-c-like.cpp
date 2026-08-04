@@ -27,7 +27,6 @@
 #include "slang-visitor.h"
 #include "slang/slang-ir.h"
 
-#include <assert.h>
 
 namespace Slang
 {

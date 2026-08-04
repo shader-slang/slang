@@ -513,7 +513,7 @@ void emitRaw(FILE* stream, char const* begin, char const* end)
             }
             else
             {
-                assert(false);
+                SLANG_ASSERT_FAILURE("non-printable character in string literal");
             }
         }
     }
