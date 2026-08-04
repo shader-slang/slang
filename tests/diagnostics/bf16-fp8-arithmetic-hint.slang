@@ -46,10 +46,10 @@ void computeMain()
     //CHECK: E40021
     outBufBF16Mat[0] = ma + mb;
 
-    // Mixed-operand sanity check: the explicit fp32 round-trip resolves cleanly,
-    // so no further hint is emitted. CHECK-NOT asserts that absence explicitly
-    // (from the last hint above through end of output), locking in that the hint
-    // does not fire for supported float arithmetic.
+    // Negative control: the explicit fp32 round-trip converts a to float first, so
+    // both operands are plain float — the expression resolves cleanly and emits no
+    // hint. CHECK-NOT asserts that absence (from the last hint above through end of
+    // output), locking in that the hint does not fire for supported float arithmetic.
     //CHECK-NOT: E40021
     outBufFloat[0] = float(a) + 1.0f;
 }
