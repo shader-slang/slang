@@ -8,6 +8,7 @@
 
 RWStructuredBuffer<BFloat16>               outBufBF16;
 RWStructuredBuffer<vector<BFloat16, 4>>    outBufBF16Vec;
+RWStructuredBuffer<matrix<BFloat16, 2, 2>> outBufBF16Mat;
 RWStructuredBuffer<FloatE4M3>              outBufE4M3;
 RWStructuredBuffer<FloatE5M2>              outBufE5M2;
 RWStructuredBuffer<float>                  outBufFloat;
@@ -37,8 +38,18 @@ void computeMain()
     //CHECK: E40021
     outBufE5M2[0] = e - f;
 
-    // Mixed-operand sanity check: the explicit fp32 round-trip resolves cleanly
-    // (no overload failure, no E40021 hint expected). The earlier hints above
-    // are all that should appear in the output.
+    // Matrices of storage-only floats hit the same overload failure — the hint's
+    // helper inspects the matrix element type — so component-wise arithmetic on
+    // matrix<BFloat16,...> must also produce the hint.
+    matrix<BFloat16, 2, 2> ma = matrix<BFloat16, 2, 2>(BFloat16(1.0));
+    matrix<BFloat16, 2, 2> mb = matrix<BFloat16, 2, 2>(BFloat16(2.0));
+    //CHECK: E40021
+    outBufBF16Mat[0] = ma + mb;
+
+    // Mixed-operand sanity check: the explicit fp32 round-trip resolves cleanly,
+    // so no further hint is emitted. CHECK-NOT asserts that absence explicitly
+    // (from the last hint above through end of output), locking in that the hint
+    // does not fire for supported float arithmetic.
+    //CHECK-NOT: E40021
     outBufFloat[0] = float(a) + 1.0f;
 }
