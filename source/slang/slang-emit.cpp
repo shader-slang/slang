@@ -611,9 +611,8 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetValueFromTaggedUnion:
     case kIROp_CastInterfaceToTaggedUnionPtr:
         result.taggedUnion = true;
-        // `lowerTaggedUnionTypes` runs after the final scan and synthesizes
-        // `UntaggedUnionType`, `GetTagOfElementInSet` and `SetTagType` insts, so a tagged-union
-        // opcode has to conservatively request the three passes that consume them.
+        // `lowerTaggedUnionTypes` runs after the last scan, so the insts it synthesizes are
+        // invisible to that scan and the three passes consuming them must be requested here.
         result.untaggedUnion = true;
         result.tagOps = true;
         result.tagType = true;
@@ -621,8 +620,8 @@ void calcRequiredLoweringPassSet(
     case kIROp_AssumeAddress:
         result.assumeAddress = true;
         break;
-    // `NoneTypeElement` is here because `lowerUntaggedUnionTypes` also replaces it with `void`,
-    // and it can occur without any untagged union.
+    // `lowerUntaggedUnionTypes` also replaces `NoneTypeElement` with `void`, so gating on
+    // `UntaggedUnionType` alone would be narrower than the work the pass does.
     case kIROp_UntaggedUnionType:
     case kIROp_NoneTypeElement:
         result.untaggedUnion = true;
@@ -632,6 +631,9 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetTagForSubSet:
     case kIROp_GetTagForMappedSet:
         result.tagOps = true;
+        // Every tag op is typed `SetTagType`, so request `tagType` here rather than relying on the
+        // scan reaching that type instruction separately.
+        result.tagType = true;
         break;
     case kIROp_SetTagType:
         result.tagType = true;
@@ -1059,7 +1061,7 @@ Result linkAndOptimizeIR(
 
     // Scan the IR module and determine which lowering/legalization passes are needed.
     // This has to run before `validateAndRemoveAssumeAddress` so the scan still sees the
-    // `AssumeAddress` insts that pass removes.
+    // `AssumeAddress` insts that pass removes; scanning earlier only ever adds flags.
     RequiredLoweringPassSet& requiredLoweringPassSet = codeGenContext->getRequiredLoweringPassSet();
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
@@ -1725,9 +1727,8 @@ Result linkAndOptimizeIR(
             requiredLoweringPassSet.reinterpret = true;
     }
 
-    // The three gates below are each set by their own opcode family, and additionally by any
-    // tagged-union opcode above, since `lowerTaggedUnionTypes` synthesizes members of those
-    // families after the last scan. `lowerSequentialIDTagCasts` stays unconditional.
+    // `lowerTagInsts` has to run before `lowerTagTypes`: the tag ops are typed `SetTagType`, so
+    // lowering those types first would leave the op pass reading already-rewritten types.
     if (requiredLoweringPassSet.untaggedUnion)
         SLANG_PASS(lowerUntaggedUnionTypes, targetProgram, sink);
 
