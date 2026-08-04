@@ -15580,17 +15580,21 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                     continue;
 
                 IRInst* includerDebugSource = nullptr;
+                IRInst* includedDebugSource = nullptr;
                 IRDebugCompilationUnit* compilationUnit = nullptr;
                 if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
                         includer,
                         includerDebugSource) &&
+                    context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
+                        source,
+                        includedDebugSource) &&
                     context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
                         as<IRDebugSource>(includerDebugSource),
                         compilationUnit))
                 {
-                    auto debugSource = as<IRDebugSource>(
-                        context->shared->mapSourceFileToDebugSourceInst.getValue(source));
-                    context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
+                    context->shared
+                        ->mapDebugSourceToCompilationUnit[as<IRDebugSource>(includedDebugSource)] =
+                        compilationUnit;
                 }
             }
         }
