@@ -173,7 +173,10 @@ produce a document with the following sections, in order:
    the symptom, the rule that handles it, and the diagnostic (or
    silent behavior) the compiler produces. Where relevant, cite the
    `Diagnostics::*` identifier from
-   [../../../../source/slang/slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
+   [../../../../source/slang/slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua).
+   Individual diagnostics are declared in that Lua file; `slang-diagnostics.h`
+   only describes the delivery interface, so citing the header for a specific
+   diagnostic points the reader at the wrong place.
 6. `## See also` — bullet list linking peer name-resolution pages,
    the relevant `ast-reference/` page(s), the relevant
    `pipeline/` page(s), and the glossary terms most directly relevant
@@ -231,10 +234,10 @@ produce a document with the following sections, in order:
    | Column | Content |
    | --- | --- |
    | Opcode | Backtick-wrapped Lua entry name; this is also the `kIROp_<name>` enum tag. |
-   | C++ wrapper | `IRFoo` struct name (from `struct_name` or implicit). Use an em-dash (`—`) when no wrapper exists. |
-   | Operands | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. |
+   | C++ wrapper | The `IRFoo` struct name, written **with** the `IR` prefix (`IRNameHintDecoration`, not `NameHintDecoration`). Do **not** use an em-dash here: no opcode is wrapper-less, so an em-dash column carries no information. One page in a past round had an em-dash in all 64 rows. Every opcode ends up with a wrapper, but fiddle does not generate all of them — `getAllOtherInstStructsData()` in [../../../../source/slang/slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (near line 152) opens with `if not Slang["IR" .. struct_name] then`, so it *skips* any opcode whose struct is already hand-written in `slang-ir-insts.h` and emits a struct only for the remainder. Mark which are hand-written (a footnote marker such as `‡` works) and state the count in the prose. |
+   | Operands | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. A Lua entry that declares `min_operands = N` but gives **no** operand names is common; write `(N unnamed)` for it — do not invent names, and do not fall back to `(variadic)`, which means something different. Where the C++ accessor in `slang-ir-insts.h` reveals what an unnamed operand actually is, you may name it and mark the cell with `†`, explaining the marker in a legend; that is strictly more useful than `(N unnamed)` and is allowed. Pages previously invented `(variadic, min=N)` and other spellings for this case, which produced avoidable review findings. |
    | Flags | One-letter codes joined without separators: `H` hoistable, `P` parent, `G` global. Blank when none apply. |
-   | AST origin | The AST class (`VarDecl`, `BinaryExpr` (`+`), ...) whose `visit*` in `slang-lower-to-ir.cpp` produces this opcode, or `(synthesized)` for IR-pass-introduced opcodes, or `—` for opcodes with no direct AST source (e.g. autodiff intermediates). |
+   | AST origin | **Name the actual producer.** For an opcode lowered from the AST, that is the AST class plus the `visit*` in `slang-lower-to-ir.cpp` that produces it (`VarDecl`, `BinaryExpr` (`+`), ...). For an opcode introduced by a pass, name the pass or function (e.g. `lowerTypeLayout`, the forward-mode autodiff pass, the PyTorch binding pass). For an opcode that **nothing in `source/` constructs**, write **no producer at HEAD** and say so in the summary. The old catch-alls `(synthesized)` and a bare `—` are retired: they hid real distinctions and made unproduced opcodes indistinguishable from pass-produced ones. Verify a producer exists before naming one — an intrinsic-declared opcode (`__intrinsic_op`) has no `visit*` at all. |
    | Summary | One short clause; no markup beyond inline code. |
 
 5. `## Notable opcodes` — short prose callouts (2-5 sentences each)
@@ -391,13 +394,19 @@ order:
 4. `## Shared shape` — references the **Target-pipeline page
    contract** and explains the four-phase decomposition once so
    readers do not have to re-read it on every page. Identifies
-   `linkAndOptimizeIR` (`slang-emit.cpp` line ~892) as the shared
-   orchestrator.
+   `linkAndOptimizeIR` (`slang-emit.cpp`) as the shared orchestrator.
+   Re-derive its line number rather than copying one from this file.
 5. `## Cross-target comparison` — a single table summarizing the
-   five targets, columns: **Target**, **CodeGenTarget enum values**,
+   five targets, columns: **Target**, **CodeGenTarget enum values**
+   (the enum is declared in `slang-target.h`, not `slang-compiler.h`),
    **Phase C entry**, **Phase D emitter**, **Downstream tools**,
-   **Loops** (Y/N + a short note such as
-   `simplifyIRForSpirvLegalization (8x16)`).
+   **Loops** (Y/N + a short note).
+   Two traps in this table, both of which produced wrong pages before:
+   SPIR-V's `legalizeIRForSPIRV` runs inside the emit step and belongs
+   to **Phase D**, not Phase C; and `simplifyIRForSpirvLegalization`
+   declares `kMaxIterations`/`kMaxFuncIterations` bounds whose counters
+   are never incremented, so describe it as running to convergence with
+   a nominal, unenforced bound rather than as "8 x 16".
 6. `## Filtering rules` — short paragraph reminding the reader that
    each target page filters out switch arms gated on a sibling
    target; a glance at one page should not be mistaken for the
@@ -419,7 +428,8 @@ The page `docs/generated/design/pipeline/04b-pre-link-passes.md`
 documents the ordered, per-translation-unit IR pass sequence that
 runs inside `generateIRForTranslationUnit`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line ~14386) **before** the module IR is cached on the
+line 15386 at the time of writing -- re-derive it, this citation has
+drifted by ~1000 lines before) **before** the module IR is cached on the
 `Module` and pulled into `linkAndOptimizeIR` by `linkIR`. The
 shape mirrors the **Target-pipeline page contract** above with
 adjustments: no downstream tools, no per-target dispatch, no
@@ -529,3 +539,28 @@ Before considering the document done, verify:
 - [ ] No speculative claims about code that does not exist.
 - [ ] Cross-references to dependency docs use relative paths.
 - [ ] No emojis, no editorial commentary, no copied prose.
+- [ ] **Identifier sweep run.** Extract every backticked identifier and
+      bracketed attribute from the page and grep each one against `source/`.
+      Lint validates markdown link *targets* but never checks identifiers or
+      file paths named in prose, so a fabricated symbol survives it silently.
+      One page in a past round asserted `[OptixSbt]`, `[AutoBindEntry]`,
+      `coverageBufferUniformOffset`, `coverageBufferUniformSize`, and a
+      capability `optix_ray_tracing_pipeline` — none of which existed anywhere
+      in the tree. Two careful human-style reads missed all five; one scripted
+      sweep found them.
+- [ ] **File-name sweep run**, as a second pass. A tokenizing identifier sweep
+      splits on `-` and `.`, so `slang-ir-lower-untyped-resource-handle.cpp`
+      decomposes into fragments that each exist while the file does not.
+      Extract whole `*.{h,cpp,lua,capdef,slang}` names from links *and* prose
+      and confirm each resolves. Real examples of non-existent files that
+      reached published pages: `slang-ir-autodiff-transcribe.cpp` (the
+      forward-mode code is in `slang-ir-autodiff-fwd.cpp`) and
+      `slang-ir-lower-untyped-resource-handle.cpp` (the pass lives in
+      `slang-ir-lower-dynamic-resource-heap.cpp`).
+- [ ] Every line-number citation re-derived with `rg -n` in this pass, not
+      carried forward. Drift is not uniform down a file: in one round
+      `slang-lower-to-ir.cpp` moved `+324` in one region and `+565` in another.
+- [ ] For an aggregator/index page whose `watched_paths` glob matches its own
+      directory, the front-matter `watched_paths_digest` is a moving target and
+      cannot be made to match. Leave it alone; `mark-fresh` records the
+      authoritative value in `freshness.json`.
