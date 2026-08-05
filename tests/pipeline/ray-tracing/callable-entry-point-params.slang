@@ -23,6 +23,8 @@ struct Payload
     int value;
 };
 
+RWStructuredBuffer<uint> outputBuffer;
+
 // Declare the inout parameter case as a callable shader in the source.
 [shader("callable")]
 void callableInOut(inout Payload payload)
@@ -46,7 +48,9 @@ float callableReturn()
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{}
+{
+    outputBuffer[0] = dispatchThreadID.x;
+}
 
 // SPIRV_INOUT: OpEntryPoint Callable{{NV|KHR}}
 // SPIRV_INOUT-DAG: OpTypePointer IncomingCallableData{{NV|KHR}}
@@ -69,3 +73,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CUDA_MIXED-LABEL: extern "C" __device__ void __direct_callable__callableInOut(
 // CUDA_MIXED-SAME: Payload_0 * payload_0)
 // CUDA_MIXED-LABEL: extern "C" __global__ void computeMain()
+// CUDA_MIXED: = (blockIdx * blockDim + threadIdx).x;
