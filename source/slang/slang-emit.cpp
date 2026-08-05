@@ -3428,8 +3428,16 @@ static SlangResult createArtifactFromIR(
 
         if (needsValidation)
         {
-            if (SLANG_FAILED(
-                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
+            const SlangResult validationResult =
+                compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+
+            if (validationResult == SLANG_E_NOT_AVAILABLE)
+            {
+                // The validator never ran, so disassembling here would wrongly imply the SPIR-V was
+                // found invalid.
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationUnavailable{});
+            }
+            else if (SLANG_FAILED(validationResult))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
