@@ -418,9 +418,14 @@ private:
         auto elementStride = Int64(_read<FossilUInt>(layoutOffset + kContainerStrideOffset));
         SLANG_SERIALIZE_FOSSIL_VALIDATE(elementStride > 0);
 
-        // Both operands are 32-bit values widened to `Int64`, so the extent of the
-        // element array is computed without overflow before being checked.
+        // The count and the stride are both 32-bit values taken from the blob, so
+        // their product does not fit in `Int64` in the worst case: (2^32-1)^2 is
+        // larger than `INT64_MAX`. Forming it first would be signed overflow, and
+        // the wrapped result is negative, which would make the range check below
+        // pass for an extent that does not fit. So the comparison is done by
+        // division, and only then is the product formed, now known to be in range.
         //
+        SLANG_SERIALIZE_FOSSIL_VALIDATE(elementCount <= _size / elementStride);
         _requireRange(objOffset, elementCount * elementStride);
 
         auto elementLayoutOffset = _getElementLayoutOffset(layoutOffset);
