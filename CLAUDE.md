@@ -80,7 +80,9 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 
 ### Formatting
 
-**Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
+**Run `./extras/formatting.sh --modified` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
+
+`--modified` covers tracked changes only. Format an untracked file by naming it: `./extras/formatting.sh -- path/to/new-file`. Run with no arguments, the script prints its help text and exits 0 without formatting anything.
 
 ### Suppressing Unused Variable Warnings
 
@@ -243,7 +245,7 @@ change.)
 
 ### PR Workflow
 
-1. **Format your code**: Run `./extras/formatting.sh` before committing
+1. **Format your code**: Run `./extras/formatting.sh --modified` before committing
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Write the PR description in this required five-part format:**
