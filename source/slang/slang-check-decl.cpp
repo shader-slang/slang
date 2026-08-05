@@ -17063,11 +17063,16 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     for (auto moduleScope = moduleDecl->ownedScope; moduleScope;
          moduleScope = moduleScope->nextSibling)
     {
-        if (moduleScope->containerDecl != moduleDecl &&
-            moduleScope->containerDecl->parentDecl != moduleDecl)
+        // Re-export only this module's own scope and its own `__include`d files;
+        // drop `using`-spliced namespace siblings (a primary-file `using namespace
+        // Foo;` must not leak through `import`) and any foreign module's files that a
+        // plain transitive `import` put on the chain. See
+        // `isOwnModuleOrIncludedFileScope` / shader-slang/slang#11443.
+        auto containerDecl = moduleScope->containerDecl;
+        if (!isOwnModuleOrIncludedFileScope(containerDecl, moduleDecl))
             continue;
 
-        addSiblingScopeForContainerDecl(getASTBuilder(), scope, moduleScope->containerDecl);
+        addSiblingScopeForContainerDecl(getASTBuilder(), scope, containerDecl);
     }
 
     // Also import any modules from nested `import` declarations
@@ -21344,13 +21349,24 @@ DeclVisibility getDeclVisibility(Decl* decl)
         else if (as<PrivateModifier>(modifier))
             return DeclVisibility::Private;
     }
+    // In Slang 2026+, an unmodified member of an aggregate inherits the aggregate's effective
+    // visibility, mirroring the interface-member rule below. Keyed off effective visibility so it
+    // composes transitively through nested aggregates.
+    auto parentModule = getModuleDecl(decl);
+    if (parentModule && parentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+    {
+        if (auto parentAggTypeDecl = getParentAggTypeDecl(decl))
+        {
+            return getDeclVisibility(parentAggTypeDecl);
+        }
+    }
     // Interface members will always have the same visibility as the interface itself.
     if (auto interfaceDecl = findParentInterfaceDecl(decl))
     {
         return getDeclVisibility(interfaceDecl);
     }
     auto defaultVis = DeclVisibility::Default;
-    if (auto parentModule = getModuleDecl(decl))
+    if (parentModule)
     {
         defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
                          ? DeclVisibility::Public

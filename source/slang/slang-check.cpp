@@ -5,7 +5,7 @@
 // checking that don't cleanly land in one of the more
 // specialized `slang-check-*` files.
 
-#include "../core/slang-type-text-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-check-impl.h"
 #include "slang-rich-diagnostics.h"
 

@@ -1,8 +1,6 @@
-// Unit tests for the committer-signal ranking (the JS port of pr_signal.py),
-// run against the copy INLINED in pr-board-sync.yml (the single source of
-// truth), extracted at run time. No deps; run with:
-//   node .github/scripts/pr-signal.test.js
-// Mirrors the pure-helper and cache tests in the slang-skills test_pr_sweep.py.
+// Unit tests for committer-signal ranking, run against the copy INLINED in
+// pr-board-sync.yml (the single source of truth), extracted at run time.
+// No deps; run with: node .github/scripts/pr-signal.test.js
 "use strict";
 
 const assert = require("node:assert");

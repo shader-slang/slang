@@ -1,11 +1,11 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
-#include "../core/slang-char-encode.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-hash.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-random-generator.h"
+#include "core/slang-char-encode.h"
+#include "core/slang-char-util.h"
+#include "core/slang-hash.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-random-generator.h"
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
@@ -518,6 +518,12 @@ struct SharedIRGenContext
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
+
+    // Lets a DebugFunction be scoped to the compilation unit of its own source file. Only
+    // non-included sources have a compilation unit; a function defined in an #include'd or
+    // #line-remapped source has no entry here and is left with a null parent scope (see the
+    // creation site). Populated in generateIRForTranslationUnit before any function is lowered.
+    Dictionary<IRDebugSource*, IRDebugCompilationUnit*> mapDebugSourceToCompilationUnit;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
@@ -9109,6 +9115,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Has anything been emitted to the current "active" case block?
         bool anythingEmittedToCurrentCaseBlock = false;
 
+        bool warnedUnreachableBeforeFirstCase = false;
+
         // The collected (value, label) pairs for
         // all the `case` statements.
         List<IRInst*> cases;
@@ -9304,14 +9312,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // emitted to the current case block.
             if (!info->currentCaseLabel)
             {
-                // It possible in full C/C++ to have statements
-                // before the first `case`. Usually these are
-                // unreachable, unless they start with a label.
-                //
-                // We'll ignore them here, figuring they are
-                // dead. If we ever add `LabelStmt` then we'd
-                // need to emit these statements to a dummy
-                // block just in case.
+                // Control can enter a switch body only through the dispatch to a
+                // case/default label (Slang has no `goto` into the body), so
+                // statements before the first label are unreachable. Warn once
+                // for the leading run.
+                if (!info->warnedUnreachableBeforeFirstCase)
+                {
+                    context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = stmt});
+                    info->warnedUnreachableBeforeFirstCase = true;
+                }
             }
             else
             {
@@ -9665,13 +9674,25 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
     auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
     String sourcePath = pathInfo.getName();
 
-    // If the source file path corresponds to an existing SourceFile in the source manager, use it.
+    // getName() and getMostUniqueIdentity() can spell the same file differently. For a PathInfo of
+    // Type::Normal, getName() returns the found path, which may be relative (e.g. "m.slang" for a
+    // module reached by a relative import), while getMostUniqueIdentity() returns the unique
+    // identity, which for the default OS file system is the canonical absolute path (e.g.
+    // "/home/.../m.slang"). For FoundPath/FromString paths neither has a separate identity, so both
+    // return the same found path.
+    //
+    // We spell the emitted DebugSource filename with getMostUniqueIdentity() to match the
+    // per-source-file loop in generateIRForTranslationUnit, which also emits it via
+    // getMostUniqueIdentity(). DebugSource is hoistable, so an imported module's record only
+    // collapses onto the entry-point module's at link time when the filenames match byte-for-byte;
+    // the getName()-vs-identity mismatch previously left a duplicate, orphaned record (see
+    // shader-slang/slang#11982). The found-path lookup below still keys on the original
+    // getName()-based path; only sourcePath — the fallback-lookup key, the dedup-map key, and the
+    // emitted filename — is switched to the canonical identity.
     auto source = sourceManager->findSourceFileByPathRecursively(sourcePath);
+    sourcePath = pathInfo.getMostUniqueIdentity();
     if (!source)
-    {
-        sourcePath = pathInfo.getMostUniqueIdentity();
         source = sourceManager->findSourceFile(sourcePath);
-    }
     if (source &&
         context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
     {
@@ -9688,21 +9709,37 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
         return debugSourceInst;
     }
 
-    // If the source manager does not have an entry for the corresponding file name, make sure we
-    // still emit a source file entry in the spirv module.
+    // Emit the DebugSource. All three operands (filename, content, isIncludedFile) must match the
+    // per-source-file loop in generateIRForTranslationUnit so the hoistable records collapse at
+    // link time. Prefer the SourceFile*'s own (already BOM-decoded) content when it has any;
+    // otherwise fall back to reading it off disk. The fallback matters for separate compilation: a
+    // SourceFile deserialized from a precompiled .slang-module is found here but has no embedded
+    // content blob (hasContent() is false), so without the fallback we would drop the DebugSource
+    // source-text operand (see shader-slang/slang#11982's review) — loading from foundPath restores
+    // it, matching the pre-change behavior. A bare-path fallback (no SourceFile*) is never an
+    // #include'd file, so its isIncludedFile stays false.
     ComPtr<ISlangBlob> contentBlob;
     UnownedStringSlice content;
+    bool isIncludedFile = false;
 
-    // Only embed source content for Standard and Maximal debug level
-    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
+    // Embed source content for Standard/Maximal, or at any level when
+    // `-debug-info-include-source` is set. Must match the per-source-file loop in
+    // generateIRForTranslationUnit so a source reached only through this producer still carries
+    // content at `-g1` (otherwise the SPIR-V `OpSource` for it would have an empty Source operand).
+    bool embedContent = context->debugInfoLevel >= DebugInfoLevel::Standard ||
+                        context->getLinkage()->m_optionSet.shouldIncludeSourceInDebugInfo();
+    if (source)
+    {
+        if (embedContent)
+            content = source->getContent();
+        isIncludedFile = source->isIncludedFile();
+    }
+    if (embedContent && (!source || !source->hasContent()) && pathInfo.hasFileFoundPath())
     {
         ComPtr<ISlangBlob> rawBlob;
-        if (pathInfo.hasFileFoundPath())
-        {
-            context->getLinkage()->getFileSystemExt()->loadFile(
-                pathInfo.foundPath.getBuffer(),
-                rawBlob.writeRef());
-        }
+        context->getLinkage()->getFileSystemExt()->loadFile(
+            pathInfo.foundPath.getBuffer(),
+            rawBlob.writeRef());
         if (rawBlob)
         {
             // The raw file bytes may carry a UTF-8 BOM (or another encoding). Decode them the same
@@ -9718,7 +9755,8 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    debugSourceInst = builder.emitDebugSource(sourcePath.getUnownedSlice(), content, false);
+    debugSourceInst =
+        builder.emitDebugSource(sourcePath.getUnownedSlice(), content, isIncludedFile);
     context->shared->mapSourcePathToDebugSourceInst[sourcePath] = debugSourceInst;
     if (source)
     {
@@ -14652,12 +14690,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
+                // Parent the function to the compilation unit of its own source file. Only
+                // non-included files have a compilation unit, so this is null for a function whose
+                // source is an #include'd/__include'd file or a #line-remapped source, and for
+                // every function at Minimal debug level (where no compilation unit is built at
+                // all).
+                IRDebugCompilationUnit* parentScope = nullptr;
+                if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+                {
+                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                        debugSource,
+                        parentScope);
+                }
+
                 auto debugFuncCallee = getBuilder()->emitDebugFunction(
                     nameOperand,
                     locationDecor->getLine(),
                     locationDecor->getCol(),
                     locationDecor->getSource(),
-                    debugType);
+                    debugType,
+                    parentScope);
 
                 // Add a decoration to link the function to its debug function
                 getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
@@ -15399,16 +15451,21 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // This is needed for Minimal level and above (for line number correlation)
     if (context->debugInfoLevel != DebugInfoLevel::None)
     {
+        // Minimal normally keeps only the path, but `-debug-info-include-source` carries the source
+        // text into every `IRDebugSource` so the SPIR-V emitter can embed it via core `OpSource`.
+        const bool includeSource = linkage->m_optionSet.shouldIncludeSourceInDebugInfo();
+
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
             // For Standard and Maximal level, include the source content, otherwise just the
             // path
-            auto debugSource = builder->emitDebugSource(
+            auto debugSource = cast<IRDebugSource>(builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
-                                                                      : UnownedStringSlice(),
-                source->isIncludedFile());
+                (context->debugInfoLevel >= DebugInfoLevel::Standard || includeSource)
+                    ? source->getContent()
+                    : UnownedStringSlice(),
+                source->isIncludedFile()));
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
             // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
@@ -15417,7 +15474,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // SPIR-V emission.
             if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
             {
-                builder->emitDebugCompilationUnit(debugSource);
+                auto compilationUnit =
+                    cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));
+                context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
             }
         }
     }
@@ -15988,6 +16047,19 @@ static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, Type
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
+    }
+
+    // Preserve the byte alignment the front-end computed (the `uniformAlignment`
+    // field, whose historical name uses "uniform" to mean bytes). We record it
+    // for any layout that occupies the byte unit at all; the builder decides
+    // whether an attribute is actually emitted (it drops the default alignment of
+    // 1 and any unit with zero size), so this side only needs to supply the
+    // value when the byte unit is present.
+    if (typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+    {
+        builder->addAlignment(
+            LayoutResourceKind::Uniform,
+            IRIntegerValue(typeLayout->uniformAlignment.getValidValue()));
     }
 
     return builder->build();

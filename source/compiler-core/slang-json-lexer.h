@@ -2,7 +2,7 @@
 #ifndef SLANG_JSON_LEXER_H
 #define SLANG_JSON_LEXER_H
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-diagnostic-sink.h"
 #include "slang-source-loc.h"
 

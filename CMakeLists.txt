@@ -39,6 +39,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Default to `-Og` for Debug builds on GNU-style compilers: it enables the
+# optimizations that do not interfere with debugging, producing noticeably
+# faster Debug binaries while keeping a faithful step-through/inspection
+# experience.
+#
+# The `NOT WIN32` guard excludes MSVC and clang-cl, which expect MSVC-style
+# flags and have no `-Og` equivalent. `CMAKE_CXX_COMPILER_ID` is not yet known
+# at this point (it is set by enable_language() below), so the platform is
+# the closest available proxy. A side effect is that MinGW builds do not get
+# `-Og` by default. Those users can pass `-DCMAKE_CXX_FLAGS_DEBUG="-Og -g"`
+# explicitly.
+#
+# Note: We use `string(PREPEND ...)` rather than `set(...)`: a
+# toolchain file is processed by the `project()` call above, and some
+# toolchains seed these same `_INIT` variables. Prepending keeps
+# whatever the toolchain asked for, giving precedence to the toolchain
+# option definitions (e.g., optimization level).
+if(NOT WIN32)
+    string(PREPEND CMAKE_C_FLAGS_DEBUG_INIT "-Og ")
+    string(PREPEND CMAKE_CXX_FLAGS_DEBUG_INIT "-Og ")
+endif()
+
 #
 # CMake-supplied modules and our utils
 #
@@ -352,7 +374,7 @@ if(
 endif()
 advanced_option(
     SLANG_ENABLE_MIMALLOC
-    "Use mimalloc for global C++ allocation in slang-compiler"
+    "Use mimalloc for Slang-owned allocations"
     ${SLANG_ENABLE_MIMALLOC_DEFAULT}
 )
 if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)

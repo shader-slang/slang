@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -g3
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -g3 -O0
 RWStructuredBuffer<int> outputBuffer;
 
 // Test where outer function is inlined before the inner function.
@@ -23,10 +23,10 @@ int inlineSingleBasicBlock2(int value1, int value2)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int i = dispatchThreadID.x;
-    
+
     // Call the forceinline function
     int result = inlineSingleBasicBlock2(16, 10);
-    
+
     outputBuffer[i] = result;
 }
 

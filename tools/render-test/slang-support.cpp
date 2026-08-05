@@ -4,13 +4,12 @@
 
 #include "slang-support.h"
 
-#include "../../source/compiler-core/slang-artifact-desc-util.h"
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "core/slang-file-system.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "options.h"
 
-#include <assert.h>
 #include <stdio.h>
 
 namespace renderer_test

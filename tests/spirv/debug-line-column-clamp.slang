@@ -12,7 +12,7 @@
 #line 1 "tests/spirv/debug-line-column-clamp-original.slang"
 RWStructuredBuffer<float> outputBuffer;
 
-float helper(float value)
+[noinline] float helper(float value)
 {
     {
     return value;
