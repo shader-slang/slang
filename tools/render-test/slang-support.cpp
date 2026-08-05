@@ -10,7 +10,6 @@
 #include "core/slang-test-tool-util.h"
 #include "options.h"
 
-#include <assert.h>
 #include <stdio.h>
 
 namespace renderer_test

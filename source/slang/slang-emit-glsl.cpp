@@ -11,7 +11,6 @@
 #include "slang-rich-diagnostics.h"
 #include "slang/slang-ir.h"
 
-#include <assert.h>
 
 namespace Slang
 {

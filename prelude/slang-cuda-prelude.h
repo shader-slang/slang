@@ -191,6 +191,11 @@ typedef unsigned long long CUsurfObject;
 struct SamplerStateUnused;
 typedef SamplerStateUnused* SamplerState;
 
+// Same treatment for SamplerComparisonState: a declared/bound comparison sampler is a no-op
+// placeholder here so that unused globals of this type compile. It does not implement SampleCmp.
+struct SamplerComparisonStateUnused;
+typedef SamplerComparisonStateUnused* SamplerComparisonState;
+
 
 // TODO(JS): Not clear yet if this can be handled on CUDA, by just ignoring.
 // For now, just map to the index type.

@@ -419,7 +419,6 @@ IRPtrTypeBase* asRelevantPtrType(IRInst* inst);
 IRPtrTypeBase* isMutablePointerType(IRInst* inst);
 
 void initializeScratchData(IRInst* inst);
-void resetScratchDataBit(IRInst* inst, int bitIndex);
 ///
 /// IRBlock related common helper methods
 ///

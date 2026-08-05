@@ -5,7 +5,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {
