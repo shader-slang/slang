@@ -3443,8 +3443,11 @@ static SlangResult createArtifactFromIR(
             }
             else if (SLANG_FAILED(validationResult))
             {
+                // Whether a rejected module reaches the caller must not depend on the diagnostic's
+                // severity, so fail here rather than leaving it to the sink's abort.
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
+                return SLANG_FAIL;
             }
         }
 

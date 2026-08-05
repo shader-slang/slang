@@ -180,10 +180,12 @@ protected:
 // hand back the `validate` implementation under test.
 IDownstreamCompiler* getFakeSpirvOptCompiler(
     RefPtr<DownstreamCompilerSet>& ioSet,
-    ISlangSharedLibraryLoader* loader)
+    ISlangSharedLibraryLoader* loader,
+    SlangResult& outLocateResult)
 {
     ioSet = new DownstreamCompilerSet;
-    if (SLANG_FAILED(SpirvOptDownstreamCompilerUtil::locateCompilers(String(), loader, ioSet)))
+    outLocateResult = SpirvOptDownstreamCompilerUtil::locateCompilers(String(), loader, ioSet);
+    if (SLANG_FAILED(outLocateResult))
     {
         return nullptr;
     }
@@ -207,7 +209,15 @@ SLANG_UNIT_TEST(spirvValidateReportsUnavailableWhenSymbolMissing)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeValidatorState::Absent));
     RefPtr<DownstreamCompilerSet> set;
-    IDownstreamCompiler* compiler = getFakeSpirvOptCompiler(set, loader);
+    SlangResult locateResult = SLANG_OK;
+    IDownstreamCompiler* compiler = getFakeSpirvOptCompiler(set, loader, locateResult);
+    if (locateResult == SLANG_E_NOT_AVAILABLE)
+    {
+        // A build with `SLANG_ENABLE_GLSLANG_SUPPORT=0` compiles the locator as a stub returning
+        // exactly this code, so there is no compiler to exercise. Any other locator failure is a
+        // real regression and must still abort below.
+        SLANG_IGNORE_TEST;
+    }
     SLANG_CHECK_ABORT(compiler != nullptr);
 
     gFakeValidatorWasCalled = false;
@@ -224,7 +234,15 @@ SLANG_UNIT_TEST(spirvValidateReportsFailWhenValidatorRejects)
 {
     ComPtr<ISlangSharedLibraryLoader> loader(new FakeLoader(FakeValidatorState::PresentRejecting));
     RefPtr<DownstreamCompilerSet> set;
-    IDownstreamCompiler* compiler = getFakeSpirvOptCompiler(set, loader);
+    SlangResult locateResult = SLANG_OK;
+    IDownstreamCompiler* compiler = getFakeSpirvOptCompiler(set, loader, locateResult);
+    if (locateResult == SLANG_E_NOT_AVAILABLE)
+    {
+        // A build with `SLANG_ENABLE_GLSLANG_SUPPORT=0` compiles the locator as a stub returning
+        // exactly this code, so there is no compiler to exercise. Any other locator failure is a
+        // real regression and must still abort below.
+        SLANG_IGNORE_TEST;
+    }
     SLANG_CHECK_ABORT(compiler != nullptr);
 
     gFakeValidatorWasCalled = false;
