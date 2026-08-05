@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:24:00+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:18:42+00:00
 target_doc: cross-cutting/core-module.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_watched_paths_digest: 2c33d82801bf8c85c90f7a72974d48339879a5c470ed66dd9ad1279eeab52e62
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 758f3793c6cde62bb10f3ecad0e65bcabd0d3115b5629165afe8408e4fab2f78
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,11 +13,11 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 1
+finding_count: 2
 severity_breakdown:
-  critical: 0
-  major: 0
-  minor: 1
+  critical: 1
+  major: 1
+  minor: 0
   nit: 0
 ---
 
@@ -25,24 +25,25 @@ severity_breakdown:
 
 ## Summary
 
-The document largely matches the prompt contract and the watched source files: it covers the core, HLSL, GLSL, diff meta-slang files, the neural standard module, and all resolved prelude headers. The only issue I found is a small but real source-alignment error in the GLSL module loading description: the source gates loading on the global-session `enableGLSL` flag, not directly on the current target or an on-demand request for GLSL-flavored names.
+The document satisfies the required structure, covers all resolved meta-slang and prelude files, and is broadly accurate. Two source-alignment errors remain: the non-embedded build can still compile the core module eagerly and fail during the build, and default preludes are emitted into generated source as embedded text rather than referenced through generated `#include` directives.
 
 ## Items checked
 
-- Verified the required front matter fields and copied `target_doc_source_commit` / `target_doc_watched_paths_digest` from the target document.
-- Used `regenerate.py show cross-cutting/core-module.md` to identify the prompt, dependency document, watched paths, and resolved watched files.
-- Read `_common.md`, `cross-cutting-core-module.md`, the target document, and the dependency document `architecture/overview.md`.
-- Spot-checked more than 10 concrete claims against resolved watched files: `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, `glsl.meta.slang`, `source/slang-core-module/CMakeLists.txt`, the embedded core / GLSL module glue, `source/standard-modules/README.md`, `source/standard-modules/CMakeLists.txt`, `source/standard-modules/neural/CMakeLists.txt`, `neural.slang`, `slang-standard-module-config.h.in`, and every resolved `prelude/*.h`.
-- Resolved all 43 Markdown links in the target document; none were missing.
+- Read `_review.md`, `_common.md`, the per-document prompt, the target document, `architecture/overview.md`, and the complete resolved file list from `regenerate.py show`.
+- Verified 31 factual claims at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including meta-module declarations, autodiff types and conformances, standard-module contents and import paths, compiler selection, build products, cache format, and prelude selection.
+- Verified every line-number citation in the body; the document contains no explicit source line-number citations.
+- Resolved all 59 Markdown-link occurrences (45 distinct destinations) at the recorded commit and confirmed all referenced generated pages are manifest entries.
+- Recomputed the watched-path digest, confirmed all mandatory front-matter fields, ran the document lint, and confirmed the 20,211-byte document is below its 24,576-byte cap.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## GLSL module`, lines 121-123 | The statement `Loading it is target-conditional: the compiler pulls it in when the user is compiling GLSL or asks for GLSL-flavoured names from Slang code` describes the trigger too narrowly. The source loads the GLSL builtin module during global session creation when `desc->enableGLSL` is true; explicit `import glsl` then retrieves that builtin module if it is available. | `source/slang/slang-api.cpp:218` gates GLSL loading with `if (desc->enableGLSL)`, and `source/slang/slang-session.cpp:1520` handles `moduleName == getSessionImpl()->glslModuleName` by returning `getBuiltinModule(BuiltinModuleName::GLSL)`. `include/slang.h:5657` documents `enableGLSL` as the global-session flag. | Replace the sentence with wording tied to `SlangGlobalSessionDesc::enableGLSL`, for example: "The global session loads the GLSL builtin module when `enableGLSL` is set; later GLSL-language scopes or `import glsl` use that loaded builtin module." |
+| F-001 | critical | `## Core module`, lines 74-80; `## Building the core module`, lines 267-270 and 377-380 | The repeated claim that with `SLANG_EMBED_CORE_MODULE=OFF` meta-source errors surface only at runtime is false for the documented build graph. A non-embedded shared build creates the `ALL` target `generate_core_module_cache`, which depends on `generate_core_module`; both standard modules also depend on `generate_core_module`, and their module targets are `ALL`. Thus the build can run `slang-bootstrap -compile-core-module` and report meta-source errors before any normal session starts, even though C++ source compilation is decoupled from core-module compilation. | `source/slang/CMakeLists.txt:370-404` defines the eager cache target and its dependency on `generate_core_module`; `source/slang-core-module/CMakeLists.txt:141-174` shows that target runs `slang-bootstrap -compile-core-module`; `source/standard-modules/neural/CMakeLists.txt:53-82` and `source/standard-modules/experimental/CMakeLists.txt:46-64` make the standard-module `ALL` targets depend on the same generator target. | Replace all “only at runtime” wording with the narrower invariant: disabling embedding separates core-module compilation from C++ compilation. Explain that the normal full/shared build may still compile the module eagerly for the archive, standard modules, or runtime cache; runtime compilation is the fallback when no valid cache or embedded module is available. |
+| F-002 | major | `## Preludes`, lines 235-240 | The document says prelude headers are emitted alongside target output and referenced through `#include "<prelude>"`-style mechanisms. The default compiler path instead embeds each `*-prelude.h` into the compiler as a string, registers the CUDA/C++/HLSL strings on the global session, and writes the selected string directly into generated source. A custom prelude string may itself contain an include, but that is not how the shipped default preludes are brought into scope. | `prelude/CMakeLists.txt:2-20` runs `slang-embed` on each prelude header; `source/slang/slang-global-session.cpp:125-128` registers the embedded default strings; `source/slang/slang-emit.cpp:2937-2951` emits the Torch, host, or language prelude string directly through `sourceWriter.emit(...)`. | Replace the sidecar-header/`#include` description with the embedded-string flow. Note separately that the headers are installed and that callers can override a language prelude with text containing an include if desired. |
 
 ## No-issues notes
 
-- The standard-module build description matches `source/standard-modules/neural/CMakeLists.txt`: the module is built with `slang-bootstrap` and `-load-core-module ${core_module_archive}`.
-- The core-module build-product description matches `source/slang-core-module/CMakeLists.txt`: one `-compile-core-module` command writes the core archive plus core and GLSL embeddable headers.
-- The prelude table covers all resolved `prelude/*.h` files from the manifest output.
+- All four watched `*.meta.slang` files and all nine resolved `prelude/*.h` files are mentioned.
+- The standard-module import paths, build compiler selection, and `-load-core-module` dependency match the two module CMake files.
+- The core archive, core embeddable header, and GLSL embeddable header are correctly described as outputs of one `-compile-core-module` command.

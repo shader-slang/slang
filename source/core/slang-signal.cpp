@@ -77,11 +77,18 @@ static bool _readAssertEnvVar(char* buffer, size_t bufferSize)
     return getenv_s(&requiredSize, buffer, bufferSize, "SLANG_ASSERT") == 0 && requiredSize > 0;
 #else
     const char* value = getenv("SLANG_ASSERT");
-    if (!value || strlen(value) >= bufferSize)
+    if (!value)
     {
         return false;
     }
-    strcpy(buffer, value);
+    // Copy with the same length that was bounds-checked, so the check and the copy cannot drift
+    // apart the way a `strlen` guard followed by an unbounded `strcpy` can.
+    const size_t length = strlen(value);
+    if (length >= bufferSize)
+    {
+        return false;
+    }
+    memcpy(buffer, value, length + 1);
     return true;
 #endif
 }
