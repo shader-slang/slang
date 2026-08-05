@@ -7417,14 +7417,13 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
     return expr;
 }
 
-// Return the object a direct field access ultimately reads out of, so that `go.inner.v` and
-// `arr[0].v` both resolve to the group-shared variable holding them. `groupshared` is declared on
-// that object and never on the field, while `getValidTypeForAddressOf` answers for whichever
-// declaration it is handed -- and a field's own declaration reports `UserPointer` -- so the address
-// space of a field access has to be read from the base. A `DerefMemberExpr` (`a->b`, also how a
-// `ConstantBuffer` member is reached) stops the walk, because it goes through a pointer whose own
-// type already carries the address space.
-static Expr* getBaseObjectOfFieldAccess(Expr* expr)
+// Strip the projections that read a part of an object -- `.field`, `[i]`, `.xy`, `._m00`, `(...)`
+// -- to reach the object whose declaration carries the address space. `groupshared` sits on that
+// object, never on the part.
+//
+// Anything reached through a pointer stops the walk, because there the pointer's own type carries
+// the address space.
+static Expr* getBaseObjectOfProjection(Expr* expr)
 {
     for (;;)
     {
@@ -7432,6 +7431,21 @@ static Expr* getBaseObjectOfFieldAccess(Expr* expr)
             expr = parenExpr->base;
         else if (auto indexExpr = as<IndexExpr>(expr))
             expr = indexExpr->baseExpression;
+        else if (auto swizzleExpr = as<SwizzleExpr>(expr))
+        {
+            // A multi-element swizzle may be non-contiguous, so it has no address of its own and
+            // the caller materializes a private temporary for it. Stop, so that such an argument is
+            // judged on its own and rejected rather than inheriting the base's address space.
+            if (swizzleExpr->elementIndices.getCount() > 1)
+                return expr;
+            expr = swizzleExpr->base;
+        }
+        else if (auto matrixSwizzleExpr = as<MatrixSwizzleExpr>(expr))
+        {
+            if (matrixSwizzleExpr->elementCount > 1)
+                return expr;
+            expr = matrixSwizzleExpr->base;
+        }
         else if (auto memberExpr = as<MemberExpr>(expr))
         {
             auto memberDecl = memberExpr->declRef.getDecl();
@@ -7448,19 +7462,19 @@ static Expr* getBaseObjectOfFieldAccess(Expr* expr)
 // A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
 // its argument must itself name thread-group-shared storage: an addressable expression whose
 // address space is `GroupShared` (a `groupshared` variable/parameter, a component of one, or a
-// dereference of a group-shared pointer). Passing a private local, a copy, or an rvalue would
-// silently alias non-shared memory as shared, breaking the group-shared aliasing semantics HLSL
-// requires (DXC rejects it outright with error 0043). `getValidTypeForAddressOf` already computes
-// the addressable pointer type -- carrying its address space -- for an addressable expression, so
-// reuse it as the source of truth rather than re-deriving addressability here.
+// member reached through a group-shared pointer with `->`). Passing a private local, a copy, or an
+// rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
+// semantics HLSL requires (DXC rejects it outright with error 0043). `getValidTypeForAddressOf`
+// already computes the addressable pointer type -- carrying its address space -- for an addressable
+// expression, so reuse it as the source of truth rather than re-deriving addressability here.
+//
+// An explicit dereference (`*p`, `(*p).field`) is not accepted; only the `->` spelling is.
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
     if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
         return;
 
-    // Only this check needs the base object's address space; `getValidTypeForAddressOf` keeps
-    // answering for the expression it is given, so `__getAddress` is unaffected.
-    auto addressedExpr = getBaseObjectOfFieldAccess(argIn);
+    auto addressedExpr = getBaseObjectOfProjection(argIn);
 
     bool namesGroupSharedStorage = false;
     if (auto ptrType = getValidTypeForAddressOf(

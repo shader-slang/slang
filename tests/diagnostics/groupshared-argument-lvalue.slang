@@ -1,8 +1,8 @@
 // An argument to a `groupshared` parameter must name thread-group-shared storage -- an addressable
 // expression in `AddressSpace::GroupShared` (a `groupshared` variable, a component of one, or a
-// dereference of a group-shared pointer). A private local, a copy, or an rvalue cannot be aliased
-// as thread-group-shared memory, so it is rejected (shader-slang/slang#10641; aligns with HLSL/DXC
-// error 0043).
+// member reached through a group-shared pointer with `->`). A private local, a copy, or an rvalue
+// cannot be aliased as thread-group-shared memory, so it is rejected (shader-slang/slang#10641;
+// aligns with HLSL/DXC error 0043).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry computeMain -stage compute
 
@@ -25,6 +25,10 @@ void takesGroupShared(uint tid, groupshared uint s[N])
 }
 
 void takesGroupSharedScalar(groupshared float v)
+{
+}
+
+void takesGroupSharedVector(const groupshared float2 v)
 {
 }
 
@@ -56,11 +60,18 @@ void computeMain(uint3 tid : SV_GroupThreadID)
     // A private local array is not thread-group-shared memory.
     uint localData[N];
     takesGroupShared(tid.x, localData);
+//CHECK:                    ^^^^^^^^^ error E30711
 
-    // Deferring to the base does not make every member access acceptable: a field of a private
-    // local is still rejected.
+    // A field of private storage is not thread-group-shared memory either.
     Holder localHolder;
     takesGroupSharedScalar(localHolder.v);
-}
+//CHECK:                               ^ error E30711
 
-// CHECK: 30711
+    // A multi-element swizzle may be non-contiguous, so it has no address of its own and the caller
+    // has to materialize a private temporary for it -- which is not group-shared storage, even
+    // though the vector it reads from is.
+    takesGroupSharedVector(sharedVec.xy);
+//CHECK:                             ^^ error E30711
+    takesGroupSharedVector(sharedMat._m00_m11);
+//CHECK:                             ^^^^^^^^ error E30711
+}

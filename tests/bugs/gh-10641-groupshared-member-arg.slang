@@ -1,16 +1,8 @@
 // gh-10641-groupshared-member-arg.slang
 
-// A field of a group-shared variable names group-shared storage, so it is a valid argument for a
-// `groupshared` parameter and must be passed by reference.
-//
-// `getValidTypeForAddressOf` answers "what address space does this expression name?", and
-// `checkGroupSharedArgumentOfParam` uses that answer to accept or reject the argument. `MemberExpr`
-// derives from `DeclRefExpr` and a struct field is a `VarDeclBase`, so `gss.v` used to match the
-// variable case and be answered for the *field's* declaration. `groupshared` sits on the base
-// variable `gss`, never on the field, so that path reported `UserPointer` and the argument was
-// rejected as not naming group-shared storage. An array element such as `arr[0]` was unaffected
-// because `IndexExpr` is not a `DeclRefExpr`, so it already recursed onto its base -- which is why
-// the two spellings disagreed. A non-static member access now defers to that same recursion.
+// A field of a group-shared variable, and a component of such a field, name group-shared storage,
+// so each is a valid argument for a `groupshared` parameter and is passed by reference rather than
+// copied per invocation (shader-slang/slang#10641).
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute -o /dev/null -dump-ir
 
@@ -23,6 +15,8 @@ struct Outer
 {
     Inner inner;
     uint scratch[4];
+    float4 vector;
+    float2x2 matrix;
 }
 
 groupshared Outer go;
@@ -40,8 +34,19 @@ void readWriteField(groupshared uint a)
 }
 
 [noinline]
+void readOnlyComponent(const groupshared float a)
+{
+}
+
+[noinline]
 void readOnlyWholeStruct(const groupshared Inner s)
 {
+}
+
+[noinline]
+void readWriteWholeStruct(groupshared Inner s)
+{
+    s.v = 2;
 }
 
 [numthreads(8, 1, 1)]
@@ -59,19 +64,25 @@ void main(uint tid : SV_DispatchThreadID)
     // An element of an array that is itself a field.
     readOnlyField(go.scratch[0]);
 
-    // A whole group-shared struct, passed by reference rather than field by field.
+    // A component of a field.
+    readOnlyComponent(go.vector.x);
+    readOnlyComponent(go.matrix._m00);
+
+    // A whole group-shared struct, passed by reference rather than field by field. The read-write
+    // spelling writes through to the caller's storage.
     readOnlyWholeStruct(go.inner);
     readOnlyWholeStruct(arr[1]);
+    readWriteWholeStruct(go.inner);
 }
 
-// The read-only spellings keep the read-only reference ...
+// A `const groupshared` parameter is the read-only reference ...
 //CHECK-DAG: func %readOnlyField{{.*}}BorrowInParam
+//CHECK-DAG: func %readOnlyComponent{{.*}}BorrowInParam
 //CHECK-DAG: func %readOnlyWholeStruct{{.*}}BorrowInParam
 
-// A field of a *non*-group-shared variable is still rejected: deferring to the base means the
-// answer follows the base, not that every member access is accepted. See the companion diagnostic
-// test `tests/diagnostics/groupshared-argument-lvalue.slang` for that direction.
-
-// ... and the bare spelling stays the strict read-write reference. Without this half of the
-// control, a change that made every group-shared parameter read-only would still pass.
+// ... and a bare `groupshared` parameter is the strict read-write reference.
 //CHECK-DAG: func %readWriteField{{.*}}RefParam
+//CHECK-DAG: func %readWriteWholeStruct{{.*}}RefParam
+
+// The opposite direction -- a field of a *non*-group-shared variable must still be rejected -- is
+// covered by tests/diagnostics/groupshared-argument-lvalue.slang.
