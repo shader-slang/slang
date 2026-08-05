@@ -77,10 +77,9 @@ jobs:
           cmake --workflow --preset "${{matrix.config}}"
       - uses: robinraju/release-downloader@28fc21f50d76778e7023361aa1f863e717d3d56f # v1.13
         with:
-          tag: "VK-GL-CTS_WithSlang-0.0.9-win64"
+          latest: true
           repository: "shader-slang/VK-GL-CTS"
           fileName: "VK-GL-CTS_WithSlang-0.0.9-win64.zip"
-          preRelease: true
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: "shader-slang/VK-GL-CTS"
