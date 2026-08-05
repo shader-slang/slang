@@ -419,4 +419,16 @@ SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passT
 
 const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name);
 
+// Returns how many builtin/core modules `session` currently has loaded, for unit tests that observe
+// lazy builtin-module loading (e.g. the autodiff supplement, which loads on demand).
+//
+// This is defined out-of-line in libslang on purpose: reading the count dereferences the internal
+// `Session`, and under `-fsanitize=vptr` that dereference needs `typeinfo for Slang::Session`,
+// which is emitted with Session's implementation. Doing it here lets a separately linked unit-test
+// tool query the count through the public `IGlobalSession*` without referencing that internal
+// typeinfo itself — a reference that fails to link on ELF, where the internal type's RTTI is not
+// exported. It is exported (SLANG_API) solely so the unit-test tool can link it and is deliberately
+// absent from the public `slang.h` API.
+SLANG_API Index getLoadedBuiltinModuleCountForUnitTest(slang::IGlobalSession* session);
+
 } // namespace Slang

@@ -24,13 +24,3 @@ type:*ISlangUnknown*
 type:*ISlangCastable*
 type:*ISlangSharedLibrary*
 type:*IFileCheck*
-
-# Slang::Session is implemented in libslang-compiler with hidden visibility, so its typeinfo is not
-# exported to the separately linked slang-unit-test-tool library. The lazyAutodiffModuleLoading unit
-# test is the only unit test that reaches into an internal Session* (via asInternal) to read
-# coreModules, so under -fsanitize=vptr its object file references `typeinfo for Slang::Session` and
-# the tool fails to link (clang-18/ELF; macOS Mach-O exports the typeinfo and does not hit this).
-# The pointer is a Session the test just created through slang_createGlobalSession, so the vptr
-# check is always satisfied and adds no value here. A src:-scoped skip is the narrow suppression
-# preferred by #10754 (a type: entry does not match this call site's recorded type).
-src:*unit-test-lazy-autodiff-module.cpp

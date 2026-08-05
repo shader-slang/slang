@@ -166,6 +166,15 @@ Module* Session::getBuiltinModule(slang::BuiltinModuleName name)
     return nullptr;
 }
 
+Index getLoadedBuiltinModuleCountForUnitTest(slang::IGlobalSession* session)
+{
+    // `session` is always our own global-session implementation, and this translation unit has
+    // Session's full definition and typeinfo, so the vptr check that the dereference emits under
+    // `-fsanitize=vptr` resolves here. Returning the count lets the unit-test tool observe lazy
+    // builtin-module loading without dereferencing an internal Session* across the DLL boundary.
+    return static_cast<Session*>(session)->coreModules.getCount();
+}
+
 SlangResult Session::loadAutodiffModuleIfNeeded()
 {
     if (getBuiltinModule(slang::BuiltinModuleName::Autodiff))
