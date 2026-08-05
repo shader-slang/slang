@@ -80,9 +80,21 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 
 ### Formatting
 
-**Run `./extras/formatting.sh --modified` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
+**Run both of these before committing changes:**
 
-`--modified` covers tracked changes only. Format an untracked file by naming it: `./extras/formatting.sh -- path/to/new-file`. Run with no arguments, the script prints its help text and exits 0 without formatting anything.
+```bash
+./extras/formatting.sh --modified        # C++, CMake, YAML/JSON, shell
+./extras/formatting.sh --modified --md   # markdown - not covered by the line above
+```
+
+PRs must conform to the project's coding style. Add `--check-only` to either command to verify without modifying files.
+
+Two commands are needed because a type flag such as `--md` narrows the run to that type rather than adding to it, and markdown is the one formatter a flagless run does not enable. Two further cases are covered by neither command, and both exit 0 having formatted nothing:
+
+- **Untracked files are invisible** to `--modified` (it is `git diff HEAD`). Format a new file by naming it: `./extras/formatting.sh -- path/to/new-file`.
+- **`.slang` files have no formatter configured**, so naming one selects nothing.
+
+Run with no arguments, the script prints its help text and exits 0 without formatting anything.
 
 ### Suppressing Unused Variable Warnings
 
@@ -245,7 +257,7 @@ change.)
 
 ### PR Workflow
 
-1. **Format your code**: Run `./extras/formatting.sh --modified` before committing
+1. **Format your code**: Run `./extras/formatting.sh --modified` and then `./extras/formatting.sh --modified --md` before committing (see [Formatting](#formatting) for why both). New files are untracked, so name them explicitly: `./extras/formatting.sh -- path/to/new-file` — this does not apply to the `.slang` tests in step 3, since no formatter is configured for `.slang`.
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Write the PR description in this required five-part format:**
