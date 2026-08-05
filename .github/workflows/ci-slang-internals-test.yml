@@ -1,0 +1,135 @@
+name: CI Internals Unit Tests
+
+# Builds and runs `slang-internals-test`, the unit tests that call `source/slang`
+# internals directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
+# different configuration from every other CI build, so this is a separate
+# workflow rather than an option on ci-slang-build.yml.
+#
+# It builds only the `slang-internals-test` target rather than everything, which
+# is roughly a third of the compile work of a full build.
+#
+# These tests do not touch a GPU, so they run on GitHub-hosted runners. Keeping
+# them off the self-hosted Windows pool avoids competing for runners with the
+# GPU build/test jobs that sit on the critical path of a CI run.
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  internals-test:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # Ensure Git Bash tools (gzip, tar) are in PATH for Windows, as
+      # actions/cache needs them before common-setup runs.
+      - name: Add Git Bash to PATH (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      # This cache key deliberately carries an `internals-static` component and
+      # so shares nothing with the keys used by ci-slang-build.yml. A static
+      # build cannot reuse objects from a shared build: SLANG_DYNAMIC and
+      # SLANG_DYNAMIC_EXPORT are defined only for SHARED, STB_IMAGE_STATIC only
+      # for STATIC, and sccache hashes the preprocessed source. Sharing a key
+      # would mean this job misses on everything it restores and then writes
+      # static objects back under a key the shared builds also restore,
+      # degrading their hit rate too.
+      - name: Restore sccache cache
+        continue-on-error: true
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
+          key: sccache-internals-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            sccache-internals-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: ${{ inputs.os }}
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: false
+
+      - name: Build slang-internals-test
+        run: |
+          cmake_launcher_defines=()
+          if [[ -n "${sccache_path:-}" ]]; then
+            echo "Using sccache: ${sccache_path}"
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+            # Precompiled headers are incompatible with sccache and cause
+            # linker errors, matching what ci-slang-build.yml does.
+            cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
+            sccache --show-stats || true
+          fi
+
+          cmake --preset default --fresh \
+            -DSLANG_LIB_TYPE=STATIC \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_DXIL=OFF \
+            -DSLANG_DXC_BUILD_FROM_SOURCE=OFF \
+            -DSLANG_IGNORE_ABORT_MSG=ON \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            "${cmake_launcher_defines[@]}"
+
+          cmake --build build --config "$cmake_config" --target slang-internals-test
+
+          if [[ -n "${sccache_path:-}" ]]; then
+            sccache --show-stats || true
+          fi
+
+      - name: Run slang-internals-test
+        run: |
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+            test_path="$bin_dir/slang-internals-test.exe"
+          else
+            test_path="$bin_dir/slang-internals-test"
+          fi
+
+          if [[ ! -f "$test_path" ]]; then
+            echo "::error::expected slang-internals-test at $test_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+
+          "$test_path"

@@ -485,7 +485,14 @@ endif()
 # definition here — rather than marking it EXCLUDE_FROM_ALL — means it is part
 # of `all` exactly where it can work.
 #
-if(SLANG_ENABLE_TESTS AND SLANG_LIB_TYPE STREQUAL "STATIC")
+# The SLANG_ENABLE_SLANG_RHI condition mirrors the guard on the `unit-test`
+# object library this target links against, even though these tests do not use
+# the RHI themselves.
+if(
+    SLANG_ENABLE_TESTS
+    AND SLANG_ENABLE_SLANG_RHI
+    AND SLANG_LIB_TYPE STREQUAL "STATIC"
+)
     slang_add_target(
         slang-internals-test
         EXECUTABLE
