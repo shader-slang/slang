@@ -9371,7 +9371,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                if (targetCase->body != nullptr) {
+                if (targetCase->body != nullptr)
+                {
                     lowerStmt(context, targetCase->body);
                 }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
@@ -9450,7 +9451,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                if (targetCase->body != nullptr) {
+                if (targetCase->body != nullptr)
+                {
                     lowerStmt(context, targetCase->body);
                 }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
