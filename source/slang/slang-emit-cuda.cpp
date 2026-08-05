@@ -501,9 +501,8 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 
 String CUDASourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    // We have an entry-point function in the IR module, which we
-    // need to generate the name of the corresponding CUDA C++
-    // function.
+    // We have an entry-point function in the IR module and need to
+    // generate the name of the corresponding CUDA C++ function.
     //
     // The most common case will be a compute kernel, in which case
     // we will emit the function more or less as-is, including

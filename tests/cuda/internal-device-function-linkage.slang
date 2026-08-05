@@ -88,7 +88,9 @@ void rayGen()
 // CHECK-DAG: {{^}}static __device__ uint namedButNotExported
 // CHECK-DAG: {{^}}static __device__ uint _S{{[0-9]+}}()
 
-// Explicit downstream exports and bodyless external declarations remain externally visible.
+// Exported definitions are deliberately not all reachable from each entry point. Their export
+// decorations must both keep them in the emitted CUDA and give them external linkage for downstream
+// device linking. Bodyless external declarations also remain externally visible.
 // CHECK-DAG: {{^}}__device__ uint downstreamExported
 // CHECK-DAG: {{^}}__device__ uint downstreamExtern
 // CHECK-DAG: {{^}}__device__ uint exportedDefined

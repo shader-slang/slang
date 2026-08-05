@@ -2160,7 +2160,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         SLANG_OVERRIDE
     {
         // OptiX direct-callable programs use the CUDA function-call ABI, so their signatures
-        // should not undergo varying-parameter legalization.
+        // should not undergo varying-parameter legalization. The CUDA emitter preserves the
+        // pointer-typed parameters and emits the callable as an ordinary __device__ function.
         if (entryPointDecor->getProfile().getStage() == Stage::Callable)
             return;
 
