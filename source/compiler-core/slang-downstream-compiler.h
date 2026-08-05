@@ -358,7 +358,9 @@ public:
     /// Get the version of this compiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getVersionString(slang::IBlob** outVersionString) = 0;
-    /// Validate and return the result
+    /// Validate `contents` and return the result. Returns `SLANG_E_NOT_AVAILABLE` when this
+    /// compiler cannot validate at all, which callers reporting a failure to the user must keep
+    /// distinct from a result saying the module was examined and rejected.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) = 0;
     /// Disassemble and print to stdout

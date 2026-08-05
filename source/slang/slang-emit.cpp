@@ -3434,8 +3434,12 @@ static SlangResult createArtifactFromIR(
             if (validationResult == SLANG_E_NOT_AVAILABLE)
             {
                 // The validator never ran, so disassembling here would wrongly imply the SPIR-V was
-                // found invalid.
+                // found invalid. Fail the compile rather than falling through: validation was
+                // requested, and publishing the artifact would hand a caller SPIR-V that nothing
+                // checked. `error` severity alone does not stop this path -- only `Severity::Fatal`
+                // and above abort a compile.
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationUnavailable{});
+                return SLANG_FAIL;
             }
             else if (SLANG_FAILED(validationResult))
             {
