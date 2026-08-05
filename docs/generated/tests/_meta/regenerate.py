@@ -3382,9 +3382,11 @@ def cmd_selftest(args: argparse.Namespace) -> int:
     which is kept clean -- so it proves the happy path and nothing else.
     The cases below are the edge ones: the punctuation rule that made
     every anchor in this corpus wrong, the escaped pipe that decides
-    whether a row is well-formed, and the GFM spellings (single-dash
+    whether a row is well-formed, the GFM spellings (single-dash
     delimiter, one-column table) that a stricter reader would skip
-    without reporting anything.
+    without reporting anything, and the link/anchor resolution that is
+    the headline of this change -- its error, warning, and dedup
+    branches, which the clean corpus never triggers.
     """
     failures: list[str] = []
 
@@ -3445,6 +3447,35 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         check(
             "table blames the pipe",
             "escape a literal pipe" in found[0] if found else False,
+            True,
+        )
+
+    # lint_markdown_links -- the function this PR is named for. A dead
+    # path is an error (the `../` miscount this PR set out to fix), a
+    # resolved path whose `#anchor` hits no heading is a warning, a
+    # citation that resolves in both halves is silent, and the same
+    # broken citation repeated across rows is reported once (a coverage
+    # table cites the same anchor per claim).
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "target.md").write_text("# Real Heading\n", encoding="utf-8")
+        src = root / "README.md"
+        src.write_text(
+            "[ok](target.md#real-heading)\n"
+            "[stale anchor](target.md#missing)\n"
+            "[dead](nope.md#x)\n"
+            "[dead again](nope.md#x)\n",
+            encoding="utf-8",
+        )
+        issues = lint_markdown_links(src)
+        errors = [i for i in issues if i.severity == "error"]
+        warnings = [i for i in issues if i.severity == "warning"]
+        check("links dead path is error", len(errors), 1)
+        check("links stale anchor is warning", len(warnings), 1)
+        check("links dedups repeated citation", len(issues), 2)
+        check(
+            "links error names the path",
+            "nope.md" in errors[0].message if errors else False,
             True,
         )
 
