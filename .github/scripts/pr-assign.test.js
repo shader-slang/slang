@@ -29,9 +29,9 @@ const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
 
 test("issue assignee wins", () => {
-  const { assignee, reviewers } = select(["owner2"], ["owner1", "dev1"]);
+  const { assignee, autoRequestedReviewer } = select(["owner2"], ["owner1", "dev1"]);
   assert.strictEqual(assignee, "owner2");
-  assert.deepStrictEqual(reviewers, ["owner2"]);
+  assert.strictEqual(autoRequestedReviewer, "owner2");
 });
 
 test("commit-signal owner when no issue", () => {
@@ -40,45 +40,45 @@ test("commit-signal owner when no issue", () => {
 });
 
 test("maintainer fallback", () => {
-  const { assignee, reviewers, suggestedReviewer, requestedReviewer } =
+  const { assignee, autoRequestedReviewer, suggestedReviewer } =
     select([], ["dev1"]);
   assert.strictEqual(assignee, "maintainer");
-  assert.deepStrictEqual(reviewers, ["maintainer"]);
-  assert.strictEqual(requestedReviewer, "maintainer");
+  assert.strictEqual(autoRequestedReviewer, "maintainer");
   assert.strictEqual(suggestedReviewer, "dev1");
 });
 
 test("auto-request is shepherd only; higher-signal collaborator is suggested", () => {
-  const { assignee, reviewers, suggestedReviewer, requestedReviewer } = select(
+  const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     [], ["dev2", "owner1", "dev1"]);
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, ["owner1"]);
-  assert.strictEqual(requestedReviewer, "owner1");
+  assert.strictEqual(autoRequestedReviewer, "owner1");
   assert.strictEqual(suggestedReviewer, "dev2");
 });
 
 test("may suggest another owner who outranks the auto-requested shepherd", () => {
-  const { assignee, reviewers, suggestedReviewer } = select(
+  const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
     ["owner1"], ["owner2", "owner1", "dev1"]);
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, ["owner1"]);
+  assert.strictEqual(autoRequestedReviewer, "owner1");
   assert.strictEqual(suggestedReviewer, "owner2");
 });
 
 test("no suggestion when auto-requested reviewer has top signal", () => {
-  const { reviewers, suggestedReviewer } = select([], ["owner1", "owner2", "dev1"]);
-  assert.deepStrictEqual(reviewers, ["owner1"]);
+  const { autoRequestedReviewer, suggestedReviewer } =
+    select([], ["owner1", "owner2", "dev1"]);
+  assert.strictEqual(autoRequestedReviewer, "owner1");
   assert.strictEqual(suggestedReviewer, null);
 });
 
 test("no collaborator above reviewer means only assignee", () => {
-  const { reviewers, suggestedReviewer } = select([], ["owner1", "owner2"]);
-  assert.deepStrictEqual(reviewers, ["owner1"]);
+  const { autoRequestedReviewer, suggestedReviewer } =
+    select([], ["owner1", "owner2"]);
+  assert.strictEqual(autoRequestedReviewer, "owner1");
   assert.strictEqual(suggestedReviewer, null);
 });
 
 test("author shepherd is not auto-requested; top collaborator is suggested", () => {
-  const { assignee, reviewers, suggestedReviewer, requestedReviewer } =
+  const { assignee, autoRequestedReviewer, suggestedReviewer } =
     selectAssigneeAndReviewers({
       issueAssignees: [],
       committersBySignal: ["dev1", "owner1"],
@@ -88,50 +88,66 @@ test("author shepherd is not auto-requested; top collaborator is suggested", () 
       maintainer: MAINT,
     });
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, []);
-  assert.strictEqual(requestedReviewer, null);
+  assert.strictEqual(autoRequestedReviewer, null);
   assert.strictEqual(suggestedReviewer, "dev1");
 });
 
-test("real existing reviewer blocks adding but still suggests", () => {
-  const { assignee, reviewers, suggestedReviewer } = select([], ["dev2", "owner1"], {
-    existingReviewers: ["dave"], ignoredReviewers: new Set(["bmillsNV"]),
-  });
+test("ignored shepherd is not auto-requested; suggestion uses null baseline", () => {
+  const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
+    [], ["dev2"], {
+      maintainer: "bmillsNV",
+      ignoredReviewers: new Set(["bmillsNV"]),
+    });
+  // No owners in ranking → maintainer fallback, but ignored → no auto-request.
+  assert.strictEqual(assignee, "bmillsNV");
+  assert.strictEqual(autoRequestedReviewer, null);
+  assert.strictEqual(suggestedReviewer, "dev2");
+});
+
+test("real existing reviewer clears auto-request but still may suggest", () => {
+  const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
+    [], ["dev2", "owner1"], {
+      existingReviewers: ["dave"], ignoredReviewers: new Set(["bmillsNV"]),
+    });
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, []);
+  assert.strictEqual(autoRequestedReviewer, null);
+  // Baseline is null, but assignee is excluded from suggestion → next is dev2.
   assert.strictEqual(suggestedReviewer, "dev2");
 });
 
 test("ignored and bot reviewers do not count as existing", () => {
-  const { assignee, reviewers, suggestedReviewer } = select([], ["dev2", "owner1"], {
-    existingReviewers: ["bmillsNV", "copilot[bot]"],
-    botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["bmillsNV"]),
-  });
+  const { assignee, autoRequestedReviewer, suggestedReviewer } = select(
+    [], ["dev2", "owner1"], {
+      existingReviewers: ["bmillsNV", "copilot[bot]"],
+      botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["bmillsNV"]),
+    });
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, ["owner1"]);
+  assert.strictEqual(autoRequestedReviewer, "owner1");
   assert.strictEqual(suggestedReviewer, "dev2");
 });
 
-test("pickSuggestedReviewer skips non-collaborators and bots", () => {
+test("pickSuggestedReviewer skips non-collaborators, bots, and assignee", () => {
   assert.strictEqual(
     pickSuggestedReviewer({
       committersBySignal: ["outsider", "bot[bot]", "dev1", "owner1"],
       collaborators: COLLAB,
       author: "author",
-      requestedReviewer: "owner1",
+      assignee: "owner1",
+      autoRequestedReviewer: "owner1",
       botAuthors: [],
     }),
     "dev1",
   );
 });
 
-test("pickSuggestedReviewer with no requested reviewer takes top collaborator", () => {
+test("pickSuggestedReviewer with no auto-request takes top non-assignee collaborator", () => {
   assert.strictEqual(
     pickSuggestedReviewer({
-      committersBySignal: ["dev2", "owner1"],
+      committersBySignal: ["owner1", "dev2"],
       collaborators: COLLAB,
       author: "author",
-      requestedReviewer: null,
+      assignee: "owner1",
+      autoRequestedReviewer: null,
       botAuthors: [],
     }),
     "dev2",
@@ -144,7 +160,7 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
       source: "Bot",
       assignee: "jkwak-work",
       suggestedReviewer: null,
-      requestedReviewer: "jkwak-work",
+      autoRequestedReviewer: "jkwak-work",
     }),
     "**PR board sync:** auto-assigned @jkwak-work as shepherd for this Bot PR.",
   );
@@ -152,20 +168,23 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     source: "Community",
     assignee: "alice",
     suggestedReviewer: "skallweitNV",
-    requestedReviewer: "alice",
+    autoRequestedReviewer: "alice",
   });
   assert.match(
     withRequested,
     /^\*\*PR board sync:\*\* auto-assigned @alice as shepherd for this Community PR\./,
   );
-  assert.match(withRequested, /higher for skallweitNV than for the auto-requested reviewer \(alice\)/);
+  assert.match(
+    withRequested,
+    /higher for skallweitNV than for the auto-requested reviewer \(alice\)/,
+  );
   assert.doesNotMatch(withRequested, /@skallweitNV/);
 
   const withoutRequested = formatAssignmentComment({
     source: "Bot",
     assignee: "author-owner",
     suggestedReviewer: "dev1",
-    requestedReviewer: null,
+    autoRequestedReviewer: null,
   });
   assert.match(withoutRequested, /highest for dev1 among collaborators/);
   assert.doesNotMatch(withoutRequested, /@dev1/);

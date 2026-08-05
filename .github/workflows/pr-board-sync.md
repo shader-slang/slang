@@ -118,9 +118,10 @@ merge-queued PRs.
 3. Maintainer team member (or `fallback_assignee`).
 
 The owners allowlist (`pr-owners` for Community, `bot-pr-owners` for Bot) gates
-who may be chosen as shepherd. Auto-request never goes beyond that shepherd, and
-never requests the PR author. A collaborator with stronger committer signal than
-the auto-requested reviewer (or the top collaborator when nobody was
+who may be chosen as shepherd. Auto-request is that shepherd only when they are
+not the PR author, not on the ignored-reviewers list, and no real reviewer is
+already requested. A collaborator with stronger committer signal than the
+auto-requested reviewer (or the top other collaborator when nobody was
 auto-requested) may be named in the assignment comment as a suggested
 additional reviewer, but is never `requestReviewers`'d — so they are not
 notified unless someone follows up.
