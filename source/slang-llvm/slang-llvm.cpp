@@ -907,7 +907,7 @@ SlangResult LLVMDownstreamCompiler::compile(
                 // from the IR builder JIT path; the wrapper pairs disable
                 // with create() so a future caller can't accidentally
                 // construct an LLJIT with AVX-512 enabled.
-                Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createAVX512SafeLLJIT();
+                Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createSlangLLJIT();
                 if (!expectJit)
                 {
                     /* JS: NOTE!

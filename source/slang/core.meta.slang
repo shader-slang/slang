@@ -2802,6 +2802,28 @@ __generic<T> __extension vector<T, 4>
     [__unsafeForceInlineEarly]
     __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int2, int) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (vector<T, 2>, T) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(vector<T,2> xy, T z)
+    {
+        // legacy semantics with implicit promotion of z to vector<T,2>
+        this = { xy.x, xy.y, z, z };
+    }
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int, int2) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (T, vector<T, 2>) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(T x, vector<T,2> yz)
+    {
+        // legacy semantics with implicit promotion of x to vector<T,2>
+        this = { x, x, yz.x, yz.y };
+    }
 }
 
 ${
@@ -3972,6 +3994,23 @@ __generic<T>
 int __naturalStrideOf()
 {
     return __naturalStrideOf_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_GetNaturalAlignment))
+int __naturalAlignmentOf_impl(T v);
+
+// Return the largest power-of-two byte alignment that `T`'s natural layout guarantees.
+// This is the strongest alignment a value of `T` can be promised when its address is a
+// multiple of `T`'s natural stride, e.g. 16 for `float4`, 8 for `float2`/`half4`, and 4
+// for `float3` (whose 12-byte stride is not a power of two). It is the value the implicit
+// single-argument `*Aligned` byte-address accessors forward as their alignment promise so
+// that the promise is always a valid (power-of-two) alignment.
+__generic<T>
+[__unsafeForceInlineEarly]
+int __naturalAlignmentOf()
+{
+    return __naturalAlignmentOf_impl(__declVal<T>());
 }
 
 [__unsafeForceInlineEarly]

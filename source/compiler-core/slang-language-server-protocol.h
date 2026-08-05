@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../source/compiler-core/slang-json-value.h"
-#include "../../source/core/slang-rtti-info.h"
+#include "compiler-core/slang-json-value.h"
+#include "core/slang-rtti-info.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"

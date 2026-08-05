@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T16:50:00+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#hlsl-semantics-sv
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#hlsl-semantics--sv
 //META: doc_section_digest=54f4af64d5483b7505c99a89151017d4036d4772330ee479fadd0f341299c8f6
 //META: purpose=`: register(...)` binding semantic propagates to emitted HLSL.
 //META: intent=functional

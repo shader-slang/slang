@@ -18,9 +18,9 @@
 //     SPIR-V is a stream of 32-bit words).
 //   * `Options` has documented defaults the rest of the embedder relies on.
 
-#include "../../source/compiler-core/slang-artifact.h"
-#include "../../source/compiler-core/slang-source-embed-util.h"
-#include "../../source/core/slang-string.h"
+#include "compiler-core/slang-artifact.h"
+#include "compiler-core/slang-source-embed-util.h"
+#include "core/slang-string.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

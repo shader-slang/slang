@@ -1,18 +1,19 @@
 // slang-code-gen.cpp
 #include "slang-code-gen.h"
 
-#include "../compiler-core/slang-slice-allocator.h"
-#include "../core/slang-type-convert-util.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-type-convert-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
+#include "slang-emit-metal.h"        // for `MetalExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
 #include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-util.h"
 #include "slang-artifact-output-util.h"
 
 namespace Slang
@@ -237,6 +238,12 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
             return new ShaderExtensionTracker;
+        }
+    case CodeGenTarget::Metal:
+    case CodeGenTarget::MetalLib:
+    case CodeGenTarget::MetalLibAssembly:
+        {
+            return new MetalExtensionTracker;
         }
     default:
         return nullptr;
@@ -773,16 +780,27 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
     options.targetType = (SlangCompileTarget)target;
 
-    // When compiling emitted MSL down to a metallib, tell the metal compiler which language
-    // standard to use. This must match the metallib capability the emitter honored: the emitter
-    // gates version-specific syntax such as `[[required_threads_per_threadgroup]]` on
-    // `metallib_4_0` (see MetalSourceEmitter::emitEntryPointAttributesImpl), so if the target
-    // implies metal4.0 we must compile with `-std=metal4.0` or the metal compiler rejects that
-    // syntax. Leaving the version unset preserves the compiler's historical default standard.
-    if (compilerType == PassThroughMode::MetalC &&
-        getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+    // The `-std` handed to the metal compiler must cover the newest syntax the emitter used, which
+    // the target capability alone does not describe: `printf` emits `<metal_logging>` (metal3.2)
+    // even though no metallib atom is present. Leaving it unset keeps the historical default.
+    if (compilerType == PassThroughMode::MetalC)
     {
-        options.metalLanguageVersion = SemanticVersion(4, 0);
+        SemanticVersion metalLanguageVersion;
+        if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+            metalLanguageVersion = SemanticVersion(4, 0);
+
+        if (auto metalTracker = as<MetalExtensionTracker>(extensionTracker))
+        {
+            auto emittedVersion = metalTracker->getRequiredMetalLanguageVersion();
+            if (emittedVersion > metalLanguageVersion)
+                metalLanguageVersion = emittedVersion;
+
+            if (metalTracker->getRequiresLogging())
+                options.flags |= CompileOptions::Flag::EnableLogging;
+        }
+
+        if (metalLanguageVersion.isSet())
+            options.metalLanguageVersion = metalLanguageVersion;
     }
 
     // Need to configure for the compilation

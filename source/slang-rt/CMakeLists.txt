@@ -9,6 +9,7 @@ if(SLANG_ENABLE_SLANGRT)
         LINK_WITH_PUBLIC unordered_dense::unordered_dense
         EXPORT_MACRO_PREFIX SLANG_RT
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
         INSTALL
         # This depends on unordered_dense in the header, so we can't export
         # this via cmake without obligating ourselves to also install our
@@ -16,10 +17,12 @@ if(SLANG_ENABLE_SLANGRT)
         # name so we don't attempt to export it
         EXPORT_SET_NAME SlangRTTargets
     )
-    set_target_properties(slang-rt PROPERTIES
-        VERSION 0.${SLANG_VERSION_NUMERIC}
-        SOVERSION 0.${SLANG_VERSION_NUMERIC}
-        MACHO_COMPATIBILITY_VERSION 0.0.0
-        MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
+    set_target_properties(
+        slang-rt
+        PROPERTIES
+            VERSION 0.${SLANG_VERSION_NUMERIC}
+            SOVERSION 0.${SLANG_VERSION_NUMERIC}
+            MACHO_COMPATIBILITY_VERSION 0.0.0
+            MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
     )
 endif()

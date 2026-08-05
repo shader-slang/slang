@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T16:30:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
-//META: doc_ref=docs/generated/design/ast-reference/expressions.md#astypeexpr-istypeexpr-casttosupertypeexpr
+//META: doc_ref=docs/generated/design/ast-reference/expressions.md#astypeexpr--istypeexpr--casttosupertypeexpr
 //META: doc_section_digest=8acefa9f31e1283f2e07f4a5c07a19625522aed173eb000464e0d7fc4693e965
 //META: purpose=An AsTypeExpr `value as Type` yields an Optional<Type> populated when the dynamic type matches; the value is recoverable.
 //META: intent=functional

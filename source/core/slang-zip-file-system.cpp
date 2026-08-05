@@ -10,10 +10,41 @@
 #include "slang-string-util.h"
 #include "slang-uint-set.h"
 
+#include <limits>
 #include <miniz.h>
 
 namespace Slang
 {
+
+/// Allocates a miniz ZIP buffer with Slang's configured allocator.
+static void* _allocateZipBuffer(void*, size_t items, size_t size)
+{
+    if (items && size > std::numeric_limits<size_t>::max() / items)
+        return nullptr;
+    return StandardAllocator::allocate(items * size);
+}
+
+/// Reallocates a miniz ZIP buffer that was returned by `_allocateZipBuffer`.
+static void* _reallocateZipBuffer(void*, void* address, size_t items, size_t size)
+{
+    if (items && size > std::numeric_limits<size_t>::max() / items)
+        return nullptr;
+    return StandardAllocator::reallocate(address, items * size);
+}
+
+/// Deallocates a miniz ZIP buffer that was returned by `_allocateZipBuffer`.
+static void _deallocateZipBuffer(void*, void* address)
+{
+    StandardAllocator::deallocate(address);
+}
+
+/// Configures a zeroed miniz ZIP archive to keep all owned buffers on Slang's allocator.
+static void _setZipAllocator(mz_zip_archive& archive)
+{
+    archive.m_pAlloc = _allocateZipBuffer;
+    archive.m_pRealloc = _reallocateZipBuffer;
+    archive.m_pFree = _deallocateZipBuffer;
+}
 
 class ZipFileSystemImpl : public ComBaseObject,
                           public ISlangMutableFileSystem,
@@ -163,6 +194,7 @@ static mz_file_read_func _calcReadFunc()
 {
     mz_zip_archive archive;
     mz_zip_zero_struct(&archive);
+    _setZipAllocator(archive);
     mz_zip_writer_init_heap(&archive, 0, 0);
     // Convert to reader
 
@@ -181,6 +213,7 @@ static mz_file_read_func _calcReadFunc()
 
     // Read
     mz_zip_zero_struct(&archive);
+    _setZipAllocator(archive);
     mz_zip_reader_init_mem(&archive, buf, size, 0);
 
     auto readFunc = archive.m_pRead;
@@ -249,6 +282,7 @@ String ZipFileSystemImpl::_getPathAtIndex(Index index)
 void ZipFileSystemImpl::_initReadWrite(mz_zip_archive& outWriter)
 {
     mz_zip_zero_struct(&outWriter);
+    _setZipAllocator(outWriter);
     mz_zip_writer_init_heap(&outWriter, 0, 0);
     outWriter.m_pRead = m_readFunc;
 }
@@ -316,6 +350,7 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                 {
                     mz_uint flags = 0;
                     mz_zip_zero_struct(&m_archive);
+                    _setZipAllocator(m_archive);
                     mz_zip_reader_init(&m_archive, 0, flags);
                     break;
                 }
@@ -404,25 +439,21 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                     void* buf;
                     size_t size;
                     mz_zip_writer_finalize_heap_archive(&m_archive, &buf, &size);
-                    // `buf` was allocated by the archive's own allocator (`m_pAlloc`); copy it
-                    // into the member allocation and release the original with the archive's
-                    // matching free callback (`m_pFree`) rather than `ScopedAllocation`'s
-                    // `::free`, so alloc/free stay paired even under custom allocator callbacks.
-                    // The callback must be read before `mz_zip_writer_end` below.
-                    const void* copied = m_data.set(buf, size);
-                    m_archive.m_pFree(m_archive.m_pAlloc_opaque, buf);
+
+                    // This archive uses `StandardAllocator` for all of its allocation callbacks,
+                    // so its finalized buffer can be transferred directly to `m_data` without a
+                    // copy.
+                    SLANG_RELEASE_ASSERT(
+                        m_archive.m_pAlloc == _allocateZipBuffer &&
+                        m_archive.m_pRealloc == _reallocateZipBuffer &&
+                        m_archive.m_pFree == _deallocateZipBuffer);
+                    m_data.attach(buf, size);
 
                     mz_zip_writer_end(&m_archive);
 
-                    // The copy above can fail under memory pressure; surface it as OOM (matching
-                    // `loadArchive`) rather than a generic reader-init failure below.
-                    if (!copied)
-                    {
-                        return SLANG_E_OUT_OF_MEMORY;
-                    }
-
                     // Read
                     mz_zip_zero_struct(&m_archive);
+                    _setZipAllocator(m_archive);
                     if (!mz_zip_reader_init_mem(
                             &m_archive,
                             m_data.getData(),
@@ -867,6 +898,7 @@ SlangResult ZipFileSystemImpl::loadArchive(const void* archive, size_t archiveSi
 
     // Initialize archive
     mz_zip_zero_struct(&m_archive);
+    _setZipAllocator(m_archive);
 
     // Read the contents of the archive, and make m_archive own it
     if (!mz_zip_reader_init_mem(&m_archive, m_data.getData(), archiveSizeInBytes, 0))

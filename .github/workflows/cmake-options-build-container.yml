@@ -67,7 +67,8 @@ jobs:
         with:
           persist-credentials: false
           submodules: "recursive"
-          fetch-depth: "2"
+          fetch-depth: "250"
+          fetch-tags: true
 
       - name: Configure Git safe directory
         run: |
