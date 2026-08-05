@@ -2796,10 +2796,8 @@ FIDDLE()
 struct IRDebugNoScope : IRInst
 {
     FIDDLE(leafInst())
-    // The scope operand is optional. With no operand this clears the active scope. With one it
-    // names a scope to restore, and consumers must treat it exactly as a DebugScope carrying only
-    // that scope — reusing this inst rather than adding an opcode keeps older compilers, whose
-    // emitter reads no operands here, able to load modules containing the one-operand form.
+    // The scope operand is optional: with none this clears the active scope, and with one it names
+    // a scope to restore, which consumers read as a DebugScope carrying only that scope.
     IRInst* getScope() { return operandCount >= 1 ? getOperand(0) : nullptr; }
     bool isScopePresent() { return operandCount >= 1; }
 };

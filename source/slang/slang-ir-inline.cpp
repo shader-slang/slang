@@ -371,17 +371,11 @@ struct InliningPassBase
                 break;
             }
         }
-        // Find the `IRDebugInlinedAt` active at the call site, if any. It is null when the call is
-        // not inside an inlined region (e.g. a top-level entry point). The call's inline context is
-        // the inlinedAt of its *enclosing* DebugScope, so stop at the first DebugScope and take its
-        // inlinedAt. Stopping there is what prevents crossing a preceding sibling inlined region's
-        // restore and wrongly picking up that earlier region's DebugInlinedAt; a DebugNoScope is
-        // likewise a hard boundary, and a scope-carrying one contributes no inlinedAt by
-        // construction, so null is correct in both of its forms. This shares the boundary set with
-        // the `callDebugScope` scan above and is largely its corollary: when that scan found a
-        // `callDebugScope`, this value is just that scope's `getInlinedAt()`. A separate scan is
-        // still needed for the one case it does not cover — a bare leftover `DebugInlinedAt`
-        // reached before any enclosing DebugScope/DebugNoScope.
+        // Find the `IRDebugInlinedAt` active at the call site, if any; it is null when the call is
+        // not inside an inlined region. Stopping at the first DebugScope or DebugNoScope is what
+        // prevents crossing a preceding sibling region's restore and picking up that region's
+        // DebugInlinedAt. A separate scan is needed from the one above for the case it does not
+        // cover — a bare leftover `DebugInlinedAt` reached before any enclosing scope inst.
         IRDebugInlinedAt* callDebugInlinedAt = nullptr;
         for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
         {

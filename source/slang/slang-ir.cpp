@@ -3685,9 +3685,6 @@ IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 
 IRInst* IRBuilder::emitDebugNoScope(IRInst* scope)
 {
-    // A null `scope` clears the active scope; a non-null one names the scope to restore, which
-    // consumers read as a DebugScope with no inlinedAt. An older compiler's emitter reads no
-    // operands from this inst, so it can still load a module containing the one-operand form.
     if (scope)
         return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 1, &scope);
     return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 0, nullptr);
