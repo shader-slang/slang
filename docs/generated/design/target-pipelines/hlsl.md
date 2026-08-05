@@ -631,10 +631,10 @@ flowchart TD
 | 5 | `simplifyForEmit` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | (always) | Line 2895. |
 | 6 | `sourceEmitter->emitModule` | [slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp) (+ HLSL overrides in `slang-emit-hlsl.cpp`) | (always) | Line 2903. Walks IR and writes HLSL text; prelude comes from `slang-emit-hlsl-prelude.cpp`. |
 | 7 | `createArtifactForCompileTarget` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | At line 2972 of `emitEntryPointsSourceFromIR`; wraps the HLSL text as an `IArtifact`. (`createArtifactFromIR` is the SPIR-V-direct helper and is not on the HLSL path.) |
-| 8 | `_emitEntryPoints` (intermediate recursion) | [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) | `target == DXILAssembly || target == DXBytecodeAssembly` | Lines 1119-1131: re-enters `_emitEntryPoints` on the binary intermediate (`DXIL` / `DXBytecode`) before any disassembly. |
+| 8 | `_emitEntryPoints` (intermediate recursion) | [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) | `target == DXILAssembly \|\| target == DXBytecodeAssembly` | Lines 1119-1131: re-enters `_emitEntryPoints` on the binary intermediate (`DXIL` / `DXBytecode`) before any disassembly. |
 | 9 | `compile` (DXC) | (downstream) | `target == DXIL` (line 1191) | Reached via `emitWithDownstreamForEntryPoints` after `_getDefaultSourceForTarget` maps the target to `CodeGenTarget::HLSL`. DXC is the default for SM 6.0+; output is DXIL bytecode. |
 | 10 | `compile` (fxc) | (downstream) | `target == DXBytecode` (line 1192) | Reached via `emitWithDownstreamForEntryPoints`. Legacy path; fxc compiles HLSL into D3D bytecode for SM 5.x. |
-| 11 | `dissassembleWithDownstream` | (downstream) | `target == DXILAssembly || target == DXBytecodeAssembly` | Line 1137 of `slang-code-gen.cpp`: disassembles the binary produced by row 8 into the requested assembly text. |
+| 11 | `dissassembleWithDownstream` | (downstream) | `target == DXILAssembly \|\| target == DXBytecodeAssembly` | Line 1137 of `slang-code-gen.cpp`: disassembles the binary produced by row 8 into the requested assembly text. |
 
 Neither spirv-link nor spirv-val nor spirv-opt apply to HLSL.
 Slang still validates and optimizes its own IR before emitting text

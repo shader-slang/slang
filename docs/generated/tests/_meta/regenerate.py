@@ -37,9 +37,11 @@ Subcommands
                                --commit / --model to override.
     lint [<bundle>...]         Structural linter (README.md front-matter
                                present + valid, every .slang file has a
-                               //META block, doc_ref resolves, size cap
-                               respected) on the given bundles (default:
-                               all).
+                               //META block, doc_ref resolves, README
+                               links resolve and their anchors name real
+                               headings, README tables are well-formed,
+                               size cap respected) on the given bundles
+                               (default: all).
     expansion-candidates [--from <report.json>]
                                Rank bundles by how lightly their
                                coverage_targets are exercised by the
@@ -85,9 +87,11 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote
 
 # --------------------------------------------------------------------------
 # Repo + path helpers
@@ -174,7 +178,16 @@ _ALLOWED_OOS_REASONS = (
 
 
 def _rel_to_repo(path: Path) -> str:
-    return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    """Return `path` relative to the repo root, for use in messages.
+
+    A path outside the repo is returned unchanged rather than raising:
+    this only labels diagnostics, so a caller reporting on a file
+    elsewhere should still get a readable message.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except ValueError:
+        return str(path)
 
 
 # --------------------------------------------------------------------------
@@ -1132,6 +1145,252 @@ class LintIssue:
     message: str
 
 
+# --------------------------------------------------------------------------
+# Markdown link / anchor resolution
+#
+# Bundle READMEs and //META doc_ref fields both cite documentation as
+# `<path>#<anchor>`. Both halves have to hold up on GitHub: the path has
+# to resolve relative to the file that spells it (a bundle nested one
+# level deeper than the prompt template's example otherwise silently
+# loses a `../`), and the anchor has to match a heading slug in the
+# target document.
+# --------------------------------------------------------------------------
+
+_MD_LINK_RE = re.compile(r"\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+_ATX_HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.*?)\s*#*\s*$")
+_SETEXT_UNDERLINE_RE = re.compile(r"^(?:=+|-+)\s*$")
+
+
+def _github_slug(title: str) -> str:
+    """Return the fragment GitHub generates for a markdown heading.
+
+    GitHub lowercases the text, drops everything that is neither a word
+    character, a hyphen, nor a space, and then turns each remaining space
+    into a hyphen. Note that the punctuation is dropped rather than
+    replaced, so `A / B` becomes `a--b` (two hyphens, one per space) --
+    the most common way a hand-written anchor ends up not resolving.
+    """
+    title = re.sub(r"`([^`]*)`", r"\1", title)
+    title = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", title)
+    title = re.sub(r"[*_~]", "", title)
+    slug = re.sub(r"[^\w\- ]", "", title.strip().lower(), flags=re.UNICODE)
+    return slug.replace(" ", "-")
+
+
+_HEADING_SLUG_CACHE: dict[Path, set[str]] = {}
+
+
+def heading_slugs(doc: Path) -> set[str]:
+    """Return every anchor GitHub would generate for `doc`'s headings.
+
+    Handles both ATX (`## Title`) and setext (`Title` over `-----`)
+    headings, skips fenced code blocks, and appends `-1`, `-2`, ... to
+    repeated slugs the way GitHub disambiguates them.
+    """
+    cached = _HEADING_SLUG_CACHE.get(doc)
+    if cached is not None:
+        return cached
+    slugs: set[str] = set()
+    counts: dict[str, int] = {}
+    try:
+        lines = doc.read_text(encoding="utf-8").split("\n")
+    except OSError:
+        _HEADING_SLUG_CACHE[doc] = slugs
+        return slugs
+    in_fence = False
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _ATX_HEADING_RE.match(line)
+        if m:
+            title = m.group("title")
+        elif (
+            _SETEXT_UNDERLINE_RE.match(line)
+            and i > 0
+            and lines[i - 1].strip()
+            and lines[i - 1].lstrip()[:1] not in ("|", ">", "#", "-", "=")
+        ):
+            title = lines[i - 1].strip()
+        else:
+            continue
+        slug = _github_slug(title)
+        if not slug:
+            continue
+        n = counts.get(slug, 0)
+        counts[slug] = n + 1
+        slugs.add(slug if n == 0 else f"{slug}-{n}")
+    _HEADING_SLUG_CACHE[doc] = slugs
+    return slugs
+
+
+def lint_markdown_links(md_path: Path) -> list[LintIssue]:
+    """Check that every relative link in `md_path` resolves.
+
+    A link whose path does not exist is an error: it renders as a dead
+    link on GitHub, and the usual cause is a `../` miscount, which no
+    other check catches. A link whose path resolves but whose `#anchor`
+    matches no heading in the target is a warning -- it lands the reader
+    on the right document but the wrong place, and repairing it needs a
+    judgement call about which section was meant.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    # A coverage table cites the same anchor once per claim row, so report
+    # each distinct problem once rather than once per citation.
+    reported: set[str] = set()
+    for m in _MD_LINK_RE.finditer(text):
+        url = m.group("url")
+        if url.startswith(("http://", "https://", "mailto:", "#", "<")):
+            continue
+        path, _, fragment = url.partition("#")
+        if not path:
+            continue
+        if url in reported:
+            continue
+        target = (md_path.parent / unquote(path)).resolve()
+        if not target.exists():
+            reported.add(url)
+            issues.append(
+                LintIssue(rel, "error", f"link path does not resolve: {url}")
+            )
+            continue
+        if fragment and target.suffix == ".md":
+            if unquote(fragment) not in heading_slugs(target):
+                reported.add(url)
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "warning",
+                        f"link anchor matches no heading in {path}: #{fragment}",
+                    )
+                )
+    return issues
+
+
+# --------------------------------------------------------------------------
+# Markdown table shape
+#
+# A bundle README is almost entirely tables, and a claim is free text that
+# can contain a `|` -- an operator (`isKhronosTarget || HLSL`), a union
+# type, a shell pipe. Unescaped, it opens a new cell. GitHub only renders
+# a table at all when its delimiter row has exactly as many cells as its
+# header, so one stray `|` in a claim can drop a 30-row coverage table on
+# the floor and render it as a wall of pipe characters.
+# --------------------------------------------------------------------------
+
+_UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+_DELIM_CELL_RE = re.compile(r"^:?-+:?$")
+
+
+def _is_delimiter_row(line: str) -> bool:
+    """Return whether `line` is a table's delimiter row.
+
+    GFM accepts a single dash per cell (`| - | - |`) and a one-column
+    table, so this tests each cell rather than matching the row against
+    one pattern -- a stricter pattern would skip such a table entirely
+    and quietly leave it unvalidated.
+    """
+    cells = _row_cells(line)
+    return bool(cells) and all(_DELIM_CELL_RE.match(c.strip()) for c in cells)
+
+
+def _row_cells(line: str) -> list[str]:
+    """Split one markdown table row into cells on its unescaped pipes.
+
+    A `\\|` is content rather than a cell boundary, which is how a claim
+    spells a literal pipe, so only bare `|` separates. The leading and
+    trailing pipes that delimit the row are not separators and are
+    dropped.
+    """
+    parts = _UNESCAPED_PIPE_RE.split(line.strip())
+    if parts and not parts[0].strip():
+        parts = parts[1:]
+    if parts and not parts[-1].strip():
+        parts = parts[:-1]
+    return parts
+
+
+def lint_markdown_tables(md_path: Path) -> list[LintIssue]:
+    """Check that every markdown table in `md_path` renders on GitHub.
+
+    A delimiter row whose cell count differs from its header's is an
+    error, because GitHub then does not recognize the block as a table
+    at all and renders the raw pipes. A body row that disagrees with the
+    header is also an error: GitHub pads or truncates it, so a claim
+    containing an unescaped `|` silently loses its trailing columns --
+    which is how a coverage row can end up with no Tests link.
+
+    Fenced code blocks are skipped, the same way `heading_slugs` skips
+    them: a bundle README quotes example tables inside ``` fences, and
+    those are illustrations rather than tables GitHub will render.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        lines = md_path.read_text(encoding="utf-8").split("\n")
+    except OSError:
+        return issues
+    i = 0
+    in_fence = False
+    while i < len(lines):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        header = lines[i]
+        if in_fence or not header.lstrip().startswith("|") or i + 1 >= len(lines):
+            i += 1
+            continue
+        if not _is_delimiter_row(lines[i + 1]):
+            i += 1
+            continue
+        width = len(_row_cells(header))
+        delim_width = len(_row_cells(lines[i + 1]))
+        if delim_width != width:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"table at line {i + 1} does not render: header has"
+                    f" {width} cells but its delimiter row has {delim_width}",
+                )
+            )
+        i += 2
+        while i < len(lines) and lines[i].lstrip().startswith("|"):
+            cells = _row_cells(lines[i])
+            if len(cells) != width:
+                # An extra cell that carries text came from a `|` inside
+                # the content; an extra empty one is just a stray
+                # delimiter. Naming the right cause saves the reader a
+                # hunt through a 400-character claim.
+                hint = ""
+                if len(cells) > width:
+                    hint = (
+                        " (escape a literal pipe in cell text as `\\|`)"
+                        if any(c.strip() for c in cells[width:])
+                        else " (stray trailing delimiter)"
+                    )
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "error",
+                        f"table row at line {i + 1} has {len(cells)} cells,"
+                        f" expected {width}{hint}",
+                    )
+                )
+            i += 1
+    return issues
+
+
 _REQUIRED_BUNDLE_FM_KEYS = (
     "generated",
     "model",
@@ -1193,6 +1452,9 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                     f" {spec.source_doc!r}",
                 )
             )
+
+    issues.extend(lint_markdown_links(bundle_md))
+    issues.extend(lint_markdown_tables(bundle_md))
 
     test_files = sorted(bdir.glob("*.slang"))
     if len(test_files) > spec.size_cap_files:
@@ -1390,7 +1652,7 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             )
     doc_ref = meta.get("doc_ref", "")
     if doc_ref:
-        target = doc_ref.split("#", 1)[0]
+        target, _, anchor = doc_ref.partition("#")
         if not target:
             issues.append(LintIssue(rel, "error", "//META doc_ref has empty path"))
         else:
@@ -1403,6 +1665,16 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                         f"//META doc_ref path does not resolve: {target}",
                     )
                 )
+            elif anchor and candidate.suffix == ".md":
+                if anchor not in heading_slugs(candidate):
+                    issues.append(
+                        LintIssue(
+                            rel,
+                            "warning",
+                            f"//META doc_ref anchor matches no heading in"
+                            f" {target}: #{anchor}",
+                        )
+                    )
     # Every test file must contain at least one //TEST or //DIAGNOSTIC_TEST
     # directive — otherwise slang-test will silently skip it.
     if "//TEST" not in text and "//DIAGNOSTIC_TEST" not in text:
@@ -2116,24 +2388,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------
 
 
-def _gh_slug(heading_text: str) -> str:
-    """Compute a GitHub-flavored markdown heading anchor.
-
-    Approximation of the algorithm GitHub uses to render `## Foo Bar`
-    as `#foo-bar`:
-    - lowercase
-    - replace runs of whitespace with `-`
-    - strip characters outside [a-z0-9-_]
-    - leading hyphens kept, but consecutive hyphens collapsed
-    """
-    s = heading_text.strip().lower()
-    s = re.sub(r"[`*_~]", "", s)  # strip markdown emphasis
-    s = re.sub(r"\s+", "-", s)
-    s = re.sub(r"[^a-z0-9\-_]", "", s)
-    s = re.sub(r"-+", "-", s)
-    return s
-
-
 def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
     """Walk docs/language-reference/*.md. For each file, return a list
     of (lineno, level, anchor_id) tuples — one per heading.
@@ -2164,18 +2418,18 @@ def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
                     aid = m2.group(1).lower()
                     txt = re.sub(r"\s*\{#[\w\-]+\}\s*$", "", txt)
                 else:
-                    aid = _gh_slug(txt)
+                    aid = _github_slug(txt)
                 anchors.append((i + 1, level, aid))
             else:
                 # Setext-style: a non-blank line followed by ==== or ----
                 if i + 1 < len(lines):
                     nxt = lines[i + 1]
                     if ln.strip() and re.match(r"^=+\s*$", nxt):
-                        anchors.append((i + 1, "#", _gh_slug(ln)))
+                        anchors.append((i + 1, "#", _github_slug(ln)))
                         i += 2
                         continue
                     if ln.strip() and re.match(r"^-+\s*$", nxt) and not ln.startswith("-"):
-                        anchors.append((i + 1, "##", _gh_slug(ln)))
+                        anchors.append((i + 1, "##", _github_slug(ln)))
                         i += 2
                         continue
             i += 1
@@ -3035,6 +3289,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_dg.set_defaults(func=cmd_doc_gaps)
 
+    p_st = sub.add_parser(
+        "selftest",
+        help="unit-check the slug / link / table helpers used by lint",
+    )
+    p_st.set_defaults(func=cmd_selftest)
+
     p_rs = sub.add_parser(
         "review-status",
         help="(Phase D) per-bundle review/remediation freshness",
@@ -3112,6 +3372,117 @@ def _build_parser() -> argparse.ArgumentParser:
     p_fd.set_defaults(func=cmd_findings_dup)
 
     return p
+
+
+def cmd_selftest(args: argparse.Namespace) -> int:
+    """Unit-check the helpers `lint` depends on, on inputs the corpus does
+    not contain.
+
+    `lint` itself only ever exercises these against the committed corpus,
+    which is kept clean -- so it proves the happy path and nothing else.
+    The cases below are the edge ones: the punctuation rule that made
+    every anchor in this corpus wrong, the escaped pipe that decides
+    whether a row is well-formed, the GFM spellings (single-dash
+    delimiter, one-column table) that a stricter reader would skip
+    without reporting anything, and the link/anchor resolution that is
+    the headline of this change -- its error, warning, and dedup
+    branches, which the clean corpus never triggers.
+    """
+    failures: list[str] = []
+
+    def check(what: str, got, want) -> None:
+        if got != want:
+            failures.append(f"{what}: got {got!r}, want {want!r}")
+
+    # Punctuation is deleted, not replaced, so each surrounding space
+    # still yields a hyphen. This is the rule the old `_gh_slug`
+    # collapsed away, and collapsing it is what made the corpus's
+    # anchors miss.
+    check("slug plain", _github_slug("Basic scalar types"), "basic-scalar-types")
+    check(
+        "slug slashes",
+        _github_slug("CUDA / Python / FFI attributes"),
+        "cuda--python--ffi-attributes",
+    )
+    check("slug code span", _github_slug("The `IRFunc` type"), "the-irfunc-type")
+    check("slug trailing punct", _github_slug("What now?"), "what-now")
+
+    # Repeated headings get -1, -2; fenced `# comment` lines are not
+    # headings.
+    with tempfile.TemporaryDirectory() as td:
+        doc = Path(td) / "d.md"
+        doc.write_text(
+            "# Title\n## Dup\n## Dup\nSetext\n------\n"
+            "```sh\n# not a heading\n```\n",
+            encoding="utf-8",
+        )
+        check(
+            "heading slugs",
+            heading_slugs(doc),
+            {"title", "dup", "dup-1", "setext"},
+        )
+
+    # Only a bare pipe separates cells.
+    check("row plain", _row_cells("| a | b | c |"), [" a ", " b ", " c "])
+    check("row escaped", len(_row_cells(r"| a | `x \|\| y` | c |")), 3)
+    check("row extra", len(_row_cells("| a | b | c | d |")), 4)
+
+    # GFM spellings a stricter delimiter test would silently skip.
+    check("delim single dash", _is_delimiter_row("| - | - |"), True)
+    check("delim one column", _is_delimiter_row("| --- |"), True)
+    check("delim aligned", _is_delimiter_row("| :--- | ---: | :---: |"), True)
+    check("delim not a delim", _is_delimiter_row("| a | b |"), False)
+
+    # A malformed row is reported, and a table inside a fence is not.
+    with tempfile.TemporaryDirectory() as td:
+        md = Path(td) / "README.md"
+        md.write_text(
+            "| h1 | h2 |\n| --- | --- |\n| a | b | c |\n\n"
+            "```markdown\n| bad |\n| --- | --- |\n```\n",
+            encoding="utf-8",
+        )
+        found = [i.message for i in lint_markdown_tables(md)]
+        check("table one issue", len(found), 1)
+        check("table names the row", "line 3" in found[0] if found else False, True)
+        check(
+            "table blames the pipe",
+            "escape a literal pipe" in found[0] if found else False,
+            True,
+        )
+
+    # lint_markdown_links -- the function this PR is named for. A dead
+    # path is an error (the `../` miscount this PR set out to fix), a
+    # resolved path whose `#anchor` hits no heading is a warning, a
+    # citation that resolves in both halves is silent, and the same
+    # broken citation repeated across rows is reported once (a coverage
+    # table cites the same anchor per claim).
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "target.md").write_text("# Real Heading\n", encoding="utf-8")
+        src = root / "README.md"
+        src.write_text(
+            "[ok](target.md#real-heading)\n"
+            "[stale anchor](target.md#missing)\n"
+            "[dead](nope.md#x)\n"
+            "[dead again](nope.md#x)\n",
+            encoding="utf-8",
+        )
+        issues = lint_markdown_links(src)
+        errors = [i for i in issues if i.severity == "error"]
+        warnings = [i for i in issues if i.severity == "warning"]
+        check("links dead path is error", len(errors), 1)
+        check("links stale anchor is warning", len(warnings), 1)
+        check("links dedups repeated citation", len(issues), 2)
+        check(
+            "links error names the path",
+            "nope.md" in errors[0].message if errors else False,
+            True,
+        )
+
+    for f in failures:
+        print(f"FAIL {f}")
+    print(f"selftest: {len(failures)} failure(s)")
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:

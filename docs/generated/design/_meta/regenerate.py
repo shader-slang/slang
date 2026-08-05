@@ -30,7 +30,8 @@ Subcommands
                                generation timestamp. Pass --commit / --model
                                to override.
     lint [<doc>...]            Run the structural linter (front-matter
-                               present, paths resolve, size cap respected)
+                               present, paths resolve, tables well-formed,
+                               size cap respected)
                                on the given documents (default: all). Also
                                lints every review and remediation report
                                under _meta/reviews/ and _meta/remediations/.
@@ -580,6 +581,9 @@ def parse_markdown_table(section_body: str) -> list[dict[str, str]] | None:
     return None
 
 
+_UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+
+
 def _is_separator_row(line: str) -> bool:
     cells = _split_md_row(line)
     if not cells:
@@ -592,12 +596,22 @@ def _is_separator_row(line: str) -> bool:
 
 
 def _split_md_row(line: str) -> list[str]:
+    """Split one Markdown table row into its cells.
+
+    Only a bare `|` separates cells: a `\\|` is a literal pipe in the
+    cell's text, which is how a table spells a gate condition such as
+    `isD3DTarget \\|\\| isSPIRV` without opening a new column. Splitting
+    on every pipe would give that row two extra cells, and
+    `parse_markdown_table` stops at the first row whose cell count
+    disagrees with the header -- so an escape-blind split silently
+    truncates a findings or Actions table at its first such row.
+    """
     s = line.strip()
     if s.startswith("|"):
         s = s[1:]
-    if s.endswith("|"):
+    if s.endswith("|") and not s.endswith("\\|"):
         s = s[:-1]
-    return [c.strip() for c in s.split("|")]
+    return [c.strip().replace("\\|", "|") for c in _UNESCAPED_PIPE_RE.split(s)]
 
 
 # --------------------------------------------------------------------------
@@ -667,6 +681,75 @@ def lint_doc(spec: DocSpec) -> list[LintIssue]:
                     spec.path, "error", f"link target does not resolve: {target}"
                 )
             )
+    issues.extend(lint_markdown_tables(spec.path, text))
+    return issues
+
+
+def lint_markdown_tables(doc: str, text: str) -> list[LintIssue]:
+    """Check that every Markdown table in `text` renders on GitHub.
+
+    These docs describe pass pipelines, so their tables are full of gate
+    conditions like `isD3DTarget || isSPIRV`. An unescaped pipe there
+    opens a new cell, and GitHub renders a row with more cells than the
+    header by dropping the extra ones -- so the row's last columns
+    silently vanish from the published doc. A delimiter row that does not
+    match its header is worse: GitHub then does not recognize the block
+    as a table at all and prints the raw pipes.
+
+    Fenced code blocks are skipped, matching the tests-tree twin. These
+    docs quote grammar productions and example tables inside ``` fences
+    -- e.g. the BNF alternatives in `syntax-reference/grammar.md`, whose
+    lines begin with `|` -- which are illustrations, not tables GitHub
+    renders. Since this lint now runs in CI, a false positive on such a
+    fenced block would fail the nightly.
+    """
+    issues: list[LintIssue] = []
+    lines = text.split("\n")
+    i = 0
+    in_fence = False
+    while i < len(lines):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        if in_fence or not lines[i].lstrip().startswith("|") or i + 1 >= len(lines):
+            i += 1
+            continue
+        if not _is_separator_row(lines[i + 1]):
+            i += 1
+            continue
+        width = len(_split_md_row(lines[i]))
+        sep_width = len(_split_md_row(lines[i + 1]))
+        if sep_width != width:
+            issues.append(
+                LintIssue(
+                    doc,
+                    "error",
+                    f"table at line {i + 1} does not render: header has"
+                    f" {width} cells but its separator row has {sep_width}",
+                )
+            )
+        i += 2
+        while i < len(lines) and lines[i].lstrip().startswith("|"):
+            cells = _split_md_row(lines[i])
+            if len(cells) != width:
+                hint = ""
+                if len(cells) > width:
+                    hint = (
+                        " (escape a literal pipe in cell text as `\\|`)"
+                        if any(c for c in cells[width:])
+                        else " (stray trailing delimiter)"
+                    )
+                issues.append(
+                    LintIssue(
+                        doc,
+                        "error",
+                        f"table row at line {i + 1} has {len(cells)} cells,"
+                        f" expected {width}{hint}",
+                    )
+                )
+            i += 1
     return issues
 
 
