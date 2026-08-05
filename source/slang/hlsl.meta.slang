@@ -19620,7 +19620,8 @@ void CallShader(uint shaderIndex, inout Payload payload)
 {
     __target_switch
     {
-    // $1 is the already-pointer-typed inout payload, matching the callee's pointer parameter.
+    // $0 is the shader index, and $1 is the already-pointer-typed inout payload, matching the
+    // callee's pointer parameter. CallShader always returns void; results flow back through $1.
     case cuda: __intrinsic_asm "optixDirectCall<void>($0, $1)";
     case hlsl: __intrinsic_asm "CallShader";
     case glsl:
