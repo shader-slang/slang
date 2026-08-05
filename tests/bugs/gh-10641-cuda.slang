@@ -1,11 +1,10 @@
 // Regression test for the CUDA and Metal handling of a bare `groupshared` array parameter
 // (https://github.com/shader-slang/slang/issues/10641).
 //
-// A bare `groupshared` array parameter is passed by reference, which lowers to a pointer into the
-// group-shared address space. This test pins the target-specific spelling of that pointer. On the
-// CUDA target it is a plain pointer parameter (`T*`) with no parameter-level `__shared__`
-// qualifier -- the `__shared__` storage stays on the caller's global -- and `[noinline]` must be
-// honored. On the Metal target it is a `threadgroup`-qualified pointer (`T threadgroup*`). The
+// A bare `groupshared` array parameter is passed by reference, so a write through it must land on
+// the caller's group-shared storage and never on a per-thread copy. Inlining the callee is the
+// default legalization and `[noinline]` does not prevent it, so what these lanes pin is the storage
+// the write reaches once the callee is gone: `__shared__` on CUDA, `threadgroup` on Metal. The
 // `-target ptx` lane additionally compiles the emitted CUDA through NVRTC, which rejects member
 // access on a pointer -- the failure mode when the by-reference parameter is mistaken for a
 // by-value array.
@@ -20,14 +19,15 @@ RWStructuredBuffer<uint> outputBuffer;
 static const uint N = 8;
 groupshared uint groupSharedData[N];
 
-// A `[noinline]` bare group-shared parameter must survive as an ordinary by-reference (pointer)
-// parameter, with no `__shared__` qualifier on the parameter itself and no forced inlining. Its
-// `__shared__`-ness stays on the caller's global, never on the parameter.
-// CUDA: void writeSlot{{.*}}({{.*}}* scratch
-// CUDA-NOT: __shared__ {{[A-Za-z0-9_<>, ]*}}scratch
+// The array itself is the group-shared storage, and the write reaches it directly rather than a
+// local copy. A per-thread copy -- the #10641 defect -- would appear as a plain (non-`__shared__`)
+// declaration written instead.
+// CUDA: __shared__ {{.*}}groupSharedData
+// CUDA: groupSharedData{{.*}}] =
 //
-// The same by-reference group-shared pointer is spelled `threadgroup*` on Metal.
-// METAL: void writeSlot{{.*}}(uint {{[A-Za-z0-9_]+}}, {{.*}}threadgroup* scratch
+// Metal spells the same storage `threadgroup`.
+// METAL: threadgroup {{.*}}groupSharedData
+// METAL: groupSharedData{{.*}}] =
 //
 // NVRTC accepts the emitted CUDA and produces PTX for the entry point.
 // PTX: computeMain

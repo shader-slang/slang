@@ -47,7 +47,8 @@ void main(uint tid : SV_DispatchThreadID)
 //CHECK-DAG: func %readOnlyConst{{.*}}BorrowInParam
 //CHECK-DAG: func %readOnlyConstRef{{.*}}BorrowInParam
 
-// ... while the bare spelling keeps the read-write `BorrowInOutParam`. This is the other half of
-// the control: injecting the borrow modifier unconditionally would silently make every bare
-// `groupshared` parameter read-only, which this check would catch.
-//CHECK-DAG: func %readWrite{{.*}}BorrowInOutParam
+// ... while the bare spelling is the strict read-write reference `RefParam`, which unlike a borrow
+// has no copy-in fallback. This is the other half of the control: injecting the borrow modifier
+// unconditionally would silently make every bare `groupshared` parameter read-only and reintroduce
+// that fallback, which this check would catch.
+//CHECK-DAG: func %readWrite{{.*}}RefParam
