@@ -5,6 +5,7 @@
 
 RWStructuredBuffer<float> outputBuffer;
 
+[noinline]
 float cube(float x) { return x * x * x; }
 
 [ForceInline]

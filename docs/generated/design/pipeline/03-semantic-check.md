@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-29T13:53:20Z
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-watched_paths_digest: 028fc0023a149337cabae05a0de4a7ebf1eec342be28f4f423b6a59e178c6578
+model: claude-opus-5
+generated_at: 2026-08-03T13:32:49Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: a244dfa19ecf6d79ea826d9b14c775491f6a2445e1ddbc0c633a710605a2aec3
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -62,10 +62,10 @@ Every file collaborates through `SemanticsContext` /
 | [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup |
 | [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances |
 | [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks |
-| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance, extension lookup, member visibility |
+| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation |
 | [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments |
 | [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) |
-| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Validates `Val` substitution after generic resolution |
+| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values |
 | [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules |
 
 ## Two-pass interaction with the parser
@@ -181,6 +181,65 @@ see the `switch` over `candidate.genericInferenceFailure.kind` in
 Before this mechanism, every specialization failure collapsed into the
 catch-all `Diagnostics::GenericArgumentInferenceFailed`.
 
+### Differentiability as interface conformance
+
+Differentiability is recorded as an interface conformance of the
+*function viewed as a type*, rather than as a modifier fact that later
+stages re-derive. Consider:
+
+```slang
+[Differentiable]
+float f(float x) { return x * x; }
+```
+
+`[Differentiable]` parses to a `BackwardDifferentiableAttribute` (see
+the `attribute_syntax` declarations in
+[core.meta.slang](../../../../source/slang/core.meta.slang), line 470 at
+`source_commit`). When `SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon`
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp),
+line 14950) sees that attribute or a `ForwardDifferentiableAttribute`,
+it calls `extendContainerDecl` to synthesize
+`extension __func_as_type(f) : IForwardDifferentiable<__func_as_type(f)>`
+and then `addSynthesizedFunc` to give that extension the `fwd_diff`
+member the interface requires, with `kIROp_ForwardDifferentiate` as its
+implementation. The synthesized `fwd_diff` is in turn given the same
+pair of conformances, which is what makes higher-order differentiation
+resolve through ordinary lookup.
+
+The interface types themselves are built by
+`getForwardDiffFuncInterfaceType` and
+`getBackwardDiffFuncInterfaceType` (lines 10014 and 10020), which pair
+the base function type with the `__hasDiffTypeInfo` witness that
+`IForwardDifferentiable<FType>` / `IBackwardDifferentiable<FType>`
+demand — those interfaces are declared in
+[core.meta.slang](../../../../source/slang/core.meta.slang) at lines 720
+and 739, and their requirements (`fwd_diff`, the `BwdCallable` /
+`MinimalContext` associated types, `apply_bwd`) are what the checker
+must supply.
+
+Because the fact now lives in a witness table, asking "is this callee
+differentiable?" is a subtype query instead of a modifier lookup:
+`isFuncForwardDifferentiable` and `isFuncBackwardDifferentiable` (lines
+5467 and 5476) return the `SubtypeWitness*` that
+`tryGetSubtypeWitness` produced, replacing the earlier boolean
+`doesCalleeHaveFwdDiff` / `doesCalleeHaveBwdDiff` predicates. Handing
+back the witness rather than a `bool` matters because the caller needs
+that witness to build and specialize the derivative call.
+
+A `[Differentiable]` annotation on an *interface requirement* is
+handled the same way as the associated-type constraints described
+above — as a requirement of the enclosing interface rather than
+something nested under the member. `_moveInterfaceDifferentiabilityRequirementToInterface`
+(line 14863) starts the `GenericTypeConstraintDecl` under the callable
+that owns the generic environment its type mentions, then uses
+`liftDeclFromGenericContainers` to hoist it into a standalone generic
+requirement directly under the interface. The explicit
+`__func_extension fwd_diff(foo)(...)` spelling arrives at the same
+representation through `_funcExtensionForwardDiff` /
+`_funcExtensionBackwardDiff` (lines 15981 and 16016), which rewrite it
+into `extension foo : IForwardDifferentiable<foo>` with the user's body
+as the `fwd_diff` member.
+
 The full conceptual model (interfaces, witness tables, existential
 types) is in
 [../../../design/interfaces.md](../../../design/interfaces.md) and
@@ -248,6 +307,38 @@ validation rather than the general inference walk:
   now uses `Linkage::isSpecialized` together with the presence of
   specialization-argument strings to decide, and emits the diagnostic
   only for the truly-unspecialized case.
+- **Conflicting depth outputs.** A fragment entry point may write at
+  most one depth system value. Because the per-parameter semantic check
+  looks at each semantic in isolation, the conflict is detected
+  separately: `collectDepthOutputSemantics`
+  ([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp),
+  line 536 at `source_commit`) walks every `out` / `inout` parameter and
+  the return type — unwrapping `Conditional<T>` and array wrappers and
+  recursing into struct fields, so a semantic on a field of an
+  `out DepthOut a[1]` is still reached — and a collected count above one
+  produces `Diagnostics::MultipleDepthOutputSemantics`, naming the
+  second contributor as conflicting with the first.
+- **System-value semantic type compatibility.** `isSemanticTypeCompatible`
+  (line 112) decides whether a declared type may carry a given
+  system-value semantic. Two types match when they have the same shape
+  (both scalar, or both vectors of equal element count) and their scalar
+  element types fall in the same category — integer, floating-point, or
+  bool. That admits sign coercions such as `int3` for a `uint3` semantic
+  while still rejecting cross-category ones such as `float` for a `uint`
+  semantic.
+- **Ignored binding modifiers on entry-point parameters.** Slang
+  silently ignores `[[vk::binding(...)]]`, `[[vk::push_constant]]`,
+  `register()`, and `packoffset()` in some positions, which misleads
+  users either way. Entry-point parameter checking therefore reports
+  `Diagnostics::UnhandledModOnEntryPointParameter` for each such
+  modifier. Only the `[[vk::binding(...)]]` case is gated — by
+  `_allTargetsSupportVkBindingOnEntryPointParameters` (line 1580) over
+  all of the linkage's targets and by
+  `isVkBindingCompatibleEntryPointParameterType` (line 920) for the
+  parameter's own type — so that it fires only where the attribute
+  really would be dropped. `[[vk::push_constant]]`, `register()`, and
+  `packoffset()` are diagnosed unconditionally when found on an
+  entry-point parameter.
 
 ## Failure modes
 
@@ -292,6 +383,8 @@ point the user at the likely fix:
 The diagnostic infrastructure is described in
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md).
 
-When the checker completes, every `Decl` in the translation unit is
-either fully checked or marked errored, and the AST is ready for IR
-lowering (see [04-ast-to-ir.md](04-ast-to-ir.md)).
+`checkModule` drives every `Decl` in the translation unit through the
+`DeclCheckState` sequence up to `CapabilityChecked`; there is no
+separate errored state, so recovery is expressed as diagnostics plus
+error types / expressions substituted in place. The AST is then ready
+for IR lowering (see [04-ast-to-ir.md](04-ast-to-ir.md)).

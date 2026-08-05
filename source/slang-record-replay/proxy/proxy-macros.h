@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../replay-context.h"
-#include "../replay-shared.h"
 #include "proxy-base.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-shared.h"
 
 #include <tuple>
 #include <type_traits>

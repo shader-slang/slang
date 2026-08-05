@@ -1,0 +1,31 @@
+name: PR Board Sweep (nightly)
+
+# Scheduled cadence caller for the reusable board-sync workflow in "sweep" mode.
+# Copy to `.github/workflows/pr-sweep-nightly.yml`.
+#
+# Reconciles every open PR in THIS repo onto the shared "Slang PR Tracking"
+# board. It is the periodic backstop for what the per-event path
+# (pr-maintenance.yml and the other callers) cannot see -- missed webhooks or
+# failed runs, an issue assigned/linked after the fact, board drift -- and
+# shares all per-PR logic with them (only the enumeration differs).
+#
+# Cross-repo safe: the reusable workflow reads `context.repo` of the CALLER, so
+# this schedule in slangpy / slang-rhi / etc. sweeps that repo's open PRs, not
+# slang's. No per-repo customization needed beyond copying the file.
+#
+# Generic -- copy verbatim. (workflow_dispatch allows on-demand runs.)
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # nightly ~07:00 UTC (GitHub may delay under load)
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  board-sweep:
+    uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+    with:
+      mode: sweep
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

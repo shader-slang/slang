@@ -1,0 +1,86 @@
+# Shader Coverage Tutorial Files
+
+> **Note:** Shader coverage is an experimental feature; details may change in future
+> versions.
+
+These are the companion files for the user-guide chapter
+[Shader Execution Coverage](../../docs/user-guide/a3-01-shader-coverage.md), which walks
+through them command by command. Unlike the other coverage examples, this one is driven
+entirely from the command line — there is deliberately no CMake target to build. A CI job
+that runs `run-tutorial.sh` (whose golden-file checks fail on drift) is a planned
+follow-up; until then the check runs whenever a human runs the script.
+
+| File | Role |
+| --- | --- |
+| `hello-coverage.slang` | The compute shader the chapter instruments. |
+| `hello-coverage-host.cpp` | A minimal host program that loads the `slangc`-precompiled CPU kernel, binds the coverage buffer where the sidecar manifest says, dispatches, prints the outputs, and writes the raw counters. It uses no Slang headers or library. Pass `--no-coverage` to skip the counter report and run it as a plain CPU shared-library dispatch. |
+| `run-tutorial.sh` / `run-tutorial.ps1` | Commented scripts that execute every tutorial step in order — each step is labeled with the chapter section it comes from. Both fail on drift from any number the chapter publishes: the SPIR-V manifest's `counter_count`/`space`/`binding`, the host program's printed outputs and counters, and the produced LCOV records. |
+| `expected.lcov` | The LCOV records the chapter publishes; the single copy both runner scripts assert against. |
+| `expected-host-output.txt` | The host program's stdout as the chapter publishes it (outputs and raw counter slots); both runner scripts assert against it. |
+
+## Quick run
+
+Run all the steps at once. The scripts pick the first `slangc` with coverage support
+from `PATH` or a sibling repo build (`../../build`), or take one explicitly:
+
+```bash
+./run-tutorial.sh                            # Linux / macOS / Git Bash
+SLANGC=/path/to/slangc ./run-tutorial.sh     # explicit compiler
+./run-tutorial.sh --open-report              # also open the HTML report
+
+./run-tutorial.ps1                           # Windows (PowerShell)
+./run-tutorial.ps1 -Slangc C:/path/to/slangc.exe
+./run-tutorial.ps1 -OpenReport               # also open the HTML report
+```
+
+Or step by step, with `slangc` on your `PATH` (v2026.13 or newer — the first release with
+CPU coverage support) and Python 3:
+
+```bash
+# 1. Precompile the shader to a directly callable CPU kernel, with coverage.
+slangc hello-coverage.slang -target shader-sharedlib -stage compute -entry computeMain \
+    -trace-coverage -o hello-coverage-kernel.so     # use .dll on Windows
+
+# 2. Build and run the host program (an ordinary C++ compile, no SDK paths).
+#    -ldl: dlopen lives in libdl on glibc older than 2.34; harmless elsewhere.
+c++ -std=c++17 hello-coverage-host.cpp -o hello-coverage-host -ldl
+./hello-coverage-host
+
+# 3. Turn the counters into an LCOV report.
+python3 <slang-repo>/tools/shader-coverage/slang-coverage-to-lcov.py \
+    --manifest hello-coverage-kernel.so.coverage-manifest.json \
+    --counters hello-coverage.counters.bin --output hello-coverage.lcov
+genhtml hello-coverage.lcov --output-directory coverage-html
+```
+
+`genhtml` (lcov package) has no common Windows distribution. Where it is unavailable, the
+repository's own renderer produces an equivalent report anywhere Python runs:
+`python3 <slang-repo>/tools/coverage-html/slang-coverage-html.py hello-coverage.lcov --output-dir coverage-html`.
+LCOV viewers such as the VS Code Coverage Gutters extension read `hello-coverage.lcov`
+directly.
+
+Expected host-program output:
+
+```
+output[0] = 1
+output[1] = 4
+output[2] = 6
+output[3] = 8
+counter[0] = 4
+counter[1] = 3
+counter[2] = 1
+counter[3] = 4
+counter[4] = 4
+counter[5] = 4
+counter[6] = 0
+counter[7] = 4
+counter[8] = 4
+```
+
+Thread 0 uses a gain of 1.0 and the other three use 2.0, so `applyGain`'s branches split
+3/1 (slots 1 and 2). Slot 6 is `value = 0.0` (line 19), which no input exercises — the
+LCOV report shows it in red.
+
+For GPU dispatch and the in-process (C++ API) workflow, see
+[`examples/shader-coverage-image-pipeline`](../shader-coverage-image-pipeline) and
+[`examples/shader-coverage-bvh-traversal`](../shader-coverage-bvh-traversal).

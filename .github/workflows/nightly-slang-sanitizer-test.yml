@@ -16,6 +16,7 @@ jobs:
       # diagnostic tests under sanitizer.
       server-count: 1
       timeout-minutes: 90
+      upload-binaries: true
     secrets: inherit
 
   notify:

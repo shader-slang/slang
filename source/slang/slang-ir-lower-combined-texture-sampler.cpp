@@ -124,6 +124,10 @@ IRTypeLayout* maybeCreateArrayLayout(
                 sizeAttr->getResourceKind(),
                 elementCount == -1 ? LayoutSize::infinite() : sizeAttr->getSize() * elementCount);
         }
+        for (auto alignmentAttr : newElementTypeLayout->getAlignmentAttrs())
+        {
+            arrayTypeLayoutBuilder.addAlignment(alignmentAttr);
+        }
         return arrayTypeLayoutBuilder.build();
     }
     return elementTypeLayout;

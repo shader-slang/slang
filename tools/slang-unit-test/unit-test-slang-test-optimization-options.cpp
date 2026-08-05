@@ -27,6 +27,16 @@ SLANG_UNIT_TEST(slangTestOptimizationArgDetection)
     SLANG_CHECK(!SlangTest::isSlangOptimizationArg(String("-Odump")));
     SLANG_CHECK(!SlangTest::isSlangOptimizationArg(String("-output")));
 
+    const char* testOptimizationArgs[] = {"-O0", "-O1", "-O2", "-O3"};
+    for (const auto arg : testOptimizationArgs)
+    {
+        SLANG_CHECK(SlangTest::isSlangTestOptimizationArg(UnownedStringSlice(arg)));
+    }
+
+    SLANG_CHECK(!SlangTest::isSlangTestOptimizationArg(UnownedStringSlice("-O")));
+    SLANG_CHECK(!SlangTest::isSlangTestOptimizationArg(UnownedStringSlice("-O4")));
+    SLANG_CHECK(!SlangTest::isSlangTestOptimizationArg(UnownedStringSlice("-Ohigh")));
+
     {
         List<String> args;
         args.add("-target");
@@ -131,7 +141,7 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
     {
         CommandLine cmdLine;
 
-        SlangTest::addDefaultSlangOptimization(cmdLine);
+        SlangTest::addDefaultSlangOptimization(cmdLine, String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 1);
         SLANG_CHECK(cmdLine.m_args[0] == SlangTest::kTestOptimizationOption);
@@ -141,7 +151,7 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         CommandLine cmdLine;
         cmdLine.addArg("-O3");
 
-        SlangTest::addDefaultSlangOptimization(cmdLine);
+        SlangTest::addDefaultSlangOptimization(cmdLine, String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 1);
         SLANG_CHECK(cmdLine.m_args[0] == "-O3");
@@ -156,7 +166,7 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("ps_4_0");
         cmdLine.addArg("-target");
 
-        SlangTest::addDefaultSlangOptimization(cmdLine);
+        SlangTest::addDefaultSlangOptimization(cmdLine, String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 5);
         SLANG_CHECK(cmdLine.m_args[0] == SlangTest::kTestOptimizationOption);
@@ -167,7 +177,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         CommandLine cmdLine;
         cmdLine.addArg("-vk");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
@@ -180,7 +192,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("-Xslang");
         cmdLine.addArg("-O3");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 2);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
@@ -192,7 +206,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("-compile-arg");
         cmdLine.addArg("-O2");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 2);
         SLANG_CHECK(cmdLine.m_args[0] == "-compile-arg");
@@ -204,7 +220,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("-xslang");
         cmdLine.addArg("-Ohigh");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 2);
         SLANG_CHECK(cmdLine.m_args[0] == "-xslang");
@@ -219,7 +237,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("-O3");
         cmdLine.addArg("-X.");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 5);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang...");
@@ -235,7 +255,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         CommandLine cmdLine;
         cmdLine.addArg("-mtl");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
@@ -247,7 +269,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         CommandLine cmdLine;
         cmdLine.addArg("-metal");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
@@ -262,7 +286,9 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("-Xslang");
         cmdLine.addArg("-O3");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 3);
         SLANG_CHECK(cmdLine.m_args[0] == "-mtl");
@@ -278,12 +304,64 @@ SLANG_UNIT_TEST(slangTestDefaultOptimizationInsertion)
         cmdLine.addArg("-vk");
         cmdLine.addArg("-xslang");
 
-        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine);
+        SlangTest::addDefaultRenderTestSlangOptimization(
+            cmdLine,
+            String(SlangTest::kTestOptimizationOption));
 
         SLANG_CHECK(cmdLine.m_args.getCount() == 4);
         SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
         SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kTestOptimizationOption);
         SLANG_CHECK(cmdLine.m_args[2] == "-vk");
         SLANG_CHECK(cmdLine.m_args[3] == "-xslang");
+    }
+}
+
+SLANG_UNIT_TEST(slangTestDefaultOptimizationOverride)
+{
+    // A compiler test with no pinned level takes the command-line override.
+    {
+        CommandLine cmdLine;
+
+        SlangTest::addDefaultSlangOptimization(cmdLine, String("-O2"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-O2");
+    }
+
+    // An optimization level in the test directive remains the source of truth.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-O1");
+
+        SlangTest::addDefaultSlangOptimization(cmdLine, String("-O2"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 1);
+        SLANG_CHECK(cmdLine.m_args[0] == "-O1");
+    }
+
+    // Render-test must forward the override to slangc.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-vk");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine, String("-O2"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == "-O2");
+        SLANG_CHECK(cmdLine.m_args[2] == "-vk");
+    }
+
+    // Metal render tests keep the stable downstream-toolchain level.
+    {
+        CommandLine cmdLine;
+        cmdLine.addArg("-metal");
+
+        SlangTest::addDefaultRenderTestSlangOptimization(cmdLine, String("-O2"));
+
+        SLANG_CHECK(cmdLine.m_args.getCount() == 3);
+        SLANG_CHECK(cmdLine.m_args[0] == "-Xslang");
+        SLANG_CHECK(cmdLine.m_args[1] == SlangTest::kMetalRenderTestOptimizationOption);
+        SLANG_CHECK(cmdLine.m_args[2] == "-metal");
     }
 }
