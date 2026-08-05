@@ -13,10 +13,21 @@ Detailed build instructions can be found in docs/building.md
 ## Formatting
 
 DO THIS BEFORE COMMITTING YOUR CHANGES:
-RUN `./extras/formatting.sh --modified` to format your changes first!!
+RUN BOTH OF THESE to format your changes first!!
+
+```bash
+./extras/formatting.sh --modified        # C++, CMake, YAML/JSON, shell
+./extras/formatting.sh --modified --md   # markdown - not covered by the line above
+```
+
 Your PR needs to be formatted according to our coding style.
 
-`--modified` covers tracked changes only. Format an untracked file by naming it: `./extras/formatting.sh -- path/to/new-file`. Run with no arguments, the script prints its help text and exits 0 without formatting anything.
+Two commands are needed because a type flag such as `--md` narrows the run to that type rather than adding to it, and markdown is the one formatter a flagless run does not enable. Two further cases are covered by neither command, and both exit 0 having formatted nothing:
+
+- **Untracked files are invisible** to `--modified` (it is `git diff HEAD`). Format a new file by naming it: `./extras/formatting.sh -- path/to/new-file`.
+- **`.slang` files have no formatter configured**, so naming one selects nothing.
+
+Run with no arguments, the script prints its help text and exits 0 without formatting anything.
 
 The formatting script requires these tools:
 
@@ -45,7 +56,7 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 brew install clang-format gersemi prettier shfmt
 ```
 
-You can also use `./extras/formatting.sh --check-only` to verify formatting without modifying files.
+You can also add `--check-only` to either command above to verify without modifying files — that checks the same set the command would format. A bare `./extras/formatting.sh --check-only` checks the whole tree instead, which will report pre-existing violations in files you did not touch.
 
 ## Labeling your PR
 
