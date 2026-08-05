@@ -7582,6 +7582,7 @@ ThrowStmt* Parser::ParseThrowStatement()
     FillPosition(throwStatement);
     ReadToken("throw");
     throwStatement->expression = ParseExpression();
+    ReadToken(TokenType::Semicolon);
     return throwStatement;
 }
 
