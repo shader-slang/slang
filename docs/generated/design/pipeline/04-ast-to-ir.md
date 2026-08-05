@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-29T15:20:45Z
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-watched_paths_digest: 8a4f880d8b981d67ad88abf7aa75a535d3a572cbe530098477dde31879574746
+model: claude-opus-5
+generated_at: 2026-08-03T13:49:43Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: bfaba4260e5950b0732424070a24791f1265e6debdda1d5c6493fbe0abe1e140
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -20,9 +20,14 @@ opcode that the lowering step must produce.
   `ASTBuilder` (see [03-semantic-check.md](03-semantic-check.md)).
 - **Output**: a fresh `IRModule` containing IR definitions for every
   function, type, generic, and global variable defined in that
-  translation unit. The lowering step does **not** include the IR for
-  `import`ed modules; those are linked in by a later IR pass before
-  code generation.
+  translation unit. The lowering step does **not** link in `import`ed
+  modules wholesale; those are linked in by a later IR pass before code
+  generation. The one exception is targeted prelinking: lowering records
+  imported `[unsafeForceInlineEarly]` functions in
+  `externalSymbolsToPrelink` (line 13811) and `prelinkIR` (line 15544)
+  clones their bodies into this module before it is returned, so the
+  mandatory optimization passes can see them (see
+  [04b-pre-link-passes.md](04b-pre-link-passes.md)).
 
 ## Lowering driver
 
@@ -51,11 +56,41 @@ allocates corresponding IR instructions, recurses into bodies (whose
 unparsed forms have by now been parsed and checked, see
 [03-semantic-check.md](03-semantic-check.md)), and lowers
 expressions and statements into SSA value instructions and basic
-blocks.
+blocks. There is one visitor family per AST family —
+`DeclLoweringVisitor`, `StmtLoweringVisitor`,
+`ExprLoweringVisitorBase`, and `ValLoweringVisitor` — all sharing
+state through `IRGenContext` / `SharedIRGenContext`.
+
+### `LoweredValInfo` and the lowering environment
+
+A lowered expression is not always a plain `IRInst*`, so lowering
+returns a `LoweredValInfo` (line 120). Its `Flavor` enum distinguishes
+`None`, a `Simple` r-value, a `Ptr` l-value, and the compound forms
+lowering must keep symbolic until a use site decides how to read or
+write them: `BoundMember`, `Subscript`, `BoundStorage`,
+`SwizzledLValue`, `SwizzledMatrixLValue`, `ExtractedExistential`, and
+`ImplicitCastedLValue`. `getSimpleVal` is the funnel that forces any
+flavor down to a single `IRInst*` (emitting a load or an accessor call
+where needed).
+
+Per-environment caches sit on `IRGenEnv`: `mapDeclToValue` for decls
+and `mapValToValue` (line 472) for `Val`s. `lowerVal` and `lowerType`
+both route through the `lowerValWithCache` helper (line 3053), which
+resolves the `Val`, consults `mapValToValue`, and stores only completed
+results so recursive `Val` graphs are not disturbed by an in-progress
+entry. The cache is per environment rather than global because a nested
+generic environment can bind the same `Val` (for example a type
+parameter `T` reachable both as a generic argument and through its
+conformance witness) to a different IR parameter. `lowerType` (line
+3081) still runs `lowerAssociatedVals` and `lowerRelatedTypes` after a
+cache hit, because those are contextual side effects on the current
+module rather than part of the `Val`-to-IR mapping.
 
 ## IRBuilder and instruction creation
 
 `IRBuilder` (declared in
+[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line 3158
+and forward-declared in
 [slang-ir.h](../../../../source/slang/slang-ir.h)) is the canonical way
 to create IR instructions:
 
@@ -68,9 +103,10 @@ to create IR instructions:
   deduplicated this way. The separate `kIROpFlag_Global` flag marks
   opcodes that are always hoisted to module scope but are **never**
   deduplicated.
-- It exposes typed convenience emitters (`emitVar`, `emitCall`,
-  `emitAdd`, ...) plus a generic `createIntrinsicInst` for opcodes
-  that do not have a dedicated emitter.
+- It exposes typed convenience emitters (`emitVar`, `emitCallInst`,
+  `emitAdd`, ...) plus the generic `emitIntrinsicInst` /
+  `createIntrinsicInst` pair for opcodes that do not have a dedicated
+  emitter.
 
 Hoistable / global value semantics are the topic of
 [../../../design/ir.md](../../../design/ir.md); this document does not
@@ -102,11 +138,19 @@ is authoritative.
 | `BlockStmt` | A sequence of basic blocks; locals turn into `IRVar` |
 | `IfStmt`, `ForStmt`, `WhileStmt`, `SwitchStmt` | Structured branches whose join point is an explicit operand on the terminator (see [../../../design/ir.md](../../../design/ir.md) for the structured-CFG encoding) |
 | `ReturnStmt` | An `IRReturn` terminator |
-| `BuiltinOperatorExpr` (checker fast-path arithmetic / comparison / bitwise / unary) | A single pure value inst (`IRAdd`, `IRMul`, `IREq`, `IRBitAnd`, `IRNeg`, ...) emitted directly by `lowerBuiltinOperatorExpr` |
+| `BuiltinOperatorExpr` (checker fast-path arithmetic / comparison / bitwise / unary) | A single pure value inst (`kIROp_Add`, `kIROp_Mul`, `kIROp_Eql`, `kIROp_BitAnd`, `kIROp_Neg`, ...) emitted directly by `lowerBuiltinOperatorExpr` |
 | `InvokeExpr` (general operator / function call) | An `IRCall` (after callable resolution) |
 | `MemberExpr` | A `IRFieldAddress` / `IRFieldExtract` (lvalue vs rvalue) |
 | `LiteralExpr` | A constant inst (`IRIntLit`, `IRFloatLit`, ...) |
-| `WitnessTable` (synthesized in checking) | An `IRWitnessTable` |
+| `CastOptionalExpr` | An `if`/`else` diamond around a temporary: `visitCastOptionalExpr` tests `emitOptionalHasValue`, coerces the unwrapped value on the true side, and propagates `emitMakeOptionalNone` on the false side |
+| `WitnessTable` (synthesized in checking) | An `IRWitnessTable`, or — for a `SynthesizedModifier`-tagged conformance — a single intrinsic inst (see [Generics and existentials](#generics-and-existentials)) |
+
+A few intrinsic-op call sites are special-cased in
+`emitCallToDeclRef` (line 949) rather than emitted verbatim. Notably a `(void)expr`
+cast reaches lowering as the builtin `__init(T)` on `void` with opcode
+`kIROp_CastToVoid`; lowering evaluates the operand for its side effects
+and yields the canonical `IRVoidLit` from `getVoidValue()` instead of
+creating a `CastToVoid` inst, so no backend has to know the opcode.
 
 Phi-style joining is encoded as block parameters (`IRParam` at the
 start of a block) rather than explicit `phi` instructions; branches
@@ -122,17 +166,19 @@ operands is rewritten to a `BuiltinOperatorExpr` carrying a resolved
 class comment in
 [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) /
 [slang-ast-expr.h](../../../../source/slang/slang-ast-expr.h)).
-`lowerBuiltinOperatorExpr` switches on that enum and emits the matching
-pure IR op directly via `emitIntrinsicInst`, skipping callable
+`lowerBuiltinOperatorExpr` (line 5402) switches on that enum and emits the
+matching pure IR op directly via `emitIntrinsicInst`, skipping callable
 resolution entirely. The element type only matters for `%`, which picks
-`IRFRem` for floating-point operands and `IRIRem` otherwise. Only the
+`kIROp_FRem` for floating-point operands and `kIROp_IRem` otherwise
+(the element type is unwrapped out of a vector or matrix operand first).
+Only the
 fast-path operators reach this visitor: `?:`, `&&`, and `||`
 (short-circuiting / ternary) are still lowered through their dedicated
 control-flow paths, so those `BuiltinOperationKind` values are an
 `SLANG_UNEXPECTED` here rather than handled.
 
 Compile-time integer expressions take a parallel path on the `Val`
-side. `visitBuiltinOperationIntVal` in
+side. `visitBuiltinOperationIntVal` (line 1901) in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 lowers a `BuiltinOperationIntVal` (the checked, folded form of a
 constant operator expression) to the hoistable `constexpr*` opcode keyed
@@ -157,9 +203,105 @@ Witness tables (computed by
 [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp))
 become `IRWitnessTable` insts whose entries map interface
 requirements to the concrete implementations.
+`visitInheritanceDecl` (line 11199) creates the table and
+`lowerWitnessTable` (line 11087) fills it in:
+
+```cpp
+void lowerWitnessTable(
+    IRGenContext* subContext,
+    WitnessTable* astWitnessTable,
+    IRWitnessTable* irWitnessTable,
+    DeclRefBase* witnessTableBaseDeclRef)
+```
+
+The last parameter is the decl-ref of the *base* (interface) side of the
+conformance, obtained from `getWitnessTableBaseDeclRef` (lines 10904 and
+10915). When it is non-null, every requirement witness taken out of the
+AST requirement dictionary is `specialize`d through it before being
+lowered, so an entry copied from a generic interface carries the
+conforming type's substitutions rather than the interface's own
+parameters. Per-entry
+lowering is factored into `lowerWitnessEntryValue` (line 10933), which
+switches on the `RequirementWitness::Flavor`: a `declRef` witness lowers
+through `emitDeclRef`, a `val` witness through `lowerSimpleVal`, and a
+`witnessTable` witness recursively materializes a nested
+`IRWitnessTable` (with its own conformance mangled name and, for an
+exported type, `HLSLExport` / `KeepAlive` decorations). The
+already-materialized nested tables are memoized in
+`IRGenContext::mapASTWitnessTableToIRWitnessTable` (line 676), a
+*non-owning* pointer: the dictionary is owned by the lowering scope, so
+copied contexts can share the cache for the current insertion / generic
+environment without a single global cache keyed only on the front-end
+`WitnessTable*` (which would be too coarse, since an `IRWitnessTable` is
+inserted into a specific IR scope and may refer to that scope's generic
+parameters).
+
+### Generic interface requirements
+
+A requirement can itself be generic — most commonly a differentiability
+constraint attached to a generic interface method, which the checker
+records as a sibling `GenericDecl` whose `inner` is a
+`GenericTypeConstraintDecl`. Such an entry is not a flat value: it must
+supply the method-local generic parameters. `lowerWitnessTable`
+recognizes that shape and routes it to
+`lowerWitnessEntryValueInGenericWitnessTable` (line 11018), which
+
+- opens a nested `IRGenEnv` and its own nested-witness-table cache,
+- emits the requirement's own generic parameters with `emitGenericDecl`
+  (line 12905 for the `DeclRef<GenericDecl>` form, line 13002 for the
+  bare-`GenericDecl` convenience overload),
+- lowers the satisfying witness inside that environment, and
+- closes only the generics it opened, using the `stopBeforeGeneric`
+  parameter added to `finishOuterGenerics` so the enclosing witness
+  table's own generic is left intact.
+
+The result is a requirement-local `IRGeneric` stored as the witness-table
+entry value, so a use site becomes
+`specialize(lookupWitness(table, key), methodArgs...)` rather than a flat
+witness lookup that has dropped the method's generic arguments.
+`canDeclLowerToAGeneric` (line 14860) has the matching rule on the decl
+side: a `GenericTypeConstraintDecl` lowers to a generic exactly when it
+is the `inner` of a `GenericDecl`.
+
+Which constraint decls become *generic parameters* at all is decided by
+`isGenericConstraintParameterDecl` (declared in
+[slang-ast-decl.h](../../../../source/slang/slang-ast-decl.h) line 1186);
+`emitGenericDecl` consults it before emitting a
+hidden parameter for each constraint member, and the substitution-argument
+walk in `ExprLoweringContext` uses the same predicate so parameters and
+arguments stay in agreement. Constraints that are instead interface
+requirements are skipped there and lowered as requirement keys.
+
+### Associated-type bounds
+
+A bound on an associated type — `associatedtype A : IBar`,
+`associatedtype A where A : IBar`, or `__constraint A : IBar` — is a
+requirement of the *enclosing interface*, a sibling of `A`, not something
+nested under it (see
+[03-semantic-check.md](03-semantic-check.md)). Lowering follows that
+representation:
+
+- `visitAssocTypeDecl` lowers the associated type with an empty list of
+  constraint interfaces, because the bounds are no longer its members.
+- The `IRInterfaceType` requirement loop emits exactly one entry per
+  direct interface member; it no longer walks an associated type's or a
+  callable's nested `TypeConstraintDecl`s to synthesize extra entries.
+  A relocated non-equality subtype constraint gets a
+  `WitnessTableType(bound)` requirement value, wrapped in an `IRGeneric`
+  when the constraint is the `inner` of a `GenericDecl` (so a `sup` type
+  mentioning a cloned method parameter is lowered inside the matching IR
+  generic environment).
+- `visitGenericTypeConstraintDecl` (line 10784) therefore recognizes just
+  two interface-requirement shapes — a constraint that is a direct member
+  of an `InterfaceDecl`, and a constraint that is the `inner` of a
+  `GenericDecl` directly under an `InterfaceDecl` — plus the
+  global-generic-parameter case. The former per-`AssocTypeDecl` and
+  per-`FuncDecl` parent cases are gone.
+
+### Requirement keys
 
 Each interface requirement is identified by a *requirement key*.
-`getInterfaceRequirementKey` in
+`getInterfaceRequirementKey` (line 1713) in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 returns an `IRInst*` (cached per requirement `Decl` in
 `SharedIRGenContext::interfaceRequirementKeys`) of one of two shapes:
@@ -180,12 +322,55 @@ returns an `IRInst*` (cached per requirement `Decl` in
   the requirement list. The witness-table entry's `lookupKey` operand
   is therefore typed `IRInst` (not `IRStructKey`).
 
-`visitGenericTypeConstraintDecl` lowers a constraint that is a direct
-member of an `InterfaceDecl` (an interface-level `__constraint`, see
-[03-semantic-check.md](03-semantic-check.md)) as the requirement key for
-that requirement, and a non-equality subtype constraint relocated to
-interface level gets a `WitnessTableType` requirement value, matching
-how the bound was lowered when nested inside the associated type.
+### Differentiability arrives as a conformance
+
+Differentiability is not a modifier that lowering re-derives. The checker
+represents it as an interface conformance of the *function viewed as a
+type*: a `[Differentiable]` function `f` gets a synthesized
+`extension __func_as_type(f) : IForwardDifferentiable<__func_as_type(f)>`
+(and the backward analogue), where
+`IForwardDifferentiable<FType>` / `IBackwardDifferentiable<FType>` are
+declared in
+[core.meta.slang](../../../../source/slang/core.meta.slang) at lines 720
+and 739. See
+[03-semantic-check.md](03-semantic-check.md#differentiability-as-interface-conformance)
+for how that representation is built. Lowering consumes it in three
+places:
+
+- **The conformance itself.** `visitInheritanceDecl` treats an
+  `InheritanceDecl` carrying a `SynthesizedModifier` specially: instead of
+  a real `IRWitnessTable` it emits one intrinsic inst whose opcode is the
+  modifier's `op` (for the forward case `kIROp_ForwardDifferentiate`),
+  typed `WitnessTableType(IForwardDifferentiable<...>)`, with the
+  conformance's `Val` operands lowered as the inst's operands. Back-end
+  passes reconstruct a table from those operands if one is needed. Because
+  the subtype here is a callable rather than an aggregate type, lowering
+  also has to reorder its own recursion guard: the placeholder
+  `LoweredValInfo` normally installed *before* `lowerType(subType)` is,
+  for a callable subtype, installed *after* it (lines 11334-11350), so
+  that lowering the callable decl-ref sees the real callable and can
+  attach its autodiff-associated values instead of recording the
+  placeholder as the callable's differentiability witness.
+- **The interface members.** A `SynthesizedFuncDecl` (line 13847) — the
+  `fwd_diff` member the interface requires — is lowered by creating an
+  `IRFunc`, replacing it with `emitIntrinsicInst` of the decl's stored
+  `irOp`, and rewriting the decl→value mapping to that inst.
+- **Associated values.** `lowerAssociatedVals` (line 4944) reads the
+  `DifferentiableAttribute` of the function currently being lowered and
+  attaches each associated value with `IRBuilder::addAnnotation` (an
+  `Annotation` inst keyed by an `AnnotationKind`). It skips a decl for
+  which `isInterfaceRequirement` holds (a requirement's annotations belong
+  to the conforming implementation), and, when the key is a `DeclRefBase`,
+  substitutes the stored associated value through that decl-ref first, so
+  an interface default implementation lowered through a concrete
+  conformance produces witness entries with the same substitutions as the
+  callee they annotate.
+
+A function-typed conformance also changes what `this` means for the
+members of the synthesized extension: `_findReplacementThisParamType`
+(line 3967) and `getThisParamTypeForCallable` (line 4033) redirect an
+extension whose target type is a callable decl-ref to that callable's own
+this-type.
 
 ### Variadic pack-count witnesses
 
@@ -203,12 +388,16 @@ witness-table representation as other data-free generic witnesses:
 - `visitDeclaredVariadicPackCountWitness` lowers the *use* of that
   constraint as an `emitDeclRef` to the same `void` witness-table type.
 - `visitConcreteVariadicPackCountWitness` lowers an already-satisfied
-  (concrete) instance to one module-level proof-only `IRWitnessTable`,
-  cached on `SharedIRGenContext::concreteVariadicPackCountWitnessTable`
+  (concrete) instance through the `emitConcreteVariadicPackCountWitness`
+  helper, which creates one module-level proof-only `IRWitnessTable` and
+  caches it on
+  `SharedIRGenContext::concreteVariadicPackCountWitnessTable` (line 528)
   so every specialized call site reuses a single table rather than
   emitting a fresh one. A global-generic-param form is handled by
-  `visitGenericVariadicPackCountConstraintDecl`, which emits an
-  `IRGlobalGenericParam` of the same witness type.
+  `visitGenericVariadicPackCountConstraintDecl` (line 10855), which emits
+  an `IRGlobalGenericParam` of the same witness type; that visitor now
+  asserts up front that a pack-count constraint is never an interface
+  requirement.
 
 The point of using a witness-table-shaped value (instead of a runtime
 `countof`) is that the count is a compile-time fact: the witness only
@@ -222,32 +411,88 @@ encode them — typically because a feature is unsupported on a given
 target or a synthesized witness cannot be produced. For example, when
 the assignment-lowering switch in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-reaches an assignment whose left-hand side it cannot encode, it now
-emits `Diagnostics::UnsupportedAssignmentTarget` (recovering the
-nearest non-zero source location from the builder's source-loc info)
-rather than aborting via `SLANG_UNIMPLEMENTED_X`. Lowering errors flow
-through the same `DiagnosticSink` used by the rest of the front-end
-(see [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).
+reaches an assignment whose left-hand side it cannot encode, it emits
+`Diagnostics::UnsupportedAssignmentTarget` (line 10602), recovering the
+nearest non-zero source location from the builder's source-loc info,
+rather than aborting via `SLANG_UNIMPLEMENTED_X`. Lowering
+errors flow through the same `DiagnosticSink` used by the rest of the
+front-end (see
+[../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).
+
+Two other lowering-time reports are worth knowing about because they
+depend on facts only the lowering walk has:
+
+- **Statements before the first `case` label.** When `StmtLoweringVisitor`
+  reaches a statement inside a `switch` body while no case label is
+  active, that statement is unreachable: control can only enter a switch
+  body through the dispatch to a `case` / `default` label, and Slang has no
+  `goto` into a body. Lowering warns once for the leading run with
+  `Diagnostics::UnreachableCode`, tracked by the
+  `warnedUnreachableBeforeFirstCase` flag on the switch-lowering info.
+  Previously these statements were silently dropped.
+- **Runaway constructor-call lowering.** `visitInvokeExprImpl` counts its
+  own recursion depth in `IRGenContext::invokeLoweringRecursionDepth` and,
+  past `kMaxIRInvokeLoweringRecursionDepth` (128), diagnoses
+  `Diagnostics::MaximumTypeNestingLevelExceeded` and yields
+  `getPoison(type)` rather than overflowing the native stack on an
+  infinitely nesting type that keeps synthesizing constructor calls.
 
 ## Module-level outputs
 
-Beyond the IR module itself, the lowering step records a few side
-artefacts on the surrounding `Module` and component types:
+The `IRModule` that `generateIRForTranslationUnit` returns is its only
+separate output object; the one other lasting effect is a mutation of
+the checked AST — when a registered entry point carries no explicit
+`EntryPointAttribute`, lowering creates one (filling its capability set
+from the entry-point profile) and calls `addModifier` on the function
+decl at line 15223, so that ordinary function lowering recognizes it as
+an entry point:
 
-- The list of entry-point IR functions (each lowered `FuncDecl` that
-  was registered as an entry point).
-- Type-conformance bookkeeping (used by
-  `generateIRForTypeConformance`).
-- Layout intent on global parameters — actual layout assignment is
-  performed later by IR passes
+- The entry-point IR functions and their decorations are children of
+  that module — the loop at line 15467 lowers each registered entry
+  point into it.
+- Layout intent on global parameters is likewise recorded in the module;
+  actual layout assignment is performed later by IR passes
   (`slang-ir-layout`, `slang-ir-collect-global-uniforms`, ...).
+
+The caller in
+[slang-compile-request.cpp](../../../../source/slang/slang-compile-request.cpp)
+installs the returned module on the AST-level `Module` with
+`setIRModule` (line 570); that is the whole hand-off.
+
+Two adjacent generation paths build their own modules and are *not*
+outputs of translation-unit lowering: `generateIRForTypeConformance`
+(line 15982) and `TargetProgram::createIRModuleForLayout` (line 16353).
+The latter uses the type-layout lowering helper `_lowerTypeLayoutCommon`
+(line 16023), which records the front-end's byte alignment as a
+`TypeAlignment` attribute whenever the layout occupies the
+`LayoutResourceKind::Uniform` unit at all; the `IRTypeLayout::Builder`
+decides whether an attribute is actually emitted.
+
+### Entry-point-scoped decorations
+
+`lowerFrontEndEntryPointToIR` (line 15198) attaches the decorations that
+are meaningful only on an entry point. Besides the name / module
+decorations, it lifts the `spvShader64BitIndexingEXT` capability onto the
+entry point as an `IRShader64BitIndexingDecoration`: it scans the
+`inferredCapabilityRequirements` atom sets of the entry-point function
+(iterating `getAtomSets()` rather than calling `implies()`, which is
+AND-across-alternatives and therefore too strict as a presence test). The
+requirement is lifted here rather than left on the attributed callee
+because the corresponding SPIR-V execution mode is entry-point scoped.
+Work-graph node attributes take the same route in the general function
+path: `NodeLaunchAttribute`, `NodeIDAttribute`,
+`NodeMaxDispatchGridAttribute`, `NodeDispatchGridAttribute`,
+`MaxRecordsAttribute` and `NodeIsProgramEntryAttribute` each lower to
+their matching decoration, with the launch mode kept as an
+`IRStringLit` rather than an integer so HLSL emit can re-emit the source
+name.
 
 ### Debug-info gating
 
 Lowering decides per construct whether to attach source-level debug
-information. Notably, `isSynthesizedConstructorDecl` in
+information. Notably, `isSynthesizedConstructorDecl` (line 9898) in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-makes both `maybeEmitDebugLine` and `maybeAddDebugLocationDecoration`
+makes `maybeEmitDebugLine` and `maybeAddDebugLocationDecoration`
 skip a Slang-synthesized initializer (a `ConstructorDecl` with the
 `SynthesizedDefault` or `SynthesizedMemberInit` flavor). Such a function
 has no user-authored body, so emitting a `DebugLine` / `IRDebugLocationDecoration`
@@ -256,6 +501,28 @@ the struct/member declaration lines. The discrimination is by
 constructor *flavor*, not by the mangled `$init` name, because a
 user-written `__init` mangles the same way but must keep its debug
 info.
+
+The same predicate has a third caller. Constructor lowering (line 14271)
+names the object under construction `this` — either the caller-provided
+return-destination out-parameter or the by-value local the initializer
+returns — so a debugger stopped inside `__init` can inspect the members
+being initialized. That call site checks the predicate itself because
+`addNameHint` has no internal synthesized-constructor gate, and it adds an
+`IRDebugLocationDecoration` to the by-value local so
+`slang-ir-insert-debug-value-store` surfaces it.
+
+Debug *source* records also need care, because they are hoistable and only
+collapse across modules when their operands match byte-for-byte.
+`getOrEmitDebugSource` (line 9658) therefore spells the emitted filename
+with `PathInfo::getMostUniqueIdentity()` — the same spelling the
+per-source-file loop in `generateIRForTranslationUnit` uses — while still
+looking the `SourceFile` up by the `getName()`-based path. It embeds source
+text when the debug level is `Standard` or above *or* when
+`shouldIncludeSourceInDebugInfo()` is set, falling back to reading the
+found path off disk (decoded through `SourceFile::decodeContentBlob`, so
+the embedded text is BOM-free and stays aligned with the line/column data)
+for a `SourceFile` deserialized from a precompiled module, which carries
+no content blob of its own.
 
 After lowering, the IR module is the input to the IR-pass pipeline
 described in [05-ir-passes.md](05-ir-passes.md).
@@ -273,9 +540,13 @@ IR-pass pipeline:
   when asking "where do `lowerErrorHandling`, `synthesizeBitFieldAccessors`,
   or `performMandatoryEarlyInlining` run, and what gates them?".
 - [04c-layout-ir.md](04c-layout-ir.md) — `TargetProgram::createIRModuleForLayout`
-  builds a separate, per-target IR module whose only contents are
-  `IRLayoutDecoration`s on stub globals and entry points. It is not
+  builds a separate, per-target IR module holding imported global and
+  entry-point stubs, the `IRLayoutDecoration`s attached to those stubs
+  and to the module root, the type- and variable-layout instructions
+  those decorations reference, and (for SPIR-V and Metal)
+  `IRRequireCapabilityAtomDecoration`s on the entry-point stubs. It is not
   the executable per-translation-unit module and does not run the
   mandatory passes above, but an existing layout module is considered
-  by `linkIR` (`slang-ir-link.cpp` lines 2120-2127) so its
+  by `linkIR` (which pulls it in via
+  `TargetProgram::getExistingIRModuleForLayout`) so its
   layout-decorated global symbols participate in linking.

@@ -1242,38 +1242,43 @@ def cmd_list_stale(args, manifest: Manifest) -> int:
         else:
             base = f"fresh    {key}"
         if args.include_review:
-            status = _compute_review_status(key, manifest, review_docs)
+            status = _compute_review_status(key, review_docs, docs_state)
             print(f"{base}  [{status}]")
         else:
             print(base)
     return 1 if any_stale else 0
 
 
-def _doc_front_matter_digest(spec: DocSpec) -> str | None:
-    p = REPO_ROOT / spec.path
-    if not p.exists():
-        return None
-    fm = parse_front_matter(p.read_text(encoding="utf-8"))
-    if fm is None:
-        return None
-    return fm.get("watched_paths_digest") or None
-
-
 def _compute_review_status(
-    key: str, manifest: Manifest, review_docs: dict
+    key: str, review_docs: dict, freshness_docs: dict
 ) -> str:
-    """Return one of:
+    """Return the review/remediation state of one document, as one of:
 
         unreviewed
         review-stale
         reviewed-pending-remediation
         remediated
+
+    Staleness is decided against the digest recorded for `key` in
+    `freshness.json`, which `mark-fresh` writes and is therefore the
+    authoritative record of what the document was last generated from.
+
+    Do not read the digest out of the document's own YAML front-matter
+    instead. `mark-fresh` never rewrites the document, so a front-matter
+    digest is only as current as whatever the generating agent happened to
+    write there, and a document regenerated without that field being updated
+    keeps a digest that still matches its previous review. That is not a
+    hypothetical: in one cycle 11 documents were fully rewritten, kept their
+    old front-matter digests, and so reported `remediated` from a review of
+    the superseded text. The reviewer trusted the status and skipped all 11.
+    Front-matter is also unusable for the aggregator pages whose
+    `watched_paths` glob matches their own directory, because writing the
+    digest into such a page changes the page and thus the digest.
     """
     entry = review_docs.get(key)
     if not entry or "last_reviewed" not in entry:
         return "unreviewed"
-    spec = manifest.docs[key]
-    doc_digest = _doc_front_matter_digest(spec)
+    doc_digest = (freshness_docs.get(key) or {}).get("watched_paths_digest")
     last_reviewed = entry["last_reviewed"]
     if (
         doc_digest is None
@@ -1295,6 +1300,7 @@ def _compute_review_status(
 def cmd_review_status(args, manifest: Manifest) -> int:
     review_state = load_review_state()
     review_docs = review_state.get("documents", {})
+    freshness_docs = load_freshness().get("documents", {})
     keys: list[str]
     if args.docs:
         for d in args.docs:
@@ -1305,7 +1311,7 @@ def cmd_review_status(args, manifest: Manifest) -> int:
     else:
         keys = sorted(manifest.docs)
     for key in keys:
-        status = _compute_review_status(key, manifest, review_docs)
+        status = _compute_review_status(key, review_docs, freshness_docs)
         line = f"{status:<32}{key}"
         if args.show_counts:
             entry = review_docs.get(key, {})
@@ -1368,6 +1374,42 @@ def cmd_mark_reviewed(args, manifest: Manifest) -> int:
             file=sys.stderr,
         )
         return 1
+    # Record the digest from `freshness.json`, not the copy the reviewer wrote
+    # into the report. Both should describe the same thing -- the watched-set
+    # state the reviewed text was generated from -- but only `freshness.json`
+    # is authoritative, because `mark-fresh` writes it and never rewrites the
+    # document. A reviewer that reads `watched_paths_digest` out of the target
+    # document's front-matter instead picks up whatever the generating agent
+    # last happened to type there, which is routinely out of date.
+    #
+    # Trusting the report's copy silently destroys the ledger: recording a
+    # stale digest makes `_compute_review_status` report `review-stale` the
+    # instant the review is recorded, so a completed review looks like it never
+    # happened and the remediation that follows it looks unmotivated. That is
+    # not hypothetical -- an entire 31-document review round transcribed
+    # front-matter digests and every one of them disagreed with the real value.
+    # Warn rather than fail, so that a good review is still recorded correctly.
+    review_digest = _yaml_to_str(fm["target_doc_watched_paths_digest"])
+    authoritative_digest = (
+        (load_freshness().get("documents") or {}).get(args.doc) or {}
+    ).get("watched_paths_digest")
+    if authoritative_digest is None:
+        print(
+            f"warning: {args.doc} has no freshness entry; recording the digest"
+            f" from the review report, which may be stale",
+            file=sys.stderr,
+        )
+        authoritative_digest = review_digest
+    elif review_digest != authoritative_digest:
+        print(
+            f"warning: {args.doc}: review report records watched-paths digest"
+            f" {review_digest[:12]}, but freshness.json says"
+            f" {authoritative_digest[:12]}; recording the latter."
+            f" The reviewer most likely read the digest from the target"
+            f" document's front-matter, which is not authoritative --"
+            f" use `regenerate.py digest {args.doc}` instead.",
+            file=sys.stderr,
+        )
     state = load_review_state()
     state.setdefault("schema_version", 1)
     state.setdefault("documents", {})
@@ -1376,9 +1418,7 @@ def cmd_mark_reviewed(args, manifest: Manifest) -> int:
         "reviewer_model": _yaml_to_str(fm["reviewer_model"]),
         "reviewed_at": _yaml_to_str(fm["reviewed_at"]),
         "target_doc_source_commit": _yaml_to_str(fm["target_doc_source_commit"]),
-        "target_doc_watched_paths_digest": _yaml_to_str(
-            fm["target_doc_watched_paths_digest"]
-        ),
+        "target_doc_watched_paths_digest": authoritative_digest,
         "finding_count": int(fm["finding_count"]),
         "severity_breakdown": {
             k: int(fm["severity_breakdown"][k]) for k in _REVIEW_SEVERITIES

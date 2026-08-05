@@ -40,8 +40,16 @@ cmake --preset default
 # modal abort dialogs during unattended/LLM-driven builds.
 # Use -DSLANG_EMBED_CORE_MODULE=OFF to keep core module compilation separate
 # from C++ source compilation. This way errors in *.meta.slang files (e.g.
-# hlsl.meta.slang) do not break the C++ build — slangc and slang-test still
-# compile successfully and the module errors surface at runtime instead.
+# hlsl.meta.slang) do not break the C++ compile — slangc and slang-test still
+# compile successfully, and the module errors are reported by the separate
+# `slang-bootstrap -compile-core-module` step instead.
+# Those errors still fail the build, though: generate_core_module_cache is an
+# ALL target that depends on generate_core_module (source/slang/CMakeLists.txt),
+# generate_core_module runs the bootstrap compile
+# (source/slang-core-module/CMakeLists.txt), and slangc itself takes
+# `REQUIRES generate_core_module_cache`, so even `--target slangc` runs it.
+# What OFF buys you is a clean separation of meta-source errors from C++
+# compilation errors, not a build that ignores meta-source errors.
 cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON -DSLANG_EMBED_CORE_MODULE=OFF
 
 # Build Release/Debug binaries.
