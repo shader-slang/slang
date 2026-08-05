@@ -17,6 +17,7 @@ Examples:
         --only autodiff --samples 7
 """
 import argparse
+import ctypes  # for the Win32 peak-RSS struct; import is safe on every platform
 import json
 import os
 import re
@@ -245,6 +246,36 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
 
 # Peak RSS collection: per-child ru_maxrss via os.wait4 on POSIX,
 # PeakWorkingSetSize via GetProcessMemoryInfo on Windows (below).
+
+
+class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+    """The Win32 PROCESS_MEMORY_COUNTERS struct that GetProcessMemoryInfo
+    fills in. Defined at module scope, and with FIXED-WIDTH field types, so
+    its binary layout can be pinned by a self-check on any platform.
+
+    The DWORD fields are ctypes.c_uint32 rather than ctypes.wintypes.DWORD
+    deliberately. On Windows the two are identical (DWORD is c_ulong, which
+    is 4 bytes under LLP64), but ctypes.wintypes is importable on POSIX too,
+    where c_ulong is 8 bytes — so a wintypes.DWORD version of this struct
+    silently has a DIFFERENT layout off Windows and cannot be checked
+    anywhere but the platform it is used on. Spelling the width explicitly
+    makes the layout identical everywhere, which is what lets the assertion
+    at the bottom of this module catch a mis-ordered or mis-typed field.
+    A wrong layout would not raise: it would read PeakWorkingSetSize from
+    the wrong offset and return a believable but incorrect number."""
+
+    _fields_ = [("cb", ctypes.c_uint32),
+                ("PageFaultCount", ctypes.c_uint32),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t)]
+
+
 def _windows_peak_rss_kb(popen):
     """PeakWorkingSetSize of a finished subprocess in KB via
     GetProcessMemoryInfo — the Windows equivalent of POSIX ru_maxrss. Reads
@@ -255,28 +286,19 @@ def _windows_peak_rss_kb(popen):
     collection degrades to None — check here first if rss_kb goes null on
     the runner after a Python upgrade. Returns None if the query fails."""
     try:
-        import ctypes
+        # wintypes stays function-local: it is only needed for the call
+        # signature, and only Windows ever reaches here. The struct itself is
+        # at module scope so its layout can be self-checked (see above).
         from ctypes import wintypes
 
-        class PMC(ctypes.Structure):
-            _fields_ = [("cb", wintypes.DWORD),
-                        ("PageFaultCount", wintypes.DWORD),
-                        ("PeakWorkingSetSize", ctypes.c_size_t),
-                        ("WorkingSetSize", ctypes.c_size_t),
-                        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
-                        ("QuotaPagedPoolUsage", ctypes.c_size_t),
-                        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
-                        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
-                        ("PagefileUsage", ctypes.c_size_t),
-                        ("PeakPagefileUsage", ctypes.c_size_t)]
-
-        pmc = PMC()
-        pmc.cb = ctypes.sizeof(PMC)
+        pmc = PROCESS_MEMORY_COUNTERS()
+        pmc.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
         psapi = ctypes.WinDLL("psapi")
         fn = psapi.GetProcessMemoryInfo
         # Declare the signature: without argtypes ctypes coerces the handle
         # through a C int, which can truncate 64-bit HANDLE values.
-        fn.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+        fn.argtypes = [wintypes.HANDLE,
+                       ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]
         fn.restype = wintypes.BOOL
         if fn(wintypes.HANDLE(popen._handle), ctypes.byref(pmc), pmc.cb):
             return pmc.PeakWorkingSetSize / 1024.0
@@ -295,7 +317,7 @@ def _maxrss_to_kb(ru_maxrss, platform):
     return ru_maxrss / (1024.0 if platform == "darwin" else 1.0)
 
 
-def _reap_posix(proc, wait4=os.wait4):
+def _reap_posix(proc, wait4=None):
     """Reap a finished child with os.wait4, set proc.returncode from its wait
     status, and return its peak RSS in KB.
 
@@ -306,7 +328,17 @@ def _reap_posix(proc, wait4=os.wait4):
     `wait4` is a parameter so the status decode and unit conversion can be
     exercised against a stub instead of a live process — this is the sole
     source of BOTH the return code and the memory number on Linux, so a
-    regression here would null out every rss series at once."""
+    regression here would null out every rss series at once.
+
+    It defaults to None and resolves os.wait4 in the BODY rather than in the
+    signature, because a default-argument expression is evaluated once when
+    the def statement runs at import. os.wait4 is POSIX-only, so binding it
+    in the signature would raise AttributeError while merely importing this
+    module on Windows — a platform that never calls this function, and whose
+    own path (_windows_peak_rss_kb) is right below. Do not "simplify" this
+    back into the signature."""
+    if wait4 is None:
+        wait4 = os.wait4
     _pid, status, ru = wait4(proc.pid, 0)
     proc.returncode = os.waitstatus_to_exitcode(status)
     return _maxrss_to_kb(ru.ru_maxrss, sys.platform)
@@ -645,6 +677,31 @@ assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed line
 # rather than only the one running the check.
 assert _maxrss_to_kb(2048, "linux") == 2048.0, "Linux ru_maxrss is already KB"
 assert _maxrss_to_kb(2048 * 1024, "darwin") == 2048.0, "macOS ru_maxrss is BYTES"
+
+
+# Import-time guard against re-introducing a POSIX-only default argument.
+# os.wait4 does not exist on Windows, and a default-argument expression is
+# evaluated when the def statement runs — so `def _reap_posix(proc,
+# wait4=os.wait4)` raises AttributeError while merely IMPORTING this module
+# on Windows, before any os.name branch can protect it. This check runs on
+# every platform because the POSIX hosts are the ones that would not notice.
+assert _reap_posix.__defaults__ == (None,), \
+    "_reap_posix must resolve os.wait4 in its body, not bind it as a default"
+
+
+# Import-time self-check for the Win32 struct layout. Runs on every platform
+# — which is the point: the fields are fixed-width (see the class docstring),
+# so the layout here is the layout Windows sees, and a mis-ordered or
+# mis-typed field is caught on the Linux CI rather than by a believable wrong
+# number on the Windows runner. The expected values are the x64 ABI's:
+# two 4-byte DWORDs, then eight 8-byte SIZE_T fields at offset 8.
+assert ctypes.sizeof(ctypes.c_size_t) == 8, \
+    "these offsets assume a 64-bit host; revisit if a 32-bit runner appears"
+assert ctypes.sizeof(PROCESS_MEMORY_COUNTERS) == 72, \
+    "PROCESS_MEMORY_COUNTERS layout drifted from the Win32 x64 definition"
+assert PROCESS_MEMORY_COUNTERS.PeakWorkingSetSize.offset == 8, \
+    "PeakWorkingSetSize must follow the two DWORDs; a wrong offset reads garbage"
+assert PROCESS_MEMORY_COUNTERS.cb.offset == 0, "cb must be the first field"
 
 
 # Import-time self-check for the POSIX reaping path, driven by a stub wait4 so

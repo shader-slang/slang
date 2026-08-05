@@ -365,3 +365,54 @@ _mu = canonical_runs([dict(_rec, workload="conformance")])
 assert "peakRssKb" not in _mu[0]["timers"], \
     "memory promotion must be curated: only track_memory workloads"
 del _rec, _mr, _mu
+
+
+# Import-time self-check for daily_labels, over a throwaway tmpdir (the same
+# idiom as fetch_releases.py's zip check). This function is the single place
+# that knows the daily storage layout, so a change here forks silently into
+# both report.combined_index and daily_movers.daily_points; and its two
+# fallbacks only fire for points registered before meta.json carried the
+# fields, which no current nightly produces — so nothing else would exercise
+# them. The three cases: meta present (fields win, full SHA preserved), meta
+# absent (date from the label prefix, commit from the label suffix — a SHORT
+# sha, which is why the docstring says the field has no guaranteed length),
+# and a directory with no results.json (skipped entirely).
+def _daily_labels_selfcheck():
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="analyze_selfcheck_")
+    try:
+        def point(label, meta=None, results=True):
+            p = os.path.join(d, "daily", label)
+            os.makedirs(p)
+            if results:
+                with open_output(os.path.join(p, "results.json")) as fh:
+                    fh.write("[]")
+            if meta is not None:
+                with open_output(os.path.join(p, "meta.json")) as fh:
+                    json.dump(meta, fh)
+
+        point("2026-01-02-bbbbbbb",
+              {"date": "2026-01-02", "commit": "b" * 40, "commit_time": "t"})
+        point("2026-01-01-aaaaaaa")            # legacy: no meta.json
+        point("2026-01-03-ccccccc", results=False)  # swept but never completed
+
+        got = daily_labels(d)
+        assert [r["label"] for r in got] == ["2026-01-01-aaaaaaa",
+                                             "2026-01-02-bbbbbbb"], \
+            "daily_labels must be label-sorted and skip points with no results"
+        assert got[0]["date"] == "2026-01-01" and got[0]["commit"] == "aaaaaaa", \
+            "without meta.json, date/commit fall back to the label's two halves"
+        assert got[0]["commit_time"] == "", "missing commit_time defaults to ''"
+        assert got[1]["date"] == "2026-01-02" and got[1]["commit"] == "b" * 40, \
+            "with meta.json, its fields win and the full SHA is preserved"
+        assert os.path.isfile(got[0]["path"]), "path must point at results.json"
+        assert daily_labels(os.path.join(d, "nonexistent")) == [], \
+            "a results dir with no daily/ yields no points, not an error"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_daily_labels_selfcheck()
+del _daily_labels_selfcheck
