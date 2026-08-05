@@ -29,7 +29,7 @@ namespace Fossil
 template<typename T>
 SLANG_FORCE_INLINE ValPtr<T> expectNonNullValOfType(AnyValPtr valPtr)
 {
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
     if (auto resultPtr = as<T>(valPtr))
         return resultPtr;
     SLANG_UNEXPECTED("invalid format encountered in serialized data");
@@ -47,7 +47,7 @@ SLANG_FORCE_INLINE ValPtr<T> expectNonNullValOfType(AnyValPtr valPtr)
 template<typename T>
 SLANG_FORCE_INLINE ValPtr<T> expectPossiblyNullValOfType(AnyValPtr valPtr)
 {
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
     auto layout = valPtr.getLayout();
     if (!layout || !T::isMatchingKind(layout->kind))
     {

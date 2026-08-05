@@ -72,7 +72,7 @@ Fossil::AnyValPtr getRootValue(void const* data, Size size)
         SLANG_UNEXPECTED("bad format for fossil");
     }
 
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
     validateRootValue(data, size, rootValueVariant);
 #endif
 

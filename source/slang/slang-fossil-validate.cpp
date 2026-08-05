@@ -1,7 +1,7 @@
 // slang-fossil-validate.cpp
 #include "slang-fossil.h"
 
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
 
 #include "core/slang-dictionary.h"
 #include "core/slang-list.h"

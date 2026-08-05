@@ -118,7 +118,7 @@ The user-facing surface that survives is:
 
 - The **`serialize(serializer, value)` template pattern**
   (`#the-serialize-pattern`) — a C++ idiom; not observable from CLI.
-- The **`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` macro**
+- The **`SLANG_ENABLE_VALIDATION_FOSSIL` macro**
   (`#fossil-backend`) — a compile-time toggle baked into the
   binary; we cannot flip it from the CLI.
 - The **Fossil memory-mappable property** (`#fossil-backend`) — an

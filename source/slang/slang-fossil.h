@@ -29,26 +29,23 @@ namespace Slang
 // checks throughout the process, and fail fast rather than
 // risk reading mal-formed data.
 //
-// However, validation typically comes at a performance cost,
-// and one of the key cases for serialization in Slang is loading
-// the core module from the `slang.dll` binary itself. In order
-// to measure how much performance is being lost to validation
-// checks, we provide a define that is intended to enable or
-// disable validation during deserialization.
-//
-// Validation defaults to enabled; the guard lets a build turn it off
-// for measurement without editing this file, e.g. by passing
-// `-DSLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS=0`.
+// Validation is off by default, because it is expensive and a key case for
+// deserialization in Slang is loading the core module from the `slang.dll`
+// binary itself, which is trusted. It covers both the type/kind checks made
+// while reading and the walk that proves the whole object graph lies inside
+// the blob; the latter alone costs around two seconds per process in a release
+// build. Builds that read untrusted serialized data should turn it on with the
+// `SLANG_ENABLE_VALIDATION_FOSSIL` CMake option, which defines this macro.
 //
 // It is defined here rather than in `slang-serialize-fossil.h` because
 // the reader for the format itself (`Fossil::getRootValue`) needs it
 // too, and sits below the serializer in the include graph.
 //
-#ifndef SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
-#define SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS 1
+#ifndef SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_ENABLE_VALIDATION_FOSSIL 0
 #endif
 
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
 #define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
     do                                                                         \
     {                                                                          \
@@ -1199,7 +1196,7 @@ struct Header
 
 static_assert(sizeof(Header) == 32);
 
-#if SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS
+#if SLANG_ENABLE_VALIDATION_FOSSIL
 
 /// Validate that everything reachable from the root value of the blob at `data`
 /// (of `size` bytes) lies within that blob.

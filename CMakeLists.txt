@@ -148,7 +148,12 @@ option(
 
 option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
-option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
+option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)" OFF)
+option(
+    SLANG_ENABLE_VALIDATION_FOSSIL
+    "Enable validation of serialized fossil data on load (SLOW!)"
+    OFF
+)
 option(SLANG_ENABLE_VALIDATION_VM_BYTECODE "Enable VM bytecode validation" ON)
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
