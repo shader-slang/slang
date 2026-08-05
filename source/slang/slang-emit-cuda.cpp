@@ -430,6 +430,29 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     SLANG_UNUSED(entryPointDecor);
 }
 
+static bool _isCudaDeviceFunctionDefinitionExported(IRFunc* func)
+{
+    // Slang visibility controls IR linking, not linkage between emitted CUDA translation units.
+    // A public definition can be included in multiple separately emitted CUDA modules, so giving
+    // all public device functions external CUDA linkage can cause multiple-definition errors when
+    // those modules are linked together.
+    //
+    // Give non-entry-point __device__ function definitions internal linkage by default. Only give
+    // them external linkage when their IR carries one of the export decorations recognized below.
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_HLSLExportDecoration:
+        case kIROp_CudaDeviceExportDecoration:
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
@@ -464,6 +487,15 @@ void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
     }
     else
     {
+        // Forward declarations of definitions also pass through this hook and satisfy
+        // isDefinition(), giving their declarations and definitions matching internal linkage. A
+        // declaration-only function may be defined in another CUDA translation unit and must
+        // remain externally linkable.
+        if (auto func = as<IRFunc>(inst);
+            func && func->isDefinition() && !_isCudaDeviceFunctionDefinitionExported(func))
+        {
+            m_writer->emit("static ");
+        }
         m_writer->emit("__device__ ");
     }
 }
