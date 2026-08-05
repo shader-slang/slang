@@ -15606,11 +15606,11 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     addModifier(decl, prefixModifier);
 }
 
-// A bare `groupshared` parameter is passed by reference (#10641), which lowers to a pointer into the
-// thread-group-shared address space. HLSL cannot pass that across a function boundary at all -- DXC
-// rejects it with error 0043 -- so a `groupshared` parameter is rejected whenever the function forces
-// a boundary, which both `[noinline]` and `export` do (an exported function is a separately compiled
-// entry the caller reaches by call, so its parameter is never inlined away).
+// A bare `groupshared` parameter is passed by reference (#10641), which lowers to a pointer into
+// the thread-group-shared address space. HLSL cannot pass that across a function boundary at all --
+// DXC rejects it with error 0043 -- so a `groupshared` parameter is rejected whenever the function
+// forces a boundary, which both `[noinline]` and `export` do (an exported function is a separately
+// compiled entry the caller reaches by call, so its parameter is never inlined away).
 //
 // Other targets are not diagnosed here: they either keep the boundary or have the parameter inlined
 // away as ordinary legalization.
