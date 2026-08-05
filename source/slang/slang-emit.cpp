@@ -1618,6 +1618,9 @@ Result linkAndOptimizeIR(
     if (target == CodeGenTarget::HostVM)
     {
         SLANG_PASS(performForceInlining);
+        // Autodiff can leave void differential parameters and matching call arguments, but the
+        // bytecode constants section cannot represent void values. Remove them before emission,
+        // as the later target pipelines do.
         SLANG_PASS(cleanUpVoidType);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
         return SLANG_OK;

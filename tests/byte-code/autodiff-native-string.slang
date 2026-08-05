@@ -31,6 +31,7 @@ int main()
 }
 
 // BC: func s_bwdProp_square
+// BC: store.8 {{.*}}, str:"y2"
 // BC: call {{.*}}, s_bwdProp_debugGrad
 // CHECK: Gradient of y2 is 1.000000
 // CHECK: dL/dx: 6.000000, dL/dy: 8.000000

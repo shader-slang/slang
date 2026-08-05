@@ -657,16 +657,20 @@ public:
             {
                 auto storeInst = as<IRStore>(inst);
                 IRBuilder builder(inst);
-                // Use the destination type to determine how many bytes the store writes. For
-                // example, a string literal stored into a NativeString field has a zero-sized
-                // literal type, but the destination field holds a pointer-sized NativeString.
-                auto storedType =
+
+                // A HostVM store must have a typed destination. NativePtr/ComPtr are opaque handle
+                // values and RawPointer is untyped, so none is a valid store destination here.
+                auto pointeeType =
                     tryGetPointedToType(&builder, storeInst->getPtr()->getDataType());
-                SLANG_RELEASE_ASSERT(storedType);
+                SLANG_RELEASE_ASSERT(pointeeType);
+
+                // Use the destination type to determine how many bytes the store writes. For
+                // example, StringType has no configured HostVM size, but a NativeString field is
+                // pointer-sized.
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
                     codeGenContext->getTargetReq(),
-                    storedType,
+                    pointeeType,
                     &sizeAlignment);
                 writeInst(
                     funcBuilder,
