@@ -204,7 +204,10 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     autoRequestedReviewer: null,
     autoRequestedHasSignal: false,
   });
-  assert.match(withoutRequested, /highest for dev1 among collaborators/);
+  assert.match(
+    withoutRequested,
+    /highest for dev1 among collaborators other than the assignee/,
+  );
   assert.doesNotMatch(withoutRequested, /@dev1/);
 
   // Auto-requested maintainer with no measured signal: do not claim they have
@@ -216,7 +219,10 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     autoRequestedReviewer: "maintainer",
     autoRequestedHasSignal: false,
   });
-  assert.match(noSignalBaseline, /highest for dev1 among collaborators/);
+  assert.match(
+    noSignalBaseline,
+    /highest for dev1 among collaborators other than the assignee/,
+  );
   assert.doesNotMatch(noSignalBaseline, /than for the auto-requested reviewer/);
 });
 

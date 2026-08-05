@@ -142,7 +142,10 @@ per-file LOC tiebreak runs only when the top two are close.
 
 The ranking/selection logic is inlined in `pr-board-sync.yml` (between
 `extract-js:assignment:begin/end` markers); Source classification helpers live
-in `extract-js:classify:begin/end`. Unit tests extract those blocks at run time:
+in `extract-js:classify:begin/end`. Unit tests extract those blocks at run time.
+Wiring outside the extract markers (`reconcileAssignment`,
+`postAssignmentComment`, and the `requestReviewers` call site) is not covered by
+those unit tests and is verified manually / after merge.
 
 ```bash
 node .github/scripts/pr-signal.test.js

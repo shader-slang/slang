@@ -921,6 +921,11 @@ jobs:
             // fallback), that baseline is treated as rank −∞ and any eligible
             // collaborator counts as higher-signal. Used only for a suggestion
             // comment — never for requestReviewers.
+            //
+            // Collaborator membership uses raw login equality (same as
+            // selectAssigneeAndReviewers' owners.has / collaborators.has). All three
+            // sets come from GitHub APIs with canonical login casing, so a
+            // case-insensitive check is unnecessary here.
             function pickSuggestedReviewer({
               committersBySignal = [],
               collaborators,
@@ -975,10 +980,14 @@ jobs:
                     `(${autoRequestedReviewer}) — consider requesting a review ` +
                     `from them as well. They were not auto-requested.`;
                 } else {
+                  // Assignee (and author / auto-requested when present) were
+                  // excluded from the pick, so this is highest among remaining
+                  // eligible collaborators — not among all collaborators.
                   body +=
                     `\n\nCommitter signal on the changed files is highest for ` +
-                    `${suggestedReviewer} among collaborators — consider ` +
-                    `requesting a review from them. They were not auto-requested.`;
+                    `${suggestedReviewer} among collaborators other than the ` +
+                    `assignee — consider requesting a review from them. They ` +
+                    `were not auto-requested.`;
                 }
               }
               return body;
