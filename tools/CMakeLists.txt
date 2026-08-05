@@ -440,7 +440,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         )
         target_include_directories(
             slang-unit-test
-            SYSTEM PRIVATE ${OptiX_INCLUDE_DIRS}
+            SYSTEM
+            PRIVATE ${OptiX_INCLUDE_DIRS}
         )
     endif()
     slang_add_target(
