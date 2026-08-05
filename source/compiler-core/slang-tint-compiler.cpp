@@ -146,7 +146,7 @@ SlangResult TintDownstreamCompiler::getVersionString(slang::IBlob** /* outVersio
 {
     // We just use Tint at whatever version is in our Dawn fork, so nobody should
     // depend on the particular version at the moment.
-    return SLANG_FAIL;
+    return SLANG_E_NOT_AVAILABLE;
 }
 
 } // namespace Slang

@@ -8133,15 +8133,20 @@ static void dumpEmbeddedDownstream(IRDumpContext* context, IRInst* inst)
         {
             // Use glslang interface to disassemble with string output
             String disassemblyOutput;
-            if (SLANG_SUCCEEDED(compiler->disassembleWithResult(
-                    spirvCode,
-                    int(spirvWordCount),
-                    disassemblyOutput)))
+            const SlangResult disassembleResult =
+                compiler->disassembleWithResult(spirvCode, int(spirvWordCount), disassemblyOutput);
+            if (SLANG_SUCCEEDED(disassembleResult))
             {
                 // Dump the captured disassembly
                 dump(context, "\n");
                 dumpIndent(context);
                 dump(context, disassemblyOutput);
+            }
+            else if (disassembleResult == SLANG_E_NOT_AVAILABLE)
+            {
+                // The compiler loaded but exports no disassembler, so nothing examined this blob.
+                // Reporting that as a failure would misdescribe a perfectly valid module.
+                dump(context, "<unavailable disassembler>");
             }
             else
             {

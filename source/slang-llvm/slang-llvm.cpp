@@ -135,19 +135,21 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() SLANG_OVERRIDE { return false; }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getVersionString(slang::IBlob** outVersionString)
         SLANG_OVERRIDE;
+    // This compiler consumes SPIR-V for none of its targets, so it has no validator or
+    // disassembler at all -- distinct from having one that rejected the contents.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
         const uint32_t* contents,
@@ -157,7 +159,7 @@ public:
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
         SLANG_UNUSED(outString);
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     LLVMDownstreamCompiler()

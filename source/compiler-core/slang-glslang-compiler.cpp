@@ -377,9 +377,11 @@ SlangResult GlslangDownstreamCompiler::disassembleWithResult(
     int contentsSize,
     String& outString)
 {
+    // As with `validate`, `init` accepts a library that exports no disassembler, so "cannot
+    // disassemble" must stay distinguishable from "disassembling these contents failed".
     if (m_disassembleWithResult == nullptr)
     {
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     char* resultString = nullptr;
@@ -402,7 +404,7 @@ SlangResult GlslangDownstreamCompiler::disassemble(const uint32_t* contents, int
 {
     if (m_disassemble == nullptr)
     {
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     if (m_disassemble(contents, contentsSize))

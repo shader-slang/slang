@@ -46,6 +46,11 @@ public int normalFunc(int a, float b)
 }
 
 // CHECK1:EmbeddedDownstreamIR(6 : Int,
+// A working disassembler must produce disassembly, not either of the two ways the dump reports it
+// could not: "unavailable disassembler" when the library exports none, and "disassembly failed"
+// when one ran and failed.
+// CHECK1-NOT:unavailable disassembler
+// CHECK1-NOT:disassembly failed
 // CHECK1:               OpCapability Linkage
 
 // CHECK2-NOT:EmbeddedDownstreamIR(6 : Int,

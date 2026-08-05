@@ -355,7 +355,8 @@ public:
     /// Converts an artifact `from` to a desc of `to` and puts the result in outArtifact
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     convert(IArtifact* from, const ArtifactDesc& to, IArtifact** outArtifact) = 0;
-    /// Get the version of this compiler
+    /// Get the version of this compiler. Returns `SLANG_E_NOT_AVAILABLE` when this compiler does
+    /// not report a version at all, which is not the same as failing to determine one.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getVersionString(slang::IBlob** outVersionString) = 0;
     /// Validate `contents` and return the result. Returns `SLANG_E_NOT_AVAILABLE` when this
@@ -363,10 +364,14 @@ public:
     /// distinct from a result saying the module was examined and rejected.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) = 0;
-    /// Disassemble and print to stdout
+    /// Disassemble and print to stdout. Returns `SLANG_E_NOT_AVAILABLE` when this compiler cannot
+    /// disassemble at all, which callers must keep distinct from a failure to disassemble the
+    /// given contents.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) = 0;
-    /// Disassemble and return the result as a string
+    /// Disassemble and return the result as a string. Returns `SLANG_E_NOT_AVAILABLE` when this
+    /// compiler cannot disassemble at all, which callers must keep distinct from a failure to
+    /// disassemble the given contents.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassembleWithResult(const uint32_t* contents, int contentsSize, String& outString) = 0;
 
@@ -410,7 +415,7 @@ public:
         SLANG_OVERRIDE
     {
         *outVersionString = nullptr;
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE
@@ -424,7 +429,7 @@ public:
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
@@ -435,7 +440,7 @@ public:
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
         SLANG_UNUSED(outString);
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     DownstreamCompilerBase(const Desc& desc)
