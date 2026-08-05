@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#comparison
-//META: doc_section_digest=04ce765c6615b6d4afcb57668ffc53ea9c74c835ea05c4c4d58b93fe0cbf4541
+//META: doc_section_digest=a41eec816a55db301ccafcfa867bab048ae6ed92cc99c5f791c2e8474302d15d
 //META: purpose=The `cmpGE` opcode lowers to three distinct SPIR-V ops keyed by operand type: `OpSGreaterThanEqual` for signed, `OpUGreaterThanEqual` for unsigned, `OpFOrdGreaterThanEqual` for floating-point.
 //META: intent=expansion
 //META: pipeline_stage=emit

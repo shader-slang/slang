@@ -1,15 +1,15 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#conversions
-//META: doc_section_digest=d86bedaed855595e10c45be817dcd07ae903a5905ada08a17d56c55e59daa232
+//META: doc_section_digest=15a849f7cabcf06b95570121d08d30f735912628e8a357779f17fa39de0aca01
 //META: purpose=The `intCast` opcode lowers to `OpSConvert` when widening a signed integer and `OpUConvert` when widening an unsigned integer, realizing the doc's "sign/zero extension chosen by types".
 //META: intent=expansion
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc describes `intCast` as "Integer-to-integer cast (sign/zero
+// Verifies that `intCast` as "Integer-to-integer cast (sign/zero
 // extension chosen by types)". The unified IR opcode splits in SPIR-V on
 // the source signedness when widening: a signed source emits `OpSConvert`
 // (sign-extend), an unsigned source emits `OpUConvert` (zero-extend).

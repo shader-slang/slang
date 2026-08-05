@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-legacy-diagnostic
-//META: doc_section_digest=04e6b41a5ed7b7f40deee827fed8dac1f618dc77bdfc81ebd67f98a5810bb953
-//META: purpose=A legacy warning with a note renders both the warning's primary message and the companion note pointing at the previous definition.
-//META: intent=negative
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#anatomy-of-a-diagnostic-entry
+//META: doc_section_digest=79bb0fc1ac8583fef268d4e89fe89d0e6aa8ce66124dff7c481098ca077adbae
+//META: purpose=A `warning` entry carrying a note renders the warning span plus its companion note at the previous definition.
+//META: intent=functional
 //META: pipeline_stage=preprocess
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// macro-redefinition (15400) is a legacy `warning(...)` entry with a
-// companion `note(...)` pointing at the original. Verify the warning
-// message appears at the new definition and the note appears at the
-// original definition.
+// Verifies that a `warning` entry carrying a note renders both records. A
+// macro is defined twice; the annotations pin the warning (code 15400) at the
+// second definition and the companion note at the first, so losing either
+// record fails the exhaustive check.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
@@ -23,9 +23,8 @@
 
 #define MY_MACRO 2
 /*CHECK:
-        ^^^^^^^^ macro redefined
+        ^^^^^^^^ E15400
         ^^^^^^^^ redefinition of macro 'MY_MACRO'
 */
-// CHECK: W15400
 
 void main() {}

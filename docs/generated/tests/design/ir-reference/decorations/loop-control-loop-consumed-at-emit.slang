@@ -1,20 +1,20 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:10:36Z
-//META: source_commit=f39188078fe010048714735213c24a7cb15532b9
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#branch--flatten--loopcontrol
-//META: doc_section_digest=262cdb3047c0e840655e74b96e0546c7c47439596c001991c8eb9e996922be06
+//META: doc_section_digest=f2ba884d83c46721a4e1598e9622f13a2cab5e3cbdcc2f2993805ccbe9c8f247
 //META: purpose=The loopControl loop mode recorded from [loop] flows through the IR unchanged and is re-emitted by the HLSL backend as the [loop] attribute on the loop.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the loopControl decoration recorded for [loop] is a
-// pass-through hint consumed at emit: the HLSL backend prints the
-// [loop] attribute back onto the for statement, selecting the
-// keep-as-a-loop strategy (the mode distinct from unroll). The loop
-// body accumulates a thread-id-dependent value that escapes through a
-// buffer write, so the loop survives to the emit step.
+// Verifies that `loopControl` is a pass-through hint the backend turns back
+// into a target construct. The HLSL CHECKs assert `[loop]` is printed
+// immediately before a `for`, i.e. the compiler kept the loop rolled and
+// forwarded the request rather than acting on it in the IR. The loop
+// accumulates a thread-id-dependent value into a buffer so it survives to
+// emit.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 

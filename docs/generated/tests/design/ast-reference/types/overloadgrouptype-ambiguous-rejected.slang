@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=0acf92c990c51e23e6b949538b0504562447e6a609a849cd20f331b1ba8f82e3
-//META: purpose=OverloadGroupType is the pseudo-type of an unresolved overload set; when overload resolution is ambiguous the diagnostic reports the candidate set.
+//META: doc_section_digest=c7f55cb42aaa9e03df513fb2e3ff5bbcf380f2c09432d750a2aa9c55dfc56801
+//META: purpose=An unresolved overload set is a pseudo-type that checking must collapse; when no candidate is better the call is rejected and the diagnostic names the candidate set.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the observable surface of OverloadGroupType: two overloads
-// of `f` are equally good for (int, int) (each needs one int->float
-// conversion), so the unresolved overload set cannot collapse and the
-// checker reports an ambiguous call over the candidate set. CHECK
-// pins the ambiguity diagnostic and both candidate notes.
+// Verifies the observable surface of the unresolved-overload pseudo-
+// type: both `f` overloads need exactly one int-to-float conversion for
+// the call `f(1, 2)`, so neither wins and the set cannot collapse.
+// CHECK pins the ambiguity diagnostic plus one note per candidate,
+// which shows the set was carried to the point of resolution.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

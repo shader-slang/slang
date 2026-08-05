@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T12:00:00+00:00
-//META: source_commit=5f0e613fdd3c2890bb087d9ff76154e2605a14d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#texture-and-image
-//META: doc_section_digest=6c8a0e2f5621fa8fe9870a96fba7f97261b6b3930a336ced3ad67bd4bfd658e6
+//META: doc_section_digest=d256dde64890becaf8cd7de87d2e7c15cce6794507c618550a67824d086322d4
 //META: purpose=GLSL `imageAtomicAdd` and `imageAtomicExchange` on a storage image both route through the documented `ImageTexelPointer` opcode, observable as `OpImageTexelPointer` instructions feeding `OpAtomicIAdd` / `OpAtomicExchange` in the emitted SPIR-V.
 //META: intent=functional
 //META: pipeline_stage=emit

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:25:00Z
-//META: source_commit=6b490bc8cb3cf11b356ddf70168c5609efa46341
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#scope-bearing-ast-nodes
-//META: doc_section_digest=4012d317b8285bf4455042f74ea907029640a1b43e84b980a12945df5545dd84
+//META: doc_section_digest=53cc9594629df0d6fdaba40b6892c4ce92119b3c38da01e7da3565a3cdc7634f
 //META: purpose=A while loop's block body owns its own scope (the parser does not push a fresh ScopeDecl on the WhileStmt itself); a local declared in the body is not visible after the loop.
 //META: intent=negative
 //META: pipeline_stage=check

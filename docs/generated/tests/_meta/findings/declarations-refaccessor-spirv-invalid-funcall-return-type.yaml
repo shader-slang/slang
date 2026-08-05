@@ -1,0 +1,47 @@
+schema_version: 1
+id: declarations-refaccessor-spirv-invalid-funcall-return-type
+bundle: design/ast-reference/declarations
+suspected_kind: wrong-codegen
+title: "[declarations] `ref` accessor emits invalid SPIR-V (call return-type mismatch)"
+observed_at: "2026-06-11T00:00:00Z"
+scope: spirv
+evidence:
+  command: "SLANG_RUN_SPIRV_VALIDATION=1 build/RelWithDebInfo/bin/slangc -target spirv-asm -entry main -stage compute /tmp/ref.slang"
+  source_slang: docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
+  observed_summary: |
+    A property with an explicit `[mutating] ref` accessor (RefAccessorDecl) emits invalid
+    SPIR-V. With validation enabled the compiler reports:
+      error: line 45: OpFunctionCall Result Type <id> '11[%_ptr_Function_int]'s type does
+      not match Function <id> '6[%int]'s return type.
+        %14 = OpFunctionCall %_ptr_Function_int %Cell_value_ref %c
+      internal error[E99999]: Validation of generated SPIR-V failed.
+    Without validation (default) slangc exits 0 but the emitted module contains a malformed
+    `OpStore %int_0 %int_13` (store into a constant id), i.e. the ref helper's pointer result
+    was mis-lowered. The same shader emits correct return-by-reference helpers on hlsl, glsl,
+    and wgsl. Repro shader:
+      struct Cell {
+          int _v;
+          property int value { get { return _v; } [mutating] ref { return _v; } }
+      }
+      RWStructuredBuffer<int> outBuf;
+      [shader("compute")] [numthreads(1,1,1)]
+      void main() { Cell c; c._v = 0; c.value = 13; outBuf[0] = c.value; }
+  exit_code: 255
+  stderr_tail: "error: line 45: OpFunctionCall Result Type <id> '11[%_ptr_Function_int]'s type does not match Function <id> '6[%int]'s return type. ; internal error[E99999]: Validation of generated SPIR-V failed."
+expected:
+  claim: |
+    A property `ref` accessor lowering to a return-by-reference helper must produce a
+    SPIR-V function whose declared return type matches its OpFunctionCall result type, so
+    the generated module passes spirv-val; the assignment through the ref accessor must
+    store into the backing field, not into a constant.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/declarations.md
+provenance:
+  agent_model: claude-opus-4-8
+  source_commit: 1ee81dae21143fb69ccb9999f0fd013b4db2d922
+  doc_anchor: docs/generated/design/ast-reference/declarations.md#accessordecl-family
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the same shader emits correct helpers on hlsl, glsl, and wgsl; only the SPIR-V path mis-types the ref-helper call."
+    - "Acceptable optimization: ruled out — the result fails spirv-val and the default (no-validation) emit contains a store into a constant, both of which are malformed regardless of optimization level."

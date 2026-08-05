@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#conditionalbranch-vs-ifelse
-//META: doc_section_digest=3716e77c564043cb9f0c5b8c964ce43385211b156222579c14f4aba6721548d8
+//META: doc_section_digest=96f04f740c4687e22beab296ffbc9afcbc132a64b968c6692bcb6c3ea1648cbc
 //META: purpose=The front-end emits structured ifElse — not conditionalBranch — as the in-loop condition test; the loop body's predicate becomes an ifElse with the break label as one target.
 //META: intent=functional
 //META: pipeline_stage=lower

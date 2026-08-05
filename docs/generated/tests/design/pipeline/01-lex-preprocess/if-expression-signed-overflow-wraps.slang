@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T12:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#preprocessor-directives
-//META: doc_section_digest=c3ad01b7a04e24b43f66e2d017e85a491e5a0fbbf99a28a1c828245742a23613
+//META: doc_section_digest=4608df68ba69a62121bc1827dea7e4379ab2e4bc223340d0aead0d9cc6654fc2
 //META: purpose=Boundary probe of arithmetic in `#if`: `(INT_MAX + 1)` wraps to a negative value (observed behavior).
 //META: intent=boundary
 //META: pipeline_stage=preprocess

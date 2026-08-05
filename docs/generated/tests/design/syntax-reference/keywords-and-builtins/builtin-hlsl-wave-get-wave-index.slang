@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T00:00:00Z
-//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#core-module-syntax-declarations
-//META: doc_section_digest=950d7a7efcea5da748ec49fa6499555097f3093abb07ac97945a51be1ce2339c
+//META: doc_section_digest=61eae4cb09aaf55ca13e1b5adcdbe1bcd8d876e194e57de10e1861ffeb9396c7
 //META: purpose=`hlsl.meta.slang` layers in the wave-index builtins: `WaveGetWaveIndex` resolves in a compute shader and lowers to a load of the SubgroupId builtin in SPIR-V, and an `SV_GroupIndex` compute entry parameter survives into the emitted HLSL signature.
 //META: intent=functional
 //META: pipeline_stage=emit

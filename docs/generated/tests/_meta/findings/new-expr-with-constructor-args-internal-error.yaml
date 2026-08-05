@@ -1,0 +1,40 @@
+schema_version: 1
+id: new-expr-with-constructor-args-internal-error
+bundle: design/ast-reference/expressions
+suspected_kind: sigsegv
+title: "[expressions] `new T(args)` with a user __init aborts: internal error"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang -target hlsl -entry computeMain -stage compute"
+  source_slang: docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang
+  observed_summary: |
+    Allocating a class with an argument list — `new Counter(4 + int(tid.x))` where
+    `class Counter { int v; __init(int start) { v = start * 2; } }` — aborts compilation
+    with `error[E99997]: Slang compilation aborted due to an exception of
+    N5Slang13InternalErrorE unexpected: could not resolve target declaration for call`,
+    preceded by `note 99999: an internal error threw an exception while working on code
+    near this location`. The zero-argument form `new Counter()` on the same class (with
+    the `__init` removed) compiles on every text-emit target. The failure reproduces on
+    `-target hlsl`, `-target cpp`, `-target host-cpp`, `-target spirv-asm`, and under
+    `slangi`, so it is not target-specific.
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unexpected: could not resolve target declaration for call"
+expected:
+  claim: |
+    `new T(...)` is documented as the class-allocation expression form and takes an
+    argument list, so allocating a class that declares a matching `__init` should resolve
+    to that constructor and compile, not abort with an internal compiler error. Even if
+    the construct were unsupported, the compiler should emit a normal user-facing
+    diagnostic rather than an internal-error abort.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/expressions.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/ast-reference/expressions.md#nodes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug (wrong syntax): ruled out — `new Counter()` with no arguments compiles on the same class shape, and `Counter(4)` on an equivalent struct with the same `__init` compiles and runs."
+    - "Class types unsupported on the chosen target: ruled out — the same input aborts identically on hlsl, cpp, host-cpp, spirv-asm, and slangi."
+    - "The locally available slangc build predates a fix; the observation should be re-checked against a current build during triage."

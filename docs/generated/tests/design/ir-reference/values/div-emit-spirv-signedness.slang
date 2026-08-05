@@ -1,15 +1,15 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=1d2f08dfecd3e2ccb26b50652f1294ebe4c1c5182a6aab140a589ccecd16faa1
+//META: doc_section_digest=19b077f47f71a1feb81adb9dea6ff4919edb188c235b3634dce08c45cf359e3c
 //META: purpose=The unified `div` IR opcode lowers to three distinct SPIR-V ops keyed by operand type: `OpSDiv` for signed, `OpUDiv` for unsigned, `OpFDiv` for floating-point.
 //META: intent=expansion
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states `div` is "Division (signed / unsigned / floating-point
+// Verifies that `div` is "Division (signed / unsigned / floating-point
 // keyed by operand types)". The IR opcode is one (`div`); the SPIR-V
 // legalizer branches it into three distinct ops. This pins the
 // distinguishing emitted token per operand-type row of that branch.

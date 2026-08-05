@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-and-binding
-//META: doc_section_digest=53c33072d342ae9430710df507cdde301b5918b46f7119412b00900374c8e222
+//META: doc_section_digest=928ba5f8c333b9ec8b6e55397dc87060a4d672e8f7a0cc913acb7f02d7fea184
 //META: purpose=A global parameter declared with a register(uN) binding lowers to a HasExplicitHLSLBinding decoration on the parameter.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Per the doc table row for HasExplicitHLSLBinding: "Marks a
-// parameter as having an explicit HLSL register binding"; AST
-// origin is `register(...)` modifier. The decoration takes no
-// operands.
+// Verifies that `HasExplicitHLSLBinding` is the nullary marker recording
+// that a global parameter was given an explicit register binding. The
+// parameter also carries `[[vk::binding(3, 0)]]` so the SPIR-V target does
+// not warn about a D3D register without a Vulkan binding; the CHECK pins
+// the bare decoration.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

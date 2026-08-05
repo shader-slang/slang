@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=0acf92c990c51e23e6b949538b0504562447e6a609a849cd20f331b1ba8f82e3
-//META: purpose=A ConstantBufferType<T> uniform makes its fields visible and is the AST type for HLSL cbuffer; the HLSL emit renders the cbuffer keyword.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/types.md#resource-and-texture-type-families
+//META: doc_section_digest=0036091ab5f0cd50c2bada4820b7c7d7db668e207cf8e5052d6b074f59b4585f
+//META: purpose=A ConstantBufferType `ConstantBuffer<T>` makes its element's fields visible at the entry point and lowers to an HLSL cbuffer.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies ConstantBufferType is the UniformParameterGroupType leaf
-// for `ConstantBuffer<T>` / HLSL cbuffer: its fields are visible at
-// the entry point and the HLSL backend renders the cbuffer keyword.
-// CHECK matches the cbuffer spelling in the emitted HLSL.
+// Verifies the uniform-parameter-group leaf for constant buffers: the
+// element struct's fields are read straight off the buffer value, and
+// the HLSL backend must render the binding as a cbuffer rather than as
+// a plain struct parameter. CHECK matches the cbuffer keyword in the
+// emitted HLSL.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

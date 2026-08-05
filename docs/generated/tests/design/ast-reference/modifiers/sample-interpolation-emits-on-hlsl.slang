@@ -1,16 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#interpolation-modes
-//META: doc_section_digest=24e7271a64c5842b122da8c1f81403c6afa1794c0903bde19c22179fa5e608b4
-//META: purpose=`sample` interpolation modifier is preserved through emitted HLSL.
+//META: doc_section_digest=b00757f585ffb1d581749d3144f4d738cfa61d44114ac021c2e6dc15ad86eb5e
+//META: purpose=The `sample` interpolation modifier is preserved through emitted HLSL.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `HLSLSampleModifier` is the modifier behind the `sample`
-// per-sample-interpolation keyword. It must appear in emitted HLSL.
+// Verifies `sample` -- the per-sample sibling of `nointerpolation` in the same
+// interpolation-mode family -- is likewise preserved to the back end. The
+// annotated varying is returned so it survives DCE, and CHECK asserts the
+// qualifier is present in the emitted HLSL.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage fragment
 

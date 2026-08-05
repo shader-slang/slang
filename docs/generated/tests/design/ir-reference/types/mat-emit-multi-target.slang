@@ -1,19 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vec-and-mat
-//META: doc_section_digest=3375fc96f25274ba6b5f61268aab7b799044240063cd3b64ac3928c13a5702fc
+//META: doc_section_digest=fede71bd73c83957c94e27eab0113790d3ae8864e230db8dde234dca52b8d824
 //META: purpose=A float4x4 matrix type lowers to target-specific spellings (float4x4 on HLSL, mat4x4 on GLSL, mat4x4<f32> on WGSL).
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `Mat` is the IR encoding of a fixed-shape matrix.
-// Per-target text emit diverges: HLSL `float4x4`, GLSL `mat4x4`,
-// WGSL uses `mat4x4<f32>` (or its `array<vec4<f32>, 4>` storage
-// representation). Metal wraps the matrix in a storage struct (no
-// portable single-token spelling), so it is not checked here.
+// A float4x4 matrix type lowers to target-specific spellings (float4x4
+// on HLSL, mat4x4 on GLSL, mat4x4<f32> on WGSL). Per-target text emit
+// diverges: HLSL `float4x4`, GLSL `mat4x4`, WGSL uses `mat4x4<f32>`
+// (or its `array<vec4<f32>, 4>` storage representation). Metal wraps
+// the matrix in a storage struct (no portable single-token spelling),
+// so it is not checked here.
 
 //TEST:SIMPLE(filecheck=CHECKHLSL):-target hlsl -stage compute -entry main
 //TEST:SIMPLE(filecheck=CHECKGLSL):-target glsl -stage compute -entry main

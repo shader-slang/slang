@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
-//META: doc_section_digest=bea4097f3cb99e6205f4e10d4bf9ab240dde03162a3388a24e9a78e55d5c0e65
-//META: purpose=When the global scope is wrapped in a parameter group (cbuffer), the module's layout decoration is an IRParameterGroupTypeLayout rather than the raw IRStructTypeLayout; observable as parameterGroupTypeLayout(...) in the layout block.
+//META: doc_section_digest=cb9b7a613d39760a93548dfbce14e96da09e14aa0f49313bd097e522bedd9206
+//META: purpose=When the global scope is wrapped in a parameter group such as a cbuffer, the module's layout is a parameterGroupTypeLayout rather than a bare structTypeLayout.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that wrapping the global scope in a parameter group (a
-// cbuffer here) makes the module-level layout an
-// IRParameterGroupTypeLayout rather than the raw struct layout: the
-// CHECK asserts a parameterGroupTypeLayout(...) instruction appears
-// in the first post-link layout block.
+// Verifies the wrapped branch of the global-scope type layout. Declaring a
+// `cbuffer` puts the global scope inside a parameter group, so the layout
+// builder wraps the struct layout. CHECK asserts a
+// `parameterGroupTypeLayout(` instruction appears in the merged layout
+// block, which only the wrapped path emits.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

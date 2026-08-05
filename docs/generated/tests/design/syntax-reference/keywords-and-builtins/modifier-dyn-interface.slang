@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#simple-modifiers
-//META: doc_section_digest=14131d1346ae80bf12a86c5f0464133e39600a2d8baef546279830e042b6cb1c
+//META: doc_section_digest=c20a44348c0739e8c347913c83450bf1d0dc3c34d664be2becfd728a37d9b098
 //META: purpose=`dyn` is a simple modifier on an `interface` declaration that marks the interface for dynamic dispatch; declaring a `dyn interface` with a conforming struct parses and survives into a clean HLSL / SPIR-V emit.
 //META: intent=expansion
 //META: pipeline_stage=emit

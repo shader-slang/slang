@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#block-and-param
-//META: doc_section_digest=6464d00693cef2b4a0aff4d2217833f482b5d7a83cc29251b96ae2aaa6d765d4
+//META: doc_section_digest=2b345e8ce476ee0da24b2daa9c3e2bd0961bcb6de69a3908825bbe7092d800a6
 //META: purpose=Boundary: a loop header carrying two independent induction variables receives two `param` declarations — one per induction value — and both initial values appear as trailing operands on the loop terminator.
 //META: intent=boundary
 //META: pipeline_stage=lower
