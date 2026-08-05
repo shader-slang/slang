@@ -320,17 +320,31 @@ peak RSS lands in results.json for every workload (deep dives never need
 a re-bench), but `analyze.canonical_runs` promotes memory into the
 tracked counter series (`peakRssKb`,
 `apiCreateGlobalSessionRssDeltaKb`) only for workloads the manifest
-flags with `track_memory` — `minimal` (the session floor, the #9817
-headline) and the realistic end-to-end workloads (`mdl_dxr`,
-`rt_renderer`, `rt_renderer_specialize`; the rt api-driver runs also
-carry the createGlobalSession RSS delta) — because most workloads'
-peaks are floor-bound and would just re-draw the floor across dozens
-of panels and alert series. The tracked series
+flags with `track_memory` — the realistic end-to-end workloads
+(`mdl_dxr`, `rt_renderer`, `rt_renderer_specialize`; the rt api-driver
+runs also carry the createGlobalSession RSS delta) plus **one floor per
+execution mode** — because most workloads' peaks are floor-bound and
+would just re-draw the floor across dozens of panels and alert series.
+The tracked series
 feed the nightly trend check (1 MiB absolute floor, same ratio gate)
 and the progress tables like timers; `analyze.unit_of`/`fmt_qty` keep
-kilobytes from rendering as milliseconds. The site presents memory on `memory-{tot,releases}.html` as a compact
-dashboard of line panels — the session floor (the one absolute chart),
+kilobytes from rendering as milliseconds.
+
+**Two floors, not one.** A process peak is only comparable against a
+baseline measured from the _same executable_, and `build_commands` runs
+target-mode workloads as `slangc` but api-mode workloads as the separate
+`api-driver` binary. So `minimal` (an empty-shader compile, the #9817
+headline) is the floor for target-mode workloads and
+`api_session_create` (create + destroy a session, nothing else) is the
+floor for api-mode ones; `report.MEMORY_FLOOR` maps mode to floor and
+`report.floor_workload_for` resolves it per workload. Subtracting the
+slangc floor from an api-driver peak would fold the two binaries'
+differing startup cost into the workload's own-memory curve, so a change
+in either baseline would read as a workload regression.
+
+The site presents memory on `memory-{tot,releases}.html` as a compact
+dashboard of line panels — the session floors (the absolute charts),
 the createGlobalSession delta, then each tracked workload's OWN memory
-(its peak minus the same point's floor, the pure workload signal) —
-because memory components do not tile a total and a stacked area would
-lie.
+(its peak minus the same point's floor for its mode, the pure workload
+signal) — because memory components do not tile a total and a stacked
+area would lie.

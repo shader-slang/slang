@@ -147,15 +147,37 @@ def grid_page(path, title, sub, note, svg, extra_html=""):
     print(f"wrote {path}")
 
 
+def append_memory_point(per, vals, n_labels):
+    """Append one cadence point's {(workload, counter): kb} to the accumulated
+    series map `per`, keeping every series exactly `n_labels` long.
+
+    A key seen for the first time is back-filled with `n_labels - 1` Nones —
+    one per earlier point it missed — before its value is appended, and a key
+    absent from this point gets a None so it keeps a gap rather than
+    disappearing. The back-fill length is `n_labels - 1` rather than
+    `n_labels` BECAUSE the caller appends the current point's label before
+    calling, so `n_labels` already counts this point.
+
+    Split out of memory_series (which reads results.json) so this accumulation
+    can be exercised without a results directory. Consumers pair values to
+    labels POSITIONALLY — own-memory zips a workload's series against its
+    floor series, and render.line_panel maps value index to x position — so a
+    skew here would render a plausible-but-wrong chart rather than an error,
+    which is why it is both asserted below and pinned by a fixture at the
+    bottom of this module."""
+    for key in set(per) | set(vals):
+        per.setdefault(key, [None] * (n_labels - 1)).append(vals.get(key))
+    assert all(len(v) == n_labels for v in per.values()), \
+        "memory_series: series/label length skew"
+
+
 def memory_series(results_dir, recs, metric):
     """Per-point kb-counter series for a cadence: (labels, {(workload,
     counter): [kb_or_None per label]}). Reads every point's canonical
     records once; points that predate memory collection yield gaps.
 
-    Invariant: every series in `per` has exactly len(labels) entries. The
-    back-fill length is len(labels) - 1 BECAUSE the label for the current
-    point is appended before the series loop runs — a brand-new key gets
-    len(labels)-1 Nones for the points it missed plus one appended value."""
+    Invariant: every series in `per` has exactly len(labels) entries — see
+    append_memory_point, which owns the back-fill and asserts the alignment."""
     labels, per = [], {}
     for rec in recs:
         tag = rec["tag"]
@@ -167,20 +189,51 @@ def memory_series(results_dir, recs, metric):
                 for cnt, st in (run.get("timers") or {}).items():
                     if analyze.unit_of(cnt) == "kb" and st:
                         vals[(run["workload"], cnt)] = st.get(metric)
-        for key in set(per) | set(vals):
-            per.setdefault(key, [None] * (len(labels) - 1)).append(vals.get(key))
-        # Fail loudly if the alignment ever skews: consumers pair values to
-        # labels positionally (own-memory zips against the floor series, and
-        # line_panel maps value index to x position), so a length mismatch
-        # would render a plausible-but-wrong chart, not an error.
-        assert all(len(v) == len(labels) for v in per.values()), \
-            "memory_series: series/label length skew"
+        append_memory_point(per, vals, len(labels))
     return labels, per
 
 
 def mib(vs):
     """kb series -> MiB series, preserving None gaps."""
     return [v / 1024.0 if v is not None else None for v in vs]
+
+
+# The floor workload for each execution mode, and the title of its panel.
+#
+# A process peak is only comparable against a baseline measured from the SAME
+# executable. bench.build_commands runs target-mode workloads as slangc and
+# api-mode workloads as the separate api-driver binary, so the two have
+# different startup footprints. Subtracting the slangc floor from an
+# api-driver peak — which is what a single `minimal` floor did — folds that
+# difference into the workload's "own memory" curve as a constant offset, and
+# lets a change in EITHER binary's baseline move a curve that is supposed to
+# show only the workload's own growth.
+#
+# `minimal` compiles a near-empty shader; `api_session_create` creates and
+# destroys a session and does nothing else. Both are flagged track_memory in
+# the manifest so their peaks reach the tracked series this reads.
+#
+# Insertion order is the panel order, and slangc comes first deliberately: it
+# is the floor quoted in #9817 and the one most readers are looking for.
+MEMORY_FLOOR = {
+    "target": ("minimal", "Session floor (slangc) — minimal workload peak RSS"),
+    "api": ("api_session_create",
+            "Session floor (api driver) — api_session_create peak RSS"),
+}
+FLOOR_WORKLOADS = {wl for wl, _t in MEMORY_FLOOR.values()}
+
+
+def floor_workload_for(workload):
+    """Return the name of the floor workload whose peak RSS is subtractable
+    from `workload`'s — the one that ran the same executable — or None when
+    the workload's mode has no floor (or it is not in the manifest at all,
+    which happens when reading history for a since-renamed workload). A None
+    means no own-memory curve can be drawn, not that zero should be used."""
+    spec = manifest.BY_NAME.get(workload)
+    if spec is None:
+        return None
+    entry = MEMORY_FLOOR.get(spec.mode)
+    return entry[0] if entry else None
 
 
 def main():
@@ -276,12 +329,14 @@ def main():
 
     def memory_page(recs, fname, cad_title, note):
         labels, per = memory_series(args.results, recs, args.metric)
-        floor = per.get(("minimal", "peakRssKb"), [None] * len(labels))
+        floors = {wl: per.get((wl, "peakRssKb"), [None] * len(labels))
+                  for wl in FLOOR_WORKLOADS}
         panels = []
-        if any(v is not None for v in floor):
-            panels.append(render.line_panel(
-                labels, [("minimal peak RSS", "#2171b5", mib(floor))],
-                "Session floor — minimal workload peak RSS", unit="MiB"))
+        for fwl, ftitle in MEMORY_FLOOR.values():  # insertion order = panel order
+            if any(v is not None for v in floors[fwl]):
+                panels.append(render.line_panel(
+                    labels, [(f"{fwl} peak RSS", "#2171b5", mib(floors[fwl]))],
+                    ftitle, unit="MiB"))
         sc = [(wl, vs) for (wl, cnt), vs in per.items()
               if cnt == "apiCreateGlobalSessionRssDeltaKb"
               and any(v is not None for v in vs)]
@@ -293,31 +348,41 @@ def main():
                 labels, series,
                 "createGlobalSession RSS delta (api driver)", unit="MiB"))
         # Each tracked workload's OWN memory: process peak minus the same
-        # point's session floor — the floor panel above carries the absolute
-        # story once, so subtracting it here leaves the pure workload signal
-        # (where changes like v2026.11's front-end memory optimization live).
+        # point's floor for ITS execution mode (see MEMORY_FLOOR) — the floor
+        # panels above carry the absolute story once, so subtracting it here
+        # leaves the pure workload signal (where changes like v2026.11's
+        # front-end memory optimization live).
         wls = []
         for (wl, cnt), vs in per.items():
-            if cnt != "peakRssKb" or wl == "minimal":
+            if cnt != "peakRssKb" or wl in FLOOR_WORKLOADS:
+                continue
+            fwl = floor_workload_for(wl)
+            if fwl is None:
                 continue
             own = [v - f if v is not None and f is not None else None
-                   for v, f in zip(vs, floor)]
+                   for v, f in zip(vs, floors[fwl])]
             if any(v is not None for v in own):
                 last = next((v for v in reversed(own) if v is not None), 0.0)
-                wls.append((last, wl, own))
-        for _mag, wl, own in sorted(wls, reverse=True):
+                wls.append((last, wl, fwl, own))
+        for _mag, wl, fwl, own in sorted(wls, reverse=True):
             panels.append(render.line_panel(
-                labels, [(f"{wl} − minimal", "#e6550d", mib(own))],
-                f"{wl} — own memory (peak − session floor)", unit="MiB"))
+                labels, [(f"{wl} − {fwl}", "#e6550d", mib(own))],
+                f"{wl} — own memory (peak − {fwl} floor)", unit="MiB"))
         body = "".join(f'<span style="display:inline-block;margin:6px">{p}</span>'
                        for p in panels)
         explainer = (
             "<p class='small'><b>Session floor</b> — peak resident memory of "
-            "compiling an <i>empty</i> shader: the cost of starting the "
-            "compiler (createGlobalSession + core module), paid by every "
-            "compile. <b>Workload panels</b> — each tracked workload's OWN "
-            "memory: its process peak minus the same point's session floor, "
-            "i.e. what the workload's work added beyond compiler startup. "
+            "doing nothing but starting the compiler (createGlobalSession + "
+            "core module), paid by every compile. There are two, because a "
+            "process peak is only comparable against a baseline from the same "
+            "executable: <i>slangc</i>'s floor is compiling an <i>empty</i> "
+            "shader (the <code>minimal</code> workload), and the "
+            "<i>api-driver</i>'s is creating and destroying a session and "
+            "nothing else (<code>api_session_create</code>). "
+            "<b>Workload panels</b> — each tracked workload's OWN memory: its "
+            "process peak minus the same point's floor <i>for the binary it "
+            "ran</i>, i.e. what the workload's work added beyond compiler "
+            "startup. "
             "Raw peak RSS is recorded for every workload in results.json; "
             "only the curated set (the realistic rt/mdl workloads and the "
             "microbenchmarks with meaningful own memory) is charted and "
@@ -343,13 +408,17 @@ def main():
     # Landing page: stacked section rows — API & RT on top, microbenchmarks,
     # then the sweeps archive.
     n_rel, n_day = len(releases), len(dailies)
-    # latest daily point's minimal-workload peak RSS — the #9817 headline
+    # Latest daily point's minimal-workload peak RSS — the #9817 headline.
+    # Deliberately the slangc floor specifically, not "whichever floor": this
+    # is the number quoted in the issue, and the api-driver's floor is a
+    # different measurement (see MEMORY_FLOOR), so the status line names it.
+    slangc_floor = MEMORY_FLOOR["target"][0]
     floor_mib = None
     if dailies:
         p = analyze.results_path(args.results, dailies[-1]["tag"])
         if os.path.exists(p):
             for run in analyze.canonical_runs(analyze.read_json(p)):
-                if run["workload"] == "minimal":
+                if run["workload"] == slangc_floor:
                     st = (run.get("timers") or {}).get("peakRssKb")
                     if st and st.get(args.metric):
                         floor_mib = st[args.metric] / 1024.0
@@ -402,7 +471,7 @@ def main():
          f'<p class="status">latest nightly: <b>{html_escape(last_daily)}</b> &nbsp;·&nbsp; '
          f'latest release in charts: <b>{html_escape(last_rel)}</b> &nbsp;·&nbsp; '
          f'{n_rel} releases + {n_day} daily points · metric: {args.metric}'
-         + (f" &nbsp;·&nbsp; session floor: <b>{floor_mib:.0f} MiB</b>"
+         + (f" &nbsp;·&nbsp; slangc session floor: <b>{floor_mib:.0f} MiB</b>"
             if floor_mib else "") + "</p>",
          *rows,
          '<p class="small">Data: <a href="https://github.com/shader-slang/slang-compile-perf">'
@@ -437,3 +506,42 @@ _html = movers_block([_M0, _M1], ["w"])
 assert "-20.0%" in _html and "aaaaaaaaa..bbbbbbbbb" in _html, \
     "movers_block fixture: boundaries() tuple layout drifted"
 del _M0, _M1, _html
+
+
+# Import-time self-check for the memory series' back-fill and positional
+# alignment (see append_memory_point). Three points covering the cases the
+# charts depend on: a counter present throughout, one that first appears at
+# point 2 (must be back-filled so its values still line up with the labels),
+# and one that stops being reported (must keep a trailing gap rather than
+# shorten its series and shift every later value left by one).
+_per = {}
+append_memory_point(_per, {("minimal", "peakRssKb"): 100.0}, 1)
+append_memory_point(_per, {("minimal", "peakRssKb"): 110.0,
+                           ("mdl_dxr", "peakRssKb"): 900.0}, 2)
+append_memory_point(_per, {("mdl_dxr", "peakRssKb"): 950.0}, 3)
+assert _per[("minimal", "peakRssKb")] == [100.0, 110.0, None], \
+    "append_memory_point: a counter absent from a later point keeps a gap"
+assert _per[("mdl_dxr", "peakRssKb")] == [None, 900.0, 950.0], \
+    "append_memory_point: a counter first seen at point 2 must be back-filled"
+del _per
+
+
+# Import-time self-check that every mode a track_memory workload runs in has
+# a floor to subtract, and that each floor is itself tracked. Without this a
+# new track_memory workload in an untracked mode would silently lose its
+# own-memory panel (floor_workload_for returns None), which reads as "this
+# workload has no memory data" rather than as a manifest gap.
+_tracked = [w for w in manifest.WORKLOADS if getattr(w, "track_memory", False)]
+assert _tracked, "manifest must track memory for at least the floors"
+for _w in _tracked:
+    assert _w.mode in MEMORY_FLOOR, \
+        f"{_w.name}: track_memory workload in mode '{_w.mode}' has no floor"
+for _mode, (_fwl, _title) in MEMORY_FLOOR.items():
+    _spec = manifest.BY_NAME.get(_fwl)
+    assert _spec is not None and _spec.mode == _mode, \
+        f"floor '{_fwl}' must exist in the manifest with mode '{_mode}'"
+    assert getattr(_spec, "track_memory", False), \
+        f"floor '{_fwl}' must be track_memory or its peak never reaches report"
+    assert floor_workload_for(_fwl) == _fwl, \
+        f"floor '{_fwl}' must resolve to itself"
+del _tracked, _w, _mode, _fwl, _title, _spec

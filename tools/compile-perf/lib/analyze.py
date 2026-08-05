@@ -49,7 +49,17 @@ def daily_labels(results_dir):
     report.py's combined index, daily_movers' point loader, and any future
     consumer enumerate through here so layout knowledge cannot fork.
     `date` falls back to the label prefix and `commit` to the label suffix
-    for points registered before meta carried them."""
+    for points registered before meta carried them.
+
+    `commit` has NO guaranteed length: track.py register stores whatever
+    --commit was passed, which the nightly workflow sets from
+    `git rev-parse HEAD` (full SHA), while the legacy fallback takes the
+    label suffix, which came from `git rev-parse --short HEAD`. So the field
+    is a full SHA for points registered with meta and a short one for older
+    points. Consumers must treat it as an opaque prefix-comparable string and
+    shorten it themselves for display (daily_movers uses `[:9]`, which is
+    correct for both shapes); never compare two commits for equality by
+    length or slice a fixed width expecting a complete SHA."""
     out = []
     ddir = os.path.join(results_dir, "daily")
     for label in sorted(os.listdir(ddir)) if os.path.isdir(ddir) else []:

@@ -285,13 +285,37 @@ def _windows_peak_rss_kb(popen):
     return None
 
 
+def _maxrss_to_kb(ru_maxrss, platform):
+    """Convert a getrusage ru_maxrss field to kilobytes for the given
+    sys.platform string. The field's UNIT is platform-specific: kilobytes on
+    Linux, but BYTES on macOS, which inherited the BSD definition. Isolated
+    into its own function because getting it wrong scales every memory number
+    on one platform by 1024 — which renders as a perfectly plausible chart
+    rather than an error — so the rule is pinned by a self-check below."""
+    return ru_maxrss / (1024.0 if platform == "darwin" else 1.0)
+
+
+def _reap_posix(proc, wait4=os.wait4):
+    """Reap a finished child with os.wait4, set proc.returncode from its wait
+    status, and return its peak RSS in KB.
+
+    wait4 rather than Popen.wait so ru_maxrss is per-child: a
+    getrusage(RUSAGE_CHILDREN) high-water mark would smear one workload's
+    peak onto every later one in the same sweep.
+
+    `wait4` is a parameter so the status decode and unit conversion can be
+    exercised against a stub instead of a live process — this is the sole
+    source of BOTH the return code and the memory number on Linux, so a
+    regression here would null out every rss series at once."""
+    _pid, status, ru = wait4(proc.pid, 0)
+    proc.returncode = os.waitstatus_to_exitcode(status)
+    return _maxrss_to_kb(ru.ru_maxrss, sys.platform)
+
+
 def run_once(cmd):
     """Run one compile; return (rc, wall_ms, combined_text, rss_kb_or_None).
 
     rss is the child's peak resident set (peak working set on Windows) in KB.
-    On POSIX the child is reaped with os.wait4 so ru_maxrss is per-child (a
-    getrusage(RUSAGE_CHILDREN) high-water mark would smear one workload's
-    peak onto every later one); ru_maxrss is KB on Linux and BYTES on macOS.
     Platform constants differ slightly (working set vs RSS), but the tracked
     series compares within one runner fingerprint, never across platforms."""
     t0 = time.perf_counter()
@@ -304,11 +328,24 @@ def run_once(cmd):
         rss = _windows_peak_rss_kb(proc)
     else:
         try:
-            _pid, status, ru = os.wait4(proc.pid, 0)
-            proc.returncode = os.waitstatus_to_exitcode(status)
-            rss = ru.ru_maxrss / (1024.0 if sys.platform == "darwin" else 1.0)
-        except ChildProcessError:
-            proc.wait()  # already reaped elsewhere; lose rss, keep rc
+            rss = _reap_posix(proc)
+        except ChildProcessError as e:
+            # Deliberately fatal rather than degraded. Nothing in this tool
+            # reaps the child, so ECHILD means the ENVIRONMENT auto-reaped it
+            # — SIGCHLD set to SIG_IGN — and the exit status is gone.
+            # Falling back to proc.wait() does not recover it and is actively
+            # harmful: CPython's Popen._try_wait catches ChildProcessError and
+            # substitutes returncode = 0, so a compile that FAILED would be
+            # recorded as a clean run with no memory number. Abandoning the
+            # sweep is the only outcome that cannot publish a fabricated one.
+            raise RuntimeError(
+                "os.wait4 could not reap the compile child (ECHILD): the "
+                "environment reaped it first, which happens when SIGCHLD is "
+                "set to SIG_IGN. Its exit status and peak RSS are "
+                "unrecoverable, and Popen.wait() would report success for a "
+                "failed compile, so this sweep is abandoned rather than "
+                "recorded. Re-run with default SIGCHLD handling."
+            ) from e
     wall = (time.perf_counter() - t0) * 1000.0
     text = out.decode("utf-8", "replace")
     return proc.returncode, wall, text, rss
@@ -601,6 +638,44 @@ assert parse_mem("[MEM] apiCreateGlobalSessionRssDeltaKb\t20480kb\nnoise\n[*] x\
     {"apiCreateGlobalSessionRssDeltaKb": 20480.0}, \
     "parse_mem: [MEM] line contract drifted vs api-driver.cpp"
 assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed lines"
+
+
+# Import-time self-check for the ru_maxrss unit rule. Pure and platform-free
+# (the platform is a parameter), so both branches are exercised on every host
+# rather than only the one running the check.
+assert _maxrss_to_kb(2048, "linux") == 2048.0, "Linux ru_maxrss is already KB"
+assert _maxrss_to_kb(2048 * 1024, "darwin") == 2048.0, "macOS ru_maxrss is BYTES"
+
+
+# Import-time self-check for the POSIX reaping path, driven by a stub wait4 so
+# no process is spawned at import. This path is the only source of BOTH the
+# return code and the peak RSS on Linux, and its failure mode is silent
+# (rss_kb: null across every workload, or a fabricated returncode), so the
+# status decode and the wait4 call convention are pinned here.
+if os.name != "nt":  # the function, and the wait-status encoding, are POSIX-only
+    class _StubProc:
+        pid = 4321
+        returncode = None
+
+    class _StubRusage:
+        # KB on Linux, bytes on macOS — matched to the host so the expected
+        # value below is the same 2 MiB either way.
+        ru_maxrss = 2048 * (1024 if sys.platform == "darwin" else 1)
+
+    _seen = []
+
+    def _stub_wait4(pid, flags):
+        _seen.append((pid, flags))
+        return pid, 0x100, _StubRusage()  # wait status for "exited with code 1"
+
+    _p = _StubProc()
+    assert _reap_posix(_p, wait4=_stub_wait4) == 2048.0, \
+        "_reap_posix: ru_maxrss must reach the caller as KB"
+    assert _p.returncode == 1, \
+        "_reap_posix: returncode must come from the wait status, not Popen"
+    assert _seen == [(4321, 0)], \
+        "_reap_posix: wait4 must be called blocking on the child's own pid"
+    del _StubProc, _StubRusage, _seen, _stub_wait4, _p
 
 
 if __name__ == "__main__":

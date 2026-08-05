@@ -152,3 +152,54 @@ def buckets(timers, tree=TREE):
 
     alloc(tree, _t(timers, tree[0]))
     return out
+
+
+# Import-time self-checks over synthetic timer maps, matching the directory
+# idiom (lib/manifest.py, lib/analyze.py). daily_movers' fixture covers the
+# pp-sum tiling contract THROUGH this partition; these pin the two allocation
+# rules that fixture cannot isolate — the residual threshold and proportional
+# scaling — against a tiny two-level tree rather than the real TREE, so a
+# future timer added to TREE does not have to be mirrored here.
+_FIX_TREE = ("root", [("a", []), ("b", [])])
+
+# 1. Ordinary case: measured children plus a residual, tiling the root.
+_b = buckets({"root": 100.0, "a": 60.0, "b": 30.0}, _FIX_TREE)
+assert _b == {"a": 60.0, "b": 30.0, "root (self)": 10.0}, \
+    "buckets: children keep their measured ms and the remainder is (self)"
+
+# 2. The residual threshold. Every POSITIVE residual is kept, however thin —
+# sub-0.05 ms slivers used to be dropped as chart noise, but the partition's
+# contract is that buckets tile the root exactly (daily_movers' pp column sums
+# to the overall % because of it), and on a very short workload a dropped
+# sliver breaks that. A band that thin is invisible in the stacked view
+# anyway, so there is no rendering cost to keeping it.
+_b = buckets({"root": 100.0, "a": 60.0, "b": 39.99}, _FIX_TREE)
+assert "root (self)" in _b and abs(_b["root (self)"] - 0.01) < 1e-9, \
+    "buckets: a residual below the old 0.05 ms threshold must be KEPT"
+assert abs(sum(_b.values()) - 100.0) < 1e-9, "buckets must tile the root"
+
+# 3. Exact fit: a zero residual is NOT a bucket. Zero-width bands would
+# clutter the legend, and the tiling invariant already holds without them.
+_b = buckets({"root": 100.0, "a": 60.0, "b": 40.0}, _FIX_TREE)
+assert _b == {"a": 60.0, "b": 40.0}, \
+    "buckets: an exactly-zero residual must not become a (self) bucket"
+
+# 4. Overshoot: Slang's phase timers are not perfectly additive, so named
+# sub-timers can sum to MORE than their parent. The children are then scaled
+# proportionally to fit the budget — preserving their relative proportions,
+# and keeping the overshoot LOCAL rather than producing a negative residual
+# that propagates up and zeroes out an ancestor's self-time.
+_b = buckets({"root": 100.0, "a": 90.0, "b": 60.0}, _FIX_TREE)
+assert abs(_b["a"] - 60.0) < 1e-9 and abs(_b["b"] - 40.0) < 1e-9, \
+    "buckets: overshooting children scale proportionally into the budget"
+assert "root (self)" not in _b, \
+    "buckets: an overshooting parent has no self-time left to report"
+assert abs(sum(_b.values()) - 100.0) < 1e-9, \
+    "buckets must tile the root even when its children overshoot it"
+
+# 5. A missing timer is a 0 ms phase, not an absent bucket key: _t defaults
+# unmeasured names to 0.0, and alloc drops zero-width children.
+_b = buckets({"root": 100.0, "a": 100.0}, _FIX_TREE)
+assert _b == {"a": 100.0}, "buckets: an unmeasured child contributes nothing"
+
+del _FIX_TREE, _b
