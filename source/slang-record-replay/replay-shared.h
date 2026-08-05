@@ -32,12 +32,9 @@ namespace SlangRecord
 // Use the RAII guard `SuppressRefCountRecording` rather than manipulating
 // the counter directly.
 
-/// Access the raw suppression counter (for internal use by the RAII guard).
-inline int& suppressionCounter()
-{
-    thread_local int counter = 0;
-    return counter;
-}
+/// Returns a reference to the calling thread's suppression counter, shared
+/// across all DSOs in the process (for internal use by the RAII guard).
+SLANG_API int& suppressionCounter();
 
 /// Check if ref-count recording is currently suppressed on this thread.
 inline bool isRefCountRecordingSuppressed()

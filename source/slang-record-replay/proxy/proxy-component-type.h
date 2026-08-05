@@ -69,9 +69,11 @@ public:
 
     ~ComponentTypeProxy()
     {
-        // Clear returned entry points to release references before the component is released
+        // Release the cached entry-point ComPtrs while the suppression guard
+        // is still active. See SessionProxy::~SessionProxy for the same
+        // List<>::clear() vs. clearAndDeallocate() reasoning.
         SuppressRefCountRecording guard;
-        m_returnedEntryPoints.clear();
+        m_returnedEntryPoints.clearAndDeallocate();
     }
 
     // Uses Slang AST internals to discover the core module so it can be wrapped

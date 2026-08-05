@@ -25,9 +25,14 @@ public:
 
     ~SessionProxy()
     {
-        // Clear loaded modules to release references before the session is released
+        // Release the cached module ComPtrs while the suppression guard is
+        // still active. List<>::clear() only resets m_count; the actual
+        // ComPtr destructors run later in the implicit ~List, by which time
+        // the guard has gone out of scope and the nested release() calls
+        // would pollute the parent record frame. clearAndDeallocate() runs
+        // them now.
         SuppressRefCountRecording guard;
-        m_loadedModules.clear();
+        m_loadedModules.clearAndDeallocate();
     }
 
     // Record addRef/release for lifetime tracking during replay
