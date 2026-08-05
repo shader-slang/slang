@@ -60,9 +60,12 @@ runs:
         echo "📊 LLVM installation size:"
         du -sh build/llvm-project-install
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Use $GITHUB_WORKSPACE (not ${{ github.workspace }}) so the path is
+        # correct inside Docker containers where the volume-mounted workspace
+        # is at /__w/<repo>/<repo> rather than the host path.
+        LLVM_PREFIX="${GITHUB_WORKSPACE}/build/llvm-project-install"
+        echo "Clang_DIR=${LLVM_PREFIX}/lib/cmake/clang" >> $GITHUB_ENV
+        echo "LLVM_DIR=${LLVM_PREFIX}/lib/cmake/llvm" >> $GITHUB_ENV
 
     - name: Build LLVM from source
       if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'
@@ -77,14 +80,16 @@ runs:
         fi
 
         ./external/build-llvm.sh \
-          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+          --install-prefix "${GITHUB_WORKSPACE}/build/llvm-project-install" \
           --repo "${REPO_URL}"
 
         echo "✅ LLVM build complete"
 
-        # Set environment variables for CMake
-        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        # Use $GITHUB_WORKSPACE (not ${{ github.workspace }}) so the path is
+        # correct inside Docker containers.
+        LLVM_PREFIX="${GITHUB_WORKSPACE}/build/llvm-project-install"
+        echo "Clang_DIR=${LLVM_PREFIX}/lib/cmake/clang" >> $GITHUB_ENV
+        echo "LLVM_DIR=${LLVM_PREFIX}/lib/cmake/llvm" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
       if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
@@ -92,7 +97,7 @@ runs:
       run: |
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
-        LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
+        LLVM_DIR="${GITHUB_WORKSPACE}/build/llvm-project-install"
 
         if [ ! -d "${LLVM_DIR}" ]; then
           echo "ERROR: LLVM directory not found at ${LLVM_DIR}"
