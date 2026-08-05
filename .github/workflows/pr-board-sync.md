@@ -106,23 +106,24 @@ In implementation terms:
 linked-issue sync when already assigned). Skips human drafts (except Bot PRs) and
 merge-queued PRs.
 
-| Source              | Assignee             | Reviewers                                                                 | Comment |
-| ------------------- | -------------------- | ------------------------------------------------------------------------- | ------- |
-| **Internal**        | PR author            | none                                                                      | none |
-| **Community / Bot** | see pick order below | assignee only (owners allowlist), unless a real reviewer is already requested | one-shot note naming the assignee; may suggest a higher-signal collaborator without `@` or auto-request |
+| Source              | Assignee             | Auto-requested reviewer                                      | Comment |
+| ------------------- | -------------------- | ------------------------------------------------------------ | ------- |
+| **Internal**        | PR author            | none                                                         | none |
+| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot note naming the assignee; may suggest a higher-signal collaborator without `@` |
 
-**Pick order** (Community/Bot):
+**Pick order** (Community/Bot assignee / shepherd):
 
 1. Linked-issue assignee who is in the owners team.
 2. Top **committer-signal** owner from changed files.
 3. Maintainer team member (or `fallback_assignee`).
 
-Auto-requested reviewers are always drawn from the same owners allowlist that
-gates the assignee (`pr-owners` for Community, `bot-pr-owners` for Bot). A
-collaborator with stronger committer signal who is **not** on that list is
-named in the assignment comment as a suggested additional reviewer, but is
-never `requestReviewers`'d — so they are not notified unless someone follows
-up.
+The owners allowlist (`pr-owners` for Community, `bot-pr-owners` for Bot) gates
+who may be chosen as shepherd. Auto-request never goes beyond that shepherd, and
+never requests the PR author. A collaborator with stronger committer signal than
+the auto-requested reviewer (or the top collaborator when nobody was
+auto-requested) may be named in the assignment comment as a suggested
+additional reviewer, but is never `requestReviewers`'d — so they are not
+notified unless someone follows up.
 
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 

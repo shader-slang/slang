@@ -34,13 +34,17 @@ How Source is classified today:
   `Scope: [...]` with no space before the colon; the label is case-insensitive
   and the first `Scope:` wins if several appear. The author is assigned; no
   reviewer is auto-requested (they are expected to find one).
-- **Community** — everyone else who is not a bot. A maintainer is assigned to
-  shepherd it and arrange review. Automation auto-requests only that assignee
-  (from `pr-owners`) and posts a one-shot comment; if someone else has higher
-  committer signal on the changed files, the comment suggests them without
-  `@`-mentioning or auto-requesting review.
-- **Bot** — opened by an automated coworker. Same assignment / comment rules as
-  Community, but the allowlist is `bot-pr-owners` instead of `pr-owners`.
+- **Community** — everyone else who is not a bot. Automation picks a shepherd
+  from `pr-owners` (linked-issue assignee on that team, else strongest
+  committer-signal owner, else the maintainer fallback), auto-requests that
+  shepherd **only if they are not the PR author**, and posts a one-shot
+  comment. If another collaborator has stronger committer signal than the
+  auto-requested reviewer (or the strongest collaborator signal when nobody
+  was auto-requested), the comment suggests them without `@`-mentioning or
+  auto-requesting review.
+- **Bot** — opened by an automated coworker. Same assignment / review-request /
+  comment rules as Community, but the allowlist is `bot-pr-owners` instead of
+  `pr-owners`.
 
 If those team rosters cannot be read, automation leaves `Source` (and the
 assignee) blank rather than guessing, and the nightly sweep retries.
