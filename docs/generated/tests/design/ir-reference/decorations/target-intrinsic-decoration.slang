@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T17:13:48Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#targetintrinsic-targetintrinsicdecoration
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#targetintrinsic--targetintrinsicdecoration
 //META: doc_section_digest=cb8a8327f83d2f0346939069b3bffffc9403ae749340d6d2499128810dc798f5
 //META: purpose=Calling a core-module built-in pulls in its [targetIntrinsic(capSet, "spelling")] decoration in the IR dump's core-module section.
 //META: intent=functional

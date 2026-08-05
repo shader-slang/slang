@@ -33,7 +33,6 @@
 #include "slang-serialize-ir.h"
 #include "slang.h"
 
-#include <assert.h>
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
