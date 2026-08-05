@@ -11,6 +11,14 @@ groupshared uint sharedData[N];
 groupshared float4 sharedVec;
 groupshared float2x2 sharedMat;
 
+struct Holder
+{
+    float v;
+}
+
+groupshared Holder sharedStruct;
+groupshared Holder sharedStructs[2];
+
 void takesGroupShared(uint tid, groupshared uint s[N])
 {
     s[tid] = tid;
@@ -40,9 +48,19 @@ void computeMain(uint3 tid : SV_GroupThreadID)
     takesGroupSharedScalar(sharedMat._m00);
     forwards(tid.x, sharedData);
 
+    // A field of a group-shared variable also names group-shared storage: the address space comes
+    // from the base object, since `groupshared` is never on the field itself.
+    takesGroupSharedScalar(sharedStruct.v);
+    takesGroupSharedScalar(sharedStructs[0].v);
+
     // A private local array is not thread-group-shared memory.
     uint localData[N];
     takesGroupShared(tid.x, localData);
+
+    // Deferring to the base does not make every member access acceptable: a field of a private
+    // local is still rejected.
+    Holder localHolder;
+    takesGroupSharedScalar(localHolder.v);
 }
 
 // CHECK: 30711

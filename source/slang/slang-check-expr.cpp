@@ -7417,6 +7417,34 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
     return expr;
 }
 
+// Return the object a direct field access ultimately reads out of, so that `go.inner.v` and
+// `arr[0].v` both resolve to the group-shared variable holding them. `groupshared` is declared on
+// that object and never on the field, while `getValidTypeForAddressOf` answers for whichever
+// declaration it is handed -- and a field's own declaration reports `UserPointer` -- so the address
+// space of a field access has to be read from the base. A `DerefMemberExpr` (`a->b`, also how a
+// `ConstantBuffer` member is reached) stops the walk, because it goes through a pointer whose own
+// type already carries the address space.
+static Expr* getBaseObjectOfFieldAccess(Expr* expr)
+{
+    for (;;)
+    {
+        if (auto parenExpr = as<ParenExpr>(expr))
+            expr = parenExpr->base;
+        else if (auto indexExpr = as<IndexExpr>(expr))
+            expr = indexExpr->baseExpression;
+        else if (auto memberExpr = as<MemberExpr>(expr))
+        {
+            auto memberDecl = memberExpr->declRef.getDecl();
+            if (as<DerefMemberExpr>(memberExpr) || !as<VarDeclBase>(memberExpr->declRef) ||
+                (memberDecl && memberDecl->hasModifier<HLSLStaticModifier>()))
+                return expr;
+            expr = memberExpr->baseExpression;
+        }
+        else
+            return expr;
+    }
+}
+
 // A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
 // its argument must itself name thread-group-shared storage: an addressable expression whose
 // address space is `GroupShared` (a `groupshared` variable/parameter, a component of one, or a
@@ -7430,9 +7458,16 @@ void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr*
     if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())
         return;
 
+    // Only this check needs the base object's address space; `getValidTypeForAddressOf` keeps
+    // answering for the expression it is given, so `__getAddress` is unaffected.
+    auto addressedExpr = getBaseObjectOfFieldAccess(argIn);
+
     bool namesGroupSharedStorage = false;
-    if (auto ptrType =
-            getValidTypeForAddressOf(this, m_astBuilder, argIn, getType(m_astBuilder, argIn)))
+    if (auto ptrType = getValidTypeForAddressOf(
+            this,
+            m_astBuilder,
+            addressedExpr,
+            getType(m_astBuilder, addressedExpr)))
     {
         if (auto addrSpaceVal = as<ConstantIntVal>(ptrType->getAddressSpace()))
             namesGroupSharedStorage =
