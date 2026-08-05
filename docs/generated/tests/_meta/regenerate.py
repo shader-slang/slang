@@ -167,6 +167,7 @@ _ALLOWED_OOS_REASONS = (
     "gpu-vulkan-extension",
     "gpu-cross-api-flag",
     "gpu-other",
+    "unsupported-on-target",  # this text-emit target cannot express the claim
     # Truly terminal — no harness or runner upgrade unblocks
     "link-stage-only",
     "out-of-bundle",
@@ -1452,6 +1453,120 @@ _REQUIRED_BUNDLE_FM_KEYS = (
 )
 
 
+# --------------------------------------------------------------------------
+# Emission fan-out gate
+#
+# Enforcement of `_claims.md §2` "Meaningful back-ends": a target-dependent
+# (emission) claim must be exercised on every feasible text-emit target, or
+# account for each absent target with an Untested row. The rule existed only
+# as prose when the 2026-06 doc-scope regen silently dropped it, deleting
+# ~985 emission tests and dropping coverage 53.10% -> 51.77% undetected.
+# Making it a lint check is what turns the rule from advisory into a gate.
+#
+# NOTE: rolled out as "warning" first. Flip _FANOUT_SEVERITY to "error" once
+# the existing suite's violations are fixed or opted out — that flip is the
+# moment the regression becomes impossible to reland.
+# --------------------------------------------------------------------------
+_FANOUT_SEVERITY = "warning"
+
+# All text-emit targets (used to detect which targets a test exercises and
+# which an Untested opt-out row names).
+_EMIT_TEXT_TARGETS = frozenset(
+    {"hlsl", "glsl", "spirv-asm", "metal", "wgsl", "cuda", "cpp"}
+)
+# Shader text targets. The fan-out gate enforces these as a *set*: a claim
+# emitted to any one of them must cover them all (or opt out per target) —
+# this is the regression class (shader emission breadth). cpp/cuda are
+# general-purpose backends with different semantics and are NOT force-
+# required; a claim emitted only to cpp/cuda is backend-specific (e.g. the
+# C++ prelude/host-shim) and is not subject to the shader fan-out rule.
+_SHADER_TEXT_TARGETS = frozenset({"hlsl", "glsl", "spirv-asm", "metal", "wgsl"})
+# Untested-claims reasons that legitimately account for an absent target.
+_FANOUT_OPTOUT_REASONS = frozenset(
+    {"unsupported-on-target", "out-of-bundle"}
+    | {r for r in _ALLOWED_OOS_REASONS if r.startswith("gpu-")}
+)
+_SIMPLE_TARGET_RE = re.compile(r"//TEST:SIMPLE\([^)]*\):([^\n]*)")
+_TARGET_FLAG_RE = re.compile(r"-target\s+(\S+)")
+
+
+def _norm_target(t: str) -> str:
+    """Normalize a -target token to its text-emit spelling."""
+    return {"spirv": "spirv-asm", "dxil": "dxil-asm"}.get(t, t)
+
+
+def _emission_targets(text: str) -> set[str]:
+    """Text-emit targets named across a test file's //TEST:SIMPLE directives."""
+    out: set[str] = set()
+    for line in _SIMPLE_TARGET_RE.findall(text):
+        for t in _TARGET_FLAG_RE.findall(line):
+            t = _norm_target(t)
+            if t in _EMIT_TEXT_TARGETS:
+                out.add(t)
+    return out
+
+
+def _lint_emission_fanout(
+    spec: "BundleSpec", readme_text: str, test_files: list[Path]
+) -> list[LintIssue]:
+    """An emission claim must cover every feasible text-emit target, or
+    account for each absent target with an Untested `unsupported-on-target`
+    (or gpu-*/out-of-bundle) row whose Claim cell matches the claim.
+    """
+    issues: list[LintIssue] = []
+    # target-pipelines/* bundles are single-target *by design* — exempt.
+    if spec.dir.startswith("docs/generated/tests/design/target-pipelines/"):
+        return issues
+
+    # Group tests by claim (//META: purpose, which the README Claim cell
+    # must match verbatim); collect each claim's covered emit targets.
+    claim_targets: dict[str, set[str]] = {}
+    claim_is_emission: dict[str, bool] = {}
+    for tf in test_files:
+        t = tf.read_text(encoding="utf-8")
+        meta = parse_test_meta(t)
+        purpose = meta.get("purpose", "").strip()
+        if not purpose:
+            continue
+        tgts = _emission_targets(t)
+        claim_targets.setdefault(purpose, set()).update(tgts)
+        # Emission/target-dependent iff stamped emit AND it emits to a target.
+        if meta.get("pipeline_stage") == "emit" and tgts:
+            claim_is_emission[purpose] = True
+
+    # Opt-out targets declared per claim in the Untested-claims table.
+    optout: dict[str, set[str]] = {}
+    if "## Untested claims" in readme_text:
+        for row in _parse_tagged_table(readme_text, "## Untested claims"):
+            claim_cell, reason, _anchor, why = row
+            if reason not in _FANOUT_OPTOUT_REASONS:
+                continue
+            blob = claim_cell + " " + why
+            named = {_norm_target(m) for m in _TARGET_FLAG_RE.findall(blob)}
+            named |= {w for w in blob.split() if w in _EMIT_TEXT_TARGETS}
+            optout.setdefault(claim_cell.strip(), set()).update(named)
+
+    for purpose, covered in claim_targets.items():
+        if not claim_is_emission.get(purpose):
+            continue  # not an emission claim — fan-out rule does not apply
+        if not (covered & _SHADER_TEXT_TARGETS):
+            continue  # cpp/cuda-only: backend-specific, shader rule N/A
+        missing = _SHADER_TEXT_TARGETS - covered - optout.get(purpose, set())
+        if missing:
+            issues.append(
+                LintIssue(
+                    spec.dir,
+                    _FANOUT_SEVERITY,
+                    f"emission claim {purpose!r} covers shader targets"
+                    f" {sorted(covered & _SHADER_TEXT_TARGETS)} but is missing"
+                    f" {sorted(missing)}; add an emission test per target or an"
+                    f" Untested 'unsupported-on-target' row naming each absent"
+                    f" target (_claims.md §2 Meaningful back-ends)",
+                )
+            )
+    return issues
+
+
 def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     issues: list[LintIssue] = []
     bdir = REPO_ROOT / spec.dir
@@ -1595,6 +1710,9 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f" {row.anchor!r}",
                     )
                 )
+
+    # Emission fan-out gate (enforces _claims.md §2 "Meaningful back-ends").
+    issues.extend(_lint_emission_fanout(spec, text, test_files))
     return issues
 
 
