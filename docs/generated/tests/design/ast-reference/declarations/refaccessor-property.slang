@@ -13,8 +13,24 @@
 // l-value at the HLSL backend. The shader assigns through the property and
 // reads it back into an output buffer; the CHECK asserts the entry point was
 // emitted, which only happens if the ref accessor legalized successfully.
+//
+// The Metal and SPIR-V directives carry the same claim to the two remaining
+// shader text targets. Both currently fail on compiler bugs, so the file is
+// listed in `_meta/expected-failures.txt`:
+//   - Metal aborts with the internal error "Unknown addressspace
+//     encountered" (finding
+//     `declarations-refaccessor-metal-unknown-addressspace-abort`).
+//   - SPIR-V declares the accessor as a value-returning function while
+//     calling it as if it returned `ptr<Function,int>`, so the module fails
+//     validation (finding
+//     `declarations-refaccessor-spirv-invalid-funcall-return-type`).
+// The CHECKs below pin the *correct* shape on purpose; they are the shape
+// that must hold once the bugs are fixed, and weakening them would hide the
+// bugs.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 struct Cell
 {
@@ -30,6 +46,21 @@ struct Cell
 RWStructuredBuffer<int> outBuf;
 
 //CHECK: void main
+// The Metal entry-point spelling below is the one the Metal back-end really
+// produces for this shader when the `ref` accessor is replaced by a `set`
+// accessor, so it is the shape a fixed `ref` path has to reach as well.
+// (`[[kernel]]` cannot be spelled literally: FileCheck reads `[[...]]` as a
+// variable reference, so the qualifier is matched as a bare substring.)
+//METAL: kernel{{.*}} void main_0(
+// On SPIR-V the accessor is already *called* as a pointer-returning function
+// (`OpFunctionCall %_ptr_Function_int %Cell_value_ref`) and the 13 is already
+// stored through that result, so the assignment survives lowering. What is
+// missing is the matching function *type*: the definition is emitted as
+// `OpTypeFunction %int %_ptr_Function_Cell`, which contradicts the call site
+// and makes the module invalid.
+//SPIRV: %{{[0-9]+}} = OpTypeFunction %_ptr_Function_int %_ptr_Function_Cell
+//SPIRV: %[[REF:[0-9]+]] = OpFunctionCall %_ptr_Function_int %Cell_value_ref
+//SPIRV: OpStore %[[REF]] %int_13
 [shader("compute")]
 [numthreads(1,1,1)]
 void main()

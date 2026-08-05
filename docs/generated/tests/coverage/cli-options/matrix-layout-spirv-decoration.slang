@@ -20,8 +20,28 @@
 // independently confirmed here).
 //META: characterization-unverified=true
 
+// Emission fan-out: the `ColMajor` / `RowMajor` token is SPIR-V's own spelling,
+// but the layout choice behind it reaches every text target, so each one gets a
+// row-major/column-major pair here too. HLSL and GLSL can only express it at
+// the declaration (`#pragma pack_matrix(...)`, `layout(<order>) uniform;`) —
+// their use sites are byte-identical between the two modes — while Metal and
+// WGSL carry no layout qualifier at all and instead show the choice at the
+// *use* site: row-major reads the matrix member directly, column-major
+// reconstructs it element-by-element in transposed order. The Metal and WGSL
+// directives below therefore pin the unpack order, which is a different
+// emitter path from the declaration token pinned in
+// `matrix-layout-row-major-hlsl-pragma.slang`.
+
 //TEST:SIMPLE(filecheck=ROW):-target spirv-asm -matrix-layout-row-major -entry main -stage compute
 //TEST:SIMPLE(filecheck=COL):-target spirv-asm -matrix-layout-column-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLR):-target hlsl -matrix-layout-row-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLC):-target hlsl -matrix-layout-column-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLR):-target glsl -matrix-layout-row-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLC):-target glsl -matrix-layout-column-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=MTR):-target metal -matrix-layout-row-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=MTC):-target metal -matrix-layout-column-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGR):-target wgsl -matrix-layout-row-major -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGC):-target wgsl -matrix-layout-column-major -entry main -stage compute
 
 RWStructuredBuffer<float4> outBuf;
 uniform float4x4 m;
@@ -35,3 +55,15 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 //ROW: OpMemberDecorate {{.*}} 0 ColMajor
 //COL: OpMemberDecorate {{.*}} 0 RowMajor
+
+//HLR: #pragma pack_matrix(row_major)
+//HLC: #pragma pack_matrix(column_major)
+
+//GLR: layout(column_major) uniform;
+//GLC: layout(row_major) uniform;
+
+//MTR: (float4(1.0f, 2.0f, 3.0f, 4.0f)) * (globalParams_{{[0-9]+}}->m_{{[0-9]+}})
+//MTC: ->m_{{[0-9]+}}.data_{{[0-9]+}}[int(0)][int(0)], globalParams_{{[0-9]+}}->m_{{[0-9]+}}.data_{{[0-9]+}}[int(1)][int(0)]
+
+//WGR: .m_{{[0-9]+}}.data_{{[0-9]+}}[i32(0)][i32(0)], globalParams_{{[0-9]+}}.m_{{[0-9]+}}.data_{{[0-9]+}}[i32(0)][i32(1)]
+//WGC: .m_{{[0-9]+}}.data_{{[0-9]+}}[i32(0)][i32(0)], globalParams_{{[0-9]+}}.m_{{[0-9]+}}.data_{{[0-9]+}}[i32(1)][i32(0)]

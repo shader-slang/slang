@@ -778,6 +778,13 @@ def lint_expected_failures() -> list[LintIssue]:
         # multi-config tests carries a trailing " (config)" suffix (e.g.
         # "foo.slang (cpu)"); strip it before resolving the file path.
         path_part = re.sub(r" \([a-z0-9-]+\)$", "", s)
+        # slang-test names the Nth //TEST directive in a file
+        # "<file>.slang.N" (the first directive keeps the bare file name), so
+        # an entry may legitimately target one directive rather than the whole
+        # file — which is what emission fan-out produces, where only one
+        # target of several is known-failing. Strip that index before
+        # resolving; "foo.slang.2" is the file "foo.slang".
+        path_part = re.sub(r"(?<=\.slang)\.\d+$", "", path_part)
         candidate = REPO_ROOT / path_part
         if not candidate.exists():
             issues.append(

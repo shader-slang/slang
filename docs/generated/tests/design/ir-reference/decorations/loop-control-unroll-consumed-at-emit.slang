@@ -12,9 +12,14 @@
 // Verifies the unroll half of the pass-through claim: the compiler does not
 // unroll the loop itself, it forwards the request. The HLSL CHECKs assert
 // `[unroll]` is printed and a `for` statement is still there, which would
-// not hold if the IR had consumed the hint by expanding the loop body.
+// not hold if the IR had consumed the hint by expanding the loop body. The
+// GLSL and SPIR-V CHECKs assert the same surviving hint in those targets'
+// own spellings - the `GL_EXT_control_flow_attributes` `[[unroll]]`
+// attribute, and the `Unroll` loop-control mask on `OpLoopMerge`.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -O0 -entry main -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -34,3 +39,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: [unroll]
 // HLSL: for
+
+// GLSL: #extension GL_EXT_control_flow_attributes
+// GLSL: {{\[\[}}unroll{{\]\]}}
+// GLSL: for
+
+// SPIRV: OpLoopMerge {{.*}} Unroll

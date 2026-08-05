@@ -14,7 +14,13 @@
 // `vk::`-qualified name and CHECK asserts it reaches the emitted `OpTypeImage`,
 // so the alternate spelling is shown to be equivalent rather than ignored.
 
+// The GLSL back end reads the same attribute and turns it into the image
+// uniform's `layout(rgba16f)` qualifier, so the GLSL prefix shows the alternate
+// spelling is resolved before target selection rather than in a SPIR-V-only
+// path.
+
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
 [vk::image_format("rgba16f")]
 RWTexture2D<float4> tex;
@@ -26,3 +32,5 @@ void main()
 }
 
 //CHECK: OpTypeImage {{.*}}Rgba16f
+
+//GLSL: layout(rgba16f)

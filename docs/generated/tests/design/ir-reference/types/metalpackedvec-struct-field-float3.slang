@@ -15,8 +15,18 @@
 // contents. The kernel reads both fields of a StructuredBuffer<Item>
 // element; METAL asserts the emitted struct declaration carries a
 // packed_float3 field.
+//
+// Repacking the struct's contents is Metal-only, so the other
+// text-emit back-ends pin the boundary of the claim: the same Item
+// element keeps an ordinary vector field — HLSL `float3 dir`, GLSL
+// `vec3 dir`, WGSL a `vec3<f32>` field in the std430 struct, and
+// SPIR-V an `OpTypeStruct %v3float %float`.
 
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry main
 
 struct Item
 {
@@ -36,3 +46,10 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // METAL-DAG: struct Item
 // METAL-DAG: packed_float3 dir
+// HLSL-DAG: struct Item
+// HLSL-DAG: float3 dir
+// GLSL-DAG: struct Item
+// GLSL-DAG: vec3 dir
+// WGSL-DAG: struct Item
+// WGSL-DAG: dir{{.*}} : vec3<f32>
+// SPIRV-DAG: = OpTypeStruct %v3float %float

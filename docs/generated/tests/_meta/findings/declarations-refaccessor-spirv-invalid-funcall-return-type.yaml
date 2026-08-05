@@ -7,7 +7,7 @@ observed_at: "2026-06-11T00:00:00Z"
 scope: spirv
 evidence:
   command: "SLANG_RUN_SPIRV_VALIDATION=1 build/RelWithDebInfo/bin/slangc -target spirv-asm -entry main -stage compute /tmp/ref.slang"
-  source_slang: docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
+  source_slang: docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang
   observed_summary: |
     A property with an explicit `[mutating] ref` accessor (RefAccessorDecl) emits invalid
     SPIR-V. With validation enabled the compiler reports:

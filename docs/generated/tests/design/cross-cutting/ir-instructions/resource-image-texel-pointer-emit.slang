@@ -17,9 +17,21 @@
 // assert an `OpImageTexelPointer` producing a `_ptr_Image_uint` and an
 // `OpAtomicIAdd` consuming a pointer — the atomic cannot address a texel
 // any other way, which is the reason the opcode exists.
+//
+// The other shader-text targets are the contrast that shows the texel pointer
+// is a SPIR-V-specific step rather than something in the source: GLSL and MSL
+// both have a texture-atomic call that takes the coordinate directly, so the
+// same `InterlockedAdd(tex[tid.xy], ...)` emits `imageAtomicAdd(tex, ivec2(..))`
+// on GLSL and `tex.atomic_fetch_add(coord, ..)` on Metal, with no intermediate
+// pointer value in either. WGSL has no texture-atomic at all — the entry point
+// is rejected with E36107 "unavailable features in entry point" naming
+// `InterlockedAdd` — so WGSL is recorded as `unsupported-on-target` in the
+// bundle README instead of being given a directive.
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
 
 uniform RWTexture2D<uint> tex;
 uniform RWStructuredBuffer<uint> outbuf;
@@ -36,3 +48,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 // SPV: OpAtomicIAdd %uint
 
 // HLSL: InterlockedAdd(tex_{{[0-9]+}}[
+
+// GLSL: imageAtomicAdd(tex_{{[0-9]+}}, ivec2(
+
+// METAL: tex_{{[0-9]+}}.atomic_fetch_add(tid_{{[0-9]+}}.xy,

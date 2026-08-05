@@ -18,8 +18,17 @@
 // signature (the emitter may upper-case semantics, so both spellings
 // are accepted).
 
+// The remaining shader text targets each resolve the same intrinsic to
+// their own wave-index builtin, so the claim fans out to all five:
+// GLSL to `gl_SubgroupID` (pulling in `GL_KHR_shader_subgroup_basic`),
+// Metal to the `simdgroup_index_in_threadgroup` entry-point builtin,
+// and WGSL to `@builtin(subgroup_id)` under `enable subgroups`.
+
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 
 RWStructuredBuffer<uint> outBuf;
 
@@ -31,3 +40,13 @@ void main(uint gi: SV_GroupIndex)
     // HLSL: {{SV_GroupIndex|SV_GROUPINDEX}}
     outBuf[gi] = WaveGetWaveIndex();
 }
+
+//GLSL-DAG: GL_KHR_shader_subgroup_basic
+//GLSL-DAG: gl_SubgroupID
+//GLSL-DAG: gl_LocalInvocationIndex
+
+//METAL: {{\[\[}}simdgroup_index_in_threadgroup
+
+//WGSL-DAG: enable subgroups
+//WGSL-DAG: @builtin(subgroup_id)
+//WGSL-DAG: @builtin(local_invocation_index)

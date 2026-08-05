@@ -15,7 +15,11 @@
 // carries `precise` -- the qualifier a downstream compiler needs in order to
 // suppress re-association of the expression.
 
+// GLSL keeps the qualifier under the same spelling, so the GLSL prefix shows
+// the modifier is not an HLSL-only passthrough.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
 RWStructuredBuffer<float> outBuf;
 
@@ -27,3 +31,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 //CHECK: precise float
+
+//GLSL: precise float a_{{[0-9]+}} =

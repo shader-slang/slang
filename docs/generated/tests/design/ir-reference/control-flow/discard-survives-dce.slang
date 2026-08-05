@@ -12,11 +12,19 @@
 // Verifies the same conservative side-effect classification for `discard`.
 // The instruction yields nothing and has no users, so a value-based DCE
 // would be free to drop it and silently change which pixels are written.
-// The shader is compiled at -O3 and the CHECK asserts `discard` is still in
-// the emitted HLSL, guarded by a condition read from a uniform so the branch
-// itself cannot be folded away first.
+// The shader is compiled at -O3 and each CHECK asserts the target's own
+// spelling of `discard` is still in the emitted text, guarded by a condition
+// read from a uniform so the branch itself cannot be folded away first.
+//
+// The claim is target-dependent -- each back-end spells the kill differently
+// (`discard;` in HLSL/GLSL/WGSL, `discard_fragment();` in Metal, `OpKill` in
+// SPIR-V) -- so every text-emit shader target gets its own directive.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -O3 -entry main -stage fragment
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -O3 -entry main -stage fragment
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -O3 -entry main -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -O3 -entry main -stage fragment
+//TEST:SIMPLE(filecheck=METAL):-target metal -O3 -entry main -stage fragment
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -O3 -entry main -stage fragment
 
 uniform float threshold;
 
@@ -27,5 +35,17 @@ float4 main(float4 pos : SV_Position) : SV_Target
     return float4(1, 0, 0, 1);
 }
 
-// CHECK-LABEL: float4 main(
-// CHECK: discard;
+// HLSL-LABEL: float4 main(
+// HLSL: discard;
+
+// GLSL-LABEL: void main()
+// GLSL: discard;
+
+// SPIRV-LABEL: %main = OpFunction
+// SPIRV: OpKill
+
+// METAL-LABEL: pixelOutput_0 main_0(
+// METAL: discard_fragment();
+
+// WGSL-LABEL: fn main(
+// WGSL: discard;

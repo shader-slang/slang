@@ -17,6 +17,17 @@
 // at least one DebugLine carrying line numbers. A location reduced to a
 // bare integer would produce the DebugLine entries with no path to hang
 // them off, so requiring all three together is the point.
+//
+// This claim is SPIR-V-only by construction: OpString, DebugSource and
+// DebugLine are SPIR-V instructions with no counterpart in any text
+// emitter, so there is no emission fan-out to write here. Under -g2 the
+// HLSL and Metal emitters render the same retained locations as
+// `#line <n> "<path>"`, GLSL as `#line <n> <fileNumber>` with no path,
+// and WGSL emits nothing - separate claims that the sibling
+// source-loc-line-directives-multi-target.slang and
+// source-loc-line-directive-mode-variants.slang tests already assert.
+// The four absent targets are therefore recorded as
+// unsupported-on-target in the bundle README.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute -g2
 

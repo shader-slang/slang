@@ -13,12 +13,16 @@
 // case and does not collide. Four separate buffers are declared and all four
 // are written, so none can be dead-code eliminated; each prefix asserts all
 // four indices appear. `CHECK-DAG` is used because declaration order in the
-// emitted text is not the property under test — index distinctness is.
+// emitted text is not the property under test — index distinctness is. Metal
+// spells the same thing as an argument-table slot, `[[buffer(N)]]` on the
+// kernel parameter, so it is exercised too; the `[[` is written as a regex
+// block because FileCheck otherwise reads it as a variable reference.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 
 RWStructuredBuffer<int> bufA;
 RWStructuredBuffer<int> bufB;
@@ -54,3 +58,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 // WGSL-DAG: @binding(1) @group(0) var<storage, read_write> bufB_
 // WGSL-DAG: @binding(2) @group(0) var<storage, read_write> bufC_
 // WGSL-DAG: @binding(3) @group(0) var<storage, read_write> bufD_
+
+// METAL-DAG: bufA_{{[0-9]+}} {{\[\[}}buffer(0)
+// METAL-DAG: bufB_{{[0-9]+}} {{\[\[}}buffer(1)
+// METAL-DAG: bufC_{{[0-9]+}} {{\[\[}}buffer(2)
+// METAL-DAG: bufD_{{[0-9]+}} {{\[\[}}buffer(3)

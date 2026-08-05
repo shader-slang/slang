@@ -14,7 +14,16 @@
 // it cannot be eliminated, and CHECK asserts the emitted HLSL declares it with
 // the `groupshared` storage class.
 
+// Every shader back end has its own name for the same address space -- GLSL
+// `shared`, Metal `threadgroup`, WGSL `var<workgroup>`, SPIR-V the `Workgroup`
+// storage class -- so each prefix asserts the array landed in workgroup storage
+// on that target rather than in a private or global one.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 groupshared int gShared[4];
 
@@ -29,3 +38,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 //CHECK: groupshared
+
+//GLSL: shared int  gShared_{{[0-9]+}}[4];
+//METAL: threadgroup array<int, int(4)> gShared_{{[0-9]+}};
+//WGSL: var<workgroup> gShared_{{[0-9]+}} : array<i32
+//SPIRV: %gShared = OpVariable %{{[A-Za-z0-9_]+}} Workgroup

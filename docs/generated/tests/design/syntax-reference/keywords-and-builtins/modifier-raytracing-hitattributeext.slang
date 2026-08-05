@@ -17,10 +17,19 @@
 // `GL_EXT_ray_tracing` extension and binds the custom struct as a
 // `hitAttributeEXT` storage-class variable. We pin both signals on
 // the GLSL emit, and the SPIR-V `HitAttribute` storage class on the
-// spirv-asm emit, so the same claim is observed on two backends.
+// spirv-asm emit.
+//
+// HLSL is the third feasible target: it is the source flavour of this
+// surface, so the intersection entry point and the `ReportHit` call
+// carrying the user-defined attribute struct are re-emitted as-is,
+// which is what shows the modifier family did not perturb the
+// HLSL-flavoured round trip. Metal and WGSL have no raytracing
+// capability at all and reject the entry point; see the
+// `unsupported-on-target` rows in the bundle README.
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage intersection
 //TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv-asm -entry main -stage intersection -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage intersection
 
 struct SphereHitAttributes
 {
@@ -45,3 +54,7 @@ void main()
 // CHECK_GLSL: hitAttributeEXT
 // CHECK_SPV: OpEntryPoint Intersection{{NV|KHR}} %main "main"
 // CHECK_SPV: HitAttribute{{NV|KHR}}
+
+// CHECK_HLSL-DAG: struct SphereHitAttributes
+// CHECK_HLSL-DAG: [shader("intersection")]
+// CHECK_HLSL-DAG: ReportHit(

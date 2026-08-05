@@ -14,7 +14,16 @@
 // still present in the emitted HLSL (modulo the mangling suffix), so the two
 // attributes are shown to select opposite outcomes for the same shader shape.
 
+// The same "do not fold the callee away" outcome is checked on every shader
+// back end: GLSL, Metal and WGSL each keep a separate function definition, and
+// SPIR-V additionally records the request as the `DontInline` function-control
+// mask on `OpFunction`.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -31,3 +40,8 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 //CHECK: helperNoInline
+
+//GLSL: int helperNoInline_{{[0-9]+}}(int
+//METAL: int helperNoInline_{{[0-9]+}}(int
+//WGSL: fn helperNoInline_{{[0-9]+}}(
+//SPIRV: %helperNoInline = OpFunction %int DontInline

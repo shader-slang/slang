@@ -14,7 +14,14 @@
 // size the output stream. CHECK asserts the emitted HLSL names the same count
 // the source wrote.
 
+// The Khronos back ends carry the same bound as stage state rather than as an
+// attribute: GLSL emits `layout(max_vertices = 3) out` and SPIR-V the
+// `OutputVertices 3` execution mode, so each prefix asserts the count itself
+// travelled, not merely that a geometry entry point was produced.
+
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_5_0 -stage geometry -entry main
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage geometry -entry main
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage geometry -entry main
 
 struct GsIn
 {
@@ -38,3 +45,6 @@ void main(triangle GsIn input[3], inout TriangleStream<GsOut> outStream)
 }
 
 //CHECK: maxvertexcount(3)
+
+//GLSL: layout(max_vertices = 3) out;
+//SPIRV: OpExecutionMode %{{[A-Za-z0-9_]+}} OutputVertices 3

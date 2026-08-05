@@ -14,7 +14,14 @@
 // annotated varying is returned so it survives DCE, and CHECK asserts the
 // qualifier is present in the emitted HLSL.
 
+// The per-sample request has a spelling on each of the other shader back ends
+// too -- GLSL `sample`, Metal `[[sample_perspective]]`, SPIR-V a `Sample`
+// decoration -- so each prefix pins that back end's own form of the rate.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage fragment
 
 struct VsOut
 {
@@ -28,3 +35,7 @@ float4 main(VsOut v) : SV_Target
 }
 
 //CHECK: sample
+
+//GLSL: sample layout(location = 0)
+//METAL: {{\[\[}}sample_perspective{{\]\]}} float4 perSample_
+//SPIRV: OpDecorate %v_perSample Sample

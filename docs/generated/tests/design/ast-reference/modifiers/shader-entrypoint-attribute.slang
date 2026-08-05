@@ -14,7 +14,16 @@
 // `-stage`, so nothing else identifies `csMain`. The CHECK-DAG lines assert the
 // function and its compute workgroup attribute reach the emitted HLSL.
 
+// The same entry-point discovery is repeated on every other shader back end,
+// each of which then stamps its own compute-entry marker: GLSL a
+// `local_size_*` input layout, Metal `[[kernel]]`, WGSL `@compute`, and SPIR-V
+// a `GLCompute` `OpEntryPoint`.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl
+//TEST:SIMPLE(filecheck=GLSL):-target glsl
+//TEST:SIMPLE(filecheck=METAL):-target metal
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm
 
 RWStructuredBuffer<int> outBuf;
 
@@ -27,3 +36,12 @@ void csMain(uint3 tid : SV_DispatchThreadID)
 
 //CHECK-DAG: numthreads
 //CHECK-DAG: csMain
+
+// GLSL renames every entry point to `main`, so the compute marker is what shows
+// the attribute selected the function.
+//GLSL: layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+//METAL: {{\[\[}}kernel{{\]\]}} void csMain
+//WGSL-DAG: @compute
+//WGSL-DAG: fn csMain
+//SPIRV: OpEntryPoint GLCompute %csMain

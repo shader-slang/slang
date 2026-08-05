@@ -15,7 +15,14 @@
 // assert both the `point` qualifier on the emitted parameter and the
 // `[instance(2)]` attribute survive.
 
+// The Khronos back ends encode the same two facts as stage layout: GLSL emits
+// `layout(points) in` plus `layout(invocations = 2) in`, and SPIR-V emits the
+// `InputPoints` and `Invocations 2` execution modes, so each prefix shows the
+// primitive kind and the invocation count survive that pipeline too.
+
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile sm_5_0 -stage geometry -entry main
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage geometry -entry main
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage geometry -entry main
 
 struct GsIn
 {
@@ -38,3 +45,9 @@ void main(point GsIn input[1], inout PointStream<GsOut> outStream)
 
 //CHECK-DAG: [instance(2)]
 //CHECK-DAG: point GsIn
+
+//GLSL-DAG: layout(points) in;
+//GLSL-DAG: layout(invocations = 2) in;
+
+//SPIRV-DAG: OpExecutionMode %{{[A-Za-z0-9_]+}} InputPoints
+//SPIRV-DAG: OpExecutionMode %{{[A-Za-z0-9_]+}} Invocations 2

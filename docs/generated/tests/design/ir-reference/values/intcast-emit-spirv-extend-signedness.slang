@@ -15,8 +15,22 @@
 // (sign-extend), an unsigned source emits `OpUConvert` (zero-extend).
 // This pins the distinguishing op per signedness row. Operands are
 // uniform narrow ints to keep the conversion live.
+//
+// HLSL, GLSL and Metal state the same split in their own spelling: the
+// widening is a named constructor whose name carries the signedness
+// (`int(...)` vs `uint(...)`), applied to a narrow source the emitter
+// declares as `int8_t`/`uint8_t` (HLSL, GLSL) or `char`/`uchar` (Metal).
+// GLSL additionally has to request `GL_EXT_shader_8bit_storage` for the
+// narrow uniform to exist at all, which is checked here too.
+//
+// WGSL has no integer type other than `i32`/`u32`, so integer *widening*
+// has no WGSL spelling and the claim cannot be stated there; see the
+// bundle README's `## Untested claims` row (`unsupported-on-target`).
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
 
 uniform int8_t s8;
 uniform uint8_t u8;
@@ -32,3 +46,19 @@ void main()
 
 // SPV-DAG: OpSConvert %int %{{[0-9]+}}
 // SPV-DAG: OpUConvert %uint %{{[0-9]+}}
+
+// HLSL-DAG: int8_t s8_{{[0-9]+}};
+// HLSL-DAG: uint8_t u8_{{[0-9]+}};
+// HLSL-DAG: = int({{.*}}s8_{{[0-9]+}});
+// HLSL-DAG: = uint({{.*}}u8_{{[0-9]+}});
+
+// GLSL-DAG: #extension GL_EXT_shader_8bit_storage : require
+// GLSL-DAG: int8_t s8_{{[0-9]+}};
+// GLSL-DAG: uint8_t u8_{{[0-9]+}};
+// GLSL-DAG: = int({{.*}}s8_{{[0-9]+}});
+// GLSL-DAG: = uint({{.*}}u8_{{[0-9]+}});
+
+// METAL-DAG: char s8_{{[0-9]+}};
+// METAL-DAG: uchar u8_{{[0-9]+}};
+// METAL-DAG: = int({{.*}}s8_{{[0-9]+}});
+// METAL-DAG: = uint({{.*}}u8_{{[0-9]+}});

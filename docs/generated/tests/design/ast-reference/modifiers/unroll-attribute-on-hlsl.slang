@@ -14,7 +14,13 @@
 // HLSL, but it now carries the attribute. CHECK asserts the `[unroll]` token
 // appears in the emitted text.
 
+// SPIR-V keeps the loop as a loop as well and forwards the hint as the
+// `Unroll` loop-control mask on `OpLoopMerge`, so the SPIRV prefix shows the
+// attribute reaches the Khronos back end as a hint rather than being performed
+// by Slang.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -31,3 +37,5 @@ void main()
 }
 
 //CHECK: [unroll]
+
+//SPIRV: OpLoopMerge %{{[A-Za-z0-9_]+}} %{{[A-Za-z0-9_]+}} Unroll

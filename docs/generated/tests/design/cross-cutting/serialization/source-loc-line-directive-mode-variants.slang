@@ -17,9 +17,26 @@
 // the same locations as `#line <line> <fileNumber>` - a line number
 // with a numeric file id and no quoted path. Together they show the
 // directive content is derived per compile from the retained locations.
+//
+// Both halves are a property of the shared C-family line-directive
+// writer rather than of one back-end, so the same pair is asserted on
+// the Metal and WGSL emitters too: METALNONE / WGSLNONE assert the
+// suppression, METALNUM / WGSLNUM assert the numeric-file rendering.
+// WGSL is the interesting one - `#line` is not WGSL syntax and the
+// target emits no directives by default, yet asking for the glsl mode
+// still renders the retained locations, which is only possible if the
+// locations themselves survived to emit. The SPIR-V emitter has no
+// `#line` concept at all and ignores -line-directive-mode outright
+// (its output is byte-identical under `none` and `standard`), so it is
+// recorded as unsupported-on-target in the bundle README instead of
+// being given a directive here.
 
 //TEST:SIMPLE(filecheck=NONE):-target hlsl -entry main -stage compute -line-directive-mode none
 //TEST:SIMPLE(filecheck=GLSLNUM):-target glsl -entry main -stage compute -line-directive-mode glsl
+//TEST:SIMPLE(filecheck=METALNONE):-target metal -entry main -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=METALNUM):-target metal -entry main -stage compute -line-directive-mode glsl
+//TEST:SIMPLE(filecheck=WGSLNONE):-target wgsl -entry main -stage compute -line-directive-mode none
+//TEST:SIMPLE(filecheck=WGSLNUM):-target wgsl -entry main -stage compute -line-directive-mode glsl
 
 RWStructuredBuffer<int> outBuf;
 
@@ -35,3 +52,15 @@ void main(uint3 tid : SV_DispatchThreadID)
 // NONE-NOT: #line
 
 // GLSLNUM: #line {{[0-9]+}} {{[0-9]+}}
+
+// METALNONE-NOT: #line
+// METALNONE: void main_0(
+// METALNONE-NOT: #line
+
+// METALNUM: #line {{[0-9]+}} {{[0-9]+}}
+
+// WGSLNONE-NOT: #line
+// WGSLNONE: fn main(
+// WGSLNONE-NOT: #line
+
+// WGSLNUM: #line {{[0-9]+}} {{[0-9]+}}

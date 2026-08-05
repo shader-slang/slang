@@ -17,6 +17,10 @@
 
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
 uniform int gValue;
@@ -31,4 +35,26 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // CUDA: __ldg(
 // HLSL-NOT: __ldg
+
+// Every shader text target other than CUDA reads the uniform field
+// through its own ordinary member access: GLSL and WGSL index the
+// uniform block variable with `.`, Metal dereferences the `constant*`
+// argument with `->`, and SPIR-V walks to the member with an
+// `OpAccessChain` into the `Uniform` storage class and reads it with a
+// plain `OpLoad`. Each `-NOT` pins the other half of the claim: no
+// `__ldg` appears on a non-CUDA target.
+
+// GLSL-NOT: __ldg
+// GLSL: = globalParams_{{[0-9]+}}.gValue_{{[0-9]+}};
+
+// SPIRV-NOT: __ldg
+// SPIRV: OpAccessChain %_ptr_Uniform_int %globalParams %int_0
+// SPIRV: OpLoad %int
+
+// METAL-NOT: __ldg
+// METAL: = globalParams_{{[0-9]+}}->gValue_{{[0-9]+}};
+
+// WGSL-NOT: __ldg
+// WGSL: = globalParams_{{[0-9]+}}.gValue_{{[0-9]+}};
+
 // CPP-NOT: __ldg

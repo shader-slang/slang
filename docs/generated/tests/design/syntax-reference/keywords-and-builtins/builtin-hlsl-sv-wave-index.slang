@@ -15,8 +15,17 @@
 // neither parameter can be eliminated. CHECK asserts both semantics
 // appear on the emitted HLSL entry signature; an unrecognized semantic
 // would be rejected during checking instead.
+//
+// Metal and WGSL map the same semantic onto their own wave-index
+// entry-point builtin (`simdgroup_index_in_threadgroup` and
+// `@builtin(subgroup_id)` respectively), so the semantic is observable
+// there too. GLSL and SPIR-V have no varying-parameter mapping for it
+// at all -- see the `unsupported-on-target` rows in the bundle README
+// and the matching `undocumented-behavior` doc-gap row.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 
 RWStructuredBuffer<uint> outBuf;
 
@@ -30,3 +39,8 @@ void main(uint wi: SV_WaveIndex, uint gi: SV_GroupIndex)
 //HLSL: void main(
 //HLSL-SAME: {{SV_WaveIndex|SV_WAVEINDEX}}
 //HLSL-SAME: {{SV_GroupIndex|SV_GROUPINDEX}}
+
+//METAL: uint wi{{.*}}{{\[\[}}simdgroup_index_in_threadgroup
+
+//WGSL: @builtin(subgroup_id) wi
+//WGSL-SAME: u32

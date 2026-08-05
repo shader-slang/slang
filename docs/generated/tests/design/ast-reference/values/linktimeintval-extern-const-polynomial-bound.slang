@@ -15,10 +15,16 @@
 // property through its operand. The array size is therefore not known
 // until the value is resolved; the CHECKs assert that the final emitted
 // text carries a fully-resolved bound of 9 (HLSL prints the array
-// extent, SPIR-V prints the array-length constant).
+// extent, SPIR-V prints the array-length constant). Every shader text
+// target has an array-declaration syntax that spells the resolved
+// extent, so the claim is observable on all of them and each gets its
+// own directive.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry computeMain
 
 extern static const int N = 4;
 
@@ -35,3 +41,6 @@ void computeMain()
 // 4 * 2 + 1 == 9 once the link-time value is resolved.
 //HLSL: data{{[A-Za-z0-9_]*}}[int(9)]
 //SPV: OpConstant %{{[A-Za-z0-9_]+}} 9
+//GLSL: int data{{[A-Za-z0-9_]*}}[9];
+//METAL: array<int, int(9)> data
+//WGSL: data{{[A-Za-z0-9_]*}} : array<i32, i32(9)>

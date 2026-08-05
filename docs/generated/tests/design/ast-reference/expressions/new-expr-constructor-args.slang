@@ -14,8 +14,26 @@
 // constructor here doubles its argument and the dispatch id keeps the value
 // symbolic; the CHECK asserts the doubling appears in the stored expression,
 // which is only there if the argument list reached the constructor.
+//
+// Class allocation is lowered per target, so every shader text target is
+// exercised. The per-target buffer-store spellings pinned below are the ones
+// the two working neighbours of this test emit today: `new-expr-class-instance.slang`
+// (a class allocated with `new T()` and no constructor) and the same shader
+// with `class` replaced by `struct` (`Counter(4 + int(tid.x))`), which both
+// compile on all five targets and both store through the same expression shape.
+//
+// This test is a known expected failure: `new T(args)` on a class that declares
+// a matching `__init` currently aborts with `E99997 ... InternalError ... could
+// not resolve target declaration for call` on *every* target, HLSL included.
+// See docs/generated/tests/_meta/findings/new-expr-with-constructor-args-internal-error.yaml.
+// The per-target directives are kept so that fixing the abort restores emission
+// coverage on all five back-ends at once rather than on HLSL alone.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -31,4 +49,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     Counter c = new Counter(4 + int(tid.x));
     outputBuffer[0] = c.v;
     // HLSL: outputBuffer{{[A-Za-z0-9_]*}}[int(0)] =
+    // GLSL: outputBuffer{{[A-Za-z0-9_]*}}._data[uint(0)] =
+    // METAL: *(outputBuffer{{[A-Za-z0-9_]*}}+int(0)) =
+    // WGSL: outputBuffer{{[A-Za-z0-9_]*}}[i32(0)] =
+    // SPV: %{{[0-9]+}} = OpAccessChain %_ptr_StorageBuffer_int %outputBuffer
+    // SPV: OpStore
 }

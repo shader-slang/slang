@@ -14,8 +14,21 @@
 // constant buffer and are used directly as a texture and a sampler.
 // CHECK matches the heap subscripts in the emitted HLSL, which is where
 // the stored index is turned back into a concrete resource.
+//
+// The other text-emit back-ends each realise the same handle in their
+// own bindless form, so the fan-out pins what each one does with the
+// stored index. GLSL and SPIR-V declare an unbounded descriptor array
+// and subscript it with the handle's index before sampling; WGSL does
+// the same with an `array<texture_2d<f32>>` heap; Metal has no
+// descriptor-heap indirection, so the handle is realised directly as
+// the resource member of an argument buffer and the sample is issued
+// off that member.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 struct Stuff
 {
@@ -28,6 +41,23 @@ RWStructuredBuffer<float4> outBuf;
 
 //CHECK-DAG: ResourceDescriptorHeap[
 //CHECK-DAG: SamplerDescriptorHeap[
+
+//GLSL-DAG: uniform texture2D  _slang_resource_heap_{{[0-9]+}}[]
+//GLSL-DAG: uniform sampler  _slang_resource_heap_{{[0-9]+}}[]
+//GLSL: sampler2D(_slang_resource_heap_{{[0-9]+}}[cb_0.tex_0.x],_slang_resource_heap_{{[0-9]+}}[cb_0.samp_0.x])
+
+//METAL-DAG: texture2d<float, access::sample> tex_0;
+//METAL-DAG: sampler samp_0;
+//METAL: (cb_{{[0-9]+}}->tex_0).sample((cb_{{[0-9]+}}->samp_0)
+
+//SPIRV-DAG: OpCapability RuntimeDescriptorArray
+//SPIRV-DAG: %_runtimearr_{{[0-9]+}} = OpTypeRuntimeArray %{{[0-9]+}}
+//SPIRV-DAG: OpAccessChain %_ptr_UniformConstant_{{[0-9]+}} %__slang_resource_heap %{{[0-9]+}}
+//SPIRV-DAG: OpAccessChain %_ptr_UniformConstant_{{[0-9]+}} %__slang_resource_heap_0 %{{[0-9]+}}
+
+//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : array<texture_2d<f32>>
+//WGSL-DAG: var _slang_resource_heap_{{[0-9]+}} : array<sampler>
+//WGSL: textureSampleLevel((_slang_resource_heap_{{[0-9]+}}[cb_0.tex_0.x]), (_slang_resource_heap_{{[0-9]+}}[cb_0.samp_0.x])
 [numthreads(1, 1, 1)]
 void computeMain()
 {

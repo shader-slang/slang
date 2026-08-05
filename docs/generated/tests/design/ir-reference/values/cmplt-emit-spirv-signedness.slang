@@ -13,11 +13,22 @@
 // operand type when it reaches SPIR-V. The SPIR-V
 // legalizer branches the ordered relational on operand type: signed
 // `OpSLessThan`, unsigned `OpULessThan`, float `OpFOrdLessThan`. This pins
-// the distinguishing op per type row. GLSL renders all three as the `<`
-// operator (no per-type token), so spirv-asm is the distinguishing
-// target. Operands are uniforms; `select` keeps the bool result live.
+// the distinguishing op per type row. Operands are uniforms; `select`
+// keeps the bool result live.
+//
+// HLSL, GLSL, Metal and WGSL render all three rows as the same `<`
+// operator, because in those languages the ordering is chosen by the
+// operand's own type rather than by the operator token. The claim is still
+// observable on each of them, just one level down: the emitter has to hand
+// the target an `int` / `uint` / `float` pair for the comparison to mean
+// signed / unsigned / ordered-float. Each target therefore pins its
+// declared operand types alongside the comparison that reads them.
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry main
 
 uniform int sa;
 uniform int sb;
@@ -38,3 +49,31 @@ void main()
 // SPV-DAG: OpSLessThan %bool %{{[0-9]+}} %{{[0-9]+}}
 // SPV-DAG: OpULessThan %bool %{{[0-9]+}} %{{[0-9]+}}
 // SPV-DAG: OpFOrdLessThan %bool %{{[0-9]+}} %{{[0-9]+}}
+
+// HLSL-DAG: int sa_{{[0-9]+}};
+// HLSL-DAG: uint ua_{{[0-9]+}};
+// HLSL-DAG: float fa_{{[0-9]+}};
+// HLSL-DAG: ({{.*}}sa_{{[0-9]+}}) < ({{.*}}sb_{{[0-9]+}})
+// HLSL-DAG: ({{.*}}ua_{{[0-9]+}}) < ({{.*}}ub_{{[0-9]+}})
+// HLSL-DAG: ({{.*}}fa_{{[0-9]+}}) < ({{.*}}fb_{{[0-9]+}})
+
+// GLSL-DAG: int sa_{{[0-9]+}};
+// GLSL-DAG: uint ua_{{[0-9]+}};
+// GLSL-DAG: float fa_{{[0-9]+}};
+// GLSL-DAG: ({{.*}}sa_{{[0-9]+}}) < ({{.*}}sb_{{[0-9]+}})
+// GLSL-DAG: ({{.*}}ua_{{[0-9]+}}) < ({{.*}}ub_{{[0-9]+}})
+// GLSL-DAG: ({{.*}}fa_{{[0-9]+}}) < ({{.*}}fb_{{[0-9]+}})
+
+// METAL-DAG: int sa_{{[0-9]+}};
+// METAL-DAG: uint ua_{{[0-9]+}};
+// METAL-DAG: float fa_{{[0-9]+}};
+// METAL-DAG: ({{.*}}sa_{{[0-9]+}}) < ({{.*}}sb_{{[0-9]+}})
+// METAL-DAG: ({{.*}}ua_{{[0-9]+}}) < ({{.*}}ub_{{[0-9]+}})
+// METAL-DAG: ({{.*}}fa_{{[0-9]+}}) < ({{.*}}fb_{{[0-9]+}})
+
+// WGSL-DAG: sa_{{[0-9]+}} : i32,
+// WGSL-DAG: ua_{{[0-9]+}} : u32,
+// WGSL-DAG: fa_{{[0-9]+}} : f32,
+// WGSL-DAG: ({{.*}}sa_{{[0-9]+}}) < ({{.*}}sb_{{[0-9]+}})
+// WGSL-DAG: ({{.*}}ua_{{[0-9]+}}) < ({{.*}}ub_{{[0-9]+}})
+// WGSL-DAG: ({{.*}}fa_{{[0-9]+}}) < ({{.*}}fb_{{[0-9]+}})

@@ -11,13 +11,19 @@
 
 // Verifies that the aggregate type declared in Slang is still an aggregate in
 // the emitted target text. The same two-field struct is compiled to HLSL,
-// GLSL and CUDA; each prefix's CHECK pins the `struct Point` declaration in
-// that backend's output, so a backend that flattened the aggregate would
-// fail its own directive.
+// GLSL, CUDA and SPIR-V; each prefix's CHECK pins the `struct Point`
+// declaration in that backend's output, so a backend that flattened the
+// aggregate would fail its own directive.
+//
+// SPIR-V is a binary IR rather than source text, so "named struct type"
+// there means an `OpTypeStruct` that still carries the `OpName`/`OpMemberName`
+// debug names for `Point` and its two fields, which is what the CHECK_SPIRV
+// lines pin.
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_SPIRV):-target spirv-asm -entry main -stage compute
 
 struct Point { int x; int y; }
 
@@ -27,6 +33,10 @@ RWStructuredBuffer<int> outBuf;
 //CHECK_HLSL: struct Point
 //CHECK_GLSL: struct Point
 //CHECK_CUDA: struct Point
+//CHECK_SPIRV: OpName %Point "Point"
+//CHECK_SPIRV: OpMemberName %Point 0 "x"
+//CHECK_SPIRV: OpMemberName %Point 1 "y"
+//CHECK_SPIRV: %Point = OpTypeStruct %int %int
 [shader("compute")]
 [numthreads(1,1,1)]
 void main()

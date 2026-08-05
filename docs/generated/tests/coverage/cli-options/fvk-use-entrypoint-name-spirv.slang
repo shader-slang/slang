@@ -17,6 +17,15 @@
 // the RENAME directive (no flag) pins the default `"main"` export — both on the
 // same %fragMain function id, isolating the option's effect.
 
+// Emission fan-out: the rename-to-"main" default and the flag that suppresses
+// it live in the SPIR-V emitter's OpEntryPoint naming path only. On this same
+// source, `-fvk-use-entrypoint-name` produces byte-identical output with and
+// without the flag for glsl, hlsl, metal and wgsl (GLSL must always name its
+// entry `main` regardless; the other three already keep `fragMain`), so there
+// is no delta a CHECK could pin. Those four targets are recorded in the bundle
+// README's Untested-claims table with reason `unsupported-on-target` rather
+// than given a vacuously-passing directive.
+
 //TEST:SIMPLE(filecheck=KEEP):-target spirv-asm -fvk-use-entrypoint-name -entry fragMain -stage fragment
 //TEST:SIMPLE(filecheck=RENAME):-target spirv-asm -entry fragMain -stage fragment
 

@@ -13,11 +13,23 @@
 // side-effect classifier and therefore landing in the conservative arm:
 // nothing consumes the print, so a purely value-based DCE would delete it.
 // The shader is compiled at -O3 with an unused arithmetic expression sitting
-// right next to the call; the CHECK asserts the printf is still in the
-// emitted HLSL while CHECK-NOT asserts the unused multiply is gone, so the
-// test distinguishes "DCE did not run" from "DCE ran and kept the printf".
+// right next to the call; each target's CHECK asserts the print is still in
+// the emitted text while the CHECK-NOT asserts the unused multiply is gone,
+// so the test distinguishes "DCE did not run" from "DCE ran and kept the
+// print".
+//
+// The claim is target-dependent: each back-end lowers the print to its own
+// facility (`printf` in HLSL, `debugPrintfEXT` in GLSL, a DebugPrintf
+// `OpExtInst` in SPIR-V, `os_log_default.log` in Metal), so every text-emit
+// shader target that can express a print gets its own directive. WGSL has no
+// print facility at all -- it rejects the entry point with E36107 -- so it is
+// recorded in the bundle README as an `unsupported-on-target` Untested claim
+// rather than given a weakened directive here.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -O3 -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -O3 -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -O3 -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -O3 -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -O3 -entry main -stage compute
 
 uniform int n;
 uniform RWStructuredBuffer<int> buf;
@@ -30,6 +42,18 @@ void main()
     buf[0] = n;
 }
 
-// CHECK-LABEL: void main()
-// CHECK-NOT: {{[*]}} int(3)
-// CHECK: printf("kept %d\n"
+// HLSL-LABEL: void main()
+// HLSL-NOT: {{[*]}} int(3)
+// HLSL: printf("kept %d\n"
+
+// GLSL-LABEL: void main()
+// GLSL-NOT: {{[*]}} 3 {{[+]}} 7
+// GLSL: debugPrintfEXT("kept %d\n"
+
+// SPIRV-LABEL: %main = OpFunction
+// SPIRV-NOT: OpIMul
+// SPIRV: OpExtInst %void
+
+// METAL-LABEL: main_0(
+// METAL-NOT: {{[*]}} int(3)
+// METAL: os_log_default.log("kept %d\n"

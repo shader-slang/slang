@@ -14,11 +14,17 @@
 // `dyn interface` with `[anyValueSize(N)]`, conform a struct, and
 // have the compiler accept and emit the program. If the parser did
 // not recognize `dyn`, this file would fail to compile and FileCheck
-// would report no match. We pin two text-emit targets so the
-// recognition is observable independent of any single backend.
+// would report no match. We pin every shader text-emit target so the
+// recognition is observable independent of any single backend: `dyn`
+// is a front-end modifier, so each backend must still produce its own
+// entry point plus the conforming struct's method, and a backend that
+// choked on the modifier would show up here as a missing emit.
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry main -stage compute
 
 [anyValueSize(16)]
 dyn interface IComputeOp
@@ -45,3 +51,12 @@ void main()
     //CHECK_HLSL: void main
     //CHECK_SPV: OpEntryPoint GLCompute %main "main"
 }
+
+//CHECK_GLSL-DAG: void main()
+//CHECK_GLSL-DAG: AddOne_compute
+
+//CHECK_METAL-DAG: {{\[\[}}kernel]] void main
+//CHECK_METAL-DAG: AddOne_compute
+
+//CHECK_WGSL-DAG: fn main()
+//CHECK_WGSL-DAG: AddOne_compute

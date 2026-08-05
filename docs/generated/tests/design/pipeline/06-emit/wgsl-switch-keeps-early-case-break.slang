@@ -15,8 +15,19 @@
 // trailing one (which must not). CHECK asserts the early break appears
 // nested inside the `if` and that the case body ends without a second break
 // before the next case label.
+//
+// The HLSL, GLSL and Metal prefixes run the same source through the backends
+// that do not suppress the tail break, and assert *two* sequential `break;`
+// tokens between the case label and `default` — the early one and the trailing
+// one. That is what makes the WGSL result specific: same input, same early
+// break, one fewer terminator. SPIR-V has no textual `break` (a switch lowers
+// to `OpSwitch` plus branches), so it is recorded in the README's
+// Untested-claims row instead.
 
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -46,3 +57,21 @@ void main(uint3 tid : SV_DispatchThreadID)
 // WGSL: break;
 // WGSL: default :
 // WGSL-NOT: break;
+
+// HLSL: case int(0):
+// HLSL: if(a_{{[0-9]+}} > int(5))
+// HLSL: break;
+// HLSL: break;
+// HLSL: default:
+
+// METAL: case int(0):
+// METAL: if(a_{{[0-9]+}} > int(5))
+// METAL: break;
+// METAL: break;
+// METAL: default:
+
+// GLSL: case 0:
+// GLSL: if(a_{{[0-9]+}} > 5)
+// GLSL: break;
+// GLSL: break;
+// GLSL: default:

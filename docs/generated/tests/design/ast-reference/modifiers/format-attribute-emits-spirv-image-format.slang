@@ -14,7 +14,14 @@
 // asserts the emitted `OpTypeImage` names `Rgba32f`; without the attribute the
 // image type would carry the unknown format instead.
 
+// The other two back ends that carry a storage-image format spell it their own
+// way: GLSL as a `layout(rgba32f)` qualifier on the image uniform and WGSL as
+// the first type argument of `texture_storage_2d`, so each prefix asserts the
+// requested format arrived there rather than the target's default.
+
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 
 [format("rgba32f")]
 RWTexture2D<float4> tex;
@@ -26,3 +33,6 @@ void main()
 }
 
 //CHECK: OpTypeImage {{.*}}Rgba32f
+
+//GLSL: layout(rgba32f)
+//WGSL: texture_storage_2d<rgba32float

@@ -15,7 +15,13 @@
 // eliminated, and the CHECK-DAG lines assert each emitted HLSL resource type
 // still spells its normalisation modifier.
 
+// SPIR-V records the same distinction in the image type's format operand: the
+// `unorm` texture becomes `Rgba8` and the `snorm` one `Rgba8Snorm`, so the
+// SPIRV prefix shows the two modifiers stay apart after legalization instead of
+// collapsing onto one format.
+
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 RWTexture2D<unorm float4> uTex;
 RWTexture2D<snorm float4> sTex;
@@ -29,3 +35,6 @@ void main()
 
 //CHECK-DAG: RWTexture2D<unorm float4
 //CHECK-DAG: RWTexture2D<snorm float4
+
+//SPIRV-DAG: OpTypeImage %float 2D 2 0 0 2 Rgba8Snorm
+//SPIRV-DAG: OpTypeImage %float 2D 2 0 0 2 Rgba8{{$}}

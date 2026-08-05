@@ -15,7 +15,13 @@
 // tracing passes payloads. CHECK asserts that storage qualifier appears in the
 // emitted GLSL.
 
+// The direct SPIR-V path performs the same rewrite under the Khronos name for
+// that storage class, so the SPIRV prefix asserts the payload became a module
+// -scope `IncomingRayPayloadKHR` variable there rather than staying a function
+// parameter.
+
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -profile glsl_460+GL_EXT_ray_tracing -stage closesthit -entry chitMain
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage closesthit -entry chitMain
 
 struct ColorPayload
 {
@@ -29,3 +35,5 @@ void chitMain(inout ColorPayload payload, BuiltInTriangleIntersectionAttributes 
 }
 
 //CHECK: rayPayloadInEXT
+
+//SPIRV: %payload = OpVariable %{{[A-Za-z0-9_]+}} IncomingRayPayloadKHR

@@ -15,8 +15,13 @@
 // directives with separate prefixes assert the respective emitted token, so a
 // regression on either target fails this file.
 
+// SPIR-V records the same device-scope coherence as a `Coherent` decoration on
+// the buffer variable, so the SPIRV prefix completes the Khronos half of the
+// claim.
+
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 globallycoherent RWStructuredBuffer<int> outBuf;
 
@@ -28,3 +33,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 //HLSL: globallycoherent
 //GLSL: coherent
+//SPIRV: OpDecorate %outBuf Coherent

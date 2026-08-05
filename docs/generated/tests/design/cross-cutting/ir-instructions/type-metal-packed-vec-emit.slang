@@ -17,9 +17,21 @@
 // control: the same source keeps the ordinary padded `float3` there, which
 // is what makes the Metal spelling a target-specific storage decision
 // rather than a property of the source type.
+//
+// The claim has two halves and the second one ("while other targets keep the
+// padded vector spelling") is only shown by fanning the same source out over
+// the remaining shader-text targets. GLSL keeps `vec3`, WGSL keeps
+// `vec3<f32>`, and SPIR-V keeps `%v3float` with an explicit `ArrayStride 16`
+// on the runtime array — 16, not the 12 bytes three floats occupy, which is
+// the padding Metal's `packed_float3` is defined to drop. Each of those
+// directives also asserts the Metal spelling does *not* leak into that
+// target's output.
 
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry main
 
 uniform StructuredBuffer<float3> inbuf;
 uniform RWStructuredBuffer<float3> outbuf;
@@ -35,3 +47,15 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // HLSL-DAG: RWStructuredBuffer<float3 > outbuf_{{[0-9]+}}
 // HLSL-NOT: packed_float3
+
+// GLSL: buffer {{[A-Za-z0-9_]+}} {
+// GLSL-NEXT: vec3 _data[];
+// GLSL-NOT: packed_float3
+
+// WGSL-DAG: var<storage, read_write> outbuf_{{[0-9]+}} : array<vec3<f32>>;
+// WGSL-DAG: var<storage, read> inbuf_{{[0-9]+}} : array<vec3<f32>>;
+// WGSL-NOT: packed_float3
+
+// SPIRV-DAG: OpDecorate %_runtimearr_v3float ArrayStride 16
+// SPIRV-DAG: %v3float = OpTypeVector %float 3
+// SPIRV-DAG: %_runtimearr_v3float = OpTypeRuntimeArray %v3float

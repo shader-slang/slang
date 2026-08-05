@@ -16,10 +16,21 @@
 // string preserved. The dispatch id is used as the argument so the call cannot
 // be folded away, and a buffer write keeps the kernel non-trivial. Contrast
 // prefixes on HLSL and CUDA confirm those backends keep the plain `printf`.
+//
+// The same requirement-then-satisfy shape is what the other backends that have
+// a logging facility do, so they are exercised alongside Metal: GLSL requests
+// `GL_EXT_debug_printf` in the preamble and rewrites the call to
+// `debugPrintfEXT`, and the direct SPIR-V backend imports the
+// `NonSemantic.DebugPrintf` extended instruction set and interns the format
+// string as an `OpString`. WGSL has no logging facility at all — `printf` is
+// outside its compute capability set, so it diagnoses instead of emitting (see
+// the README's Untested-claims row).
 
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -37,3 +48,11 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: printf("v=%d
 // CUDA: printf("v=%d
+
+// GLSL-DAG: {{^}}#extension GL_EXT_debug_printf : require
+// GLSL-DAG: debugPrintfEXT("v=%d
+// GLSL-NOT: {{^}}    printf(
+
+// SPIRV-DAG: OpExtension "SPV_KHR_non_semantic_info"
+// SPIRV-DAG: OpExtInstImport "NonSemantic.DebugPrintf"
+// SPIRV-DAG: OpString "v=%d

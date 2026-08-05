@@ -14,9 +14,14 @@
 // immediately before a `for`, i.e. the compiler kept the loop rolled and
 // forwarded the request rather than acting on it in the IR. The loop
 // accumulates a thread-id-dependent value into a buffer so it survives to
-// emit.
+// emit. GLSL spells the same request as the `GL_EXT_control_flow_attributes`
+// `[[dont_unroll]]` attribute and SPIR-V as the `DontUnroll` loop-control
+// mask on `OpLoopMerge`, so both are observed here to show one IR hint
+// reaching three different target encodings.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -O0 -entry main -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -36,3 +41,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: [loop]
 // HLSL: for
+
+// GLSL: #extension GL_EXT_control_flow_attributes
+// GLSL: {{\[\[}}dont_unroll{{\]\]}}
+// GLSL: for
+
+// SPIRV: OpLoopMerge {{.*}} DontUnroll

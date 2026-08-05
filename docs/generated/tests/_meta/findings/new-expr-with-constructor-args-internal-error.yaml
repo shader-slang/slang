@@ -17,7 +17,9 @@ evidence:
     near this location`. The zero-argument form `new Counter()` on the same class (with
     the `__init` removed) compiles on every text-emit target. The failure reproduces on
     `-target hlsl`, `-target cpp`, `-target host-cpp`, `-target spirv-asm`, and under
-    `slangi`, so it is not target-specific.
+    `slangi`, so it is not target-specific. A later emission fan-out pass confirmed the
+    same abort on `-target glsl`, `-target metal` and `-target wgsl`, so all five shader
+    text targets reproduce it.
   stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unexpected: could not resolve target declaration for call"
 expected:
   claim: |

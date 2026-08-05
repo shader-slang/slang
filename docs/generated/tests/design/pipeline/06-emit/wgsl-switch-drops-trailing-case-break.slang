@@ -13,12 +13,17 @@
 // case bodies never fall through, and older validators reject a `break`
 // outside a loop, so the tail break must not be printed. Every case in the
 // switch below ends in `break`; the WGSL prefix asserts none survives
-// (CHECK-NOT over the whole output), while HLSL and Metal assert theirs do —
-// so the test would also fail if the suppression leaked into a shared path.
+// (CHECK-NOT over the whole output), while HLSL, GLSL and Metal assert theirs
+// do — so the test would also fail if the suppression leaked into a shared
+// path. GLSL is the interesting third case because it is the one non-WGSL
+// backend whose switch selector is spelled from a builtin rather than a
+// parameter. SPIR-V has no textual `break` — a switch lowers to `OpSwitch`
+// plus branches — so it is recorded in the README's Untested-claims row.
 
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -50,3 +55,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // METAL: switch(int(tid_{{[0-9]+}}.x))
 // METAL: break;
+
+// GLSL: switch(int(gl_GlobalInvocationID.x))
+// GLSL: break;

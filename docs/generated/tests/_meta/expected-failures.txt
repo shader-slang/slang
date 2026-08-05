@@ -198,7 +198,17 @@ docs/generated/tests/design/ir-reference/misc/countof-fixed-size-array.slang (cp
 # call` on every target tried (hlsl, cpp, host-cpp, spirv-asm, slangi).
 # The zero-argument `new T()` form compiles. (Will become a tracking issue
 # after human triage.)
+# The emission fan-out added glsl/spirv-asm/metal/wgsl directives to the same
+# file, and the abort is not target-specific, so every sub-test fails too.
+# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
+# flags the `<file>.<n>` sub-test names as unresolvable; the lint rule does not
+# yet know about slang-test's sub-test naming. Remove the whole block when the
+# abort is fixed.
 docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.1
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.2
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.3
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.4
 
 # Pending: docs/generated/tests/_meta/findings/switch-case-decl-used-in-later-case-invalid-cpp-emit.yaml
 # A local declared under one `switch` case label and used under another is
@@ -240,3 +250,21 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 # ir-types-unorm-snorm-struct-field-sigsegv. (Will become a tracking issue
 # after human triage.)
 docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
+
+# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
+# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
+# The emission fan-out for the `ref`-accessor claim reaches the last two
+# shader targets and both are broken: `-target metal` (directive `.1`) aborts
+# with the internal error "Unknown addressspace encountered", and
+# `-target spirv-asm` (directive `.2`) declares the accessor helper as
+# `OpTypeFunction %int %_ptr_Function_Cell` while calling it as
+# `OpFunctionCall %_ptr_Function_int`, so the module fails spirv-val.
+# The entries name the two sub-tests rather than the file because the file's
+# first directive (`-target hlsl`) still passes and must keep reporting.
+# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
+# flags these two sub-test names as unresolvable; the lint rule does not yet
+# know about slang-test's `<file>.<n>` sub-test naming. Remove these entries
+# when either back-end is fixed. (Will become a tracking issue after human
+# triage.)
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2

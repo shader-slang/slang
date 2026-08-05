@@ -13,11 +13,17 @@
 // before constructing the SourceWriter. GLSL has no file-name form of `#line`,
 // so a C-style directive would be a syntax error for glslang. CHECK asserts
 // the GLSL emit contains `#line <n> <n>` and, via CHECK-NOT, that no quoted
-// file name appears in a directive; the HLSL prefix asserts the C-style
-// quoted form on the same source so the two modes are contrasted directly.
+// file name appears in a directive; the HLSL and Metal prefixes assert the
+// C-style quoted form on the same source so the two modes are contrasted
+// directly, and the WGSL prefix pins the third resolution — the `None` mode,
+// which emits no directive in either spelling. SPIR-V is not exercised here:
+// it is a binary backend that never constructs a `SourceWriter`, so it has no
+// `LineDirectiveMode` to resolve (see the README's Untested-claims row).
 
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -33,3 +39,9 @@ void main(uint3 tid : SV_DispatchThreadID)
 // GLSL: {{^}}#line {{[0-9]+}} {{[0-9]+$}}
 // GLSL-NOT: {{^}}#line {{[0-9]+}} "
 // HLSL: {{^}}#line {{[0-9]+}} "{{.*}}.slang"
+
+// METAL: {{^}}#line {{[0-9]+}} "{{.*}}.slang"
+// METAL-NOT: {{^}}#line {{[0-9]+}} {{[0-9]+$}}
+
+// WGSL: {{^}}@compute
+// WGSL-NOT: #line

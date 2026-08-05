@@ -14,7 +14,15 @@
 // ordering, so dropping it would silently change rendering; CHECK asserts the
 // marker is present in the emitted HLSL.
 
+// The same attribute is spelled per back end: GLSL turns it into an input
+// layout qualifier, Metal into a function attribute, and SPIR-V into an
+// execution mode on the entry point, so each prefix pins that back end's own
+// form of the depth-test-ordering request.
+
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=GLSL): -target glsl -entry main -stage fragment
+//TEST:SIMPLE(filecheck=METAL): -target metal -entry main -stage fragment
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -entry main -stage fragment
 
 [earlydepthstencil]
 float4 main(float4 pos : SV_Position) : SV_Target
@@ -23,3 +31,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 }
 
 //CHECK: [earlydepthstencil]
+
+//GLSL: layout(early_fragment_tests) in;
+//METAL: {{\[\[}}early_fragment_tests{{\]\]}}
+//SPIRV: OpExecutionMode %{{[A-Za-z0-9_]+}} EarlyFragmentTests

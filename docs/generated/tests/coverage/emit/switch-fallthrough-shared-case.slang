@@ -20,6 +20,9 @@
 // folded; result sunk to outputBuffer.
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
@@ -57,3 +60,39 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // SPIR-V keeps one OpSwitch with 0 and 1 mapped to the same case label
 // and 2 to its own; the trailing operand is the default label.
 //SPV: OpSwitch %{{[0-9]+}} %{{[0-9]+}} 0 %[[C01:[0-9]+]] 1 %[[C01]] 2 %{{[0-9]+}}
+// GLSL emits the two empty cases as two adjacent labels over one shared body,
+// and keeps a natural C fall-through for case 2: the `+100` body ends without
+// a `break` and control drops into `default`, whose `+1` body is emitted
+// exactly once. The trailing CHECK-NOTs are what pin "not duplicated".
+//GLSL: case 0:
+//GLSL-NEXT: case 1:
+//GLSL: r_0 = r_0 + 10;
+//GLSL: break;
+//GLSL: case 2:
+//GLSL: r_0 = r_0 + 100;
+//GLSL-NOT: r_0 = r_0 + 100;
+//GLSL: default:
+//GLSL: r_0 = r_0 + 1;
+//GLSL-NOT: r_0 = r_0 + 1;
+// Metal matches GLSL's shape, with its `int(...)`-wrapped literal selectors.
+//METAL: case int(0):
+//METAL-NEXT: case int(1):
+//METAL: r_0 = r_0 + int(10);
+//METAL: break;
+//METAL: case int(2):
+//METAL: r_0 = r_0 + int(100);
+//METAL-NOT: r_0 = r_0 + int(100);
+//METAL: default:
+//METAL: r_0 = r_0 + int(1);
+//METAL-NOT: r_0 = r_0 + int(1);
+// WGSL is the third shape. The language has no fall-through, so the two empty
+// cases collapse into one comma-separated selector list, and case 2 gets the
+// default body *duplicated* into it (like HLSL, unlike GLSL/Metal/SPIR-V) --
+// the compiler reports this restructuring as E41026.
+//WGSL: case i32(0), i32(1):
+//WGSL: r_0 = r_0 + i32(10);
+//WGSL: case i32(2):
+//WGSL: r_0 = r_0 + i32(100);
+//WGSL-NEXT: r_0 = r_0 + i32(1);
+//WGSL: default
+//WGSL: r_0 = r_0 + i32(1);

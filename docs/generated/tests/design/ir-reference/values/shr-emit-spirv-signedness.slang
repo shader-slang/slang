@@ -13,11 +13,21 @@
 // operand signedness)". The unified IR `shr` opcode (sibling
 // arith-shifts.slang pins the IR form) splits in SPIR-V: a signed value
 // emits `OpShiftRightArithmetic`, an unsigned value emits
-// `OpShiftRightLogical`. GLSL renders both as `>>`, collapsing the
-// branch, so spirv-asm is the distinguishing target. Operands are
-// uniforms to defeat folding.
+// `OpShiftRightLogical`. Operands are uniforms to defeat folding.
+//
+// HLSL, GLSL, Metal and WGSL all write one `>>` token for both rows and
+// take the arithmetic-vs-logical decision from the shifted value's own
+// type, so on those targets the claim shows up as the operand type the
+// emitter declares. Metal and WGSL add a second visible per-target step:
+// both require the shift *amount* to be unsigned, so the emitter wraps the
+// `int amt` in `uint(...)` / `u32(...)` while leaving the shifted value's
+// signedness untouched — exactly the distinction this claim is about.
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -stage compute -entry main
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry main
 
 uniform int sa;
 uniform uint ua;
@@ -34,3 +44,23 @@ void main()
 
 // SPV-DAG: OpShiftRightArithmetic %int %{{[0-9]+}} %{{[0-9]+}}
 // SPV-DAG: OpShiftRightLogical %uint %{{[0-9]+}} %{{[0-9]+}}
+
+// HLSL-DAG: int sa_{{[0-9]+}};
+// HLSL-DAG: uint ua_{{[0-9]+}};
+// HLSL-DAG: ({{.*}}sa_{{[0-9]+}}) >> ({{.*}}amt_{{[0-9]+}});
+// HLSL-DAG: ({{.*}}ua_{{[0-9]+}}) >> ({{.*}}amt_{{[0-9]+}});
+
+// GLSL-DAG: int sa_{{[0-9]+}};
+// GLSL-DAG: uint ua_{{[0-9]+}};
+// GLSL-DAG: ({{.*}}sa_{{[0-9]+}}) >> ({{.*}}amt_{{[0-9]+}});
+// GLSL-DAG: ({{.*}}ua_{{[0-9]+}}) >> ({{.*}}amt_{{[0-9]+}});
+
+// METAL-DAG: int sa_{{[0-9]+}};
+// METAL-DAG: uint ua_{{[0-9]+}};
+// METAL-DAG: ({{.*}}sa_{{[0-9]+}}) >> uint({{.*}}amt_{{[0-9]+}});
+// METAL-DAG: ({{.*}}ua_{{[0-9]+}}) >> uint({{.*}}amt_{{[0-9]+}});
+
+// WGSL-DAG: sa_{{[0-9]+}} : i32,
+// WGSL-DAG: ua_{{[0-9]+}} : u32,
+// WGSL-DAG: ({{.*}}sa_{{[0-9]+}}) >> (u32({{.*}}amt_{{[0-9]+}}))
+// WGSL-DAG: ({{.*}}ua_{{[0-9]+}}) >> (u32({{.*}}amt_{{[0-9]+}}))

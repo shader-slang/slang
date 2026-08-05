@@ -17,8 +17,18 @@
 // consuming OpAtomicIAdd / OpAtomicExchange — the emit-time form the
 // opcode row commits to. The returned previous values escape to a
 // buffer so neither access is dead-code-eliminated.
+//
+// The GLSL back-end is the other half of the fan-out: the same two
+// intrinsics must survive to GLSL source as the `imageAtomic*` calls the
+// opcode row is named after, on a `uimage2D` storage image. The
+// remaining shader targets (hlsl, metal, wgsl) cannot express the claim
+// at all — the `imageAtomic*` family is GLSL/SPIR-V capability-gated and
+// the entry point is rejected with E36107 there — so they are recorded
+// as `unsupported-on-target` in the bundle README instead of being
+// forced into a directive here.
 
 //TEST:SIMPLE(filecheck=SPV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
 import glsl;
 
@@ -37,3 +47,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 // SPV-DAG: OpAtomicIAdd
 // SPV-DAG: OpImageTexelPointer
 // SPV-DAG: OpAtomicExchange
+
+// GLSL-DAG: uniform uimage2D
+// GLSL-DAG: imageAtomicAdd(
+// GLSL-DAG: imageAtomicExchange(

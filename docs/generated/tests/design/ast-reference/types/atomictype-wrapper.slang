@@ -13,13 +13,22 @@
 // updated: `buf[0].add(3)` on an Atomic<int> element must lower to the
 // backend's atomic add rather than a load/add/store triple. CHECK
 // matches InterlockedAdd in the emitted HLSL, which a plain int element
-// would not produce.
+// would not produce, and the per-target prefixes pin the equivalent
+// atomic-add opcode on each of the other text-emit back-ends.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<Atomic<int> > buf;
 
 //CHECK: InterlockedAdd
+//GLSL: atomicAdd(
+//METAL: atomic_fetch_add_explicit(
+//SPIRV: OpAtomicIAdd
+//WGSL: atomicAdd(
 [numthreads(1, 1, 1)]
 void computeMain()
 {

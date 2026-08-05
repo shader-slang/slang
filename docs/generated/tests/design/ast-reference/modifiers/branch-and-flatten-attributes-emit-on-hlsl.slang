@@ -14,8 +14,12 @@
 // neither `if` can be folded away, and the CHECK-DAG lines assert the emitted
 // HLSL carries `[branch]` on one and `[flatten]` on the other -- proving the two
 // attributes are distinguished, not collapsed to a single marker.
+// SPIR-V spells the same pair as selection-control masks on `OpSelectionMerge`:
+// `[branch]` becomes `DontFlatten` and `[flatten]` becomes `Flatten`, so the
+// SPIRV prefix asserts the two hints stay distinguished on that back end too.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -32,3 +36,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 //CHECK-DAG: [branch]
 //CHECK-DAG: [flatten]
+
+//SPIRV-DAG: OpSelectionMerge %{{[A-Za-z0-9_]+}} DontFlatten
+//SPIRV-DAG: OpSelectionMerge %{{[A-Za-z0-9_]+}} Flatten

@@ -23,6 +23,14 @@
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+// SPIR-V does not go through the c-like constructor fan-out at all, so it
+// needs its own entry point: reading a single element (`m[1][1]`) lets the
+// SPIR-V path collapse the whole matrix away, leaving nothing to observe.
+// `computeMainMul` consumes the whole matrix with a `mul`, which forces the
+// matrix value to materialize, and there the same scalar fan-out shows up as
+// a nested `OpCompositeConstruct`: one row vector built from the scalar three
+// times, then the 3x3 built from that row three times.
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMainMul -stage compute
 
 RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
@@ -31,6 +39,15 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float s = (float)tid.x + 1.0;
     float3x3 m = float3x3(s);
     outputBuffer[0] = m[1][1];
+}
+
+[numthreads(1, 1, 1)]
+void computeMainMul(uint3 tid : SV_DispatchThreadID)
+{
+    float s = (float)tid.x + 1.0;
+    float3x3 m = float3x3(s);
+    float3 v = mul(m, float3(1.0, 2.0, 3.0));
+    outputBuffer[0] = v.x + v.y + v.z;
 }
 
 // HLSL repeats the scalar nine times in a flat float3x3 constructor.
@@ -43,3 +60,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //WGSL: mat3x3<f32>({{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}}, {{.*}})
 // CUDA keeps it as a single-argument makeMatrix template call.
 //CUDA: makeMatrix<float, 3, 3>
+// SPIR-V has no constructor syntax, so the same scalar fan-out appears as a
+// nested composite construct: the scalar is replicated three times into a row
+// vector, and that row is replicated three times into the 3x3 matrix.
+//SPIRV: %[[S:[A-Za-z0-9_]+]] = OpFAdd %float
+//SPIRV: %[[ROW:[A-Za-z0-9_]+]] = OpCompositeConstruct %v3float %[[S]] %[[S]] %[[S]]
+//SPIRV: OpCompositeConstruct %mat3v3float %[[ROW]] %[[ROW]] %[[ROW]]

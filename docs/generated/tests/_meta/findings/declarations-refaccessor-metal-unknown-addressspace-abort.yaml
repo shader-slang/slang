@@ -7,7 +7,7 @@ observed_at: "2026-06-11T00:00:00Z"
 scope: metal
 evidence:
   command: "build/RelWithDebInfo/bin/slangc -target metal -entry main -stage compute /tmp/ref.slang"
-  source_slang: docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
+  source_slang: docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang
   observed_summary: |
     A property with an explicit `[mutating] ref` accessor (RefAccessorDecl) aborts the
     Metal backend with an internal exception during emission:

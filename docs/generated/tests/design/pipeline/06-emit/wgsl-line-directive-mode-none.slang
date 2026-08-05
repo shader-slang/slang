@@ -13,12 +13,18 @@
 // multi-statement kernel that makes HLSL emit several `#line` directives must
 // produce none on WGSL, since `#` is not valid WGSL syntax anywhere. The WGSL
 // prefix uses CHECK-NOT over the whole output for both the C-style and the
-// bare directive spelling; the HLSL prefix confirms the source really does
-// have locations to advance through, so the WGSL result is a suppression
-// rather than an artefact of a locationless shader.
+// bare directive spelling; the HLSL, Metal and GLSL prefixes confirm the
+// source really does have locations to advance through — each of those three
+// resolves to a mode that prints something (C-style with a quoted file name on
+// HLSL and Metal, the numeric source-string form on GLSL) — so the WGSL result
+// is a suppression rather than an artefact of a locationless shader. SPIR-V is
+// not exercised: it is a binary backend with no `SourceWriter` and therefore no
+// mode to resolve (see the README's Untested-claims row).
 
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
 RWStructuredBuffer<int> outBuf;
 
@@ -36,3 +42,5 @@ void main(uint3 tid : SV_DispatchThreadID)
 // WGSL: @compute
 // WGSL-NOT: #line
 // HLSL: {{^}}#line
+// METAL: {{^}}#line {{[0-9]+}} "{{.*}}.slang"
+// GLSL: {{^}}#line {{[0-9]+}} {{[0-9]+$}}

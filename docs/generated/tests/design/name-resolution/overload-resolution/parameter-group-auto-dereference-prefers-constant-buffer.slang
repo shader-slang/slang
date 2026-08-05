@@ -12,10 +12,17 @@
 // Verifies that the auto-dereference of a parameter-group type is charged a
 // real cost, so the overload that takes the parameter group itself stays
 // cheaper than the one that takes the dereferenced element. The two overloads
-// return distinct sentinels; CHECK asserts the emitted HLSL contains the
-// ConstantBuffer overload's sentinel and never the element overload's.
+// return distinct sentinels; each per-target CHECK asserts the emitted code
+// contains the ConstantBuffer overload's sentinel and never the element
+// overload's. Overload resolution runs before codegen, but the chosen
+// callee is what every back-end actually emits, so the fan-out below pins
+// the sentinel in each emitter's own output form.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 struct Foo { int v; }
 
@@ -33,3 +40,15 @@ void computeMain()
 
 //HLSL: 4242
 //HLSL-NOT: 7777
+
+//GLSL: return 4242;
+//GLSL-NOT: 7777
+
+//METAL: return int(4242);
+//METAL-NOT: 7777
+
+//WGSL: return i32(4242);
+//WGSL-NOT: 7777
+
+//SPIRV: OpConstant %int 4242
+//SPIRV-NOT: 7777
