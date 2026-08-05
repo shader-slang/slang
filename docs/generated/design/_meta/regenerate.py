@@ -695,12 +695,25 @@ def lint_markdown_tables(doc: str, text: str) -> list[LintIssue]:
     silently vanish from the published doc. A delimiter row that does not
     match its header is worse: GitHub then does not recognize the block
     as a table at all and prints the raw pipes.
+
+    Fenced code blocks are skipped, matching the tests-tree twin. These
+    docs quote grammar productions and example tables inside ``` fences
+    -- e.g. the BNF alternatives in `syntax-reference/grammar.md`, whose
+    lines begin with `|` -- which are illustrations, not tables GitHub
+    renders. Since this lint now runs in CI, a false positive on such a
+    fenced block would fail the nightly.
     """
     issues: list[LintIssue] = []
     lines = text.split("\n")
     i = 0
+    in_fence = False
     while i < len(lines):
-        if not lines[i].lstrip().startswith("|") or i + 1 >= len(lines):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        if in_fence or not lines[i].lstrip().startswith("|") or i + 1 >= len(lines):
             i += 1
             continue
         if not _is_separator_row(lines[i + 1]):
