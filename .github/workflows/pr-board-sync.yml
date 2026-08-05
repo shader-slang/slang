@@ -913,9 +913,14 @@ jobs:
 
             // Among committersBySignal (highest first), pick the first collaborator
             // who is not the author / shepherd / auto-requested reviewer / bot and
-            // who outranks the auto-requested reviewer. When nobody was
-            // auto-requested, any such collaborator counts as higher-signal.
-            // Used only for a suggestion comment — never for requestReviewers.
+            // who outranks the auto-requested reviewer. committersBySignal must be
+            // sorted highest-signal-first; the loop stops at the auto-requested
+            // reviewer's index because later entries cannot strictly outrank them.
+            // When nobody was auto-requested, or the auto-requested login is absent
+            // from the ranking (no measured signal on these files — e.g. maintainer
+            // fallback), that baseline is treated as rank −∞ and any eligible
+            // collaborator counts as higher-signal. Used only for a suggestion
+            // comment — never for requestReviewers.
             function pickSuggestedReviewer({
               committersBySignal = [],
               collaborators,
@@ -952,15 +957,18 @@ jobs:
             // GitHub's assign event) but never @-mentions the suggested
             // reviewer, so the suggestion does not ping them.
             // autoRequestedReviewer must be the login we actually intend to
-            // requestReviewers (or null) — not a candidate we later dropped.
+            // requestReviewers (or null). autoRequestedHasSignal is true only
+            // when that login appears in committersBySignal; otherwise we avoid
+            // saying they have "lower" signal when they have none measured.
             function formatAssignmentComment({
-              source, assignee, suggestedReviewer, autoRequestedReviewer,
+              source, assignee, suggestedReviewer,
+              autoRequestedReviewer, autoRequestedHasSignal,
             }) {
               let body =
                 `**PR board sync:** auto-assigned @${assignee} as shepherd ` +
                 `for this ${source} PR.`;
               if (suggestedReviewer) {
-                if (autoRequestedReviewer) {
+                if (autoRequestedReviewer && autoRequestedHasSignal) {
                   body +=
                     `\n\nCommitter signal on the changed files is higher for ` +
                     `${suggestedReviewer} than for the auto-requested reviewer ` +
@@ -1015,6 +1023,10 @@ jobs:
                   && !classifyIsBot(r, botAuthors) && !r.toLowerCase().endsWith("[bot]"));
               if (realExisting.length) autoRequestedReviewer = null;
 
+              const autoRequestedHasSignal = !!(autoRequestedReviewer &&
+                committersBySignal.some(
+                  (c) => c && c.toLowerCase() === autoRequestedReviewer.toLowerCase()));
+
               const suggestedReviewer = pickSuggestedReviewer({
                 committersBySignal,
                 collaborators,
@@ -1024,7 +1036,12 @@ jobs:
                 botAuthors,
               });
 
-              return { assignee, autoRequestedReviewer, suggestedReviewer };
+              return {
+                assignee,
+                autoRequestedReviewer,
+                autoRequestedHasSignal,
+                suggestedReviewer,
+              };
             }
             // ----- extract-js:assignment:end -----
 
@@ -1459,14 +1476,16 @@ jobs:
             // are updated, including when the PR was assigned earlier or the
             // issue was linked later.
             async function postAssignmentComment(number, {
-              source, assignee, suggestedReviewer, autoRequestedReviewer,
+              source, assignee, suggestedReviewer,
+              autoRequestedReviewer, autoRequestedHasSignal,
             }) {
               try {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner, repo: context.repo.repo,
                   issue_number: number,
                   body: formatAssignmentComment({
-                    source, assignee, suggestedReviewer, autoRequestedReviewer,
+                    source, assignee, suggestedReviewer,
+                    autoRequestedReviewer, autoRequestedHasSignal,
                   }),
                 });
                 if (suggestedReviewer) {
@@ -1491,7 +1510,8 @@ jobs:
               if (info.inMergeQueue) return;            // far enough along
               if (info.isDraft && !info.isBot) return;  // human draft: author's "not ready"
 
-              let assignee, autoRequestedReviewer = null, suggestedReviewer = null;
+              let assignee, autoRequestedReviewer = null, autoRequestedHasSignal = false,
+                  suggestedReviewer = null;
               if (source === SOURCE_INTERNAL) {
                 // Internal: the author drives; assign them, request no reviewers.
                 assignee = info.authorLogin;
@@ -1519,7 +1539,7 @@ jobs:
                     cache: SIGNAL_CACHE,
                     since: SIGNAL_SINCE,
                   });
-                ({ assignee, autoRequestedReviewer, suggestedReviewer } =
+                ({ assignee, autoRequestedReviewer, autoRequestedHasSignal, suggestedReviewer } =
                   selectAssigneeAndReviewers({
                     issueAssignees: info.issueAssignees,
                     committersBySignal: ranking,
@@ -1592,7 +1612,8 @@ jobs:
               // synchronize/sweep will not re-post.
               if (source !== SOURCE_INTERNAL) {
                 await postAssignmentComment(number, {
-                  source, assignee, suggestedReviewer, autoRequestedReviewer,
+                  source, assignee, suggestedReviewer,
+                  autoRequestedReviewer, autoRequestedHasSignal,
                 });
               }
 

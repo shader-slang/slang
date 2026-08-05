@@ -40,10 +40,11 @@ test("commit-signal owner when no issue", () => {
 });
 
 test("maintainer fallback", () => {
-  const { assignee, autoRequestedReviewer, suggestedReviewer } =
+  const { assignee, autoRequestedReviewer, autoRequestedHasSignal, suggestedReviewer } =
     select([], ["dev1"]);
   assert.strictEqual(assignee, "maintainer");
   assert.strictEqual(autoRequestedReviewer, "maintainer");
+  assert.strictEqual(autoRequestedHasSignal, false); // absent from ranking
   assert.strictEqual(suggestedReviewer, "dev1");
 });
 
@@ -154,6 +155,20 @@ test("pickSuggestedReviewer with no auto-request takes top non-assignee collabor
   );
 });
 
+test("pickSuggestedReviewer skips a named bot from botAuthors", () => {
+  assert.strictEqual(
+    pickSuggestedReviewer({
+      committersBySignal: ["nv-slang-bot", "dev1", "owner1"],
+      collaborators: new Set(["nv-slang-bot", "dev1", "owner1"]),
+      author: "author",
+      assignee: "owner1",
+      autoRequestedReviewer: "owner1",
+      botAuthors: ["nv-slang-bot"],
+    }),
+    "dev1",
+  );
+});
+
 test("formatAssignmentComment always notes assignee; suggestion has no @", () => {
   assert.strictEqual(
     formatAssignmentComment({
@@ -161,6 +176,7 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
       assignee: "jkwak-work",
       suggestedReviewer: null,
       autoRequestedReviewer: "jkwak-work",
+      autoRequestedHasSignal: true,
     }),
     "**PR board sync:** auto-assigned @jkwak-work as shepherd for this Bot PR.",
   );
@@ -169,6 +185,7 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     assignee: "alice",
     suggestedReviewer: "skallweitNV",
     autoRequestedReviewer: "alice",
+    autoRequestedHasSignal: true,
   });
   assert.match(
     withRequested,
@@ -185,9 +202,22 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     assignee: "author-owner",
     suggestedReviewer: "dev1",
     autoRequestedReviewer: null,
+    autoRequestedHasSignal: false,
   });
   assert.match(withoutRequested, /highest for dev1 among collaborators/);
   assert.doesNotMatch(withoutRequested, /@dev1/);
+
+  // Auto-requested maintainer with no measured signal: do not claim they have
+  // "lower" signal than the suggestion.
+  const noSignalBaseline = formatAssignmentComment({
+    source: "Community",
+    assignee: "maintainer",
+    suggestedReviewer: "dev1",
+    autoRequestedReviewer: "maintainer",
+    autoRequestedHasSignal: false,
+  });
+  assert.match(noSignalBaseline, /highest for dev1 among collaborators/);
+  assert.doesNotMatch(noSignalBaseline, /than for the auto-requested reviewer/);
 });
 
 (async () => {
