@@ -106,16 +106,23 @@ In implementation terms:
 linked-issue sync when already assigned). Skips human drafts (except Bot PRs) and
 merge-queued PRs.
 
-| Source              | Assignee             | Reviewers                                                                          |
-| ------------------- | -------------------- | ---------------------------------------------------------------------------------- |
-| **Internal**        | PR author            | none                                                                               |
-| **Community / Bot** | see pick order below | assignee + top collaborator-not-owner, unless a real reviewer is already requested |
+| Source              | Assignee             | Reviewers                                                                 | Comment |
+| ------------------- | -------------------- | ------------------------------------------------------------------------- | ------- |
+| **Internal**        | PR author            | none                                                                      | none |
+| **Community / Bot** | see pick order below | assignee only (owners allowlist), unless a real reviewer is already requested | one-shot note naming the assignee; may suggest a higher-signal collaborator without `@` or auto-request |
 
 **Pick order** (Community/Bot):
 
 1. Linked-issue assignee who is in the owners team.
 2. Top **committer-signal** owner from changed files.
 3. Maintainer team member (or `fallback_assignee`).
+
+Auto-requested reviewers are always drawn from the same owners allowlist that
+gates the assignee (`pr-owners` for Community, `bot-pr-owners` for Bot). A
+collaborator with stronger committer signal who is **not** on that list is
+named in the assignment comment as a suggested additional reviewer, but is
+never `requestReviewers`'d — so they are not notified unless someone follows
+up.
 
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 

@@ -4,7 +4,11 @@
 "use strict";
 
 const assert = require("node:assert");
-const { selectAssigneeAndReviewers } = require("./extract-workflow-js.js").load({
+const {
+  selectAssigneeAndReviewers,
+  pickSuggestedReviewer,
+  formatAssignmentComment,
+} = require("./extract-workflow-js.js").load({
   workflow: ".github/workflows/pr-board-sync.yml",
   block: "assignment",
 });
@@ -36,46 +40,89 @@ test("commit-signal owner when no issue", () => {
 });
 
 test("maintainer fallback", () => {
-  const { assignee, reviewers } = select([], ["dev1"]);
+  const { assignee, reviewers, suggestedReviewer } = select([], ["dev1"]);
   assert.strictEqual(assignee, "maintainer");
-  assert.deepStrictEqual(reviewers, ["maintainer", "dev1"]);
+  assert.deepStrictEqual(reviewers, ["maintainer"]);
+  assert.strictEqual(suggestedReviewer, "dev1");
 });
 
-test("extra reviewer is top collaborator-not-owner", () => {
-  const { assignee, reviewers } = select([], ["dev2", "owner1", "dev1"]);
+test("auto-request is assignee only; non-owner is suggested not requested", () => {
+  const { assignee, reviewers, suggestedReviewer } = select(
+    [], ["dev2", "owner1", "dev1"]);
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, ["owner1", "dev2"]);
+  assert.deepStrictEqual(reviewers, ["owner1"]);
+  assert.strictEqual(suggestedReviewer, "dev2");
+});
+
+test("no suggestion when assignee has top signal", () => {
+  const { reviewers, suggestedReviewer } = select([], ["owner1", "owner2", "dev1"]);
+  assert.deepStrictEqual(reviewers, ["owner1"]);
+  assert.strictEqual(suggestedReviewer, null);
 });
 
 test("no collaborator committer means only assignee", () => {
-  const { reviewers } = select([], ["owner1", "owner2"]);
+  const { reviewers, suggestedReviewer } = select([], ["owner1", "owner2"]);
   assert.deepStrictEqual(reviewers, ["owner1"]);
+  assert.strictEqual(suggestedReviewer, null);
 });
 
 test("author never requested as reviewer", () => {
-  const { assignee, reviewers } = selectAssigneeAndReviewers({
+  const { assignee, reviewers, suggestedReviewer } = selectAssigneeAndReviewers({
     issueAssignees: [], committersBySignal: ["dev1"], owners: OWNERS,
     collaborators: COLLAB, author: "maintainer", maintainer: "maintainer",
   });
   assert.strictEqual(assignee, "maintainer");
-  assert.deepStrictEqual(reviewers, ["dev1"]); // author(maintainer) excluded
+  assert.deepStrictEqual(reviewers, []); // author(maintainer) excluded from request
+  assert.strictEqual(suggestedReviewer, "dev1");
 });
 
-test("real existing reviewer blocks adding", () => {
-  const { assignee, reviewers } = select([], ["dev2", "owner1"], {
+test("real existing reviewer blocks adding but still suggests", () => {
+  const { assignee, reviewers, suggestedReviewer } = select([], ["dev2", "owner1"], {
     existingReviewers: ["dave"], ignoredReviewers: new Set(["bmillsNV"]),
   });
   assert.strictEqual(assignee, "owner1");
   assert.deepStrictEqual(reviewers, []);
+  assert.strictEqual(suggestedReviewer, "dev2");
 });
 
 test("ignored and bot reviewers do not count as existing", () => {
-  const { assignee, reviewers } = select([], ["dev2", "owner1"], {
+  const { assignee, reviewers, suggestedReviewer } = select([], ["dev2", "owner1"], {
     existingReviewers: ["bmillsNV", "copilot[bot]"],
     botAuthors: ["nv-slang-bot"], ignoredReviewers: new Set(["bmillsNV"]),
   });
   assert.strictEqual(assignee, "owner1");
-  assert.deepStrictEqual(reviewers, ["owner1", "dev2"]);
+  assert.deepStrictEqual(reviewers, ["owner1"]);
+  assert.strictEqual(suggestedReviewer, "dev2");
+});
+
+test("pickSuggestedReviewer skips non-collaborators and bots", () => {
+  assert.strictEqual(
+    pickSuggestedReviewer({
+      committersBySignal: ["outsider", "bot[bot]", "dev1", "owner1"],
+      collaborators: COLLAB,
+      author: "author",
+      assignee: "owner1",
+      botAuthors: [],
+    }),
+    "dev1",
+  );
+});
+
+test("formatAssignmentComment always notes assignee; suggestion has no @", () => {
+  assert.strictEqual(
+    formatAssignmentComment({
+      source: "Bot", assignee: "jkwak-work", suggestedReviewer: null,
+    }),
+    "**PR board sync:** auto-assigned @jkwak-work as shepherd for this Bot PR.",
+  );
+  const withSuggestion = formatAssignmentComment({
+    source: "Community",
+    assignee: "alice",
+    suggestedReviewer: "skallweitNV",
+  });
+  assert.match(withSuggestion, /^\*\*PR board sync:\*\* auto-assigned @alice as shepherd for this Community PR\./);
+  assert.match(withSuggestion, /higher for skallweitNV than/);
+  assert.doesNotMatch(withSuggestion, /@skallweitNV/);
 });
 
 (async () => {
