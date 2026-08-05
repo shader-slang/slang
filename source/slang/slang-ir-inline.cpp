@@ -405,12 +405,8 @@ struct InliningPassBase
         // When the call did not belong to an in-IR `DebugScope`, restore the caller function's own
         // scope after the inlined region rather than clearing scope entirely. Without this, the
         // caller's subsequent debug records (e.g. a `DebugValue` for a caller local) would sit
-        // under a scope-clearing `DebugNoScope` with no enclosing scope. The restore carries the
-        // scope in `DebugNoScope`'s operand rather than in a `DebugScope`, because a `DebugScope`
-        // needs an `inlinedAt` it does not have here and an older compiler reads that operand
-        // unguarded; `DebugNoScope`'s operand is one an older emitter ignores. A null
-        // `callerDebugFunc` (no `DebugFunction` to restore to) leaves the operand off, clearing
-        // scope as before. See shader-slang/slang#11616.
+        // under a scope-clearing `DebugNoScope` with no enclosing scope. A null `callerDebugFunc`
+        // means there is no scope to restore, which clears it. See shader-slang/slang#11616.
         if (!callDebugScope)
             builder.emitDebugNoScope(callerDebugFunc);
 

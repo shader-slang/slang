@@ -2797,7 +2797,8 @@ struct IRDebugNoScope : IRInst
 {
     FIDDLE(leafInst())
     // The scope operand is optional: with none this clears the active scope, and with one it names
-    // a scope to restore, which consumers read as a DebugScope carrying only that scope.
+    // a scope to restore, which the inliner and SPIR-V emitter read as a DebugScope carrying only
+    // that scope.
     IRInst* getScope() { return operandCount >= 1 ? getOperand(0) : nullptr; }
     bool isScopePresent() { return operandCount >= 1; }
 };
