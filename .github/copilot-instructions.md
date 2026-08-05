@@ -13,8 +13,10 @@ Detailed build instructions can be found in docs/building.md
 ## Formatting
 
 DO THIS BEFORE COMMITTING YOUR CHANGES:
-RUN `./extras/formatting.sh` to format your changes first!!
+RUN `./extras/formatting.sh --modified` to format your changes first!!
 Your PR needs to be formatted according to our coding style.
+
+`--modified` covers tracked changes only. Format an untracked file by naming it: `./extras/formatting.sh -- path/to/new-file`. Run with no arguments, the script prints its help text and exits 0 without formatting anything.
 
 The formatting script requires these tools:
 
