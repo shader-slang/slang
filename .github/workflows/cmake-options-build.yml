@@ -196,9 +196,11 @@ jobs:
       # an x64 runner and cannot execute what they build, so they are excluded
       # with the same guard the slangc version check uses.
       - name: Run slang-internals-test (${{ matrix.option }})
-        if: matrix.option == 'SLANG_LIB_TYPE' && !(inputs.os == 'windows' && inputs.arch != '')
+        if: matrix.option == 'SLANG_LIB_TYPE' && (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '')
         run: |
-          if [[ "${{ inputs.os }}" == "windows" ]]; then
+          # RUNNER_OS is provided by the runner, so nothing from the workflow
+          # inputs is interpolated into this script.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
             test_path="$bin_dir/slang-internals-test.exe"
           else
             test_path="$bin_dir/slang-internals-test"

@@ -125,7 +125,9 @@ jobs:
 
       - name: Run slang-internals-test
         run: |
-          if [[ "${{ inputs.os }}" == "windows" ]]; then
+          # RUNNER_OS is provided by the runner, so nothing from the workflow
+          # inputs is interpolated into this script.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
             test_path="$bin_dir/slang-internals-test.exe"
           else
             test_path="$bin_dir/slang-internals-test"

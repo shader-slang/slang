@@ -47,16 +47,20 @@ public:
             recordFailure();
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
-    addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
-        override
+    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(
+        TestResult result,
+        const char* testText,
+        const char* file,
+        int line) override
     {
         addResultWithLocation(result == TestResult::Pass, testText, file, line);
     }
 
-    virtual SLANG_NO_THROW void SLANG_MCALL
-    addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line)
-        override
+    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(
+        bool testSucceeded,
+        const char* testText,
+        const char* file,
+        int line) override
     {
         if (testSucceeded)
             return;
@@ -117,21 +121,33 @@ int main(int argc, char** argv)
     context.executableDirectory = ".";
 
     const SlangInt testCount = testModule->getTestCount();
+    SlangInt selectedCount = 0;
     for (SlangInt i = 0; i < testCount; i++)
     {
         const char* testName = testModule->getTestName(i);
         if (filter && !strstr(testName, filter))
             continue;
 
+        selectedCount++;
         reporter.startTest(testName);
         testModule->getTestFunc(i)(&context);
         reporter.endTest();
     }
 
-    printf(
-        "\n%d passed, %d failed\n",
-        reporter.passedTestCount,
-        reporter.failedTestCount);
+    // A filter that matches nothing would otherwise run zero tests and report
+    // success, so a mistyped name would look like a passing run.
+    if (filter && selectedCount == 0)
+    {
+        fprintf(
+            stderr,
+            "error: filter \"%s\" matched none of the %d test(s)\n",
+            filter,
+            (int)testCount);
+        testModule->destroy();
+        return 1;
+    }
+
+    printf("\n%d passed, %d failed\n", reporter.passedTestCount, reporter.failedTestCount);
 
     testModule->destroy();
     return reporter.failedTestCount == 0 ? 0 : 1;

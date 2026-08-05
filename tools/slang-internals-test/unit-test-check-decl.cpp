@@ -76,12 +76,18 @@ SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes)
     StructDecl* structDecl = findMemberDecl<StructDecl>(module->getModuleDecl(), "Mixed");
     SLANG_CHECK_ABORT(structDecl != nullptr);
 
+    ASTBuilder* astBuilder = env.getASTBuilder();
+    Type* floatType = astBuilder->getFloatType();
+    Type* intType = astBuilder->getIntType();
+
     List<String> fieldNames;
+    List<Type*> fieldTypes;
     for (auto field : structDecl->getDirectMemberDeclsOfType<VarDecl>())
     {
         // Every field must have been resolved to a type by the checker; a null
         // type here means checking silently left the declaration incomplete.
-        SLANG_CHECK(field->getType() != nullptr);
+        SLANG_CHECK_ABORT(field->getType() != nullptr);
+        fieldTypes.add(field->getType());
         if (field->getName())
             fieldNames.add(field->getName()->text);
     }
@@ -90,6 +96,14 @@ SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes)
     SLANG_CHECK(fieldNames[0] == "first");
     SLANG_CHECK(fieldNames[1] == "second");
     SLANG_CHECK(fieldNames[2] == "third");
+
+    // The declared types must survive checking in the same order. Asserting the
+    // resolved types, rather than only that they are non-null, is what catches a
+    // checker that pairs a field with the wrong declaration.
+    SLANG_CHECK_ABORT(fieldTypes.getCount() == 3);
+    SLANG_CHECK(fieldTypes[0]->equals(floatType));
+    SLANG_CHECK(fieldTypes[1]->equals(intType));
+    SLANG_CHECK(fieldTypes[2]->equals(floatType));
 }
 
 // A checked declaration can be mangled, and overloads that differ only in
