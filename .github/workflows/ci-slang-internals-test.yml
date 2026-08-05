@@ -30,6 +30,11 @@ on:
       runs-on:
         required: true
         type: string
+      save-sccache:
+        description: "Save sccache to GitHub Actions cache (for populate-sccache on the default branch)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   internals-test:
@@ -133,3 +138,13 @@ jobs:
           fi
 
           "$test_path"
+
+      # Populate the cache from the default branch only, mirroring
+      # ci-slang-build.yml. Pull-request runs restore but never save, so a PR
+      # cannot poison the cache for everyone else.
+      - name: Save sccache cache
+        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
+          key: sccache-internals-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
