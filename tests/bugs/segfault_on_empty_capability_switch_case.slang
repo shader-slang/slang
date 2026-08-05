@@ -1,5 +1,6 @@
 /*
 There was once a bug where all of these capability switch statements caused a segfault.
+https://github.com/shader-slang/slang/pull/12357
 */
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal
