@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T17:13:48Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#namehint-namehintdecoration
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#namehint--namehintdecoration
 //META: doc_section_digest=883eb56d4459110d6c60afc98e0feca78b8411f8e7783e41110d89c26b5c6c56
 //META: purpose=Two distinct user-named functions each carry their own nameHint decoration with the matching source identifier as the string operand.
 //META: intent=functional
