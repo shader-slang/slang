@@ -13996,14 +13996,22 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
                 .modifier = directionModifier});
 
-        // `getExplicitlyDeclaredParamPassingMode` never inspects `ConstModifier`, so without this
-        // a `const groupshared` parameter would reach the read-write default and lower to the same
-        // `BorrowInOutParam` as a bare one -- its read-only-ness staying in the AST only. Give it
-        // the `BorrowModifier` that `__constref` already carries so both yield `BorrowInParam`.
-        if (paramDecl->hasModifier<ConstModifier>() && !paramDecl->hasModifier<BorrowModifier>() &&
-            !paramDecl->hasModifier<RefModifier>())
+        // Give the parameter a passing mode that keeps the reference, since
+        // `getExplicitlyDeclaredParamPassingMode` would otherwise fall through to a by-value
+        // default for the read-only spelling.
+        //
+        // The two spellings cannot take the same modifier. `RefModifier` is the strict reference,
+        // but it also *requires a mutable l-value argument*: the invoke check at
+        // `slang-check-expr.cpp:4284` fires for `RefParamType`, and `ConstModifier` clears
+        // `isLeftValue` (`:1660`), so `const groupshared` + `RefModifier` cannot be called at all.
+        // `BorrowModifier` is what `__constref` carries and passes that check, because
+        // `BorrowInParamType` is a sibling of `RefParamType` rather than a subtype.
+        if (!paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>())
         {
-            addModifier(paramDecl, this->getASTBuilder()->create<BorrowModifier>());
+            if (paramDecl->hasModifier<ConstModifier>())
+                addModifier(paramDecl, this->getASTBuilder()->create<BorrowModifier>());
+            else
+                addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());
         }
     }
 

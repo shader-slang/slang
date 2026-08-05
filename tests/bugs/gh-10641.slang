@@ -32,14 +32,28 @@ groupshared uint groupSharedData[N];
 // array. Each thread writes its own slot, then -- after a barrier -- reads its
 // neighbour's slot, which only yields the right value if the array is genuinely
 // shared across the group rather than copied per invocation.
-// HLSL: void shiftLeftByOne
-// The parameter must survive as a by-reference `groupshared` array (positive
-// signature check), with no per-thread copy of it in the body, and no illegal
-// `groupshared`+direction-keyword pairing.
-// HLSL: groupshared uint {{.*}}scratch
+//
+// The requirement is that both accesses land on the shared global, with no
+// per-thread copy anywhere in between. The parameter is passed by reference, and
+// the helper is then force-inlined on this target, so the checks below name the
+// shared array rather than a surviving function signature -- an inlined body
+// satisfies the requirement too, and pinning the signature would only assert
+// which of the two happened.
+// The negatives are bracketed by positives on both sides, so each is scanned over
+// the region between the shared declaration and the shared store -- exactly where
+// a per-thread copy would have to appear. A trailing `CHECK-NOT` would instead
+// cover only the text after the last positive match.
+// HLSL: groupshared uint {{.*}}groupSharedData
+// The by-value bug copied the shared array into a per-thread local before using
+// it; no such copy may appear between the declaration and the shared store, and
+// a `groupshared` parameter may never carry a direction keyword (DXC rejects it).
 // HLSL-NOT: [int({{[0-9]+}})] = {{.*}}scratch
+// HLSL-NOT: uint {{[A-Za-z_0-9]+}}[int({{[0-9]+}})] = groupSharedData
 // HLSL-NOT: groupshared inout
 // HLSL-NOT: inout groupshared
+// HLSL: groupSharedData{{.*}}] =
+// HLSL: GroupMemoryBarrierWithGroupSync
+// HLSL: outputBuffer{{.*}}] = groupSharedData
 void shiftLeftByOne(uint tid, groupshared uint scratch[N])
 {
     scratch[tid] = tid + 1;
