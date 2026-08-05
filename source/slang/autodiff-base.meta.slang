@@ -1,9 +1,17 @@
-// Eagerly loaded autodiff declarations.
+// Eagerly loaded autodiff declarations (the "base surface"), folded into the core module.
 //
-// Keep declarations here when ordinary user code can name them directly, or when semantic
-// checking needs them without first encountering a differentiability attribute or a
-// differentiation expression. Derivative implementation machinery belongs in diff.meta.slang,
-// which is loaded only after one of those explicit autodiff triggers.
+// Keep a declaration here when ordinary user code can name it directly (e.g. `diffPair`, `detach`,
+// the `update*` helpers, `DiffTensorView`/`TorchTensor`), or when semantic checking reaches it
+// without an explicit autodiff trigger (e.g. the `Array`/`Optional`/`Tuple : IDifferentiable`
+// conformances that aggregate-conformance synthesis needs). This cluster must be eager precisely
+// because those uses have no trigger that could load it on demand.
+//
+// Derivative-implementation machinery belongs in the lazy supplement diff.meta.slang instead. The
+// supplement is loaded only when semantic checking hits a concrete autodiff trigger: a
+// differentiability header modifier (`[Differentiable]` / `[ForwardDifferentiable]` /
+// `[BackwardDifferentiable]`, via `checkDifferentiableCallableCommon`), a `fwd_diff`/`bwd_diff`
+// expression, or a `PrimalSubstituteExpr` synthesized from a `[PrimalSubstitute]`/
+// `[PrimalSubstituteOf]` attribute (both routed through `_checkHigherOrderInvokeExpr`).
 
 // A 'none-type' that acts as a run-time sentinel for zero differentials. This is primarily
 // for internal use.

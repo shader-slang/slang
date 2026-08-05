@@ -265,6 +265,10 @@ public:
 
     ComPtr<ISlangBlob> coreLibraryCode;
     ComPtr<ISlangBlob> hlslLibraryCode;
+    // Source for the eager base-surface segment (autodiff-base.meta.slang), concatenated into the
+    // `Core` builtin module. Distinct from `autodiffLibraryCode` below, which is the lazy
+    // supplement source (diff.meta.slang) compiled/deserialized only as the separate `Autodiff`
+    // builtin module. See `getBuiltinModuleSource`, which routes each to its own module.
     ComPtr<ISlangBlob> autodiffBaseLibraryCode;
     ComPtr<ISlangBlob> glslLibraryCode;
     ComPtr<ISlangBlob> autodiffLibraryCode;
@@ -273,7 +277,9 @@ public:
 
     ComPtr<ISlangBlob> getCoreLibraryCode();
     ComPtr<ISlangBlob> getHLSLLibraryCode();
+    // Base-surface source folded into the `Core` module (eager); see `autodiffBaseLibraryCode`.
     ComPtr<ISlangBlob> getAutodiffBaseLibraryCode();
+    // Supplement source for the standalone lazy `Autodiff` module; see `autodiffLibraryCode`.
     ComPtr<ISlangBlob> getAutodiffLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 

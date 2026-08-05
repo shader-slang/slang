@@ -65,6 +65,10 @@ SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
     const SlangResult loadResult = session->loadAutodiffModuleIfNeeded();
     if (SLANG_FAILED(loadResult))
     {
+        // The load only fails if the embedded supplement blob is corrupt, or a source-only build
+        // fails to compile the supplement on demand. Neither is reachable from a `.slang`
+        // regression test without fault injection, so this diagnostic (38038) has no automated
+        // test; the caller in `_checkHigherOrderInvokeExpr` then returns an error expression.
         m_sink->diagnose(Diagnostics::UnableToLoadAutodiffModule{.location = location});
         return loadResult;
     }
@@ -76,8 +80,13 @@ SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
         return SLANG_OK;
     }
 
-    // Source-compiling a builtin module deliberately suppresses recursive supplement loads.
-    // Its declarations are checked in the current module, so there is no late module to merge.
+    // Reaching here means the load reported success yet produced no module. The only path that does
+    // so is the recursion guard in `loadAutodiffModuleIfNeeded`: while source-compiling a builtin
+    // module it returns SLANG_OK without loading, because that compilation already checks the
+    // supplement's declarations in the current module and there is no separate late module to
+    // merge. Returning SLANG_OK with no merge is therefore correct in that state, so this is a
+    // debug assertion documenting the invariant rather than a release guard — promoting it would
+    // turn a benign, self-consistent path into a crash.
     SLANG_ASSERT(session->isCompilingBuiltinModule());
     return SLANG_OK;
 }

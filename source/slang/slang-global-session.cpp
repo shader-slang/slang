@@ -188,6 +188,11 @@ SlangResult Session::loadAutodiffModuleIfNeeded()
             moduleBlob->getBufferSize());
     }
 
+    // Source-compile fallback, taken only in a `SLANG_EMBED_CORE_MODULE=OFF` build where
+    // `slang_getEmbeddedAutodiffModule()` is null. The standard test binaries embed the blob and
+    // take the branch above, so this runtime path has no automated regression test; it mirrors the
+    // eager core module's own source-only fallback and is exercised at build time when the
+    // no-embed bootstrap compiles the supplement.
     return compileBuiltinModule(slang::BuiltinModuleName::Autodiff, 0);
 }
 
