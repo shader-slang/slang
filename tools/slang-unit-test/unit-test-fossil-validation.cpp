@@ -197,6 +197,81 @@ BlobBuilder makeStructBlob()
     return blob;
 }
 
+/// Build a well-formed blob whose root variant holds a pointer to a `uint32`, or
+/// an optional holding one when `kind` is `OptionalObj`.
+///
+/// The two kinds share a layout shape and a walk path: both store a relative
+/// pointer in place and describe what it points at with the layout's element
+/// layout, and in both cases the target is reached as a pointer target rather
+/// than in place.
+///
+///   0..31   header
+///   32..39  pointer-like layout (kind, element-layout pointer)
+///   40..43  the element's layout (kind = UInt32)
+///   44..47  the variant's content-layout pointer
+///   48..51  the variant's content: the pointer itself
+///   52..55  the pointed-to value
+///
+BlobBuilder makePointerLikeBlob(FossilizedValKind kind)
+{
+    BlobBuilder blob;
+    blob.resize(56);
+    blob.putHeader(48);
+
+    blob.putU32(32, uint32_t(kind));
+    blob.putRelativePtr(36, 40);
+
+    blob.putU32(40, uint32_t(FossilizedValKind::UInt32));
+
+    blob.putRelativePtr(44, 32);
+    blob.putRelativePtr(48, 52);
+    blob.putU32(52, 0xABCDEF01);
+    return blob;
+}
+
+/// Build a well-formed blob whose object graph contains a cycle: a struct whose
+/// second field is a pointer back to the struct itself.
+///
+/// The walk memoizes visited locations and runs off a work list precisely so a
+/// graph like this terminates instead of looping forever. The struct needs a
+/// leading field so the back-pointer sits at a non-zero offset -- a pointer whose
+/// stored offset is zero is how the format spells null, so a self-pointer stored
+/// at the struct's own address could not express the cycle.
+///
+///   0..31   header
+///   32..39  record layout (kind, field count = 2)
+///   40..47  field 0: layout pointer, offset 0
+///   48..55  field 1: layout pointer, offset 4
+///   56..59  field 0's layout (kind = UInt32)
+///   60..67  field 1's layout: a pointer back to the record layout
+///   68..71  the variant's content-layout pointer
+///   72..79  the record: a `uint32`, then the pointer back to the record
+///
+BlobBuilder makeCyclicBlob()
+{
+    BlobBuilder blob;
+    blob.resize(80);
+    blob.putHeader(72);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(36, 2);
+
+    blob.putRelativePtr(40, 56);
+    blob.putU32(44, 0);
+    blob.putRelativePtr(48, 60);
+    blob.putU32(52, 4);
+
+    blob.putU32(56, uint32_t(FossilizedValKind::UInt32));
+
+    blob.putU32(60, uint32_t(FossilizedValKind::Ptr));
+    blob.putRelativePtr(64, 32);
+
+    blob.putRelativePtr(68, 32);
+    blob.putU32(72, 0xABCDEF01);
+    blob.putRelativePtr(76, 72);
+    return blob;
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
@@ -205,6 +280,52 @@ SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
     SLANG_CHECK(isAccepted(makeArrayBlob()));
     SLANG_CHECK(isAccepted(makeStringBlob()));
     SLANG_CHECK(isAccepted(makeStructBlob()));
+    SLANG_CHECK(isAccepted(makePointerLikeBlob(FossilizedValKind::Ptr)));
+    SLANG_CHECK(isAccepted(makePointerLikeBlob(FossilizedValKind::OptionalObj)));
+}
+
+SLANG_UNIT_TEST(fossilValidationHandlesPointerAndOptional)
+{
+    for (auto kind : {FossilizedValKind::Ptr, FossilizedValKind::OptionalObj})
+    {
+        // A pointer whose target is outside the blob.
+        auto blob = makePointerLikeBlob(kind);
+        blob.putI32(48, 0x7F000000);
+        SLANG_CHECK(!isAccepted(blob));
+
+        // A layout that names no element layout, so nothing describes what the
+        // pointer points at.
+        blob = makePointerLikeBlob(kind);
+        blob.putI32(36, 0);
+        SLANG_CHECK(!isAccepted(blob));
+
+        // A target that is in bounds but whose value runs off the end.
+        blob = makePointerLikeBlob(kind);
+        blob.putRelativePtr(48, 54);
+        SLANG_CHECK(!isAccepted(blob));
+    }
+
+    // A null pointer is legal for both kinds -- for an optional it is how absence
+    // is spelled -- and must be accepted rather than followed.
+    for (auto kind : {FossilizedValKind::Ptr, FossilizedValKind::OptionalObj})
+    {
+        auto blob = makePointerLikeBlob(kind);
+        blob.putI32(48, 0);
+        SLANG_CHECK(isAccepted(blob));
+    }
+}
+
+SLANG_UNIT_TEST(fossilValidationTerminatesOnCyclicGraph)
+{
+    // Accepting this at all is the assertion: without the visited set the walk
+    // would follow the back-pointer forever.
+    SLANG_CHECK(isAccepted(makeCyclicBlob()));
+
+    // The cycle must not mask a bad location either -- corrupting the
+    // back-pointer still has to be caught.
+    auto blob = makeCyclicBlob();
+    blob.putI32(76, 0x7F000000);
+    SLANG_CHECK(!isAccepted(blob));
 }
 
 SLANG_UNIT_TEST(fossilValidationRejectsMalformedString)
