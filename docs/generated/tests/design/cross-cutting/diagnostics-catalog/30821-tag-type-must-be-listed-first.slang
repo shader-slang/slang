@@ -11,7 +11,7 @@
 //META: catalog_name=tag-type-must-be-listed-first
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 interface I {}
 enum E : I, int { A }

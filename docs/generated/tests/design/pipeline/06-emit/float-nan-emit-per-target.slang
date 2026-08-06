@@ -36,7 +36,11 @@ void main(uint3 tid : SV_DispatchThreadID)
 
 // HLSL: (0.0f / 0.0f)
 // GLSL: (0.0 / 0.0)
-// SPIRV: OpConstant %float -0x1.8p+128
+// The NaN produced by folding `x/x` carries a host-dependent sign: x86
+// hosts fold to a negative quiet NaN, aarch64 hosts to a positive one.
+// The claim under test is that a NaN literal reaches the SPIR-V module
+// as a constant, not which sign bit it carries, so match either.
+// SPIRV: OpConstant %float {{-?}}0x1.8p+128
 // METAL: (0.0 / 0.0)
 // WGSL: _slang_getNan()
 // CUDA: (0.0 / 0.0)
