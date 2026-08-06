@@ -523,23 +523,39 @@ SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e5m2)
 SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e5m2)
 #endif
 
-#define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                                 \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal, T##n other)             \
-    {                                                                                         \
-        T##n result;                                                                          \
-        for (int i = 0; i < n; i++)                                                           \
-            *_slang_vector_get_element_ptr(&result, i) =                                      \
-                _slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i); \
-        return result;                                                                        \
+/* Assign the components of a fixed-width vector operation directly, rather than looping with the
+   runtime-index accessors, which reach a component through a reinterpreted element pointer.
+   Dispatch on the width with the preprocessor rather than `if constexpr`: these operators are not
+   templates, so a `.z` or `.w` access would still be diagnosed for a 2-component type even in a
+   discarded `if constexpr` branch. The comparison operators share these bodies with the
+   value-returning ones because `bool##n` declares the same components as `T##n`. */
+#define SLANG_CUDA_VECTOR_BINARY_BODY_2(result, left, right, op) \
+    (result).x = (left).x op(right).x;                           \
+    (result).y = (left).y op(right).y;
+#define SLANG_CUDA_VECTOR_BINARY_BODY_3(result, left, right, op) \
+    SLANG_CUDA_VECTOR_BINARY_BODY_2(result, left, right, op)     \
+    (result).z = (left).z op(right).z;
+#define SLANG_CUDA_VECTOR_BINARY_BODY_4(result, left, right, op) \
+    SLANG_CUDA_VECTOR_BINARY_BODY_3(result, left, right, op)     \
+    (result).w = (left).w op(right).w;
+/* The same `n` must select the body and name the result type: a body wider than the result type is
+   a compile error, but a narrower one silently leaves the trailing components unassigned. */
+#define SLANG_CUDA_VECTOR_BINARY_BODY(n, result, left, right, op) \
+    SLANG_CUDA_VECTOR_BINARY_BODY_##n(result, left, right, op)
+
+#define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                     \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal, T##n other) \
+    {                                                                             \
+        T##n result;                                                              \
+        SLANG_CUDA_VECTOR_BINARY_BODY(n, result, thisVal, other, op)              \
+        return result;                                                            \
     }
-#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                           \
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other)            \
-    {                                                                                           \
-        bool##n result;                                                                         \
-        for (int i = 0; i < n; i++)                                                             \
-            *_slang_vector_get_element_ptr(&result, i) =                                        \
-                (_slang_vector_get_element(thisVal, i) op _slang_vector_get_element(other, i)); \
-        return result;                                                                          \
+#define SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, op)                                \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool##n operator op(T##n thisVal, T##n other) \
+    {                                                                                \
+        bool##n result;                                                              \
+        SLANG_CUDA_VECTOR_BINARY_BODY(n, result, thisVal, other, op)                 \
+        return result;                                                               \
     }
 #define SLANG_CUDA_VECTOR_UNARY_OP(T, n, op)                                                       \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##n operator op(T##n thisVal)                              \
