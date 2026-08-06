@@ -43,7 +43,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     # `-exported_symbols_list` with its own file format: see #12380.
     if(NOT WIN32 AND NOT APPLE)
         set(slang_glslang_version_script
-            "${CMAKE_CURRENT_SOURCE_DIR}/slang-glslang.map"
+            "${CMAKE_CURRENT_SOURCE_DIR}/slang-glslang.version-script"
         )
         add_supported_cxx_linker_flags(
             slang-glslang
