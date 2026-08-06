@@ -406,7 +406,75 @@ BlobBuilder makeRecordWithVariantFieldBlob()
     return blob;
 }
 
+/// Build a blob that is entirely in bounds but whose reachable location set is
+/// quadratic in its own size.
+///
+/// Every location here passes the range checks, so nothing is rejected on those
+/// grounds. The blow-up comes from the memoization key: an array of `count`
+/// elements whose element layout is a record with `fieldCount` fields that all
+/// sit at offset 0 but name *distinct* layouts. Each element reaches `fieldCount`
+/// distinct keys at one address -- distinct only because the layout offset
+/// differs -- so the walk reaches `count * fieldCount` of them.
+///
+///   0..31             header
+///   32..43            container layout (kind, element-layout pointer, stride)
+///   44..51            the element's record layout (kind, field count)
+///   52..               one entry per field: layout pointer, offset 0
+///   fieldLayouts..     one distinct `UInt32` layout per field
+///   ..                 the variant's content-layout pointer and content
+///   ..                 the element count, then the elements themselves
+///
+BlobBuilder makeQuadraticBlob(Size count, Size fieldCount)
+{
+    const Size fieldEntries = 52;
+    const Size fieldLayouts = fieldEntries + 8 * fieldCount;
+    const Size variantLayoutPtr = fieldLayouts + 4 * fieldCount;
+    const Size variantContent = variantLayoutPtr + 4;
+    const Size countWord = variantContent + 4;
+    const Size elements = countWord + 4;
+
+    BlobBuilder blob;
+    blob.resize(elements + 4 * count);
+    blob.putHeader(variantContent);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::ArrayObj));
+    blob.putRelativePtr(36, 44);
+    blob.putU32(40, 4);
+
+    blob.putU32(44, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(48, uint32_t(fieldCount));
+
+    for (Size i = 0; i < fieldCount; ++i)
+    {
+        blob.putRelativePtr(fieldEntries + 8 * i, fieldLayouts + 4 * i);
+        blob.putU32(fieldEntries + 8 * i + 4, 0);
+        blob.putU32(fieldLayouts + 4 * i, uint32_t(FossilizedValKind::UInt32));
+    }
+
+    blob.putRelativePtr(variantLayoutPtr, 32);
+    blob.putRelativePtr(variantContent, elements);
+    blob.putU32(countWord, uint32_t(count));
+    return blob;
+}
+
 } // namespace
+
+SLANG_UNIT_TEST(fossilValidationBoundsTotalWork)
+{
+    // Memoizing on (data, layout, form) stops the walk looping on a cyclic graph,
+    // but it does not bound how many distinct locations exist: one address paired
+    // with many distinct layouts multiplies out. Without a work cap this blob is
+    // accepted, after churning through count * fieldCount locations -- which for a
+    // slightly larger blob is enough memory to take the process down. Since the
+    // walk exists to make hostile input safe to load, running out of memory on it
+    // is a denial of service rather than an acceptable outcome, so it must be
+    // rejected instead.
+    SLANG_CHECK(!isAccepted(makeQuadraticBlob(768, 768)));
+
+    // The same shape at a size the cap does allow still validates, so the bound
+    // does not reject ordinary blobs that merely share layouts between fields.
+    SLANG_CHECK(isAccepted(makeQuadraticBlob(4, 4)));
+}
 
 SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
 {

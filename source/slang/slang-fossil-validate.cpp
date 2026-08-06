@@ -51,9 +51,11 @@ enum class ValForm
 
 /// Return the number of bytes a value of the given `kind` occupies in place.
 ///
-/// The object-like kinds store only a relative pointer in place, so they are the
-/// same size as a pointer. Records are excluded, because they have no single
-/// in-place size: their extent is described field-by-field by their layout.
+/// Only valid for the scalar and pointer-sized kinds. Records have no single
+/// in-place size -- their extent is described field-by-field by their layout --
+/// and the caller peels records and object kinds off in earlier `switch` cases
+/// before reaching here, so the `default` arm below is an asserted invariant on
+/// the caller rather than a path a crafted blob can drive.
 ///
 static Int64 getInPlaceSizeOfVal(FossilizedValKind kind)
 {
@@ -284,7 +286,37 @@ private:
         if (!_visited.add(key))
             return;
 
+        // Memoizing makes a shared or cyclic graph terminate, but it does not
+        // bound how *many* distinct locations are reachable: one data offset can
+        // pair with many distinct layout offsets, so the reachable set can be
+        // quadratic in the blob's own size rather than linear.
+        //
+        // Consider an array of N elements whose element layout is a record with F
+        // fields that all sit at offset 0 but name distinct layouts. Each element
+        // reaches F distinct locations at a single address, so the walk reaches
+        // N*F of them -- and every one is in bounds, so nothing is rejected and
+        // the walk simply runs until the visited set exhausts memory. A blob of a
+        // few hundred kilobytes is enough to demand gigabytes. That would be a
+        // denial of service inside the walk whose whole purpose is to make
+        // hostile input safe to load, so the total work is capped as well.
+        //
+        SLANG_SERIALIZE_FOSSIL_VALIDATE(Int64(_visited.getCount()) <= _getMaxVisitedLocations());
+
         _workList.add(key);
+    }
+
+    /// Return the most locations this blob is allowed to reach.
+    ///
+    /// A well-formed blob reaches far fewer locations than its own size in bytes,
+    /// because every location is a value its writer emitted and every value costs
+    /// bytes to describe. The multiple below is well above what any well-formed
+    /// blob needs, while still bounding the quadratic case above.
+    ///
+    Int64 _getMaxVisitedLocations() const
+    {
+        static const Int64 kMaxLocationsPerByte = 16;
+        static const Int64 kMinLocations = 1024;
+        return kMaxLocationsPerByte * _size + kMinLocations;
     }
 
     /// Validate one location, queueing whatever it refers to.
@@ -408,7 +440,7 @@ private:
             SLANG_SERIALIZE_FOSSIL_VALIDATE(fieldLayoutOffset != kNullOffset);
 
             auto fieldDataOffset =
-                Int64(_read<FossilUInt>(fieldOffset + Int64(sizeof(FossilizedPtr<void>))));
+                Int64(_read<FossilUInt>(fieldOffset + kRecordElementOffsetOffset));
             _queue(dataOffset + fieldDataOffset, fieldLayoutOffset, ValForm::InPlace);
         }
     }
@@ -477,6 +509,7 @@ private:
     static const Int64 kElementLayoutOffset = sizeof(FossilizedValKind);
     static const Int64 kRecordFieldCountOffset = sizeof(FossilizedValKind);
     static const Int64 kRecordFieldsOffset = sizeof(FossilizedRecordLayout);
+    static const Int64 kRecordElementOffsetOffset = sizeof(FossilizedPtr<FossilizedValLayout>);
     static const Int64 kContainerStrideOffset =
         sizeof(FossilizedValKind) + sizeof(FossilizedPtr<FossilizedValLayout>);
 };
@@ -489,6 +522,7 @@ static_assert(sizeof(FossilizedPtrLikeLayout) == 8);
 static_assert(sizeof(FossilizedContainerLayout) == 12);
 static_assert(sizeof(FossilizedRecordLayout) == 8);
 static_assert(sizeof(FossilizedRecordElementLayout) == 8);
+static_assert(offsetof(FossilizedRecordElementLayout, offset) == 4);
 
 } // namespace
 
