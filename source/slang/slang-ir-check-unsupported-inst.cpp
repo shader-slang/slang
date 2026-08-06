@@ -125,9 +125,9 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
 // op-name fallback, or an empty type annotation for WGSL (issue #12367).
 //
 // Host C++ is excluded because its prelude does define `Slang_FuncType`, for `[DllImport]`.
-// The PyTorch binding target is excluded for a weaker reason: its prelude does not define the
-// name either, but every shader shape tried here failed earlier in an unrelated pass, so there
-// is no measured behaviour to base a decision on and no test that could pin one.
+// The set is otherwise limited to targets where a function-typed value has been observed
+// reaching emission and producing invalid output, which is why the PyTorch binding target is
+// absent even though its prelude does not define the name either.
 //
 // `ShaderSharedLibrary` and `ShaderHostCallable` compile through kernel C++
 // (`_getDefaultSourceForTarget`), so without them the undefined name is reported by the
