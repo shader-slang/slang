@@ -475,6 +475,51 @@ BlobBuilder makeQuadraticBlob(Size count, Size fieldCount)
     return blob;
 }
 
+/// Build the quadratic blob's harder variant: every field sits at offset 0 and
+/// names the *same* layout, so all of a record's field locations collapse to one
+/// key.
+///
+/// This is the shape a cap on distinct locations cannot see. Deduplication keeps
+/// the visited set linear in the element count, while the walk still runs one
+/// loop iteration per field per element -- so the work is `count * fieldCount`
+/// while the visited set is only about `2 * count`.
+///
+BlobBuilder makeSharedLayoutQuadraticBlob(Size count, Size fieldCount)
+{
+    const Size fieldEntries = 52;
+    const Size sharedFieldLayout = fieldEntries + 8 * fieldCount;
+    const Size variantLayoutPtr = sharedFieldLayout + 4;
+    const Size variantContent = variantLayoutPtr + 4;
+    const Size countWord = variantContent + 4;
+    const Size elements = countWord + 4;
+
+    BlobBuilder blob;
+    blob.resize(elements + 4 * count);
+    blob.putHeader(variantContent);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::ArrayObj));
+    blob.putRelativePtr(36, 44);
+    blob.putU32(40, 4);
+
+    blob.putU32(44, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(48, uint32_t(fieldCount));
+
+    // Every field entry points at the one shared layout, and every field is at
+    // offset 0 within the record.
+    //
+    for (Size i = 0; i < fieldCount; ++i)
+    {
+        blob.putRelativePtr(fieldEntries + 8 * i, sharedFieldLayout);
+        blob.putU32(fieldEntries + 8 * i + 4, 0);
+    }
+    blob.putU32(sharedFieldLayout, uint32_t(FossilizedValKind::UInt32));
+
+    blob.putRelativePtr(variantLayoutPtr, 32);
+    blob.putRelativePtr(variantContent, elements);
+    blob.putU32(countWord, uint32_t(count));
+    return blob;
+}
+
 /// Build a well-formed blob whose root variant holds a pointer to an optional.
 ///
 /// An optional reached *through a pointer* holds no storage of its own: the walk
@@ -585,6 +630,17 @@ SLANG_UNIT_TEST(fossilValidationBoundsTotalWork)
     // The same shape at a size the cap does allow still validates, so the bound
     // does not reject ordinary blobs that merely share layouts between fields.
     SLANG_CHECK(isAccepted(makeQuadraticBlob(4, 4)));
+
+    // The harder variant: when every field of a record names the same layout at
+    // the same offset, all of that record's field locations collapse to a single
+    // key, so deduplication keeps the visited set linear even though the walk
+    // still runs one iteration per field per element. A cap on distinct locations
+    // cannot see this shape at all -- only a cap on the iterations themselves
+    // rejects it.
+    SLANG_CHECK(!isAccepted(makeSharedLayoutQuadraticBlob(4096, 4096)));
+
+    // And the same shape small enough to be ordinary is still accepted.
+    SLANG_CHECK(isAccepted(makeSharedLayoutQuadraticBlob(4, 4)));
 }
 
 SLANG_UNIT_TEST(fossilValidationHandlesOptionalAsPointerTarget)

@@ -51,11 +51,16 @@ enum class ValForm
 
 /// Return the number of bytes a value of the given `kind` occupies in place.
 ///
-/// Only valid for the scalar and pointer-sized kinds. Records have no single
-/// in-place size -- their extent is described field-by-field by their layout --
-/// and the caller peels records and object kinds off in earlier `switch` cases
-/// before reaching here, so the `default` arm below is an asserted invariant on
-/// the caller rather than a path a crafted blob can drive.
+/// Only valid for the scalar kinds. Its one caller is the `default` arm of
+/// `_visitVal`, which reaches here only after every record and object kind has
+/// been handled by an earlier `case`, so the scalars are all that remain. Records
+/// have no single in-place size at all -- their extent is described field by field
+/// by their layout -- and the object kinds are stored out of line behind a
+/// relative pointer.
+///
+/// The `default` arm below is therefore an asserted invariant on the caller, not a
+/// path a crafted blob can drive: a bad kind byte is rejected by
+/// `_validateLayoutHeader` long before it gets here.
 ///
 static Int64 getInPlaceSizeOfVal(FossilizedValKind kind)
 {
@@ -79,14 +84,6 @@ static Int64 getInPlaceSizeOfVal(FossilizedValKind kind)
     case FossilizedValKind::UInt64:
     case FossilizedValKind::Float64:
         return 8;
-
-    case FossilizedValKind::StringObj:
-    case FossilizedValKind::ArrayObj:
-    case FossilizedValKind::OptionalObj:
-    case FossilizedValKind::DictionaryObj:
-    case FossilizedValKind::Ptr:
-    case FossilizedValKind::VariantObj:
-        return sizeof(FossilizedPtr<void>);
 
     default:
         SLANG_UNEXPECTED("unhandled fossilized value kind");
@@ -161,6 +158,12 @@ private:
     Int64 _size = 0;
     HashSet<ValKey> _visited;
     List<WorkItem> _workList;
+
+    /// Loop iterations spent walking record fields and container elements, which
+    /// `_chargeWork()` bounds. Counted separately from `_visited` because
+    /// deduplication makes the two diverge; see `_chargeWork()`.
+    ///
+    Int64 _workDone = 0;
 
     /// Require that `[offset, offset + rangeSize)` lies within the blob.
     ///
@@ -298,14 +301,38 @@ private:
         // the walk simply runs until the visited set exhausts memory. A blob of a
         // few hundred kilobytes is enough to demand gigabytes. That would be a
         // denial of service inside the walk whose whole purpose is to make
-        // hostile input safe to load, so the total work is capped as well.
+        // hostile input safe to load, so the reachable set is capped.
         //
-        SLANG_SERIALIZE_FOSSIL_VALIDATE(Int64(_visited.getCount()) <= _getMaxVisitedLocations());
+        // This bounds memory, not time: an iteration that lands on an
+        // already-visited key returns above without ever reaching here. Time is
+        // bounded separately, by `_chargeWork()` at the loops themselves.
+        //
+        SLANG_SERIALIZE_FOSSIL_VALIDATE(Int64(_visited.getCount()) <= _getMaxWork());
 
         _workList.add(key);
     }
 
-    /// Return the most locations this blob is allowed to reach.
+    /// Charge one unit of walk work, and reject the blob once the total exceeds
+    /// what a blob of this size is allowed to cost.
+    ///
+    /// This is charged per loop iteration rather than per queued location, because
+    /// deduplication makes those two very different quantities. A record whose
+    /// fields all sit at offset 0 and all name the *same* layout collapses every
+    /// one of its field locations to a single key: the visited set grows by one
+    /// while the loop still runs once per field. An array of N such records
+    /// therefore costs N*F iterations while the visited set stays at about 2N, so
+    /// a bound on the visited set alone never fires -- and N*F is quadratic in the
+    /// blob's size, which is a denial of service in the walk that exists to make
+    /// hostile input safe to load.
+    ///
+    void _chargeWork()
+    {
+        _workDone++;
+        SLANG_SERIALIZE_FOSSIL_VALIDATE(_workDone <= _getMaxWork());
+    }
+
+    /// Return the most work this blob is allowed to cost, counting both the
+    /// locations it reaches and the loop iterations it takes to reach them.
     ///
     /// A well-formed blob reaches fewer locations than it has bytes, because every
     /// location is a value its writer emitted and every value costs bytes to
@@ -320,11 +347,11 @@ private:
     /// the input size. Raising the multiple raises that amplification proportionally,
     /// which matters because the blobs this cap exists to stop are hostile ones.
     ///
-    Int64 _getMaxVisitedLocations() const
+    Int64 _getMaxWork() const
     {
-        static const Int64 kMaxLocationsPerByte = 2;
-        static const Int64 kMinLocations = 1024;
-        return kMaxLocationsPerByte * _size + kMinLocations;
+        static const Int64 kMaxWorkPerByte = 2;
+        static const Int64 kMinWork = 1024;
+        return kMaxWorkPerByte * _size + kMinWork;
     }
 
     /// Validate one location, queueing whatever it refers to.
@@ -441,6 +468,8 @@ private:
         auto fieldCount = Int64(_read<FossilUInt>(layoutOffset + kRecordFieldCountOffset));
         for (Int64 i = 0; i < fieldCount; ++i)
         {
+            _chargeWork();
+
             auto fieldOffset = layoutOffset + kRecordFieldsOffset +
                                i * Int64(sizeof(FossilizedRecordElementLayout));
 
@@ -477,6 +506,16 @@ private:
         if (elementCount == 0)
             return;
 
+        // The stride comes from the blob, so a hostile one may name any positive
+        // value. Only positivity is required, because a wrong-but-positive stride
+        // cannot produce an out-of-bounds read: it only changes where each element
+        // is said to begin, and every one of those elements is queued and then has
+        // its own extent proven from its own layout before anything reads it. So a
+        // bad stride mis-groups elements, and the per-element walk rejects whatever
+        // then falls outside the blob. Zero is excluded separately because it would
+        // make the extent check below vacuous while still yielding `elementCount`
+        // elements all at the same address.
+        //
         auto elementStride = Int64(_read<FossilUInt>(layoutOffset + kContainerStrideOffset));
         SLANG_SERIALIZE_FOSSIL_VALIDATE(elementStride > 0);
 
@@ -493,6 +532,7 @@ private:
         auto elementLayoutOffset = _getElementLayoutOffset(layoutOffset);
         for (Int64 i = 0; i < elementCount; ++i)
         {
+            _chargeWork();
             _queue(objOffset + i * elementStride, elementLayoutOffset, ValForm::InPlace);
         }
     }
