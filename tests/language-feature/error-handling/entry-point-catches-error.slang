@@ -8,7 +8,8 @@
 // error handling *inside* an entry point must keep working, on both the success and the
 // failure path. Lane 0 takes the throwing path; lanes 1..3 take the returning path.
 
-// The thrown error code is printed in hex, the returned lane values in decimal.
+// The buffer is dumped in hex, so lane 0 shows the thrown 0xBAD as BAD; lanes 1-3 read the same
+// in either base.
 // CHECK: BAD
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
