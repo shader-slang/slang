@@ -275,8 +275,8 @@ struct TransformParamsToConstRefContext
     //
     // The argument ends up `ConstRef<T, CudaKernelParam>` while the callee slot stays
     // `ConstRef<T, Generic>`. Do not "fix" that by giving both the same atom: this atom is what
-    // makes the emitter print a parameter as by-value `T p` instead of `T*`, so a callee carrying it
-    // would declare `readsum_0(Big_0 b_0, ...)` yet still be called as `readsum_0(&big_0, ...)`,
+    // makes the emitter print a parameter as by-value `T p` instead of `T*`, so a callee carrying
+    // it would declare `readsum_0(Big_0 b_0, ...)` yet still be called as `readsum_0(&big_0, ...)`,
     // which NVRTC rejects. `cuda-forward-uniform-struct-forward.slang` pins both spellings.
     IRInst* forwardParamStorageAddress(IRParam* param)
     {
