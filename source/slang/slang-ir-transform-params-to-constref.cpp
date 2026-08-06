@@ -232,7 +232,7 @@ struct TransformParamsToConstRefContext
     // Returns the validated `IRParam` on success so the caller can forward it without repeating the
     // cast, and null when `arg` is not forwardable - so `forwardParamStorageAddress`'s non-null
     // precondition is carried by the return value rather than left to a duplicated `as<IRParam>`.
-    IRParam* getForwardableParamStorage(IRInst* arg)
+    IRParam* findForwardableParamStorage(IRInst* arg)
     {
         auto param = as<IRParam>(arg);
         if (!param)
@@ -284,7 +284,7 @@ struct TransformParamsToConstRefContext
     // its in-kernel value reads are redirected through one inserted `IRLoad` so they still observe
     // a `T`. Returns `param` itself, not a freshly-built address instruction.
     //
-    // Precondition: `param` came from `getForwardableParamStorage`, which guarantees no surviving
+    // Precondition: `param` came from `findForwardableParamStorage`, which guarantees no surviving
     // call use reads the parameter by value.
     IRInst* forwardParamStorageAddress(IRParam* param)
     {
@@ -299,7 +299,7 @@ struct TransformParamsToConstRefContext
         // Collect the value reads before changing anything. Call arguments are excluded: they
         // either forward the pointer or belong to the old calls `updateCallSites` is about to
         // discard, and the precondition guarantees none of them reads the parameter by value -
-        // `getForwardableParamStorage` returned it, which means every call use of `param`
+        // `findForwardableParamStorage` returned it, which means every call use of `param`
         // lands in a callee slot this pass rewrites to a `borrow in` pointer, so no surviving call
         // reads it as a `T`.
         List<IRUse*> readUses;
@@ -373,20 +373,32 @@ struct TransformParamsToConstRefContext
                     newArgs.add(addr);
                 }
                 else if (
-                    auto forwardable =
-                        forwardEntryPointUniformAddress ? getForwardableParamStorage(arg) : nullptr)
+                    auto forwardable = forwardEntryPointUniformAddress
+                                           ? findForwardableParamStorage(arg)
+                                           : nullptr)
                 {
                     // Forward the aggregate by address instead of copying it into a per-thread
                     // temporary - the #11774 slowdown.
                     //
                     // The forwarded argument is `ConstRef<T, CudaKernelParam>` while the callee
-                    // slot stays `ConstRef<T, Generic>` (set in `processFunc`). That address-space
-                    // divergence between argument and parameter is deliberate: each side is emitted
-                    // independently and they agree in C++ (`&p` into a `T*` slot). Nothing between
-                    // here and CUDA emit compares a call argument's address space against its
-                    // callee's - `slang-ir-validate.cpp` does not type-check call arguments against
-                    // callee parameters - so the mismatch is inert. A call-type check added there
-                    // would need to permit this pairing.
+                    // slot stays `ConstRef<T, Generic>` (set in `processFunc`). The address spaces
+                    // must differ, because this atom is what tells the CPP emitter to print a
+                    // parameter as by-value `T p` rather than `T*` (`emitSimpleTypeImpl`'s
+                    // `kIROp_BorrowInParamType` case). The entry point wants that by-value spelling
+                    // to keep its kernel ABI; the callee must keep `T*` so it can receive the
+                    // address. Giving the callee slot `CudaKernelParam` too makes it declare
+                    // `readsum_0(Big_0 b_0, ...)` while still being called as
+                    // `readsum_0(&big_0, ...)` - a pointer into a by-value parameter, which NVRTC
+                    // rejects. The divergence is the mechanism, not an oversight.
+                    //
+                    // Nothing between here and CUDA emit compares the two: `validateIRInstOperand`
+                    // in `slang-ir-validate.cpp` checks operand back-pointers and that a def
+                    // dominates its uses, never an argument's type against the callee's parameter
+                    // type. A future call-argument type check there must permit this pairing.
+                    // `cuda-forward-uniform-struct-forward.slang` pins both halves in the emitted
+                    // text - the by-value `computeMain(Big_0 big_0, ...)` and the pointer-taking
+                    // `readsum_0(Big_0 * b_0, ...)` it is passed to - so collapsing the two atoms
+                    // into one fails that test rather than silently changing the ABI.
                     //
                     // No write can reach the forwarded storage: an `IRStore` destination must be
                     // pointer-typed and a by-value `IRParam` is an SSA value, so the front end
