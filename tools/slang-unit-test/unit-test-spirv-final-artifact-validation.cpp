@@ -4,9 +4,9 @@
 // pipeline step replaces.
 //
 // The optimize step and the debug-strip inside it each replace the artifact, so validating before
-// them checks bytes the caller never gets. That difference is invisible in the compiler's output --
-// validation is read-only, and every artifact in the tree is valid under either ordering -- so the
-// only way to observe which module was inspected is to watch the validator itself.
+// them checks bytes the caller never gets. Validation is read-only, so when the module is
+// acceptable either way the compiler's output and diagnostics are identical under both orderings;
+// the only way to observe which module was inspected is to watch the validator itself.
 //
 // These tests install a fake `slang-glslang` whose validator records the module size it was handed
 // and whose optimizer returns a module of a deliberately different size. Comparing the recorded
@@ -29,8 +29,11 @@ namespace
 {
 
 // What the fake validator saw. Sizes are in 32-bit words, as `glslang_validateSPIRV` receives them.
+// Every call is recorded, not just the last, because `-separate-debug-info` produces two shipped
+// modules and the test needs to see which sizes were presented across both calls.
 int gValidatedWordCount = -1;
 int gValidatorCallCount = 0;
+List<int> gValidatedWordCounts;
 
 // The word count the fake optimizer produced, so a test can compare what was validated against
 // what the optimize step actually returned rather than against a hardcoded expectation.
@@ -40,6 +43,7 @@ bool fakeValidateRecordingSize(const uint32_t* contents, int contentsSize)
 {
     SLANG_UNUSED(contents);
     gValidatedWordCount = contentsSize;
+    gValidatedWordCounts.add(contentsSize);
     ++gValidatorCallCount;
     return true;
 }
@@ -152,10 +156,15 @@ protected:
 // Compile a trivial compute entry point to SPIR-V with validation forced on and the optimizer
 // enabled, through the fake `slang-glslang`. Returns the size of the module the caller received,
 // in 32-bit words, or -1 if no module came back.
-int compileAndReturnShippedWordCount()
+//
+// With `separateDebugInfo` the debug-strip step runs too, replacing the artifact a second time
+// after the optimizer already replaced it once. That distinguishes validating the final module from
+// validating merely the optimizer's output.
+int compileAndReturnShippedWordCount(bool separateDebugInfo = false)
 {
     gValidatedWordCount = -1;
     gValidatorCallCount = 0;
+    gValidatedWordCounts.clear();
     gOptimizedWordCount = -1;
 
     ComPtr<slang::IGlobalSession> globalSession;
@@ -169,13 +178,29 @@ int compileAndReturnShippedWordCount()
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
 
-    // A non-zero optimization level is what makes the compiler run the optimize step at all.
+    // This test selects a non-zero optimization level so the optimize step runs.
+    List<slang::CompilerOptionEntry> options;
     slang::CompilerOptionEntry optimization = {};
     optimization.name = slang::CompilerOptionName::Optimization;
     optimization.value.kind = slang::CompilerOptionValueKind::Int;
     optimization.value.intValue0 = SLANG_OPTIMIZATION_LEVEL_DEFAULT;
-    targetDesc.compilerOptionEntries = &optimization;
-    targetDesc.compilerOptionEntryCount = 1;
+    options.add(optimization);
+    if (separateDebugInfo)
+    {
+        slang::CompilerOptionEntry debugLevel = {};
+        debugLevel.name = slang::CompilerOptionName::DebugInformation;
+        debugLevel.value.kind = slang::CompilerOptionValueKind::Int;
+        debugLevel.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
+        options.add(debugLevel);
+
+        slang::CompilerOptionEntry separate = {};
+        separate.name = slang::CompilerOptionName::EmitSeparateDebug;
+        separate.value.kind = slang::CompilerOptionValueKind::Int;
+        separate.value.intValue0 = 1;
+        options.add(separate);
+    }
+    targetDesc.compilerOptionEntries = options.getBuffer();
+    targetDesc.compilerOptionEntryCount = (uint32_t)options.getCount();
 
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
@@ -255,6 +280,28 @@ SLANG_UNIT_TEST(spirvValidationInspectsShippedArtifact)
     // ordering would have recorded `shippedWordCount + 1`.
     SLANG_CHECK(shippedWordCount == gOptimizedWordCount);
 
-    // The claim: what was validated is what shipped.
     SLANG_CHECK(gValidatedWordCount == shippedWordCount);
+}
+
+// The optimize step is not the only one that replaces the artifact: under `-separate-debug-info`
+// the debug-strip runs afterwards and replaces it again. Validation must still see that final
+// module, so this covers the second replacement path -- a validation call sitting between the
+// optimize and the strip would satisfy the test above while failing this one.
+SLANG_UNIT_TEST(spirvValidationInspectsStrippedArtifact)
+{
+    const int shippedWordCount = compileAndReturnShippedWordCount(true);
+
+    SLANG_CHECK(shippedWordCount > 0);
+    SLANG_CHECK(gOptimizedWordCount > 0);
+
+    // The strip must actually have removed something, otherwise the stripped and unstripped modules
+    // are the same size and this test cannot tell which one the validator was handed.
+    SLANG_CHECK(shippedWordCount < gOptimizedWordCount);
+
+    // Both modules the caller receives are validated: the stripped main artifact and the debug
+    // companion written as `.dbg.spv`, which keeps the instructions the strip removed.
+    SLANG_CHECK(gValidatorCallCount == 2);
+    SLANG_CHECK(gValidatedWordCounts.getCount() == 2);
+    SLANG_CHECK(gValidatedWordCounts[0] == shippedWordCount);
+    SLANG_CHECK(gValidatedWordCounts[1] == gOptimizedWordCount);
 }

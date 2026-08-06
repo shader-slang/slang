@@ -3286,9 +3286,6 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
     return false;
 }
 
-// Validates the SPIR-V module that `artifact` currently holds, and fails the compile if it is
-// rejected or if no validator was available.
-//
 // The blob is loaded here rather than passed in, so the bytes validated are necessarily the bytes
 // the artifact holds; the same words feed the disassembly on the failure path, so a reported module
 // always matches the one that was rejected.
@@ -3519,17 +3516,27 @@ static SlangResult createArtifactFromIR(
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
+        SLANG_RETURN_ON_FAIL(
+            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+
         // Validate here, where `artifact` is final: the optimize step and the debug-strip within it
-        // each replace it, so validating any earlier checks bytes the caller never receives -- the
-        // optimizer's output at `-O1` and above, and the stripped module under
-        // `-separate-debug-info`.
+        // each replace it, so validating any earlier inspects a predecessor rather than what the
+        // caller receives -- leaving the optimizer's output unchecked at `-O1` and above, and the
+        // stripped module unchecked under `-separate-debug-info`.
+        //
+        // Runs after the downstream diagnostics are forwarded so that a rejected module still
+        // reports what the optimizer had to say about it.
         if (needsValidation)
         {
             SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, artifact));
-        }
 
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+            // `-separate-debug-info` writes the debug module out as its own `.dbg.spv`, so it is a
+            // second module the caller receives and is held to the same rules.
+            if (dbgArtifact)
+            {
+                SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, dbgArtifact));
+            }
+        }
     }
 
     return SLANG_OK;
