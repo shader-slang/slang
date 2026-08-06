@@ -3,8 +3,8 @@
 
 // Regression for shader-slang/slang#8183: a vertex output struct that both nests another struct and
 // has a field with no user semantic must still get varying locations synthesized for WGSL and Metal.
-// Both conditions are required to exercise this path — giving `originalBitangent` a semantic, or
-// removing the nested `Vertex original` member, takes a different path.
+// The nested struct is what makes this shape flatten against a stale result layout; unsemanticed
+// `out` parameters reach the same walk without any nesting (tracked separately on #8183).
 
 struct Vertex
 {
