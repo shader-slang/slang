@@ -8,7 +8,10 @@
 // a type`, and the LLVM path `no template named 'Slang_FuncType'`, neither naming the shader
 // line responsible. `llvm-shader-ir` shares that lowering and crashed outright rather than
 // reporting anything, so the diagnostic replaces a segmentation fault there.
-
+//
+// Left in exhaustive mode deliberately: `//CHECK-NOT:` is inert in a `diag=` test, so
+// exhaustive matching is the only thing asserting that one mistake yields one error. Adding
+// `non-exhaustive` to quiet a future cascading diagnostic would silently drop that.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target shader-sharedlib -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target host-callable -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target llvm-shader-ir -entry computeMain -stage compute

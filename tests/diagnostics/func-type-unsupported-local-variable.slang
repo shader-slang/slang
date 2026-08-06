@@ -5,7 +5,10 @@
 // accepts, so the function type survives on both the local and on `applyIt`'s parameter.
 // Neither is a global or a `KernelContext` field, so this is the shape that pins the
 // check to function bodies as well as to module-level declarations.
-
+//
+// Left in exhaustive mode deliberately: `//CHECK-NOT:` is inert in a `diag=` test, so
+// exhaustive matching is the only thing asserting that one mistake yields one error. Adding
+// `non-exhaustive` to quiet a future cascading diagnostic would silently drop that.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute

@@ -11,7 +11,10 @@
 // One directive per target: the four differ structurally. `introduceExplicitGlobalContext`
 // (C++/CUDA/Metal) moves `gFn` into a `KernelContext` struct field, while WGSL keeps it as
 // a global variable, so the diagnostic is reached through two different shapes.
-
+//
+// Left in exhaustive mode deliberately: `//CHECK-NOT:` is inert in a `diag=` test, so
+// exhaustive matching is the only thing asserting that one mistake yields one error. Adding
+// `non-exhaustive` to quiet a future cascading diagnostic would silently drop that.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute

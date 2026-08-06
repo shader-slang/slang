@@ -11,7 +11,10 @@
 // `cuda` is deliberately absent: it discards the dead field entirely and emits no
 // reference to the function type, so there is nothing to diagnose there. That target's
 // silence is correct behaviour, not a missing diagnostic.
-
+//
+// Left in exhaustive mode deliberately: `//CHECK-NOT:` is inert in a `diag=` test, so
+// exhaustive matching is the only thing asserting that one mistake yields one error. Adding
+// `non-exhaustive` to quiet a future cascading diagnostic would silently drop that.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target wgsl -entry computeMain -stage compute
