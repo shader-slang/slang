@@ -22,11 +22,23 @@ void computeMain()
 //diag:                  ^^ declaration not allowed here
 //diag:                  ^^ variable definition is not allowed here.
 
+    // check that statement behind labels are checked, too
+    defer test: rest: var v4 : uint = 10;
+//diag:                   ^^ declaration not allowed here
+//diag:                   ^^ variable definition is not allowed here.
+
+    defer uint v5 = 1, v6 = 1;
+//diag:        ^^ declaration not allowed here
+//diag:        ^^ variable definition is not allowed here.
+
     // these used to crash the compiler before 12266 was fixed
     output[0] = v0;
     output[1] = v1;
     output[2] = v2;
     output[3] = v3;
+    output[4] = v4;
+    output[5] = v5;
+    output[6] = v6;
 
     // type declarations
     defer typealias T1 = uint;

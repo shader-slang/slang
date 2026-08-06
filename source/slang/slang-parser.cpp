@@ -6877,11 +6877,23 @@ static bool peekTypeName(Parser* parser)
 // See also https://github.com/shader-slang/slang/issues/12296
 static void checkForValidSubstatementType(Parser* parser, Stmt* substmt)
 {
-    // declaration statements are never allowed as substatements
+    // We're actually interested in the nested statement, not the label
+    // statement per se.
+    while (auto labelStmt = as<LabelStmt>(substmt))
+        substmt = labelStmt->innerStmt;
+
+    // Declaration statements are never allowed as substatements
     if (auto declStmt = as<DeclStmt>(substmt))
     {
         StringBuilder sb;
         DeclBase* decl = declStmt->decl;
+
+        // If this is a group declaration (e.g., "uint a, b, c;"), diagnose the
+        // first member declaration for better clarity
+        if (auto declGroup = as<DeclGroup>(decl))
+            if (declGroup->decls.getCount() > 0U)
+                decl = declGroup->decls.getFirst();
+
         printDiagnosticArg(sb, decl->astNodeType);
         parser->sink->diagnose(
             Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
