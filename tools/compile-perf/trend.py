@@ -67,9 +67,9 @@ def classify_metric(ratio, delta, rel, warn_rel, abs_floor):
     or filesystem), and it is the seam a per-counter floor plugs into — see
     the note at the call site.
 
-    The bands assume warn_rel < rel, which main() enforces at parse time; at
-    ratio == rel the metric is an error, since `rel` is documented as the
-    threshold at which the nightly fails."""
+    The bands assume warn_rel < rel, which check_threshold_order enforces at
+    parse time; at ratio == rel the metric is an error, since `rel` is
+    documented as the threshold at which the nightly fails."""
     if delta < abs_floor:
         return None
     if ratio >= rel:
@@ -77,6 +77,29 @@ def classify_metric(ratio, delta, rel, warn_rel, abs_floor):
     if ratio >= warn_rel:
         return "warning"
     return None
+
+
+def check_threshold_order(rel, warn_rel):
+    """Raise SystemExit unless the warning band sits STRICTLY below the error
+    band; return None when the pair is usable.
+
+    A function rather than an inline `if` in main() so that the guard itself —
+    not a second copy of its condition — is what the self-checks exercise. A
+    separate predicate returning a bool would be a second source of truth for
+    the relation, and could drift from the branch that actually rejects.
+
+    Equal thresholds are rejected as well as inverted ones, which is why the
+    comparison is `>=` and not `>`: at warn_rel == rel, classify_metric's
+    error branch matches every ratio the warning branch would have, so the
+    warning tier does not misfire — it silently ceases to exist. Inversion is
+    worse still: the error branch claims the whole warning band, so every
+    5-10% move fails the nightly, which is the alert fatigue the two-tier gate
+    was added to remove."""
+    if warn_rel >= rel:
+        raise SystemExit(f"--warn-rel ({warn_rel}) must be < --rel ({rel}): "
+                         f"the warning band sits below the error band, and a "
+                         f"pair that is equal or inverted silently promotes "
+                         f"every warning-level change to an error")
 
 
 def main():
@@ -127,18 +150,9 @@ def main():
                     help="judge the point with this label instead of the last point")
     args = ap.parse_args()
 
-    # The two-tier gate is only meaningful when the warning band sits BELOW
-    # the error band; argparse cannot express the relation. An inverted pair
-    # does not merely produce no warnings — classify_metric's error branch
-    # claims the whole warning band first, so every 5-10% mover becomes an
-    # ERROR and the nightly starts failing on noise, which is the alert
-    # fatigue this gate exists to remove. Fail loudly rather than run
-    # backwards.
-    if args.warn_rel >= args.rel:
-        raise SystemExit(f"--warn-rel ({args.warn_rel}) must be < --rel "
-                         f"({args.rel}): the warning band sits below the "
-                         f"error band, and an inverted pair silently "
-                         f"promotes every warning-level change to an error")
+    # argparse cannot express a relation between two options, so the gate's
+    # central precondition is checked here. See check_threshold_order.
+    check_threshold_order(args.rel, args.warn_rel)
 
     tpath = os.path.join(args.results, "tracking", "tracking.json")
     if not os.path.exists(tpath):
@@ -234,6 +248,13 @@ def main():
     # not fail the job. A regression is already carried by the exit code
     # (steps.trend.outcome == 'failure'), so an `errors` key would be a second
     # spelling of the same fact — one that no reader would notice going stale.
+    #
+    # This write must stay AHEAD of every path that leaves main() below — the
+    # clean-night `return` and the regression `SystemExit(1)`. Both are exits
+    # the workflow still reads the output on, and an unwritten key falls back
+    # to the step's `|| '0'`, which reports a warnings-only night as clean:
+    # the one state this key exists to distinguish. Classify, emit, then
+    # report — do not move reporting logic above this block.
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as fh:
@@ -309,7 +330,20 @@ assert classify_metric(1.50, _ABS, _REL, _WARN, _ABS) == "error", \
 assert classify_metric(0.5, -50.0, _REL, _WARN, _ABS) is None, \
     "an improvement must never be classified as a regression"
 
-del _REL, _WARN, _ABS
+# The threshold-order guard, exercised through the real function rather than
+# a restatement of its condition. The shipped defaults must pass; an EQUAL
+# pair must be rejected as firmly as an inverted one, since it erases the
+# warning tier just as completely — that is the >=-vs-> boundary, and it is
+# the one-character regression this block exists to catch.
+check_threshold_order(_REL, _WARN)
+for _bad in ((_REL, _REL), (_WARN, _REL)):
+    try:
+        check_threshold_order(*_bad)
+    except SystemExit:
+        pass
+    else:
+        raise AssertionError(f"check_threshold_order{_bad} must be rejected")
+del _REL, _WARN, _ABS, _bad
 
 
 if __name__ == "__main__":
