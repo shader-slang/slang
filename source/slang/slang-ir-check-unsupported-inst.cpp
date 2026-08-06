@@ -124,29 +124,29 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
 // C++/CUDA kernels (defined only in `slang-cpp-host-prelude.h`), `Func<...>` from Metal's
 // op-name fallback, or an empty type annotation for WGSL (issue #12367).
 //
-// Host C++ is not in this set because its prelude does define `Slang_FuncType`, for
-// `[DllImport]`; the PyTorch binding target is, because the torch prelude does not.
+// Host C++ is excluded because its prelude does define `Slang_FuncType`, for `[DllImport]`.
+// The PyTorch binding target is excluded as well: its own prelude does not define the name
+// either, but no shader reaches emission on it today (an unrelated pass asserts first), so
+// there is no observable behaviour to check and no test that could pin one.
 //
-// `ShaderSharedLibrary` and `ShaderHostCallable` are included because they compile through
-// kernel C++ (see `_getDefaultSourceForTarget`), so without them the undefined name reaches
-// the downstream C++ compiler instead of a Slang diagnostic. Their LLVM path provides no
-// function-type support either.
+// `ShaderSharedLibrary` and `ShaderHostCallable` compile through kernel C++
+// (`_getDefaultSourceForTarget`), so without them the undefined name is reported by the
+// downstream compiler -- `'Slang_FuncType' does not name a type` from gcc -- rather than here.
 static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
 {
-    if (isMetalTarget(target) || isWGPUTarget(target))
-        return true;
-
     switch (target->getTarget())
     {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::ShaderHostCallable:
-    case CodeGenTarget::ShaderObjectCode:
         return true;
     default:
-        break;
+        return isMetalTarget(target) || isWGPUTarget(target);
     }
-
-    return isKernelCPPOrCUDASourceTarget(target);
 }
 
 // True if `type` is a function type, or an array of one, looking through the pointer that a
