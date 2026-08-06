@@ -3714,12 +3714,16 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 /// checker rejects infinite-size types), so the depth limit is only a safety guard.
 static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, int depth)
 {
-    // Guard against malformed programs that produce deeply nested or cyclic type graphs.
-    // kMaxTypeNestingDepth matches the limit used by other recursive type walkers in this
-    // codebase (slang-type-layout.cpp, slang-check-decl.cpp). Valid programs have
-    // finite-depth struct layouts, so this limit is only a safety guard.
+    // Guard against pathologically deep type graphs (e.g. a 143-level acyclic chain with
+    // Atomic<T> at the bottom). kMaxTypeNestingDepth matches the limit used by other
+    // recursive type walkers (slang-type-layout.cpp, slang-check-decl.cpp). Unlike those
+    // walkers (which emit a diagnostic and fail with an error return), we must be
+    // conservative: returning true (non-copyable) is safe — at worst it causes an
+    // unnecessary BorrowInOut→Ref promotion, which is never incorrect. Returning false
+    // (copyable) risks silently skipping the promotion for a type that actually contains
+    // Atomic<T>, producing invalid SPIR-V.
     if (depth >= (int)kMaxTypeNestingDepth)
-        return false;
+        return true;
     // Unwrap modifier wrappers (e.g. NoDiffType applied to `this` by autodiff)
     // so the underlying type is visible.
     type = unwrapModifiedType(type);
