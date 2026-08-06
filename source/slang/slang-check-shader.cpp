@@ -1729,6 +1729,19 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
+    // An entry point is invoked by the pipeline, which has no channel for returning an error,
+    // so it cannot declare `throws`. `getErrorCodeType` normalizes a missing `throws` clause to
+    // the bottom type, and is the same predicate `_lowerInfoFromFuncParameters` uses to decide
+    // whether to attach `kIROp_FuncThrowTypeAttr`, so the two cannot drift apart.
+    auto astBuilder = linkage->getASTBuilder();
+    if (!getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef())
+             ->equals(astBuilder->getBottomType()))
+    {
+        sink->diagnose(Diagnostics::EntryPointCannotThrow{
+            .entryPoint = entryPointName,
+            .location = entryPointFuncDecl->loc});
+    }
+
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType)
