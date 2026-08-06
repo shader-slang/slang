@@ -2159,10 +2159,6 @@ static RefPtr<TypeLayout> processSimpleEntryPointParameter(
     return typeLayout;
 }
 
-/// Return true if `varLayout` records a semantic carrying the `SV_` prefix (case-insensitive).
-/// Deliberately narrower than the system-value classification in
-/// `processSimpleEntryPointParameter`, which also accepts `NV_`: no `NV_` semantic reaches this
-/// code with a varying-output resource, so only the `SV_` prefix is relevant.
 static bool hasSVPrefixSemantic(VarLayout* varLayout)
 {
     return varLayout && varLayout->systemValueSemantic.toLower().startsWith("sv_");
@@ -2345,30 +2341,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
             isKhronosTarget(context->getTargetRequest()) && context->stage == Stage::Fragment &&
             hasSVPrefixSemantic(varLayout))
         {
-            // A fragment-shader color output declared with `SV_Target<N>` is, for GLSL/SPIR-V
-            // purposes, an ordinary varying output that belongs at `layout(location = N)`. When no
-            // explicit `[[vk::location]]` is present we would otherwise let the completion pass
-            // auto-assign locations in declaration order, which silently mismatches HLSL (and the
-            // render-target index N) whenever the outputs are declared out of numeric order.
-            // Presetting the `VaryingOutput` location from the `SV_Target<N>` semantic index keeps
-            // GLSL/SPIR-V in agreement with what the user wrote, mirroring the explicit
-            // `[[vk::location(N)]]` path above. WGSL/Metal derive this in the IR-legalization pass
-            // (`fixFieldSemanticsOfFlatStruct`) instead, so this only applies to Khronos targets.
-            //
-            // The `Stage::Fragment` gate is load-bearing, not a narrowing convenience: on SPIR-V a
-            // *vertex* output declared `SV_InstanceID` is also treated as a user-defined varying
-            // (see `processSimpleEntryPointParameter`), so it reaches here with a `VaryingOutput`
-            // resource. Presetting its location would mark it as explicitly bound while a sibling
-            // field with a plain user semantic stays implicitly bound, which is rejected outright
-            // as `MixingImplicitAndExplicitBindingForVaryingParams`. Restricting to fragment
-            // outputs keeps `SV_Target` — where the suffix genuinely *is* the location — the only
-            // semantic whose index is derived here.
-            //
-            // The `VaryingOutput` guard restricts this to the real fragment-color-output case: a
-            // (degenerate) `SV_Target` used as an input has no `VaryingOutput` resource, so it is
-            // skipped and left to the default system-value handling. Note it must stay a lookup
-            // rather than a `findOrAdd`, or every system value would acquire the very resource
-            // whose absence is what excludes it.
+            // Otherwise the completion pass assigns locations in declaration order, disagreeing
+            // with the render-target index whenever `SV_Target<N>`s are declared out of order.
+            // Fragment stage only: a SPIR-V vertex `SV_InstanceID` output is also a user-defined
+            // varying, and presetting it would trip diagnostic 39023 against an implicitly-bound
+            // sibling (tests/bugs/gh-3087-multi-entry-point.slang).
             if (auto typeResInfo = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput);
                 typeResInfo)
             {
@@ -3626,25 +3603,10 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                 auto entryPointRes = paramsStructLayout->findOrAddResourceInfo(rr.kind);
                 auto resultRes = resultLayout->findOrAddResourceInfo(rr.kind);
 
-                // Normally the result's resource index is rebased to the entry point's running
-                // count so multiple top-level varying outputs get distinct, packed locations.
-                //
-                // The exception is a *direct* (non-aggregate) fragment return declared with
-                // `SV_Target<N>`, e.g. `float4 pmain() : SV_Target1`. In that case the result IS
-                // the leaf, and `processEntryPointVaryingParameterDecl` has already set its
-                // `VaryingOutput` index to the render-target index N. Rebasing here would clobber
-                // that N with the running count (0), so `SV_Target1` would wrongly land at
-                // location 0. We therefore preserve the preset index for that one case, matching
-                // the struct-field case (where the field index survives as an offset under the
-                // container's base of 0). `SV_Target` is still the only semantic that can reach a
-                // fragment return's `VaryingOutput`: `processSimpleEntryPointParameter` gives a
-                // system value a varying resource only for a fragment `SV_Target` output or a
-                // SPIR-V `SV_InstanceID` whose direction/stage pairing excludes a fragment return,
-                // and `[[vk::location]]` is not permitted on a return at all.
-                //
-                // Gated on `isKhronosTarget` so this exactly matches the preset above: only Khronos
-                // targets get the preset index, so only they skip the rebase. WGSL/Metal never get
-                // a preset here, so their result layout is rebased exactly as before.
+                // A direct fragment return like `float4 pmain() : SV_Target1` is itself the leaf,
+                // so the usual rebase to the running count would clobber the location already
+                // preset from N. Struct fields are unaffected: their preset index survives as an
+                // offset under the container's base of 0.
                 bool preservePresetSvTargetLocation =
                     isKhronosTarget(context->getTargetRequest()) &&
                     context->stage == Stage::Fragment &&
