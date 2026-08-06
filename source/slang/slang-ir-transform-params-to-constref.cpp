@@ -229,22 +229,15 @@ struct TransformParamsToConstRefContext
     // callee would be handed a pointer for a by-value `T`. An already-forwarded parameter (the
     // multi-forward case) trivially qualifies; it is the pointer to forward again.
     //
-    // Returns the validated `IRParam` on success so the caller can forward it without repeating the
-    // cast, and null when `arg` is not forwardable - so `forwardParamStorageAddress`'s non-null
-    // precondition is carried by the return value rather than left to a duplicated `as<IRParam>`.
+    // Returns the validated `IRParam`, or null when `arg` is not forwardable.
     IRParam* findForwardableParamStorage(IRInst* arg)
     {
         auto param = as<IRParam>(arg);
         if (!param)
             return nullptr;
-        // Already forwarded, so the call-use loop below has already run for it and passed:
-        // `forwardParamStorageAddress` is the only place that ever sets this address space, and it
-        // only runs on a parameter this function just approved. Re-validating would be redundant -
-        // but the shortcut does assume no *new* callee has entered the picture since. That holds
-        // because `updateCallSites` only rebuilds calls that already existed, one per original
-        // call, each keeping its callee; it never routes the parameter to an unseen callee.
-        // A future change that forwarded a parameter into a genuinely new call would have to re-run
-        // the loop rather than land here.
+        // Already forwarded, so the loop below already ran and passed for it:
+        // `forwardParamStorageAddress` is the only producer of this address space, and
+        // `updateCallSites` only rebuilds existing calls, so no unseen callee can have appeared.
         if (isCudaKernelParamBorrowInType(param->getDataType()))
             return param;
         if (!isEntryPointByValueUniformAggregateParam(param))
@@ -258,19 +251,12 @@ struct TransformParamsToConstRefContext
             // `forwardParamStorageAddress` redirects through the one hoisted load.
             if (!call)
                 continue;
-            // Checking the callee rather than the slot it lands in is deliberate. `param` is a
-            // struct/sized-array aggregate and `shouldTransformParam` rewrites every such slot
-            // unconditionally, so a transformable callee necessarily rewrites this one. Querying
-            // the slot directly would not be equivalent: functions are processed in arbitrary
-            // order, and `shouldTransformParam` is a pre-transform predicate that returns false
-            // once a slot has been retyped to `borrow in`, so an already-processed callee would
-            // read as untransformable.
-            //
-            // Both decline reasons keep a by-value callee from being handed a `Big_0 *`, and each
-            // has its own test because they are reached differently.
-            // `cuda-forward-uniform-signature-preserved-callee.slang` covers a callee also used as
-            // a function value; `cuda-forward-uniform-unprocessed-callee.slang` covers one the pass
-            // refuses to rewrite at all (`[CudaDeviceExport]`, externally visible signature).
+            // Test the callee, not the slot the argument lands in: `shouldTransformParam` is a
+            // pre-transform predicate that returns false once a slot is already `borrow in`, and
+            // functions are processed in arbitrary order, so a slot query would depend on visit
+            // order. Declining keeps a by-value callee from being handed a `Big_0 *`; covered by
+            // cuda-forward-uniform-signature-preserved-callee.slang and
+            // cuda-forward-uniform-unprocessed-callee.slang.
             auto callee = as<IRFunc>(call->getCallee());
             if (!callee || !shouldProcessFunction(callee) || hasSignaturePreservingUse(callee))
                 return nullptr;
@@ -287,27 +273,11 @@ struct TransformParamsToConstRefContext
     // Precondition: `param` came from `findForwardableParamStorage`, which guarantees no surviving
     // call use reads the parameter by value.
     //
-    // The forwarded argument is `ConstRef<T, CudaKernelParam>` while the callee slot stays
-    // `ConstRef<T, Generic>` (set in `processFunc`). The address spaces must differ, because this
-    // atom is what tells the CPP emitter to print a parameter as by-value `T p` rather than `T*`
-    // (`emitSimpleTypeImpl`'s `kIROp_BorrowInParamType` case). The entry point wants that by-value
-    // spelling to keep its kernel ABI; the callee must keep `T*` so it can receive the address.
-    // Giving the callee slot `CudaKernelParam` too makes it declare `readsum_0(Big_0 b_0, ...)`
-    // while still being called as `readsum_0(&big_0, ...)` - a pointer into a by-value parameter,
-    // which NVRTC rejects. The divergence is the mechanism, not an oversight.
-    //
-    // Nothing between here and CUDA emit compares the two: `validateIRInstOperand` in
-    // `slang-ir-validate.cpp` checks operand back-pointers and that a def dominates its uses, never
-    // an argument's type against the callee's parameter type. A future call-argument type check
-    // there must permit this pairing. `cuda-forward-uniform-struct-forward.slang` pins both halves
-    // in the emitted text - the by-value `computeMain(Big_0 big_0, ...)` and the pointer-taking
-    // `readsum_0(Big_0 * b_0, ...)` it is passed to - so collapsing the two atoms into one fails
-    // that test rather than silently changing the ABI.
-    //
-    // No write can reach the forwarded storage: an `IRStore` destination must be pointer-typed and
-    // a by-value `IRParam` is an SSA value, so the front end proxies any source-level mutation onto
-    // a fresh local; the callee slot is `borrow in` and copies the pointee before any write. That
-    // is a type-system guarantee, not a convention.
+    // The argument ends up `ConstRef<T, CudaKernelParam>` while the callee slot stays
+    // `ConstRef<T, Generic>`. Do not "fix" that by giving both the same atom: this atom is what
+    // makes the emitter print a parameter as by-value `T p` instead of `T*`, so a callee carrying it
+    // would declare `readsum_0(Big_0 b_0, ...)` yet still be called as `readsum_0(&big_0, ...)`,
+    // which NVRTC rejects. `cuda-forward-uniform-struct-forward.slang` pins both spellings.
     IRInst* forwardParamStorageAddress(IRParam* param)
     {
         auto valueType = param->getDataType();
@@ -466,17 +436,13 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
-    // True if `func` is used in a way that requires its signature to survive this pass unchanged -
-    // anything other than being called or annotated. Three use kinds are treated as benign and do
-    // not preserve the signature: decorations, specialization-dictionary entries (transient
-    // bookkeeping for later specialization/finalization), and being the *callee* operand of a call.
-    // Anything else - taken as a function value, passed as a callback - counts.
+    // True if `func` is used in a way that requires its signature to survive this pass unchanged,
+    // i.e. anything beyond being annotated, called, or named by a specialization-dictionary entry.
+    // Taken as a function value or passed as a callback counts.
     //
-    // Two callers depend on this. `processFunc` uses it to skip rewriting the function at all, and
-    // `findForwardableParamStorage` uses it to decline forwarding an address into it: a function
-    // whose signature is preserved keeps by-value parameters, so handing it a pointer would be an
-    // ABI mismatch (see `cuda-forward-uniform-signature-preserved-callee.slang`). Widening the
-    // benign set therefore relaxes a correctness decision, not just an optimization.
+    // Widening the benign set below relaxes a correctness decision, not just an optimization:
+    // `findForwardableParamStorage` also consults this to decline forwarding an address into a
+    // function that kept by-value parameters, which would be an ABI mismatch.
     bool hasSignaturePreservingUse(IRFunc* func)
     {
         for (auto use = func->firstUse; use; use = use->nextUse)
