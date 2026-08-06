@@ -104,8 +104,17 @@ jobs:
         # Structural lint must pass before slang-test runs — a bundle
         # whose front-matter or //META block is malformed produces
         # spurious slang-test failures that obscure real ones.
+        #
+        # selftest covers the linter's own edge cases; the committed
+        # corpus is kept clean, so `lint` alone only ever proves the
+        # happy path. The design-tree lint is gated here too — it is the
+        # only CI home for the design docs' table/link check, and without
+        # it a doc regeneration can silently reintroduce a non-rendering
+        # table (the exact defect this check was added to catch).
         run: |
           python3 docs/generated/tests/_meta/regenerate.py lint
+          python3 docs/generated/tests/_meta/regenerate.py selftest
+          python3 docs/generated/design/_meta/regenerate.py lint
 
       - name: Run agentic test suite
         id: run-tests

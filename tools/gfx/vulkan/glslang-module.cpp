@@ -1,7 +1,6 @@
 // glslang-module.cpp
 #include "glslang-module.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 

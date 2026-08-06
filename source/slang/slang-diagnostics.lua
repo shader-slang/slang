@@ -254,6 +254,13 @@ err(
 )
 
 err(
+    "spirv-validation-unavailable",
+    115,
+    "SPIR-V validation was requested, but the loaded 'slang-glslang' library does not export 'glslang_validateSPIRV'; no SPIR-V was validated",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -3380,6 +3387,13 @@ err(
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
 )
 
+err(
+    "switch-condition-not-integer",
+    30607,
+    "switch condition must be an integer or enum type",
+    span { loc = "expr:Expr", message = "'switch' condition must be of an integer or enum type, but is of type '~type:Type'" }
+)
+
 -- 310xx: link time specialization
 -- (definitions moved to slang-diagnostics-semantic-checking-7.lua)
 
@@ -4014,15 +4028,15 @@ standalone_note(
 err(
     "case-outside-switch",
     39999,
-    "'case' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'case' not allowed outside of a 'switch' statement" }
+    "'case' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'case' is only allowed in a 'switch' body" }
 )
 
 err(
     "default-outside-switch",
     39999,
-    "'default' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'default' not allowed outside of a 'switch' statement" }
+    "'default' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'default' is only allowed in a 'switch' body" }
 )
 
 err(
