@@ -519,6 +519,12 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
+    // Lets a DebugFunction be scoped to the compilation unit of its own source file. Only
+    // non-included sources have a compilation unit; a function defined in an #include'd or
+    // #line-remapped source has no entry here and is left with a null parent scope (see the
+    // creation site). Populated in generateIRForTranslationUnit before any function is lowered.
+    Dictionary<IRDebugSource*, IRDebugCompilationUnit*> mapDebugSourceToCompilationUnit;
+
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
     // Concrete pack-count witnesses prove facts that have already been checked
@@ -9365,7 +9371,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                lowerStmt(context, targetCase->body);
+                if (targetCase->body != nullptr)
+                {
+                    lowerStmt(context, targetCase->body);
+                }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
@@ -9442,7 +9451,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                lowerStmt(context, targetCase->body);
+                if (targetCase->body != nullptr)
+                {
+                    lowerStmt(context, targetCase->body);
+                }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
@@ -14684,12 +14696,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
+                // Parent the function to the compilation unit of its own source file. Only
+                // non-included files have a compilation unit, so this is null for a function whose
+                // source is an #include'd/__include'd file or a #line-remapped source, and for
+                // every function at Minimal debug level (where no compilation unit is built at
+                // all).
+                IRDebugCompilationUnit* parentScope = nullptr;
+                if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+                {
+                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                        debugSource,
+                        parentScope);
+                }
+
                 auto debugFuncCallee = getBuilder()->emitDebugFunction(
                     nameOperand,
                     locationDecor->getLine(),
                     locationDecor->getCol(),
                     locationDecor->getSource(),
-                    debugType);
+                    debugType,
+                    parentScope);
 
                 // Add a decoration to link the function to its debug function
                 getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
@@ -15440,12 +15466,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         {
             // For Standard and Maximal level, include the source content, otherwise just the
             // path
-            auto debugSource = builder->emitDebugSource(
+            auto debugSource = cast<IRDebugSource>(builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
                 (context->debugInfoLevel >= DebugInfoLevel::Standard || includeSource)
                     ? source->getContent()
                     : UnownedStringSlice(),
-                source->isIncludedFile());
+                source->isIncludedFile()));
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
             // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
@@ -15454,7 +15480,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // SPIR-V emission.
             if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
             {
-                builder->emitDebugCompilationUnit(debugSource);
+                auto compilationUnit =
+                    cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));
+                context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
             }
         }
     }

@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-8
 //META: generated_at=2026-07-02T00:00:00+00:00
 //META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/generated/design/ast-reference/types.md#aggregate-collection-types
+//META: doc_ref=docs/generated/design/ast-reference/types.md#aggregate--collection-types
 //META: doc_section_digest=acec388be6a124a34086d58d95713bb5cd33eeac4b8fcf6534173cfc8ec11143
 //META: purpose=An enum name is usable as a value type; a variable of the enum type holds one of its enumerators and compares by underlying value.
 //META: intent=functional

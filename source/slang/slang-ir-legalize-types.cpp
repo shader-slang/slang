@@ -3822,7 +3822,10 @@ struct IRTypeLegalizationPass
             //
             List<IRInst*> workListCopy = _Move(workList);
 
-            resetScratchDataBit(module->getModuleInst(), kHasBeenAddedScratchBitIndex);
+            // Clear the "on the work list" bit for the whole batch before processing any of it,
+            // since processing one item may re-queue a later one in this same batch.
+            for (auto inst : workListCopy)
+                inst->scratchData &= ~(1ULL << kHasBeenAddedScratchBitIndex);
 
             // Now we simply process each instruction on the copy of
             // the work list, knowing that `processInst` may add additional
@@ -3996,6 +3999,49 @@ struct IRTypeLegalizationPass
     }
 };
 
+// Return true if the module has any work for `legalizeEmptyTypes`, by scanning module-scope globals
+// for a shape the pass rewrites. Over-detection is safe (the pass then no-ops); under-detection
+// would skip a real rewrite.
+//
+// Only the immediate array element is tested, not an array-stripped leaf: element types are
+// hoisted, so a nested `T[a][b]` has its inner `T[b]` as its own global that this loop visits.
+// This also keeps a bare `void` — ubiquitous, e.g. a `void`-returning entry point — from reading
+// as empty and defeating the early-out.
+//
+// Any global `IRGeneric` forces the pass to run: a type used only inside a generic body is not
+// hoisted to global scope, so this scan cannot see it, yet the legalizer would rewrite it.
+// Reachable under `-disable-specialization`.
+static bool hasEmptyTypeLegalizationWork(IRModule* module)
+{
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (as<IRGeneric>(inst))
+            return true;
+
+        auto type = as<IRType>(inst);
+        if (!type)
+            continue;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            // `IRInstListBase::Iterator` defines only `operator!=`, hence the negated form.
+            auto fields = structType->getFields();
+            if (!(fields.begin() != fields.end()))
+                return true;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            if (arrayType->getElementType()->getOp() == kIROp_VoidType)
+                return true;
+        }
+        else if (as<IRPseudoPtrType>(type))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void legalizeTypes(IRTypeLegalizationContext* context)
 {
     IRTypeLegalizationPass pass;
@@ -4160,6 +4206,11 @@ void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, Diag
 
 void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
+    // A globals-scope scan can gate this entry point but not the two above, whose type changes
+    // propagate through function signatures, calls, returns and locals.
+    if (!hasEmptyTypeLegalizationWork(module))
+        return;
+
     IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
