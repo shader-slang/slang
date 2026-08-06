@@ -272,6 +272,95 @@ BlobBuilder makeCyclicBlob()
     return blob;
 }
 
+/// Build a well-formed blob whose root variant holds a dictionary of one
+/// key/value pair.
+///
+/// Dictionaries share `_visitContainerObj` with arrays, but their elements are
+/// records rather than scalars, so this is what exercises a container element
+/// that is itself an aggregate.
+///
+///   0..31   header
+///   32..43  container layout (kind, element-layout pointer, element stride)
+///   44..51  the element's record layout (kind, field count = 2)
+///   52..67  the two field entries: layout pointer and offset for each
+///   68..71  both fields' layout (kind = UInt32)
+///   72..75  the variant's content-layout pointer
+///   76..79  the variant's content: a pointer to the dictionary object
+///   80..83  the element count, which sits *before* the object
+///   84..91  the single key/value pair
+///
+BlobBuilder makeDictionaryBlob()
+{
+    BlobBuilder blob;
+    blob.resize(92);
+    blob.putHeader(76);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::DictionaryObj));
+    blob.putRelativePtr(36, 44);
+    blob.putU32(40, 8);
+
+    blob.putU32(44, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(48, 2);
+    blob.putRelativePtr(52, 68);
+    blob.putU32(56, 0);
+    blob.putRelativePtr(60, 68);
+    blob.putU32(64, 4);
+
+    blob.putU32(68, uint32_t(FossilizedValKind::UInt32));
+
+    blob.putRelativePtr(72, 32);
+    blob.putRelativePtr(76, 84);
+    blob.putU32(80, 1);
+    blob.putU32(84, 0xAAAAAAAA);
+    blob.putU32(88, 0xBBBBBBBB);
+    return blob;
+}
+
+/// Build a well-formed blob whose root variant holds a struct whose second field
+/// is a string.
+///
+/// Every other well-formed blob bottoms out in a scalar leaf. This one exercises
+/// the walk's core descent: a field reached in place, found to be an object kind,
+/// its relative pointer read, and the object re-queued as a pointer target.
+///
+///   0..31   header
+///   32..39  record layout (kind, field count = 2)
+///   40..55  the two field entries
+///   56..59  field 0's layout (kind = UInt32)
+///   60..63  field 1's layout (kind = StringObj)
+///   64..67  the variant's content-layout pointer
+///   68..75  the record: a `uint32`, then a pointer to the string object
+///   76..79  the string's length
+///   80..83  the string's bytes and terminator
+///
+BlobBuilder makeRecordWithObjectFieldBlob()
+{
+    BlobBuilder blob;
+    blob.resize(84);
+    blob.putHeader(68);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(36, 2);
+    blob.putRelativePtr(40, 56);
+    blob.putU32(44, 0);
+    blob.putRelativePtr(48, 60);
+    blob.putU32(52, 4);
+
+    blob.putU32(56, uint32_t(FossilizedValKind::UInt32));
+    blob.putU32(60, uint32_t(FossilizedValKind::StringObj));
+
+    blob.putRelativePtr(64, 32);
+    blob.putU32(68, 0xABCDEF01);
+    blob.putRelativePtr(72, 80);
+
+    blob.putU32(76, 3);
+    blob.bytes[80] = 'a';
+    blob.bytes[81] = 'b';
+    blob.bytes[82] = 'c';
+    blob.bytes[83] = 0;
+    return blob;
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
@@ -282,6 +371,37 @@ SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
     SLANG_CHECK(isAccepted(makeStructBlob()));
     SLANG_CHECK(isAccepted(makePointerLikeBlob(FossilizedValKind::Ptr)));
     SLANG_CHECK(isAccepted(makePointerLikeBlob(FossilizedValKind::OptionalObj)));
+    SLANG_CHECK(isAccepted(makeDictionaryBlob()));
+    SLANG_CHECK(isAccepted(makeRecordWithObjectFieldBlob()));
+}
+
+SLANG_UNIT_TEST(fossilValidationRejectsMalformedAggregateElements)
+{
+    // A dictionary whose element records run past the end of the blob, which the
+    // extent check has to catch before any field of them is walked.
+    auto blob = makeDictionaryBlob();
+    blob.putU32(80, 4);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A dictionary element whose second field is placed past the element itself.
+    // This only fails if field offsets are applied relative to the element, which
+    // is the arithmetic a container of aggregates exercises.
+    blob = makeDictionaryBlob();
+    blob.putU32(64, 0xFFF0);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A record field that is an object kind, whose pointer leaves the blob. The
+    // walk has to follow the field in place, see the object kind, and range-check
+    // the target it points at.
+    blob = makeRecordWithObjectFieldBlob();
+    blob.putI32(72, 0x7F000000);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // The same field's string object, with a length that overruns. Reaching this
+    // check at all requires the descent through the record to have worked.
+    blob = makeRecordWithObjectFieldBlob();
+    blob.putU32(76, 1000);
+    SLANG_CHECK(!isAccepted(blob));
 }
 
 SLANG_UNIT_TEST(fossilValidationHandlesPointerAndOptional)
