@@ -46,33 +46,5 @@ Miscellaneous:
 
 - [block statement](statements-block.md) — groups multiple statements in a single statement.
 - [empty statement](statements-empty.md) — does nothing.
-
-## Compile-Time For Statement
-
-TODO: this needs to be moved somewhere
-
-A _compile-time for statement_ is used as an alternative to preprocessor techniques for loop unrolling.
-It looks like:
-
-```hlsl
-$for( <name> in Range(<initial-value>, <upper-bound>)) <body statement>
-```
-
-The _initial value_ and _upper bound_ expressions must be compile-time constant integers.
-The semantics of a compile-time for statement are as if it were expanded into:
-
-```hlsl
-{
-    let <name> = <initial-value>;
-    <body statement>
-}
-{
-    let <name> = <initial-value> + 1;
-    <body statement>
-}
-...
-{
-    let <name> = <upper-bound> - 1;
-    <body statement>
-}
-```
+- [compile-time for statement](statements-compile-time-for.md) — compile-time replication, alternative to
+  preprocessor techniques for loop unrolling.
