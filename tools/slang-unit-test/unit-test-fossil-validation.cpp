@@ -142,12 +142,118 @@ BlobBuilder makeArrayBlob()
     return blob;
 }
 
+/// Build a well-formed blob whose root variant holds a string.
+///
+///   0..31   header
+///   32..35  layout of the content (kind = StringObj)
+///   36..39  the variant's content-layout pointer
+///   40..43  the variant's content: a pointer to the string object
+///   44..47  the string's length, which sits *before* the string object
+///   48..51  the string's bytes, followed by their terminator
+///
+BlobBuilder makeStringBlob()
+{
+    BlobBuilder blob;
+    blob.resize(52);
+    blob.putHeader(40);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::StringObj));
+    blob.putRelativePtr(36, 32);
+    blob.putRelativePtr(40, 48);
+
+    blob.putU32(44, 3);
+    blob.bytes[48] = 'a';
+    blob.bytes[49] = 'b';
+    blob.bytes[50] = 'c';
+    blob.bytes[51] = 0;
+    return blob;
+}
+
+/// Build a well-formed blob whose root variant holds a struct with one `uint32`
+/// field.
+///
+///   0..31   header
+///   32..39  record layout (kind, field count)
+///   40..47  the single field's entry: its layout pointer and its offset
+///   48..51  the field's layout (kind = UInt32)
+///   52..55  the variant's content-layout pointer
+///   56..59  the variant's content: the record, whose only field is at offset 0
+///
+BlobBuilder makeStructBlob()
+{
+    BlobBuilder blob;
+    blob.resize(60);
+    blob.putHeader(56);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(36, 1);
+    blob.putRelativePtr(40, 48);
+    blob.putU32(44, 0);
+
+    blob.putU32(48, uint32_t(FossilizedValKind::UInt32));
+
+    blob.putRelativePtr(52, 32);
+    blob.putU32(56, 0xABCDEF01);
+    return blob;
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
 {
     SLANG_CHECK(isAccepted(makeScalarBlob()));
     SLANG_CHECK(isAccepted(makeArrayBlob()));
+    SLANG_CHECK(isAccepted(makeStringBlob()));
+    SLANG_CHECK(isAccepted(makeStructBlob()));
+}
+
+SLANG_UNIT_TEST(fossilValidationRejectsMalformedString)
+{
+    // A stored length that runs past the end of the buffer.
+    auto blob = makeStringBlob();
+    blob.putU32(44, 1000);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A length that is in bounds but whose terminator is not zero. Consumers hand
+    // the bytes out as a NUL-terminated slice, so without this check a reader
+    // would run off the end of the string looking for a terminator.
+    blob = makeStringBlob();
+    blob.bytes[51] = 'X';
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A length that places the terminator exactly one byte past the buffer.
+    blob = makeStringBlob();
+    blob.putU32(44, 4);
+    SLANG_CHECK(!isAccepted(blob));
+}
+
+SLANG_UNIT_TEST(fossilValidationRejectsMalformedRecord)
+{
+    // A field count whose field array runs past the end of the buffer.
+    auto blob = makeStructBlob();
+    blob.putU32(36, 0x0FFFFFFF);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A field whose layout pointer is null. Every field must name a layout,
+    // because the walk cannot describe the field's data without one.
+    blob = makeStructBlob();
+    blob.putI32(40, 0);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A field placed past the end of the record's own storage.
+    blob = makeStructBlob();
+    blob.putU32(44, 0xFFFF);
+    SLANG_CHECK(!isAccepted(blob));
+}
+
+SLANG_UNIT_TEST(fossilValidationRejectsZeroContainerStride)
+{
+    // A zero stride with a non-zero element count. The stride divides the blob
+    // size in the extent check, so this must be rejected rather than divide by
+    // zero.
+    auto blob = makeArrayBlob();
+    blob.putU32(40, 0);
+    SLANG_CHECK(!isAccepted(blob));
 }
 
 SLANG_UNIT_TEST(fossilValidationRejectsOutOfBoundsRootValue)
