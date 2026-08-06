@@ -169,7 +169,36 @@ static void recordSessionCreateRss(long rssBefore)
 static void reportMemDeltas()
 {
     for (const auto& e : g_memDeltas.entries)
+    {
+        // Enforce the "written AT MOST ONCE per process" contract at the point
+        // the number is published. Timers::add ACCUMULATES (totalMs += ms), so
+        // a regressed g_sessionRssRecorded guard would not produce a duplicate
+        // line that a reader could notice — it would produce one line holding
+        // the SUM of every session's delta, which for api_session_create
+        // (--iters 10) is a plausible-looking number roughly 10x too large,
+        // silently destroying the cold-session figure the metric exists to
+        // isolate. count is the only surviving evidence, and it is dropped by
+        // the printf below, so it has to be checked here.
+        //
+        // An "error: " line fails the workload in bench.py (real_error ->
+        // sample_ok), which is the loudest channel available from here and the
+        // same one the driver's other failures use. It is a run-time check
+        // rather than a test because this file is built ad hoc by bench.py and
+        // never enters the Slang tests/ harness; api_session_create exercises
+        // it on every nightly.
+        if (e.count != 1)
+        {
+            printf(
+                "error: memory counter '%s' was recorded %ld times, expected "
+                "exactly 1 — the record-once guard in recordSessionCreateRss "
+                "has regressed and this value is a sum, not a cold-session "
+                "delta\n",
+                e.name.c_str(),
+                e.count);
+            continue;
+        }
         printf("[MEM] %s\t%.0fkb\n", e.name.c_str(), e.totalMs);
+    }
 }
 
 // Times one phase: construct to start, call stop() (or destruct) to record.

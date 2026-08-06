@@ -688,6 +688,22 @@ assert parse_mem("[MEM] apiCreateGlobalSessionRssDeltaKb\t20480kb\nnoise\n[*] x\
     "parse_mem: [MEM] line contract drifted vs api-driver.cpp"
 assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed lines"
 
+# Tie the parser to its PRODUCER, not to a restatement of it. The assertion
+# above proves parse_mem is self-consistent with a literal typed in this file,
+# which is not the drift that breaks memory collection: that drift is on the
+# C++ side (tab -> space, "kb" -> "KB", a counter name without the Kb suffix
+# unit_of depends on). Rebuilding the format string in Python would just be a
+# second hand-copy of the same literal. The producer is a sibling file, so the
+# only version of this check that genuinely couples the two is to read it.
+# Guarded on existence rather than asserted: bench.py is usable for non-api
+# workloads without the driver source, and CI always has it.
+_DRIVER_SRC = os.path.join(HERE, "native", "api-driver.cpp")
+if os.path.exists(_DRIVER_SRC):
+    assert r'printf("[MEM] %s\t%.0fkb\n"' in analyze.read_text(_DRIVER_SRC), \
+        ("api-driver.cpp's [MEM] printf format no longer matches what parse_mem "
+         "parses; memory collection would silently degrade to 'no data'")
+del _DRIVER_SRC
+
 
 # Import-time self-check for the ru_maxrss unit rule. Pure and platform-free
 # (the platform is a parameter), so both branches are exercised on every host
