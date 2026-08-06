@@ -3297,7 +3297,18 @@ static SlangResult validateSpirvArtifact(
     ComPtr<ISlangBlob> spirvBlob;
     SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, spirvBlob.writeRef()));
     const size_t spirvByteCount = spirvBlob->getBufferSize();
-    SLANG_RELEASE_ASSERT(spirvByteCount % sizeof(uint32_t) == 0);
+
+    // A SPIR-V module is a sequence of 32-bit words, so a size that is not a whole number of words
+    // is not a module the validator can read. Report it as a validation failure rather than
+    // asserting: this blob comes back from whichever `slang-glslang` was loaded, and an embedder
+    // can supply that library through `ISession::setSharedLibraryLoader`, so a malformed size is
+    // reachable input here rather than a broken invariant of ours.
+    if (spirvByteCount % sizeof(uint32_t) != 0)
+    {
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
+        return SLANG_FAIL;
+    }
+
     const auto* spirvWords = (const uint32_t*)spirvBlob->getBufferPointer();
     const int spirvWordCount = int(spirvByteCount / sizeof(uint32_t));
 
