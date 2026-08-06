@@ -18,8 +18,8 @@ using namespace Slang;
 // capability rather than call through a null function pointer.
 //
 // `init` only rejects a library outright when every `glslang_compile*` entry point is missing, so a
-// library that can compile but not link is legitimate input, and `m_link` stays null. `link` then
-// used it unconditionally, jumping to address zero.
+// successfully-initialized compiler may still have a null `m_link`. `link` must therefore report
+// the missing capability rather than call through the pointer.
 //
 // Reaching that call needs *two* SPIR-V modules: `slang-emit.cpp` only links when
 // `spirvFiles.getCount() > 1`, which happens when an imported module carries an
@@ -73,6 +73,15 @@ int fakeLinkReturningFirstModule(glslang_LinkRequest* request)
     return true;
 }
 
+// Accept whatever it is handed. These tests are about the linking path, so validation must not be
+// what decides their outcome.
+bool fakeValidateReturningTrue(const uint32_t* contents, int contentsSize)
+{
+    SLANG_UNUSED(contents);
+    SLANG_UNUSED(contentsSize);
+    return true;
+}
+
 // Copy the input SPIR-V straight to the output, a valid response to the
 // `GLSLANG_ACTION_OPTIMIZE_SPIRV` request `slang-emit.cpp` issues after linking.
 int fakeCompileIdentity(glslang_CompileRequest_1_3* request)
@@ -117,6 +126,13 @@ public:
         if (symbol == "glslang_compile_1_3")
         {
             return (void*)fakeCompileIdentity;
+        }
+        // A null `m_validate` makes validation fail, which is a compile error, so when validation
+        // is enabled externally every compile against this fake dies before reaching the linking
+        // behaviour under test.
+        if (symbol == "glslang_validateSPIRV")
+        {
+            return (void*)fakeValidateReturningTrue;
         }
         if (symbol == "glslang_linkSPIRV")
         {
@@ -257,7 +273,6 @@ SLANG_UNIT_TEST(downstreamLinkReportsFailWhenLinkerRejects)
 
     SLANG_CHECK(result == SLANG_FAIL);
     SLANG_CHECK(result != SLANG_E_NOT_AVAILABLE);
-    // Proves the result came from the linker rather than from the new early-out.
     SLANG_CHECK(gFakeLinkerWasCalled);
     SLANG_CHECK(artifact == nullptr);
 }
@@ -462,7 +477,6 @@ SLANG_UNIT_TEST(downstreamLinkRejectionDoesNotDiagnoseUnavailable)
 
     SLANG_CHECK(SLANG_FAILED(outcome.codeResult));
     SLANG_CHECK(!outcome.producedCode);
-    // The failure came from the linker running and rejecting, not from never reaching it.
     SLANG_CHECK(gFakeLinkerWasCalled);
 
     const UnownedStringSlice diagnosticSlice = outcome.diagnostics.getUnownedSlice();
