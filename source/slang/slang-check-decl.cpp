@@ -355,6 +355,12 @@ bool isSlang2026OrLater(SemanticsVisitor* visitor)
            SLANG_LANGUAGE_VERSION_2026;
 }
 
+bool isSlang202cOrLater(SemanticsVisitor* visitor)
+{
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
+           SLANG_LANGUAGE_VERSION_202C;
+}
+
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)
@@ -17057,11 +17063,16 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     for (auto moduleScope = moduleDecl->ownedScope; moduleScope;
          moduleScope = moduleScope->nextSibling)
     {
-        if (moduleScope->containerDecl != moduleDecl &&
-            moduleScope->containerDecl->parentDecl != moduleDecl)
+        // Re-export only this module's own scope and its own `__include`d files;
+        // drop `using`-spliced namespace siblings (a primary-file `using namespace
+        // Foo;` must not leak through `import`) and any foreign module's files that a
+        // plain transitive `import` put on the chain. See
+        // `isOwnModuleOrIncludedFileScope` / shader-slang/slang#11443.
+        auto containerDecl = moduleScope->containerDecl;
+        if (!isOwnModuleOrIncludedFileScope(containerDecl, moduleDecl))
             continue;
 
-        addSiblingScopeForContainerDecl(getASTBuilder(), scope, moduleScope->containerDecl);
+        addSiblingScopeForContainerDecl(getASTBuilder(), scope, containerDecl);
     }
 
     // Also import any modules from nested `import` declarations

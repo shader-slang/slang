@@ -1,8 +1,8 @@
 #ifndef SLANG_COMPILER_OPTIONS_H
 #define SLANG_COMPILER_OPTIONS_H
 
-#include "../core/slang-basic.h"
-#include "../core/slang-crypto.h"
+#include "core/slang-basic.h"
+#include "core/slang-crypto.h"
 #include "slang-generated-capability-defs.h"
 #include "slang-profile.h"
 #include "slang.h"
@@ -95,6 +95,10 @@ struct CompilerOptionSet
 
     static bool allowDuplicate(CompilerOptionName name);
 
+    /// Append a CLI-like reconstruction of the stored options to `sb`, for the descriptive command
+    /// line embedded in debug info. Only the option kinds it explicitly handles are emitted; it
+    /// reports what is stored (which for some options is a default materialized during option
+    /// resolution) and does not add implicit defaults for absent options.
     void writeCommandLineArgs(Session* globalSession, StringBuilder& sb);
 
     OrderedDictionary<CompilerOptionName, List<CompilerOptionValue>> options;
@@ -154,7 +158,7 @@ struct CompilerOptionSet
                 {
                     if (replaceDuplicate)
                     {
-                        (*v)[index].intValue2 = element.intValue;
+                        (*v)[index].intValue2 = element.intValue2;
                         (*v)[index].stringValue2 = element.stringValue2;
                     }
                 }
@@ -376,6 +380,11 @@ struct CompilerOptionSet
     bool shouldEmitSeparateDebugInfo()
     {
         return getBoolOption(CompilerOptionName::EmitSeparateDebug);
+    }
+
+    bool shouldIncludeSourceInDebugInfo()
+    {
+        return getBoolOption(CompilerOptionName::DebugInfoIncludeSource);
     }
 
     bool shouldEmitRichDiagnostics()

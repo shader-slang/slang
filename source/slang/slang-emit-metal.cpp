@@ -1,13 +1,13 @@
 // slang-emit-metal.cpp
 #include "slang-emit-metal.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -194,6 +194,17 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     {
         if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
             _emitUserSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
+    }
+}
+
+void MetalSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // Metal has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
     }
 }
 
@@ -886,6 +897,29 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             m_writer->emit(buf);
 
+            return true;
+        }
+    case kIROp_Printf:
+        {
+            // Metal has no `printf`; its equivalent is the MSL 3.2 shader logging facility. Of the
+            // severity levels `log` is the one whose `MTLLogLevelNotice` survives the widest range
+            // of host `MTLLogState` configurations.
+            ensurePrelude(kMetalBuiltinPreludeLogging);
+            m_extensionTracker->requireMetalLanguageVersion(SemanticVersion(3, 2));
+            m_extensionTracker->requireLogging();
+            m_writer->emit("os_log_default.log(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (inst->getOperandCount() > 1)
+            {
+                List<IRInst*> args;
+                collectFlattenedVariadicOperands(inst, 1, args);
+                for (auto arg : args)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(arg, getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
             return true;
         }
     case kIROp_ByteAddressBufferLoad:

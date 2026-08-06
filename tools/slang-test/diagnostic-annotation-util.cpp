@@ -1,7 +1,7 @@
 // diagnostic-annotation-util.cpp
 #include "diagnostic-annotation-util.h"
 
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-string-util.h"
 
 namespace Slang
 {

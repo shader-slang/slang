@@ -13,7 +13,15 @@ for copy-me caller templates.
 For each open PR the workflow:
 
 1. Adds the PR to the board (idempotent).
-2. Classifies and sets **Source** (`Internal` / `Community` / `Bot`).
+2. Classifies and sets **Source** (`Internal` / `Community` / `Bot`) from
+   bot-author config and membership in `source_internal_team` (default
+   `shader-slang/source-internal`; direct or nested), plus sibling teams whose
+   slug starts with that base plus `-` (e.g. `source-internal-slangpy`) when
+   their description includes `Scope: [repo1, repo2]` for this repository
+   (bare short names or `owner/repo`; matching is by short name). Write
+   `Scope: [...]` with no space before the colon; the label is
+   case-insensitive and the first `Scope:` wins. Repo write access is **not**
+   used for Source.
 3. Recomputes **Status** from live PR state (`In Review`, `Revising`, `Snagged`,
    `Approved`, `Done`).
 4. Backfills **assignee** and **reviewers** when the PR has no owner yet.
@@ -54,14 +62,14 @@ flowchart TB
 
 ### Callers in `shader-slang/slang`
 
-| Workflow | Trigger | Mode | Notes |
-| --- | --- | --- | --- |
-| `pr-maintenance.yml` | `pull_request_target`, origin `pull_request_review`, `check_suite` | event | Fork reviews are skipped here and relayed below. |
-| `pr-ci-complete.yml` | `workflow_run` (gating checks completed) | event | Actions CI does not emit usable `check_suite`. |
-| `pr-commit-status.yml` | `status` (non-pending) | event | External statuses (`SlangPy Tests`, `license/cla`, …). |
-| `pr-sweep-nightly.yml` | `schedule`, `workflow_dispatch` | **sweep** | Reconciles every open PR in the repo. |
-| `pr-review-fork-bridge.yml` | fork `pull_request_review` | relay only | No secrets; completes to trigger apply. |
-| `pr-review-fork-apply.yml` | `workflow_run` (bridge completed) | event | Privileged path for fork reviews. |
+| Workflow                    | Trigger                                                            | Mode       | Notes                                                  |
+| --------------------------- | ------------------------------------------------------------------ | ---------- | ------------------------------------------------------ |
+| `pr-maintenance.yml`        | `pull_request_target`, origin `pull_request_review`, `check_suite` | event      | Fork reviews are skipped here and relayed below.       |
+| `pr-ci-complete.yml`        | `workflow_run` (gating checks completed)                           | event      | Actions CI does not emit usable `check_suite`.         |
+| `pr-commit-status.yml`      | `status` (non-pending)                                             | event      | External statuses (`SlangPy Tests`, `license/cla`, …). |
+| `pr-sweep-nightly.yml`      | `schedule`, `workflow_dispatch`                                    | **sweep**  | Reconciles every open PR in the repo.                  |
+| `pr-review-fork-bridge.yml` | fork `pull_request_review`                                         | relay only | No secrets; completes to trigger apply.                |
+| `pr-review-fork-apply.yml`  | `workflow_run` (bridge completed)                                  | event      | Privileged path for fork reviews.                      |
 
 **Event mode** reconciles the single PR (or PRs for a commit SHA) that triggered
 the run. **Sweep mode** lists every open PR in the repo and runs the same per-PR
@@ -78,6 +86,16 @@ In implementation terms:
 
 - The board's Source value is authoritative once set; automation only backfills
   Source when the board has none.
+- Because that written value is never re-derived, an unreadable team roster
+  yields no Source at all (`classifyAuthorSource` returns null and the write is
+  skipped, as is assignment, which needs Source) rather than a guessed
+  `Community`.
+- Team reads use bounded exponential backoff before returning: by default each
+  org-team listing or roster gets three attempts, delayed by 1 then 2 seconds.
+  The settled success or failure is cached in memory for the rest of that
+  workflow run, so a sweep enumerates each team at most once after retries and
+  rebuilds the source-internal family in memory per PR. The next workflow run
+  starts with a fresh cache and retries previously failed reads.
 - `computeTarget()` maps observed PR state to Status for event and sweep mode.
 - `Done` is terminal: once the board Status is `Done`, later events leave it
   unchanged.
@@ -88,16 +106,25 @@ In implementation terms:
 linked-issue sync when already assigned). Skips human drafts (except Bot PRs) and
 merge-queued PRs.
 
-| Source | Assignee | Reviewers |
-| --- | --- | --- |
-| **Internal** | PR author | none |
-| **Community / Bot** | see pick order below | assignee + top collaborator-not-owner, unless a real reviewer is already requested |
+| Source              | Assignee             | Auto-requested reviewer                                      | Comment |
+| ------------------- | -------------------- | ------------------------------------------------------------ | ------- |
+| **Internal**        | PR author            | none                                                         | none |
+| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot note naming the assignee; may suggest a higher-signal collaborator without `@` |
 
-**Pick order** (Community/Bot):
+**Pick order** (Community/Bot assignee / shepherd):
 
 1. Linked-issue assignee who is in the owners team.
 2. Top **committer-signal** owner from changed files.
 3. Maintainer team member (or `fallback_assignee`).
+
+The owners allowlist (`pr-owners` for Community, `bot-pr-owners` for Bot) gates
+who may be chosen as shepherd. Auto-request is that shepherd only when they are
+not the PR author, not on the ignored-reviewers list, and no real reviewer is
+already requested. A collaborator with stronger committer signal than the
+auto-requested reviewer (or the top other collaborator when nobody was
+auto-requested) may be named in the assignment comment as a suggested
+additional reviewer, but is never `requestReviewers`'d — so they are not
+notified unless someone follows up.
 
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 
@@ -114,12 +141,16 @@ last approver of the introducing PR). A cheap total-LOC pass ranks candidates; a
 per-file LOC tiebreak runs only when the top two are close.
 
 The ranking/selection logic is inlined in `pr-board-sync.yml` (between
-`extract-js:assignment:begin/end` markers). Unit tests extract that block at run
-time:
+`extract-js:assignment:begin/end` markers); Source classification helpers live
+in `extract-js:classify:begin/end`. Unit tests extract those blocks at run time.
+Wiring outside the extract markers (`reconcileAssignment`,
+`postAssignmentComment`, and the `requestReviewers` call site) is not covered by
+those unit tests and is verified manually / after merge.
 
 ```bash
 node .github/scripts/pr-signal.test.js
 node .github/scripts/pr-assign.test.js
+node .github/scripts/pr-classify.test.js
 ```
 
 ## CI rollup
@@ -139,11 +170,11 @@ group.
 
 ## Fork PRs on public repos
 
-| Event | Secret for fork PR? | Path |
-| --- | --- | --- |
-| `pull_request_target` | yes | `pr-maintenance.yml` → direct |
-| `pull_request_review` | **no** | `pr-review-fork-bridge.yml` → `pr-review-fork-apply.yml` (`workflow_run`) |
-| `workflow_run`, `status`, `schedule` | yes | respective callers → direct |
+| Event                                | Secret for fork PR? | Path                                                                      |
+| ------------------------------------ | ------------------- | ------------------------------------------------------------------------- |
+| `pull_request_target`                | yes                 | `pr-maintenance.yml` → direct                                             |
+| `pull_request_review`                | **no**              | `pr-review-fork-bridge.yml` → `pr-review-fork-apply.yml` (`workflow_run`) |
+| `workflow_run`, `status`, `schedule` | yes                 | respective callers → direct                                               |
 
 When `SLANG_PR_BOT_TOKEN` is unavailable, privileged steps skip cleanly (`HAS_TOKEN`).
 

@@ -1,11 +1,11 @@
 // test-context.cpp
 #include "test-context.h"
 
-#include "../../source/compiler-core/slang-language-server-protocol.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-shared-library.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "compiler-core/slang-language-server-protocol.h"
+#include "core/slang-io.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>

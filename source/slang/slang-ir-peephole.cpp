@@ -1,6 +1,6 @@
 #include "slang-ir-peephole.h"
 
-#include "../core/slang-math.h"
+#include "core/slang-math.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
@@ -1232,6 +1232,26 @@ struct PeepholeContext : InstPassBase
                 if (auto wrap = as<IRCastUIntToUntypedSamplerHandle>(inst->getOperand(0)))
                 {
                     inst->replaceUsesWith(wrap->getOperand(0));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastDescriptorHandleToUInt2:
+            {
+                if (auto wrap = as<IRCastUInt2ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastDescriptorHandleToUInt64:
+            {
+                if (auto wrap = as<IRCastUInt64ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }

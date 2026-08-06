@@ -2,9 +2,9 @@
 #ifndef SLANG_PREPROCESSOR_H_INCLUDED
 #define SLANG_PREPROCESSOR_H_INCLUDED
 
-#include "../compiler-core/slang-include-system.h"
-#include "../compiler-core/slang-lexer.h"
-#include "../core/slang-basic.h"
+#include "compiler-core/slang-include-system.h"
+#include "compiler-core/slang-lexer.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {

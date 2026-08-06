@@ -17,10 +17,16 @@ standard output = {
                             "name": "p",
                             "type": {
                                 "kind": "GenericTypeParameter",
-                                "name": "TParam2"
+                                "name": "TParam2",
+                                "sizes": [
+                                    {"kind": "generic", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "generic", "index": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "generic", "value": 1}
                     ]
                 },
                 "containerVarLayout": {
@@ -35,14 +41,23 @@ standard output = {
                                 "name": "p",
                                 "type": {
                                     "kind": "GenericTypeParameter",
-                                    "name": "TParam2"
+                                    "name": "TParam2",
+                                    "sizes": [
+                                        {"kind": "generic", "value": 1}
+                                    ]
                                 },
                                 "binding": {"kind": "generic", "index": 0}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "generic", "value": 1}
                         ]
                     },
                     "binding": {"kind": "generic", "index": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "generic", "value": 1}
+                ]
             }
         },
         {
@@ -52,7 +67,10 @@ standard output = {
                 "kind": "parameterBlock",
                 "elementType": {
                     "kind": "GenericTypeParameter",
-                    "name": "TParam"
+                    "name": "TParam",
+                    "sizes": [
+                        {"kind": "generic", "value": 1}
+                    ]
                 },
                 "containerVarLayout": {
 
@@ -60,10 +78,16 @@ standard output = {
                 "elementVarLayout": {
                     "type": {
                         "kind": "GenericTypeParameter",
-                        "name": "TParam"
+                        "name": "TParam",
+                        "sizes": [
+                            {"kind": "generic", "value": 1}
+                        ]
                     },
                     "binding": {"kind": "generic", "index": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "generic", "value": 1}
+                ]
             }
         },
         {
@@ -79,14 +103,20 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
             "name": "s",
             "binding": {"kind": "samplerState", "index": 0},
             "type": {
-                "kind": "samplerState"
+                "kind": "samplerState",
+                "sizes": [
+                    {"kind": "samplerState", "value": 1}
+                ]
             }
         },
         {
@@ -105,7 +135,10 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "float32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 16, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                         },
@@ -117,7 +150,10 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "float32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 16, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
                         },
@@ -129,10 +165,16 @@ standard output = {
                                 "elementType": {
                                     "kind": "scalar",
                                     "scalarType": "float32"
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "uniform", "value": 16, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 32, "size": 16, "elementStride": 4}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 48, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -150,7 +192,10 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
                             },
@@ -162,7 +207,10 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 16, "size": 16, "elementStride": 4}
                             },
@@ -174,14 +222,23 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 16, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 32, "size": 16, "elementStride": 4}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 48, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 48, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "constantBuffer", "value": 1}
+                ]
             }
         }
     ],
@@ -199,7 +256,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

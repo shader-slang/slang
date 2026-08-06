@@ -1,7 +1,7 @@
 // metal-device.h
 #pragma once
 
-#include "../simple-transient-resource-heap.h"
+#include "gfx/simple-transient-resource-heap.h"
 #include "metal-base.h"
 #include "metal-device.h"
 #include "metal-framebuffer.h"

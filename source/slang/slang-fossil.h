@@ -16,7 +16,7 @@
 // but that can still be inspected and dug through.
 //
 
-#include "../core/slang-relative-ptr.h"
+#include "core/slang-relative-ptr.h"
 
 #include <optional>
 #include <type_traits>
