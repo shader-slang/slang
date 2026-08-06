@@ -15002,6 +15002,27 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
+            // A `groupshared` parameter is passed by reference, so there is nowhere to propagate a
+            // derivative back to. Span the diagnostic on the `groupshared` modifier the user wrote:
+            // the reference modifier is injected during parameter checking and carries no source
+            // location, and the `BorrowModifier` message below would name a spelling that appears
+            // nowhere in the source. This sits outside the `no_diff` check because `no_diff` does
+            // not stop the parameter being passed by reference -- without it, both spellings reach
+            // an unconditional abort in the backward-diff type builders.
+            if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
+            {
+                if (paramDecl->hasModifier<RefModifier>() ||
+                    paramDecl->hasModifier<BorrowModifier>())
+                {
+                    getSink()->diagnose(
+                        Diagnostics::CannotUseGroupsharedOnDifferentiableFunctionParameter{
+                            .spelling = paramDecl->hasModifier<ConstModifier>()
+                                            ? UnownedStringSlice("const groupshared")
+                                            : UnownedStringSlice("groupshared"),
+                            .modifier = groupSharedModifier});
+                    continue;
+                }
+            }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {
                 if (auto modifier = paramDecl->findModifier<BorrowModifier>())

@@ -4453,6 +4453,13 @@ err(
 )
 
 err(
+    "cannot-use-groupshared-on-differentiable-function-parameter",
+    38038,
+    "'~spelling' on a parameter of a differentiable function",
+    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative can be propagated back through it; 'no_diff' does not help, because the parameter is still passed by reference." }
+)
+
+err(
     "cannot-use-constref-on-differentiable-member-method",
     38036,
     "'[constref]' on differentiable member method",
