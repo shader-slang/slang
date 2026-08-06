@@ -265,6 +265,26 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
     auto cookedCaps = getTargetCaps();
     auto& targetOptionSet = getOptionSet();
 
+    // Capabilities inherited from the session-level option set (via inheritFrom) are
+    // intentionally broad — a multi-backend application may set e.g. hlsl_nvapi at
+    // the session level to enable it for D3D12 targets while also compiling for
+    // Vulkan/SPIRV in the same session.  Only flag capabilities that were explicitly
+    // requested for this specific target, not ones that arrived via session inheritance.
+    auto sessionCapArray = getLinkage()->m_optionSet.getArray(CompilerOptionName::Capability);
+    auto isSessionLevelCap = [&](const CompilerOptionValue& atomVal) -> bool
+    {
+        for (const auto& sessionAtom : sessionCapArray)
+        {
+            if (sessionAtom.kind != atomVal.kind)
+                continue;
+            if (atomVal.kind == CompilerOptionValueKind::Int
+                    ? sessionAtom.intValue == atomVal.intValue
+                    : sessionAtom.stringValue == atomVal.stringValue)
+                return true;
+        }
+        return false;
+    };
+
     for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
     {
         CapabilitySet toAdd;
@@ -291,6 +311,10 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         }
 
         if (toAdd.isEmpty())
+            continue;
+
+        // Skip capabilities that came from the session level (not target-specific).
+        if (isSessionLevelCap(atomVal))
             continue;
 
         // For GLSL targets, SPIRV-targeted capabilities are auto-converted to their
