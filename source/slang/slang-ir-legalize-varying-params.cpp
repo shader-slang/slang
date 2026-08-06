@@ -3296,9 +3296,9 @@ private:
                 continue;
             }
             SLANG_ASSERT(typeLayout);
-            // The layout only covers the fields that came from the entry point's result, so a
-            // struct field can outrun it (e.g. an `out` parameter appended to the return struct by
-            // lowerOutParameters). Stop rather than read past the field-layout array.
+            // `varLayout` can describe fewer fields than the struct has, because a field may have
+            // been merged in from outside the layout's scope (e.g. an `out` parameter appended to
+            // the return struct by lowerOutParameters). Stop rather than read past the array.
             if (index >= (Index)typeLayout->getFieldCount())
             {
                 index++;
