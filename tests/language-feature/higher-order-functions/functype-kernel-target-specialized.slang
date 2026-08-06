@@ -8,9 +8,10 @@
 // starts keying on the function *type* rather than on a function-typed value being stored,
 // every one of these targets would begin erroring on correct code.
 //
-// `CHECK-NOT` is meaningful here: these are `TEST:SIMPLE(filecheck=...)` cases, which run
-// real LLVM FileCheck over the emitted text. (In a `DIAGNOSTIC_TEST`, `CHECK-NOT` would be
-// inert -- that harness only matches lines beginning exactly `//CHECK:`.)
+// Each `-NOT` is written BEFORE its positive anchor on purpose. FileCheck scopes a `-NOT` to
+// the text between the preceding match and the next one, and every spelling below is emitted
+// near the top of the file, ahead of the entry point -- placing the `-NOT` after a
+// `computeMain` anchor would leave it scanning a region the spelling never appears in.
 
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
@@ -39,14 +40,14 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 // spelling for the undefined output it used to produce, and WGSL's failure mode is an empty
 // type annotation with no type name at all, so each is excluded in the target's own terms.
 
-//CUDA: computeMain
 //CUDA-NOT: Slang_FuncType
+//CUDA: computeMain
 
-//CPP: computeMain
 //CPP-NOT: Slang_FuncType
+//CPP: computeMain
 
-//METAL: computeMain
 //METAL-NOT: Func<
+//METAL: computeMain
 
-//WGSL: computeMain
 //WGSL-NOT: {{: *;}}
+//WGSL: computeMain
