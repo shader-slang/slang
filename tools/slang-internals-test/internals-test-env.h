@@ -92,6 +92,12 @@ public:
     /// `[KeepAlive]`, which marks it as a root for liveness-based passes.
     IRFunc* addVoidFunction(const char* name, bool keepAlive);
 
+    /// Add a top-level function of type `void()` whose body calls `callee` and
+    /// then returns. Used to build the reachability half of a liveness
+    /// contract: a callee with no decoration of its own should survive as long
+    /// as something live refers to it.
+    IRFunc* addVoidFunctionCalling(const char* name, bool keepAlive, IRFunc* callee);
+
     IRModule* getModule() const { return m_module.get(); }
 
     /// Count top-level instructions with the given opcode.
@@ -108,6 +114,11 @@ public:
     String dump() const;
 
 private:
+    // Declaration order matters: the constructor initializes `m_builder` from
+    // `m_module.get()`, and members are initialized in declaration order rather
+    // than in the order the initializer list happens to name them. Declaring
+    // `m_builder` first would bind it to an uninitialized `RefPtr`, with no
+    // compiler diagnostic.
     RefPtr<IRModule> m_module;
     IRBuilder m_builder;
 };

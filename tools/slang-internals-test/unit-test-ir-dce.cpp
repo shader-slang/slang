@@ -92,3 +92,49 @@ SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
     SLANG_CHECK(!eliminateDeadCode(builder.getModule()));
     SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == afterFirstRun);
 }
+
+// A function with no decoration of its own survives when a live function calls
+// it. This is the other half of the pass's contract: the tests above cover what
+// gets removed, while this covers what reachability keeps alive. A regression
+// that stopped following call operands when marking live instructions would
+// leave every test above green and fail only this one.
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
+{
+    InternalsTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSession());
+
+    IRFunc* callee = builder.addVoidFunction("calleeFunc", /* keepAlive: */ false);
+    builder.addVoidFunctionCalling("rootFunc", /* keepAlive: */ true, callee);
+    builder.addVoidFunction("deadFunc", /* keepAlive: */ false);
+    SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 3);
+
+    SLANG_CHECK(eliminateDeadCode(builder.getModule()));
+
+    // `calleeFunc` carries no decoration and is kept only by the reference from
+    // `rootFunc`, while `deadFunc` differs solely in not being referenced.
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 2);
+    SLANG_CHECK(names.contains("rootFunc"));
+    SLANG_CHECK(names.contains("calleeFunc"));
+    SLANG_CHECK(!names.contains("deadFunc"));
+}
+
+// Reachability is transitive: a function reached only through an intermediate
+// callee is still kept. A pass that marked only the direct operands of a live
+// root would keep the intermediate but drop the function beyond it.
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
+{
+    InternalsTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSession());
+
+    IRFunc* leaf = builder.addVoidFunction("leafFunc", /* keepAlive: */ false);
+    IRFunc* middle = builder.addVoidFunctionCalling("middleFunc", /* keepAlive: */ false, leaf);
+    builder.addVoidFunctionCalling("rootFunc", /* keepAlive: */ true, middle);
+    SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 3);
+
+    SLANG_CHECK(!eliminateDeadCode(builder.getModule()));
+
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 3);
+    SLANG_CHECK(names.contains("leafFunc"));
+}

@@ -56,8 +56,11 @@ Module* InternalsTestEnv::checkModuleFromSource(
     m_usedModuleNames.add(moduleName);
 
     ComPtr<slang::IBlob> diagnostics;
-    slang::IModule* module =
-        m_session->loadModuleFromSourceString(moduleName, moduleName, source, diagnostics.writeRef());
+    slang::IModule* module = m_session->loadModuleFromSourceString(
+        moduleName,
+        moduleName,
+        source,
+        diagnostics.writeRef());
 
     if (outDiagnostics && diagnostics)
     {
@@ -83,6 +86,27 @@ IRFunc* IRFixtureBuilder::addVoidFunction(const char* name, bool keepAlive)
     // A function needs an entry block with a terminator to be well-formed.
     m_builder.setInsertInto(func);
     m_builder.emitBlock();
+    m_builder.emitReturn();
+
+    if (keepAlive)
+    {
+        m_builder.addKeepAliveDecoration(func);
+    }
+
+    return func;
+}
+
+IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAlive, IRFunc* callee)
+{
+    m_builder.setInsertInto(m_module.get());
+
+    IRFunc* func = m_builder.createFunc();
+    func->setFullType(m_builder.getFuncType(0, nullptr, m_builder.getVoidType()));
+    m_builder.addNameHintDecoration(func, UnownedStringSlice(name));
+
+    m_builder.setInsertInto(func);
+    m_builder.emitBlock();
+    m_builder.emitCallInst(m_builder.getVoidType(), callee, 0, nullptr);
     m_builder.emitReturn();
 
     if (keepAlive)

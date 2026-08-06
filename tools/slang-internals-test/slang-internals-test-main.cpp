@@ -34,17 +34,18 @@ class ConsoleTestReporter : public ITestReporter
 public:
     int failedTestCount = 0;
     int passedTestCount = 0;
+    int ignoredTestCount = 0;
 
     virtual SLANG_NO_THROW void SLANG_MCALL startTest(const char* testName) override
     {
         m_currentTestName = testName;
         m_currentTestFailed = false;
+        m_currentTestIgnored = false;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL addResult(TestResult result) override
     {
-        if (result == TestResult::Fail)
-            recordFailure();
+        recordResult(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(
@@ -53,7 +54,9 @@ public:
         const char* file,
         int line) override
     {
-        addResultWithLocation(result == TestResult::Pass, testText, file, line);
+        if (result == TestResult::Fail)
+            printf("    FAILED: %s\n      at %s:%d\n", testText, file, line);
+        recordResult(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(
@@ -64,7 +67,7 @@ public:
     {
         if (testSucceeded)
             return;
-        recordFailure();
+        recordResult(TestResult::Fail);
         printf("    FAILED: %s\n      at %s:%d\n", testText, file, line);
     }
 
@@ -77,18 +80,38 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL endTest() override
     {
-        printf("  %-6s %s\n", m_currentTestFailed ? "FAIL" : "ok", m_currentTestName);
+        const char* label = m_currentTestFailed ? "FAIL" : (m_currentTestIgnored ? "skip" : "ok");
+        printf("  %-6s %s\n", label, m_currentTestName);
         if (m_currentTestFailed)
             failedTestCount++;
+        else if (m_currentTestIgnored)
+            ignoredTestCount++;
         else
             passedTestCount++;
     }
 
 private:
-    void recordFailure() { m_currentTestFailed = true; }
+    /// Classify a result the same way regardless of which entry point reported
+    /// it. Only `Fail` is a failure; `Ignored` is tracked separately so a test
+    /// that skips itself is not silently tallied as a pass.
+    void recordResult(TestResult result)
+    {
+        switch (result)
+        {
+        case TestResult::Fail:
+            m_currentTestFailed = true;
+            break;
+        case TestResult::Ignored:
+            m_currentTestIgnored = true;
+            break;
+        default:
+            break;
+        }
+    }
 
     const char* m_currentTestName = "<unknown>";
     bool m_currentTestFailed = false;
+    bool m_currentTestIgnored = false;
 };
 
 } // namespace
@@ -121,6 +144,18 @@ int main(int argc, char** argv)
     context.executableDirectory = ".";
 
     const SlangInt testCount = testModule->getTestCount();
+
+    // Tests register themselves through static initializers. If that ever
+    // stopped happening — a refactor moving them into an intermediate static
+    // library, or aggressive dead-section stripping — the suite would run
+    // nothing and still report success.
+    if (testCount == 0)
+    {
+        fprintf(stderr, "error: no tests were registered\n");
+        testModule->destroy();
+        return 1;
+    }
+
     SlangInt selectedCount = 0;
     for (SlangInt i = 0; i < testCount; i++)
     {
