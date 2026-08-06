@@ -5579,6 +5579,13 @@ err(
 )
 
 err(
+    "func-type-not-supported-on-target",
+    55215,
+    "function-typed value is not supported on this target",
+    span { loc = "location", message = "a function-typed value cannot be represented when generating code for the current target; it is supported only where the value can be resolved at compile time, so name the function directly at the call site (or pass it as an argument that names a function directly) instead of storing it in a variable or selecting it at runtime" }
+)
+
+err(
     "unsupported-recursion",
     55201,
     "recursion not allowed",

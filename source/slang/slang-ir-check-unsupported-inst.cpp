@@ -106,6 +106,49 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     }
 }
 
+// True if `target` generates output that has no representation for a function-typed
+// value, i.e. a value that holds a function and is stored, loaded, or selected at
+// runtime rather than named directly at a call site.
+//
+// Consider this shader:
+//
+//      int addOne(int x) { return x + 1; }
+//      static functype(int) -> int gFn = addOne;
+//      void computeMain() { outBuf[0] = applyIt(gFn, 41); }
+//
+// `specializeHigherOrderParameters` normally replaces a function-typed argument with
+// a direct call, but it is best-effort: `isParamSuitableForSpecialization` only accepts
+// an argument it can resolve statically (an `IRGlobalValueWithCode`, a global param, and
+// a few similar cases), and a call it cannot specialize is silently skipped. Reading `gFn`
+// out of a variable is not one of those cases, so the function type survives to emit,
+// where each of these targets writes something no prelude defines: `Slang_FuncType<...>`
+// for C++/CUDA kernels (defined only in `slang-cpp-host-prelude.h`), `Func<...>` from
+// Metal's op-name fallback, and an empty type annotation for WGSL. The result compiled
+// with no diagnostic at all (issue #12367).
+//
+// Host C++ output is excluded because `isKernelCPPOrCUDASourceTarget` does not list
+// `HostCPPSource`: `Slang_FuncType` *is* defined in the host prelude, where `[DllImport]`
+// legitimately lowers to a function pointer. The PyTorch binding target is included even
+// though it is also host-facing, because it uses the torch prelude, which does not define
+// `Slang_FuncType` either.
+static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
+{
+    if (isMetalTarget(target) || isWGPUTarget(target))
+        return true;
+    return isKernelCPPOrCUDASourceTarget(target);
+}
+
+// True if `type` is a function type, looking through the pointer that a variable or
+// struct field of function type is declared with.
+static bool isFuncTypeOrPtrToFuncType(IRType* type)
+{
+    if (as<IRFuncType>(type))
+        return true;
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        return as<IRFuncType>(ptrType->getValueType()) != nullptr;
+    return false;
+}
+
 // True if `funcType` has any parameter or result of type `String`.
 static bool funcTypeReferencesStringType(IRFuncType* funcType)
 {
@@ -165,10 +208,39 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // any diagnostic.
     const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
+    // See `isTargetWithoutFuncTypeSupport`. A function-typed value also reaches emission as a
+    // local variable or a parameter that specialization could not resolve, which the
+    // module-level checks for globals and `KernelContext` fields do not see:
+    //
+    //      functype(int) -> int local = (tid.x > 0) ? addOne : addTwo;
+    //
+    // A `select` between two functions is not a shape `isParamSuitableForSpecialization`
+    // accepts, so both the local and the parameter it is passed to keep their function type.
+    const bool rejectFuncTypedValue = isTargetWithoutFuncTypeSupport(target);
+
+    if (auto firstBlock = func->getFirstBlock(); firstBlock && rejectFuncTypedValue)
+    {
+        for (auto param : firstBlock->getParams())
+        {
+            if (isFuncTypeOrPtrToFuncType(param->getFullType()))
+            {
+                auto loc = param->sourceLoc.isValid() ? param->sourceLoc : findFirstUseLoc(param);
+                sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+            }
+        }
+    }
+
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
+            if (rejectFuncTypedValue && inst->getOp() == kIROp_Var &&
+                isFuncTypeOrPtrToFuncType(inst->getFullType()))
+            {
+                auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+                sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+            }
+
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
@@ -232,8 +304,52 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
+    // A function-typed value has no representation on these targets. It reaches here as
+    // one of two shapes, and which one depends on the target: `introduceExplicitGlobalContext`
+    // (run for C++/CUDA/Metal) moves a global into a `KernelContext` struct field, while WGSL
+    // keeps it as a global variable. Both are emitted through the ordinary type-emission path
+    // -- a struct field via `emitStructDeclarationsBlock` -- so both produce undefined output
+    // and both must be rejected. Checking only uses inside function bodies would miss a global
+    // that is written but never read, which still emits the undefined field declaration.
+    const bool rejectFuncTypedValue = isTargetWithoutFuncTypeSupport(target);
+
+    // Only the targets that keep a global variable as a global need it inspected. Everywhere
+    // else `introduceExplicitGlobalContext` has already turned it into a `KernelContext`
+    // field, so the field check below covers it. Keeping the two disjoint also keeps this
+    // check away from the function-typed global that `generateDllImportFuncs` synthesizes for
+    // a `[DllImport]` function, which is a legitimate function pointer and runs only for the
+    // C++ source/header targets.
+    const bool rejectFuncTypedGlobalVar = rejectFuncTypedValue && isWGPUTarget(target);
+
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (rejectFuncTypedValue)
+        {
+            if (auto structType = as<IRStructType>(globalInst))
+            {
+                for (auto field : structType->getFields())
+                {
+                    if (isFuncTypeOrPtrToFuncType(field->getFieldType()))
+                    {
+                        // The key carries the location of the global this field replaced
+                        // (see `introduceExplicitGlobalContext`).
+                        auto key = field->getKey();
+                        auto loc = key->sourceLoc.isValid() ? key->sourceLoc : findFirstUseLoc(key);
+                        sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                    }
+                }
+            }
+            else if (rejectFuncTypedGlobalVar && globalInst->getOp() == kIROp_GlobalVar)
+            {
+                if (isFuncTypeOrPtrToFuncType(globalInst->getFullType()))
+                {
+                    auto loc = globalInst->sourceLoc.isValid() ? globalInst->sourceLoc
+                                                               : findFirstUseLoc(globalInst);
+                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                }
+            }
+        }
+
         switch (globalInst->getOp())
         {
         case kIROp_VectorType:
