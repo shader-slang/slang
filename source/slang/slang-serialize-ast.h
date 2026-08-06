@@ -25,7 +25,8 @@ ModuleDecl* readSerializedModuleAST(
     ISlangBlob* blobHoldingSerializedData,
     RIFF::Chunk const* chunk,
     SerialSourceLocReader* sourceLocReader,
-    SourceLoc requestingSourceLoc);
+    SourceLoc requestingSourceLoc,
+    Fossil::Trust trust = Fossil::Trust::Untrusted);
 
 } // namespace Slang
 

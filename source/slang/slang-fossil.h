@@ -1209,13 +1209,25 @@ void validateRootValue(void const* data, Size size, FossilizedVariantObj* rootVa
 
 #endif
 
-/// Get the root object from a fossilized blob.
+/// Whether the contents of a blob are already trusted.
 ///
-/// This operation performs some basic validation on the blob to
-/// ensure that it doesn't seem incorrectly sized or otherwise
-/// corrupted/malformed.
+/// Validating a blob costs time proportional to its size, and the core module
+/// that ships inside the compiler binary is both the largest blob loaded and the
+/// one loaded on every single startup -- while also being the one blob that
+/// cannot have come from an attacker. Marking it trusted is what keeps validation
+/// affordable to leave switched on.
 ///
-Fossil::AnyValPtr getRootValue(ISlangBlob* blob);
+/// `Untrusted` is the default everywhere, so forgetting to pass this errs toward
+/// validating rather than toward a hole.
+///
+enum class Trust
+{
+    /// Came from outside the compiler; validate before navigating it.
+    Untrusted,
+
+    /// Shipped with the compiler itself; validating it would be pure cost.
+    Trusted,
+};
 
 /// Get the root object from a fossilized blob.
 ///
@@ -1223,7 +1235,15 @@ Fossil::AnyValPtr getRootValue(ISlangBlob* blob);
 /// ensure that it doesn't seem incorrectly sized or otherwise
 /// corrupted/malformed.
 ///
-Fossil::AnyValPtr getRootValue(void const* data, Size size);
+Fossil::AnyValPtr getRootValue(ISlangBlob* blob, Trust trust = Trust::Untrusted);
+
+/// Get the root object from a fossilized blob.
+///
+/// This operation performs some basic validation on the blob to
+/// ensure that it doesn't seem incorrectly sized or otherwise
+/// corrupted/malformed.
+///
+Fossil::AnyValPtr getRootValue(void const* data, Size size, Trust trust = Trust::Untrusted);
 } // namespace Fossil
 
 SLANG_FORCE_INLINE Size FossilizedStringObj::getSize() const

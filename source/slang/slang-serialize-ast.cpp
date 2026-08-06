@@ -1969,7 +1969,8 @@ ModuleDecl* readSerializedModuleAST(
     ISlangBlob* blobHoldingSerializedData,
     RIFF::Chunk const* chunk,
     SerialSourceLocReader* sourceLocReader,
-    SourceLoc requestingSourceLoc)
+    SourceLoc requestingSourceLoc,
+    Fossil::Trust trust)
 {
     SLANG_PROFILE;
 
@@ -1984,7 +1985,7 @@ ModuleDecl* readSerializedModuleAST(
     }
 
     Fossil::AnyValPtr rootValPtr =
-        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize(), trust);
     if (!rootValPtr)
     {
         SLANG_UNEXPECTED("invalid format for serialized module AST");

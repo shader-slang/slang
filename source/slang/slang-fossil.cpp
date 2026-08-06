@@ -25,12 +25,12 @@ const char Fossil::Header::kMagic[16] = {
     '\n'    // byte 15
 };
 
-Fossil::AnyValPtr getRootValue(ISlangBlob* blob)
+Fossil::AnyValPtr getRootValue(ISlangBlob* blob, Trust trust)
 {
-    return getRootValue(blob->getBufferPointer(), blob->getBufferSize());
+    return getRootValue(blob->getBufferPointer(), blob->getBufferSize(), trust);
 }
 
-Fossil::AnyValPtr getRootValue(void const* data, Size size)
+Fossil::AnyValPtr getRootValue(void const* data, Size size, Trust trust)
 {
     if (!data)
     {
@@ -73,7 +73,14 @@ Fossil::AnyValPtr getRootValue(void const* data, Size size)
     }
 
 #if SLANG_ENABLE_VALIDATION_FOSSIL
-    validateRootValue(data, size, rootValueVariant);
+    // A trusted blob skips the walk entirely. This is not an optimization so much
+    // as what makes validation usable: the core module is the largest blob the
+    // compiler loads and it is loaded on every startup, so validating it dominates
+    // the cost of every short-lived `slangc` invocation, while being the one blob
+    // that provably did not come from an attacker.
+    //
+    if (trust == Trust::Untrusted)
+        validateRootValue(data, size, rootValueVariant);
 #endif
 
     return getVariantContentPtr(rootValueVariant);

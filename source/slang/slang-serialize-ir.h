@@ -27,7 +27,8 @@ void writeSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
-    RefPtr<IRModule>& outIRModule);
+    RefPtr<IRModule>& outIRModule,
+    Fossil::Trust trust = Fossil::Trust::Untrusted);
 
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
