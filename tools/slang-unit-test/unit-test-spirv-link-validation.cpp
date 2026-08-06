@@ -14,11 +14,12 @@ using SlangUnitTest::ScopedEnvVar;
 namespace
 {
 
-// `SPV_GENERATOR_KHRONOS_LINKER` from SPIRV-Tools' `source/spirv_constant.h`, which the linker
-// writes into the module header. Spelled out rather than included: that header is private to
-// SPIRV-Tools, so reaching it would mean adding an include path into another project's internals.
-// The value is a registry allocation, not a sequence position, so it cannot be derived by eye.
-static const uint32_t kSpvGeneratorKhronosLinker = 17;
+// The generator word SPIRV-Tools' linker writes into a module header: tool id
+// `SPV_GENERATOR_KHRONOS_LINKER` in the high half, per `(tool << 16) | misc`. Stored pre-shifted to
+// match `kSPIRVSlangCompilerId` in `slang-emit-spirv.cpp`. Spelled out rather than included because
+// the defining header is private to SPIRV-Tools, and the id is a registry allocation, so it cannot
+// be derived by eye.
+static const uint32_t kSpvGeneratorKhronosLinker = 17 << 16;
 
 // The result code and whether any code came back are tracked separately so a compile that reports
 // success without returning a module is not read as a pass.
@@ -26,8 +27,8 @@ struct LinkedSpirvOutcome
 {
     SlangResult codeResult;
     bool producedCode;
-    // Generator magic of the returned module, or 0 when no code came back. SPIRV-Tools' linker
-    // stamps its own tool id, so this distinguishes a linked module from one Slang emitted alone.
+    // Header word 2 of the returned module. Only meaningful when `producedCode` is true, since 0 is
+    // itself a legal tool id.
     uint32_t generatorMagic;
     String diagnostics;
 };
@@ -168,11 +169,17 @@ SLANG_UNIT_TEST(spirvValidationAcceptsDownstreamLinkedModule)
 {
     const LinkedSpirvOutcome outcome = compileImportingModuleWithValidation();
 
+    // This test is designed to bite in CI, where nobody can attach a debugger, so surface the
+    // compiler's own diagnostics rather than leaving a bare failed assertion in the log.
+    if (outcome.codeResult != SLANG_OK && outcome.diagnostics.getLength())
+    {
+        fprintf(stderr, "compile diagnostics:\n%s\n", outcome.diagnostics.getBuffer());
+    }
+
     SLANG_CHECK(outcome.codeResult == SLANG_OK);
     SLANG_CHECK(outcome.producedCode);
 
     // Without this the test would still pass if a change stopped the link from happening at all,
-    // since a single-module compile also succeeds. The shift recovers the tool half of the
-    // generator word, whose layout is `(tool << 16) | misc`.
-    SLANG_CHECK((outcome.generatorMagic >> 16) == kSpvGeneratorKhronosLinker);
+    // since a single-module compile also succeeds.
+    SLANG_CHECK((outcome.generatorMagic & 0xFFFF0000u) == kSpvGeneratorKhronosLinker);
 }
