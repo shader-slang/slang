@@ -457,6 +457,50 @@ BlobBuilder makeQuadraticBlob(Size count, Size fieldCount)
     return blob;
 }
 
+/// Build a well-formed blob whose root variant holds a pointer to an optional.
+///
+/// An optional reached *through a pointer* holds no storage of its own: the walk
+/// re-queues at the same address under the optional's element layout. That arm
+/// is only reachable via a shape like `Ptr<Optional<T>>`, an array of optionals,
+/// or a nested optional -- never by an optional stored in place.
+///
+///   0..31   header
+///   32..39  pointer layout (kind, element-layout pointer -> the optional layout)
+///   40..47  optional layout (kind, element-layout pointer -> the scalar layout)
+///   48..51  the scalar layout (kind = UInt32)
+///   52..55  the variant's content-layout pointer
+///   56..59  the variant's content: the pointer
+///   60..63  the value, which the optional aliases rather than points at
+///
+BlobBuilder makePointerToOptionalBlob()
+{
+    BlobBuilder blob;
+    blob.resize(64);
+    blob.putHeader(56);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::Ptr));
+    blob.putRelativePtr(36, 40);
+
+    blob.putU32(40, uint32_t(FossilizedValKind::OptionalObj));
+    blob.putRelativePtr(44, 48);
+
+    blob.putU32(48, uint32_t(FossilizedValKind::UInt32));
+
+    blob.putRelativePtr(52, 32);
+    blob.putRelativePtr(56, 60);
+    blob.putU32(60, 0xABCDEF01);
+    return blob;
+}
+
+/// Build the scalar blob with a chosen scalar `kind`, so the differing in-place
+/// sizes are exercised rather than only the 4-byte one.
+///
+BlobBuilder makeScalarBlobOfKind(FossilizedValKind kind)
+{
+    auto blob = makeScalarBlob();
+    blob.putU32(32, uint32_t(kind));
+    return blob;
+}
 } // namespace
 
 SLANG_UNIT_TEST(fossilValidationBoundsTotalWork)
@@ -474,6 +518,41 @@ SLANG_UNIT_TEST(fossilValidationBoundsTotalWork)
     // The same shape at a size the cap does allow still validates, so the bound
     // does not reject ordinary blobs that merely share layouts between fields.
     SLANG_CHECK(isAccepted(makeQuadraticBlob(4, 4)));
+}
+
+SLANG_UNIT_TEST(fossilValidationHandlesOptionalAsPointerTarget)
+{
+    SLANG_CHECK(isAccepted(makePointerToOptionalBlob()));
+
+    // The pointer that reaches the optional leaves the blob.
+    auto blob = makePointerToOptionalBlob();
+    blob.putI32(56, 0x7F000000);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // The optional names no element layout, so nothing describes the value it
+    // aliases.
+    blob = makePointerToOptionalBlob();
+    blob.putI32(44, 0);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // The aliased value runs off the end.
+    blob = makePointerToOptionalBlob();
+    blob.resize(62);
+    SLANG_CHECK(!isAccepted(blob));
+}
+
+SLANG_UNIT_TEST(fossilValidationChecksScalarSizes)
+{
+    // Only 4-byte scalars flowed through the other blobs, so a wrong in-place
+    // size for a wider or narrower kind would under-check without being noticed.
+    // The scalar blob has exactly four bytes of content, so an 8-byte kind must
+    // be rejected and the narrow kinds must be accepted.
+    SLANG_CHECK(!isAccepted(makeScalarBlobOfKind(FossilizedValKind::Int64)));
+    SLANG_CHECK(!isAccepted(makeScalarBlobOfKind(FossilizedValKind::Float64)));
+
+    SLANG_CHECK(isAccepted(makeScalarBlobOfKind(FossilizedValKind::Bool)));
+    SLANG_CHECK(isAccepted(makeScalarBlobOfKind(FossilizedValKind::Int16)));
+    SLANG_CHECK(isAccepted(makeScalarBlobOfKind(FossilizedValKind::Float32)));
 }
 
 SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
