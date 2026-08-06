@@ -15,7 +15,8 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         EXPORT_SET_NAME SlangTargets
     )
     # Our only interface is through what we define in source/slang-glslang, in the
-    # interests of hygiene, hide anything else we link in.
+    # interests of hygiene, hide anything else we link in. This hides our own non-exported symbols;
+    # the version script below is what bounds the final export list.
     set_target_properties(
         slang-glslang
         PROPERTIES CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN ON
@@ -37,4 +38,22 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         PRIVATE
         "-Wl,--exclude-libs,ALL"
     )
+    # Bounds the export list irrespective of where a symbol came from, which the visibility preset
+    # and `--exclude-libs` above cannot do on their own. macOS is not yet covered -- Mach-O needs
+    # `-exported_symbols_list` with its own file format: see #12380.
+    if(NOT WIN32 AND NOT APPLE)
+        set(slang_glslang_version_script
+            "${CMAKE_CURRENT_SOURCE_DIR}/slang-glslang.map"
+        )
+        add_supported_cxx_linker_flags(
+            slang-glslang
+            PRIVATE
+            "-Wl,--version-script=${slang_glslang_version_script}"
+        )
+        set_property(
+            TARGET slang-glslang
+            APPEND
+            PROPERTY LINK_DEPENDS "${slang_glslang_version_script}"
+        )
+    endif()
 endif()
