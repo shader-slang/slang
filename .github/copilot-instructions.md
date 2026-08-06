@@ -16,11 +16,13 @@ DO THIS BEFORE COMMITTING YOUR CHANGES:
 RUN BOTH OF THESE to format your changes first!!
 
 ```bash
-./extras/formatting.sh --modified        # C++, CMake, YAML/JSON, shell
-./extras/formatting.sh --modified --md   # markdown - not covered by the line above
+./extras/formatting.sh --modified --no-version-check        # C++, CMake, YAML/JSON, shell
+./extras/formatting.sh --modified --md --no-version-check   # markdown - not covered by the line above
 ```
 
 Your PR needs to be formatted according to our coding style.
+
+`--no-version-check` is included because the version ranges are narrow — a distro clang-format 18.1.3 is rejected as "too new" and the script then formats nothing. Drop it if you want the exact versions CI uses; keep it if you would otherwise skip the check.
 
 Two commands are needed because a type flag such as `--md` narrows the run to that type rather than adding to it, and markdown is the one formatter a flagless run does not enable. Two further cases are covered by neither command, and both exit 0 having formatted nothing:
 

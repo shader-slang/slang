@@ -83,11 +83,13 @@ cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 **Run both of these before committing changes:**
 
 ```bash
-./extras/formatting.sh --modified        # C++, CMake, YAML/JSON, shell
-./extras/formatting.sh --modified --md   # markdown - not covered by the line above
+./extras/formatting.sh --modified --no-version-check        # C++, CMake, YAML/JSON, shell
+./extras/formatting.sh --modified --md --no-version-check   # markdown - not covered by the line above
 ```
 
 PRs must conform to the project's coding style. Add `--check-only` to either command to verify without modifying files.
+
+`--no-version-check` is included because the version ranges are narrow — a distro clang-format 18.1.3 is rejected as "too new" and the script then formats nothing, which is worse than formatting with a near-miss version. Drop the flag if you want the exact versions CI uses (`.github/actions/format-setup/action.yml`); keep it if you would otherwise skip the check.
 
 Two commands are needed because a type flag such as `--md` narrows the run to that type rather than adding to it, and markdown is the one formatter a flagless run does not enable. Two further cases are covered by neither command, and both exit 0 having formatted nothing:
 
@@ -257,7 +259,7 @@ change.)
 
 ### PR Workflow
 
-1. **Format your code**: Run `./extras/formatting.sh --modified` and then `./extras/formatting.sh --modified --md` before committing (see [Formatting](#formatting) for why both). New files are untracked, so name them explicitly: `./extras/formatting.sh -- path/to/new-file` — this does not apply to the `.slang` tests in step 3, since no formatter is configured for `.slang`.
+1. **Format your code**: Run `./extras/formatting.sh --modified --no-version-check` and then `./extras/formatting.sh --modified --md --no-version-check` before committing (see [Formatting](#formatting) for why both, and for the version flag). New files are untracked, so name them explicitly: `./extras/formatting.sh -- path/to/new-file` — this does not apply to the `.slang` tests in step 3, since no formatter is configured for `.slang`.
 2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking change" (for ABI/language breaking changes)
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Write the PR description in this required five-part format:**
@@ -569,6 +571,7 @@ The correct pattern:
 3. **Provide a mapping function** in the HLSL emitter (`slang-emit-hlsl.cpp` or `slang-emit-c-like.cpp`) that converts the stored enum/string value back to the HLSL source name so that emitted code reads e.g. `[NodeLaunch("broadcasting")]` not `[NodeLaunch(0)]`.
 
 Examples of this pattern already in the codebase:
+
 - `NodeLaunchDecoration` stores the mode as `IRStringLit("broadcasting")` and the emitter re-emits the string verbatim.
 - Work-graph output record `Get()` returns `Ref<T>` backed by `__intrinsic_asm ".Get"` so the emitted HLSL says `.Get(i)` (an l-value in HLSL) rather than an integer offset.
 
@@ -579,15 +582,18 @@ Use this when a Slang enum must be emitted as named constants rather than intege
 1. **Define the C++ enum in `slang-type-system-shared.h`** (inside `namespace Slang`, plain `enum` not `enum class` so values implicitly convert to `int`). This header is transitively included by both the core-module source and the emitters.
 
 2. **Mirror it as a Slang enum in the appropriate `*.meta.slang` file**, pulling the actual values from C++ via `$(...)` splices so the two definitions stay in sync:
+
    ```slang
    enum MyFlags : uint { FlagA = $(MyFlags::FlagA), FlagB = $(MyFlags::FlagB) }
    ```
 
 3. **Declare a `__intrinsic_op` converter in the `.meta.slang` file** to represent the enum-to-string conversion in the IR:
+
    ```slang
    __intrinsic_op(getEnumMyFlags)
    int GetEnumMyFlags(MyFlags f);
    ```
+
    The mnemonic passed to `__intrinsic_op(...)` must exactly match the Lua key in the next step.
 
 4. **Register the new IR op in `slang-ir-insts.lua`** and add a stable ID in `slang-ir-insts-stable-names.lua`.
