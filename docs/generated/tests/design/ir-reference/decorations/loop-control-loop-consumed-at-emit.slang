@@ -2,7 +2,7 @@
 //META: model=claude-fable-5
 //META: generated_at=2026-07-08T15:10:36Z
 //META: source_commit=f39188078fe010048714735213c24a7cb15532b9
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#branch-flatten-loopcontrol
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#branch--flatten--loopcontrol
 //META: doc_section_digest=262cdb3047c0e840655e74b96e0546c7c47439596c001991c8eb9e996922be06
 //META: purpose=The loopControl loop mode recorded from [loop] flows through the IR unchanged and is re-emitted by the HLSL backend as the [loop] attribute on the loop.
 //META: intent=functional

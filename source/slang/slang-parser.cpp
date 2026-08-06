@@ -88,6 +88,12 @@ enum class ParsingStage
     Body,
 };
 
+enum class AllowCaseDefaultStatements : bool
+{
+    Disallow = false,
+    Allow = true,
+};
+
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
@@ -206,8 +212,11 @@ public:
     Decl* ParseStruct();
     ClassDecl* ParseClass();
     Decl* ParseGLSLInterfaceBlock();
-    Stmt* ParseStatement(Stmt* parentStmt = nullptr);
-    Stmt* parseBlockStatement();
+    Stmt* ParseStatement(
+        Stmt* parentStmt = nullptr,
+        AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
+    Stmt* parseBlockStatement(
+        AllowCaseDefaultStatements allowCaseDefault = AllowCaseDefaultStatements::Disallow);
     Stmt* parseLabelStatement();
     DeclStmt* parseVarDeclrStatement(Modifiers modifiers);
     IfStmt* parseIfStatement();
@@ -6576,7 +6585,7 @@ static Stmt* ParseSwitchStmt(Parser* parser)
     parser->ReadToken(TokenType::LParent);
     stmt->condition = parser->ParseExpression();
     parser->ReadToken(TokenType::RParent);
-    stmt->body = parser->parseBlockStatement();
+    stmt->body = parser->parseBlockStatement(AllowCaseDefaultStatements::Allow);
     return stmt;
 }
 
@@ -6910,7 +6919,7 @@ Stmt* parseCompileTimeStmt(Parser* parser)
     }
 }
 
-Stmt* Parser::ParseStatement(Stmt* parentStmt)
+Stmt* Parser::ParseStatement(Stmt* parentStmt, AllowCaseDefaultStatements allowCaseDefault)
 {
     auto modifiers = ParseModifiers(this);
 
@@ -6956,9 +6965,19 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("__intrinsic_asm"))
         statement = parseIntrinsicAsmStmt(this);
     else if (LookAheadToken("case"))
-        statement = ParseCaseStmt(this);
+    {
+        statement = ParseCaseStmt(this); // should always return non-null
+        SLANG_RELEASE_ASSERT(statement); // ... so we'll assert that it's the case
+        if (allowCaseDefault != AllowCaseDefaultStatements::Allow)
+            sink->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = statement});
+    }
     else if (LookAheadToken("default"))
-        statement = ParseDefaultStmt(this);
+    {
+        statement = ParseDefaultStmt(this); // should always return non-null
+        SLANG_RELEASE_ASSERT(statement);    // ... so we'll assert that it's the case
+        if (allowCaseDefault != AllowCaseDefaultStatements::Allow)
+            sink->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = statement});
+    }
     else if (LookAheadToken("__GPU_FOREACH"))
         statement = ParseGpuForeachStmt(this);
     else if (LookAheadToken(TokenType::Dollar))
@@ -7126,7 +7145,7 @@ bool lookAheadTokenAfterModifiers(Parser* parser, const char* token)
     return false;
 }
 
-Stmt* Parser::parseBlockStatement()
+Stmt* Parser::parseBlockStatement(AllowCaseDefaultStatements allowCaseDefault)
 {
     if (!beginMatch(this, MatchedTokenType::CurlyBraces))
     {
@@ -7201,7 +7220,7 @@ Stmt* Parser::parseBlockStatement()
             continue;
         }
 
-        auto stmt = ParseStatement();
+        auto stmt = ParseStatement(nullptr, allowCaseDefault);
 
         if (stmt)
             addStmt(stmt);
