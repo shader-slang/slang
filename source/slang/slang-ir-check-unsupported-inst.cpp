@@ -126,10 +126,26 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
 //
 // Host C++ is not in this set because its prelude does define `Slang_FuncType`, for
 // `[DllImport]`; the PyTorch binding target is, because the torch prelude does not.
+//
+// `ShaderSharedLibrary` and `ShaderHostCallable` are included because they compile through
+// kernel C++ (see `_getDefaultSourceForTarget`), so without them the undefined name reaches
+// the downstream C++ compiler instead of a Slang diagnostic. Their LLVM path provides no
+// function-type support either.
 static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
 {
     if (isMetalTarget(target) || isWGPUTarget(target))
         return true;
+
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::ShaderObjectCode:
+        return true;
+    default:
+        break;
+    }
+
     return isKernelCPPOrCUDASourceTarget(target);
 }
 
@@ -323,11 +339,6 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
     // type-emission path, so a global that is only ever written still emits its declaration.
     const bool rejectFuncTypedValue = isTargetWithoutFuncTypeSupport(target);
 
-    // Restricted to WGSL-like targets so this cannot reach the function-typed global that
-    // `generateDllImportFuncs` synthesizes for `[DllImport]`, which is a legitimate function
-    // pointer emitted only for the C++ source/header targets.
-    const bool rejectFuncTypedGlobalVar = rejectFuncTypedValue && isWGPUTarget(target);
-
     for (auto globalInst : module->getGlobalInsts())
     {
         if (rejectFuncTypedValue)
@@ -338,21 +349,29 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                 {
                     if (holdsFuncType(field->getFieldType()))
                     {
-                        // The key carries the location of the global this field replaced
-                        // (see `introduceExplicitGlobalContext`).
+                        // The key carries the location of the global this field replaced (see
+                        // `introduceExplicitGlobalContext`). A key with no location did not come
+                        // from a declaration the user wrote -- `generateDllImportFuncs`
+                        // synthesizes a function pointer for `[DllImport]`, which is legitimate
+                        // on the C++ targets that support it -- so there is nothing to report.
                         auto key = field->getKey();
-                        auto loc = key->sourceLoc.isValid() ? key->sourceLoc : findFirstUseLoc(key);
-                        sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                        if (key->sourceLoc.isValid())
+                        {
+                            sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{
+                                .location = key->sourceLoc});
+                        }
                     }
                 }
             }
-            else if (rejectFuncTypedGlobalVar && globalInst->getOp() == kIROp_GlobalVar)
+            else if (globalInst->getOp() == kIROp_GlobalVar)
             {
-                if (holdsFuncType(globalInst->getFullType()))
+                // Same reasoning as the struct field above: WGSL keeps the global rather than
+                // moving it into a context struct, and a global with no location was
+                // synthesized rather than declared.
+                if (holdsFuncType(globalInst->getFullType()) && globalInst->sourceLoc.isValid())
                 {
-                    auto loc = globalInst->sourceLoc.isValid() ? globalInst->sourceLoc
-                                                               : findFirstUseLoc(globalInst);
-                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{
+                        .location = globalInst->sourceLoc});
                 }
             }
         }
