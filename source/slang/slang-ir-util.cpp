@@ -2182,15 +2182,16 @@ bool isEntryPointByValueUniformAggregateParam(IRParam* param)
 
     // Must be uniform, not varying; a missing layout counts as varying, the conservative direction.
     // Not asserted, even though no CUDA stage should reach here with a varying aggregate:
-    // `SLANG_ASSERT` is `SLANG_ASSUME` in release, so asserting the negation of this condition would
-    // license deleting the decline it guards.
+    // `SLANG_ASSERT` is `SLANG_ASSUME` in release, so asserting the negation of this condition
+    // would license deleting the decline it guards.
     auto varLayout = findVarLayout(param);
     if (!varLayout || isVaryingParameter(varLayout))
         return false;
 
-    // Must be a fixed-size by-value aggregate. Narrower than `isCompositeType` on purpose: that also
-    // admits `UnsizedArrayType`, which has no by-value storage whose address could be forwarded.
-    // `lowerTuples` runs first, so the tuple assert is a tripwire for a pipeline reordering.
+    // Must be a fixed-size by-value aggregate. Narrower than `isCompositeType` on purpose: that
+    // also admits `UnsizedArrayType`, which has no by-value storage whose address could be
+    // forwarded. `lowerTuples` runs first, so the tuple assert is a tripwire for a pipeline
+    // reordering.
     auto type = param->getDataType();
     if (!type)
         return false;
