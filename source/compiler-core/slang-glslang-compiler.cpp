@@ -358,9 +358,11 @@ SlangResult GlslangDownstreamCompiler::compile(
 
 SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int contentsSize)
 {
+    // `init` accepts a library that exports no validator, so "could not validate" and "the module
+    // is invalid" must stay distinguishable to the caller.
     if (m_validate == nullptr)
     {
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     if (m_validate(contents, contentsSize))
