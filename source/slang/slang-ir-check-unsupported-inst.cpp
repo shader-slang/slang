@@ -341,26 +341,24 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                     if (holdsFuncType(field->getFieldType()))
                     {
                         // The key carries the location of the global this field replaced (see
-                        // `introduceExplicitGlobalContext`). Without a location there is no
-                        // source position to report and nothing the reader could act on, so
-                        // the value is passed over.
+                        // `introduceExplicitGlobalContext`), but a declaration read from a
+                        // precompiled module has none, so fall back to a use. The value is
+                        // rejected either way: emitting it would produce output the target
+                        // cannot represent, whether or not a position can be named for it.
                         auto key = field->getKey();
-                        if (key->sourceLoc.isValid())
-                        {
-                            sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{
-                                .location = key->sourceLoc});
-                        }
+                        auto loc = key->sourceLoc.isValid() ? key->sourceLoc : findFirstUseLoc(key);
+                        sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
                     }
                 }
             }
             else if (globalInst->getOp() == kIROp_GlobalVar)
             {
-                // WGSL keeps the global rather than moving it into a context struct. Same
-                // location requirement as the struct field above.
-                if (holdsFuncType(globalInst->getDataType()) && globalInst->sourceLoc.isValid())
+                // WGSL keeps the global rather than moving it into a context struct.
+                if (holdsFuncType(globalInst->getDataType()))
                 {
-                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{
-                        .location = globalInst->sourceLoc});
+                    auto loc = globalInst->sourceLoc.isValid() ? globalInst->sourceLoc
+                                                               : findFirstUseLoc(globalInst);
+                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
                 }
             }
         }
