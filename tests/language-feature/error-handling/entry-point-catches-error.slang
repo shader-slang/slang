@@ -34,8 +34,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     }
     catch (err : uint)
     {
-        // Reached only for lane 0, and only because the entry point handles the error here
-        // instead of declaring `throws` itself.
         outputBuffer[tid.x] = err;
     }
 }

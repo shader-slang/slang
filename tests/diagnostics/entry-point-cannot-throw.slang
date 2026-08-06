@@ -9,11 +9,7 @@
 // `[shader("compute")]` attribute below (reaching it via `Module::_discoverEntryPointsImpl`).
 //
 // A shader entry point is invoked by the pipeline, not by other Slang code, so it has
-// nowhere to propagate an uncaught error to. `throws` on an entry point used to reach
-// error-handling lowering, which rewrote the entry point's `void` result into a
-// `ResultType` struct that no layout had been computed for -- aborting SPIR-V/GLSL/
-// Metal/WGSL legalization on an assert, and emitting an entry point with a struct
-// return type (rejected by DXC) for HLSL. It is now diagnosed up front.
+// nowhere to propagate an uncaught error to.
 
 RWStructuredBuffer<uint> outputBuffer;
 

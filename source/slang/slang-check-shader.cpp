@@ -1731,8 +1731,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     // An entry point is invoked by the pipeline, which has no channel for returning an error,
     // so it cannot declare `throws`. `getErrorCodeType` normalizes a missing `throws` clause to
-    // the bottom type, and is the same predicate `_lowerInfoFromFuncParameters` uses to decide
-    // whether to attach `kIROp_FuncThrowTypeAttr`, so the two cannot drift apart.
+    // the bottom type; it is the canonical AST error-type predicate, also used by function
+    // lowering to decide whether to attach `kIROp_FuncThrowTypeAttr`.
     auto astBuilder = linkage->getASTBuilder();
     if (!getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef())
              ->equals(astBuilder->getBottomType()))
