@@ -92,6 +92,8 @@ prelude/*.h.cpp
 /external/dxvk-remix/
 /external/SaschaWillems-Vulkan/
 /external/falcor/
+/external/vk-gl-cts/
+/external/vk-gl-cts-bin/
 
 build/**/*.tlog
 build/**/*.lastbuildstate

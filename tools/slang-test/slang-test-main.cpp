@@ -1525,6 +1525,14 @@ static SlangResult _extractSlangCTestRequirements(
             ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
         }
     }
+
+    // `-emit-cpu-via-llvm` routes CPU/host-callable code generation through the slang-llvm
+    // backend regardless of the `-target`, so a test using it depends on that backend.
+    if (_hasOption(cmdLine.m_args, "-emit-cpu-via-llvm"))
+    {
+        ioRequirements->addUsedBackEnd(SLANG_PASS_THROUGH_LLVM);
+    }
+
     return SLANG_OK;
 }
 
@@ -4636,10 +4644,17 @@ TestResult runTest(
     String const& testName,
     TestOptions const& testOptions)
 {
-    // If we are collecting requirements and it's diagnostic test, we always run
-    // (ie no requirements need to be captured - effectively it has 'no requirements')
+    // Diagnostic tests validate front-end diagnostics that slangc emits before any backend
+    // runs, so they normally need no backend and run everywhere. The exception is
+    // `-emit-cpu-via-llvm`, which forces the slang-llvm backend before the diagnostic is
+    // reached; capture that here too. This branch returns before the general
+    // `_extractSlangCTestRequirements` path runs, so the two checks stay disjoint.
     if (context->isCollectingRequirements() && testOptions.type == TestOptions::Diagnostic)
     {
+        if (_hasOption(testOptions.args, "-emit-cpu-via-llvm"))
+        {
+            context->getTestRequirements()->addUsedBackEnd(SLANG_PASS_THROUGH_LLVM);
+        }
         return TestResult::Pass;
     }
 

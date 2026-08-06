@@ -254,6 +254,13 @@ err(
 )
 
 err(
+    "spirv-validation-unavailable",
+    115,
+    "SPIR-V validation was requested, but the loaded 'slang-glslang' library does not export 'glslang_validateSPIRV'; no SPIR-V was validated",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -1737,6 +1744,13 @@ warning(
     30082,
     "implicit float-to-double conversion",
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
+)
+
+warning(
+    "deprecated-struct-cast-from-zero",
+    30087,
+    "casting literal 0 to a struct type changes semantics in Slang 202c",
+    span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 202c. To keep the current semantics, switch to a constructor with no parameters." }
 )
 
 -- try/throw diagnostics
