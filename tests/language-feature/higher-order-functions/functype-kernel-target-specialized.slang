@@ -3,7 +3,7 @@
 //
 // `isParamSuitableForSpecialization` accepts an `IRGlobalValueWithCode` argument, so
 // `specializeHigherOrderParameters` replaces the call with a direct one and no function type
-// ever reaches emission. This is the shape users should write, and it is what E55215 points
+// ever reaches emission. This is the shape users should write, and it is what E55216 points
 // them toward -- so this test guards against that diagnostic being too broad. If the check
 // starts keying on the function *type* rather than on a function-typed value being stored,
 // every one of these targets would begin erroring on correct code.

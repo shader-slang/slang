@@ -5,7 +5,7 @@
 // wrote source that cannot be compiled, with no diagnostic at all.
 //
 // `functype` is implemented for SPIR-V and the LLVM/CPU path, so this is a per-target
-// limitation rather than a language-level one: it must be reported (E55215) instead of
+// limitation rather than a language-level one: it must be reported (E55216) instead of
 // silently emitting undefined output.
 //
 // One directive per target: the four differ structurally. `introduceExplicitGlobalContext`
