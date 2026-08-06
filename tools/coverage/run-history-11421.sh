@@ -10,7 +10,7 @@ BRANCH_HEAD="$(git rev-parse HEAD)"
 RUNNER="tools/coverage/run-generated-coverage.sh"
 
 echo "=== Waiting for run-history.sh to finish (if still running) ==="
-while pgrep -f run-history.sh > /dev/null 2>&1; do
+while pgrep -f run-history.sh >/dev/null 2>&1; do
   sleep 30
 done
 

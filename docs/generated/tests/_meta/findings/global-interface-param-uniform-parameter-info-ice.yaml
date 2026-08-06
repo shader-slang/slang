@@ -6,7 +6,7 @@ title: "uniform global of interface type + -conformance aborts with an internal 
 observed_at: "2026-08-05T00:00:00+00:00"
 scope: diagnostics
 evidence:
-  command: "build/RelWithDebInfo/bin/slangc /tmp/emitcov/iface3.slang -target hlsl -entry computeMain -stage compute -conformance \"Circle:IShape=0\" -conformance \"Square:IShape=1\""
+  command: 'build/RelWithDebInfo/bin/slangc /tmp/emitcov/iface3.slang -target hlsl -entry computeMain -stage compute -conformance "Circle:IShape=0" -conformance "Square:IShape=1"'
   source_slang: tests/language-feature/dynamic-dispatch/global-interface-param.slang
   observed_summary: |
     A global shader parameter declared directly at interface type aborts every target
