@@ -33,8 +33,8 @@ Run with no arguments, the script prints its help text and exits 0 without forma
 
 The formatting script requires these tools:
 
-- **clang-format** 17-18 (for C++ files)
-- **gersemi** 0.21-0.22 (for CMake files)
+- **clang-format** 17.x only (`>= 17, < 18`) (for C++ files)
+- **gersemi** 0.21.x only (`>= 0.21, < 0.22`) (for CMake files)
 - **prettier** 3+ (for YAML/JSON/Markdown files)
 - **shfmt** 3+ (for shell scripts)
 
