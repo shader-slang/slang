@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-8[1m]
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-codes-and-the-name-field
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-code-namespace
 //META: doc_section_digest=f4e4743214fa16b25679c231bf78519febf5f40d591d803e8822ade1f048c8fc
 //META: purpose=Verifies an out-of-range optimization level (-O9) is rejected with E00062 listing the accepted -O values.
 //META: intent=characterization

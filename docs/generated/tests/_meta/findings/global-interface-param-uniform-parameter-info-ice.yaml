@@ -1,0 +1,61 @@
+schema_version: 1
+id: global-interface-param-uniform-parameter-info-ice
+bundle: coverage/emit
+suspected_kind: wrong-diagnostic
+title: "uniform global of interface type + -conformance aborts with an internal error"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/emitcov/iface3.slang -target hlsl -entry computeMain -stage compute -conformance \"Circle:IShape=0\" -conformance \"Square:IShape=1\""
+  source_slang: tests/language-feature/dynamic-dispatch/global-interface-param.slang
+  observed_summary: |
+    A global shader parameter declared directly at interface type aborts every target
+    with an internal error as soon as two conformances are registered:
+
+      error[E99997]: Slang compilation aborted due to an exception of
+      N5Slang13InternalErrorE unexpected: Unexpected context type for parameter info retrieval
+
+    Reproduced on -target hlsl, glsl, spirv-asm, cuda and cpp; exit code 255 in each case.
+    The shader is the ConstantBuffer form of the existing hand-written sibling test with
+    the wrapper removed:
+
+      [anyValueSize(16)]
+      interface IShape { float area(); }
+      struct Circle : IShape { float r; float area() { return 3.14159 * r * r; } }
+      struct Square : IShape { float s; float area() { return s * s; } }
+      RWStructuredBuffer<float> outBuf;
+      uniform IShape shape;                 // <-- ConstantBuffer<IShape> in the sibling test
+      [numthreads(1,1,1)]
+      void computeMain() { outBuf[0] = shape.area(); }
+
+    Changing only that one line to `ConstantBuffer<IShape> shape;` compiles cleanly on
+    every one of those targets, so the interface, the conformances and the call site are
+    all accepted; it is the unwrapped global-parameter form that aborts. Dropping
+    `[anyValueSize(16)]` does not change the outcome, and omitting `-conformance`
+    produces the ordinary `error[E50100]: no type conformances found` instead of the
+    abort, so the abort is specific to the combination.
+
+    The finding surfaced while probing the C++ back end's witness-table emission path
+    (`CLikeSourceEmitter::getSortedWitnessTableEntries`) for the coverage/emit bundle;
+    no test was committed for it. `evidence.source_slang` points at the closest
+    committed shader — the sibling test whose single-line variation reproduces this.
+  exit_code: 255
+  stderr_tail: "error[E99997]: Slang compilation aborted due to an exception of N5Slang13InternalErrorE unexpected: Unexpected context type for parameter info retrieval"
+expected:
+  claim: |
+    A global shader parameter of interface type should either compile the same way the
+    `ConstantBuffer<IFoo>` form does, or be rejected with a real, located diagnostic
+    naming the unsupported declaration form. An unhandled InternalError with no source
+    location leaves the user no way to tell which declaration is at fault.
+  citation_kind: sibling-test
+  citation: tests/language-feature/dynamic-dispatch/global-interface-param.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/06-target-code-emit.md
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug (bad -conformance spelling): ruled out — the identical flags compile cleanly once the parameter is wrapped in ConstantBuffer<>, and the sequential-ID form matches the sibling test."
+    - "Deliberately unsupported declaration form: plausible, and in that case the correct behaviour is still a located diagnostic rather than an InternalError."
+    - "Missing [anyValueSize]: ruled out — the abort reproduces both with and without the attribute."
