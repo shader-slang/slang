@@ -58,6 +58,8 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 brew install clang-format gersemi prettier shfmt
 ```
 
+These formulae are unpinned, so they may install versions outside the ranges above. Check with `clang-format --version` and `gersemi --version`; if either falls outside its range, install a matching build or rely on `--no-version-check` as the commands above do.
+
 You can also add `--check-only` to either command above to verify without modifying files — that checks the same set the command would format. A bare `./extras/formatting.sh --check-only` checks the whole tree instead, which will report pre-existing violations in files you did not touch.
 
 ## Labeling your PR
