@@ -15011,8 +15011,12 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             // an unconditional abort in the backward-diff type builders.
             if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
             {
-                if (paramDecl->hasModifier<RefModifier>() ||
-                    paramDecl->hasModifier<BorrowModifier>())
+                // Only a differentiable parameter type is a problem: a derivative is only expected
+                // through a parameter whose type conforms to `IDifferentiable`, so
+                // `const groupshared uint[N]` is fine while `const groupshared float[N]` is not.
+                if (isTypeDifferentiable(paramDecl->type.type) &&
+                    (paramDecl->hasModifier<RefModifier>() ||
+                     paramDecl->hasModifier<BorrowModifier>()))
                 {
                     getSink()->diagnose(
                         Diagnostics::CannotUseGroupsharedOnDifferentiableFunctionParameter{
