@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
 
-// The second decline reason in `getForwardableParamStorage`: a callee that `shouldProcessFunction`
+// The second decline reason in `findForwardableParamStorage`: a callee that `shouldProcessFunction`
 // refuses to rewrite. `cuda-forward-uniform-signature-preserved-callee.slang` covers the
 // `hasSignaturePreservingUse` reason; this one covers `!shouldProcessFunction(callee)`, which is a
 // distinct path - `exported_read` below is only ever *called*, so it has no signature-preserving
@@ -10,7 +10,7 @@
 // leaves alone (`shouldProcessFunction` returns false on `CudaDeviceExportDecoration`). Forwarding
 // `&big` into it would hand a `Big_0 *` to a by-value `Big_0` parameter, which NVRTC rejects.
 //
-// Two callees are needed to reach the decline at all. `getForwardableParamStorage` is only
+// Two callees are needed to reach the decline at all. `findForwardableParamStorage` is only
 // consulted from `updateCallSites`, which runs for a function the pass *did* rewrite: `normal_read`
 // is that function and makes the forward be attempted for `big`, while `exported_read` is the one
 // the gate then has to decline. With only the exported callee present, no rewrite happens anywhere,

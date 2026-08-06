@@ -9,7 +9,7 @@
 // a function *value* for the runtime-selected argument of `call`. That second use makes
 // `hasSignaturePreservingUse(readsumA)` true, so `processFunc` leaves its parameters as by-value
 // `Big`. Forwarding `&big` into it anyway would hand a `Big*` to a `Big` parameter, which NVRTC
-// rejects; the callee check in `getForwardableParamStorage` is what declines that.
+// rejects; the callee check in `findForwardableParamStorage` is what declines that.
 //
 // `call` itself has no such use, so its aggregate parameter *is* rewritten to `borrow in` - which
 // is what makes this a discriminating test rather than a target-wide no-op: both decisions are
