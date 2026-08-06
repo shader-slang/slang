@@ -25,8 +25,9 @@ uint g(uint n) throws uint
 // The `/*CHECK:` block below binds to the last non-blank line above it that is not itself an
 // annotation, and matches its carets against that line by column. A comment counts as such a
 // line, so inserting one between the declaration and the block retargets the carets at the
-// comment instead. Renaming `computeMain` or re-indenting its line moves the target
-// horizontally. Both mistakes leave a test that still runs, so re-run it after either.
+// comment; renaming `computeMain` or re-indenting its line moves the target horizontally.
+// Either way the run fails loudly rather than passing vacuously -- matching is exhaustive, so
+// the orphaned diagnostic is reported too -- and the harness prints annotations to copy.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID) throws uint
