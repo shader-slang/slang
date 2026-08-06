@@ -164,7 +164,13 @@ private:
     ///
     void _requireRange(BlobOffset offset, Int64 rangeSize)
     {
-        SLANG_ASSERT(rangeSize >= 0);
+        // Release-asserted rather than debug-asserted, because this is the single
+        // control that proves every read is in bounds and a negative `rangeSize`
+        // silently inverts it: the bound below would grow instead of shrink. That
+        // is not hypothetical -- an earlier revision of the container extent check
+        // overflowed to a negative size and defeated this test in release builds.
+        //
+        SLANG_RELEASE_ASSERT(rangeSize >= 0);
 
         // Subtract from the bound rather than adding to `offset`, so that a large
         // `offset` cannot overflow.
@@ -190,6 +196,12 @@ private:
     /// Read the relative pointer stored at `offset`, returning the offset of what
     /// it points at, or `kNullOffset` if it is null.
     ///
+    /// Null is decided from the raw stored offset being zero, exactly as
+    /// `RelativePtr::get()` decides it. The two tests have to agree: if the walk
+    /// treated a pointer as null that the reader treats as non-null, it would skip
+    /// validating everything that pointer reaches while the reader still followed
+    /// it.
+    ///
     BlobOffset _readRelativePtr(BlobOffset offset)
     {
         auto relativeOffset = _read<FossilInt>(offset);
@@ -200,7 +212,17 @@ private:
         // computed in the offset domain, so no pointer outside the blob is ever
         // formed, let alone dereferenced.
         //
-        return offset + Int64(relativeOffset);
+        auto targetOffset = offset + Int64(relativeOffset);
+
+        // A target before the start of the blob is out of bounds, so rejecting it
+        // here loses nothing. Doing so is also what keeps a computed target from
+        // colliding with `kNullOffset`: a pointer aimed one byte before the blob
+        // computes to exactly -1, and without this check every caller would read
+        // that as null and skip the subtree, while the reader -- which sees a
+        // non-zero raw offset -- would follow it out of bounds.
+        //
+        SLANG_SERIALIZE_FOSSIL_VALIDATE(targetOffset >= 0);
+        return targetOffset;
     }
 
     /// Validate that the layout object at `layoutOffset` is itself readable, and
