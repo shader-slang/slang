@@ -1,5 +1,5 @@
 // slang-check-modifier.cpp
-#include "../core/slang-char-util.h"
+#include "core/slang-char-util.h"
 #include "slang-check-impl.h"
 #include "slang-rich-diagnostics.h"
 

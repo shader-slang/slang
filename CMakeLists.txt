@@ -39,6 +39,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Default to `-Og` for Debug builds on GNU-style compilers: it enables the
+# optimizations that do not interfere with debugging, producing noticeably
+# faster Debug binaries while keeping a faithful step-through/inspection
+# experience.
+#
+# The `NOT WIN32` guard excludes MSVC and clang-cl, which expect MSVC-style
+# flags and have no `-Og` equivalent. `CMAKE_CXX_COMPILER_ID` is not yet known
+# at this point (it is set by enable_language() below), so the platform is
+# the closest available proxy. A side effect is that MinGW builds do not get
+# `-Og` by default. Those users can pass `-DCMAKE_CXX_FLAGS_DEBUG="-Og -g"`
+# explicitly.
+#
+# Note: We use `string(PREPEND ...)` rather than `set(...)`: a
+# toolchain file is processed by the `project()` call above, and some
+# toolchains seed these same `_INIT` variables. Prepending keeps
+# whatever the toolchain asked for, giving precedence to the toolchain
+# option definitions (e.g., optimization level).
+if(NOT WIN32)
+    string(PREPEND CMAKE_C_FLAGS_DEBUG_INIT "-Og ")
+    string(PREPEND CMAKE_CXX_FLAGS_DEBUG_INIT "-Og ")
+endif()
+
 #
 # CMake-supplied modules and our utils
 #
@@ -341,6 +363,27 @@ enum_option(
     "Build slang-compiler as a static library"
 )
 
+set(SLANG_ENABLE_MIMALLOC_DEFAULT OFF)
+if(
+    WIN32
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
+    AND SLANG_LIB_TYPE STREQUAL "SHARED"
+    AND NOT SLANG_ENABLE_ASAN
+)
+    set(SLANG_ENABLE_MIMALLOC_DEFAULT ON)
+endif()
+advanced_option(
+    SLANG_ENABLE_MIMALLOC
+    "Use mimalloc for Slang-owned allocations"
+    ${SLANG_ENABLE_MIMALLOC_DEFAULT}
+)
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
+    message(
+        WARNING
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
+    )
+endif()
+
 option(
     SLANG_ENABLE_RELEASE_DEBUG_INFO
     "Generate debug info for Release builds"
@@ -623,6 +666,13 @@ install(
     DESTINATION .
     COMPONENT metadata
     EXCLUDE_FROM_ALL
+)
+install(
+    DIRECTORY "${slang_SOURCE_DIR}/LICENSES"
+    DESTINATION .
+    COMPONENT metadata
+    EXCLUDE_FROM_ALL
+    PATTERN ".*" EXCLUDE
 )
 install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"

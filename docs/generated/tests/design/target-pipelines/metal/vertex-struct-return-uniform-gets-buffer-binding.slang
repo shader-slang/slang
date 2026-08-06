@@ -35,6 +35,6 @@ VOut main(uint vid : SV_VertexID, uniform float2 scaleBias)
 
 // CHECK: position
 // CHECK: vertex
-// CHECK-SAME: main_0
+// CHECK-SAME: main_{{[0-9]+}}
 // CHECK-SAME: constant
 // CHECK-SAME: buffer(0)

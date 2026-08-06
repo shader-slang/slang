@@ -11,12 +11,11 @@
 // of the compiler, and operates as logical transformation from one stream of tokens
 // to another.
 
-#include "../compiler-core/slang-lexer.h"
+#include "compiler-core/slang-lexer.h"
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {

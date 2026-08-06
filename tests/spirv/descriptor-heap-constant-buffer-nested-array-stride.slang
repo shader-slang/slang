@@ -1,18 +1,16 @@
 // Regression test for #11483: a `ConstantBuffer<T>` fetched through the
-// descriptor-heap untyped-pointer path (`spvDescriptorHeapEXT`) read back wrong data
-// for any nested-array member, because the descriptor-heap buffer pointer was emitted
-// in the Uniform storage class. Uniform pointer types carry no pointer-type
-// `ArrayStride` (Uniform uses logical addressing), so addressing a nested array
-// through the `OpBufferPointerEXT`-derived pointer computed an undefined offset; only
-// the leading scalar at offset 0 was correct. A bound `[[vk::binding]]` ConstantBuffer
-// and a `StructuredBuffer<T>` fetched the same way are unaffected.
+// descriptor-heap path (`spvDescriptorHeapEXT`) read back wrong data for any nested-array
+// member, because the descriptor-heap buffer pointer was emitted as a typed pointer that
+// carried no pointer-type `ArrayStride`, so addressing a nested array through it computed an
+// undefined offset; only the leading scalar at offset 0 was correct.
 //
-// The fix retypes the descriptor-heap ConstantBuffer buffer pointer into the
-// StorageBuffer storage class (matching the StructuredBuffer-via-heap path), so the
-// buffer pointer and its nested-array element pointer types receive the pointer-type
-// `ArrayStride` decorations the driver needs. The reporter hit this under scalar
-// layout, so both the default std140 path and `-fvk-use-scalar-layout` (`_natural`)
-// are pinned below.
+// Since #12226 the descriptor-heap constant buffer is fetched as a uniform-buffer descriptor
+// (`OpTypeBufferEXT Uniform`) whose data pointer is an untyped Uniform pointer, and members
+// are addressed with `OpUntypedAccessChainKHR` naming the pointee aggregate. The stride comes
+// from ordinary array-type `ArrayStride` decorations (logical addressing), so nested arrays
+// address correctly with no pointer-type `ArrayStride` and the descriptor keeps its
+// uniform-buffer kind. The reporter hit this under scalar layout, so both the default std140
+// path and `-fvk-use-scalar-layout` (`_natural`) are pinned below.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -entry main -stage compute -capability spvDescriptorHeapEXT
 //TEST:SIMPLE(filecheck=CHECKSCALAR): -target spirv-asm -entry main -stage compute -capability spvDescriptorHeapEXT -fvk-use-scalar-layout
@@ -34,24 +32,28 @@ void main(uniform DescriptorHandle<RWStructuredBuffer<float>> output, uniform ui
         cb.vals[2] + cb.vecs[1].x + cb.mats[3][1][2] + cb.scalar;
 }
 
-// Checks are ordered to match SPIR-V section order: annotations (OpDecorate) before
-// types (OpTypePointer) before the function body (OpBufferPointerEXT).
-//
 // --- default std140 layout ---
-// The nested-array element pointer types must carry pointer-type ArrayStride so the
-// buffer-pointer addressing of vals[i] / vecs[i] / mats[i] is well-defined.
-// CHECK-DAG: OpDecorate %_ptr_StorageBuffer__arr_float_int_4 ArrayStride 16
-// CHECK-DAG: OpDecorate %_ptr_StorageBuffer__arr_v4float_int_4 ArrayStride 64
-// CHECK-DAG: OpDecorate %_ptr_StorageBuffer__arr_mat4v4float_int_4 ArrayStride 256
-// The descriptor-heap ConstantBuffer must be fetched as a StorageBuffer-class buffer
-// pointer (a regression back to Uniform would rename this type and fail the match),
-// and that pointer must feed the OpBufferPointerEXT heap fetch.
-// CHECK: %[[CBPTR:_ptr_StorageBuffer_CameraData_std140]] = OpTypePointer StorageBuffer %CameraData_std140
-// CHECK: OpBufferPointerEXT %[[CBPTR]]
+// The nested arrays carry ordinary array-type ArrayStride decorations (std140 rounds the
+// float[4] element stride up to 16); no pointer-type ArrayStride is emitted.
+// CHECK-DAG: OpDecorate %_arr_float_int_4 ArrayStride 16
+// CHECK-DAG: OpDecorate %_arr_v4float_int_4 ArrayStride 16
+// CHECK-DAG: OpDecorate %_arr_mat4v4float_int_4 ArrayStride 64
+// The descriptor-heap ConstantBuffer is a uniform-buffer descriptor whose data pointer is an
+// untyped Uniform pointer, and its members are addressed with untyped access chains naming the
+// pointee aggregate as the Base Type.
+// CHECK: OpTypeBufferEXT Uniform
+// CHECK: %[[UNIFORM_PTR:_ptr_Uniform]] = OpTypeUntypedPointerKHR Uniform{{$}}
+// CHECK: OpBufferPointerEXT %[[UNIFORM_PTR]]
+// CHECK: OpUntypedAccessChainKHR %[[UNIFORM_PTR]] %CameraData_std140
+// A regression back to a typed StorageBuffer constant-buffer pointer must not reappear.
+// CHECK-NOT: OpTypePointer StorageBuffer %CameraData_std140
 
 // --- scalar layout (-fvk-use-scalar-layout): the configuration the #11483 reporter used ---
-// CHECKSCALAR-DAG: OpDecorate %_ptr_StorageBuffer__arr_float_int_4 ArrayStride 16
-// CHECKSCALAR-DAG: OpDecorate %_ptr_StorageBuffer__arr_v4float_int_4 ArrayStride 64
-// CHECKSCALAR-DAG: OpDecorate %_ptr_StorageBuffer__arr_mat4v4float_int_4 ArrayStride 256
-// CHECKSCALAR: %[[CBPTRN:_ptr_StorageBuffer_CameraData_natural]] = OpTypePointer StorageBuffer %CameraData_natural
-// CHECKSCALAR: OpBufferPointerEXT %[[CBPTRN]]
+// CHECKSCALAR-DAG: OpDecorate %_arr_float_int_4 ArrayStride 4
+// CHECKSCALAR-DAG: OpDecorate %_arr_v4float_int_4 ArrayStride 16
+// CHECKSCALAR-DAG: OpDecorate %_arr_mat4v4float_int_4 ArrayStride 64
+// CHECKSCALAR: OpTypeBufferEXT Uniform
+// CHECKSCALAR: %[[UNIFORM_PTRN:_ptr_Uniform]] = OpTypeUntypedPointerKHR Uniform{{$}}
+// CHECKSCALAR: OpBufferPointerEXT %[[UNIFORM_PTRN]]
+// CHECKSCALAR: OpUntypedAccessChainKHR %[[UNIFORM_PTRN]] %CameraData_natural
+// CHECKSCALAR-NOT: OpTypePointer StorageBuffer %CameraData_natural

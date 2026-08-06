@@ -19,7 +19,10 @@ standard output = {
                             "name": "ptrInt",
                             "type": {
                                 "kind": "pointer",
-                                "valueType": "int"
+                                "valueType": "int",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 8}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
                         },
@@ -27,7 +30,10 @@ standard output = {
                             "name": "ptrInt2",
                             "type": {
                                 "kind": "pointer",
-                                "valueType": "int"
+                                "valueType": "int",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 8}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
                         },
@@ -35,7 +41,10 @@ standard output = {
                             "name": "anInt",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "int32"
+                                "scalarType": "int32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 0}
                         },
@@ -49,7 +58,10 @@ standard output = {
                                         "name": "a",
                                         "type": {
                                             "kind": "scalar",
-                                            "scalarType": "float32"
+                                            "scalarType": "float32",
+                                            "sizes": [
+                                                {"kind": "uniform", "value": 4, "alignment": 4}
+                                            ]
                                         },
                                         "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                                     },
@@ -57,7 +69,10 @@ standard output = {
                                         "name": "b",
                                         "type": {
                                             "kind": "scalar",
-                                            "scalarType": "int32"
+                                            "scalarType": "int32",
+                                            "sizes": [
+                                                {"kind": "uniform", "value": 4, "alignment": 4}
+                                            ]
                                         },
                                         "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                                     },
@@ -65,10 +80,16 @@ standard output = {
                                         "name": "ptrC",
                                         "type": {
                                             "kind": "pointer",
-                                            "valueType": "int"
+                                            "valueType": "int",
+                                            "sizes": [
+                                                {"kind": "uniform", "value": 8, "alignment": 8}
+                                            ]
                                         },
                                         "binding": {"kind": "uniform", "offset": 8, "size": 8, "elementStride": 0}
                                     }
+                                ],
+                                "sizes": [
+                                    {"kind": "uniform", "value": 16, "alignment": 8}
                                 ]
                             },
                             "binding": {"kind": "uniform", "offset": 24, "size": 16, "elementStride": 0}
@@ -77,12 +98,21 @@ standard output = {
                             "name": "anotherPtr",
                             "type": {
                                 "kind": "pointer",
-                                "valueType": "AnotherStruct"
+                                "valueType": "AnotherStruct",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 8, "alignment": 8}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 40, "size": 8, "elementStride": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 48, "alignment": 8}
                     ]
-                }
+                },
+                "sizes": [
+                    {"kind": "uniform", "value": 16, "alignment": 8}
+                ]
             }
         },
         {
@@ -94,8 +124,14 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "int32"
-                }
+                    "scalarType": "int32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "uniform", "value": 16, "alignment": 8}
+                ]
             }
         }
     ],
@@ -113,7 +149,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

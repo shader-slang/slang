@@ -62,9 +62,27 @@ authoritative doc for that one claim. Examples:
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#name-binding
 ```
 
-The path must exist; the lint pass validates this. If the anchor
-fragment does not match a heading in the file, the test still passes
-lint but the citation is fragile and reviewers will catch it.
+The path must exist; the lint pass validates this and fails on a
+`doc_ref` whose path does not resolve.
+
+The anchor fragment must also match a heading in that file. Lint checks
+it and reports a warning when it does not, because an anchor that no
+heading generates silently drops the reader at the top of the document.
+Derive the fragment from the heading the way GitHub does rather than
+writing it by hand: lowercase the heading, delete every character that
+is not a word character, a hyphen, or a space, then turn each remaining
+space into a hyphen. Punctuation is **deleted, not replaced**, so the
+spaces around it each still produce a hyphen:
+
+| Heading                                          | Anchor                                             |
+| ------------------------------------------------ | -------------------------------------------------- |
+| `### Builtin operators bypass call lowering`     | `#builtin-operators-bypass-call-lowering`          |
+| `### MemberExpr / StaticMemberExpr`              | `#memberexpr--staticmemberexpr` (two hyphens)      |
+| `### CUDA / Python / FFI attributes`             | `#cuda--python--ffi-attributes`                    |
+
+Copy the anchor out of the source doc's heading; do not reuse an anchor
+quoted in another bundle's README without checking it against the
+heading.
 
 ### Where the test lives — role-based trees (`conformance/` + `design/`)
 
@@ -196,22 +214,22 @@ strategy (e.g. "one positive + one negative per claim in sections
 
 | Claim                                                                          | Intent     | Anchor                                                               | Tests                                                                    |
 | ------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| The more specialized generic wins when both candidates are equally accessible. | functional | [#overload-resolution](../../../design/<doc>.md#overload-resolution) | [`overload-prefer-specialized.slang`](overload-prefer-specialized.slang) |
+| The more specialized generic wins when both candidates are equally accessible. | functional | [#overload-resolution](<relative-path-to-doc>#overload-resolution) | [`overload-prefer-specialized.slang`](overload-prefer-specialized.slang) |
 | ...                                                                            | ...        | ...                                                                  | ...                                                                      |
 
 ## Untested claims
 
 | Claim                                                                                                                                     | Reason          | Anchor                                                           | Why untested                                                                                                                                     |
 | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization. | needs-unit-test | [#serialize-pattern](../../../design/<doc>.md#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
-| The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function.                                                      | gpu-dxr         | [#dxr-ray-tracing](../../../design/<doc>.md#dxr-ray-tracing)     | Agent runtime has no GPU; CI nightly has D3D12 + DXR support.                                                                                    |
+| The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization. | needs-unit-test | [#serialize-pattern](<relative-path-to-doc>#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
+| The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function.                                                      | gpu-dxr         | [#dxr-ray-tracing](<relative-path-to-doc>#dxr-ray-tracing)     | Agent runtime has no GPU; CI nightly has D3D12 + DXR support.                                                                                    |
 | ...                                                                                                                                       | ...             | ...                                                              | ...                                                                                                                                              |
 
 ## Doc gaps observed
 
 | Anchor                                                             | Kind            | Gap                                                                                                             | Suggested addition                                                              |
 | ------------------------------------------------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [#basic-scalar-types](../../../design/<doc>.md#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
+| [#basic-scalar-types](<relative-path-to-doc>#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
 | ...                                                                | ...             | ...                                                                                                             | ...                                                                             |
 ```
 
@@ -228,6 +246,18 @@ negative | expansion | regression` and matches the test's
 - **Anchor** is a markdown link to the cited section of the source doc:
   `[#anchor-name](<relative-path-to-doc>#anchor-name)`. Use the same
   anchor that appears in the tests' `//META: doc_ref=...` fields.
+  The path is relative to **this bundle's directory**, which is one
+  level deeper in the `design/` tree than in the `conformance/` tree —
+  count the `../` steps for the bundle you are actually writing instead
+  of copying them from another bundle:
+
+  | Bundle directory                                     | Link to `docs/generated/design/<doc>.md` | Link to `docs/language-reference/<doc>.md` |
+  | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+  | `docs/generated/tests/conformance/<bundle>/`         | `../../../design/<doc>.md`               | `../../../../language-reference/<doc>.md`  |
+  | `docs/generated/tests/design/<area>/<bundle>/`       | `../../../../design/<doc>.md`            | `../../../../../language-reference/<doc>.md` |
+
+  Lint fails on a README link whose path does not resolve, so check the
+  link resolves from the bundle directory before finishing.
 - **Tests** is a comma-separated list of clickable filenames in the
   bundle directory, formatted ``[`filename.slang`](filename.slang)``.
   Never repeat a claim across rows — if multiple tests verify the same
@@ -235,9 +265,16 @@ negative | expansion | regression` and matches the test's
   row.
 - Rows are sorted by anchor, then by claim text, so claims under the
   same doc section cluster.
+- A literal `|` inside any cell must be escaped as `\|`, including
+  inside backticks. Claims often need one — a `||` operator in a gate
+  condition, a union, a shell pipe — and an unescaped one opens a new
+  cell, so the row grows a column and GitHub drops the trailing ones.
+  Write `` `gated on isKhronosTarget \|\| HLSL` ``, not `` `... || ...` ``.
+  Every row must have exactly as many cells as the header.
 
 The lint pass verifies that every `.slang` file in the bundle directory
-appears in the Functional coverage table's Tests column.
+appears in the Functional coverage table's Tests column, and fails on
+any table whose rows disagree with its header on cell count.
 
 **Doc-gap table rules:**
 
@@ -491,6 +528,88 @@ Allowed directives (any of these — pick what fits the claim):
 matcher will consume. A `//TEST` directive with no corresponding
 CHECK pattern is rejected by lint — such a test runs but verifies
 nothing.
+
+### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
+
+You are writing a pattern that must match the compiler's *actual*
+emitted text, which you cannot see while generating. You will guess
+wrong if you pin exact generated output. **Assert stable structure with
+loose patterns; never pin volatile detail.** The rules below each
+correspond to a real, recurring failure class — follow every one.
+
+1. **Never pin a compiler-generated SSA id or mangled name.** IDs like
+   SPIR-V `%29`, IR `%1234`, or names like `_S3`, `f_0`, `main_1` are
+   assigned by codegen and *vary*. Worse, the slang-test harness
+   disassembles SPIR-V with **friendly names** (so an operand prints as
+   `%f_0`, not `%29`) in some run modes and numeric in others — a test
+   that pins one form fails in the other. For any id/operand use a
+   permissive capture, not a numeric one:
+   - ✅ `%{{[A-Za-z0-9_]+}} = OpConvertFToS %int %{{[A-Za-z0-9_]+}}`
+   - ❌ `%{{[0-9]+}} = OpConvertFToS %int %{{[0-9]+}}`  (fails on `%f_0`)
+   - ❌ `%29 = OpConvertFToS %int %17`  (pins volatile ids)
+   Match the opcode/structure, not the numbering.
+
+2. **Escape FileCheck metacharacters when the emitted text contains them
+   literally.** `[[...]]` is a FileCheck *variable* reference and
+   `{{...}}` is a *regex*. Emitted Metal/HLSL attributes literally
+   contain double brackets (`[[unroll]]`, `[[color(0)]]`, `[[buffer(0)]]`).
+   A CHECK line `// CHECK: [[unroll]]` is parsed as a variable and fails
+   with `undefined variable: unroll`. Escape:
+   - ✅ `// CHECK: {{\[\[}}unroll{{\]\]}}`
+   Likewise escape a literal `{{` as `{{\{\{}}`.
+
+3. **Avoid substring collisions.** FileCheck matches substrings, so a
+   short pattern silently matches inside a longer token:
+   - `CHECK-NOT: OpFunction` fires on `OpFunctionEnd` (present in every
+     module) — use the specific token you mean, e.g. `CHECK-NOT: OpFunctionCall`.
+   - unanchored `StructuredBuffer` matches inside `RWStructuredBuffer` —
+     anchor the read-only spelling: `CHECK-DAG: {{^}}StructuredBuffer`.
+   Prefer the most specific token, anchor with `{{^}}`, or include enough
+   surrounding context to disambiguate.
+
+4. **Plain `CHECK`/`CHECK-DAG` order must equal emission order.** Sequential
+   `CHECK` lines must appear in the order the compiler emits them. Metal
+   and C-family targets emit **callees before the entry point**; IR dumps
+   emit passes top-to-bottom. If you are not certain of the order, use
+   `CHECK-DAG` (order-independent) instead of guessing a sequence.
+
+5. **Match the harness's default `-O0`.** slang-test compiles at `-O0`
+   unless the directive says otherwise. Behavior that only happens with
+   optimization — force-inlining folding a helper away, dead-code
+   elimination, aggressive constant folding — does **not** occur at `-O0`.
+   If the claim is "the helper is inlined / the call disappears", add
+   `-O1` (or higher) to that directive; otherwise assert the un-optimized
+   shape.
+
+6. **Only assert a feature on a target that supports it.** Picking the
+   wrong target makes the feature diagnose instead of emit, so the CHECK
+   never matches. E.g. `String` is unsupported on the `cpp` (kernel)
+   target (emits `E55213`) but works on `host-cpp`. If a target genuinely
+   cannot express the claim, write a negative/diagnostic directive that
+   pins the diagnostic, or record it in `## Untested claims` — **never**
+   weaken the CHECK to force green.
+
+7. **`DIAGNOSTIC_TEST`: annotate the compiler's *actual* message, and use
+   `non-exhaustive` deliberately.** Do not invent diagnostic wording —
+   most diagnostics emit a **short + long message pair** at the same caret
+   span, plus secondary notes (`candidate: ...`, `argument N does not
+   match: ...`, `see declaration of ...`). Rules:
+   - Annotate the *actual* text the compiler emits (a substring is fine),
+     not a plausible-sounding guess. If you cannot be sure of the wording,
+     assert the **error code** (`//CHECK: E39999`) which is stable.
+   - Align the caret (`^`) to the reported column; a multi-caret span
+     (`^^^^`) must cover the reported range.
+   - Add `non-exhaustive` **only when** the compiler emits secondary
+     diagnostics you are intentionally not annotating (candidate notes,
+     etc.). Do **not** add it when every emitted diagnostic is already
+     annotated — the harness rejects an unnecessary `non-exhaustive`. Do
+     **not** omit it when unannotated diagnostics remain — exhaustive mode
+     then fails.
+
+**Bottom line:** keep patterns loose (`{{...}}`, `-DAG`, error codes,
+opcodes) and structural. Every time you are tempted to write an exact id,
+name, ordering, or full message string, ask "will codegen or the harness
+render this differently?" — if yes, loosen it.
 
 If a claim is genuinely unobservable through any `slang-test`
 directive even with full runner access (e.g., the claim is about a

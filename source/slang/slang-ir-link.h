@@ -1,7 +1,7 @@
 // slang-ir-link.h
 #pragma once
 
-#include "../compiler-core/slang-artifact-associated.h"
+#include "compiler-core/slang-artifact-associated.h"
 #include "slang-compiler.h"
 
 namespace Slang
