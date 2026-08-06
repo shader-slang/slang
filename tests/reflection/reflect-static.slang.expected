@@ -13,6 +13,9 @@ standard output = {
                     "name": "Thing",
                     "fields": [
 
+                    ],
+                    "sizes": [
+
                     ]
                 },
                 "containerVarLayout": {
@@ -24,9 +27,15 @@ standard output = {
                         "name": "Thing",
                         "fields": [
 
+                        ],
+                        "sizes": [
+
                         ]
                     }
-                }
+                },
+                "sizes": [
+
+                ]
             }
         },
         {
@@ -42,7 +51,10 @@ standard output = {
                             "name": "a",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "int32"
+                                "scalarType": "int32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                         },
@@ -50,10 +62,16 @@ standard output = {
                             "name": "b",
                             "type": {
                                 "kind": "scalar",
-                                "scalarType": "int32"
+                                "scalarType": "int32",
+                                "sizes": [
+                                    {"kind": "uniform", "value": 4, "alignment": 4}
+                                ]
                             },
                             "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "uniform", "value": 8, "alignment": 16}
                     ]
                 },
                 "containerVarLayout": {
@@ -68,7 +86,10 @@ standard output = {
                                 "name": "a",
                                 "type": {
                                     "kind": "scalar",
-                                    "scalarType": "int32"
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
                             },
@@ -76,14 +97,23 @@ standard output = {
                                 "name": "b",
                                 "type": {
                                     "kind": "scalar",
-                                    "scalarType": "int32"
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
                                 },
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 8, "alignment": 16}
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0}
-                }
+                },
+                "sizes": [
+                    {"kind": "constantBuffer", "value": 1}
+                ]
             }
         },
         {
@@ -95,8 +125,14 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "int32"
-                }
+                    "scalarType": "int32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "unorderedAccess", "value": 1}
+                ]
             }
         }
     ],
@@ -114,7 +150,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

@@ -1,8 +1,8 @@
 // test-reporter.cpp
 #include "test-reporter.h"
 
-#include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-string-util.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string-util.h"
 #include "options.h"
 
 #include <mutex>
@@ -95,20 +95,20 @@ TestReporter::TestReporter()
     m_verbosity = VerbosityLevel::Info;
 }
 
-Result TestReporter::init(
-    TestOutputMode outputMode,
-    const HashSet<String>& expectedFailureList,
-    bool isSubReporter)
+Result TestReporter::init(const Options& options, bool isSubReporter)
 {
-    m_outputMode = outputMode;
+    m_outputMode = options.outputMode;
     m_isSubReporter = isSubReporter;
+    m_dumpOutputOnFailure = options.dumpOutputOnFailure;
+    m_verbosity = options.verbosity;
+    m_hideIgnored = options.hideIgnored;
 
     // Deep copy the expected failure list to avoid sharing ref-counted
     // StringRepresentation objects across threads (RefObject::referenceCount
     // is not atomic, so concurrent addReference/releaseReference from
     // multiple threads causes data races and heap corruption).
     m_expectedFailureList.clear();
-    for (const auto& s : expectedFailureList)
+    for (const auto& s : options.expectedFailureList)
     {
         m_expectedFailureList.add(String(s.getUnownedSlice()));
     }

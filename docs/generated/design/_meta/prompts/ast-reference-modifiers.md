@@ -32,15 +32,27 @@ Cover at least the following:
   list — `in`, `out`, `inout`, `const`, `uniform`, `static`,
   `volatile`) and **attributes** (`[attr(args)]` syntax that subclass
   `Attribute`).
-- `HLSLAttribute` family — its role as a common ancestor for HLSL
-  shader-stage attributes.
+- The attribute hierarchy — `AttributeBase`, the checked `Attribute`
+  subclass, and the `UncheckedAttribute` /
+  `UncheckedGLSLLayoutAttribute` families that precede checking.
+  Note that there is **no** `HLSLAttribute` common ancestor: HLSL
+  shader-stage attributes derive from `Attribute` directly. An earlier
+  revision of this prompt asked for an `HLSLAttribute` family, and the
+  page it produced asserted a class that exists nowhere in `source/`.
 - `IntrinsicOpModifier` — how the core module uses it to bind a
   function to an IR opcode; see
   [../cross-cutting/core-module.md](../cross-cutting/core-module.md).
 - `TargetIntrinsicModifier` — how it ties a declaration to a target
   backend.
-- `LayoutModifier` / `HLSLLayoutModifier` family — their role in
-  parameter binding.
+- The layout modifiers and their role in parameter binding. There is
+  **no** `LayoutModifier` or `HLSLLayoutModifier` base class — both
+  names were asked for by an earlier revision of this prompt and exist
+  nowhere in `source/`. The real groupings are `MatrixLayoutModifier`
+  (with `RowMajorLayoutModifier` / `ColumnMajorLayoutModifier` and
+  their HLSL and GLSL leaves), the GLSL layout modifiers
+  (`GLSLUnparsedLayoutModifier`, `GLSLBufferDataLayoutModifier`, the
+  `GLSLLayoutModifierGroupMarker` pair), and the
+  `UncheckedGLSLLayoutAttribute` family.
 - Visibility / linkage modifiers (`PublicModifier`, `PrivateModifier`,
   `InternalModifier`).
 - `RequireCapabilityAttribute` — its relationship to the capability

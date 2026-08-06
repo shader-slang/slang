@@ -1,14 +1,15 @@
 // slang-emit.cpp
 
-#include "../compiler-core/slang-artifact-associated-impl.h"
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-util.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-type-text-util.h"
-#include "../core/slang-writer.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-name.h"
+#include "compiler-core/slang-slice-allocator.h"
+#include "core/slang-castable.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "slang-capability.h"
 #include "slang-check-out-of-bound-access.h"
 #include "slang-emit-c-like.h"
@@ -142,7 +143,6 @@
 #include "slang-visitor.h"
 #include "slang-vm-bytecode.h"
 
-#include <assert.h>
 #include <limits>
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
@@ -406,8 +406,28 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
-    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+    // The autodiff finalization passes (finalizeAutoDiffPass / lowerDiffTypeInfoInsts in
+    // linkAndOptimizeIR) lower or strip these constructs. They can appear in modules that
+    // never call fwd_diff/bwd_diff (e.g. direct DifferentialPair use, or a no_diff type),
+    // so mark autodiff here too; otherwise those passes would be skipped and autodiff IR
+    // would survive into emission.
+    //
+    // These stay as base-class checks (not switch cases) because each spans several
+    // concrete opcodes; `as<Base>` keeps matching if a new leaf op is added under the
+    // base later. Single-opcode autodiff insts live in the switch below.
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst) ||
+        as<IRDifferentialPairTypeBase>(inst) || as<IRMakeDifferentialPairBase>(inst) ||
+        as<IRDifferentialPairGetDifferentialBase>(inst) ||
+        as<IRDifferentialPairGetPrimalBase>(inst))
+    {
         result.autodiff = true;
+    }
+    // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
+    if (auto attrType = as<IRAttributedType>(inst))
+    {
+        if (attrType->findAttr<IRNoDiffAttr>())
+            result.autodiff = true;
+    }
 
     switch (inst->getOp())
     {
@@ -481,8 +501,11 @@ void calcRequiredLoweringPassSet(
     case kIROp_GetRegisterSpace:
         result.bindingQuery = true;
         break;
+    case kIROp_Annotation:
+    case kIROp_DetachDerivative:
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
+    case kIROp_DiffTypeInfo:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -1406,7 +1429,27 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
-    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    // finalizeAutoDiffPass walks the whole module and builds an AutoDiffSharedContext. It
+    // only has work to do when the module contains autodiff constructs, which
+    // calcRequiredLoweringPassSet records in requiredLoweringPassSet.autodiff (covering
+    // direct DifferentialPair / no_diff use, not just fwd_diff/bwd_diff). Skip it for
+    // modules with none so they don't pay the per-compile cost.
+    //
+    // Even a module with no autodiff constructs still links in the core-module autodiff
+    // builtins (types marked [__AutoDiffBuiltin], e.g. NullDifferential), which carry
+    // Export/HLSLExport/KeepAlive decorations that keep them alive through DCE. Those
+    // must still be stripped so the eliminateDeadCode pass below can drop the unused
+    // builtins. stripAutoDiffDecorations removes those pins (along with the other
+    // autodiff-only transient decorations) and needs no AutoDiffSharedContext, so run it
+    // directly on the skip path.
+    if (requiredLoweringPassSet.autodiff)
+    {
+        SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    }
+    else
+    {
+        SLANG_PASS(stripAutoDiffDecorations);
+    }
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
@@ -1415,7 +1458,11 @@ Result linkAndOptimizeIR(
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
-    lowerDiffTypeInfoInsts(irModule);
+    // DiffTypeInfo originates from autodiff (calcRequiredLoweringPassSet marks it in
+    // requiredLoweringPassSet.autodiff), so skip the whole-module walk when the module
+    // contains no autodiff constructs.
+    if (requiredLoweringPassSet.autodiff)
+        lowerDiffTypeInfoInsts(irModule);
 
     if (requiredLoweringPassSet.conditionalType)
         SLANG_PASS(lowerConditionalType, sink);
@@ -2170,6 +2217,10 @@ Result linkAndOptimizeIR(
                 codeGenContext,
                 glslExtensionTrackerPtr);
 
+            // GLSL and SPIR-V both require an integer `switch` selector; a `switch` on a
+            // `bool` reaches here unchanged, so rewrite it to an integer switch.
+            SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
+
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
@@ -2205,6 +2256,8 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
+            // WGSL, like GLSL and SPIR-V, requires an integer `switch` selector.
+            SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
@@ -3264,8 +3317,6 @@ static SlangResult createArtifactFromIR(
     }
 #endif
 
-    artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
-
     // Decide whether any downstream (slang-glslang / SPIRV-Tools) work is actually required
     // for this artifact before paying the cost of loading the downstream compiler module.
     //
@@ -3326,13 +3377,23 @@ static SlangResult createArtifactFromIR(
     }
 
     const bool needsLink = downstreamLinkingAllowed && spirvFiles.getCount() > 1;
+    // `-Xspirv-opt <flag>` selects individual optimizer passes explicitly, so it must run the
+    // optimizer even at `-O0` (where the preset is empty). Detecting them here also keeps a plain
+    // `-O0` compile -- with no such flags, and no link/validation/separate-debug-info -- from
+    // loading `slang-glslang` (issue #11662).
+    List<String> spirvOptArgs =
+        codeGenContext->getTargetProgram()->getOptionSet().getDownstreamArgs("spirv-opt");
     const bool needsOptimization =
         codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel() !=
-        OptimizationLevel::None;
+            OptimizationLevel::None ||
+        spirvOptArgs.getCount() != 0;
     const bool needsValidation = shouldRunSPIRVValidation(codeGenContext);
     const bool needsSeparateDebugInfo = targetCompilerOptions.shouldEmitSeparateDebugInfo();
     const bool needsDownstreamCompiler =
         needsLink || needsOptimization || needsValidation || needsSeparateDebugInfo;
+
+    artifact->addRepresentationUnknown(
+        needsDownstreamCompiler ? ListBlob::create(spirv) : ListBlob::moveCreate(spirv));
 
     IDownstreamCompiler* compiler = needsDownstreamCompiler
                                         ? codeGenContext->getSession()->getOrLoadDownstreamCompiler(
@@ -3367,11 +3428,26 @@ static SlangResult createArtifactFromIR(
 
         if (needsValidation)
         {
-            if (SLANG_FAILED(
-                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
+            const SlangResult validationResult =
+                compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+
+            if (validationResult == SLANG_E_NOT_AVAILABLE)
             {
+                // The validator never ran, so disassembling here would wrongly imply the SPIR-V was
+                // found invalid. Fail the compile rather than falling through: validation was
+                // requested, and publishing the artifact would hand a caller SPIR-V that nothing
+                // checked. `error` severity alone does not stop this path -- only `Severity::Fatal`
+                // and above abort a compile.
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationUnavailable{});
+                return SLANG_FAIL;
+            }
+            else if (SLANG_FAILED(validationResult))
+            {
+                // Whether a rejected module reaches the caller must not depend on the diagnostic's
+                // severity, so fail here rather than leaving it to the sink's abort.
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
+                return SLANG_FAIL;
             }
         }
 
@@ -3380,6 +3456,13 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+
+        // Forward the `-Xspirv-opt` args (collected above) to the downstream optimizer, where they
+        // register on top of the `-OX` preset -- or as the only passes at `-O0`, whose preset is
+        // empty. The allocator owns the copied arg strings and slice array, so it must outlive the
+        // compile() call below.
+        SliceAllocator allocator;
+        downstreamOptions.compilerSpecificArguments = allocator.allocate(spirvOptArgs);
         switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:

@@ -29,7 +29,7 @@ Result RenderPassLayoutImpl::init(DeviceImpl* renderer, const IRenderPassLayout:
 
     // Create render pass using load/storeOp and layouts info from `desc`.
     auto framebufferLayout = static_cast<FramebufferLayoutImpl*>(desc.framebufferLayout);
-    assert(desc.renderTargetCount == framebufferLayout->m_renderTargetCount);
+    SLANG_ASSERT(desc.renderTargetCount == framebufferLayout->m_renderTargetCount);
 
     // We need extra space if we have depth buffer
     Array<VkAttachmentDescription, kMaxTargets> targetDescs;

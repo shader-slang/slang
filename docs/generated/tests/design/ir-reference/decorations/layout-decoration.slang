@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T17:13:48Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-layoutdecoration
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout--layoutdecoration
 //META: doc_section_digest=31fd6c29642b2014d16781ceb9cd5a2070d0dd3d7233c66a65799e59f1cdeb9c
 //META: purpose=The layout decoration attaches a Layout opcode reference to a global parameter; the operand is an inst-reference to a Layout instruction.
 //META: intent=functional

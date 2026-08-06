@@ -1,25 +1,32 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-30T13:57:46Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T15:25:00Z
 target_doc: architecture/overview.md
 review_report: ../../reviews/architecture/overview.md.review.md
-target_doc_source_commit_before: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-target_doc_source_commit_after: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 0
+  fixed: 5
   rejected_bogus: 0
-  rejected_out_of_scope: 0
-  deferred: 1
+  rejected_out_of_scope: 1
+  deferred: 0
   escalated: 0
 ---
 
 # Remediation report for architecture/overview.md
 
 ## Summary
-The review carried one major finding (F-001) and no others. F-001 is valid: the per-doc checklist clause `docs/generated/design/_meta/prompts/architecture-overview.md:61-62` requires every subsystem in `## Top-level decomposition` to cite a file that exists in the watched paths, yet `regenerate.py show architecture/overview.md` resolves only three `CMakeLists.txt` files, `include/slang.h`, `CLAUDE.md`, and the `slang-compile-request`/`slang-module` header+cpp pairs — none of which cover the many required subsystems (`source/slang-rt/`, `source/slang-wasm/`, `source/slangc/`, `source/slang-llvm/`, `tools/`, `tests/`, `extras/`, `external/`, the prelude/standard-module trees). I deferred F-001 because the only principled fix is a manifest watched-paths expansion, out of scope for a document-only remediation edit. No body edits were made, so `target_doc_source_commit_after` equals `_before`.
+
+Six findings were reviewed. Five were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and fixed: the global-session lifetime claim, the seven subsystem bullets that had a watched representative file available, the `slang-rt` consumer list, the split opening paragraph, and the `The In this codebase` artifact. The front-matter digest finding was rejected as out of scope. The document was edited and is now 15,958 bytes against its 16,384-byte cap, leaving little headroom for further growth.
 
 ## Actions
+
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | deferred | Valid. The prompt is self-contradictory: section 3 (`docs/generated/design/_meta/prompts/architecture-overview.md:23-40`) mandates describing `source/slang-rt/`, `source/slang-record-replay/`, `source/slang-wasm/`, `source/slangc/`, `source/slang-llvm/`, `source/slang-glslang/`, `source/slang-dispatcher/`, the standard-library dirs, `prelude/`, `tools/`, `tests/`, `extras/`, `external/`, each anchored to a representative file, while the checklist at `:61-62` demands each cite a watched-path file; the manifest (`docs/generated/design/_meta/manifest.yaml:22-31`) resolves only 9 files, none under those dirs. The `_common.md:64-72` "not located in the watched paths" path is inapplicable — the information is present and all 25 cited paths resolve at HEAD (verified), so that boilerplate would falsely claim missing info and gut an accurate, useful doc, also conflicting with the Required-sections clause. The principled fix is a watched-paths expansion, which `_remediate.md:72-78` classes as deferred and which the edit rules forbid here (no manifest/prompt edits). Follow-up: expand this doc's `watched_paths` to add a representative file per subsystem (mirroring `architecture/module-map.md`'s `source/*/CMakeLists.txt` + `source/*/*.{h,cpp}` globs, `manifest.yaml:44-48`), then re-cite the affected entries. | — |
+| F-001 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md` lines 97-100 reserve `generated_at`, `source_commit`, and `watched_paths_digest` for the operator's `regenerate.py mark-fresh` run: "Do not edit those three fields yourself." The digest is refreshed when the operator marks this page fresh after the edits below. | — |
+| F-002 | fixed | `include/slang.h:4065-4074` says an application "may create and re-use a single global session" and that "Distinct global sessions may be used from different threads in parallel", so it is not a process singleton. Consolidated with F-006, which touches the same sentence. | `## Compilation request lifecycle`: `Session` bullet now reads "global-session-scoped compiler state", and the two-meanings sentence describes reuse-for-startup-cost with coexisting global sessions permitted (see also F-006). |
+| F-003 | fixed | `docs/generated/design/_meta/prompts/architecture-overview.md` lines 46-47 and 71-72 require each subsystem bullet to cite a concrete watched file. The manifest already watches representatives for the three shims, `slang-rt`, record/replay, WebAssembly, and `slangc`, and those are now cited. Residual follow-up for a later cycle: the GLSL module, `source/standard-modules/`, and the `tools/`/`tests/`/`extras/`/`external/` trees still have no watched representative, and adding one requires a manifest edit that remediation may not make. | `### Downstream-compiler shims`, `### Runtime and bindings`, and `### Driver and tooling`: added `slang-llvm.cpp`, `slang-glslang.cpp`, `slang-dispatcher/main.cpp`, `slang-rt/CMakeLists.txt`, `replay-context.cpp`, `slang-wasm-bindings.cpp`, and `slangc/main.cpp` links (see also F-004). |
+| F-004 | fixed | `_isCPUHostTarget` in `source/slang/slang-code-gen.cpp:354-358` gates the `slang-rt` library artifact (added at `:768-778`) on `ArtifactStyle::Host`; `source/compiler-core/slang-artifact-desc-util.cpp:306-309` classifies CUDA source as `Style::Kernel`, while the PyTorch binding target is host-style. | `### Runtime and bindings`: `slang-rt` bullet now says host-style CPU outputs including PyTorch bindings, and states CUDA is kernel-style (consolidated with F-003). |
+| F-005 | fixed | `docs/generated/design/_meta/prompts/_common.md` lines 65-66 require the first paragraph to state both coverage and intended reader. | Opening: the standalone intended-reader sentence was folded into the first paragraph. |
+| F-006 | fixed | The stray `The` before "In this codebase" was present in the target document. | Removed as part of the F-002 sentence rewrite. |

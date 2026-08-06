@@ -229,11 +229,17 @@ struct ReflectingPrinting
         key("type");
         printType(type);
 
-        int64_t value;
-        if (SLANG_SUCCEEDED(variable->getDefaultValueInt(&value)))
+        ComPtr<slang::IBlob> defaultValueBlob;
+        if (SLANG_SUCCEEDED(variable->getDefaultValueBlob(defaultValueBlob.writeRef())))
         {
+            // A null blob means the variable has no explicit initializer.
+            SLANG_ASSERT(defaultValueBlob);
+            // Check the size to ensure our assumptions are correct before casting the data.
+            SLANG_ASSERT(defaultValueBlob->getBufferSize() == sizeof(uint32_t));
+            uint32_t value = *(const uint32_t*)defaultValueBlob->getBufferPointer();
+
             key("value");
-            printf("%" PRId64, value);
+            printf("%u", value);
         }
     }
 

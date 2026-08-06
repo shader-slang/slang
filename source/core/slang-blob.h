@@ -1,7 +1,7 @@
 #ifndef SLANG_CORE_BLOB_H
 #define SLANG_CORE_BLOB_H
 
-#include "../core/slang-com-object.h"
+#include "core/slang-com-object.h"
 #include "slang-allocator.h"
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
@@ -118,7 +118,7 @@ protected:
     }
     // Move ctor
     explicit ListBlob(List<uint8_t>&& data)
-        : m_data(data)
+        : m_data(_Move(data))
     {
     }
 
