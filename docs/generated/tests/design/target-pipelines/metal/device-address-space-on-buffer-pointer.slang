@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#specializeaddressspaceformetal
-//META: doc_section_digest=80c941477d24c10fff0c5bef4c1b8c2e3af5b3a9a05d65d62133e771249cc15e
+//META: doc_section_digest=315445765d1752992223a6aff4210e62fdeddf94bac693f294830da1675618e3
 //META: purpose=Structured-buffer storage pointers carry Metal's `device` address space; constant-buffer pointers carry `constant`. Both come from specializeAddressSpaceForMetal.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#entrypoint-entrypointdecoration
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#entrypoint--entrypointdecoration
 //META: doc_section_digest=d3d96830534992c13d27b2f3fc509ca407eb67250f8a01585d992e27d7abbae9
 //META: purpose=Boundary - a [shader("vertex")] entry point lowers to an entryPoint decoration whose profile integer (1) differs from the compute encoding (6), confirming the per-stage tag enum.
 //META: intent=boundary

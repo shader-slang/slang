@@ -1,0 +1,13 @@
+output[0] = 1
+output[1] = 4
+output[2] = 6
+output[3] = 8
+counter[0] = 4
+counter[1] = 3
+counter[2] = 1
+counter[3] = 4
+counter[4] = 4
+counter[5] = 4
+counter[6] = 0
+counter[7] = 4
+counter[8] = 4

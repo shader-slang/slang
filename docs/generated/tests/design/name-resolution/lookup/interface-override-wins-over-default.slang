@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#interface-requirements-vs-default-implementations
-//META: doc_section_digest=76f30c7b2e2657aa9a61baf14ba82d0fa96246f9396246481386a52c4f959681
+//META: doc_section_digest=1f8d478efc36da98ffbf3e0398a2b475394069c17890f445fa7a0d96c575be83
 //META: purpose=A conforming-type override of an interface requirement shadows the interface's default implementation; the override is what executes.
 //META: intent=functional
 //META: pipeline_stage=check

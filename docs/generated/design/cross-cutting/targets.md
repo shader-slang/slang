@@ -1,8 +1,8 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-29T18:20:41Z
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+model: claude-opus-5
+generated_at: 2026-08-03T16:39:21Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 watched_paths_digest: 720cbadffe0ddbcfd07c03b208f3f7cbad55f384b2abb3ca09da30eb7d155f95
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
@@ -32,7 +32,7 @@ the pipeline.
 | Target group | Public `SlangCompileTarget` values | Output | Emit file(s) |
 | --- | --- | --- | --- |
 | HLSL | `SLANG_HLSL`, `SLANG_DXBC`, `SLANG_DXBC_ASM`, `SLANG_DXIL`, `SLANG_DXIL_ASM` | HLSL text plus downstream DXBC/DXIL produced via FXC / DXC | [slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) (DXBC/DXIL are downstream-compiled) |
-| GLSL | `SLANG_GLSL` (plus the deprecated `SLANG_GLSL_VULKAN_*` aliases) | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../../source/slang/slang-emit-glsl.cpp) |
+| GLSL | `SLANG_GLSL`, plus the retained-but-removed `SLANG_GLSL_VULKAN_DEPRECATED` and `SLANG_GLSL_VULKAN_ONE_DESC_DEPRECATED` enumerators | GLSL text (typically forwarded to glslang for SPIR-V) | [slang-emit-glsl.cpp](../../../../source/slang/slang-emit-glsl.cpp) |
 | SPIR-V (direct) | `SLANG_SPIRV`, `SLANG_SPIRV_ASM` | SPIR-V binary or assembly | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) |
 | Metal Shading Language | `SLANG_METAL`, `SLANG_METAL_LIB`, `SLANG_METAL_LIB_ASM` | MSL text, Metal library, Metal library assembly | [slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp) (`*_LIB`/`*_LIB_ASM` go through Metal's downstream tools) |
 | WGSL | `SLANG_WGSL`, `SLANG_WGSL_SPIRV`, `SLANG_WGSL_SPIRV_ASM` | WGSL text, plus SPIR-V binary/assembly produced via WGSL | [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp) |
@@ -42,7 +42,7 @@ the pipeline.
 | Torch glue | `SLANG_CPP_PYTORCH_BINDING` | C++ PyTorch binding | [slang-emit-torch.cpp](../../../../source/slang/slang-emit-torch.cpp) |
 | CPU binaries / host-callable | `SLANG_HOST_HOST_CALLABLE`, `SLANG_SHADER_HOST_CALLABLE`, `SLANG_HOST_OBJECT_CODE`, `SLANG_OBJECT_CODE`, `SLANG_HOST_SHARED_LIBRARY`, `SLANG_SHADER_SHARED_LIBRARY`, `SLANG_HOST_EXECUTABLE`, `SLANG_HOST_LLVM_IR`, `SLANG_SHADER_LLVM_IR` | LLVM-IR, object code, JIT-callable code, shared libraries, executables | [slang-emit-llvm.cpp](../../../../source/slang/slang-emit-llvm.cpp) via `emitLLVMForEntryPoints` when `isCPUTargetViaLLVM`; otherwise routed to a downstream C++ compiler from [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) |
 | VM | `SLANG_HOST_VM` | Slang interpreter bytecode | [slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp) |
-| Slang round-trip | (no dedicated public target; used internally) | Re-emit Slang source | [slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp) |
+| Slang round-trip | (no public target and no `CodeGenTarget` value) | Unimplemented stub: `emitSlangDeclarationsForEntryPoints` ignores its inputs and writes no source | [slang-emit-slang.cpp](../../../../source/slang/slang-emit-slang.cpp) |
 
 `SLANG_TARGET_UNKNOWN` and `SLANG_TARGET_NONE` are sentinel values
 that do not select an emit backend. `SLANG_TARGET_COUNT_OF` is the
@@ -96,6 +96,19 @@ From the comments at the top of
   "keyhole" that other atoms populate. `target` and `stage` are
   distinct keyholes; an atom derived directly from an abstract
   capability is a "key atom" for that keyhole.
+- A *version family* is a chain of atoms ordered by inheritance that
+  express successive versions of one target — the Shader Model chain
+  (`_sm_4_0` ... `_sm_6_10`), the GLSL chain (`_GLSL_130` ...
+  `_GLSL_460`), the SPIR-V chain, and the MetalLib chain. Membership
+  is tested by `isTargetVersionAtom` (any family) and the per-family
+  `isSpirvVersionAtom` in
+  [slang-capability.h](../../../../source/slang/slang-capability.h).
+- A name whose spelling begins with `_` is *internal*: it is a
+  building block that user code is not expected to name directly.
+  `isInternalCapabilityName` in
+  [slang-capability.cpp](../../../../source/slang/slang-capability.cpp)
+  is just a leading-underscore test. Most public atoms are a
+  non-underscored `alias` over one or more internal `def`s.
 
 ### Definition forms
 
@@ -105,6 +118,27 @@ Three forms of declaration in `.capdef`:
   atom expands to all inherited atoms plus the new one.
 - `abstract Foo;` introduces a keyhole; no real atom is emitted.
 - `alias Foo = Bar;` introduces a name without introducing atoms.
+
+Each version family carries a `*_latest` alias that names its
+highest version, so that call sites and tests can say "newest" once
+instead of chasing a version bump through the file. The public and
+internal spellings are kept in step:
+
+```
+alias _sm_latest    = _sm_6_10;   alias sm_latest    = _sm_6_10;
+alias _GLSL_latest  = _GLSL_460;  alias GLSL_latest  = _GLSL_460;
+alias _spirv_latest = _spirv_1_6; alias spirv_latest = _spirv_1_6;
+alias metallib_latest = metallib_4_0;
+```
+
+C++ reaches the same values through the `getLatest*Atom()` accessors
+in [slang-capability.h](../../../../source/slang/slang-capability.h)
+— `getLatestSpirvAtom`, `getLatestMetalAtom`, `getLatestHlslAtom`,
+and `getLatestGlslAtom`. The HLSL and GLSL accessors exist so that
+the version-family range tests can be written as a bounded compare
+(`name >= CapabilityAtom::_sm_4_0 && name <= getLatestHlslAtom()`)
+rather than an enumerated list that must be edited on every new
+Shader Model.
 
 The arithmetic of compatibility:
 
@@ -117,6 +151,24 @@ The arithmetic of compatibility:
 - An unpopulated keyhole means the set is compatible with any
   key atom of that keyhole (e.g. `vertex + glsl` works because
   `vertex` does not populate `target`).
+
+Inheritance is also how an extension records its *version floor*, and
+the SPIR-V atoms show the layering. An extension atom derives from
+the earliest target version that can host it
+(`def SPV_EXT_shader_64bit_indexing : _spirv_1_0;`), and the SPIR-V
+`OpCapability` it enables derives from the extension atom in turn
+(`def spvShader64BitIndexingEXT : SPV_EXT_shader_64bit_indexing;`),
+so asking for the capability transitively asks for the extension and
+the floor. Because the floor is inherited rather than asserted
+separately, giving two spellings of one feature the same floor keeps
+them interchangeable: `SPV_KHR_physical_storage_buffer` is the
+KHR-promoted name of `SPV_EXT_physical_storage_buffer` and both
+derive from `_spirv_1_3`, so a requirement written in terms of the
+KHR name — as `SPV_EXT_shader_invocation_reorder` is
+(`_spirv_1_4 + SPV_KHR_ray_tracing + SPV_KHR_physical_storage_buffer`)
+— does not push the effective version up. That matters because a
+raised floor is user-visible; see the `-capability` discussion under
+[Profiles](#profiles).
 
 ### Runtime representation
 
@@ -133,6 +185,12 @@ described above. Operations:
 - Inferring the minimum capability requirement of a piece of IR —
   used by the `slang-ir-late-require-capability` pass, see
   [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md).
+- Classifying a single atom, so that callers can ask what kind of
+  thing an atom is without hard-coding names:
+  `isDirectChildOfAbstractAtom`, `isStageAtom`, `isTargetVersionAtom`,
+  `isSpirvVersionAtom`, `isSpirvExtensionAtom`, and `hasTargetAtom`.
+  `getAtomSetOfTargets` and `getAtomSetOfStages` return the
+  populated key-atom set for each of the two keyholes.
 
 The high-level design is described in
 [../../../design/capabilities.md](../../../design/capabilities.md); this
@@ -140,12 +198,28 @@ document does not duplicate it.
 
 ### Auto-generated reference
 
-A `///` doc-comment immediately preceding a `def` or `alias` in the
-`.capdef` is harvested into the auto-generated capability reference
-mentioned at the top of the file
-(`a3-02-reference-capability-atoms.md`). Comments interrupted by a
-plain `//` line are dropped (per the rules near the top of
-[slang-capabilities.capdef](../../../../source/slang/slang-capabilities.capdef)).
+Every `def` and `alias` is a *documentable atom*. A run of `///`
+lines immediately preceding one is harvested into
+[a4-02-reference-capability-atoms.md](../../../user-guide/a4-02-reference-capability-atoms.md);
+a plain `//` line in the middle of the run truncates it. A line of
+the form `/// [GROUP]` selects the reference-page heading the entry
+files under, and only six groups are accepted: `[Target]`,
+`[Stage]`, `[EXT]`, `[Version]`, `[Compound]`, `[Other]`. The rules
+are spelled out in the header comment of
+[slang-capabilities.capdef](../../../../source/slang/slang-capabilities.capdef).
+
+Because a feature is usually spelled as an internal `def` plus a
+public `alias`, the doc-comment must sit on the **public alias** for
+the description to appear under the name a user would write. The
+work-graph node stage is the model case: the bare
+`def _node : stage;` carries no comment, and the documentation
+lives on `alias node = _node + _sm_6_8;` under `/// [Stage]`.
+
+The reference page is generated, never hand-edited. To regenerate
+it, build the `slang-capability-generator` target and run it with
+the `.capdef` as input plus `--target-directory` and
+`--doc <output.md>`; commit the edited `.capdef` and the
+regenerated markdown together.
 
 Aliases tagged `[Compound]` in those comments are the names the
 front-end uses to gate a user-visible builtin or operation against
@@ -162,8 +236,8 @@ capability system rather than producing invalid output.
 
 ## Profiles
 
-Profiles bundle a target choice with a feature level. The
-declaration is in
+A profile pins a stage and a feature-level version; it does not
+carry a target format. The declaration is in
 [slang-profile.h](../../../../source/slang/slang-profile.h);
 implementation in
 [slang-profile.cpp](../../../../source/slang/slang-profile.cpp); the
@@ -173,14 +247,68 @@ table of profile names is in
 
 A `Profile` carries:
 
-- A `Stage` (compute, vertex, fragment, geometry, hull, domain,
-  raytracing stages, mesh, amplification, ...).
-- A `Family` and `Version` (e.g. HLSL Shader Model 6_6, GLSL 450).
-- A target-language hint that the profile applies to.
+- A `Stage`, declared by the `PROFILE_STAGE` X-macro rows in
+  [slang-profile-defs.h](../../../../source/slang/slang-profile-defs.h)
+  (compute, vertex, fragment, geometry, hull, domain, the raytracing
+  stages, mesh, amplification, dispatch, and the work-graph `node`
+  stage).
+- A `Version` (e.g. HLSL Shader Model 6_6, GLSL 450). The stage and
+  the version are the only state packed into `Profile::raw`;
+  `getFamily()` derives the `ProfileFamily` from the version rather
+  than storing it. The pairing of a profile with an output format
+  lives elsewhere — in the public `TargetDesc`, whose `format` and
+  `profile` fields sit side by side in
+  [include/slang.h](../../../../include/slang.h), and in the
+  `TargetRequest` built from it.
 
-Profiles map onto capability sets at the input to the back-end:
-`-target spirv -profile glsl_450` produces a `CapabilitySet` that
-has both `glsl_450` atoms and the `spirv` target-keyhole.
+Profiles map onto capability sets at the input to the back-end, but
+the target keyhole is chosen first and profile atoms are admitted
+only where they are compatible. `TargetRequest::getTargetCaps` in
+[slang-target.cpp](../../../../source/slang/slang-target.cpp) adds
+the target's own atom, then filters the profile's set: on the direct
+SPIR-V path (`-target spirv` with `shouldEmitSPIRVDirectly()`) it
+copies only the SPIR-V version and extension atoms out of the
+profile and falls back to `spirv_1_5` when the profile supplies
+none; on the SPIR-V-via-GLSL path it selects `glsl` instead and
+re-expresses the profile's SPIR-V version as a GLSL one. A final
+`join` of the whole profile set happens only when that set is
+already implied by the target set, so a cross-family request such as
+`-target spirv -profile glsl_450` does not yield a set holding both
+`glsl_450` and `spirv` — the GLSL version atoms are dropped on the
+direct path, and the via-GLSL path keeps `glsl` rather than `spirv`
+as its target keyhole.
+
+The stage side of a profile and the stage keyhole of the capability
+system are separate vocabularies that have to agree. `Stage::Node`
+and the capability alias `node` are the paired spellings for
+work-graph entry points; the alias is `_node + _sm_6_8`, so naming
+the stage in capability terms also asserts the Shader Model floor
+the stage needs.
+
+### Profiles versus explicit `-capability`
+
+`-profile` pins a version within a version family; `-capability`
+adds atoms on top of it. Because many capability atoms inherit from
+a version atom, an added capability can silently *raise* the emitted
+target version above what the profile asked for. The option parser
+detects that case rather than letting the two options disagree
+quietly:
+`doRequestedCapabilitiesRaiseTargetVersionAboveProfile` in
+[slang-capability.cpp](../../../../source/slang/slang-capability.cpp)
+takes the profile's `CapabilitySet`, the list of requested
+`-capability` names, and the version family in question, and folds
+the requested capabilities in one at a time using the same
+compatibility guard as `TargetRequest::getTargetCaps` in
+[slang-target.cpp](../../../../source/slang/slang-target.cpp). Atoms
+are folded individually and not pre-joined, because a single
+incompatible atom would invalidate the whole set and hide a
+compatible atom's version raise. If the resulting highest version in
+the family exceeds the pinned one, the call site in
+[slang-options.cpp](../../../../source/slang/slang-options.cpp)
+reports `conflicting-explicit-capability-and-profile`, defined in
+[slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua).
+When the profile pins no version of that family, the function
+returns false and nothing is diagnosed.
 
 ## How target choice affects IR
 
@@ -229,9 +357,14 @@ downstream tools), see the per-target pages under
 - [../target-pipelines/cuda.md](../target-pipelines/cuda.md) —
   CUDA plus nvrtc downstream.
 
-This page (`cross-cutting/targets.md`) describes the per-target
-options, capability sets, and predicate functions; the
-`target-pipelines/` pages describe the ordered pass sequence.
+The division of labor is: this page owns the *model* — what a target
+is, how capability atoms and profiles are declared and combined, and
+which knobs the front-end consults before any backend runs. The
+`target-pipelines/` pages own the *per-target behavior* — the ordered
+pass sequence, the gates that select each pass, the downstream tool
+chain, and any emitter-level decision specific to one target. A
+statement of the form "on SPIR-V, construct X is emitted as Y"
+belongs there, not here, even when the reason is a capability.
 
 ## Adding a new target
 
@@ -250,9 +383,17 @@ The full checklist:
    [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) — both
    the `#include` and the dispatch logic in
    `emitEntryPointsSourceFromIR`.
-4. **Prelude.** If the emitted code requires runtime support, add a
-   prelude header under [prelude/](../../../../prelude) and emit a
-   `#include` for it from the backend.
+4. **Prelude.** If the emitted code requires runtime support, add
+   the prelude source under [prelude/](../../../../prelude) and
+   register its embedded string for the new `SourceLanguage` in the
+   `Session` constructor in
+   [slang-global-session.cpp](../../../../source/slang/slang-global-session.cpp),
+   alongside the CUDA, C++, and HLSL preludes.
+   `emitEntryPointsSourceFromIR` in
+   [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) then
+   writes that string into the generated source itself. Emit a
+   `#include` only for a separate runtime header you intend to ship
+   next to the generated output.
 5. **Capability atoms.** Add atoms to
    [slang-capabilities.capdef](../../../../source/slang/slang-capabilities.capdef)
    so the front-end can reject features the new target does not
@@ -283,3 +424,8 @@ The full checklist:
 - The user-facing target documentation — see
   [../../../user-guide/](../../../user-guide) and
   [../../../command-line-slangc-reference.md](../../../command-line-slangc-reference.md).
+- Per-target emitter behavior — which extension a backend declares,
+  which decoration it attaches, how a particular construct is
+  spelled in the emitted language, and which command-line options
+  change that spelling. Those belong to the matching page under
+  [../target-pipelines/](../target-pipelines).

@@ -8,6 +8,13 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK8): -target spirv -entry vsPositionScalar -stage vertex
 //TEST:SIMPLE(filecheck=CHECK9): -target spirv -entry vsPositionFloat3 -stage vertex
 //TEST:SIMPLE(filecheck=CHECK10): -target hlsl -entry vsPositionFloat2 -stage vertex
+// Tests for cross-category coercion rejection (issue #6428):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK11): -target hlsl -entry vsBoolViewID -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK12): -target hlsl -entry fsIntIsFrontFace -stage fragment
+//TEST:SIMPLE(filecheck=CHECK13): -target hlsl -entry csInt3DispatchThreadID -stage compute
+// Tests for unsized-array element-type path in isSemanticTypeCompatible:
+//TEST:SIMPLE(filecheck=CHECK14): -target hlsl -entry vsClipDistanceFloat -stage vertex
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK15): -target hlsl -entry vsClipDistanceInt -stage vertex
 
 // Test type validation for system value semantics.
 // Each SV_ semantic declares its accepted types. Shape mismatches (e.g., vector for a
@@ -84,3 +91,45 @@ float3 vsPositionFloat3(uint vertexId : SV_VertexID) : SV_Position
 // Test 10: float2 for SV_Position works for HLSL target too
 // CHECK10-NOT: error 30701
 // (uses vsPositionFloat2 entry point from Test 2, targeting HLSL)
+
+// Test 11: bool is rejected for SV_ViewID (uint semantic) — cross-category coercion (issue #6428)
+[shader("vertex")]
+float4 vsBoolViewID(bool id: SV_ViewID) : SV_Position
+//CHECK11:               ^^ type 'bool' is not valid for system value semantic 'SV_ViewID'; expected 'uint'
+{
+    return float4(0, 0, 0, 1);
+}
+
+// Test 12: int is rejected for SV_IsFrontFace (bool semantic) — cross-category coercion (issue #6428)
+[shader("fragment")]
+float4 fsIntIsFrontFace(int isFront: SV_IsFrontFace) : SV_Target
+//CHECK12:                  ^^^^^^^ type 'int' is not valid for system value semantic 'SV_IsFrontFace'; expected 'bool'
+{
+    return float4(0, 0, 0, 1);
+}
+
+// Test 13: int3 is accepted for SV_DispatchThreadID (uint3 semantic) — sign coercion is preserved
+// CHECK13-NOT: E30701
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void csInt3DispatchThreadID(int3 tid: SV_DispatchThreadID) {}
+
+// Test 14: float[N] for SV_ClipDistance (unsized-array accessor path) — positive case
+// CHECK14-NOT: E30701
+[shader("vertex")]
+float4 vsClipDistanceFloat(uint id: SV_VertexID, out float cd[4]: SV_ClipDistance) : SV_Position
+{
+    for (int i = 0; i < 4; ++i)
+        cd[i] = 0;
+    return float4(0, 0, 0, 1);
+}
+
+// Test 15: int[N] for SV_ClipDistance — cross-category mismatch through the unsized-array element path
+[shader("vertex")]
+float4 vsClipDistanceInt(uint id: SV_VertexID, out int cd[4]: SV_ClipDistance) : SV_Position
+//CHECK15: type 'int[4]' is not valid for system value semantic 'SV_ClipDistance'; expected 'float' or 'float[]'
+{
+    for (int i = 0; i < 4; ++i)
+        cd[i] = 0;
+    return float4(0, 0, 0, 1);
+}

@@ -2,10 +2,10 @@
 
 #define _CRT_SECURE_NO_WARNINGS 1
 
-#include "../../source/core/slang-test-tool-util.h"
-#include "../source/core/slang-io.h"
-#include "../source/core/slang-std-writers.h"
-#include "../source/core/slang-string-util.h"
+#include "core/slang-io.h"
+#include "core/slang-std-writers.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-token-reader.h"
 #include "options.h"
 #include "png-serialize-util.h"
@@ -494,8 +494,12 @@ struct AssignValsFromLayoutContext
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
-        bufferData.reserve(bufferSize / sizeof(uint32_t));
-        for (size_t i = bufferData.getCount(); i < bufferSize / sizeof(uint32_t); i++)
+        // Round the backing storage up to a complete word because the RHI copies bufferSize bytes,
+        // including the final partial word.
+        const size_t wordSize = sizeof(uint32_t);
+        const size_t bufferWordCount = bufferSize / wordSize + (bufferSize % wordSize != 0);
+        bufferData.reserve(bufferWordCount);
+        for (size_t i = bufferData.getCount(); i < bufferWordCount; i++)
             bufferData.add(0);
 
         ComPtr<IBuffer> bufferResource;

@@ -1,11 +1,8 @@
-// bwd_diff is no longer further differentiable.
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -shaderobj -output-using-type
+// bwd_diff is no longer further differentiable: differentiating `df` (which calls
+// `__bwd_diff(outerF)`) must be diagnosed rather than crash, even when the inner function uses a
+// `do`/`while` loop. See https://github.com/shader-slang/slang/issues/10745.
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain
 
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 struct A : IDifferentiable
@@ -48,6 +45,8 @@ float df(A x)
     ad.x = 0.0;
     var p = diffPair(x, ad);
     __bwd_diff(outerF)(p, 1.0);
+//CHECK:              ^ cannot differentiate the result of a backward-derivative call
+//CHECK:              ^ the code produced by 'bwd_diff' is not itself differentiable
     return p.d.x;
 }
 

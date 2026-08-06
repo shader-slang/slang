@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2
 
 // Regression test for shader-slang/slang#11565 (non-copyable variant).
 //

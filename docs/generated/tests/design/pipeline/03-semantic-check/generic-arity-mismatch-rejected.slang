@@ -23,8 +23,8 @@ void main()
 {
     Pair<int> p;
 /*CHECK:
-    ^^^^ cannot specialize generic
-    ^^^^ cannot specialize generic 'Pair' with the provided arguments.
+    ^^^^ wrong number of generic arguments
+    ^^^^ generic 'Pair' expects 2 generic argument(s) but 1 were provided
 */
-// CHECK: E30075
+// CHECK: E30441
 }

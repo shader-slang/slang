@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#emit-dispatcher
-//META: doc_section_digest=05e360846fc3ee11f7582f6896e802ffbb7981b023d417a3b600718f4844ea5b
+//META: doc_section_digest=935ec71f3df71deb2fa6701feff4606f44be0b4d368c55849c4635994d8c43f5
 //META: purpose=Boundary: when the same source has two compute entry points, compiling with `-entry foo` produces foo's body (and not bar's), and `-entry bar` produces bar's body (and not foo's). The dispatcher routes a single entry per compile.
 //META: intent=boundary
 //META: pipeline_stage=emit

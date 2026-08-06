@@ -192,6 +192,29 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
                     }
                 }
                 break;
+            case kIROp_DefaultConstruct:
+                if (rejectOpaqueLocals)
+                {
+                    // There is no default/zero value for an opaque handle (an
+                    // image/sampler/subpass/acceleration-structure has no bit
+                    // pattern we can materialize), so a `defaultConstruct` of such
+                    // a type is invalid output for Khronos/WGSL. This typically
+                    // arises from `Optional<Texture2D>` being lowered when a
+                    // generic wrapper is instantiated with a resource type and a
+                    // `none` payload is default-constructed (issue #7878); the
+                    // front-end `Optional<T>` check does not fire because `T` is
+                    // only known after specialization. Diagnose instead of letting
+                    // the unhandled inst reach spirv-emit and abort.
+                    if (auto handleType = findUnstorableOpaqueHandleType(inst->getDataType()))
+                    {
+                        auto loc =
+                            inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+                        sink->diagnose(Diagnostics::OpaqueTypeInLocalVariableNotAllowedOnKhronos{
+                            .type = handleType,
+                            .location = loc});
+                    }
+                }
+                break;
             }
 
             // A `String` value has no valid lowering for a kernel C++/CUDA

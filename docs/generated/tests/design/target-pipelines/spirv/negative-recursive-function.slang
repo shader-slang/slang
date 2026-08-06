@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T12:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=ee0e6ce7e7ab498c5056d2e357cc8f20c0e28b6f8867c47be3c3588bab6092bf
+//META: doc_section_digest=198700d5c1fbb960db4ea54d8eacf861415a0051537fd84a481910acabdfa45d
 //META: purpose=Phase B's checkForRecursiveFunctions (table row 22) rejects a self-recursive call with E55201 before Phase C/D legalization can run.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T18:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
+//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
 //META: purpose=A ReturnStmt nested inside a ForStmt lowers to a `return_val(...)` terminator in a block reached from the loop body, alongside the `loop(...)` structured-branch terminator — the doc's "ReturnStmt -> IRReturn" claim is unaffected by enclosing control flow.
 //META: intent=boundary
 //META: pipeline_stage=lower

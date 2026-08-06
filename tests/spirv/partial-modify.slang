@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // Test that calling a function and passing an access-chain as argument result in legal SPIR-V
 // that introduces temp variables as needed.

@@ -13,7 +13,7 @@
 // Status::GenericArgumentInferenceFailed. CompleteOverloadCandidate
 // emits generic-argument-inference-failed".
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 struct Box<T>
 {
@@ -28,5 +28,5 @@ T unbox<T>(Box<T> b) { return b.inner; }
 void main()
 {
     int x = unbox(42);
-//CHECK:         ^ could not specialize generic for arguments of type (int)
+//CHECK:         ^ could not infer generic argument for parameter 'T'
 }

@@ -1,14 +1,14 @@
 // slang-glslang-compiler.cpp
 #include "slang-glslang-compiler.h"
 
-#include "../core/slang-blob.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-common.h"
-#include "../core/slang-io.h"
-#include "../core/slang-semantic-version.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-blob.h"
+#include "core/slang-char-util.h"
+#include "core/slang-common.h"
+#include "core/slang-io.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
 #include "slang-artifact-associated-impl.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-com-helper.h"
@@ -23,7 +23,7 @@
 #endif
 
 #if SLANG_ENABLE_GLSLANG_SUPPORT
-#include "../slang-glslang/slang-glslang.h"
+#include "slang-glslang/slang-glslang.h"
 #endif
 
 namespace Slang
@@ -69,14 +69,16 @@ public:
     }
 
 protected:
-    SlangResult _invoke(glslang_CompileRequest_1_2& request);
+    SlangResult _invoke(glslang_CompileRequest_1_3& request);
 
     glslang_CompileFunc_1_0 m_compile_1_0 = nullptr;
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr;
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
+    glslang_CompileFunc_1_3 m_compile_1_3 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
+    glslang_FreeDisassemblyFunc m_freeDisassembly = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
@@ -89,14 +91,18 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_0 = (glslang_CompileFunc_1_0)library->findFuncByName("glslang_compile");
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
+    m_compile_1_3 = (glslang_CompileFunc_1_3)library->findFuncByName("glslang_compile_1_3");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
     m_disassemble =
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
     m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
         "glslang_disassembleSPIRVWithResult");
+    m_freeDisassembly =
+        (glslang_FreeDisassemblyFunc)library->findFuncByName("glslang_freeDisassembly");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
 
-    if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
+    if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr &&
+        m_compile_1_3 == nullptr)
     {
         return SLANG_FAIL;
     }
@@ -107,7 +113,11 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_desc = Desc(m_compilerType);
 
     Slang::String filename;
-    if (m_compile_1_2)
+    if (m_compile_1_3)
+    {
+        filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_3);
+    }
+    else if (m_compile_1_2)
     {
         filename = Slang::SharedLibraryUtils::getSharedLibraryFileName((void*)m_compile_1_2);
     }
@@ -127,28 +137,54 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     return SLANG_OK;
 }
 
-SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_2& request)
+SlangResult GlslangDownstreamCompiler::_invoke(glslang_CompileRequest_1_3& request)
 {
+    // A library predating _1_3 cannot carry the `-Xspirv-opt` flags, so fail rather than silently
+    // drop them and emit unmodified SPIR-V.
+    if (request.spirvOptimizationFlagCount != 0 && !m_compile_1_3)
+    {
+        if (request.diagnosticFunc)
+        {
+            const char msg[] =
+                "error: -Xspirv-opt requires a newer slang-glslang library; the loaded version "
+                "does not support forwarding optimizer pass flags.\n";
+            request.diagnosticFunc(msg, sizeof(msg) - 1, request.diagnosticUserData);
+        }
+        return SLANG_FAIL;
+    }
+
     int err = 1;
-    if (m_compile_1_2)
+    if (m_compile_1_3)
     {
-        err = m_compile_1_2(&request);
+        err = m_compile_1_3(&request);
     }
-    else if (m_compile_1_1)
+    else
     {
-        glslang_CompileRequest_1_1 request_1_1;
-        memcpy(&request_1_1, &request, sizeof(request_1_1));
-        request_1_1.sizeInBytes = sizeof(request_1_1);
-        err = m_compile_1_1(&request_1_1);
-    }
-    else if (m_compile_1_0)
-    {
-        glslang_CompileRequest_1_1 request_1_1;
-        memcpy(&request_1_1, &request, sizeof(request_1_1));
-        request_1_1.sizeInBytes = sizeof(request_1_1);
-        glslang_CompileRequest_1_0 request_1_0;
-        request_1_0.set(request_1_1);
-        err = m_compile_1_0(&request_1_0);
+        // Downgrade for an older library by slicing to the _1_2 base. Requests carrying
+        // `-Xspirv-opt` flags were already rejected above, so nothing user-requested is dropped.
+        const glslang_CompileRequest_1_2& request_1_2 = request;
+        if (m_compile_1_2)
+        {
+            glslang_CompileRequest_1_2 downgraded = request_1_2;
+            downgraded.sizeInBytes = sizeof(downgraded);
+            err = m_compile_1_2(&downgraded);
+        }
+        else if (m_compile_1_1)
+        {
+            glslang_CompileRequest_1_1 request_1_1;
+            memcpy(&request_1_1, &request_1_2, sizeof(request_1_1));
+            request_1_1.sizeInBytes = sizeof(request_1_1);
+            err = m_compile_1_1(&request_1_1);
+        }
+        else if (m_compile_1_0)
+        {
+            glslang_CompileRequest_1_1 request_1_1;
+            memcpy(&request_1_1, &request_1_2, sizeof(request_1_1));
+            request_1_1.sizeInBytes = sizeof(request_1_1);
+            glslang_CompileRequest_1_0 request_1_0;
+            request_1_0.set(request_1_1);
+            err = m_compile_1_0(&request_1_0);
+        }
     }
 
     return err ? SLANG_FAIL : SLANG_OK;
@@ -221,7 +257,7 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     String sourcePath = ArtifactUtil::findPath(sourceArtifact);
 
-    glslang_CompileRequest_1_2 request;
+    glslang_CompileRequest_1_3 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
@@ -274,6 +310,17 @@ SlangResult GlslangDownstreamCompiler::compile(
 
     request.entryPointName = options.entryPointName.begin();
 
+    List<const char*> spirvOptFlags;
+    if (m_compilerType == SLANG_PASS_THROUGH_SPIRV_OPT)
+    {
+        for (const auto& arg : options.compilerSpecificArguments)
+        {
+            spirvOptFlags.add(arg.begin());
+        }
+        request.spirvOptimizationFlags = spirvOptFlags.getBuffer();
+        request.spirvOptimizationFlagCount = (size_t)spirvOptFlags.getCount();
+    }
+
     const SlangResult invokeResult = _invoke(request);
 
     auto artifact = ArtifactUtil::createArtifactForCompileTarget(options.targetType);
@@ -311,9 +358,11 @@ SlangResult GlslangDownstreamCompiler::compile(
 
 SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int contentsSize)
 {
+    // `init` accepts a library that exports no validator, so "could not validate" and "the module
+    // is invalid" must stay distinguishable to the caller.
     if (m_validate == nullptr)
     {
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     if (m_validate(contents, contentsSize))
@@ -339,6 +388,10 @@ SlangResult GlslangDownstreamCompiler::disassembleWithResult(
         if (resultString)
         {
             outString = String(resultString);
+            if (m_freeDisassembly)
+            {
+                m_freeDisassembly(resultString);
+            }
             return SLANG_OK;
         }
     }
@@ -411,7 +464,7 @@ SlangResult GlslangDownstreamCompiler::convert(
     auto outputFunc = [](void const* data, size_t size, void* userData)
     { (*(StringBuilder*)userData).append((char const*)data, (char const*)data + size); };
 
-    glslang_CompileRequest_1_2 request;
+    glslang_CompileRequest_1_3 request;
     memset(&request, 0, sizeof(request));
     request.sizeInBytes = sizeof(request);
 
@@ -442,7 +495,15 @@ SlangResult GlslangDownstreamCompiler::convert(
 SlangResult GlslangDownstreamCompiler::getVersionString(slang::IBlob** outVersionString)
 {
     uint64_t timestamp;
-    if (m_compile_1_1)
+    if (m_compile_1_3)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_3);
+    }
+    else if (m_compile_1_2)
+    {
+        timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_2);
+    }
+    else if (m_compile_1_1)
     {
         timestamp = SharedLibraryUtils::getSharedLibraryTimestamp((void*)m_compile_1_1);
     }

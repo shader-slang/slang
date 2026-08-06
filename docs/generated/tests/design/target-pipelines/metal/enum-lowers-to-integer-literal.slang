@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:50:00Z
 //META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=b5d7de72928d6c13745ebd9846b3776c3303adefe35d5b4109978f02477d4265
+//META: doc_section_digest=b2ff965a1c32917299c5e0ef14afe738fe74346646f6a636a4ebd2b31af21501
 //META: purpose=lowerEnumType collapses an enum to its underlying integer; the emitted Metal text contains the integer literal (int(1)) rather than the enumerator name.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

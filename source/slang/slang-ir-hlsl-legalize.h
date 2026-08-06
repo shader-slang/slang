@@ -1,6 +1,6 @@
 // slang-ir-hlsl-legalize.h
 #pragma once
-#include "../core/slang-list.h"
+#include "core/slang-list.h"
 #include "slang-compiler.h"
 #include "slang-ir.h"
 

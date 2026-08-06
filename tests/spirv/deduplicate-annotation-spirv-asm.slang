@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT -O0
+//TEST:SIMPLE(filecheck=CHECK):-emit-spirv-directly -target spirv-asm -entry computeMain -stage compute -capability spvDescriptorHeapEXT
 
 // Check that exact duplicate annotation instructions emitted from spirv_asm
 // appear only once in the final SPIR-V assembly.

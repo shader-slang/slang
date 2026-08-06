@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#specializeaddressspaceforwgsl
-//META: doc_section_digest=55422c2a92758737eb6eb0ac0f489a44b06df5c80b1e2907ff718d43d17483b7
+//META: doc_section_digest=4dfc10b6dcfc7de02c4480f005a0e2eb0f14d6a66ef8d5fb6ce781d9a448550f
 //META: purpose=A 256-element groupshared array emits as var<workgroup> ... : array<u32, i32(256)>
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

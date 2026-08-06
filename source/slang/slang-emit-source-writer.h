@@ -2,9 +2,9 @@
 #ifndef SLANG_EMIT_SOURCE_WRITER_H
 #define SLANG_EMIT_SOURCE_WRITER_H
 
-#include "../compiler-core/slang-source-map.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-castable.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-basic.h"
+#include "core/slang-castable.h"
 #include "slang-compiler.h"
 
 namespace Slang

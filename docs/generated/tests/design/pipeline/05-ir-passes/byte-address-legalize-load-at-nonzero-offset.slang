@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#type-and-value-legalization
-//META: doc_section_digest=440ef60cd49aa7b190c5138fc5695d86b4ac64644e03bf09eb6782e82ce75b0e
+//META: doc_section_digest=87cc303db4e3bb3825cd2dfa57f040c4ffad9180d465ffc6172dea9a41fbd518
 //META: purpose=Expansion: byte-address-legalize rewrites a typed `ByteAddressBuffer.Load<int>(N)` at a non-zero offset into a typed indexed SSBO access on GLSL — the offset is divided by element size as part of the rewrite.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

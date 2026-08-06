@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/ir-reference/types.md#witness-table-types
-//META: doc_section_digest=06b14fdf48b80a42b7d80961315e045b32739f5cad5c96900f6ed801844b3796
+//META: doc_section_digest=49a42ed1a7e671e433233673213bd9448bafebbaf48bf140e20c8897c9e16e21
 //META: purpose=Stress: two distinct conformances to the same interface produce two distinct witness_table values parameterised by the same interface.
 //META: intent=stress
 //META: pipeline_stage=lower

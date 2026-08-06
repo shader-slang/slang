@@ -1,6 +1,8 @@
 // slang-offset-container.cpp
 #include "slang-offset-container.h"
 
+#include "slang-allocator.h"
+
 namespace Slang
 {
 
@@ -121,7 +123,7 @@ OffsetContainer::~OffsetContainer()
 {
     if (m_data)
     {
-        ::free(m_data);
+        StandardAllocator::deallocate(m_data);
     }
 }
 
@@ -190,7 +192,7 @@ void* OffsetContainer::allocate(size_t size, size_t alignment)
         }
 
         // Reallocate space
-        uint8_t* newData = (uint8_t*)::realloc(m_data, newSize);
+        uint8_t* newData = (uint8_t*)StandardAllocator::reallocate(m_data, newSize);
         if (!newData)
         {
             return nullptr;

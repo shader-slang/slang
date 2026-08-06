@@ -11,65 +11,69 @@ don't need this — see [CONTRIBUTING.md](../../CONTRIBUTING.md).)
 > members (committers)**. Outside contributors can't see it — that's expected;
 > their PRs are still tracked on it by the committers who shepherd them.
 
-You never set the board fields by hand: they are maintained automatically from
-PR activity (open/close, pushes, reviews, CI results, merge-queue changes). Your
-job is to **read the state and act when it asks you to**.
+You never set **Status** by hand: it is maintained automatically from PR
+activity (open/close, pushes, reviews, CI results, merge-queue changes). Your
+job is to **read the state and act when it asks you to**. **Source** is also
+set by automation on first sight, but you may override it when it is wrong
+(see below).
 
 ## How a PR lands on your plate: the `Source` field
 
-Every PR carries a **`Source`** — one of:
+Automation sets each PR's **`Source`**, then picks a default assignee (and
+sometimes a reviewer). Treat that as a starting point — change it if it's wrong.
 
-- **Internal** — opened by someone with write access to the repo. The **author
-  drives it**; they're the assignee, and **they are expected to identify and
-  request their own reviewer** (no reviewer is auto-requested for Internal PRs).
-  If you're a newer committer and unsure who to ask, pick someone who has
-  recently touched the same files, or ask in the team channel.
-- **Community** — opened by an outside contributor. A maintainer (you) is
-  assigned to shepherd it and arrange review.
-- **Bot** — opened by an automated coworker. A maintainer is assigned to
-  shepherd it to ready-for-review and merge.
+**How Source is chosen**
 
-Being the assignee on a **Community** or **Bot** PR means you're responsible for
-moving it forward (or finding the right reviewer).
+- **Internal** — the author is on `shader-slang/source-internal` (or a nested
+  team under it), or on a `source-internal-*` team whose description lists this
+  repo in `Scope: [...]` (for example `Scope: [slangpy, slang-rhi]`). The author
+  is assigned and no reviewer is auto-requested; they should find one themselves.
+- **Community** — a human author who isn't Internal. A shepherd is chosen from
+  `pr-owners`, asked to review (unless they *are* the author), and a short
+  comment is posted on the PR. If someone else looks like a better reviewer
+  from recent commits on the changed files, the comment names them — without
+  `@`-mentioning or auto-requesting them.
+- **Bot** — same shepherd / review / comment behavior as Community, but the
+  allowlist is `bot-pr-owners` instead of `pr-owners`.
+
+**How the Community/Bot shepherd is chosen:** linked-issue assignee on the
+owners team, else whoever on that team has the strongest recent commit signal
+on the PR's files, else the maintainer fallback.
+
+If the team rosters can't be read, Source and assignee stay blank and the
+nightly sweep retries. Internal membership is org-wide (with optional per-repo
+scoped teams), so Source can still be wrong for a given repo — fix it on the
+board and reassign if needed.
+
+If you are the assignee, either drive the PR or hand it off. Internal authors
+still need a reviewer: pick someone who has touched the same files recently, or
+ask in the team channel.
 
 ## What each `Status` means for you
 
-| Status | What it means | Do you act? |
-|---|---|---|
-| **In Review** | The default for an open PR: awaiting review, CI still running, or a fresh commit not yet reviewed. (A **Bot draft** sits here too, so you can see and shepherd it.) | **Yes** — review it, or make sure a real reviewer is requested. |
-| **Revising** | The author is working: a **human draft**, or a reviewer requested changes. (A **Bot** PR's failed CI also lands here — the bot fixes itself.) | **No** — it's on the author/bot until it moves. |
-| **Snagged** | Needs a human's attention: a human PR's **CI failed**, **CI is awaiting your approval to run** (fork PRs from new contributors), or the PR is **approved + green but not in the merge queue** (it fell out, or needs someone to enqueue/merge it). | **Yes** — approve the CI run, help fix CI, or enqueue/merge. |
-| **Approved** | Not a draft, already has an approving review, and is waiting only on CI or the merge queue. | **No** — automated; nothing to do. |
-| **Done** | The PR is closed (merged or otherwise). Terminal. | No. |
+| Status | Meaning | Act? |
+| --- | --- | --- |
+| **In Review** | Waiting on review (or a fresh commit not yet re-reviewed). Bot drafts sit here too so you can shepherd them. | **Yes** — review, or make sure someone is. |
+| **Revising** | Author (or bot) is still working: human draft, changes requested, or a Bot PR with failed CI. | **No** |
+| **Snagged** | Needs a human: CI failed on a human PR, CI needs approval to run, or approved+green but not in the merge queue. | **Yes** — fix CI, approve the run, or enqueue/merge. |
+| **Approved** | Has an approving review; waiting on CI or the merge queue. | **No** |
+| **Done** | Closed (merged or not). Terminal. | **No** |
 
-In short: **`In Review` and `Snagged` are the two columns that want you.**
-`Revising`/`Approved` are waiting on someone/something else, and `Done` is finished.
+**`In Review` and `Snagged` are the columns that want you.** The rest are waiting on someone/something else, or finished.
 
 ## How the state is decided (priority)
 
-When several conditions are true at once, the first matching rule wins:
+Status is recomputed from current PR signals on every event (not walked along edges). First match wins:
 
-1. A reviewer's **changes-request** (made on the current commit) → **Revising**.
-2. **Draft** → **In Review** (Bot) / **Revising** (human).
-3. CI **needs approval** → **Snagged**; CI **failed** → **Revising** (Bot) /
-   **Snagged** (human).
-4. **Approved**: **Snagged** if CI is green and it's not in the merge queue,
-   otherwise **Approved**.
-5. Otherwise → **In Review**.
+1. Changes requested on the **current** commit → **Revising**
+2. Draft → **In Review** (Bot) / **Revising** (human)
+3. CI needs approval → **Snagged**; CI failed → **Revising** (Bot) / **Snagged** (human)
+4. Approved → **Snagged** if green and not in the merge queue, else **Approved**
+5. Otherwise → **In Review**
 
-Two things worth knowing:
-
-- A review only counts while it's on the **current** commit. A new push
-  supersedes earlier feedback, so the PR returns to **In Review** until it's
-  re-reviewed.
-- The **only** difference between the Bot and human flows is what a **CI failure**
-  does (Bot → `Revising`, human → `Snagged`); everything else is identical.
+A new push clears earlier review opinions, so the PR goes back to **In Review** until it is reviewed again. Bot vs human differs for **drafts** and **CI failure**; everything else is the same.
 
 ## The decision, as a flowchart
-
-The board does not move a PR along edges between states — it **recomputes** the
-status from the PR's current signals on every event. So the priority rules above
-are best read as a decision tree (first match wins):
 
 ```mermaid
 flowchart TD

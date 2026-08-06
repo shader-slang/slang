@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:48:55Z
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#what-the-core-module-provides
-//META: doc_section_digest=cf6e88293f416086490f900fb6322b3e953eeecf6ea19c2143f0800c759fa6c5
+//META: doc_section_digest=8a82ae360bcd088373acbb80719dc095678434371e751937b8feacab2eae3d90
 //META: purpose=Core-module typedef `int32_t` is visible without explicit import and lowers to a 32-bit int on every text-emit backend.
 //META: intent=functional
 //META: pipeline_stage=check

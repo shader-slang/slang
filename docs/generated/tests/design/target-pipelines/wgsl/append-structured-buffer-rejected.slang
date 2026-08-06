@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00Z
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=940b62a9312b41f261f039cda6fd50e2e307dcb924128aa8ff8c28474a8c6945
+//META: doc_section_digest=8b6c1341c5d3701b416925821dd85bff877514bbcbeea56e3e6327c0e95aa563
 //META: purpose=AppendStructuredBuffer.Append is rejected for the WGSL compute target with E36107 (unavailable features)
 //META: intent=negative
 //META: pipeline_stage=check

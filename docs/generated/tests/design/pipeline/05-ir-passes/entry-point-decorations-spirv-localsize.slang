@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
-//META: doc_section_digest=7d2dd721ab3c1d33497a937e79d182339817290b8e4a173ec5ce69d40d28ae8d
+//META: doc_section_digest=6dfdf376d754a2fd70f55482aa13c3bac397e45fb6f88efde98edefaf4cc87bd
 //META: purpose=Boundary: `[numthreads(8, 4, 2)]` (mixed non-trivial dimensions) is surfaced verbatim as `OpExecutionMode %main LocalSize 8 4 2` on SPIR-V by the entry-point-decorations pass.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

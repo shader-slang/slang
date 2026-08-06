@@ -383,6 +383,23 @@ local insts = {
 						},
 					},
 					{
+						SPIRVUntypedPtr = {
+							-- A pointer that keeps its logical pointee type and layout in the IR
+							-- (like `PtrType`) but is emitted as an untyped SPIR-V pointer
+							-- (`OpTypeUntypedPointerKHR`), with field/element addresses lowered to
+							-- `OpUntypedAccessChainKHR`. Used for a `ConstantBuffer<T>` fetched from a
+							-- descriptor heap so its uniform-buffer descriptor kind is preserved while
+							-- nested arrays are addressed logically (no pointer-type `ArrayStride`).
+							struct_name = "SPIRVUntypedPtrType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
 						OutParamTypeBase = {
 							{ OutParam = { struct_name = "OutParamType", operands = { { "valueType", "IRType" } } } },
 							{
@@ -416,6 +433,25 @@ local insts = {
 					-- A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
 					struct_name = "DescriptorHandleType",
 					operands = { { "resourceType", "IRType" } },
+					hoistable = true,
+				},
+			},
+			{
+				UntypedResourceHandle = {
+					-- An opaque, untyped handle produced by `ResourceDescriptorHeap[i]`. It is nullary:
+					-- the heap index lives in the value, not the type. `lowerUntypedResourceHandleToUInt`
+					-- rewrites it to its underlying `uint` heap index before emit, so it never reaches
+					-- emit/layout (which treat a survivor as an internal error).
+					struct_name = "UntypedResourceHandleType",
+					hoistable = true,
+				},
+			},
+			{
+				UntypedSamplerHandle = {
+					-- An opaque, untyped handle produced by `SamplerDescriptorHeap[j]`. Nullary, like
+					-- `UntypedResourceHandle`; lowered to `uint` by the same
+					-- `lowerUntypedResourceHandleToUInt` pass and likewise never reaches emit/layout.
+					struct_name = "UntypedSamplerHandleType",
 					hoistable = true,
 				},
 			},
@@ -1265,6 +1301,15 @@ local insts = {
 	},
 	-- Store into an Image.
 	{ imageStore = { operands = { { "image" }, { "coord" }, { "value" } } } },
+	-- Gather four texels from a sampled image at a coordinate, offset by a texel offset.
+	-- The offset may be a compile-time constant or a runtime value; the SPIR-V backend
+	-- inspects the offset operand and selects the `ConstOffset` image operand (no capability)
+	-- for a constant offset, or `Offset` + `ImageGatherExtended` for a runtime offset.
+	{
+		imageGatherOffset = {
+			operands = { { "sampledImage" }, { "location" }, { "component" }, { "offset" } },
+		},
+	},
 	-- Form a pointer to a texel of an image for atomic operations.
 	{ ImageTexelPointer = { operands = { { "image" }, { "coord" }, { "sample" } } } },
 	-- Load from a SubpassInput.
@@ -1325,6 +1370,7 @@ local insts = {
 	-- Resource qualifiers for dynamically varying index
 	{ nonUniformResourceIndex = { operands = { { "index" } } } },
 	{ getNaturalStride = { operands = { { "type" } } } },
+	{ getNaturalAlignment = { operands = { { "type" } } } },
 	{ meshOutputRef = { operands = { { "base" }, { "index" } } } },
 	{ nodeOutputRecordGetElementPtr = { operands = { { "base" }, { "index" } } } },
 	{ meshOutputSet = { operands = { { "base" }, { "index" }, { "elementValue" } } } },
@@ -2090,6 +2136,16 @@ local insts = {
 				},
 			},
 			{
+				synthesizedParameterGroup = {
+					-- Marks a parameter-group element struct that was synthesized by the
+					-- compiler (e.g. by collecting entry-point `uniform`/resource parameters)
+					-- rather than written by the user. Diagnostics that only make sense for
+					-- source-authored groups (such as "special type leaks from parameter
+					-- group") are suppressed for these.
+					struct_name = "SynthesizedParameterGroupDecoration",
+				},
+			},
+			{
 				dependsOn = {
 					-- A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
 					-- even if it does not otherwise reference it.
@@ -2720,6 +2776,13 @@ local insts = {
 	-- already concrete types.
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
+	-- Wrap/unwrap a `uint` heap index in an untyped descriptor-heap handle. This is an internal
+	-- representation only: the `lowerUntypedResourceHandleToUInt` pass forwards each cast to its
+	-- `uint` operand and removes it before emit, so these ops never reach a target emitter.
+	{ CastUIntToUntypedResourceHandle = { operands = { { "index" } } } },
+	{ CastUntypedResourceHandleToUInt = { operands = { { "handle" } } } },
+	{ CastUIntToUntypedSamplerHandle = { operands = { { "index" } } } },
+	{ CastUntypedSamplerHandleToUInt = { operands = { { "handle" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
 	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
@@ -2887,6 +2950,9 @@ local insts = {
 					{ offset = { struct_name = "VarOffsetAttr", min_operands = 2 } },
 				},
 			},
+			-- Alignment is stored alignment-first (operand 0), unit second and optional,
+			-- so it does not fit the kind-first `LayoutResourceInfoAttr` shape.
+			{ TypeAlignment = { struct_name = "TypeAlignmentAttr", min_operands = 1 } },
 			{ FuncThrowType = { struct_name = "FuncThrowTypeAttr", operands = { { "errorType", "IRType" } } } },
 		},
 	},

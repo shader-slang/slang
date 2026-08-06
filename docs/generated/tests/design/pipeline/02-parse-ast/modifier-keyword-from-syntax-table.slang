@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#syntax-as-declaration
-//META: doc_section_digest=d55e14c87bae9e097965548fcc3531ed08f6cc4e8b973587ecd544f7084b255d
+//META: doc_section_digest=782ebcf73f72c791307c666477dbdb853b2b65ab6b69792263cb260fdf597b35
 //META: purpose=Modifier keywords like `nointerpolation` are not hard-coded in the parser but bound to syntax via the SyntaxParseInfo table (populated by populateBaseLanguageModule and the core module); the parser dispatches to the right callback by identifier lookup.
 //META: intent=functional
 //META: pipeline_stage=parse

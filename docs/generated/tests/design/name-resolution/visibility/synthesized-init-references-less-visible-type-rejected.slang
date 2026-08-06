@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#container-level-cap
-//META: doc_section_digest=f97c340f9ed0d70698a682137262abf68c7dac2e0bc8a5cd8f0a2f7897f3b3f8
+//META: doc_section_digest=eed9de49e1899c3103b9cfa5ed071561030448aa97e7eb41f81be2574b496adc
 //META: purpose=A synthesized `$init` for a `public` struct that contains an `internal`-typed field is rejected with `references less visible type`.
 //META: intent=negative
 //META: pipeline_stage=check
