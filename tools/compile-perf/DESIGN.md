@@ -139,15 +139,33 @@ nightly passes `--label` with the label it just registered, so the judged point
 is pinned to this run's registration — daily labels are keyed by the swept
 commit's date, so several points can share a date and "the latest point" can be
 a same-date sibling. Without `--label` (ad-hoc CLI use) the last point is
-judged. A metric past both a relative (`--rel`, default 1.10×) and absolute
-(`--abs`, default 2 ms) threshold is flagged — printed, emitted as a GitHub
-`::error::` annotation + step-summary row, and the job exits non-zero (after
-the push, so the data is still stored). If the judged point's runner differs
-from the history's, it warns and compares only same-runner points.
+judged.
+
+Judgement is two-tier, and both tiers are gated on the same absolute floor
+(`--abs`, default 2 ms) so a large ratio on a tiny timer stays silent in
+either band:
+
+| ratio vs trailing median                      | tier        | effect                                                                                                      |
+| --------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| ≥ `--rel` (default 1.10×)                     | **error**   | `::error::` annotation + step-summary row, job exits non-zero (after the push, so the data is still stored) |
+| ≥ `--warn-rel` (default 1.05×), below `--rel` | **warning** | `::warning::` annotation + step-summary row, job stays green                                                |
+| below `--warn-rel`                            | —           | silent                                                                                                      |
+
+`--warn-rel` must be strictly below `--rel`; `trend.py` rejects an inverted
+pair at startup, because the error band would otherwise claim the whole
+warning band and every 5–10% move would fail the nightly. The boundaries are
+inclusive and `rel` belongs to the error tier (a metric exactly at 1.10× is an
+error); `classify_metric` owns this decision and pins each boundary with an
+import-time self-check. If the judged point's runner differs from the
+history's, it warns and compares only same-runner points.
+
 On scheduled runs (and manual runs with `notify-slack=true`) the workflow also
-posts a Slack status notification — clean / regression detected / job failed /
-trend check skipped (`SLACK_WEBHOOK_COMPILE_PERF` secret; the step is skipped
-when unset, and a delivery failure only warns — it never fails the run).
+posts a Slack status notification — clean / warning-level changes / regression
+detected / job failed / trend check skipped (`SLACK_WEBHOOK_COMPILE_PERF`
+secret; the step is skipped when unset, and a delivery failure only warns — it
+never fails the run). The warning state is what `trend.py`'s `warnings=`
+GitHub output exists for: warnings do not fail the job, so the exit code alone
+cannot tell a warnings-only night from a clean one.
 
 ### Runner-change procedure
 

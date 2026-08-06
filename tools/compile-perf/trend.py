@@ -53,6 +53,32 @@ def write_step_summary(md):
             fh.write(md + "\n")
 
 
+def classify_metric(ratio, delta, rel, warn_rel, abs_floor):
+    """Classify one metric's movement as "error", "warning", or None.
+
+    "error" fails the nightly; "warning" is reported (yellow Slack, step
+    summary) but exits 0; None is silent. `abs_floor` gates BOTH tiers — a
+    large ratio on a tiny absolute delta is measurement noise whichever band
+    it lands in, so a 50% rise in a 3 ms timer must stay silent rather than
+    becoming a warning.
+
+    Taking `abs_floor` as a parameter rather than reading args.abs is
+    deliberate: it keeps this pure (so the self-checks below need no argparse
+    or filesystem), and it is the seam a per-counter floor plugs into — see
+    the note at the call site.
+
+    The bands assume warn_rel < rel, which main() enforces at parse time; at
+    ratio == rel the metric is an error, since `rel` is documented as the
+    threshold at which the nightly fails."""
+    if delta < abs_floor:
+        return None
+    if ratio >= rel:
+        return "error"
+    if ratio >= warn_rel:
+        return "warning"
+    return None
+
+
 def main():
     # The Windows runner's Python defaults to a cp1252 console encoding, which
     # cannot encode this report's non-ASCII table headers — and the flag table
@@ -100,6 +126,19 @@ def main():
     ap.add_argument("--label", default=None,
                     help="judge the point with this label instead of the last point")
     args = ap.parse_args()
+
+    # The two-tier gate is only meaningful when the warning band sits BELOW
+    # the error band; argparse cannot express the relation. An inverted pair
+    # does not merely produce no warnings — classify_metric's error branch
+    # claims the whole warning band first, so every 5-10% mover becomes an
+    # ERROR and the nightly starts failing on noise, which is the alert
+    # fatigue this gate exists to remove. Fail loudly rather than run
+    # backwards.
+    if args.warn_rel >= args.rel:
+        raise SystemExit(f"--warn-rel ({args.warn_rel}) must be < --rel "
+                         f"({args.rel}): the warning band sits below the "
+                         f"error band, and an inverted pair silently "
+                         f"promotes every warning-level change to an error")
 
     tpath = os.path.join(args.results, "tracking", "tracking.json")
     if not os.path.exists(tpath):
@@ -172,11 +211,15 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        if delta >= args.abs:
-            if ratio >= args.rel:
-                regressions.append((wl, timer, med, cur, ratio, delta))
-            elif ratio >= args.warn_rel:
-                warnings.append((wl, timer, med, cur, ratio, delta))
+        # args.abs is passed as the floor rather than read inside
+        # classify_metric so a per-counter floor can be substituted here
+        # without touching the classifier or its self-checks — the memory
+        # counters landing in this series want a 1 MiB floor, not 2 ms.
+        verdict = classify_metric(ratio, delta, args.rel, args.warn_rel, args.abs)
+        if verdict == "error":
+            regressions.append((wl, timer, med, cur, ratio, delta))
+        elif verdict == "warning":
+            warnings.append((wl, timer, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
@@ -185,13 +228,16 @@ def main():
           f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
           f">= {args.warn_rel}, both gated on >= {args.abs} ms\n")
 
-    # Expose the counts to the workflow (the Slack step distinguishes a
-    # warnings-only night from a clean one; the exit code alone cannot,
-    # since warnings deliberately do not fail the job).
+    # `warnings` is the ONLY key the workflow reads, and the only one it
+    # needs: the Slack step distinguishes a warnings-only night from a clean
+    # one, which the exit code alone cannot do since warnings deliberately do
+    # not fail the job. A regression is already carried by the exit code
+    # (steps.trend.outcome == 'failure'), so an `errors` key would be a second
+    # spelling of the same fact — one that no reader would notice going stale.
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a", encoding="utf-8") as fh:
-            fh.write(f"errors={len(regressions)}\nwarnings={len(warnings)}\n")
+            fh.write(f"warnings={len(warnings)}\n")
 
     if not regressions and not warnings:
         print(f"OK — no compile-perf regression in {current['label']} vs trailing median.")
@@ -225,6 +271,45 @@ def main():
     print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
     if regressions and not args.no_fail:
         raise SystemExit(1)
+
+
+# Import-time self-checks over classify_metric, matching the directory idiom
+# (lib/manifest.py, daily_movers.py) and run by check-python-core.yml on every
+# PR that touches these files. This is the decision the two-tier gate exists
+# to make, and each branch's failure mode is quiet: a mis-ordered comparison
+# turns a warning into a nightly failure (alert fatigue) or an error into a
+# yellow icon nobody acts on (missed regression). Written against the shipped
+# defaults so the cases read as the real bands.
+_REL, _WARN, _ABS = 1.10, 1.05, 2.0
+
+# The three bands, comfortably inside each.
+assert classify_metric(1.20, 50.0, _REL, _WARN, _ABS) == "error"
+assert classify_metric(1.07, 50.0, _REL, _WARN, _ABS) == "warning"
+assert classify_metric(1.02, 50.0, _REL, _WARN, _ABS) is None
+
+# Both boundaries are inclusive, and `rel` belongs to the ERROR band: --rel is
+# documented as the ratio at which the nightly fails, so a metric sitting
+# exactly on it must fail rather than warn.
+assert classify_metric(_REL, 50.0, _REL, _WARN, _ABS) == "error", \
+    "ratio == rel is an error, not a warning"
+assert classify_metric(_WARN, 50.0, _REL, _WARN, _ABS) == "warning", \
+    "ratio == warn_rel is a warning, not silence"
+
+# The absolute floor gates BOTH tiers. A huge ratio on a sub-floor delta is
+# noise in a small timer, not a regression — and it must not leak into the
+# warning band either, which is the easy mistake when adding a second tier.
+assert classify_metric(1.50, _ABS - 0.1, _REL, _WARN, _ABS) is None, \
+    "abs floor must gate the error tier"
+assert classify_metric(1.07, _ABS - 0.1, _REL, _WARN, _ABS) is None, \
+    "abs floor must gate the WARNING tier too, not just the error tier"
+assert classify_metric(1.50, _ABS, _REL, _WARN, _ABS) == "error", \
+    "delta == abs is above the floor (the floor is exclusive-below)"
+
+# A drop is never flagged: delta is negative, so it fails the floor first.
+assert classify_metric(0.5, -50.0, _REL, _WARN, _ABS) is None, \
+    "an improvement must never be classified as a regression"
+
+del _REL, _WARN, _ABS
 
 
 if __name__ == "__main__":
