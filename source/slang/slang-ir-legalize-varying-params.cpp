@@ -3296,12 +3296,9 @@ private:
                 continue;
             }
             SLANG_ASSERT(typeLayout);
-            // The layout describes the fields that came from the entry point's result. A field with
-            // no corresponding layout entry is one that was merged in from elsewhere and is not
-            // part of the result varying signature (e.g. an unsemanticed `out` parameter appended
-            // to the return struct by lowerOutParameters); it correctly gets no varying attribute.
-            // Skip it rather than reading past the field-attr array. (A semanticed field never
-            // reaches here — it is handled by the semantic branch above.)
+            // The layout only covers the fields that came from the entry point's result, so a
+            // struct field can outrun it (e.g. an `out` parameter appended to the return struct by
+            // lowerOutParameters). Stop rather than read past the field-layout array.
             if (index >= (Index)typeLayout->getFieldCount())
             {
                 index++;
@@ -3745,10 +3742,9 @@ private:
         }
         // The collected leaves cover the fields that came from the struct return, in the same
         // depth-first order the struct was flattened, so they line up as a prefix of
-        // `flattenedStruct`'s fields. There can be additional trailing fields with no result-layout
-        // entry (e.g. an `out` parameter merged into the same output struct) — these either carry
-        // their own semantic or are intentionally outside the result varying signature, and are
-        // handled without a layout offset; there must never be more leaves than fields.
+        // `flattenedStruct`'s fields. Trailing fields merged in from elsewhere (e.g. an `out`
+        // parameter appended to the same output struct) have no leaf, so leaves can be fewer than
+        // fields — but never more.
         SLANG_ASSERT(leafLayouts.getCount() <= flattenedFieldCount);
 
         IRStructTypeLayout::Builder flatLayoutBuilder(&builder);
