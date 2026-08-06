@@ -1,6 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute -line-directive-mode none
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_RT):-cuda -compute -output-using-type -shaderobj
 
+// Emit-only, deliberately: this test needs a runtime-selected function value to keep the
+// signature-preserving use alive, and NVRTC cannot compile one. `Slang_FuncType` is declared only in
+// `slang-cpp-host-prelude.h`, so a `COMPARE_COMPUTE` companion here fails to build on a GPU runner
+// rather than testing anything. The sibling `unprocessed-callee` test covers the same decline with a
+// `[CudaDeviceExport]` callee, which does run.
+//
 // The negative path of the address-forward: a callee that keeps its by-value signature must keep
 // being handed the aggregate by value, even though the same aggregate is forwarded by address into
 // a callee that was rewritten.
@@ -15,10 +20,6 @@
 // is what makes this a discriminating test rather than a target-wide no-op: both decisions are
 // taken for the same `big`, in the same kernel, and the checks below pin each one, including the
 // temp-copy fallback that carries `big` into `call`.
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=output
-//TEST_INPUT:set big.v = {10.0, 20.0, 30.0, 40.0}
-//TEST_INPUT:set sel = 1
 
 struct Big
 {
@@ -53,14 +54,8 @@ void computeMain(
     uniform uint sel,
     uniform RWStructuredBuffer<float> output)
 {
-    // With sel=1 the runtime selection picks `readsumA`, so both terms read the same element and
-    // out[i] = 2 * big.v[i]. Both the by-value direct call and the temp-copy-into-`call` path must
-    // observe the unmodified uniform for these to hold: a mis-forwarded pointer or a malformed
-    // spill would change the values, not just the emit text.
-    // CHECK_RT: 20.0
-    // CHECK_RT: 40.0
-    // CHECK_RT: 60.0
-    // CHECK_RT: 80.0
+    // `sel` makes the callee a runtime choice, which is what stops specialization from folding the
+    // function value away before the pass runs.
     output[tid] = readsumA(big, tid) + call(sel != 0u ? readsumA : readsumB, big, tid);
 }
 

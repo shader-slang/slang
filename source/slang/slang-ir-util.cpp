@@ -28,8 +28,6 @@ bool isUserPointerType(IRInst* type)
 
 bool isCudaKernelParamBorrowInType(IRInst* type)
 {
-    // Only a `borrow in` ever carries this address space, so require that shape rather than testing
-    // the address space alone.
     auto ptrType = as<IRBorrowInParamType>(type);
     if (!ptrType)
         return false;
@@ -2182,34 +2180,17 @@ bool isEntryPointByValueUniformAggregateParam(IRParam* param)
         !parentFunc->findDecoration<IREntryPointDecoration>())
         return false;
 
-    // Must be uniform, not a varying (per-thread) input. `findVarLayout` is the general accessor
-    // for this - it subsumes the `IRLayoutDecoration` + `as<IRVarLayout>` lookup that
-    // `EntryPointInParamToBorrowContext::shouldTransformParam` spells out. A missing layout is
-    // treated as varying: the conservative direction, skipping the forward rather than risking it.
-    //
-    // A varying by-value aggregate cannot reach here on any CUDA stage: on compute, one without a
-    // system-value semantic is diagnosed `E38040` and treated as uniform, and on the ray-tracing
-    // stages - where payloads genuinely are varying - `legalize-varying-params` reconstructs the
-    // payload into a local first, leaving no by-value `IRParam`.
-    //
-    // Deliberately not asserted, unlike the tuple tripwire below. `SLANG_ASSERT` becomes
-    // `SLANG_ASSUME` in release, and asserting exactly `!(!varLayout || isVaryingParameter(...))`
-    // would tell the optimizer this `return false` is unreachable and license deleting it -
-    // removing the conservative decline this guard exists to provide. The tuple assert is safe
-    // because its condition does not imply its `default:` branch is dead (that branch also handles
-    // scalar/vector/matrix), so nothing load-bearing is assumed away.
+    // Must be uniform, not varying; a missing layout counts as varying, the conservative direction.
+    // Not asserted, even though no CUDA stage should reach here with a varying aggregate:
+    // `SLANG_ASSERT` is `SLANG_ASSUME` in release, so asserting the negation of this condition would
+    // license deleting the decline it guards.
     auto varLayout = findVarLayout(param);
     if (!varLayout || isVaryingParameter(varLayout))
         return false;
 
-    // Must be a fixed-size by-value aggregate (`struct`/sized `array`); everything else - including
-    // a pointer-typed param already indirected by another pass - falls through `default:` to false,
-    // which is what makes the "ByValue" in the name hold. Deliberately narrower than
-    // `isCompositeType`, which also admits `UnsizedArrayType`: an unsized array has no by-value
-    // kernel-parameter storage whose address could be forwarded.
-    //
-    // `lowerTuples` runs before this pass's only consumer, so a tuple cannot reach here; the assert
-    // is a tripwire for a pipeline reordering (in release it would fall through to `false`).
+    // Must be a fixed-size by-value aggregate. Narrower than `isCompositeType` on purpose: that also
+    // admits `UnsizedArrayType`, which has no by-value storage whose address could be forwarded.
+    // `lowerTuples` runs first, so the tuple assert is a tripwire for a pipeline reordering.
     auto type = param->getDataType();
     if (!type)
         return false;
@@ -2220,9 +2201,6 @@ bool isEntryPointByValueUniformAggregateParam(IRParam* param)
     case kIROp_ArrayType:
         return true;
     default:
-        // Everything genuinely excluded (scalar, vector, matrix, unsized array, an
-        // already-indirected pointer) lands here, and so does the asserted-impossible tuple in a
-        // release build - declining to forward is the conservative answer for both.
         return false;
     }
 }
