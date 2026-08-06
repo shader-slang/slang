@@ -162,19 +162,7 @@ static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
 // value that happens to point at the struct.
 static bool holdsFuncType(IRType* type)
 {
-    if (!type)
-        return false;
-
-    if (as<IRFuncType>(type))
-        return true;
-
-    if (auto ptrType = as<IRPtrTypeBase>(type))
-        return holdsFuncType(ptrType->getValueType());
-
-    if (auto arrayType = as<IRArrayTypeBase>(type))
-        return holdsFuncType(arrayType->getElementType());
-
-    return false;
+    return as<IRFuncType>(unwrapArrayAndPointers(type)) != nullptr;
 }
 
 // True if `funcType` has any parameter or result of type `String`.
