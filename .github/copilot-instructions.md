@@ -26,7 +26,7 @@ Your PR needs to be formatted according to our coding style.
 
 Two commands are needed because a type flag such as `--md` narrows the run to that type rather than adding to it, and markdown is the one formatter a flagless run does not enable. Two further cases are covered by neither command, and both exit 0 having formatted nothing:
 
-- **Untracked files are invisible** to `--modified` (it is `git diff HEAD`). Format a new file by naming it: `./extras/formatting.sh -- path/to/new-file`.
+- **Untracked files are invisible** to `--modified` (it is `git diff HEAD`). Format a new file by naming it: `./extras/formatting.sh --no-version-check -- path/to/new-file`.
 - **`.slang` files have no formatter configured**, so naming one selects nothing.
 
 Run with no arguments, the script prints its help text and exits 0 without formatting anything.
