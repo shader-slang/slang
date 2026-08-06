@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T13:50:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/ir-reference/types.md#ptr-and-the-access-qualifier-address-space-operands
+//META: doc_ref=docs/generated/design/ir-reference/types.md#ptr-and-the-access-qualifier--address-space-operands
 //META: doc_section_digest=24583cce8243a26e6a6077b224e031406f0c718c4c1df3a220b3be0cd7b9c590
 //META: purpose=Boundary: a local var of fixed-array type produces a value of IR type Ptr(Array(<T>, <N>)).
 //META: intent=boundary

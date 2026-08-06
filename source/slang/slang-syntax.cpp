@@ -4,7 +4,6 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
-#include <assert.h>
 #include <typeinfo>
 
 namespace Slang

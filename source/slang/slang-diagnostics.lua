@@ -254,6 +254,13 @@ err(
 )
 
 err(
+    "spirv-validation-unavailable",
+    115,
+    "SPIR-V validation was requested, but the loaded 'slang-glslang' library does not export 'glslang_validateSPIRV'; no SPIR-V was validated",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -1737,6 +1744,13 @@ warning(
     30082,
     "implicit float-to-double conversion",
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
+)
+
+warning(
+    "deprecated-struct-cast-from-zero",
+    30087,
+    "casting literal 0 to a struct type changes semantics in Slang 202c",
+    span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 202c. To keep the current semantics, switch to a constructor with no parameters." }
 )
 
 -- try/throw diagnostics
@@ -3374,6 +3388,13 @@ err(
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
 )
 
+err(
+    "switch-condition-not-integer",
+    30607,
+    "switch condition must be an integer or enum type",
+    span { loc = "expr:Expr", message = "'switch' condition must be of an integer or enum type, but is of type '~type:Type'" }
+)
+
 -- 310xx: link time specialization
 -- (definitions moved to slang-diagnostics-semantic-checking-7.lua)
 
@@ -4008,15 +4029,15 @@ standalone_note(
 err(
     "case-outside-switch",
     39999,
-    "'case' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'case' not allowed outside of a 'switch' statement" }
+    "'case' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'case' is only allowed in a 'switch' body" }
 )
 
 err(
     "default-outside-switch",
     39999,
-    "'default' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'default' not allowed outside of a 'switch' statement" }
+    "'default' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'default' is only allowed in a 'switch' body" }
 )
 
 err(
