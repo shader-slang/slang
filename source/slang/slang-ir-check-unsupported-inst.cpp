@@ -132,6 +132,8 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
 // `ShaderSharedLibrary` and `ShaderHostCallable` compile through kernel C++
 // (`_getDefaultSourceForTarget`), so without them the undefined name is reported by the
 // downstream compiler -- `'Slang_FuncType' does not name a type` from gcc -- rather than here.
+// `ShaderLLVMIR` shares that lowering and crashes further down when a function type survives, so
+// it is rejected here too.
 static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
 {
     switch (target->getTarget())
@@ -143,6 +145,7 @@ static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
     case CodeGenTarget::PTX:
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
         return true;
     default:
         return isMetalTarget(target) || isWGPUTarget(target);

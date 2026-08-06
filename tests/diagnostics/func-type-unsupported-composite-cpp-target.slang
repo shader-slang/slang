@@ -6,10 +6,12 @@
 // target, not the intermediate one. Without them in the target set the undefined name was left
 // for the downstream toolchain to complain about: gcc reported `'Slang_FuncType' does not name
 // a type`, and the LLVM path `no template named 'Slang_FuncType'`, neither naming the shader
-// line responsible.
+// line responsible. `llvm-shader-ir` shares that lowering and crashed outright rather than
+// reporting anything, so the diagnostic replaces a segmentation fault there.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target shader-sharedlib -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target host-callable -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target llvm-shader-ir -entry computeMain -stage compute
 
 int addOne(int x)
 {
