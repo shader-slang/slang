@@ -3710,7 +3710,7 @@ err(
 err(
     "groupshared-argument-must-be-groupshared-lvalue",
     30711,
-    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a member reached through a group-shared pointer with '->')",
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
     span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage" }
 )
 

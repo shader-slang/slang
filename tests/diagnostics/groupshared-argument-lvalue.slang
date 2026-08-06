@@ -1,8 +1,7 @@
-// An argument to a `groupshared` parameter must name thread-group-shared storage -- an addressable
-// expression in `AddressSpace::GroupShared` (a `groupshared` variable, a component of one, or a
-// member reached through a group-shared pointer with `->`). A private local, a copy, or an rvalue
-// cannot be aliased as thread-group-shared memory, so it is rejected (shader-slang/slang#10641;
-// aligns with HLSL/DXC error 0043).
+// An argument to a `groupshared` parameter must name thread-group-shared storage -- a `groupshared`
+// variable, a component of one, or a `groupshared` parameter forwarded on. A private local, a copy,
+// or an rvalue cannot be aliased as thread-group-shared memory, so it is rejected
+// (shader-slang/slang#10641; aligns with HLSL/DXC error 0043).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry computeMain -stage compute
 

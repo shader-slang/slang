@@ -7460,15 +7460,11 @@ static Expr* getBaseObjectOfProjection(Expr* expr)
 }
 
 // A `groupshared` parameter is a by-reference alias of a single thread-group-shared location, so
-// its argument must itself name thread-group-shared storage: an addressable expression whose
-// address space is `GroupShared` (a `groupshared` variable/parameter, a component of one, or a
-// member reached through a group-shared pointer with `->`). Passing a private local, a copy, or an
+// its argument must itself name thread-group-shared storage. Passing a private local, a copy, or an
 // rvalue would silently alias non-shared memory as shared, breaking the group-shared aliasing
 // semantics HLSL requires (DXC rejects it outright with error 0043). `getValidTypeForAddressOf`
 // already computes the addressable pointer type -- carrying its address space -- for an addressable
 // expression, so reuse it as the source of truth rather than re-deriving addressability here.
-//
-// An explicit dereference (`*p`, `(*p).field`) is not accepted; only the `->` spelling is.
 void SemanticsVisitor::checkGroupSharedArgumentOfParam(ParamDecl* paramIn, Expr* argIn)
 {
     if (!paramIn || !argIn || !paramIn->hasModifier<HLSLGroupSharedModifier>())

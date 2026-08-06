@@ -2381,19 +2381,8 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
                                                                     : nullptr;
         SLANG_ASSERT(prefix && "Unhandled type of mesh output decoration");
 
-        auto valueType = paramType;
-        if (auto outType = as<IROutParamTypeBase>(valueType))
-        {
-            valueType = outType->getValueType();
-        }
-        else if (auto refType = as<IRRefParamType>(valueType))
-        {
-            valueType = refType->getValueType();
-        }
-        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
-        {
-            valueType = constRefType->getValueType();
-        }
+        auto [directionInfo, valueType] = splitParameterDirectionAndType(paramType);
+        SLANG_UNUSED(directionInfo);
 
         m_writer->emit(prefix);
         emitType(valueType, paramName);
@@ -2462,34 +2451,17 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     if (emitMeshOutputParam())
         return;
 
-    // HLSL forbids pairing the `groupshared` address-space keyword with an
-    // `in`/`out`/`inout` direction qualifier on a parameter: DXC rejects e.g.
-    // `groupshared inout uint s[64]` with "'inout' and 'groupshared' cannot be
-    // used together for a parameter". A `groupshared` parameter already names
-    // thread-group-shared memory by reference, so the direction wrapper that
-    // lowering attaches to a by-reference parameter (e.g. `borrow inout` for a
-    // writable scratch buffer) must be stripped before emission. We unwrap the
-    // parameter type to its value type and emit it without a direction keyword;
-    // the `groupshared` already emitted by `emitRateQualifiersAndAddressSpace`
-    // above carries the by-reference shared semantics on its own.
-    //
-    // A mesh-shader input payload is *also* lowered to a group-shared rate (see
-    // `HLSLPayloadModifier` in lowering), but it must keep flowing through
-    // `Super::emitSimpleFuncParamImpl`, whose `emitMeshShaderModifiers` emits
-    // its required `in payload` syntax. It is read-only (`borrow in`) so it never
-    // hits the illegal `groupshared inout` pairing this branch exists to fix, so
-    // we exclude it here and let the base emitter handle it.
+    // DXC rejects `groupshared` paired with a direction qualifier -- "'inout' and 'groupshared'
+    // cannot be used together for a parameter" -- and the `groupshared` keyword already emitted
+    // above carries the by-reference semantics, so drop the direction wrapper here. A mesh-shader
+    // input payload shares the group-shared rate but needs `emitMeshShaderModifiers` to emit its
+    // `in payload` syntax, and being read-only it never forms the illegal pairing.
     if (as<IRGroupSharedRate>(param->getRate()) &&
         !param->findDecoration<IRHLSLMeshPayloadDecoration>())
     {
         auto paramType = param->getDataType();
-        auto valueType = paramType;
-        if (auto outType = as<IROutParamTypeBase>(valueType))
-            valueType = outType->getValueType();
-        else if (auto refType = as<IRRefParamType>(valueType))
-            valueType = refType->getValueType();
-        else if (auto constRefType = as<IRBorrowInParamType>(valueType))
-            valueType = constRefType->getValueType();
+        auto [directionInfo, valueType] = splitParameterDirectionAndType(paramType);
+        SLANG_UNUSED(directionInfo);
 
         emitType(valueType, getName(param));
         emitSemantics(param);

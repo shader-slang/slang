@@ -2268,7 +2268,7 @@ Result linkAndOptimizeIR(
             // whole-array copy that #10641 exists to remove. Inlining first makes the callee and
             // its parameter disappear, so the shared accesses land directly on the `workgroup`
             // global. Reuse the GLSL resource-return fallback pass restricted to that single case.
-            SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, sink, true);
+            SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, true);
 
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
@@ -2434,7 +2434,7 @@ Result linkAndOptimizeIR(
         // parameters, we will inline the functions in question to make sure we can produce
         // valid GLSL.
         //
-        SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, sink, false);
+        SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram);
     }
     validateIRModuleIfEnabled(codeGenContext, irModule);
 

@@ -38,7 +38,6 @@ bool performPreAutoDiffForceInlining(IRModule* module);
 void performGLSLResourceReturnFunctionInlining(
     IRModule* module,
     TargetProgram* targetProgram,
-    DiagnosticSink* sink,
     bool groupSharedByRefOnly = false);
 
 /// Inline simple intrinsic functions whose definition is a single asm block.

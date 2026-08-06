@@ -13978,13 +13978,10 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
     maybeApplyLayoutModifier(paramDecl);
 
     // A `groupshared` parameter names one thread-group-shared storage location and is therefore
-    // passed by reference (see `getExplicitlyDeclaredParamPassingMode`), so the copy-direction
-    // modifiers `in`/`out`/`inout` are not applicable to it. Reject them here at the producer
-    // rather than letting lowering silently reinterpret the shape: an `in groupshared` parameter,
-    // for instance, would otherwise revert to a per-thread by-value copy -- exactly the #10641
-    // defect. Mutability is instead spelled with `__constref` or `const` (read-only) vs the bare
-    // read-write default. `InOutModifier` derives from `OutModifier`, so it is checked first to
-    // report the most specific keyword.
+    // passed by reference, so the copy-direction modifiers are not applicable to it. Reject them at
+    // the producer rather than letting lowering revert to a per-thread copy -- the #10641 defect.
+    // `InOutModifier` derives from `OutModifier`, so it is checked first to report the most
+    // specific keyword.
     if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
     {
         Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
@@ -13996,16 +13993,9 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
             getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
                 .modifier = directionModifier});
 
-        // Give the parameter a passing mode that keeps the reference, since
-        // `getExplicitlyDeclaredParamPassingMode` would otherwise fall through to a by-value
-        // default for the read-only spelling.
-        //
-        // The two spellings cannot take the same modifier. `RefModifier` is the strict reference,
-        // but it also *requires a mutable l-value argument*: the invoke check at
-        // `slang-check-expr.cpp:4284` fires for `RefParamType`, and `ConstModifier` clears
-        // `isLeftValue` (`:1660`), so `const groupshared` + `RefModifier` cannot be called at all.
-        // `BorrowModifier` is what `__constref` carries and passes that check, because
-        // `BorrowInParamType` is a sibling of `RefParamType` rather than a subtype.
+        // `const groupshared` cannot take `RefModifier`: `ConstModifier` clears `isLeftValue`, and
+        // the invoke check requires a mutable l-value for a `RefParamType` argument, so the
+        // parameter would be uncallable. `BorrowModifier` is what `__constref` carries.
         if (!paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>())
         {
             if (paramDecl->hasModifier<ConstModifier>())

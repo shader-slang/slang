@@ -3684,14 +3684,11 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 
         return ParamPassingMode::BorrowIn;
     }
-    // A `groupshared` parameter names one thread-group-shared storage location, so it is always
-    // passed *by reference*, never copied per-invocation. A per-thread copy would defeat the
-    // sharing and, on D3D/DXIL, emit no thread-group-shared (`addrspace(3)`) storage at all
-    // (issue #10641). Semantic checking gives the parameter `RefModifier` (read-write) or
-    // `BorrowModifier` (`const`), so one of the branches above always returns first; the
-    // copy-direction modifiers are rejected there too. Reaching here means that injection was
-    // missed.
-    SLANG_ASSERT(!paramDecl->hasModifier<HLSLGroupSharedModifier>());
+    // Unlike a payload, which maps to `BorrowIn` above, a `groupshared` parameter can be read-write,
+    // so the checker picks `RefModifier` or `BorrowModifier` per spelling and one of the branches
+    // above returns first. Reaching here means that injection was missed, and the fall-through would
+    // silently return a by-value copy -- issue #10641 again -- so this must fire in release too.
+    SLANG_RELEASE_ASSERT(!paramDecl->hasModifier<HLSLGroupSharedModifier>());
     if (paramDecl->hasModifier<InOutModifier>())
     {
         // The AST specified `inout`:

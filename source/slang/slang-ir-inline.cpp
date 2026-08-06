@@ -1338,11 +1338,8 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
 void performGLSLResourceReturnFunctionInlining(
     IRModule* module,
     TargetProgram* targetProgram,
-    DiagnosticSink* sink,
     bool groupSharedByRefOnly)
 {
-    SLANG_UNUSED(sink);
-
     GLSLResourceReturnFunctionInliningPass pass(module, groupSharedByRefOnly);
     bool changed = true;
 
