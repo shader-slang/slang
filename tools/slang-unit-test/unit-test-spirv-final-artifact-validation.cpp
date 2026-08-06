@@ -311,8 +311,8 @@ int compileAndReturnShippedWordCount(
 } // namespace
 
 // The module handed to the validator must be the one the caller receives. The fake optimizer
-// returns a smaller module than it was given, so validating before the optimize step records the
-// larger pre-optimize size and validating after records the shipped size.
+// returns a smaller module than it was given, so the pre-optimize and shipped sizes differ and the
+// size the validator records says which of the two it was given.
 SLANG_UNIT_TEST(spirvValidationInspectsShippedArtifact)
 {
     const int shippedWordCount = compileAndReturnShippedWordCount();
@@ -323,10 +323,10 @@ SLANG_UNIT_TEST(spirvValidationInspectsShippedArtifact)
     SLANG_CHECK(shippedWordCount > 0);
     SLANG_CHECK(gOptimizedWordCount > 0);
 
-    // The shipped module is the optimizer's output, so the optimizer having shrunk it by exactly
-    // one word means the pre-optimize module was one word larger. Both candidate sizes are
-    // therefore known and distinct, which is what lets the final assertion discriminate: the old
-    // ordering would have recorded `shippedWordCount + 1`.
+    // The shipped module is the optimizer's output, and the fake optimizer shrinks its input by
+    // exactly one word, so the pre-optimize module is one word larger. Both candidate sizes are
+    // therefore known and distinct, which is what makes the assertion below discriminating rather
+    // than trivially true.
     SLANG_CHECK(shippedWordCount == gOptimizedWordCount);
 
     SLANG_CHECK(gValidatedWordCount == shippedWordCount);
@@ -358,9 +358,9 @@ SLANG_UNIT_TEST(spirvValidationInspectsStrippedArtifact)
 // When the optimize step produces nothing, validation still runs -- on the module the emitter
 // produced. `GlslangDownstreamCompiler::compile` reports an optimizer failure by attaching an error
 // diagnostic and returning `SLANG_OK` with no blob, so the artifact installed for the caller
-// carries no SPIR-V; validating it would report nothing useful. The compile fails either way, but a
-// caller debugging an emitter bug needs the validator's account of the SPIR-V that was actually
-// built, which is what ran before the validation call moved after the optimize step.
+// carries no SPIR-V and validating that would report nothing useful. The compile fails either way,
+// so what this pins is that a caller debugging an emitter bug still gets the validator's account of
+// the module the emitter actually built.
 SLANG_UNIT_TEST(spirvValidationRunsOnPreOptimizeModuleWhenOptimizerFails)
 {
     SlangResult codeResult = SLANG_OK;
@@ -375,12 +375,10 @@ SLANG_UNIT_TEST(spirvValidationRunsOnPreOptimizeModuleWhenOptimizerFails)
     SLANG_CHECK(gValidatedWordCount > 0);
 }
 
-// The same optimizer failure as the test above, but with `-separate-debug-info` on. That mode runs
-// the debug-strip inside the optimize block, and the strip loads the optimizer's output -- which on
-// this path carries no blob, so the strip fails and returns from `createArtifactFromIR` before
-// either the downstream diagnostics or the validation call is reached. A compile that fails without
-// saying why leaves the caller nothing to act on, so this checks the diagnostic survives rather
-// than just the result code.
+// The same optimizer failure as the test above, but with `-separate-debug-info` on, where the
+// debug-strip runs on the optimizer's output and so fails too on its missing blob. The optimizer's
+// account of the failure has to reach the caller regardless, which is why this asserts on the
+// diagnostic text: the result code is the same whether or not anything was reported.
 SLANG_UNIT_TEST(spirvValidationReportsOptimizerFailureUnderSeparateDebugInfo)
 {
     SlangResult codeResult = SLANG_OK;
@@ -400,10 +398,9 @@ SLANG_UNIT_TEST(spirvValidationReportsOptimizerFailureUnderSeparateDebugInfo)
 // stripping the `OpString` and `DebugSource` it references leaves ids in the stripped module with
 // nothing defining them.
 //
-// This inspects the shipped module's opcodes rather than relying on SPIR-V validation, because
-// validation only runs when `SLANG_RUN_SPIRV_VALIDATION` is set in the environment and the main
-// test suite does not set it -- a test that checked for the validation error would pass whether or
-// not the strip was correct.
+// This inspects the shipped module's opcodes directly rather than compiling with validation on and
+// checking that it rejects the module, so what is under test is the strip's opcode handling rather
+// than whether the validator happens to reject what the strip leaves behind.
 SLANG_UNIT_TEST(spirvStripRemovesForwardReferencedDebugInstructions)
 {
     ComPtr<slang::IGlobalSession> globalSession;
@@ -526,7 +523,7 @@ SLANG_UNIT_TEST(spirvStripRemovesForwardReferencedDebugInstructions)
     // referenced, so a module that never had them cannot show the defect either way.
     SLANG_CHECK(debugStringCount <= 1);
 
-    // The point of the test. Before the strip recognized this opcode, the instruction survived
-    // while the ids it references did not.
+    // No forward-referencing debug instruction may outlive the debug ids it references, and the
+    // strip removes those -- so none may remain in the stripped module at all.
     SLANG_CHECK(forwardRefCount == 0);
 }

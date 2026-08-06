@@ -3306,15 +3306,10 @@ static SlangResult validateSpirvArtifact(
     const size_t spirvByteCount = spirvBlob->getBufferSize();
 
     // A SPIR-V module is a sequence of 32-bit words, so a size that is not a whole number of words
-    // is not a module the validator can read. This blob comes back from whichever `slang-glslang`
-    // was loaded, and an embedder can supply that library through
-    // `ISession::setSharedLibraryLoader`, so a malformed size is reachable input rather than a
-    // broken invariant of ours.
-    //
-    // Diagnosed at `error` severity rather than through `SpirvValidationFailed`: that one is
-    // declared `internal`, and `Severity::Internal` sorts above `Fatal`, so reporting through it
-    // aborts compilation by exception and reaches the caller as an internal compiler error instead
-    // of naming the condition.
+    // is not a module the validator can read. An embedder can supply the `slang-glslang` this blob
+    // comes from through `ISession::setSharedLibraryLoader`, which makes a malformed size reachable
+    // input rather than a broken invariant of ours -- hence an `error` diagnostic that returns,
+    // rather than `SpirvValidationFailed`, whose `internal` severity aborts compilation.
     if (spirvByteCount % sizeof(uint32_t) != 0)
     {
         codeGenContext->getSink()->diagnose(
@@ -3567,11 +3562,9 @@ static SlangResult createArtifactFromIR(
         const SlangResult diagnosticsResult =
             passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact);
 
-        // A downstream error means no artifact ships, but validation is still worth running on the
-        // module we had going in: when the optimizer is what failed, that module is the emitter's
-        // own output, and reporting where it is malformed is more use to the caller than the
-        // optimizer's generic complaint. Validating ahead of the optimize step used to give exactly
-        // that.
+        // A downstream error means no artifact ships, but the module going into the optimize step
+        // is the emitter's own output, and reporting where that is malformed is more use to a
+        // caller debugging an emitter bug than the downstream tool's generic complaint.
         if (SLANG_FAILED(diagnosticsResult))
         {
             if (needsValidation)
@@ -3612,16 +3605,10 @@ static SlangResult createArtifactFromIR(
             // companion being present, which would read as "validate it if we happen to have one".
             if (needsSeparateDebugInfo)
             {
-                // `dbgArtifact` is assigned in the optimize block above, under two conditions
-                // that both hold here: `compile` succeeding, which the option values fixed above
-                // leave no way to fail, and the same pure `shouldEmitSeparateDebugInfo()` read
-                // that produced `needsSeparateDebugInfo`. The strip sitting between them is the
-                // one way to satisfy both and still leave the companion unset, and the
-                // `stripResult` check above returns on exactly that.
-                //
-                // Release-asserted rather than `SLANG_ASSERT`, which becomes `SLANG_ASSUME` in
-                // release builds: a call-site change that broke the invariant would be undefined
-                // behaviour rather than a diagnosable abort.
+                // A successful strip under this mode always assigns the companion, and the
+                // `stripResult` check above has already returned on an unsuccessful one. Release-
+                // asserted because `SLANG_ASSERT` becomes `SLANG_ASSUME` in release builds, where a
+                // broken invariant would be undefined behaviour rather than a diagnosable abort.
                 SLANG_RELEASE_ASSERT(dbgArtifact);
                 SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, dbgArtifact));
             }
