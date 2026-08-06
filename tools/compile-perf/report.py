@@ -228,6 +228,29 @@ FLOOR_WORKLOADS = {wl for wl, _t in MEMORY_FLOOR.values()}
 MAX_DELTA_SERIES = 4
 
 
+def own_memory(peaks, floors):
+    """Subtract a floor series from a peak series positionally, yielding the
+    workload's own memory per point. A point is None unless BOTH sides have a
+    value there — a peak with no floor to subtract is not "the whole peak",
+    it is unknown, and rendering it as own memory would draw the session
+    floor into the workload's curve as a step.
+
+    The two series are index-aligned by append_memory_point (same labels, same
+    length, gaps preserved), which is the invariant this relies on."""
+    return [p - f if p is not None and f is not None else None
+            for p, f in zip(peaks, floors)]
+
+
+def cap_delta_series(ordered, limit):
+    """Split an ordered [(workload, series)] list into the ones to plot and
+    the ones to name instead. Returns (shown, dropped).
+
+    The cap exists for legibility, but the caller must SAY what it dropped: a
+    missing line reads as "this workload has no session-create delta", not
+    "the chart was full"."""
+    return ordered[:limit], ordered[limit:]
+
+
 def floor_workload_for(workload):
     """Return the name of the floor workload whose peak RSS is subtractable
     from `workload`'s — the one that ran the same executable — or None when
@@ -352,8 +375,7 @@ def main():
             # full". Not hypothetical — flagging api_session_create as
             # track_memory took this from two series to three, so the next
             # track_memory api workload reaches the cap.
-            ordered = sorted(sc)
-            shown, dropped = ordered[:MAX_DELTA_SERIES], ordered[MAX_DELTA_SERIES:]
+            shown, dropped = cap_delta_series(sorted(sc), MAX_DELTA_SERIES)
             colors = ["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]
             series = [(wl, colors[i % len(colors)], mib(vs))
                       for i, (wl, vs) in enumerate(shown)]
@@ -376,8 +398,7 @@ def main():
             fwl = floor_workload_for(wl)
             if fwl is None:
                 continue
-            own = [v - f if v is not None and f is not None else None
-                   for v, f in zip(vs, floors[fwl])]
+            own = own_memory(vs, floors[fwl])
             if any(v is not None for v in own):
                 last = next((v for v in reversed(own) if v is not None), 0.0)
                 wls.append((last, wl, fwl, own))
@@ -541,6 +562,39 @@ assert _per[("minimal", "peakRssKb")] == [100.0, 110.0, None], \
 assert _per[("mdl_dxr", "peakRssKb")] == [None, 900.0, 950.0], \
     "append_memory_point: a counter first seen at point 2 must be back-filled"
 del _per
+
+
+# memory_page composes these two helpers, but it is nested inside main() and
+# so unreachable from here; pinning the pieces it delegates to is what keeps
+# its two silent-if-wrong decisions covered.
+#
+# own_memory: the subtraction the memory pages label "the pure workload
+# signal". A gap on EITHER side must stay a gap — treating a missing floor as
+# zero would silently draw the session floor into the workload's curve as a
+# step, which reads as a memory regression.
+assert own_memory([10.0, None, 30.0], [4.0, 5.0, None]) == [6.0, None, None], \
+    "own_memory: a gap on either side yields a gap, never a bare peak"
+assert own_memory([], []) == [], "own_memory: empty series stay empty"
+assert own_memory([10.0], [4.0]) == [6.0], "own_memory: plain peak minus floor"
+
+# cap_delta_series: what the panel plots vs what it only names. The dropped
+# half must be returned, not discarded — that is what lets the caller say so.
+_o = [("a", [1]), ("b", [1]), ("c", [1]), ("d", [1]), ("e", [1])]
+_shown, _dropped = cap_delta_series(_o, MAX_DELTA_SERIES)
+assert [w for w, _ in _shown] == ["a", "b", "c", "d"], "cap keeps the first N"
+assert [w for w, _ in _dropped] == ["e"], "cap returns the remainder to be named"
+assert cap_delta_series(_o[:2], MAX_DELTA_SERIES)[1] == [], \
+    "cap_delta_series: under the limit nothing is dropped"
+assert len(["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]) == MAX_DELTA_SERIES, \
+    "MAX_DELTA_SERIES must match memory_page's colour list; raise both together"
+del _o, _shown, _dropped
+
+# The no-data path: with no points at all, memory_series yields empty series,
+# so memory_page renders no panels and the landing page shows its "No data
+# yet" note. Pinned here because an inverted truthiness test on `panels` would
+# merge silently — the pages would simply look empty.
+assert memory_series("/nonexistent-results-dir", [], "median") == ([], {}), \
+    "memory_series: no points must yield no labels and no series"
 
 
 # Import-time self-check that every mode a track_memory workload runs in has

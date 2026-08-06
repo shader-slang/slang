@@ -338,10 +338,14 @@ def _reap_posix(proc, wait4=None):
     own path (_windows_peak_rss_kb) is right below. Do not "simplify" this
     back into the signature.
 
-    Raises RuntimeError if the child cannot be reaped. That is deliberately
-    fatal rather than degraded, and the translation lives HERE rather than in
-    the caller so the stub-driven self-check can reach it without spawning a
-    process — see the ECHILD case at the bottom of this module."""
+    Raises RuntimeError if the child cannot be reaped, rather than returning a
+    number it cannot stand behind. main() catches that per workload (its
+    try/except around run_spec is the isolation contract), so the workload is
+    recorded with ok=False and the sweep continues to the next one — the run
+    still ends non-zero through the ok-count. The translation lives HERE
+    rather than in the caller so the stub-driven self-check can reach it
+    without spawning a process — see the ECHILD case at the bottom of this
+    module."""
     if wait4 is None:
         wait4 = os.wait4
     try:
@@ -353,15 +357,15 @@ def _reap_posix(proc, wait4=None):
         # and is actively harmful: CPython's Popen._try_wait catches
         # ChildProcessError and substitutes returncode = 0, so a compile that
         # FAILED would be recorded as a clean run with no memory number.
-        # Abandoning the sweep is the only outcome that cannot publish a
-        # fabricated one.
+        # Raising is what keeps a fabricated success out of results.json;
+        # main() then books this workload as failed and moves on.
         raise RuntimeError(
             "os.wait4 could not reap the compile child (ECHILD): the "
             "environment reaped it first, which happens when SIGCHLD is set "
             "to SIG_IGN. Its exit status and peak RSS are unrecoverable, and "
             "Popen.wait() would report success for a failed compile, so this "
-            "sweep is abandoned rather than recorded. Re-run with default "
-            "SIGCHLD handling."
+            "workload is recorded as failed rather than measured. If every "
+            "workload fails this way, re-run with default SIGCHLD handling."
         ) from e
     proc.returncode = os.waitstatus_to_exitcode(status)
     return _maxrss_to_kb(ru.ru_maxrss, sys.platform)
@@ -375,8 +379,9 @@ def run_once(cmd):
     series compares within one runner fingerprint, never across platforms.
 
     Raises RuntimeError on POSIX if the child cannot be reaped (see
-    _reap_posix): that is unrecoverable rather than a missing data point, so
-    it propagates and ends the sweep instead of returning a tuple."""
+    _reap_posix): the exit code is unrecoverable there, so it propagates
+    instead of returning a tuple whose rc would be a guess. main()'s
+    per-workload try/except turns that into one failed workload."""
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -387,8 +392,8 @@ def run_once(cmd):
         rss = _windows_peak_rss_kb(proc)
     else:
         # No try/except: _reap_posix already translates ECHILD into a
-        # RuntimeError explaining why the sweep must stop, and letting it
-        # propagate is the point.
+        # RuntimeError explaining why no trustworthy rc exists, and letting it
+        # reach main()'s per-workload handler is the point.
         rss = _reap_posix(proc)
     wall = (time.perf_counter() - t0) * 1000.0
     text = out.decode("utf-8", "replace")
