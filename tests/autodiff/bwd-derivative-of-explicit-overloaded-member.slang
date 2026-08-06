@@ -1,4 +1,10 @@
-//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o bwd-derivative-of-explicit-overloaded-member.spv
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
 
 // A derivative method has an implicit receiver, while explicitly referencing its target as
 // `Type::method` makes the differentiated callable expose that receiver as parameter zero.
@@ -43,4 +49,18 @@ struct Scale
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
-{}
+{
+    Scale instance = {2.0};
+    var value = diffPair(3.0);
+    bwd_diff(instance.apply)(instance, value, 1.0);
+    outputBuffer[0] = value.d;
+    // CHECK: 2.0
+
+    var left = diffPair(3.0);
+    var right = diffPair(4.0);
+    bwd_diff(instance.apply)(left, right, 1.0);
+    outputBuffer[1] = left.d;
+    outputBuffer[2] = right.d;
+    // CHECK: 1.0
+    // CHECK: 1.0
+}

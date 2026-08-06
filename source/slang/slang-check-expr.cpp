@@ -5585,7 +5585,7 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
             if (auto pairType = tryGetDifferentialPairType(primalType))
                 pairOrPrimalType = pairType;
 
-        forEachElementType(
+        appendMappedElementTypes(
             m_astBuilder,
             paramTypes,
             pairOrPrimalType,
@@ -5659,7 +5659,7 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
         if (auto pairType = tryGetDifferentialPairType(primalType))
             pairOrPrimalType = pairType;
 
-        forEachElementType(
+        appendMappedElementTypes(
             m_astBuilder,
             paramTypes,
             pairOrPrimalType,
@@ -5707,7 +5707,7 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
         // ordinary `in` parameter, an r-value object argument is not made mutable. Split a
         // resolved pack before applying that direction because `FuncType` cannot distribute a
         // direction wrapper over a retained pack.
-        forEachElementType(
+        appendMappedElementTypes(
             m_astBuilder,
             paramTypes,
             pairOrPrimalThisType,
@@ -5742,7 +5742,7 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
                     // input parameter. Split a resolved pack now because `FuncType` cannot
                     // represent those per-element directions while retaining the pack as one
                     // parameter.
-                    forEachElementType(
+                    appendMappedElementTypes(
                         m_astBuilder,
                         paramTypes,
                         diffElementType,

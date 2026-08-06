@@ -826,7 +826,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         //
         auto addBackwardDiffParameterElements = [&](Type* pairOrPrimalType, ParamPassingMode mode)
         {
-            forEachElementType(
+            appendMappedElementTypes(
                 astBuilder,
                 newParamTypes,
                 pairOrPrimalType,
@@ -920,7 +920,7 @@ Val* BwdDiffFuncType::_resolveImplOverride()
                         // input parameter. Split a resolved pack now because `FuncType` cannot
                         // represent those per-element directions while retaining the pack as one
                         // parameter.
-                        forEachElementType(
+                        appendMappedElementTypes(
                             astBuilder,
                             newParamTypes,
                             diffValueType,
@@ -996,7 +996,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         auto addForwardDiffParameterElements =
             [&](Type* pairOrPrimalType, ParamPassingMode mode, bool markNoDiff)
         {
-            forEachElementType(
+            appendMappedElementTypes(
                 astBuilder,
                 newParamTypes,
                 pairOrPrimalType,

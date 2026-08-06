@@ -1,6 +1,7 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-d3d12 -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -14,23 +15,19 @@ interface IVariadic<each TArgs : IDifferentiable> : IDifferentiable
     float operator()(expand each TArgs args);
 }
 
-void trigger<F : IVariadic<float>>(F function, float value)
+float trigger<F : IVariadic<float>>(
+    DifferentialPair<F> dFunction,
+    DifferentialPair<float> dValue)
 {
-    let result = fwd_diff(function.operator())(
-        diffPair(function),
-        diffPair(value, 1.0));
-
-    outputBuffer[0] = result.d; // CHECK: 2.0
+    return fwd_diff(dFunction.p.operator())(dFunction, dValue).d;
 }
 
-void triggerBinary<F : IVariadic<float, float>>(F function, float left, float right)
+float triggerBinary<F : IVariadic<float, float>>(
+    DifferentialPair<F> dFunction,
+    DifferentialPair<float> dLeft,
+    DifferentialPair<float> dRight)
 {
-    let result = fwd_diff(function.operator())(
-        diffPair(function),
-        diffPair(left, 1.0),
-        diffPair(right, 1.0));
-
-    outputBuffer[1] = result.d; // CHECK: 3.0
+    return fwd_diff(dFunction.p.operator())(dFunction, dLeft, dRight).d;
 }
 
 struct Scale : IVariadic<float>
@@ -60,8 +57,15 @@ struct Affine : IVariadic<float, float>
 void computeMain()
 {
     Scale function = {2.0};
-    trigger(function, 3.0);
+    outputBuffer[0] = trigger(
+        diffPair(function, Scale.Differential(1.0)),
+        diffPair(3.0, 1.0));
+    // CHECK: 5.0
 
     Affine binaryFunction = {2.0};
-    triggerBinary(binaryFunction, 3.0, 4.0);
+    outputBuffer[1] = triggerBinary(
+        diffPair(binaryFunction, Affine.Differential(1.0)),
+        diffPair(3.0, 1.0),
+        diffPair(4.0, 1.0));
+    // CHECK: 6.0
 }

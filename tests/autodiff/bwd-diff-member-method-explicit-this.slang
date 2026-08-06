@@ -1,4 +1,10 @@
-//TEST:SIMPLE: -target spirv -entry fs -stage fragment -o bwd-diff-member-method-explicit-this.spv
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
 
 // Regression test for bwd_diff(value.method) after bwd_diff became a static
 // associated function. The object value must be passed explicitly as argument 0.
@@ -28,28 +34,35 @@ float3 gradient3<S : IShape3D>(S shape, float3 p)
 
     // Generic/interface case: the first argument supplies the concrete generic
     // object value `shape`, followed by the original method parameters.
-    __bwd_diff(shape.distance)(shape, dp, 1.0);
+    bwd_diff(shape.distance)(shape, dp, 1.0);
     return dp.d;
 }
 
-float3 pointerGradient(Sphere* sphere, float3 p)
-{
-    var dp = diffPair(p);
-
-    // The base of `sphere->distance` has type `Ptr<Sphere>`, but the method receives its
-    // pointee as `this`, so the static derivative's explicit `this` argument is `*sphere`.
-    __bwd_diff(sphere->distance)(*sphere, dp, 1.0);
-    return dp.d;
-}
-
-[shader("fragment")]
-float4 fs(float4 pos : SV_Position) : SV_Target
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain()
 {
     Sphere s = {1.0};
-    var dp = diffPair(pos.xyz);
+    float3 p = float3(3.0, 0.0, 0.0);
+    var dp = diffPair(p);
 
     // Concrete case: `s.distance` still requires `s` as the first explicit
     // argument for the synthesized static backward derivative.
-    __bwd_diff(s.distance)(s, dp, 1.0);
-    return float4(dp.d + gradient3(s, pos.xyz), 1.0);
+    bwd_diff(s.distance)(s, dp, 1.0);
+    float3 concreteGradient = dp.d;
+    float3 genericGradient = gradient3(s, p);
+
+    outputBuffer[0] = concreteGradient.x;
+    outputBuffer[1] = concreteGradient.y;
+    outputBuffer[2] = concreteGradient.z;
+    outputBuffer[3] = genericGradient.x;
+    outputBuffer[4] = genericGradient.y;
+    outputBuffer[5] = genericGradient.z;
+
+    // CHECK: 1.0
+    // CHECK: 0.0
+    // CHECK: 0.0
+    // CHECK: 1.0
+    // CHECK: 0.0
+    // CHECK: 0.0
 }

@@ -1,4 +1,10 @@
-//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o bwd-diff-generic-member-differentiable-this.spv
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
 
 // Regression test for differentiating a generic member function with differentiable `this`.
 
@@ -14,11 +20,10 @@ interface IUnary : IDifferentiable
     float operator()(float left, float right);
 }
 
-void trigger<F : IUnary>(F function, float value)
+void trigger<F : IUnary>(
+    inout DifferentialPair<F> dFunction,
+    inout DifferentialPair<float> dValue)
 {
-    var dFunction = diffPair(function);
-    var dValue = diffPair(value);
-
     bwd_diff(dFunction.p.operator())(dFunction, dValue, 1.0);
 }
 
@@ -44,5 +49,12 @@ struct Scale : IUnary
 void computeMain()
 {
     Scale function = {2.0};
-    trigger(function, 3.0);
+    var dFunction = diffPair(function);
+    var dValue = diffPair(3.0);
+    trigger(dFunction, dValue);
+
+    outputBuffer[0] = dFunction.d.factor;
+    outputBuffer[1] = dValue.d;
+    // CHECK: 3.0
+    // CHECK: 2.0
 }

@@ -960,15 +960,18 @@ protected:
     MemoryArena m_arena;
 };
 
-/// Maps the element types represented by `type` into function-parameter entries in `outTypes`.
+/// Maps the element types represented by `type` and appends the results to `outTypes`.
 ///
-/// This helper does something deliberately unusual for type construction: it eagerly splits a
-/// resolved `ConcreteTypePack` and applies `mapElementType` to every element. A function
-/// parameter's direction (`out`, `inout`, `ref`, and so on) is represented by wrapping its
-/// individual type.
-/// Function-type substitution can flatten a bare pack, but it cannot distribute a direction
-/// wrapper around a pack to the pack's elements. Retaining the pack would require direction queries
-/// and substitution to understand and distribute that wrapper, which they do not currently support.
+/// A `ConcreteTypePack` is recursively split and mapped element by element. An `ExpandType` maps
+/// its pattern once and remains an expansion with the same captured packs. Any other type is mapped
+/// as one element. In every case, the value returned by `mapElementType` is what gets appended.
+///
+/// Eagerly splitting a resolved `ConcreteTypePack` is important when constructing function
+/// parameters. A parameter's direction (`out`, `inout`, `ref`, and so on) is represented by
+/// wrapping its individual type. Function-type substitution can flatten a bare pack, but it cannot
+/// distribute a direction wrapper around a pack to the pack's elements. Retaining the pack would
+/// require direction queries and substitution to understand and distribute that wrapper, which
+/// they do not currently support.
 ///
 /// Consider a variadic parameter `expand each TArgs args` specialized with
 /// `TArgs = <float, float>`. Its backward derivative can require two separate
@@ -981,7 +984,7 @@ protected:
 /// expansion, so later substitution produces a bare pack of already-mapped parameter types that
 /// `FuncType` can splice. The mapping must return the type for one ordinary parameter.
 template<typename MapElementTypeFunc>
-void forEachElementType(
+void appendMappedElementTypes(
     ASTBuilder* astBuilder,
     List<Type*>& outTypes,
     Type* type,
@@ -991,7 +994,7 @@ void forEachElementType(
     {
         for (Index i = 0; i < concretePack->getTypeCount(); ++i)
         {
-            forEachElementType(
+            appendMappedElementTypes(
                 astBuilder,
                 outTypes,
                 concretePack->getElementType(i),
