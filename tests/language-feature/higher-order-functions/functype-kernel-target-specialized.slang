@@ -17,6 +17,7 @@
 //TEST:SIMPLE(filecheck=CPP): -target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=LLVMIR): -target llvm-shader-ir -entry computeMain -stage compute
 
 int addOne(int x)
 {
@@ -51,3 +52,7 @@ void computeMain(uint3 tid: SV_DispatchThreadID)
 
 //WGSL-NOT: {{: *;}}
 //WGSL: computeMain
+
+// Anchored on the module header so the exclusion covers the emitted body that follows it.
+//LLVMIR: ModuleID
+//LLVMIR-NOT: E55216

@@ -241,7 +241,7 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // point nowhere.
     auto diagnoseFuncTypedValue = [&](IRInst* inst)
     {
-        if (!rejectFuncTypedValue || !holdsFuncType(inst->getFullType()))
+        if (!rejectFuncTypedValue || !holdsFuncType(inst->getDataType()))
             return;
         auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
         if (loc.isValid())
@@ -357,7 +357,7 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
             {
                 // WGSL keeps the global rather than moving it into a context struct. Same
                 // location requirement as the struct field above.
-                if (holdsFuncType(globalInst->getFullType()) && globalInst->sourceLoc.isValid())
+                if (holdsFuncType(globalInst->getDataType()) && globalInst->sourceLoc.isValid())
                 {
                     sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{
                         .location = globalInst->sourceLoc});
