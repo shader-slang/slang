@@ -572,6 +572,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     success = false;
                 }
                 candidate.conversionCostSum += cost;
+                candidate.maxArgConversionCost = Math::Max(candidate.maxArgConversionCost, cost);
             }
             else
             {
@@ -910,6 +911,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                 return {nullptr, nullptr};
             }
             candidate.conversionCostSum += cost;
+            candidate.maxArgConversionCost = Math::Max(candidate.maxArgConversionCost, cost);
         }
         else
         {
@@ -2439,10 +2441,96 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
     return 0;
 }
 
+/// Record `candidate` on `context` when it is applicable and declared in the same module as the
+/// call site, so that `maybeDiagnoseImportedOverloadOverridingLocalCandidate` can later tell that
+/// the call site's own module offered an alternative to the overload that won.
+///
+/// Must run before candidates are filtered against each other: resolution discards a candidate as
+/// soon as a better one appears, so a beaten same-module candidate no longer exists by the time a
+/// winner is known.
+void SemanticsVisitor::noteCandidateFromCallSiteModule(
+    OverloadResolveContext& context,
+    OverloadCandidate& candidate)
+{
+    // A candidate that never type-checked is not an alternative the user lost; it would
+    // not have been called even if nothing else had been found.
+    if (candidate.status != OverloadCandidate::Status::Applicable)
+        return;
+
+    // An explicit-only candidate was never available to the unannotated call, so losing to an
+    // import did not change what that call meant. The per-argument maximum is deliberate: a sum
+    // crosses this boundary for calls whose arguments each convert implicitly.
+    if (candidate.maxArgConversionCost >= kConversionCost_Explicit)
+        return;
+
+    auto decl = candidate.item.declRef.getDecl();
+    if (!decl)
+        return;
+
+    if (!context.callSiteModuleDeclResolved)
+    {
+        context.callSiteModuleDecl = getModuleDecl(context.sourceScope);
+        context.callSiteModuleDeclResolved = true;
+    }
+
+    if (!context.callSiteModuleDecl || getModuleDecl(decl) != context.callSiteModuleDecl)
+        return;
+
+    // Ranking is by the same comparison resolution uses, so conversion cost still decides between
+    // two same-module candidates. Note that it reports a tie for generic flavors, so among generic
+    // candidates of equal cost this keeps whichever arrived first -- the diagnostic then names a
+    // lookup-order-dependent one of them rather than the closest match.
+    if (!context.localModuleCandidateValid ||
+        CompareOverloadCandidates(&candidate, &context.localModuleCandidate) < 0)
+    {
+        context.localModuleCandidate = candidate;
+        context.localModuleCandidateValid = true;
+    }
+}
+
+/// Warn when the chosen `candidate` comes from an imported module even though the call site's own
+/// module also offered an applicable overload, which means the call silently runs a different
+/// function than the one written alongside it (issue #12284).
+void SemanticsVisitor::maybeDiagnoseImportedOverloadOverridingLocalCandidate(
+    OverloadResolveContext& context,
+    OverloadCandidate const& candidate)
+{
+    if (!context.localModuleCandidateValid)
+        return;
+
+    auto localCandidateDecl = context.localModuleCandidate.item.declRef.getDecl();
+    auto winnerDecl = candidate.item.declRef.getDecl();
+    if (!localCandidateDecl || !winnerDecl || winnerDecl == localCandidateDecl)
+        return;
+
+    // `noteCandidateFromCallSiteModule` only ever records a decl from the call site's own
+    // module, so the recorded candidate's module *is* the call site's module.
+    SLANG_ASSERT(getModuleDecl(localCandidateDecl) == context.callSiteModuleDecl);
+
+    auto winnerModuleDecl = getModuleDecl(winnerDecl);
+    if (!winnerModuleDecl || winnerModuleDecl == context.callSiteModuleDecl)
+        return;
+
+    // The same call expression can be resolved more than once, for example when an enclosing
+    // expression is re-checked. `diagnoseOnce` keys on the diagnostic id plus the primary span's
+    // location and rendered message, so those repeats collapse while distinct call sites each
+    // still report.
+    diagnoseOnce(Diagnostics::ImportedOverloadOverridesLocalCandidate{
+        .name = winnerDecl->getName(),
+        .importedModule = winnerModuleDecl->getName(),
+        .chosenSignature = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder),
+        .localSignature =
+            ASTPrinter::getDeclSignatureString(context.localModuleCandidate.item, m_astBuilder),
+        .callLoc = context.funcLoc.isValid() ? context.funcLoc : context.loc,
+        .localCandidate = localCandidateDecl});
+}
+
 void SemanticsVisitor::AddOverloadCandidateInner(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
 {
+    noteCandidateFromCallSiteModule(context, candidate);
+
     // Filter our existing candidates, to remove any that are worse than our new one
 
     bool keepThisCandidate = true; // should this candidate be kept?
@@ -3703,6 +3791,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         // applicable in the end.
         // We will report errors for this one candidate, then, to give
         // the user the most help we can.
+
+        if (context.bestCandidate->status == OverloadCandidate::Status::Applicable)
+            maybeDiagnoseImportedOverloadOverridingLocalCandidate(context, *context.bestCandidate);
+
         // Now that we have resolved the overload candidate, we need to undo an
         // `openExistential` operation that was applied to `out` arguments.
         //
