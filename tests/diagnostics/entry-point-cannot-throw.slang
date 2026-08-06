@@ -26,8 +26,10 @@ uint g(uint n) throws uint
 // annotation, and matches its carets against that line by column. A comment counts as such a
 // line, so inserting one between the declaration and the block retargets the carets at the
 // comment; renaming `computeMain` or re-indenting its line moves the target horizontally.
-// Either way the run fails loudly rather than passing vacuously -- matching is exhaustive, so
-// the orphaned diagnostic is reported too -- and the harness prints annotations to copy.
+// Either way the run fails loudly rather than passing vacuously, and the harness prints
+// annotations to copy. That relies on exhaustive matching, which is the default and which these
+// directives use: adding `non-exhaustive` -- which the harness itself suggests on failure --
+// would stop unannotated diagnostics being reported and take the loud detection with it.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID) throws uint
