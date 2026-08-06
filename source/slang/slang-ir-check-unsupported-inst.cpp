@@ -351,10 +351,8 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                     {
                         // The key carries the location of the global this field replaced (see
                         // `introduceExplicitGlobalContext`). Without a location there is no
-                        // source position to report and nothing the reader could act on, so the
-                        // value is passed over -- which is also what keeps the function pointer
-                        // `generateDllImportFuncs` synthesizes for `[DllImport]` from being
-                        // rejected on the C++ targets that support it.
+                        // source position to report and nothing the reader could act on, so
+                        // the value is passed over.
                         auto key = field->getKey();
                         if (key->sourceLoc.isValid())
                         {
