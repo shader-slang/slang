@@ -336,10 +336,33 @@ def _reap_posix(proc, wait4=None):
     in the signature would raise AttributeError while merely importing this
     module on Windows — a platform that never calls this function, and whose
     own path (_windows_peak_rss_kb) is right below. Do not "simplify" this
-    back into the signature."""
+    back into the signature.
+
+    Raises RuntimeError if the child cannot be reaped. That is deliberately
+    fatal rather than degraded, and the translation lives HERE rather than in
+    the caller so the stub-driven self-check can reach it without spawning a
+    process — see the ECHILD case at the bottom of this module."""
     if wait4 is None:
         wait4 = os.wait4
-    _pid, status, ru = wait4(proc.pid, 0)
+    try:
+        _pid, status, ru = wait4(proc.pid, 0)
+    except ChildProcessError as e:
+        # Nothing in this tool reaps the child, so ECHILD means the
+        # ENVIRONMENT auto-reaped it — SIGCHLD set to SIG_IGN — and the exit
+        # status is gone. Falling back to Popen.wait() does not recover it
+        # and is actively harmful: CPython's Popen._try_wait catches
+        # ChildProcessError and substitutes returncode = 0, so a compile that
+        # FAILED would be recorded as a clean run with no memory number.
+        # Abandoning the sweep is the only outcome that cannot publish a
+        # fabricated one.
+        raise RuntimeError(
+            "os.wait4 could not reap the compile child (ECHILD): the "
+            "environment reaped it first, which happens when SIGCHLD is set "
+            "to SIG_IGN. Its exit status and peak RSS are unrecoverable, and "
+            "Popen.wait() would report success for a failed compile, so this "
+            "sweep is abandoned rather than recorded. Re-run with default "
+            "SIGCHLD handling."
+        ) from e
     proc.returncode = os.waitstatus_to_exitcode(status)
     return _maxrss_to_kb(ru.ru_maxrss, sys.platform)
 
@@ -349,7 +372,11 @@ def run_once(cmd):
 
     rss is the child's peak resident set (peak working set on Windows) in KB.
     Platform constants differ slightly (working set vs RSS), but the tracked
-    series compares within one runner fingerprint, never across platforms."""
+    series compares within one runner fingerprint, never across platforms.
+
+    Raises RuntimeError on POSIX if the child cannot be reaped (see
+    _reap_posix): that is unrecoverable rather than a missing data point, so
+    it propagates and ends the sweep instead of returning a tuple."""
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
@@ -359,25 +386,10 @@ def run_once(cmd):
         proc.wait()
         rss = _windows_peak_rss_kb(proc)
     else:
-        try:
-            rss = _reap_posix(proc)
-        except ChildProcessError as e:
-            # Deliberately fatal rather than degraded. Nothing in this tool
-            # reaps the child, so ECHILD means the ENVIRONMENT auto-reaped it
-            # — SIGCHLD set to SIG_IGN — and the exit status is gone.
-            # Falling back to proc.wait() does not recover it and is actively
-            # harmful: CPython's Popen._try_wait catches ChildProcessError and
-            # substitutes returncode = 0, so a compile that FAILED would be
-            # recorded as a clean run with no memory number. Abandoning the
-            # sweep is the only outcome that cannot publish a fabricated one.
-            raise RuntimeError(
-                "os.wait4 could not reap the compile child (ECHILD): the "
-                "environment reaped it first, which happens when SIGCHLD is "
-                "set to SIG_IGN. Its exit status and peak RSS are "
-                "unrecoverable, and Popen.wait() would report success for a "
-                "failed compile, so this sweep is abandoned rather than "
-                "recorded. Re-run with default SIGCHLD handling."
-            ) from e
+        # No try/except: _reap_posix already translates ECHILD into a
+        # RuntimeError explaining why the sweep must stop, and letting it
+        # propagate is the point.
+        rss = _reap_posix(proc)
     wall = (time.perf_counter() - t0) * 1000.0
     text = out.decode("utf-8", "replace")
     return proc.returncode, wall, text, rss
@@ -732,7 +744,43 @@ if os.name != "nt":  # the function, and the wait-status encoding, are POSIX-onl
         "_reap_posix: returncode must come from the wait status, not Popen"
     assert _seen == [(4321, 0)], \
         "_reap_posix: wait4 must be called blocking on the child's own pid"
-    del _StubProc, _StubRusage, _seen, _stub_wait4, _p
+
+    # The ECHILD branch — the highest-stakes path here, because the fallback
+    # it refuses (Popen.wait) would record a FAILED compile as a clean run.
+    # Reachable from this stub only because the translation lives inside
+    # _reap_posix rather than in run_once, which cannot be driven without
+    # spawning a process.
+    def _stub_wait4_echild(pid, flags):
+        raise ChildProcessError(10, "No child processes")
+
+    _p2 = _StubProc()
+    try:
+        _reap_posix(_p2, wait4=_stub_wait4_echild)
+        raise AssertionError("_reap_posix must not swallow ECHILD")
+    except RuntimeError as _e:
+        assert isinstance(_e.__cause__, ChildProcessError), \
+            "_reap_posix must chain the original ECHILD as __cause__"
+        assert "SIGCHLD" in str(_e), \
+            "_reap_posix: the ECHILD message must name the cause to look for"
+    assert _p2.returncode is None, \
+        "_reap_posix must NOT leave a fabricated returncode after ECHILD"
+    # `_e` needs no del: Python unbinds an `except ... as` name at block exit.
+    del _StubProc, _StubRusage, _seen, _stub_wait4, _stub_wait4_echild, _p, _p2
+
+
+# Import-time self-check for the Windows collector's degradation path, which
+# runs on every host: given an object without the CPython-internal `_handle`
+# the function must return None rather than raise, because run_once treats a
+# None rss as "no memory number this sample" and a raise would sink the sweep.
+# This is the failure the docstring warns about — a CPython release renaming
+# `_handle` — and on POSIX the missing WinDLL takes the same except path.
+class _NoHandle:
+    pass
+
+
+assert _windows_peak_rss_kb(_NoHandle()) is None, \
+    "_windows_peak_rss_kb must degrade to None, not raise, when the query fails"
+del _NoHandle
 
 
 if __name__ == "__main__":

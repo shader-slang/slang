@@ -222,6 +222,11 @@ MEMORY_FLOOR = {
 }
 FLOOR_WORKLOADS = {wl for wl, _t in MEMORY_FLOOR.values()}
 
+# How many createGlobalSession-delta series the memory page draws before it
+# starts naming the rest instead of plotting them. Matches the colour list in
+# memory_page; raise both together.
+MAX_DELTA_SERIES = 4
+
 
 def floor_workload_for(workload):
     """Return the name of the floor workload whose peak RSS is subtractable
@@ -341,12 +346,24 @@ def main():
               if cnt == "apiCreateGlobalSessionRssDeltaKb"
               and any(v is not None for v in vs)]
         if sc:
+            # The panel is capped for legibility, but says what it dropped
+            # rather than truncating silently: a missing line reads as "this
+            # workload has no session-create delta", not "the chart was
+            # full". Not hypothetical — flagging api_session_create as
+            # track_memory took this from two series to three, so the next
+            # track_memory api workload reaches the cap.
+            ordered = sorted(sc)
+            shown, dropped = ordered[:MAX_DELTA_SERIES], ordered[MAX_DELTA_SERIES:]
             colors = ["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]
             series = [(wl, colors[i % len(colors)], mib(vs))
-                      for i, (wl, vs) in enumerate(sorted(sc)[:4])]
-            panels.append(render.line_panel(
-                labels, series,
-                "createGlobalSession RSS delta (api driver)", unit="MiB"))
+                      for i, (wl, vs) in enumerate(shown)]
+            title = "createGlobalSession RSS delta (api driver)"
+            if dropped:
+                names = ", ".join(wl for wl, _vs in dropped)
+                title += f" — {len(dropped)} not shown: {names}"
+                print(f"note: {fname}: session-create delta panel caps at "
+                      f"{MAX_DELTA_SERIES} series; omitted {names}")
+            panels.append(render.line_panel(labels, series, title, unit="MiB"))
         # Each tracked workload's OWN memory: process peak minus the same
         # point's floor for ITS execution mode (see MEMORY_FLOOR) — the floor
         # panels above carry the absolute story once, so subtracting it here

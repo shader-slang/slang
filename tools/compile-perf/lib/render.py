@@ -7,6 +7,7 @@ sweep_report.py — they are genuinely different charts — but the escaper
 and the simple multi-series line panel (used by the memory pages, where
 components do NOT tile a total and a stacked area would lie) are shared.
 """
+import re
 
 
 def esc(s):
@@ -100,6 +101,19 @@ assert "<circle" in _svg and "<polyline" not in _svg, \
 _svg = line_panel(["a", "b", "c", "d"], [("s", "#000", [1.0, 2.0, None, 3.0])], "t")
 assert _svg.count("<polyline") == 1 and _svg.count("<circle") == 1, \
     "line_panel: a None gap must split into one polyline + one lone marker"
+# The negative sample must land INSIDE the plotted band, which is what the
+# `bot` domain math above exists for. Asserting only that a polyline appears
+# would not test that: two non-None points always produce one. If `bot`
+# regressed to a constant 0.0, the -3.0 point would render at y=432.7 against
+# a band of [26, 266] — clipped off-canvas — and a drawability check would
+# still pass. The gridlines are emitted at the domain's bottom, middle and
+# top, so they bound the band without this check having to know the padding.
 _svg = line_panel(["a", "b"], [("s", "#000", [-3.0, 4.0])], "t")
-assert "<polyline" in _svg, "line_panel: negative values must stay drawable"
-del _svg
+_grid = [float(v) for v in re.findall(r'<line [^>]*y1="([-\d.]+)"', _svg)]
+_ys = [float(p.split(",")[1])
+       for p in re.search(r'<polyline points="([^"]+)"', _svg).group(1).split()]
+assert len(_grid) >= 2, "line_panel must draw gridlines at the domain bounds"
+assert min(_grid) <= min(_ys) and max(_ys) <= max(_grid), \
+    f"line_panel: negative values must stay inside the plotted domain " \
+    f"(points {_ys} outside band [{min(_grid)}, {max(_grid)}])"
+del _svg, _grid, _ys

@@ -515,12 +515,15 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right>{contrib:+.1f}pp</td></tr>"
                     for t, d_ms, own, contrib in contributors)
+                # d_val, not d_ms: unlike contributors (buckets partitioning
+                # compileInner, always ms), extras also carry the kb memory
+                # counters — hence fmt_qty rather than a hard-coded " ms".
                 extra_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{esc(analyze.fmt_qty(t, d_ms, signed=True))}</td>"
+                    f"<td align=right>{esc(analyze.fmt_qty(t, d_val, signed=True))}</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right style='color:#aaa'>&ndash;</td></tr>"
-                    for t, d_ms, own in extras)
+                    for t, d_val, own in extras)
                 step_rows = "".join(
                     f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"

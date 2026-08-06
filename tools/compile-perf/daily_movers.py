@@ -113,11 +113,16 @@ def workload_progress(points, workload, step_rel=0.05):
                     ("(remaining N buckets)", d_ms, None, pp) row so the sum
                     property stays visible. pct_own is None when the bucket
                     starts at ~0, where an own-% is undefined.
-      extras        [(name, d_ms, pct_own)] — every OTHER reported counter
+      extras        [(name, d_val, pct_own)] — every OTHER reported counter
                     (e.g. readSerializedModuleIR, loadBuiltinModule): they
                     nest inside or extend beyond the partition, so they carry
                     no pp column, but their own movement is still the signal
-                    for passes without a dedicated bucket.
+                    for passes without a dedicated bucket. `d_val` is NOT
+                    always milliseconds — this list also carries the kb-unit
+                    memory counters, so it must be rendered through
+                    analyze.fmt_qty rather than formatted as ms. (The
+                    contributors list above genuinely is ms: buckets partition
+                    compileInner.)
       steps         [(d_prev, d, c_prev, c, pct, top_buckets)] — day
                     boundaries where the headline moved >= step_rel vs the
                     PREVIOUS day (both directions), with the step's top
@@ -226,9 +231,11 @@ def workload_view(points, workload, step_rel):
         print(f"   {t:32s}{d_ms:+9.1f} ms  ({o} own, {contrib:+5.1f}pp of total)")
     if extras:
         print("other reported counters (nested/overlapping; no pp):")
-        for t, d_ms, own in extras:
+        # d_val, not d_ms: extras carry kb memory counters as well as ms
+        # timers, which is why this formats through fmt_qty.
+        for t, d_val, own in extras:
             o = f"{own:+6.1f}%" if own is not None else "     -"
-            print(f"   {t:32s}{analyze.fmt_qty(t, d_ms, signed=True):>12s}  ({o} own)")
+            print(f"   {t:32s}{analyze.fmt_qty(t, d_val, signed=True):>12s}  ({o} own)")
     print(f"day steps >= {step_rel * 100:.0f}% vs previous day:")
     if not steps:
         print("   none")
@@ -372,6 +379,34 @@ assert len(_contrib) >= 4, \
 assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
     "workload_progress fixture: contributor pp must sum to the overall %"
 del _T0, _T1, _ov, _contrib, _ex, _st
+
+
+# Import-time self-check that the extras gate picks its floor BY UNIT. The
+# two counters below move by exactly the same amount (+100) over the same
+# starting value, so the only thing that can separate them is unit_of: 100 ms
+# clears the 1 ms time floor and is reported, while 100 kb is a fraction of
+# the 1 MiB memory floor and is suppressed as wobble. Asserting the pair
+# rather than a specific threshold keeps this from ossifying the constants —
+# it fails if the unit stops being consulted, not if a floor is retuned.
+_K0 = ("2026-01-01", "aaaaaaaaa", {("w", "compileInner"): 1000.0,
+                                   ("w", "aTimer"): 10000.0,
+                                   ("w", "aCounterKb"): 10000.0,
+                                   ("w", "bigCounterKb"): 10000.0})
+_K1 = ("2026-01-02", "bbbbbbbbb", {("w", "compileInner"): 1000.0,
+                                   ("w", "aTimer"): 10100.0,
+                                   ("w", "aCounterKb"): 10100.0,
+                                   ("w", "bigCounterKb"): 30720.0})
+_ov, _contrib, _ex, _st = workload_progress([_K0, _K1], "w")
+_names = {n for n, _d, _own in _ex}
+assert "aTimer" in _names, \
+    "extras: a +100 ms move clears the 1 ms time floor and must be reported"
+assert "aCounterKb" not in _names, \
+    "extras: an identical +100 must be suppressed for a kb counter (1 MiB floor)"
+assert "bigCounterKb" in _names, \
+    "extras: a +20 MiB move is well over the memory floor and must be reported"
+assert analyze.fmt_qty("bigCounterKb", 20480.0, signed=True) == "+20.0 MiB", \
+    "extras: kb counters must render as MiB, not milliseconds"
+del _K0, _K1, _ov, _contrib, _ex, _st, _names
 
 
 if __name__ == "__main__":
