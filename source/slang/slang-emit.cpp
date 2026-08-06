@@ -3430,7 +3430,7 @@ static SlangResult createArtifactFromIR(
             // the natively emitted blob. `spirvWords` stays valid only while `spirvBlob` is alive.
             ComPtr<ISlangBlob> spirvBlob;
             SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, spirvBlob.writeRef()));
-            SLANG_ASSERT(spirvBlob->getBufferSize() % sizeof(uint32_t) == 0);
+            SLANG_RELEASE_ASSERT(spirvBlob->getBufferSize() % sizeof(uint32_t) == 0);
             const auto* spirvWords = (const uint32_t*)spirvBlob->getBufferPointer();
             const int spirvWordCount = int(spirvBlob->getBufferSize() / sizeof(uint32_t));
 

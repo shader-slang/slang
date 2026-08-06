@@ -92,9 +92,11 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
             (void**)precompileService.writeRef()) == SLANG_OK);
     SLANG_CHECK_ABORT(precompileService != nullptr);
 
-    // Force validation off across the precompile, rather than merely leaving it unset: CI exports
-    // `SLANG_RUN_SPIRV_VALIDATION=1` globally, and validating a precompiled library rejects it for
-    // carrying the `Linkage` capability and `Export` decorations that make it linkable at all.
+    // Force validation off across the precompile: the validation gate does not yet know that a
+    // precompile-for-target is by construction not a final module, so an ambient
+    // `SLANG_RUN_SPIRV_VALIDATION=1` -- which CI sets globally -- rejects the library for the
+    // `Linkage` capability and `Export` decorations that make it linkable at all. See
+    // shader-slang/slang#12385; once that gate is fixed this window can be removed.
     diagnostics.setNull();
     {
         ScopedEnvVar skipValidationWhilePrecompiling("SLANG_RUN_SPIRV_VALIDATION", "0");
