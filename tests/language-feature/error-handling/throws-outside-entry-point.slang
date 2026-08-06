@@ -7,9 +7,16 @@
 // a plain throwing callee, a generic throwing callee, and an entry point that handles the
 // error itself. It fails only in one direction, if the check ever widens from "the entry
 // point declares `throws`" to "a `throws` clause is reachable from an entry point".
+//
+// Execution coverage for the catching entry point lives in entry-point-catches-error.slang;
+// this file only pins that these shapes compile.
+//
+// The check below names what must be present rather than asserting that "error" is absent: a
+// `CHECK-NOT` here would only scan the region after its preceding match, and the harness puts
+// stderr before stdout in the buffer it matches, so it could never see a diagnostic.
 
 //CHECK: OpEntryPoint
-//CHECK-NOT: error
+//CHECK: OpFunction
 
 RWStructuredBuffer<uint> outputBuffer;
 
