@@ -307,14 +307,22 @@ private:
 
     /// Return the most locations this blob is allowed to reach.
     ///
-    /// A well-formed blob reaches far fewer locations than its own size in bytes,
-    /// because every location is a value its writer emitted and every value costs
-    /// bytes to describe. The multiple below is well above what any well-formed
-    /// blob needs, while still bounding the quadratic case above.
+    /// A well-formed blob reaches fewer locations than it has bytes, because every
+    /// location is a value its writer emitted and every value costs bytes to
+    /// describe. Measured on real data, the ratio is 0.21 locations per byte for
+    /// the 17MB embedded core module and 0.32 for the largest module observed, so
+    /// the multiple below leaves roughly six times headroom over anything the
+    /// serializer produces today.
+    ///
+    /// It is deliberately not larger than that. The cap also bounds how much memory
+    /// a rejected blob may cost before it is rejected: each location costs a hash-set
+    /// entry, so the peak is on the order of this multiple times the entry size times
+    /// the input size. Raising the multiple raises that amplification proportionally,
+    /// which matters because the blobs this cap exists to stop are hostile ones.
     ///
     Int64 _getMaxVisitedLocations() const
     {
-        static const Int64 kMaxLocationsPerByte = 16;
+        static const Int64 kMaxLocationsPerByte = 2;
         static const Int64 kMinLocations = 1024;
         return kMaxLocationsPerByte * _size + kMinLocations;
     }

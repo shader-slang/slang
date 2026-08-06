@@ -179,7 +179,7 @@ BlobBuilder makeStringBlob()
 ///   52..55  the variant's content-layout pointer
 ///   56..59  the variant's content: the record, whose only field is at offset 0
 ///
-BlobBuilder makeStructBlob()
+BlobBuilder makeStructBlobImpl()
 {
     BlobBuilder blob;
     blob.resize(60);
@@ -195,6 +195,24 @@ BlobBuilder makeStructBlob()
     blob.putRelativePtr(52, 32);
     blob.putU32(56, 0xABCDEF01);
     return blob;
+}
+
+/// Build the record blob with a chosen record `kind`, so `Tuple` is exercised and
+/// not only `Struct`.
+///
+BlobBuilder makeRecordBlobOfKind(FossilizedValKind kind)
+{
+    auto blob = makeStructBlobImpl();
+    blob.putU32(32, uint32_t(kind));
+    return blob;
+}
+
+/// Build the struct blob. Kept as a named wrapper so existing callers read the
+/// same as before.
+///
+BlobBuilder makeStructBlob()
+{
+    return makeStructBlobImpl();
 }
 
 /// Build a well-formed blob whose root variant holds a pointer to a `uint32`, or
@@ -501,6 +519,55 @@ BlobBuilder makeScalarBlobOfKind(FossilizedValKind kind)
     blob.putU32(32, uint32_t(kind));
     return blob;
 }
+/// Build a well-formed blob whose root variant holds an array of two strings.
+///
+/// The object-kind descent has only ever been reached through a *record field*.
+/// Here it is reached through a container stride instead, so the element address
+/// arithmetic and the descent interact.
+///
+///   0..31   header
+///   32..43  array layout (kind, element-layout pointer, stride = 4)
+///   44..47  the element layout (kind = StringObj)
+///   48..51  the variant's content-layout pointer
+///   52..55  the variant's content: a pointer to the array object
+///   56..59  the element count
+///   60..67  the two elements, each a pointer to its string object
+///   68..71  first string length, 72..75 its bytes
+///   76..79  second string length, 80..83 its bytes
+///
+BlobBuilder makeArrayOfStringsBlob()
+{
+    BlobBuilder blob;
+    blob.resize(84);
+    blob.putHeader(52);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::ArrayObj));
+    blob.putRelativePtr(36, 44);
+    blob.putU32(40, 4);
+
+    blob.putU32(44, uint32_t(FossilizedValKind::StringObj));
+
+    blob.putRelativePtr(48, 32);
+    blob.putRelativePtr(52, 60);
+    blob.putU32(56, 2);
+
+    blob.putRelativePtr(60, 72);
+    blob.putRelativePtr(64, 80);
+
+    blob.putU32(68, 3);
+    blob.bytes[72] = 'a';
+    blob.bytes[73] = 'b';
+    blob.bytes[74] = 'c';
+    blob.bytes[75] = 0;
+
+    blob.putU32(76, 3);
+    blob.bytes[80] = 'x';
+    blob.bytes[81] = 'y';
+    blob.bytes[82] = 'z';
+    blob.bytes[83] = 0;
+    return blob;
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(fossilValidationBoundsTotalWork)
@@ -566,6 +633,44 @@ SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
     SLANG_CHECK(isAccepted(makeDictionaryBlob()));
     SLANG_CHECK(isAccepted(makeRecordWithObjectFieldBlob()));
     SLANG_CHECK(isAccepted(makeRecordWithVariantFieldBlob()));
+    SLANG_CHECK(isAccepted(makeArrayOfStringsBlob()));
+
+    // `Tuple` shares its arm with `Struct`, so this is coverage against a future
+    // change that special-cases one of them rather than a distinct branch today.
+    SLANG_CHECK(isAccepted(makeRecordBlobOfKind(FossilizedValKind::Tuple)));
+}
+
+SLANG_UNIT_TEST(fossilValidationHandlesContainerOfObjects)
+{
+    // An element that is an object kind, reached through a container stride rather
+    // than a record field, so the stride arithmetic and the object descent
+    // interact.
+    auto blob = makeArrayOfStringsBlob();
+    blob.putI32(64, 0x7F000000);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // The second element's string overruns, which is only reachable if the walk
+    // strided to that element correctly.
+    blob = makeArrayOfStringsBlob();
+    blob.putU32(76, 1000);
+    SLANG_CHECK(!isAccepted(blob));
+}
+
+SLANG_UNIT_TEST(fossilValidationAcceptsEmptyString)
+{
+    // The smallest legal string: no bytes, just the terminator. Its length check
+    // reduces to one byte, which is the boundary the `stringSize + 1` bound sits
+    // on.
+    auto blob = makeStringBlob();
+    blob.putU32(44, 0);
+    blob.bytes[48] = 0;
+    SLANG_CHECK(isAccepted(blob));
+
+    // Zero length with a non-zero terminator is still malformed.
+    blob = makeStringBlob();
+    blob.putU32(44, 0);
+    blob.bytes[48] = 'x';
+    SLANG_CHECK(!isAccepted(blob));
 }
 
 SLANG_UNIT_TEST(fossilValidationHandlesNestedVariant)
