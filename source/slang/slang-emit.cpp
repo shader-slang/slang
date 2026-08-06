@@ -3506,6 +3506,12 @@ static SlangResult createArtifactFromIR(
             SLANG_ASSERT(!"Unhandled optimization level");
             break;
         }
+        // `compile` reports an optimizer failure by attaching an error diagnostic and returning
+        // `SLANG_OK` with no blob on the artifact, so the success branch below can still replace
+        // `artifact` with something that carries no SPIR-V. Keep the module we had, so a validation
+        // report on that path describes the SPIR-V the compiler actually produced.
+        ComPtr<IArtifact> preOptimizeArtifact = artifact;
+
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
@@ -3527,8 +3533,23 @@ static SlangResult createArtifactFromIR(
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        const SlangResult diagnosticsResult =
+            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact);
+
+        // A downstream error means no artifact ships, but validation is still worth running on the
+        // module we had going in: when the optimizer is what failed, that module is the emitter's
+        // own output, and reporting where it is malformed is more use to the caller than the
+        // optimizer's generic complaint. Validating ahead of the optimize step used to give exactly
+        // that.
+        if (SLANG_FAILED(diagnosticsResult))
+        {
+            if (needsValidation)
+            {
+                SLANG_RETURN_ON_FAIL(
+                    validateSpirvArtifact(codeGenContext, compiler, preOptimizeArtifact));
+            }
+            return diagnosticsResult;
+        }
 
         // Validate here, where `artifact` is final: the optimize step and the debug-strip within it
         // each replace it, so validating any earlier inspects a predecessor rather than what the

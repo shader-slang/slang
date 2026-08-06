@@ -79,6 +79,31 @@ int fakeCompileShrinking(glslang_CompileRequest_1_3* request)
     return 0;
 }
 
+// An optimizer that fails the way a real spirv-opt failure arrives: it writes a diagnostic and
+// returns non-zero without producing any output. `GlslangDownstreamCompiler::compile` turns that
+// into an artifact carrying an error diagnostic and **no blob**, while still returning `SLANG_OK`
+// -- so the caller's success branch is taken and the artifact it installs has no SPIR-V in it.
+int fakeCompileFailing(glslang_CompileRequest_1_3* request)
+{
+    if (request && request->diagnosticFunc)
+    {
+        const char* message = "fake optimizer failure\n";
+        request->diagnosticFunc(message, strlen(message), request->diagnosticUserData);
+    }
+    return 1;
+}
+
+// Which optimizer the fake library exports. The failing variant exists to reach the path where the
+// optimize step produces nothing, which is where validation has to fall back to the module the
+// emitter produced.
+enum class FakeOptimizer
+{
+    Shrinking,
+    Failing,
+};
+
+FakeOptimizer gFakeOptimizer = FakeOptimizer::Shrinking;
+
 // A shared library that exists only as a symbol table, so the test controls what the compiler's
 // validate and optimize steps do.
 class FakeGlslangLibrary : public RefObject, public ISlangSharedLibrary
@@ -101,7 +126,8 @@ public:
         // resolve or `init` rejects the library outright.
         if (symbol == "glslang_compile_1_3")
         {
-            return (void*)fakeCompileShrinking;
+            return gFakeOptimizer == FakeOptimizer::Failing ? (void*)fakeCompileFailing
+                                                            : (void*)fakeCompileShrinking;
         }
         if (symbol == "glslang_disassembleSPIRV")
         {
@@ -160,12 +186,16 @@ protected:
 // With `separateDebugInfo` the debug-strip step runs too, replacing the artifact a second time
 // after the optimizer already replaced it once. That distinguishes validating the final module from
 // validating merely the optimizer's output.
-int compileAndReturnShippedWordCount(bool separateDebugInfo = false)
+int compileAndReturnShippedWordCount(
+    bool separateDebugInfo = false,
+    FakeOptimizer optimizer = FakeOptimizer::Shrinking,
+    SlangResult* outCodeResult = nullptr)
 {
     gValidatedWordCount = -1;
     gValidatorCallCount = 0;
     gValidatedWordCounts.clear();
     gOptimizedWordCount = -1;
+    gFakeOptimizer = optimizer;
 
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
@@ -251,9 +281,16 @@ int compileAndReturnShippedWordCount(bool separateDebugInfo = false)
         // Validation is only reachable through this environment variable; no API or command-line
         // option turns it on.
         ScopedEnvVar validateSpirv("SLANG_RUN_SPIRV_VALIDATION", "1");
-        SLANG_CHECK_ABORT(
-            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()) ==
-            SLANG_OK);
+        const SlangResult codeResult =
+            linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
+        if (outCodeResult)
+        {
+            *outCodeResult = codeResult;
+        }
+        else
+        {
+            SLANG_CHECK_ABORT(codeResult == SLANG_OK);
+        }
     }
 
     return code ? int(code->getBufferSize() / sizeof(uint32_t)) : -1;
@@ -304,4 +341,24 @@ SLANG_UNIT_TEST(spirvValidationInspectsStrippedArtifact)
     SLANG_CHECK(gValidatedWordCounts.getCount() == 2);
     SLANG_CHECK(gValidatedWordCounts[0] == shippedWordCount);
     SLANG_CHECK(gValidatedWordCounts[1] == gOptimizedWordCount);
+}
+
+// When the optimize step produces nothing, validation still runs -- on the module the emitter
+// produced. `GlslangDownstreamCompiler::compile` reports an optimizer failure by attaching an error
+// diagnostic and returning `SLANG_OK` with no blob, so the artifact installed for the caller
+// carries no SPIR-V; validating it would report nothing useful. The compile fails either way, but a
+// caller debugging an emitter bug needs the validator's account of the SPIR-V that was actually
+// built, which is what ran before the validation call moved after the optimize step.
+SLANG_UNIT_TEST(spirvValidationRunsOnPreOptimizeModuleWhenOptimizerFails)
+{
+    SlangResult codeResult = SLANG_OK;
+    compileAndReturnShippedWordCount(false, FakeOptimizer::Failing, &codeResult);
+
+    // The optimizer failed, so no module ships.
+    SLANG_CHECK(SLANG_FAILED(codeResult));
+
+    // The point of the test: validation was still invoked, and on a real module rather than the
+    // blob-less artifact the failed optimize step installed.
+    SLANG_CHECK(gValidatorCallCount == 1);
+    SLANG_CHECK(gValidatedWordCount > 0);
 }
