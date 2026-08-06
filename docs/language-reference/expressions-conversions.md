@@ -307,9 +307,9 @@ void main(uint3 tid : SV_DispatchThreadID)
     m0 = 2.0; // { 2.0, 2.0,  2.0, 2.0,  2.0, 2.0 }
 
     output[0] = v0.x; // 1.0
-    output[1] = v0.x; // 1.0
-    output[2] = v0.x; // 1.0
-    output[3] = v0.x; // 1.0
+    output[1] = v0.y; // 1.0
+    output[2] = v0.z; // 1.0
+    output[3] = v0.w; // 1.0
     output[4] = m0[0][0]; // 2.0
     output[5] = m0[0][1]; // 2.0
     output[6] = m0[1][0]; // 2.0
