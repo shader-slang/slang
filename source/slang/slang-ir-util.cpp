@@ -26,7 +26,7 @@ bool isUserPointerType(IRInst* type)
     return ptrType->getAddressSpace() == AddressSpace::UserPointer;
 }
 
-bool isCudaKernelParamType(IRInst* type)
+bool isCudaKernelParamBorrowInType(IRInst* type)
 {
     // Only a `borrow in` ever carries this address space, so require that shape rather than testing
     // the address space alone.

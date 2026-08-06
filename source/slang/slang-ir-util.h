@@ -122,7 +122,12 @@ bool isUserPointerType(IRInst* type);
 
 // True if `type` is a `ConstRef<T, CudaKernelParam>` - the CUDA-family address-forwarding
 // representation for a by-value entry-point kernel parameter (emitted as `T p` / `&p`, not `T*`).
-bool isCudaKernelParamType(IRInst* type);
+//
+// Matches only an `IRBorrowInParamType` carrying that atom, never the address space on its own. The
+// emitters branch on this to pick the by-value spelling, and `kIROp_RefParamType` shares those code
+// paths, so testing the address space alone would pull a `ref` parameter into the by-value path.
+// Call the predicate rather than inlining the comparison.
+bool isCudaKernelParamBorrowInType(IRInst* type);
 
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);

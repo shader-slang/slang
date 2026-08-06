@@ -1865,7 +1865,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
         case kIROp_Param:
             // Such a param is emitted by-value, so its pointer value is `&p` and `*&p ==> p` - the
             // same peephole as the local variable above.
-            if (isCudaKernelParamType(inst->getDataType()))
+            if (isCudaKernelParamBorrowInType(inst->getDataType()))
             {
                 m_writer->emit(getName(inst));
                 return;

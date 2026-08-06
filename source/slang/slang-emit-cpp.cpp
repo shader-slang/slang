@@ -1179,7 +1179,7 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             // Emitted as the by-value kernel parameter `T p`, not `T*`, so the kernel ABI is
             // unchanged. Testing the predicate rather than the address space alone also keeps the
             // `kIROp_RefParamType` label sharing this block out of the by-value path.
-            if (isCudaKernelParamType(ptrType))
+            if (isCudaKernelParamBorrowInType(ptrType))
             {
                 _emitType(ptrType->getValueType(), declarator);
             }
@@ -2101,7 +2101,7 @@ void CPPSourceEmitter::emitOperandImpl(IRInst* inst, EmitOpInfo const& outerPrec
 
     // Such a param is emitted by-value, so a reference to it emits `&p`, the same way a local
     // `Var`'s address is taken.
-    if (inst->getOp() == kIROp_Param && isCudaKernelParamType(inst->getDataType()))
+    if (inst->getOp() == kIROp_Param && isCudaKernelParamBorrowInType(inst->getDataType()))
     {
         emitVarExpr(inst, outerPrec);
         return;

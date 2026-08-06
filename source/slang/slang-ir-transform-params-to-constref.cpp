@@ -245,7 +245,7 @@ struct TransformParamsToConstRefContext
         // call, each keeping its callee; it never routes the parameter to an unseen callee.
         // A future change that forwarded a parameter into a genuinely new call would have to re-run
         // the loop rather than land here.
-        if (isCudaKernelParamType(param->getDataType()))
+        if (isCudaKernelParamBorrowInType(param->getDataType()))
             return param;
         if (!isEntryPointByValueUniformAggregateParam(param))
             return nullptr;
@@ -293,7 +293,7 @@ struct TransformParamsToConstRefContext
         // Idempotency guard for the multi-forward case: a parameter forwarded to a second call site
         // is already the pointer, so reuse it without a second retype or load. See
         // `cuda-forward-uniform-multi-forward.slang`.
-        if (isCudaKernelParamType(valueType))
+        if (isCudaKernelParamBorrowInType(valueType))
             return param;
 
         // Collect the value reads before changing anything. Call arguments are excluded: they
@@ -471,6 +471,17 @@ struct TransformParamsToConstRefContext
     // True if `func` has a use that requires its signature be preserved - i.e. a use other than as
     // the direct callee of an `IRCall` (for example, taken as a function value / callback). Such a
     // function cannot have its parameters rewritten, so `processFunc` leaves it untransformed.
+    // True if `func` is used in a way that requires its signature to survive this pass unchanged -
+    // anything other than being called or annotated. Three use kinds are treated as benign and do
+    // not preserve the signature: decorations, specialization-dictionary entries (transient
+    // bookkeeping for later specialization/finalization), and being the *callee* operand of a call.
+    // Anything else - taken as a function value, passed as a callback - counts.
+    //
+    // Two callers depend on this. `processFunc` uses it to skip rewriting the function at all, and
+    // `findForwardableParamStorage` uses it to decline forwarding an address into it: a function
+    // whose signature is preserved keeps by-value parameters, so handing it a pointer would be an
+    // ABI mismatch (see `cuda-forward-uniform-signature-preserved-callee.slang`). Widening the
+    // benign set therefore relaxes a correctness decision, not just an optimization.
     bool hasSignaturePreservingUse(IRFunc* func)
     {
         for (auto use = func->firstUse; use; use = use->nextUse)
