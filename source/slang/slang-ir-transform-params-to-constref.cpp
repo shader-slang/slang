@@ -286,6 +286,28 @@ struct TransformParamsToConstRefContext
     //
     // Precondition: `param` came from `findForwardableParamStorage`, which guarantees no surviving
     // call use reads the parameter by value.
+    //
+    // The forwarded argument is `ConstRef<T, CudaKernelParam>` while the callee slot stays
+    // `ConstRef<T, Generic>` (set in `processFunc`). The address spaces must differ, because this
+    // atom is what tells the CPP emitter to print a parameter as by-value `T p` rather than `T*`
+    // (`emitSimpleTypeImpl`'s `kIROp_BorrowInParamType` case). The entry point wants that by-value
+    // spelling to keep its kernel ABI; the callee must keep `T*` so it can receive the address.
+    // Giving the callee slot `CudaKernelParam` too makes it declare `readsum_0(Big_0 b_0, ...)`
+    // while still being called as `readsum_0(&big_0, ...)` - a pointer into a by-value parameter,
+    // which NVRTC rejects. The divergence is the mechanism, not an oversight.
+    //
+    // Nothing between here and CUDA emit compares the two: `validateIRInstOperand` in
+    // `slang-ir-validate.cpp` checks operand back-pointers and that a def dominates its uses, never
+    // an argument's type against the callee's parameter type. A future call-argument type check
+    // there must permit this pairing. `cuda-forward-uniform-struct-forward.slang` pins both halves
+    // in the emitted text - the by-value `computeMain(Big_0 big_0, ...)` and the pointer-taking
+    // `readsum_0(Big_0 * b_0, ...)` it is passed to - so collapsing the two atoms into one fails
+    // that test rather than silently changing the ABI.
+    //
+    // No write can reach the forwarded storage: an `IRStore` destination must be pointer-typed and
+    // a by-value `IRParam` is an SSA value, so the front end proxies any source-level mutation onto
+    // a fresh local; the callee slot is `borrow in` and copies the pointee before any write. That
+    // is a type-system guarantee, not a convention.
     IRInst* forwardParamStorageAddress(IRParam* param)
     {
         auto valueType = param->getDataType();
@@ -378,33 +400,9 @@ struct TransformParamsToConstRefContext
                                            : nullptr)
                 {
                     // Forward the aggregate by address instead of copying it into a per-thread
-                    // temporary - the #11774 slowdown.
-                    //
-                    // The forwarded argument is `ConstRef<T, CudaKernelParam>` while the callee
-                    // slot stays `ConstRef<T, Generic>` (set in `processFunc`). The address spaces
-                    // must differ, because this atom is what tells the CPP emitter to print a
-                    // parameter as by-value `T p` rather than `T*` (`emitSimpleTypeImpl`'s
-                    // `kIROp_BorrowInParamType` case). The entry point wants that by-value spelling
-                    // to keep its kernel ABI; the callee must keep `T*` so it can receive the
-                    // address. Giving the callee slot `CudaKernelParam` too makes it declare
-                    // `readsum_0(Big_0 b_0, ...)` while still being called as
-                    // `readsum_0(&big_0, ...)` - a pointer into a by-value parameter, which NVRTC
-                    // rejects. The divergence is the mechanism, not an oversight.
-                    //
-                    // Nothing between here and CUDA emit compares the two: `validateIRInstOperand`
-                    // in `slang-ir-validate.cpp` checks operand back-pointers and that a def
-                    // dominates its uses, never an argument's type against the callee's parameter
-                    // type. A future call-argument type check there must permit this pairing.
-                    // `cuda-forward-uniform-struct-forward.slang` pins both halves in the emitted
-                    // text - the by-value `computeMain(Big_0 big_0, ...)` and the pointer-taking
-                    // `readsum_0(Big_0 * b_0, ...)` it is passed to - so collapsing the two atoms
-                    // into one fails that test rather than silently changing the ABI.
-                    //
-                    // No write can reach the forwarded storage: an `IRStore` destination must be
-                    // pointer-typed and a by-value `IRParam` is an SSA value, so the front end
-                    // proxies any source-level mutation onto a fresh local; the callee slot is
-                    // `borrow in` and copies the pointee before any write. That is a type-system
-                    // guarantee, not a convention.
+                    // temporary - the #11774 slowdown. See `forwardParamStorageAddress` for why the
+                    // argument's address space deliberately differs from the callee slot's, and why
+                    // no write can reach the forwarded storage.
                     newArgs.add(forwardParamStorageAddress(forwardable));
                 }
                 else
@@ -468,9 +466,6 @@ struct TransformParamsToConstRefContext
         return true;
     }
 
-    // True if `func` has a use that requires its signature be preserved - i.e. a use other than as
-    // the direct callee of an `IRCall` (for example, taken as a function value / callback). Such a
-    // function cannot have its parameters rewritten, so `processFunc` leaves it untransformed.
     // True if `func` is used in a way that requires its signature to survive this pass unchanged -
     // anything other than being called or annotated. Three use kinds are treated as benign and do
     // not preserve the signature: decorations, specialization-dictionary entries (transient
