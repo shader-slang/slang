@@ -361,6 +361,51 @@ BlobBuilder makeRecordWithObjectFieldBlob()
     return blob;
 }
 
+/// Build a well-formed blob whose root variant holds a struct whose second field
+/// is itself a variant.
+///
+/// Every other blob makes the variant the *root*, which the walk enters directly
+/// through `validateFrom`, queueing the variant's content. A variant reached from
+/// inside the graph takes two different arms instead -- read the in-place pointer
+/// and re-queue the object as a pointer target, then descend through the object's
+/// preceding content-layout word. Real serialized modules nest variants inside
+/// structs and arrays routinely, so both arms run in production.
+///
+///   0..31   header
+///   32..39  record layout (kind, field count = 2)
+///   40..55  the two field entries
+///   56..59  field 0's layout (kind = UInt32), reused as the nested content's
+///   60..63  field 1's layout (kind = VariantObj)
+///   64..67  the root variant's content-layout pointer
+///   68..75  the record: a `uint32`, then a pointer to the nested variant object
+///   76..79  the nested variant's content-layout pointer
+///   80..83  the nested variant's content
+///
+BlobBuilder makeRecordWithVariantFieldBlob()
+{
+    BlobBuilder blob;
+    blob.resize(84);
+    blob.putHeader(68);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::Struct));
+    blob.putU32(36, 2);
+    blob.putRelativePtr(40, 56);
+    blob.putU32(44, 0);
+    blob.putRelativePtr(48, 60);
+    blob.putU32(52, 4);
+
+    blob.putU32(56, uint32_t(FossilizedValKind::UInt32));
+    blob.putU32(60, uint32_t(FossilizedValKind::VariantObj));
+
+    blob.putRelativePtr(64, 32);
+    blob.putU32(68, 0xABCDEF01);
+    blob.putRelativePtr(72, 80);
+
+    blob.putRelativePtr(76, 56);
+    blob.putU32(80, 0xABCDEF01);
+    return blob;
+}
+
 } // namespace
 
 SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
@@ -373,6 +418,41 @@ SLANG_UNIT_TEST(fossilValidationAcceptsWellFormedBlobs)
     SLANG_CHECK(isAccepted(makePointerLikeBlob(FossilizedValKind::OptionalObj)));
     SLANG_CHECK(isAccepted(makeDictionaryBlob()));
     SLANG_CHECK(isAccepted(makeRecordWithObjectFieldBlob()));
+    SLANG_CHECK(isAccepted(makeRecordWithVariantFieldBlob()));
+}
+
+SLANG_UNIT_TEST(fossilValidationHandlesNestedVariant)
+{
+    // A nested variant whose in-place pointer leaves the blob.
+    auto blob = makeRecordWithVariantFieldBlob();
+    blob.putI32(72, 0x7F000000);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A nested variant whose content-layout word -- which sits before the object,
+    // and so is only reached by descending into it -- leaves the blob.
+    blob = makeRecordWithVariantFieldBlob();
+    blob.putI32(76, 0x7F000000);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A nested variant whose content whose layout says `UInt32` runs off the end.
+    blob = makeRecordWithVariantFieldBlob();
+    blob.resize(82);
+    SLANG_CHECK(!isAccepted(blob));
+
+    // A variant with no content layout describes no content, so there is nothing
+    // to walk and nothing to reject.
+    blob = makeRecordWithVariantFieldBlob();
+    blob.putI32(76, 0);
+    SLANG_CHECK(isAccepted(blob));
+}
+
+SLANG_UNIT_TEST(fossilValidationAcceptsEmptyContainer)
+{
+    // A container with no elements skips the extent and element walk entirely, so
+    // neither the stride nor the element layout is consulted.
+    auto blob = makeArrayBlob();
+    blob.putU32(56, 0);
+    SLANG_CHECK(isAccepted(blob));
 }
 
 SLANG_UNIT_TEST(fossilValidationRejectsMalformedAggregateElements)
