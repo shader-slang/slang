@@ -1,8 +1,8 @@
 #include "slang-workspace-version.h"
 
-#include "../compiler-core/slang-lexer.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
+#include "compiler-core/slang-lexer.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
 #include "slang-check-impl.h"
 #include "slang-mangle.h"
 #include "slang-serialize-container.h"

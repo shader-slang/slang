@@ -1,11 +1,10 @@
 // slang-emit-cuda.cpp
 #include "slang-emit-cuda.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {

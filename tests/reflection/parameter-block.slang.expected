@@ -25,17 +25,26 @@ standard output = {
                                         "kind": "scalar",
                                         "scalarType": "float32"
                                     }
-                                }
+                                },
+                                "sizes": [
+                                    {"kind": "descriptorTableSlot", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "descriptorTableSlot", "index": 0}
                         },
                         {
                             "name": "s",
                             "type": {
-                                "kind": "samplerState"
+                                "kind": "samplerState",
+                                "sizes": [
+                                    {"kind": "descriptorTableSlot", "value": 1}
+                                ]
                             },
                             "binding": {"kind": "descriptorTableSlot", "index": 1}
                         }
+                    ],
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 2}
                     ]
                 },
                 "containerVarLayout": {
@@ -58,21 +67,33 @@ standard output = {
                                             "kind": "scalar",
                                             "scalarType": "float32"
                                         }
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "descriptorTableSlot", "value": 1}
+                                    ]
                                 },
                                 "binding": {"kind": "descriptorTableSlot", "index": 0}
                             },
                             {
                                 "name": "s",
                                 "type": {
-                                    "kind": "samplerState"
+                                    "kind": "samplerState",
+                                    "sizes": [
+                                        {"kind": "descriptorTableSlot", "value": 1}
+                                    ]
                                 },
                                 "binding": {"kind": "descriptorTableSlot", "index": 1}
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "descriptorTableSlot", "value": 2}
                         ]
                     },
                     "binding": {"kind": "descriptorTableSlot", "index": 0, "count": 2}
-                }
+                },
+                "sizes": [
+                    {"kind": "subElementRegisterSpace", "value": 1}
+                ]
             }
         },
         {
@@ -88,7 +109,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "descriptorTableSlot", "value": 1}
+                ]
             }
         }
     ],
@@ -106,7 +130,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

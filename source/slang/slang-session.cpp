@@ -1,8 +1,8 @@
 // slang-session.cpp
 #include "slang-session.h"
 
-#include "../core/slang-shared-library.h"
 #include "compiler-core/slang-artifact-util.h"
+#include "core/slang-shared-library.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"

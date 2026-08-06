@@ -43,7 +43,7 @@ public:
     /// Returns value up to BUT NOT INCLUDING maxValue.
     int32_t nextInt32UpTo(int32_t maxValue)
     {
-        assert(maxValue > 0);
+        SLANG_ASSERT(maxValue > 0);
         return (maxValue <= 1) ? 0 : (nextPositiveInt32() % maxValue);
     }
 
@@ -56,7 +56,7 @@ public:
     /// Returns value up to BUT NOT INCLUDING maxValue
     int64_t nextInt64UpTo(int64_t maxValue)
     {
-        assert(maxValue > 0);
+        SLANG_ASSERT(maxValue > 0);
         return (maxValue <= 1) ? 0 : (nextPositiveInt64() % maxValue);
     }
 

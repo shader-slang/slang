@@ -4,7 +4,7 @@
 #include "unit-test-replay-common.h"
 
 // Only this file uses MutableFileSystemProxy
-#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.h"
+#include "slang-record-replay/proxy/proxy-mutable-file-system.h"
 
 // =============================================================================
 // File System Proxy Tests - ISlangFileSystem interface
