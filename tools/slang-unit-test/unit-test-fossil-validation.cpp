@@ -83,11 +83,11 @@ struct BlobBuilder
 /// Validation failures surface as a thrown `InternalError`, because
 /// `SLANG_UNEXPECTED` routes through `handleSignal`.
 ///
-bool isAccepted(BlobBuilder const& blob)
+bool isAccepted(BlobBuilder const& blob, Fossil::Trust trust = Fossil::Trust::Untrusted)
 {
     try
     {
-        return Fossil::getRootValue(blob.getData(), blob.getSize()) != Fossil::AnyValPtr();
+        return Fossil::getRootValue(blob.getData(), blob.getSize(), trust) != Fossil::AnyValPtr();
     }
     catch (const InternalError&)
     {
@@ -696,6 +696,28 @@ SLANG_UNIT_TEST(fossilValidationHandlesNestedVariant)
     blob = makeRecordWithVariantFieldBlob();
     blob.putI32(76, 0);
     SLANG_CHECK(isAccepted(blob));
+}
+
+SLANG_UNIT_TEST(fossilValidationSkipsTheWalkWhenTrusted)
+{
+    // The core module is loaded as `Trusted` so that startup does not pay for the
+    // walk. Nothing else pins that `Trusted` actually skips it: every other test
+    // goes through the `Untrusted` arm, so a mis-wired gate that validated the
+    // core module anyway would silently bring the startup cost back.
+    //
+    // The corruption has to be one that only the walk catches. An out-of-bounds
+    // *root* pointer would not work here: `getRootValue` hands the root variant to
+    // `getVariantContentPtr`, which reads the content-layout word stored before it,
+    // so skipping the walk would make the test itself perform the wild read this
+    // change exists to prevent. A string whose length runs off the end keeps every
+    // pointer `getRootValue` follows inside the blob, while still being rejected by
+    // `_visitStringObj`'s extent check.
+    //
+    auto blob = makeStringBlob();
+    blob.putU32(44, 0x7F000000);
+
+    SLANG_CHECK(!isAccepted(blob, Fossil::Trust::Untrusted));
+    SLANG_CHECK(isAccepted(blob, Fossil::Trust::Trusted));
 }
 
 SLANG_UNIT_TEST(fossilValidationAcceptsEmptyRecord)
