@@ -125,9 +125,9 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
 // op-name fallback, or an empty type annotation for WGSL (issue #12367).
 //
 // Host C++ is excluded because its prelude does define `Slang_FuncType`, for `[DllImport]`.
-// The PyTorch binding target is excluded as well: its own prelude does not define the name
-// either, but no shader reaches emission on it today (an unrelated pass asserts first), so
-// there is no observable behaviour to check and no test that could pin one.
+// The PyTorch binding target is excluded for a weaker reason: its prelude does not define the
+// name either, but every shader shape tried here failed earlier in an unrelated pass, so there
+// is no measured behaviour to base a decision on and no test that could pin one.
 //
 // `ShaderSharedLibrary` and `ShaderHostCallable` compile through kernel C++
 // (`_getDefaultSourceForTarget`), so without them the undefined name is reported by the
@@ -350,10 +350,11 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                     if (holdsFuncType(field->getFieldType()))
                     {
                         // The key carries the location of the global this field replaced (see
-                        // `introduceExplicitGlobalContext`). A key with no location did not come
-                        // from a declaration the user wrote -- `generateDllImportFuncs`
-                        // synthesizes a function pointer for `[DllImport]`, which is legitimate
-                        // on the C++ targets that support it -- so there is nothing to report.
+                        // `introduceExplicitGlobalContext`). Without a location there is no
+                        // source position to report and nothing the reader could act on, so the
+                        // value is passed over -- which is also what keeps the function pointer
+                        // `generateDllImportFuncs` synthesizes for `[DllImport]` from being
+                        // rejected on the C++ targets that support it.
                         auto key = field->getKey();
                         if (key->sourceLoc.isValid())
                         {
@@ -365,9 +366,8 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
             }
             else if (globalInst->getOp() == kIROp_GlobalVar)
             {
-                // Same reasoning as the struct field above: WGSL keeps the global rather than
-                // moving it into a context struct, and a global with no location was
-                // synthesized rather than declared.
+                // WGSL keeps the global rather than moving it into a context struct. Same
+                // location requirement as the struct field above.
                 if (holdsFuncType(globalInst->getFullType()) && globalInst->sourceLoc.isValid())
                 {
                     sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{
