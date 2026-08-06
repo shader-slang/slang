@@ -22,10 +22,11 @@ uint g(uint n) throws uint
     return n;
 }
 
-// The carets in the block below are matched by column against `computeMain` on the line they
-// follow, and that block must stay immediately after it -- even a comment in between stops the
-// annotation from binding. Renaming the entry point or re-indenting its line moves the target
-// horizontally and silently misaligns them, so re-run this test after any such edit.
+// The `/*CHECK:` block below binds to the last non-blank line above it that is not itself an
+// annotation, and matches its carets against that line by column. A comment counts as such a
+// line, so inserting one between the declaration and the block retargets the carets at the
+// comment instead. Renaming `computeMain` or re-indenting its line moves the target
+// horizontally. Both mistakes leave a test that still runs, so re-run it after either.
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID) throws uint
