@@ -4,14 +4,13 @@
 // variable declaration with an empty type annotation. All four targets exited 0 and
 // wrote source that cannot be compiled, with no diagnostic at all.
 //
-// `functype` is implemented for SPIR-V and the LLVM/CPU path, so this is a per-target
-// limitation rather than a language-level one: it must be reported (E55216) instead of
-// silently emitting undefined output.
+// What works today is a function value the compiler can resolve at compile time, which
+// `specializeHigherOrderParameters` replaces with a direct call; a value selected at runtime
+// has no representation on these targets and must be reported (E55216) rather than emitted.
 //
 // One directive per target: the four differ structurally. `introduceExplicitGlobalContext`
 // (C++/CUDA/Metal) moves `gFn` into a `KernelContext` struct field, while WGSL keeps it as
 // a global variable, so the diagnostic is reached through two different shapes.
-//
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -entry computeMain -stage compute
