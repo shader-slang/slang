@@ -346,5 +346,94 @@ for _bad in ((_REL, _REL), (_WARN, _REL)):
 del _REL, _WARN, _ABS, _bad
 
 
+def _warnings_output_selfcheck():
+    """Pin the ONE invariant that only running main() can establish: the
+    `warnings=` GITHUB_OUTPUT write happens on every path out of main().
+
+    The classifier checks above are pure and cannot see this. The write is the
+    sole signal separating a warnings-only night from a clean one — warnings
+    deliberately do not fail the job — so if a future edit moved it below the
+    clean-night `return` or the regression `SystemExit(1)`, the workflow's
+    `${{ steps.trend.outputs.warnings || '0' }}` fallback would report a
+    warnings-only night as a green "No regressions detected". Nothing else
+    would notice.
+
+    Driving main() in-process rather than as a subprocess keeps this an
+    ordinary import-time check (no process spawn), but it means argv, the
+    three GITHUB_* variables, and stdout all have to be borrowed and given
+    back — GITHUB_STEP_SUMMARY especially, since leaving the real one set
+    would append fixture output to the actual CI job summary."""
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+
+    def point(label, date, metrics):
+        return {"label": label, "date": date, "kind": "daily",
+                "runner": "r1", "metrics": metrics}
+
+    BASE = 100.0
+    # Five stable trailing points: clears --window/--min-baseline comfortably.
+    history = [point(f"2026-01-0{i}-aaaaaaaaa", f"2026-01-0{i}",
+                     {"minimal|compileInner": BASE}) for i in range(1, 6)]
+    # ratio, expected (exit_code, warnings=) — one case per path out of main().
+    cases = [
+        (BASE, 0, "warnings=0"),          # clean: write precedes the early return
+        (BASE * 1.07, 0, "warnings=1"),   # warning band: does not fail the job
+        (BASE * 1.15, 1, "warnings=0"),   # regression: write precedes SystemExit
+    ]
+
+    d = tempfile.mkdtemp(prefix="trend_selfcheck_")
+    saved_argv = sys.argv
+    saved_env = {k: os.environ.get(k)
+                 for k in ("GITHUB_OUTPUT", "GITHUB_STEP_SUMMARY", "GITHUB_ACTIONS")}
+    try:
+        os.makedirs(os.path.join(d, "tracking"))
+        tpath = os.path.join(d, "tracking", "tracking.json")
+        gho = os.path.join(d, "github_output")
+        # Unset: the step summary must not receive fixture rows, and the
+        # ::warning:: annotations are noise outside a real run.
+        os.environ.pop("GITHUB_STEP_SUMMARY", None)
+        os.environ.pop("GITHUB_ACTIONS", None)
+        os.environ["GITHUB_OUTPUT"] = gho
+
+        for cur, want_code, want_line in cases:
+            with analyze.open_output(tpath) as fh:
+                json.dump({"runner": "r1",
+                           "points": history + [point("2026-01-09-zzzzzzzzz",
+                                                      "2026-01-09",
+                                                      {"minimal|compileInner": cur})]},
+                          fh)
+            with analyze.open_output(gho) as fh:
+                fh.write("")
+            sys.argv = ["trend.py", "--results", d, "--label", "2026-01-09-zzzzzzzzz"]
+            code = 0
+            with contextlib.redirect_stdout(io.StringIO()):
+                try:
+                    main()
+                except SystemExit as e:
+                    code = e.code or 0
+            written = analyze.read_text(gho)
+            assert code == want_code, \
+                (f"trend fixture: current={cur} expected exit {want_code}, got {code}"
+                 f" — the warning tier must not fail the job, and a regression must")
+            assert want_line in written, \
+                (f"trend fixture: current={cur} expected '{want_line}' in GITHUB_OUTPUT,"
+                 f" got {written!r} — the warnings= write must precede every exit "
+                 f"from main(), or a warnings-only night reports as clean")
+    finally:
+        sys.argv = saved_argv
+        for k, v in saved_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_warnings_output_selfcheck()
+del _warnings_output_selfcheck
+
+
 if __name__ == "__main__":
     main()
