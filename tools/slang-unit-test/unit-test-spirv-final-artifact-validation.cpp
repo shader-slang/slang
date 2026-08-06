@@ -22,6 +22,8 @@
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <cstring>
+
 using namespace Slang;
 using SlangUnitTest::ScopedEnvVar;
 
@@ -189,7 +191,8 @@ protected:
 int compileAndReturnShippedWordCount(
     bool separateDebugInfo = false,
     FakeOptimizer optimizer = FakeOptimizer::Shrinking,
-    SlangResult* outCodeResult = nullptr)
+    SlangResult* outCodeResult = nullptr,
+    String* outDiagnostics = nullptr)
 {
     gValidatedWordCount = -1;
     gValidatorCallCount = 0;
@@ -293,6 +296,15 @@ int compileAndReturnShippedWordCount(
         }
     }
 
+    // Reported separately from the result code: a failing compile that says nothing is a
+    // different defect from a failing compile that explains itself, and only the diagnostics
+    // text distinguishes them.
+    if (outDiagnostics)
+    {
+        *outDiagnostics =
+            diagnostics ? String((const char*)diagnostics->getBufferPointer()) : String();
+    }
+
     return code ? int(code->getBufferSize() / sizeof(uint32_t)) : -1;
 }
 
@@ -361,4 +373,160 @@ SLANG_UNIT_TEST(spirvValidationRunsOnPreOptimizeModuleWhenOptimizerFails)
     // blob-less artifact the failed optimize step installed.
     SLANG_CHECK(gValidatorCallCount == 1);
     SLANG_CHECK(gValidatedWordCount > 0);
+}
+
+// The same optimizer failure as the test above, but with `-separate-debug-info` on. That mode runs
+// the debug-strip inside the optimize block, and the strip loads the optimizer's output -- which on
+// this path carries no blob, so the strip fails and returns from `createArtifactFromIR` before
+// either the downstream diagnostics or the validation call is reached. A compile that fails without
+// saying why leaves the caller nothing to act on, so this checks the diagnostic survives rather
+// than just the result code.
+SLANG_UNIT_TEST(spirvValidationReportsOptimizerFailureUnderSeparateDebugInfo)
+{
+    SlangResult codeResult = SLANG_OK;
+    String diagnostics;
+    compileAndReturnShippedWordCount(true, FakeOptimizer::Failing, &codeResult, &diagnostics);
+
+    SLANG_CHECK(SLANG_FAILED(codeResult));
+
+    // The premise: without the fake optimizer's message reaching the sink, this path reports a bare
+    // failure code and the caller cannot tell an optimizer failure from any other.
+    SLANG_CHECK(diagnostics.indexOf(UnownedStringSlice("fake optimizer failure")) >= 0);
+}
+
+// A struct with a pointer to its own type makes the emitter describe the debug composite before its
+// members exist, and it does that with `OpExtInstWithForwardRefsKHR` rather than `OpExtInst`. The
+// debug-strip has to treat that opcode as a debug instruction too: keeping the instruction while
+// stripping the `OpString` and `DebugSource` it references leaves ids in the stripped module with
+// nothing defining them.
+//
+// This inspects the shipped module's opcodes rather than relying on SPIR-V validation, because
+// validation only runs when `SLANG_RUN_SPIRV_VALIDATION` is set in the environment and the main
+// test suite does not set it -- a test that checked for the validation error would pass whether or
+// not the strip was correct.
+SLANG_UNIT_TEST(spirvStripRemovesForwardReferencedDebugInstructions)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    List<slang::CompilerOptionEntry> options;
+    slang::CompilerOptionEntry debugLevel = {};
+    debugLevel.name = slang::CompilerOptionName::DebugInformation;
+    debugLevel.value.kind = slang::CompilerOptionValueKind::Int;
+    debugLevel.value.intValue0 = SLANG_DEBUG_INFO_LEVEL_STANDARD;
+    options.add(debugLevel);
+
+    slang::CompilerOptionEntry separate = {};
+    separate.name = slang::CompilerOptionName::EmitSeparateDebug;
+    separate.value.kind = slang::CompilerOptionValueKind::Int;
+    separate.value.intValue0 = 1;
+    options.add(separate);
+
+    targetDesc.compilerOptionEntries = options.getBuffer();
+    targetDesc.compilerOptionEntryCount = (uint32_t)options.getCount();
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    // The pointer back to `Node` is what forces the forward reference.
+    const char* source = R"SLANG(
+        struct Node
+        {
+            int value;
+            Node* next;
+        };
+
+        RWStructuredBuffer<int> outputBuffer;
+
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+        {
+            Node node;
+            node.value = 7;
+            node.next = nullptr;
+            outputBuffer[0] = node.value;
+        }
+    )SLANG";
+
+    ComPtr<slang::IBlob> diagnostics;
+    auto module =
+        session->loadModuleFromSourceString("test", "test.slang", source, diagnostics.writeRef());
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "computeMain",
+        SLANG_STAGE_COMPUTE,
+        entryPoint.writeRef(),
+        diagnostics.writeRef());
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
+
+    slang::IComponentType* componentTypes[2] = {module, entryPoint.get()};
+    ComPtr<slang::IComponentType> composedProgram;
+    SLANG_CHECK_ABORT(
+        session->createCompositeComponentType(
+            componentTypes,
+            2,
+            composedProgram.writeRef(),
+            diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    SLANG_CHECK_ABORT(
+        composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> code;
+    diagnostics.setNull();
+    SLANG_CHECK_ABORT(
+        linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef()) ==
+        SLANG_OK);
+    SLANG_CHECK_ABORT(code != nullptr);
+
+    const auto* words = (const uint32_t*)code->getBufferPointer();
+    const size_t wordCount = code->getBufferSize() / sizeof(uint32_t);
+    // A SPIR-V module opens with a five-word header; instructions begin after it.
+    const size_t headerWordCount = 5;
+    SLANG_CHECK_ABORT(wordCount > headerWordCount);
+
+    // Opcode numbers rather than the `Spv*` enums, which this test's includes do not reach.
+    const uint32_t opExtInstWithForwardRefsKHR = 4433;
+    const uint32_t opString = 7;
+
+    // Walk the instruction stream, counting what the strip should and should not have left behind.
+    int forwardRefCount = 0;
+    int debugStringCount = 0;
+    for (size_t i = headerWordCount; i < wordCount;)
+    {
+        const uint32_t instWordCount = words[i] >> 16;
+        const uint32_t opCode = words[i] & 0xFFFF;
+        if (instWordCount == 0)
+        {
+            break;
+        }
+        if (opCode == opExtInstWithForwardRefsKHR)
+        {
+            ++forwardRefCount;
+        }
+        if (opCode == opString)
+        {
+            ++debugStringCount;
+        }
+        i += instWordCount;
+    }
+
+    // Guard the premise: the strip only removes the debug strings this instruction would have
+    // referenced, so a module that never had them cannot show the defect either way.
+    SLANG_CHECK(debugStringCount <= 1);
+
+    // The point of the test. Before the strip recognized this opcode, the instruction survived
+    // while the ids it references did not.
+    SLANG_CHECK(forwardRefCount == 0);
 }

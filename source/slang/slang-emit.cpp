@@ -3236,7 +3236,14 @@ static SlangResult stripDbgSpirvFromArtifact(
                 }
             }
             // Also check if the instruction is an extended instruction containing DebugInfo.
-            if (inst.getOpCode() == SpvOpExtInst)
+            //
+            // `SpvOpExtInstWithForwardRefsKHR` counts here too: it carries the same operand layout
+            // and is what `emitOpDebugForwardRefsComposite` uses for a debug composite whose
+            // members are not emitted yet, as happens for a struct with a pointer to its own type.
+            // Matching only `SpvOpExtInst` kept those instructions while stripping the `OpString`
+            // and `DebugSource` they reference, leaving dangling ids in the stripped module.
+            if (inst.getOpCode() == SpvOpExtInst ||
+                inst.getOpCode() == SpvOpExtInstWithForwardRefsKHR)
             {
                 // Ignore this if the instruction contains DebugInfo and is from the debug import
                 if (debugExtInstNumbers.contains(inst.getOperand(3)) &&
@@ -3299,13 +3306,19 @@ static SlangResult validateSpirvArtifact(
     const size_t spirvByteCount = spirvBlob->getBufferSize();
 
     // A SPIR-V module is a sequence of 32-bit words, so a size that is not a whole number of words
-    // is not a module the validator can read. Report it as a validation failure rather than
-    // asserting: this blob comes back from whichever `slang-glslang` was loaded, and an embedder
-    // can supply that library through `ISession::setSharedLibraryLoader`, so a malformed size is
-    // reachable input here rather than a broken invariant of ours.
+    // is not a module the validator can read. This blob comes back from whichever `slang-glslang`
+    // was loaded, and an embedder can supply that library through
+    // `ISession::setSharedLibraryLoader`, so a malformed size is reachable input rather than a
+    // broken invariant of ours.
+    //
+    // Diagnosed at `error` severity rather than through `SpirvValidationFailed`: that one is
+    // declared `internal`, and `Severity::Internal` sorts above `Fatal`, so reporting through it
+    // aborts compilation by exception and reaches the caller as an internal compiler error instead
+    // of naming the condition.
     if (spirvByteCount % sizeof(uint32_t) != 0)
     {
-        codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::SpirvBlobNotWordSized{.byteCount = Int(spirvByteCount)});
         return SLANG_FAIL;
     }
 
@@ -3475,6 +3488,11 @@ static SlangResult createArtifactFromIR(
         }
 
         ComPtr<IArtifact> optimizedArtifact;
+
+        // Outcome of the debug-strip below, kept so the failure can be reported after the
+        // downstream diagnostics have been forwarded rather than instead of them.
+        SlangResult stripResult = SLANG_OK;
+
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
@@ -3521,10 +3539,23 @@ static SlangResult createArtifactFromIR(
             if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
             {
                 auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(
-                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
-                artifact = _Move(strippedArtifact);
-                dbgArtifact = _Move(optimizedArtifact);
+
+                // Returning here would skip the diagnostics forwarded below, and the optimizer's
+                // account of the failure is attached to `optimizedArtifact` rather than to
+                // `artifact`, which this branch has not reassigned yet. So take the optimizer's
+                // artifact as the one to report from and let the shared failure handling run: the
+                // strip reads its input before writing anything, so a failure here leaves nothing
+                // half-built to step around.
+                stripResult = stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact);
+                if (SLANG_FAILED(stripResult))
+                {
+                    artifact = _Move(optimizedArtifact);
+                }
+                else
+                {
+                    artifact = _Move(strippedArtifact);
+                    dbgArtifact = _Move(optimizedArtifact);
+                }
             }
             else
                 artifact = _Move(optimizedArtifact);
@@ -3551,6 +3582,19 @@ static SlangResult createArtifactFromIR(
             return diagnosticsResult;
         }
 
+        // The strip failing without the artifact carrying an error diagnostic would otherwise fall
+        // into the validation below with no debug companion to validate. Reported here so the
+        // failure still propagates once the diagnostics above have had their say.
+        if (SLANG_FAILED(stripResult))
+        {
+            if (needsValidation)
+            {
+                SLANG_RETURN_ON_FAIL(
+                    validateSpirvArtifact(codeGenContext, compiler, preOptimizeArtifact));
+            }
+            return stripResult;
+        }
+
         // Validate here, where `artifact` is final: the optimize step and the debug-strip within it
         // each replace it, so validating any earlier inspects a predecessor rather than what the
         // caller receives -- leaving the optimizer's output unchecked at `-O1` and above, and the
@@ -3563,9 +3607,22 @@ static SlangResult createArtifactFromIR(
             SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, artifact));
 
             // `-separate-debug-info` writes the debug module out as its own `.dbg.spv`, so it is a
-            // second module the caller receives and is held to the same rules.
-            if (dbgArtifact)
+            // second module the caller receives and is held to the same rules. Conditioned on the
+            // requested mode, which is what makes the companion mandatory here, rather than on the
+            // companion being present, which would read as "validate it if we happen to have one".
+            if (needsSeparateDebugInfo)
             {
+                // `dbgArtifact` is assigned in the optimize block above, under two conditions
+                // that both hold here: `compile` succeeding, which the option values fixed above
+                // leave no way to fail, and the same pure `shouldEmitSeparateDebugInfo()` read
+                // that produced `needsSeparateDebugInfo`. The strip sitting between them is the
+                // one way to satisfy both and still leave the companion unset, and the
+                // `stripResult` check above returns on exactly that.
+                //
+                // Release-asserted rather than `SLANG_ASSERT`, which becomes `SLANG_ASSUME` in
+                // release builds: a call-site change that broke the invariant would be undefined
+                // behaviour rather than a diagnosable abort.
+                SLANG_RELEASE_ASSERT(dbgArtifact);
                 SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, dbgArtifact));
             }
         }

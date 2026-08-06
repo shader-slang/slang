@@ -5758,7 +5758,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57007)
+-- SPIRV (57001-57008)
 
 warning(
     "spirv-opt-failed",
@@ -5804,6 +5804,12 @@ err(
     "debug-info-include-source-requires-debug-info",
     57007,
     "'-debug-info-include-source' cannot be used with '-g0' or when no debug information is enabled; enable at least '-g1'."
+)
+
+err(
+    "spirv-blob-not-word-sized",
+    57008,
+    "SPIR-V validation was requested, but the module to validate is '~byteCount:Int' bytes, which is not a whole number of 32-bit words"
 )
 
 -- GLSL Compatibility (58001-58003)
