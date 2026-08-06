@@ -355,6 +355,12 @@ bool isSlang2026OrLater(SemanticsVisitor* visitor)
            SLANG_LANGUAGE_VERSION_2026;
 }
 
+bool isSlang202cOrLater(SemanticsVisitor* visitor)
+{
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
+           SLANG_LANGUAGE_VERSION_202C;
+}
+
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)

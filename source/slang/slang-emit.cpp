@@ -143,7 +143,6 @@
 #include "slang-visitor.h"
 #include "slang-vm-bytecode.h"
 
-#include <assert.h>
 #include <limits>
 Slang::String get_slang_cpp_host_prelude();
 Slang::String get_slang_torch_prelude();
@@ -3429,11 +3428,26 @@ static SlangResult createArtifactFromIR(
 
         if (needsValidation)
         {
-            if (SLANG_FAILED(
-                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
+            const SlangResult validationResult =
+                compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+
+            if (validationResult == SLANG_E_NOT_AVAILABLE)
             {
+                // The validator never ran, so disassembling here would wrongly imply the SPIR-V was
+                // found invalid. Fail the compile rather than falling through: validation was
+                // requested, and publishing the artifact would hand a caller SPIR-V that nothing
+                // checked. `error` severity alone does not stop this path -- only `Severity::Fatal`
+                // and above abort a compile.
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationUnavailable{});
+                return SLANG_FAIL;
+            }
+            else if (SLANG_FAILED(validationResult))
+            {
+                // Whether a rejected module reaches the caller must not depend on the diagnostic's
+                // severity, so fail here rather than leaving it to the sink's abort.
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
+                return SLANG_FAIL;
             }
         }
 

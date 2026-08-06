@@ -83,7 +83,8 @@ jobs:
         with:
           persist-credentials: false
           submodules: "recursive"
-          fetch-depth: "2"
+          fetch-depth: "250"
+          fetch-tags: true
 
       - name: Setup
         uses: ./.github/actions/common-setup
