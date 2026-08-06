@@ -1,12 +1,12 @@
 #ifndef SLANG_DOWNSTREAM_COMPILER_H
 #define SLANG_DOWNSTREAM_COMPILER_H
 
-#include "../core/slang-common.h"
-#include "../core/slang-io.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-process-util.h"
-#include "../core/slang-semantic-version.h"
-#include "../core/slang-string.h"
+#include "core/slang-common.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
+#include "core/slang-process-util.h"
+#include "core/slang-semantic-version.h"
+#include "core/slang-string.h"
 #include "slang-artifact-associated.h"
 #include "slang-artifact.h"
 #include "slang-com-ptr.h"
@@ -172,7 +172,7 @@ struct DownstreamCompileOptions
             EnableFloat16 = 0x08,        ///< If set compiles with support for float16/half
             EnableFloat8 = 0x10,         ///< If set compiles with support for float8
             EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
-
+            EnableLogging = 0x40,        ///< If set compiles with support for shader logging
         };
     };
 
@@ -358,7 +358,9 @@ public:
     /// Get the version of this compiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getVersionString(slang::IBlob** outVersionString) = 0;
-    /// Validate and return the result
+    /// Validate `contents` and return the result. Returns `SLANG_E_NOT_AVAILABLE` when this
+    /// compiler cannot validate at all, which callers reporting a failure to the user must keep
+    /// distinct from a result saying the module was examined and rejected.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) = 0;
     /// Disassemble and print to stdout
@@ -415,7 +417,7 @@ public:
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE

@@ -25,7 +25,7 @@
 //   * `Position.Line` is monotonically non-decreasing as tokens
 //     are produced (a token after a newline is on a later line).
 
-#include "../../source/core/slang-token-reader.h"
+#include "core/slang-token-reader.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;

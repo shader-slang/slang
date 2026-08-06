@@ -2,7 +2,7 @@
 //META: model=claude-fable-5
 //META: generated_at=2026-07-08T15:00:51+00:00
 //META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability-autodiff-annotations
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability--autodiff-annotations
 //META: doc_section_digest=3959c707a386e75c3eea38b819f320935508e4d38543a0a9aeb0a01aca4d3471
 //META: purpose=`[NoDiscard]` is accepted on a value-returning function, and a call whose result is consumed checks and runs normally.
 //META: intent=functional

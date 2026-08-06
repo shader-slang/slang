@@ -170,6 +170,7 @@ if(SLANG_ENABLE_GFX)
         # this
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}
+            ${slang_SOURCE_DIR}/tools
             ${slang_SOURCE_DIR}/include
             if
             (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
@@ -242,6 +243,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_FROM_PRIVATE unit-test slang-rhi
+        INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/tools
         FOLDER test
     )
     slang_add_target(
@@ -264,7 +266,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             stb
             ${CMAKE_DL_LIBS}
             Threads::Threads
-        INCLUDE_FROM_PRIVATE slang-rhi
+        INCLUDE_FROM_PRIVATE prelude slang-rhi
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test

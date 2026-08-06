@@ -57,6 +57,7 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 bool isUniformParameterType(Type* type);
 
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
+bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
@@ -66,6 +67,14 @@ Type* checkProperType(Linkage* linkage, TypeExp typeExp, DiagnosticSink* sink);
 /// Get the element type if `type` is Ptr or PtrLike type, otherwise returns null.
 /// Note: this currently does not include PtrTypeBase.
 Type* getPointedToTypeIfCanImplicitDeref(Type* type);
+
+/// True if `containerDecl` is `moduleDecl` itself or one of its own `__include`d
+/// `FileDecl` children — i.e. a scope that belongs on `moduleDecl`'s imported surface.
+/// Used by both the `import` re-export filter (`importModuleIntoScope`) and the
+/// legacy/API name-lookup scope (`_getOrCreateScopeForLegacyLookup`) to drop
+/// `using`-spliced namespace siblings and other modules' transitively-imported files.
+/// See shader-slang/slang#11443.
+bool isOwnModuleOrIncludedFileScope(ContainerDecl* containerDecl, ModuleDecl* moduleDecl);
 
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {

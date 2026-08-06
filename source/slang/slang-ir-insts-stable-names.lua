@@ -872,5 +872,7 @@ return {
 	["CastUIntToUntypedSamplerHandle"] = 896,
 	["CastUntypedSamplerHandleToUInt"] = 897,
 	["imageGatherOffset"] = 898,
-	["getNaturalAlignment"] = 899
+	["getNaturalAlignment"] = 899,
+	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
+	["Attr.TypeAlignment"] = 901
 }

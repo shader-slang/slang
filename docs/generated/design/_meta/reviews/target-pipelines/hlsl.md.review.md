@@ -1,22 +1,22 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-30T13:34:34+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:05:53+00:00
 target_doc: target-pipelines/hlsl.md
-target_doc_source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 target_doc_watched_paths_digest: d6ab7e839f67ff67089c6ff596134280c2acd4d4480e7715012652269230eb0f
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
-  completeness: partial
+  completeness: fail
   style_consistency: pass
-  source_alignment: partial
+  source_alignment: fail
   front_matter_validity: pass
-finding_count: 3
+finding_count: 8
 severity_breakdown:
-  critical: 0
-  major: 1
+  critical: 1
+  major: 5
   minor: 2
   nit: 0
 ---
@@ -24,23 +24,29 @@ severity_breakdown:
 # Review report for target-pipelines/hlsl.md
 
 ## Summary
-The HLSL page largely matches the source ordering for the HLSL source path and the DXIL/DXBytecode downstream transition. The main issue is a Phase B diagram/table mismatch: `checkStaticAssert` appears in the diagram but is missing from the ordered table required by the target-pipeline contract. I also found a small source-section coverage gap and stale Phase D line references.
+The page accurately records most HLSL-reachable gates and all 118 citation-bearing lines point at the stated source locations, but several behavioral descriptions and required diagram/table details are wrong or incomplete. The most important error is that Phase D sends the assembly targets directly through the compile branches; the source instead compiles an intermediate binary target and then invokes a downstream disassembler.
 
 ## Items checked
-- Ran `regenerate.py show target-pipelines/hlsl.md` and reviewed the target document, `_common.md`, `target-pipelines-hlsl.md`, and the five dependency documents listed by `depends_on`.
-- Checked the target front matter for required keys, the recorded target source commit, warning string, and 64-character hex watched-path digest.
-- Spot-checked more than 10 source-backed claims against `slang-emit.cpp`, `slang-code-gen.cpp`, `slang-global-session.cpp`, `slang-emit-c-like.cpp`, `slang-emit-hlsl.cpp`, `slang-emit-hlsl-prelude.cpp`, `slang-ir-hlsl-legalize.cpp`, and `slang-ir-legalize-binary-operator.cpp`.
-- Verified the downstream mapping from `DXIL`/`DXBytecode` to `HLSL`, HLSL emitter construction, byte-address-buffer options, HLSL legalization gates, uniform-buffer-load gate, phi elimination, metadata collection, and downstream DXC/fxc descriptions.
-- Checked required target-pipeline sections and compared the Phase B diagram/table shape against the target-pipeline contract.
+- Read the target document, `_common.md`, its per-document prompt, all resolved watched files, and the five `depends_on` documents reported by `regenerate.py show`.
+- Verified the recorded source commit exists and equals review-time `HEAD`, then checked every line-number citation on the 118 citation-bearing lines against that commit.
+- Spot-checked more than 10 claims, including both required-pass scans, HLSL emitter construction, byte-address-buffer options, ray-payload gates, barrier validation, logical-operator legalization, phi elimination, variable-scope correction, named-constant emission, artifact creation, and DXC/fxc dispatch.
+- Resolved relative links and peer-document references; `regenerate.py lint target-pipelines/hlsl.md` completed cleanly.
+- Compared every HLSL-reachable `SLANG_PASS` region in `linkAndOptimizeIR` with the four phase diagrams and ordered tables.
 
 ## Findings
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | Phase B diagram/table; lines 155-305 | The Phase B diagram contains `cSA[checkStaticAssert]`, but the ordered table has no `checkStaticAssert` row. The target-pipeline contract requires one row per pass node in the diagram, so the diagram and table disagree. | `_common.md` requires a companion ordered table with one row per pass node in the diagram; `source/slang/slang-emit.cpp:1793-1795` shows `checkStaticAssert(irModule->getModuleInst(), sink)` immediately after `specializeArrayParameters`. | Add a `checkStaticAssert` row after `specializeArrayParameters` with file `slang-emit.cpp`, gate `(always)`, and a note that it is a direct call rather than `SLANG_PASS`, or remove the diagram node if direct calls are intentionally out of scope. |
-| F-002 | minor | Source and `wrapStructuredBuffersOfMatrices`; lines 31-51, 305, 645-651 | The Source section omits `slang-ir-wrap-structured-buffers.cpp` even though the page treats `wrapStructuredBuffersOfMatrices` as a notable HLSL-only pass. The manifest's resolved watched files also omit that implementation file, so changes to this HLSL-specific pass would not stale the page. | `source/slang/slang-emit.cpp:1797-1808` shows the `case CodeGenTarget::HLSL` call to `wrapStructuredBuffersOfMatrices`; the pass row cites `source/slang/slang-ir-wrap-structured-buffers.cpp`, but the Source section and resolved watched-file set do not include it. | Add `slang-ir-wrap-structured-buffers.cpp` to the Source section and to the HLSL page manifest `watched_paths`. |
-| F-003 | minor | Phase D line references; lines 476-521 | A few approximate Phase D line references are stale by more than a few lines. The page cites line ~2616 for `new HLSLSourceEmitter` and line ~2752 for artifact wrapping, while the current source has those at lines 2630 and 2766. | `source/slang/slang-emit.cpp:2628-2630` constructs `HLSLSourceEmitter`; `source/slang/slang-emit.cpp:2766-2767` wraps the emitted text in an artifact. | Refresh the Phase D line references after remediation. |
+| F-001 | critical | Phase D diagram and table, lines 564-603 | The page treats `DXILAssembly` and `DXBytecodeAssembly` as direct `emitWithDownstreamForEntryPoints` compile targets. They instead recurse through the corresponding binary target and then disassemble that binary with a downstream tool. | `source/slang/slang-code-gen.cpp:1119-1141` handles all assembly targets by compiling `_getIntermediateTarget(target)` and calling `dissassembleWithDownstream`; only `DXIL` and `DXBytecode` enter `emitWithDownstreamForEntryPoints` at lines 1191-1197. | Give each assembly target a branch to its binary intermediate followed by a `(downstream) disassemble` node. Restrict the DXC/fxc compile-row gates to `DXIL` and `DXBytecode`, respectively. |
+| F-002 | major | After the Phase D table, lines 605-606 | The statement that “all validation and optimization is delegated to DXC or fxc” contradicts the page and source: Slang performs numerous validation and optimization passes before emitting HLSL. | `source/slang/slang-emit.cpp:2394-2404` runs `validateVectorsAndMatrices` and `eliminateDeadCode`; lines 2736-2739 collect metadata and run `checkUnsupportedInst`. | Say that no SPIR-V tools apply and that downstream HLSL validation/optimization continues in DXC or fxc after Slang's own IR validation and optimization. |
+| F-003 | major | Phase C row 7 and `legalizeLogicalAndOr`, lines 490 and 906-912 | The page says `legalizeLogicalAndOr` rewrites vector operations into element-wise selects. The implementation emits no selects: it converts vector operands/results to boolean vectors as needed, while lowered matrices represented as arrays are rebuilt from per-element `And`/`Or` instructions. | `source/slang/slang-ir-legalize-binary-operator.cpp:179-245` handles vector casts and `And`/`Or`; lines 246-297 rebuild arrays from per-element `And`/`Or`. | Replace the select description with the actual vector-boolean coercion and lowered-matrix array reconstruction behavior. |
+| F-004 | major | `applyVariableScopeCorrection`, lines 925-930 | The explanation attributes this pass to live-range-marker scoping and claims DXC requires declarations at the outermost enclosing scope. The implementation instead repairs values defined in a loop and used after that loop: it hoists `IRVar`, spills storable values through a function-entry variable, or clones unstorable instructions at use sites. | `source/slang/slang-ir-variable-scope-correction.cpp:131-200` detects uses outside loop scope; lines 203-244 implement spill/reload or cloning. | Describe the loop-scope producer/use mismatch and the three repair strategies. Remove the unsupported live-range-marker and universal outermost-declaration claims. |
+| F-005 | major | Phase B ordered table, lines 297-370 | Three HLSL-reachable `SLANG_PASS` call sites have no distinct table row: `stripAutoDiffDecorations`, the minimal-mode `eliminateDeadCode` after the first fast-simplification gate, and the minimal-mode `eliminateDeadCode` after matrix legalization. Notes attached to the alternative rows do not satisfy the one-row-per-call coverage rule. | `source/slang/slang-emit.cpp:1446-1452`, `source/slang/slang-emit.cpp:1589-1595`, and `source/slang/slang-emit.cpp:1938-1941`; the coverage rule is `docs/generated/design/_meta/prompts/_common.md:364-368`. | Add separate ordered rows for all three call sites and keep their mutually exclusive gates explicit. |
+| F-006 | major | Phase diagrams, lines 116-137, 205-294, and 402-479 | The diagrams flatten many conditional calls into linear edges; Phase A explicitly says all gates were omitted. The target-pipeline contract requires every conditional gate to be a diamond with true and false fall-through arms. | `docs/generated/design/_meta/prompts/_common.md:314-324` defines the mandatory diagram convention; examples omitted from Phase A include the gates at `source/slang/slang-emit.cpp:1053-1058` and `source/slang/slang-emit.cpp:1075-1076`. | Add diamond nodes for every conditional pass call, including option, target, capability, and `RequiredLoweringPassSet` gates, with false paths rejoining the sequence. |
+| F-007 | minor | Opening paragraph, lines 12-22 | The first body paragraph explains coverage but never identifies the intended reader, which is mandatory universal content. | `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first paragraph to state both coverage and intended reader; the per-doc prompt identifies a compiler developer tracing HLSL pass order and downstream flow at `docs/generated/design/_meta/prompts/target-pipelines-hlsl.md:12-15`. | Add the intended-reader clause to the first paragraph. |
+| F-008 | minor | Phase B row 55 and `legalizeEmptyRayPayloadsForHLSL`, lines 355 and 840-846 | The page generalizes the motivation to “DXR requires non-empty ray payload structs.” The implementation documents the narrower requirement: DXIL/HLSL with NVAPI needs a non-empty payload because `NvInvokeHitObject` expects a payload argument. | `source/slang/slang-ir-hlsl-legalize.cpp:252-255`. | Narrow both descriptions to the DXIL/HLSL-with-NVAPI compatibility requirement stated by the implementation. |
 
 ## No-issues notes
-- The downstream mapping from `DXIL`/`DXBytecode` to `HLSL` is supported by `source/slang/slang-code-gen.cpp:263-266` and `source/slang/slang-code-gen.cpp:377-381`.
-- The HLSL byte-address-buffer description correctly avoids the prompt's stale `scalarizeVectorLoadStore = true` claim; source only sets `useBitCastFromUInt` for DX 5.0-era profiles.
-- The HLSL-specific `legalizeEmptyRayPayloadsForHLSL`, `legalizeNonStructParameterToStructForHLSL`, `legalizeLogicalAndOr`, and `legalizeUniformBufferLoad` gates match `slang-emit.cpp`.
+- All mandatory front-matter fields are present, and the watched-path digest is a valid 64-character hexadecimal value.
+- The two accumulating `calcRequiredLoweringPassSet` scans and the cited HLSL pass gates match `slang-emit.cpp`.
+- The HLSL byte-address-buffer section correctly uses default options and only enables `useBitCastFromUInt` for DX 5.0-or-earlier profiles.
+- Named work-graph types and barrier flags are correctly traced through the HLSL emitter and prelude helpers.

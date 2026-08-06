@@ -1,7 +1,7 @@
 // slang-emit-glsl.cpp
 #include "slang-emit-glsl.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-decorations.h"
@@ -11,7 +11,6 @@
 #include "slang-rich-diagnostics.h"
 #include "slang/slang-ir.h"
 
-#include <assert.h>
 
 namespace Slang
 {

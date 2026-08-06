@@ -1,11 +1,11 @@
 // slang-artifact-associated-impl.cpp
 #include "slang-artifact-associated-impl.h"
 
-#include "../core/slang-array-view.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-io.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-array-view.h"
+#include "core/slang-char-util.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-type-text-util.h"
 #include "slang-artifact-diagnostic-util.h"
 
 namespace Slang

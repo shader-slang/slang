@@ -2,7 +2,7 @@
 //META: model=claude-fable-5
 //META: generated_at=2026-07-08T15:18:00Z
 //META: source_commit=ef4bd0b0d91a213b52e333ce39dfe8b73efca3d2
-//META: doc_ref=docs/generated/design/ir-reference/structure.md#builtinrequirementkey-builtinrequirementkey
+//META: doc_ref=docs/generated/design/ir-reference/structure.md#builtinrequirementkey--builtinrequirementkey
 //META: doc_section_digest=28df938d7b6c7f1da019467d16e8588fdfdf4490713d538aea7f26ee4dd9331f
 //META: purpose=BuiltinRequirementKey is deduplicated by construction: two distinct conformances to the same built-in interface reference the same key inst in their witness_table_entry rows.
 //META: intent=functional

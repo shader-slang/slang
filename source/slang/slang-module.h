@@ -6,7 +6,7 @@
 // central to many parts of the Slang compiler codebase.
 //
 
-#include "../core/slang-string-util.h"
+#include "core/slang-string-util.h"
 #include "slang-ast-builder.h"
 #include "slang-entry-point.h"
 #include "slang-linkable.h"
