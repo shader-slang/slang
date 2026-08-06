@@ -698,6 +698,16 @@ SLANG_UNIT_TEST(fossilValidationHandlesNestedVariant)
     SLANG_CHECK(isAccepted(blob));
 }
 
+SLANG_UNIT_TEST(fossilValidationAcceptsEmptyRecord)
+{
+    // A record with no fields consults no field entry, so the trailing field array
+    // is empty and the walk has nothing to descend into. This is the record-side
+    // counterpart of the empty-string and empty-container boundaries.
+    auto blob = makeStructBlob();
+    blob.putU32(36, 0);
+    SLANG_CHECK(isAccepted(blob));
+}
+
 SLANG_UNIT_TEST(fossilValidationAcceptsEmptyContainer)
 {
     // A container with no elements skips the extent and element walk entirely, so
