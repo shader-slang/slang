@@ -27,33 +27,54 @@ using namespace Slang;
 namespace
 {
 
-/// Little-endian writes into a byte buffer, so a blob can be described by offset.
+/// Builds a fossil blob one field at a time, addressed by byte offset.
+///
+/// Every write is placed at an explicit offset rather than appended, because the
+/// tests are written against a known layout and need to corrupt one field of it
+/// without disturbing the rest.
 ///
 struct BlobBuilder
 {
     List<uint8_t> bytes;
 
+    /// Set the blob's total length in bytes, zero-filling any bytes added.
     void resize(Size size) { bytes.setCount(Index(size)); }
 
+    /// Write a 32-bit unsigned value at `offset`.
     void putU32(Size offset, uint32_t value) { memcpy(bytes.getBuffer() + offset, &value, 4); }
+
+    /// Write a 32-bit signed value at `offset`. Used for raw relative-pointer
+    /// offsets, including deliberately malformed ones that `putRelativePtr` could
+    /// not express.
     void putI32(Size offset, int32_t value) { memcpy(bytes.getBuffer() + offset, &value, 4); }
+
+    /// Write a 64-bit unsigned value at `offset`.
     void putU64(Size offset, uint64_t value) { memcpy(bytes.getBuffer() + offset, &value, 8); }
 
     /// Write the relative pointer stored at `at` so that it targets `target`.
+    ///
+    /// Fossil pointers are measured from the address of the pointer itself, so the
+    /// stored value is the difference between the two offsets rather than `target`.
     void putRelativePtr(Size at, Size target) { putI32(at, int32_t(Int64(target) - Int64(at))); }
 
+    /// Write the 32-byte fossil header, pointing its root value at `rootValueOffset`.
+    ///
+    /// The header is magic bytes, a total size, flags, and a relative pointer to the
+    /// root value. The total size is written as zero on purpose: `SerialWriter`
+    /// never back-patches that field, so every blob Slang emits reports its own size
+    /// as zero and a faithful test blob has to do the same.
     void putHeader(Size rootValueOffset)
     {
         memcpy(bytes.getBuffer(), Fossil::Header::kMagic, sizeof(Fossil::Header::kMagic));
-
-        // The writer records the total size as zero and never back-patches it, so
-        // a faithful blob does the same.
         putU64(16, 0);
         putU32(24, 0);
         putRelativePtr(28, rootValueOffset);
     }
 
+    /// Return a pointer to the start of the blob.
     void const* getData() const { return bytes.getBuffer(); }
+
+    /// Return the blob's length in bytes.
     Size getSize() const { return Size(bytes.getCount()); }
 };
 
