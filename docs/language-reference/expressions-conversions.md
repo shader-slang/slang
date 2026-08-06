@@ -14,10 +14,12 @@ Slang supports the following kinds of type conversions:
 
 ## Cast Expression
 
-**Grammar:**
+**Syntax**
 
+Cast expression:
 > **`'('`** *`type-expr`* **`')'`** *`base-expr`*
->
+
+Initializer expression:
 > *`type-expr`* **`'('`** *`base-expr`* **`')'`**
 
 A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). For example, `(uint32_t)5`.
@@ -64,7 +66,7 @@ the behavior is [undefined](basics-behavior.md).
 > from literal 0 to a user-defined [structure](types-struct.md) type. This is equivalent to initializing the
 > structure with a default initializer.
 >
-> The special semantics are removed in Slang 2027. In Slang 2027, a cast from literal 0 is a regular
+> The special semantics are removed in Slang 202c. In Slang 202c, a cast from literal 0 is a regular
 > conversion, and it invokes the single-argument initializer of the target type.
 >
 > ```hlsl
@@ -73,7 +75,7 @@ the behavior is [undefined](basics-behavior.md).
 > // In Slang 2026 and previous versions, the above is the same as
 > MyStruct s = MyStruct();
 >
-> // From Slang 2027 onward, the cast from literal 0 is equivalent to
+> // From Slang 202c onward, the cast from literal 0 is equivalent to
 > MyStruct s = MyStruct(0);
 > ```
 >
@@ -168,10 +170,10 @@ A matrix can be constructed from vectors in the following ways:
 For details, see [vector initialization functions](../../../core-module-reference/types/vector/init.html) and
 [matrix initialization functions](../../../core-module-reference/types/matrix/init.html).
 
-
-> ⚠️ **Warning:** The construction of a 4-dimensional vector from a 2-dimensional vector and an element is
-> currently inconsistent with the tail-padding by 0 semantics. This is tracked by GitHub issue
-> [12093](https://github.com/shader-slang/slang/issues/12093).
+> ⚠️ **Warning:** In Slang 2025 and previous, the construction of a 4-dimensional vector from a 2-dimensional
+> vector and an element is inconsistent with the tail-padding by 0 semantics. Instead, the element is
+> implicitly converted to a 2-dimensional vector. This constructor has been removed from Slang 2026. See
+> GitHub issue [12093](https://github.com/shader-slang/slang/issues/12093) for details.
 
 > ⚠️ **Warning:** Constructing a vector using an initializer list with a single element is equivalent to
 > initializing with a scalar. That is:
