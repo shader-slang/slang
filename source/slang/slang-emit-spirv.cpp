@@ -2822,11 +2822,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                bool hasBindlessTextureNV =
+                    targetCaps.implies(CapabilityAtom::spvBindlessTextureNV);
 
-                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+                if (isDescriptorHandleRepresentedAsUInt64(inst, hasBindlessTextureNV))
                 {
-                    // For spvBindlessTextureNV, DescriptorHandleType should be a uint64_t
-                    // (OpTypeInt 64 0)
+                    // Only the texture/sampler-family kinds that `spvBindlessTextureNV` converts
+                    // use the wide `uint64` form (OpTypeInt 64 0); buffers and acceleration
+                    // structures stay `uint2`.
                     return emitOpTypeInt(
                         inst,
                         SpvLiteralInteger::from32(64),
@@ -2834,7 +2837,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else
                 {
-                    // For other targets, use uint2 (OpTypeVector of 2 uint32)
+                    // uint2 (OpTypeVector of 2 uint32)
                     return emitOpTypeVector(
                         inst,
                         builder.getUIntType(),
@@ -2946,6 +2949,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
+            {
+                // These casts emit no instruction of their own; the operand is forwarded. A cast
+                // whose operand width differs from the handle's representation cannot reach here:
+                // `isInlinableGlobalInst` lists these ops, so such an initializer is inlined into
+                // the function that uses the handle and the widths are reconciled there.
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                return inner;
+            }
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
@@ -4783,6 +4795,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0)); // flags
     }
 
+    // True if one of the four `DescriptorHandle`<->integer cast intrinsics needs a real `OpBitcast`
+    // rather than forwarding its operand unchanged. The integer side named by the op (uint2 or
+    // uint64) may not match the handle's SPIR-V representation, which is kind-dependent under
+    // `spvBindlessTextureNV` (uint64 for the texture/sampler kinds the extension converts, uint2
+    // otherwise). When the two widths match the cast is a no-op; when they differ the 64-bit
+    // `ulong` and the `v2uint` share a layout whose component 0 is the low word, matching the
+    // `__asuint64` packing used elsewhere, so a bitcast is the correct conversion.
+    bool descriptorHandleIntCastNeedsBitcast(IRInst* inst)
+    {
+        auto op = inst->getOp();
+        bool intoHandle =
+            (op == kIROp_CastUInt2ToDescriptorHandle || op == kIROp_CastUInt64ToDescriptorHandle);
+        auto handleType = intoHandle ? inst->getDataType() : inst->getOperand(0)->getDataType();
+        bool hasBindlessTextureNV = m_targetProgram->getTargetReq()->getTargetCaps().implies(
+            CapabilityAtom::spvBindlessTextureNV);
+        bool handleIsUInt64 =
+            isDescriptorHandleRepresentedAsUInt64(handleType, hasBindlessTextureNV);
+        bool intSideIsUInt64 =
+            (op == kIROp_CastUInt64ToDescriptorHandle || op == kIROp_CastDescriptorHandleToUInt64);
+        return handleIsUInt64 != intSideIsUInt64;
+    }
+
     SpvInst* emitMakeUInt64(SpvInstParent* parent, IRInst* inst)
     {
         IRBuilder builder(inst);
@@ -5198,9 +5232,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_CastDescriptorHandleToUInt2:
         case kIROp_CastUInt2ToDescriptorHandle:
-        case kIROp_GlobalValueRef:
         case kIROp_CastUInt64ToDescriptorHandle:
         case kIROp_CastDescriptorHandleToUInt64:
+            {
+                if (descriptorHandleIntCastNeedsBitcast(inst))
+                {
+                    result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
+                    break;
+                }
+                auto inner = ensureInst(inst->getOperand(0));
+                registerInst(inst, inner);
+                result = inner;
+                break;
+            }
+        case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
                 registerInst(inst, inner);
@@ -5224,12 +5269,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 auto operand = ensureInst(inst->getOperand(0));
                 SpvOp conversionOp = SpvOpConvertUToSampledImageNV;
-                IRType* resultType = inst->getDataType();
+                IRType* resultType = as<IRType>(unwrapAttributedType(inst->getDataType()));
 
                 switch (resultType->getOp())
                 {
                 case kIROp_TextureType:
-                    conversionOp = SpvOpConvertUToSampledImageNV;
+                    // A combined texture-sampler lowers to `OpTypeSampledImage`, everything else in
+                    // this family (plain textures, texel buffers) to `OpTypeImage`; the conversion
+                    // opcode must match that result type.
+                    conversionOp = cast<IRTextureType>(resultType)->isCombined()
+                                       ? SpvOpConvertUToSampledImageNV
+                                       : SpvOpConvertUToImageNV;
                     result = emitInst(
                         parent,
                         inst,
@@ -5239,6 +5289,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         operand);
                     break;
                 case kIROp_SamplerStateType:
+                case kIROp_SamplerComparisonStateType:
                     conversionOp = SpvOpConvertUToSamplerNV;
                     result = emitInst(
                         parent,
