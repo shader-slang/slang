@@ -435,6 +435,13 @@ struct OverloadCandidate
     // when ranking candidates.
     ConversionCost conversionCostSum = kConversionCost_None;
 
+    // The highest cost paid by coercing any one argument to its parameter -- only those
+    // per-argument coercions, not the flat charges added for a parameter pack or for generic
+    // inference. The sum cannot answer whether a *particular* argument needed an explicit
+    // conversion, because enough individually implicit conversions add up past
+    // `kConversionCost_Explicit`.
+    ConversionCost maxArgConversionCost = kConversionCost_None;
+
     // When required, a candidate can store a pre-checked list of
     // arguments so that we don't have to repeat work across checking
     // phases. Currently this is only needed for generics.
@@ -3318,6 +3325,17 @@ public:
 
         // Full list of all candidates being considered, in the ambiguous case
         List<OverloadCandidate> bestCandidates;
+
+        // The best applicable candidate declared in the call site's own module -- the overload the
+        // call would resolve to without the imported one. Recorded here because pruning discards it
+        // before a winner exists, and held whole because ranking arrivals reads its cost fields.
+        OverloadCandidate localModuleCandidate;
+        bool localModuleCandidateValid = false;
+
+        // The module enclosing `sourceScope`, resolved on first use because deriving it walks a
+        // parent chain that would otherwise be re-walked for every candidate.
+        ModuleDecl* callSiteModuleDecl = nullptr;
+        bool callSiteModuleDeclResolved = false;
     };
 
     struct ParamCounts
@@ -3419,6 +3437,14 @@ public:
     int compareOverloadCandidateSpecificity(
         LookupResultItem const& left,
         LookupResultItem const& right);
+
+    void noteCandidateFromCallSiteModule(
+        OverloadResolveContext& context,
+        OverloadCandidate& candidate);
+
+    void maybeDiagnoseImportedOverloadOverridingLocalCandidate(
+        OverloadResolveContext& context,
+        OverloadCandidate const& candidate);
 
     void AddOverloadCandidateInner(OverloadResolveContext& context, OverloadCandidate& candidate);
 
