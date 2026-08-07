@@ -8869,8 +8869,21 @@ IRInstList<IRDecoration> IRInst::getDecorations()
     return IRInstList<IRDecoration>(getFirstDecoration(), getLastDecoration());
 }
 
+void IRInst::_materializeDeferredBody()
+{
+    // Clear the flag first: the loader links children onto this instruction, and
+    // anything it calls that touches children must not recurse back in here.
+    m_hasDeferredBody = false;
+    if (auto module = getModule())
+    {
+        if (auto loader = module->getDeferredBodyLoader())
+            loader->materializeDeferredBody(this);
+    }
+}
+
 IRInst* IRInst::getFirstChild()
 {
+    ensureBodyMaterialized();
     // The children come after any decorations,
     // so if there are any decorations, then
     // the first child is right after the last decoration.
@@ -8886,6 +8899,7 @@ IRInst* IRInst::getFirstChild()
 
 IRInst* IRInst::getLastChild()
 {
+    ensureBodyMaterialized();
     // The children come after any decorations, so
     // that the last item in the list of children
     // and decorations is the last child *unless*

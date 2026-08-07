@@ -34,6 +34,23 @@ class Type;
 class Session;
 class Name;
 class TargetRequest;
+/// Supplies instruction bodies that were not materialized when a module was
+/// deserialized.
+///
+/// A serialized builtin module is mostly bodies that a given compile never looks
+/// at, so deserialization can stop at each global value's decorations and leave
+/// the rest encoded. Whoever deserialized the module installs one of these on the
+/// `IRModule`, and the first access to a global value's children asks it to decode
+/// that one body.
+struct IRDeferredBodyLoader : RefObject
+{
+    virtual ~IRDeferredBodyLoader() = default;
+
+    /// Decodes the children of `inst`, a global value whose body was deferred, and
+    /// links them after its decorations. Called at most once per instruction.
+    virtual void materializeDeferredBody(IRInst* inst) = 0;
+};
+
 struct IRBuilder;
 struct IRFunc;
 struct IRGlobalValueWithCode;
@@ -556,6 +573,12 @@ struct IRInst
     // pointer.
     uint32_t operandCount = 0;
 
+    /// True while this instruction's children are still encoded rather than
+    /// materialized. Only ever set on global values of a lazily deserialized
+    /// module, and cleared once the body is decoded. Placed next to `operandCount`
+    /// so it occupies existing padding rather than growing `IRInst`.
+    bool m_hasDeferredBody = false;
+
     UInt getOperandCount() { return operandCount; }
 
     // Source location information for this value, if any
@@ -572,6 +595,9 @@ struct IRInst
 
     // Look up a decoration in the list of decorations
     IRDecoration* findDecorationImpl(IROp op);
+
+    /// Out-of-line slow path behind `ensureBodyMaterialized`.
+    void _materializeDeferredBody();
     template<typename T>
     T* findDecoration();
 
@@ -633,6 +659,16 @@ struct IRInst
     // its basic blocks, and the basic blocks will have children
     // that represent parameters and ordinary executable instructions.
     //
+    /// Materializes this instruction's children if they were left encoded.
+    ///
+    /// Called from the accessors that expose children. For every instruction of
+    /// every eagerly loaded module this is a predictable not-taken branch.
+    SLANG_FORCE_INLINE void ensureBodyMaterialized()
+    {
+        if (m_hasDeferredBody) [[unlikely]]
+            _materializeDeferredBody();
+    }
+
     IRInst* getFirstChild();
     IRInst* getLastChild();
     IRInstList<IRInst> getChildren() { return IRInstList<IRInst>(getFirstChild(), getLastChild()); }
@@ -656,18 +692,36 @@ struct IRInst
     IRInstListBase m_decorationsAndChildren;
 
 
+    // Deliberately not hooked: decorations always precede children, so reading the
+    // head of the list reaches only decorations, which are never deferred. Hooking
+    // it would materialize every body during decoration lookup and defeat the
+    // point. Every accessor below can reach a child, so each one materializes.
     IRInst* getFirstDecorationOrChild() { return m_decorationsAndChildren.first; }
-    IRInst* getLastDecorationOrChild() { return m_decorationsAndChildren.last; }
-    IRInstListBase getDecorationsAndChildren() { return m_decorationsAndChildren; }
+
+    IRInst* getLastDecorationOrChild()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren.last;
+    }
+    IRInstListBase getDecorationsAndChildren()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren;
+    }
     IRModifiableInstList<IRInst> getModifiableDecorationsAndChildren()
     {
+        ensureBodyMaterialized();
         return IRModifiableInstList<IRInst>(
             this,
             m_decorationsAndChildren.first,
             m_decorationsAndChildren.last);
     }
     void removeAndDeallocateAllDecorationsAndChildren();
-    bool hasDecorationOrChild() { return m_decorationsAndChildren.first != nullptr; }
+    bool hasDecorationOrChild()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren.first != nullptr;
+    }
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Unique allocation ID for this instruction since start of current process.
@@ -2157,6 +2211,11 @@ public:
 
     void buildMangledNameToGlobalInstMap();
 
+    /// Installs the loader that supplies deferred instruction bodies for this
+    /// module. See `IRDeferredBodyLoader`.
+    void setDeferredBodyLoader(IRDeferredBodyLoader* loader) { m_deferredBodyLoader = loader; }
+    IRDeferredBodyLoader* getDeferredBodyLoader() const { return m_deferredBodyLoader; }
+
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
@@ -2308,6 +2367,9 @@ private:
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
 
     Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
+
+    /// Non-null only for modules deserialized with bodies left encoded.
+    RefPtr<IRDeferredBodyLoader> m_deferredBodyLoader;
 
     /// Hold a mapping for inst -> uniqueID. This mapping is generated on
     /// demand if passes need them, rather than eagerly storing them on
