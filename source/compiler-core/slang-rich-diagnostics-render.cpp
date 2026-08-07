@@ -401,8 +401,8 @@ private:
             {
                 SourceLoc startLoc = span.startLoc;
                 SourceView* view = m_sourceManager
-                    ? m_sourceManager->findSourceViewThroughExpansion(startLoc)
-                    : nullptr;
+                                       ? m_sourceManager->findSourceViewThroughExpansion(startLoc)
+                                       : nullptr;
                 if (view)
                 {
                     line.sourceAvailable = true;

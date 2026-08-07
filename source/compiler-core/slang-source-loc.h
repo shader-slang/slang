@@ -577,8 +577,8 @@ struct SourceManager
     SourceRange allocateSourceRange(UInt size);
 
     /// A lightweight record of one macro invocation. Stored in a flat side table so the diagnostic
-    /// renderer can emit "expanded from macro 'X'" notes without creating a SourceFile or SourceView
-    /// per invocation.
+    /// renderer can emit "expanded from macro 'X'" notes without creating a SourceFile or
+    /// SourceView per invocation.
     struct MacroExpansionEntry
     {
         SourceRange range;     ///< Tiny range of remapped source locs for this invocation's body.
