@@ -168,6 +168,31 @@ static void recordSessionCreateRss(long rssBefore)
 
 static void reportMemDeltas()
 {
+    // Sanity-floor the RSS reader itself before publishing anything it fed.
+    // currentRssKb is the C++ producer of every memory number in this suite,
+    // and unlike the Python side it has no import-time coverage: it is
+    // compiled ad hoc by bench.py and never enters the Slang tests/ harness.
+    // Its plausible failures are all silent scalings rather than crashes — a
+    // field-order slip in the /proc/self/statm fscanf (reading `pages` rather
+    // than `resident`), a dropped sysconf(_SC_PAGESIZE) multiply, a wrong
+    // Win32 field — and every one of them charts a believable curve.
+    //
+    // A process that has already dlopened libslang and created a session
+    // cannot have zero resident memory, so anything <= 0 here is the reader
+    // being broken or unavailable, not a real measurement. Reported through
+    // the same "error: " channel as the count guard below, which fails the
+    // workload in bench.py rather than letting a wrong number reach a chart.
+    long rssNow = currentRssKb();
+    if (rssNow <= 0)
+    {
+        printf(
+            "error: currentRssKb() returned %ld after libslang was loaded — a "
+            "live process cannot have zero resident memory, so the RSS reader "
+            "is broken or unavailable on this platform and every [MEM] value "
+            "below is untrustworthy\n",
+            rssNow);
+        return;
+    }
     for (const auto& e : g_memDeltas.entries)
     {
         // Enforce the "written AT MOST ONCE per process" contract at the point

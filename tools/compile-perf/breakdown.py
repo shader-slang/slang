@@ -35,7 +35,7 @@ sys.path.insert(0, HERE)  # allow running from any directory
 from lib import analyze, manifest
 
 from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
-                         API_BUCKET_ORDER, buckets, api_buckets, _t)
+                         API_BUCKET_ORDER, buckets, api_buckets, timer_ms)
 
 
 from lib.render import esc  # noqa: F401 — canonical escaper, re-exported
@@ -68,7 +68,7 @@ def aggregate(runs):
     for _, _, timers in runs:
         for b, ms in buckets(timers).items():
             agg[b] = agg.get(b, 0.0) + ms
-        total += _t(timers, "compileInner")
+        total += timer_ms(timers, "compileInner")
     print(f"\n=== Where the benchmark spends time (sum of {len(runs)} workloads, "
           f"total compileInner = {total:,.0f} ms) ===")
     print(f"{'phase bucket':34s}{'ms':>10}{'% total':>9}  share")
@@ -83,9 +83,9 @@ def per_workload(runs):
     print(f"\n=== Per-workload dominant phase ===")
     print(f"{'workload':22s}{'N':>6}{'compileInner':>14}{'dominant bucket':>26}{'%':>7}")
     print("-" * 78)
-    rows = sorted(runs, key=lambda r: -_t(r[2], "compileInner"))
+    rows = sorted(runs, key=lambda r: -timer_ms(r[2], "compileInner"))
     for wl, size, timers in rows:
-        ci = _t(timers, "compileInner")
+        ci = timer_ms(timers, "compileInner")
         bk = buckets(timers)
         if not ci or not bk:
             continue
@@ -99,18 +99,18 @@ def tree_view(runs, workload):
     if not match:
         raise SystemExit(f"workload '{workload}' not in this label")
     _, size, timers = match[0]
-    ci = _t(timers, "compileInner") or 1.0
+    ci = timer_ms(timers, "compileInner") or 1.0
     print(f"\n=== {workload} (N={size}) — compileInner = {ci:.1f} ms ===")
 
     def show(node, depth):
         name, children = node
-        total = _t(timers, name)
+        total = timer_ms(timers, name)
         if total == 0 and name != "compileInner":
             return
         print(f"{'  ' * depth}{name:30s}{total:9.1f} ms  ({100*total/ci:5.1f}%)")
         child_sum = 0.0
         for c in children:
-            child_sum += _t(timers, c[0])
+            child_sum += timer_ms(timers, c[0])
             show(c, depth + 1)
         if children:
             self_ms = max(total, child_sum) - child_sum
@@ -125,9 +125,9 @@ def render_stacked_svg(runs, label, metric):
     """One horizontal stacked bar per workload, segments = phase buckets, bar
     length proportional to compileInner (so composition AND magnitude both read).
     Sorted by compileInner descending."""
-    rows = sorted(((wl, sz, t) for wl, sz, t in runs if _t(t, "compileInner") > 0),
-                  key=lambda r: -_t(r[2], "compileInner"))
-    max_ci = max((_t(t, "compileInner") for _, _, t in rows), default=1.0)
+    rows = sorted(((wl, sz, t) for wl, sz, t in runs if timer_ms(t, "compileInner") > 0),
+                  key=lambda r: -timer_ms(r[2], "compileInner"))
+    max_ci = max((timer_ms(t, "compileInner") for _, _, t in rows), default=1.0)
     ml, mt = 168, 56          # left margin (labels), top margin (title)
     pw = 760                  # max bar pixel width (== max_ci)
     rh, bh = 26, 17           # row pitch, bar height
@@ -145,7 +145,7 @@ def render_stacked_svg(runs, label, metric):
          f'phase; length ∝ time (max {max_ci:,.0f} ms)</text>']
     y = mt
     for wl, sz, t in rows:
-        ci = _t(t, "compileInner")
+        ci = timer_ms(t, "compileInner")
         bk = buckets(t)
         s.append(f'<text x="{ml-6}" y="{y+bh-4}" text-anchor="end" fill="#222" '
                  f'font-weight="600">{esc(wl)}</text>')
@@ -216,9 +216,9 @@ FE_GO_ORDER = [
 def coarse_buckets(timers):
     """Top-level split: frontEndExecute / generateOutput (+ residual), summing to
     compileInner. The high-level view for the per-workload index page."""
-    ci = _t(timers, "compileInner")
-    fe = _t(timers, "frontEndExecute")
-    go = _t(timers, "generateOutput")
+    ci = timer_ms(timers, "compileInner")
+    fe = timer_ms(timers, "frontEndExecute")
+    go = timer_ms(timers, "generateOutput")
     out = {}
     if fe > 0:
         out["frontEndExecute"] = fe

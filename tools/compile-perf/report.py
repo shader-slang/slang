@@ -357,6 +357,15 @@ def main():
 
     def memory_page(recs, fname, cad_title, note):
         labels, per = memory_series(args.results, recs, args.metric)
+        # Floors resolve through the peakRssKb series specifically, and the
+        # [None]*len fallback is meant to read as "no data for this cadence
+        # yet" rather than "wrong counter name". That distinction holds only
+        # because every floor workload is a compile-running track_memory
+        # workload and therefore always emits a peak — never an api-delta
+        # series alone. The self-check at the bottom of this module pins the
+        # half that could drift (floor is in the manifest, in the right mode,
+        # and track_memory); a floor that emitted no peak would silently blank
+        # every own-memory panel for its mode rather than fail.
         floors = {wl: per.get((wl, "peakRssKb"), [None] * len(labels))
                   for wl in FLOOR_WORKLOADS}
         panels = []

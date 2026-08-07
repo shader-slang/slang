@@ -301,10 +301,24 @@ def _windows_peak_rss_kb(popen):
                        ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]
         fn.restype = wintypes.BOOL
         if fn(wintypes.HANDLE(popen._handle), ctypes.byref(pmc), pmc.cb):
-            return pmc.PeakWorkingSetSize / 1024.0
+            return _pmc_peak_kb(pmc)
     except Exception:  # noqa: BLE001
         pass
     return None
+
+
+def _pmc_peak_kb(pmc):
+    """PeakWorkingSetSize out of a filled PROCESS_MEMORY_COUNTERS, in KB.
+
+    Win32 reports the field in BYTES, so this is the Windows counterpart of
+    _maxrss_to_kb's unit rule and fails the same way — a dropped or doubled
+    /1024 scales every Windows memory number by 1024 and renders as a
+    perfectly plausible chart. Split out of the query so at least the
+    conversion is exercised on the Linux CI: everything around it (the psapi
+    call, the argtypes handle declaration, popen._handle) can only run on the
+    Windows runner, but this part is pure arithmetic on a struct that has an
+    identical layout everywhere (see PROCESS_MEMORY_COUNTERS)."""
+    return pmc.PeakWorkingSetSize / 1024.0
 
 
 def _maxrss_to_kb(ru_maxrss, platform):
@@ -385,6 +399,11 @@ def run_once(cmd):
     t0 = time.perf_counter()
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT)
+    # Drain stdout to EOF BEFORE reaping. subprocess.run did this atomically;
+    # the manual Popen here does not, and reaping first would deadlock as soon
+    # as a workload outgrew the OS pipe buffer (~64 KB): the child blocks
+    # writing, we block waiting for it to exit. The bug would not appear on a
+    # small workload, so keep the read above the reap.
     out = proc.stdout.read()
     rss = None
     if os.name == "nt":
@@ -735,6 +754,15 @@ assert ctypes.sizeof(PROCESS_MEMORY_COUNTERS) == 72, \
 assert PROCESS_MEMORY_COUNTERS.PeakWorkingSetSize.offset == 8, \
     "PeakWorkingSetSize must follow the two DWORDs; a wrong offset reads garbage"
 assert PROCESS_MEMORY_COUNTERS.cb.offset == 0, "cb must be the first field"
+
+# And the Windows unit rule, on the same struct. The psapi call around it only
+# runs on the Windows runner, but the bytes->KB conversion is pure and the
+# struct layout is identical everywhere, so the half that silently scales
+# every Windows number by 1024 is checkable on the Linux CI.
+_pmc = PROCESS_MEMORY_COUNTERS()
+_pmc.PeakWorkingSetSize = 2048 * 1024
+assert _pmc_peak_kb(_pmc) == 2048.0, "PeakWorkingSetSize is BYTES; report KB"
+del _pmc
 
 
 # Import-time self-check for the POSIX reaping path, driven by a stub wait4 so

@@ -99,7 +99,15 @@ def api_buckets(timers):
 
 
 
-def _t(timers, name):
+def timer_ms(timers, name):
+    """One timer's milliseconds out of a {name: value} map, 0.0 when it is
+    absent or not a number.
+
+    An unmeasured phase is a 0 ms phase, not a missing key: buckets() relies
+    on that to treat a timer the compiler did not report as a zero-width band
+    rather than a hole in the partition. Public (no leading underscore)
+    because breakdown.py imports it — it is part of this module's surface
+    alongside buckets/api_buckets, not an internal detail."""
     st = timers.get(name)
     return st if isinstance(st, (int, float)) else 0.0
 
@@ -129,7 +137,7 @@ def buckets(timers, tree=TREE):
         if not children:
             out[name] = out.get(name, 0.0) + budget
             return
-        cm = [(c, _t(timers, c[0])) for c in children]
+        cm = [(c, timer_ms(timers, c[0])) for c in children]
         csum = sum(v for _, v in cm)
         if csum > budget and csum > 0:
             scale = budget / csum  # children overshoot parent -> fit proportionally
@@ -150,7 +158,7 @@ def buckets(timers, tree=TREE):
             if self_ms > 0:
                 out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
 
-    alloc(tree, _t(timers, tree[0]))
+    alloc(tree, timer_ms(timers, tree[0]))
     return out
 
 

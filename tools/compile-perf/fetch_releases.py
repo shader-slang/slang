@@ -111,6 +111,17 @@ def find_slangc(root):
     return None
 
 
+def _tar_filter_supported():
+    """Whether this interpreter's tarfile offers the "data" extraction filter.
+
+    A function rather than an inline hasattr so the self-check can simulate an
+    interpreter without it, which is the only way to exercise the refusal
+    branch in _safe_extract: from Python 3.14 the filter is the default and
+    that branch is unreachable. Patching this is surgical, where deleting
+    tarfile.data_filter would break tarfile's own default-filter lookup."""
+    return hasattr(tarfile, "data_filter")
+
+
 def _safe_extract(archive, names, dest):
     """extractall, but reject any member that would escape `dest` (zip/tar-slip).
 
@@ -142,6 +153,34 @@ def _safe_extract(archive, names, dest):
                 os.unlink(path)
             os.symlink(linkto, path)
         return
+    # Tar (the Linux and Windows release assets). The member-NAME check above
+    # is not sufficient on its own: a tar can carry a symlink `link ->
+    # ../outside` followed by a regular member `link/evil`, and at validation
+    # time `dest/link` does not exist yet, so realpath resolves it lexically
+    # and the name passes. Extraction then creates the symlink and writes
+    # through it, landing the file outside dest.
+    #
+    # tarfile's "data" filter rejects exactly that (absolute and escaping link
+    # targets). It became the DEFAULT in 3.14, but this suite runs on whatever
+    # system Python the runner has, so it is requested explicitly — guarded on
+    # the feature rather than a version number, because `filter=` did not exist
+    # before its backport (3.9.17 / 3.10.12 / 3.11.4 / 3.12) and passing it to
+    # an older tarfile raises TypeError. hasattr(tarfile, "data_filter") is the
+    # documented probe for that backport.
+    if _tar_filter_supported():
+        archive.extractall(dest, filter="data")
+        return
+    # Pre-backport interpreter: there is no filter to ask for, so refuse link
+    # members rather than extract them unchecked. Release tarballs have not
+    # carried any (the macOS zip is where the symlinks live), so this fails
+    # loudly on a genuinely new archive shape instead of guessing.
+    risky = [m.name for m in archive.getmembers() if m.issym() or m.islnk()]
+    if risky:
+        raise SystemExit(
+            f"refusing tar with link members {risky} on Python "
+            f"{sys.version_info.major}.{sys.version_info.minor}, which predates "
+            f"tarfile's 'data' extraction filter; upgrade Python to extract "
+            f"this archive safely")
     archive.extractall(dest)
 
 
@@ -273,6 +312,76 @@ if os.name != "nt":
     finally:
         shutil.rmtree(_d, ignore_errors=True)
     del _d, _mkzip
+
+    # The same escape, through the TAR branch — the one the Linux and Windows
+    # release assets take. This shape defeats the member-name check on its
+    # own: `dest/link` does not exist when the names are validated, so
+    # realpath resolves `link/evil` lexically inside dest and it passes. Only
+    # the extraction filter stops the write.
+    def _mktar(linkto):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as t:
+            li = tarfile.TarInfo("link")
+            li.type = tarfile.SYMTYPE
+            li.linkname = linkto
+            t.addfile(li)
+            payload = b"pwned"
+            fi = tarfile.TarInfo("link/evil")
+            fi.size = len(payload)
+            t.addfile(fi, io.BytesIO(payload))
+        buf.seek(0)
+        return tarfile.open(fileobj=buf)
+
+    def _try_extract_slip(dest, outside):
+        """Extract the malicious tar into `dest`; return True if it escaped."""
+        try:
+            with _mktar(os.path.join("..", "outside")) as _t:
+                _safe_extract(_t, _t.getnames(), dest)
+        except (SystemExit, tarfile.TarError, OSError):
+            pass  # rejected — by whichever of the two guards applies
+        return os.path.exists(os.path.join(outside, "evil"))
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_tar_")
+    try:
+        _outside = os.path.join(_d, "outside")
+        _dest = os.path.join(_d, "dest")
+        os.makedirs(_outside)
+        os.makedirs(_dest)
+        assert not _try_extract_slip(_dest, _outside), \
+            ("tar symlink-slip escaped the destination: a link member plus a "
+             "regular member written through it must not land outside dest")
+
+        # The branch above is only load-bearing on interpreters whose default
+        # extraction filter is NOT already "data" — from 3.14 the default
+        # protects regardless, which would make the check above pass even with
+        # every guard here deleted. So pin the part this module actually owns:
+        # with the backport probe hidden, _safe_extract must refuse the link
+        # members itself rather than fall through to an unfiltered extractall.
+        # That fallback is dead code on a modern interpreter and would
+        # otherwise never be executed anywhere.
+        _saved_probe = _tar_filter_supported
+        try:
+            globals()["_tar_filter_supported"] = lambda: False
+            _refused = False
+            try:
+                with _mktar(os.path.join("..", "outside")) as _t:
+                    _safe_extract(_t, _t.getnames(), _dest)
+            except SystemExit:
+                _refused = True          # our refusal — the contract
+            except (tarfile.TarError, OSError):
+                pass                     # extraction was ATTEMPTED and the
+                                         # interpreter stopped it; that is the
+                                         # reliance this check exists to reject
+            assert _refused, \
+                ("without tarfile's data filter available, _safe_extract must "
+                 "refuse link members itself rather than attempt an unfiltered "
+                 "extractall and rely on the interpreter to stop it")
+        finally:
+            globals()["_tar_filter_supported"] = _saved_probe
+        del _saved_probe, _refused
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _dest, _outside, _mktar, _try_extract_slip
 
 
 if __name__ == "__main__":
