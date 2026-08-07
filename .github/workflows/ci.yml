@@ -288,6 +288,38 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       warnings-as-errors: false
 
+  # Unit tests for source/slang internals. These need SLANG_LIB_TYPE=STATIC, a
+  # configuration no other CI job builds, so they get their own workflow. They
+  # build only the slang-internals-test target and run on GitHub-hosted runners
+  # (no GPU needed), so they add no load to the self-hosted Windows pool.
+  internals-test-linux-debug-gcc-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-internals-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+
+  internals-test-windows-debug-cl-x86_64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-internals-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["windows-2022"]'
+
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
@@ -654,6 +686,8 @@ jobs:
         build-macos-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
+        internals-test-linux-debug-gcc-aarch64,
+        internals-test-windows-debug-cl-x86_64,
         test-windows-release-cl-x86_64-gpu,
         test-windows-release-cl-x86_64-gpu-rhi,
         test-windows-debug-cl-x86_64-gpu,

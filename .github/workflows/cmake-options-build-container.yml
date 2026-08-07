@@ -147,6 +147,19 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
 
+      # slang-internals-test only exists when SLANG_LIB_TYPE=STATIC, which is
+      # exactly this matrix entry.
+      - name: Run slang-internals-test (${{ matrix.option }})
+        if: matrix.option == 'SLANG_LIB_TYPE' && matrix.windows_only != 'true'
+        run: |
+          test_path="build/$cmake_config/bin/slang-internals-test"
+          if [[ ! -f "$test_path" ]]; then
+            echo "ERROR: expected slang-internals-test at $test_path"
+            ls -la "build/$cmake_config/bin" || true
+            exit 1
+          fi
+          "$test_path"
+
       - name: Verify slangc version (${{ matrix.option }})
         if: matrix.windows_only != 'true'
         run: |
