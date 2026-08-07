@@ -23,6 +23,15 @@ void writeSerializedModuleIR(
     IRModule* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
+/// Read the IR module serialized in `chunk`.
+///
+/// Pass `Fossil::Trust::Trusted` only for a blob that shipped inside the compiler
+/// binary -- in practice just the embedded core module -- which skips validating
+/// it. Any blob that came from outside the compiler, including every
+/// `.slang-module` loaded from disk, must be left `Untrusted` so that the
+/// validating walk proves it safe to navigate. The default is `Untrusted`, so
+/// omitting the argument errs toward validating.
+///
 [[nodiscard]] Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
