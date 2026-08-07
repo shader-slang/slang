@@ -560,7 +560,7 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
     {
-        auto actualHumaneLoc = sourceView->getHumaneLoc(diagnostic.loc, SourceLocType::Actual);
+        auto actualHumaneLoc = sourceView->getHumaneLoc(sourceLoc, SourceLocType::Actual);
 
         // Look up the path verbosely (will get the canonical path if necessary)
         actualHumaneLoc.pathInfo.foundPath = sourceView->getSourceFile()->calcVerbosePath();

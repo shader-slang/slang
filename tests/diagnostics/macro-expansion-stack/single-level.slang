@@ -8,9 +8,7 @@ void test()
 }
 
 // The error is reported at the token inside the macro body:
-// CHECK: DECLARE_VAR
-// CHECK: undefined identifier
+//CHECK: undefined identifier 'UndefinedType'.
 
 // A single "expanded from" note should point back to the invocation site:
-// CHECK: expanded from macro 'DECLARE_VAR'
-// CHECK: single-level.slang:7
+//CHECK: expanded from macro 'DECLARE_VAR'

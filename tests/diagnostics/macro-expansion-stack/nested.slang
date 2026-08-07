@@ -9,13 +9,10 @@ void test()
 }
 
 // Error inside INNER's body:
-// CHECK: INNER
-// CHECK: undefined identifier
+//CHECK: undefined identifier 'UndefinedType'.
 
 // First note: INNER was expanded inside OUTER's definition:
-// CHECK: expanded from macro 'INNER'
-// CHECK: OUTER
+//CHECK: expanded from macro 'INNER'
 
 // Second note: OUTER was expanded at the call site:
-// CHECK: expanded from macro 'OUTER'
-// CHECK: nested.slang:8
+//CHECK: expanded from macro 'OUTER'

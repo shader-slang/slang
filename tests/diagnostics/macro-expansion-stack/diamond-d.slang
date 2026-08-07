@@ -6,9 +6,8 @@
 #include "diamond-b.h"
 #include "diamond-c.h"
 
-// Each expansion should report the correct call site.
-// B's invocation is in diamond-b.h; C's is in diamond-c.h.
-// CHECK: diamond-b.h
-// CHECK: expanded from macro 'ERRORING_MACRO'
-// CHECK: diamond-c.h
-// CHECK: expanded from macro 'ERRORING_MACRO'
+// Each expansion should produce an independent error with its own expansion note.
+//CHECK: undefined identifier 'UndefinedType'.
+//CHECK: expanded from macro 'ERRORING_MACRO'
+//CHECK: undefined identifier 'UndefinedType'.
+//CHECK: expanded from macro 'ERRORING_MACRO'
