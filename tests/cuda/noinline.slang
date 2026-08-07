@@ -52,8 +52,8 @@ void kernelFunc(int x)
 [shader("compute")]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    // Two call sites keep the helper from being folded into its only caller, so the ptx arm
-    // below can observe the specifier having an effect.
+    // Call the helper more than once: with a single call site the downstream compiler inlines
+    // it even with `__noinline__`, emitting no PTX function for the ptx arm below to observe.
     outputBuffer[0] = helperFunc(42) + plainHelper(7) + exportedFunc(1);
     outputBuffer[2] = helperFunc(7) + helperFunc(9);
 }
