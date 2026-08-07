@@ -322,7 +322,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: debug
-      server-count: 4
+      server-count: 8
 
   test-linux-debug-gcc-x86_64-rhi:
     needs: [filter, build-linux-debug-gcc-x86_64]
@@ -337,7 +337,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
-      server-count: 4
+      server-count: 8
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -357,7 +357,7 @@ jobs:
       config: release
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
-      server-count: 4
+      server-count: 8
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
   # Runs the test suite filtered to CPU and LLVM backends via
@@ -376,9 +376,7 @@ jobs:
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
       cpu-only: true
-      # Keep the CPU-only tier off the persistent test-server while we
-      # investigate intermittent JSON RPC failures on GitHub-hosted runners.
-      server-count: 1
+      server-count: 4
 
   # macOS tests
   test-macos-debug-clang-aarch64:
