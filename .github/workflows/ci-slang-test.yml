@@ -116,6 +116,8 @@ jobs:
           -I prelude -o "${{ runner.temp }}/cuda-prelude-vec1-make.obj"
 
       - name: Test Slang
+        env:
+          API_INPUT: ${{ inputs.api }}
         run: |
           # Fail fast on mutually exclusive inputs — both would accumulate
           # -api filters and produce an empty test partition.
@@ -152,10 +154,10 @@ jobs:
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ -n "${{ inputs.api }}" ]]; then
+          if [[ -n "$API_INPUT" ]]; then
             # Explicit override: caller supplies the exact -api expression,
             # e.g. "dx11+dx12" or "vk+cuda+cpu+llvm" for a per-engine split.
-            api_expr="${{ inputs.api }}"
+            api_expr="$API_INPUT"
           elif [[ "${{ inputs.cpu-only }}" == "true" ]]; then
             # Restrict to CPU / LLVM backends; tests requiring any GPU API get
             # ignored by the test filter rather than run-and-failed.
