@@ -68,7 +68,7 @@ static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& process
         {
             List<IRInst*> lits;
             List<IRInst*> strings;
-            for (const auto c : inst->m_decorationsAndChildren)
+            for (const auto c : inst->getDecorationsAndChildren())
             {
                 if (c->m_op == kIROp_BoolLit || c->m_op == kIROp_IntLit ||
                     c->m_op == kIROp_FloatLit || c->m_op == kIROp_PtrLit ||
@@ -96,7 +96,7 @@ static void traverseInstsInSerializationOrder(IRInst* moduleInst, Func&& process
         }
         else
         {
-            for (const auto c : inst->m_decorationsAndChildren)
+            for (const auto c : inst->getDecorationsAndChildren())
             {
                 go(go, c, depth + 1);
             }

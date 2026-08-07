@@ -9229,6 +9229,12 @@ void IRInst::moveToStart()
 
 void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 {
+    // Splicing into a parent whose children are still encoded would build a list
+    // that the later decode then overwrites. Decode first, so the insert happens
+    // against the real child list.
+    if (inParent)
+        inParent->ensureBodyMaterialized();
+
     // Make sure this instruction has been removed from any previous parent
     this->removeFromParent();
 
@@ -9311,6 +9317,11 @@ void IRInst::insertAt(IRInsertLoc const& loc)
 // and then destroy it (it had better have no uses!)
 void IRInst::removeFromParent()
 {
+    // Same reasoning as `_insertAt`: unlink against the real child list, not a
+    // list that has yet to be decoded.
+    if (parent)
+        parent->ensureBodyMaterialized();
+
     auto oldParent = getParent();
 
     // If we don't currently have a parent, then
