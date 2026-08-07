@@ -691,7 +691,10 @@ static void appendMacroExpansionNotes(
             DiagnosticArg arg(macroName);
             StringBuilder msg;
             formatDiagnosticMessage(
-                msg, MiscDiagnostics::seeExpandedFromMacro.messageFormat, 1, &arg);
+                msg,
+                MiscDiagnostics::seeExpandedFromMacro.messageFormat,
+                1,
+                &arg);
             DiagnosticNote note;
             note.message = msg.produceString();
             // The note span must use a real (non-expansion-range) loc so the rich diagnostic
@@ -718,7 +721,10 @@ static void appendMacroExpansionNotes(
 
         StringBuilder msg;
         formatDiagnosticMessage(
-            msg, MiscDiagnostics::seeTokenPasteLocation.messageFormat, 0, nullptr);
+            msg,
+            MiscDiagnostics::seeTokenPasteLocation.messageFormat,
+            0,
+            nullptr);
         DiagnosticNote note;
         note.message = msg.produceString();
         note.span.range = SourceRange{initiatingLoc};

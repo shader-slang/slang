@@ -828,7 +828,8 @@ const SourceManager::MacroExpansionEntry* SourceManager::findMacroExpansion(Sour
         if (manager->getSourceRange().contains(loc) && manager->m_macroExpansions.getCount() > 0)
         {
             const auto& entries = manager->m_macroExpansions;
-            // Binary search: entries are ordered by range.begin (monotone from allocateSourceRange).
+            // Binary search: entries are ordered by range.begin (monotone from
+            // allocateSourceRange).
             Index lo = 0, hi = entries.getCount();
             while (lo + 1 < hi)
             {
