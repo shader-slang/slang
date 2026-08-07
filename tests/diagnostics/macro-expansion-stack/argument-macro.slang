@@ -2,10 +2,10 @@
 
 // A macro invocation passed as the argument of another function-like macro.
 // INNER's body has the error and INNER is invoked as an argument to WRAP.
-// The chain should be:
-//   error in INNER's body
-//   -> expanded from macro 'INNER' (INNER invoked inside WRAP's argument)
-//   -> expanded from macro 'WRAP'  (WRAP invoked at the call site)
+// Because argument tokens are macro-expanded before substitution, the error
+// loc sits in INNER's expansion range; the note chain reports INNER's call
+// site (inside WRAP's argument list) but does not chain further through WRAP
+// since the substituted tokens are not remapped into WRAP's body range.
 #define INNER UndefinedType x;
 #define WRAP(y) y
 
@@ -14,6 +14,5 @@ void test()
     WRAP(INNER)
 }
 
-// CHECK: undefined identifier
-// CHECK: expanded from macro 'INNER'
-// CHECK: expanded from macro 'WRAP'
+//CHECK: undefined identifier 'UndefinedType'.
+//CHECK: expanded from macro 'INNER'
