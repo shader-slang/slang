@@ -307,6 +307,52 @@ def fetch_queue_status(repo):
         return None
 
 
+def fetch_pending_approvals(repo):
+    """Fetch workflow runs paused waiting for a deployment approval.
+
+    `status=waiting` has to be a request parameter: the default run listing
+    excludes waiting runs entirely, so filtering client-side finds nothing.
+
+    These runs are invisible in the usual CI views -- nothing has failed and
+    nothing is running, so a stalled approval looks exactly like a quiet
+    afternoon. That is why they get their own section: the cost of missing one
+    is a PR that sits until its job timeout and then reports as a test failure.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from gh_api import gh_api_list
+
+    runs, err = gh_api_list(
+        f"repos/{repo}/actions/runs?status=waiting&per_page=100",
+        "workflow_runs",
+    )
+    if err:
+        return {"pending": [], "partial": True, "errors": [err]}
+
+    now = datetime.now(timezone.utc)
+    pending = []
+    for run in runs:
+        created = run.get("created_at") or ""
+        try:
+            waited_min = int(
+                (now - datetime.fromisoformat(created.replace("Z", "+00:00"))).total_seconds() / 60
+            )
+        except ValueError:
+            waited_min = 0
+        pending.append(
+            {
+                "run_id": run.get("id"),
+                "url": run.get("html_url", ""),
+                "actor": (run.get("actor") or {}).get("login", "?"),
+                "event": run.get("event", ""),
+                "branch": run.get("head_branch", ""),
+                "title": run.get("display_title", ""),
+                "waited_min": waited_min,
+            }
+        )
+    pending.sort(key=lambda p: p["waited_min"], reverse=True)
+    return {"pending": pending, "partial": False, "errors": []}
+
+
 def fetch_recent_failures(repo):
     """Fetch recent CI workflow failures (last 3 hours)."""
     # Use gh CLI directly for a quick query
@@ -1146,6 +1192,76 @@ buildCharts(24);
 """
 
 
+def render_pending_approvals(data):
+    """Render runs paused on a deployment approval, oldest first.
+
+    Age is the number that matters. A run waiting a couple of minutes is the
+    approval bot about to pick it up; one waiting half an hour means nobody is
+    coming, and the job will eventually time out and report as a test failure.
+    """
+    if not data:
+        return "<p>Pending approvals unavailable.</p>"
+
+    pending = data.get("pending", [])
+    partial = data.get("partial", False)
+    oldest = max((p["waited_min"] for p in pending), default=0)
+
+    if partial:
+        fg, bg, label = "#6c757d", "#e2e3e5", "PARTIAL"
+        summary = "Could not read pending approvals"
+    elif not pending:
+        fg, bg, label = "#198754", "#d1e7dd", "OK"
+        summary = "Nothing waiting for approval"
+    elif oldest >= 30:
+        fg, bg, label = "#dc3545", "#f8d7da", "STALLED"
+        summary = f"{len(pending)} waiting, oldest {oldest} min"
+    else:
+        fg, bg, label = "#fd7e14", "#fff3cd", "WAITING"
+        summary = f"{len(pending)} waiting, oldest {oldest} min"
+
+    html = f"""
+<div style="border-left:4px solid {fg};background:{bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
+  <span style="background:{fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{label}</span>
+  <strong style="margin-left:8px">{_esc(summary)}</strong>
+</div>
+"""
+    if partial:
+        for err in data.get("errors", []):
+            html += f"<p style='color:#6c757d'>{_esc(str(err))}</p>"
+        return html
+
+    if not pending:
+        return html
+
+    html += """
+<table>
+  <tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
+"""
+    for p in pending:
+        # A merge-queue run holds up the whole queue, not just its own PR.
+        event = p["event"]
+        event_cell = (
+            f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
+        )
+        html += (
+            "  <tr>"
+            f"<td>{p['waited_min']} min</td>"
+            f"<td>{_link(p['url'], p['title'] or str(p['run_id']))}</td>"
+            f"<td>{_esc(p['actor'])}</td>"
+            f"<td>{event_cell}</td>"
+            f"<td>{_esc(p['branch'])}</td>"
+            "</tr>\n"
+        )
+    html += "</table>\n"
+    html += (
+        "<p style='color:#6c757d;font-size:0.9em'>Approve from the run page: "
+        "<em>Review deployments</em> &rarr; tick the environment &rarr; "
+        "<em>Approve and deploy</em>. Most runs are approved automatically; "
+        "anything listed here needs a person.</p>\n"
+    )
+    return html
+
+
 def render_hosted_runner_usage(hosted_runner_usage):
     """Render the GitHub-hosted runner quota section."""
     if not hosted_runner_usage:
@@ -1232,7 +1348,10 @@ def render_hosted_runner_usage(hosted_runner_usage):
     return html
 
 
-def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None):
+def generate_health_html(
+    queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None,
+    pending_approvals=None,
+):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
     fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -1450,6 +1569,7 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
     history_html = build_history_chart(snapshots)
 
     hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
+    pending_approvals_html = render_pending_approvals(pending_approvals)
 
     body = f"""
 <h1>CI System Health</h1>
@@ -1457,6 +1577,9 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
 <h2>Queue Status</h2>
 {queue_html}
+
+<h2>Pending Approvals</h2>
+{pending_approvals_html}
 
 <h2>GitHub-Hosted Runner Quota</h2>
 {hosted_runner_html}
@@ -1548,6 +1671,9 @@ def main():
     print("Fetching recent CI failures...")
     failures = fetch_recent_failures(args.repo)
 
+    print("Fetching pending approvals...")
+    pending_approvals = fetch_pending_approvals(args.repo)
+
     print(f"Generating health.html in {args.output}/...")
     generate_health_html(
         queue_data,
@@ -1555,6 +1681,7 @@ def main():
         args.output,
         mq_data=mq_data,
         hosted_runner_usage=hosted_runner_usage,
+        pending_approvals=pending_approvals,
     )
 
     print("Done.")
