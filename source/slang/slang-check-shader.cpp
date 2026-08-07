@@ -418,11 +418,31 @@ struct SystemValueOutputSpace
     }
 };
 
+// Return true if `baseName` (already lowercased and index-stripped) names a system value whose
+// binding is selected by the `noperspective` interpolation mode, so the perspective and
+// no-perspective spellings target *different* builtins and may legitimately coexist on one entry
+// point. Only SV_Barycentrics behaves this way: a fragment shader may read both the
+// perspective-correct and the no-perspective barycentric coordinates, as in
+//
+//     float3 bary                            : SV_Barycentrics,
+//     noperspective float3 baryNoPerspective : SV_Barycentrics
+//
+// which lower to BaryCoordKHR and BaryCoordNoPerspKHR respectively (the "sv_barycentrics" case in
+// slang-emit-spirv.cpp, and gl_BaryCoordNoPerspEXT in slang-ir-glsl-legalize.cpp). For every other
+// system value the interpolation mode decorates a single binding rather than choosing between two,
+// so it must not enter the duplicate identity: `noperspective float4 a : SV_Target0` and
+// `float4 b : SV_Target0` do collide on color 0 and must still be reported.
+static bool isInterpolationModeSplitSystemValue(UnownedStringSlice baseName)
+{
+    return baseName == toSlice("sv_barycentrics");
+}
+
 // A single system-value semantic gathered while validateSystemValueSemantic walks an entry point's
 // parameters and result, used by validateEntryPoint to reject the same system value being declared
-// more than once. Two records are duplicates when their direction, output space, base name, and
-// index all match; e.g. `float4 vs(uint a : SV_VertexID, uint b : SV_VertexID)` yields two records
-// {Input, Default, "sv_vertexid", 0}, which are equal -> E30706.
+// more than once. Two records are duplicates when their direction, output space, base name, index,
+// and no-perspective selector all match; e.g. `float4 vs(uint a : SV_VertexID, uint b :
+// SV_VertexID)` yields two records {Input, Default, "sv_vertexid", 0, false}, which are equal ->
+// E30706.
 struct CollectedSystemValueSemantic
 {
     SemanticDirection direction = SemanticDirection::Input;
@@ -431,6 +451,10 @@ struct CollectedSystemValueSemantic
     String baseName;         // lowercased base name (SV_Target0 -> "sv_target")
     String displayName;      // original spelling (e.g. "SV_Target0"), for the diagnostic message
     SourceLoc loc;           // location carrying the semantic, for the diagnostic
+    // Set only for a system value that `noperspective` splits into a separate binding (see
+    // isInterpolationModeSplitSystemValue), so the flag never separates two records that in fact
+    // share one binding.
+    bool isNoPerspective = false;
 };
 
 // Validate system value semantics on a declaration recursively, checking any SV_ semantic against
@@ -609,6 +633,13 @@ static void validateSystemValueSemantic(
             collected.baseName = String(baseNameSlice).toLower();
             collected.displayName = String(semanticNameSlice);
             collected.loc = decl->loc;
+            // `noperspective` selects a distinct builtin for SV_Barycentrics only, so record it as
+            // part of the identity there and nowhere else. The modifier sits on whichever decl
+            // carries the semantic — the parameter, or the struct field when the value arrives
+            // through an aggregate — which is `decl` in both cases.
+            collected.isNoPerspective =
+                isInterpolationModeSplitSystemValue(collected.baseName.getUnownedSlice()) &&
+                decl->findModifier<HLSLNoPerspectiveModifier>() != nullptr;
             ioCollectedSemantics->add(collected);
         }
     }
@@ -2121,11 +2152,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
             // A system value denotes a single binding, so it must not be declared twice in the same
             // direction and output space on one entry point. Two records are a duplicate when their
-            // direction, output space, base name, and index all match; report the second (and any
-            // later) occurrence. Left unchecked the duplicate reaches codegen: WGSL/HLSL emit
-            // duplicate builtins and SPIR-V hits an "Unimplemented system value" internal error
-            // (#6319). The list holds one entry per system value on the entry point (a handful), so
-            // this quadratic scan is cheap and needs no string keys.
+            // direction, output space, base name, index, and no-perspective selector all match;
+            // report the second (and any later) occurrence. Left unchecked the duplicate reaches
+            // codegen: WGSL/HLSL emit duplicate builtins and SPIR-V hits an "Unimplemented system
+            // value" internal error (#6319). The list holds one entry per system value on the entry
+            // point (a handful), so this quadratic scan is cheap and needs no string keys.
             for (Index i = 0; i < collectedSystemValueSemantics.getCount(); ++i)
             {
                 const auto& current = collectedSystemValueSemantics[i];
@@ -2135,7 +2166,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     if (current.direction == prior.direction &&
                         current.outputSpace == prior.outputSpace &&
                         current.semanticIndex == prior.semanticIndex &&
-                        current.baseName == prior.baseName)
+                        current.baseName == prior.baseName &&
+                        current.isNoPerspective == prior.isNoPerspective)
                     {
                         sink->diagnose(Diagnostics::DuplicateSystemValueSemantic{
                             .semantic = current.displayName,

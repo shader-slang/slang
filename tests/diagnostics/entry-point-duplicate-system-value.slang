@@ -4,10 +4,12 @@
 // E30706 (added in validateEntryPoint) now diagnoses it uniformly on every target.
 //
 // Each function is compiled in isolation via `-entry`, so exactly the single E30706 is produced
-// per case. Duplicates are keyed by (direction, output binding space, base name, index): two
-// SV_VertexID inputs collide, two SV_Target0 outputs collide, and a duplicate appearing on the
-// fields of a returned struct collides — while distinct indices (SV_Target0 vs SV_Target1) stay
-// clean, which is covered by the positive control in entry-point-single-system-value.slang. The
+// per case. Duplicates are keyed by (direction, output binding space, base name, index,
+// no-perspective selector): two SV_VertexID inputs collide, two SV_Target0 outputs collide, and a
+// duplicate appearing on the fields of a returned struct collides — while distinct indices
+// (SV_Target0 vs SV_Target1) stay clean, which is covered by the positive control in
+// entry-point-single-system-value.slang. The no-perspective selector is set only for
+// SV_Barycentrics, the one system value where `noperspective` chooses a different builtin. The
 // output binding space is empty for these graphics stages (all outputs share one space); it is
 // non-empty for mesh shaders (the output category — vertices / primitives / indices, so the same
 // system value on distinct categories does not collide) and for geometry shaders (the output
@@ -20,6 +22,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUPCANON):-target spirv -entry dupCanon -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUPMESHVTX):-target spirv -entry dupMeshVertices -stage mesh
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUPGSSTREAM):-target spirv -entry dupGsStream -stage geometry
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUPBARY):-target spirv -entry dupBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 
 // Two parameters carry the same input system value (the reported repro; also the SPIR-V ICE case).
 float4 dupVertex(uint a : SV_VertexID, uint b : SV_VertexID) : SV_Position
@@ -108,4 +111,18 @@ void dupGsStream(uint prim : SV_PrimitiveID, inout TriangleStream<GsBadOut> outS
     v.posA = float4(0, 0, 0, 1);
     v.posB = float4(0, 0, 0, 1);
     outStream.Append(v);
+}
+
+// SV_Barycentrics is the one system value whose binding `noperspective` splits in two, so the
+// identity carries that selector. This pins the *other* side of that rule: two barycentric inputs
+// in the SAME interpolation mode still name one builtin and so are still a duplicate. (The legal
+// perspective + no-perspective pairing is the BARY case in
+// entry-point-single-system-value.slang.)
+void dupBarycentrics(
+    float3 a : SV_Barycentrics,
+    float3 b : SV_Barycentrics,
+    out float4 result : SV_Target)
+//DUPBARY: E30706
+{
+    result = float4(a + b, 1);
 }
