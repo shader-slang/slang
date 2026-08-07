@@ -73,6 +73,26 @@ else()
         ${SLANG_OVERRIDE_LUA_PATH}
     )
 endif()
+
+# Embeds Lua (like slang-fiddle) to parse the IR stable-names table when
+# enforcing the module version-bump policy in CI.
+if(NOT SLANG_OVERRIDE_LUA_PATH)
+    generator(
+        slang-ir-version-check
+        LINK_WITH_PRIVATE
+        compiler-core
+        INCLUDE_DIRECTORIES_PUBLIC
+        ${slang_SOURCE_DIR}/external
+    )
+else()
+    generator(
+        slang-ir-version-check
+        LINK_WITH_PRIVATE
+        compiler-core
+        INCLUDE_DIRECTORIES_PUBLIC
+        ${SLANG_OVERRIDE_LUA_PATH}
+    )
+endif()
 generator(slang-embed)
 generator(slang-core-module-cache)
 generator(slang-generate USE_FEWER_WARNINGS)
@@ -289,6 +309,13 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
     add_dependencies(slang-test slang-neural-module slang-workgraph-module)
+
+    # generator() marks the checker EXCLUDE_FROM_ALL, so without this the enforce
+    # step added by the CI workflow patch would find no binary and fail closed on
+    # every PR. Cross-compiled generators are imported and prebuilt.
+    if(TARGET slang-ir-version-check AND NOT SLANG_GENERATORS_PATH)
+        add_dependencies(slang-test slang-ir-version-check)
+    endif()
 
     set_property(
         DIRECTORY ${slang_SOURCE_DIR}
