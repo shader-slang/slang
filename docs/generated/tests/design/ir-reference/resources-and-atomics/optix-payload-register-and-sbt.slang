@@ -1,27 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#getoptixraypayloadptr
-//META: doc_section_digest=c3a35e4b5037da8ad936ccd365aac116a4da968dbaab5a0d940274845cb0ca71
-//META: purpose=A small-payload `closesthit` entry point with a uniform shader-record parameter on `-target cuda` surfaces `getOptiXPayloadRegister`, `setOptiXPayloadRegister`, and `getOptiXSbtDataPointer` opcodes in the IR dump.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#raytracing-payload
+//META: doc_section_digest=bfb83cd10d15abad13aafd042e8b0e23ed62e4221ddd83671237bccf2fbb3073
+//META: purpose=A `closesthit` entry point on `-target cuda` emits `optixGetPayload_N` and `optixSetPayload_N` calls, the user-visible artifact of the `getOptiXPayloadRegister` / `setOptiXPayloadRegister` opcodes that varying-param legalization synthesizes after the IR-dump point.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's raytracing-payload table lists `getOptiXPayloadRegister`,
-// `setOptiXPayloadRegister`, and `getOptiXSbtDataPointer` as OptiX-side
-// IR opcodes synthesized for closesthit lowering on CUDA. These are
-// created inside `slang-ir-legalize-varying-params.cpp` during target
-// legalization — AFTER the `-dump-ir` snapshot point, so they are
-// not observable via IR dump. The user-visible artifact is the CUDA
-// text emit calling `optixGetPayload_*` / `optixSetPayload_*`; we
-// check for both forms here. The `getOptiXSbtDataPointer` opcode
-// fires only when an entry-point-uniform parameter actually requires
-// SBT lookup; for this small payload + scalar uniform the CUDA emit
-// folds the value rather than emitting an SBT lookup, so that claim
-// is not exercised by this test (see ## Doc gaps observed in the
-// bundle README).
+// The payload-register opcodes are synthesized during varying-param
+// legalization, which runs after the `-dump-ir` snapshot, so this test
+// observes the user-visible artifact instead: the CUDA text a
+// `closesthit` entry point emits. The CHECKs pin both the read and the
+// write form of the payload-register accessor. The SBT-data pointer is
+// not exercised here — for this small scalar uniform the emit folds the
+// value rather than performing an SBT lookup (see the bundle README's
+// doc-gap row).
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -stage closesthit -entry main
 

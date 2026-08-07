@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=A RequireCapabilityDecl is a module-level declaration that states a capability requirement; the module compiles when the target capability is met.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A RequireCapabilityDecl (`__require_capability`) is a module-scope declaration; a module requiring a capability the target provides still compiles.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of RequireCapabilityDecl: it is
-// expressed as a declaration (so it can be exported), and a module
-// that requires a capability the target supports still compiles and
-// runs.
+// Verifies that a capability requirement is expressed as a declaration and is
+// satisfied when the target provides the named capability. The module requires
+// `cpp` and is run on the interpreter's CPU-backed path; the CHECK asserts the
+// program's output, which only appears if the requirement was accepted.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

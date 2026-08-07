@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T16:30:00Z
-//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=e70a29d1d218a8caa31a9b05ae27e6e9e79c2c46f8f65751d8428df1ad6141c2
+//META: doc_section_digest=32b31a97f5e15fb2fec9486a881ce13cddbd02cb72566084734c0db4939ddf9b
 //META: purpose=A scalar `cond ? x : y` is excluded from the builtin fast path and lowers through its dedicated control-flow path: an `ifElse(...)` joining through a block parameter, not a single pure-value inst.
 //META: intent=boundary
 //META: pipeline_stage=lower

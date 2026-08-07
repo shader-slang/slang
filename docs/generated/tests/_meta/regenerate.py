@@ -133,6 +133,9 @@ _ALLOWED_INTENTS = (
     "negative",  # documented diagnostic / "is rejected" probe
     "expansion",  # added during a Phase E expansion pass
     "regression",  # anchored to a fixed compiler issue
+    "characterization",  # asserts observed current behaviour of gap-selected
+    # code rather than a documented claim; only valid in a `coverage` bundle
+    # (see docs/generated/tests/coverage/METHODOLOGY.md)
 )
 
 _ALLOWED_GAP_KINDS = (
@@ -164,6 +167,7 @@ _ALLOWED_OOS_REASONS = (
     "gpu-vulkan-extension",
     "gpu-cross-api-flag",
     "gpu-other",
+    "unsupported-on-target",  # this text-emit target cannot express the claim
     # Truly terminal — no harness or runner upgrade unblocks
     "link-stage-only",
     "out-of-bundle",
@@ -401,8 +405,12 @@ class _MiniYaml:
 @dataclass
 class BundleSpec:
     key: str
-    source_doc: str  # workspace-relative
+    # Workspace-relative path to the doc this bundle's claims come from, or
+    # None for `coverage` bundles, which are selected by coverage gap rather
+    # than anchored to a document. See `role`.
+    source_doc: str | None
     watched_paths: list[str]
+    role: str = "design"
     depends_on: list[str] = field(default_factory=list)
     coverage_targets: list[str] = field(default_factory=list)
     size_cap_files: int = 30
@@ -411,6 +419,28 @@ class BundleSpec:
     def dir(self) -> str:
         """Workspace-relative bundle directory."""
         return f"docs/generated/tests/{self.key}"
+
+    @property
+    def gap_group(self) -> str:
+        """Label this bundle's doc-gap rows are aggregated under.
+
+        `doc-gaps` groups rows by the document they were observed against; a
+        coverage bundle has no such document, so it groups under its own key.
+        """
+        return self.source_doc or f"{self.key} (no source doc)"
+
+    @property
+    def is_doc_anchored(self) -> bool:
+        """Whether this bundle derives its claims from a `source_doc`.
+
+        True for `conformance/` bundles (anchored to the human-written
+        language reference) and `design/` bundles (anchored to the generated
+        design docs). False for `coverage/` bundles, whose tests are chosen by
+        uncovered compiler code and assert observed current behaviour, so
+        there is no document whose edit should invalidate them — only their
+        `watched_paths` can. See `coverage/METHODOLOGY.md`.
+        """
+        return self.role != "coverage"
 
     @property
     def prompt(self) -> str:
@@ -443,12 +473,30 @@ def load_manifest() -> Manifest:
         watched = entry.get("watched_paths") or []
         if not watched:
             raise SystemExit(f"bundle {key!r} has no watched_paths")
+        role = str(entry.get("role") or key.split("/", 1)[0])
+        if role not in ("conformance", "design", "coverage"):
+            raise SystemExit(f"bundle {key!r} has unknown role {role!r}")
+        if not key.startswith(f"{role}/"):
+            raise SystemExit(
+                f"bundle {key!r} has role {role!r} that does not match its key prefix"
+            )
         source_doc = entry.get("source_doc")
-        if not source_doc:
+        # `coverage` bundles are gap-selected, not doc-anchored, so a
+        # source_doc would be meaningless for them; every other role requires
+        # one, because its tests must cite a claim in that document.
+        if role == "coverage":
+            if source_doc:
+                raise SystemExit(
+                    f"bundle {key!r} has role 'coverage' but declares a source_doc;"
+                    " coverage bundles are selected by coverage gap, not anchored"
+                    " to a document"
+                )
+        elif not source_doc:
             raise SystemExit(f"bundle {key!r} has no source_doc")
         spec = BundleSpec(
             key=key,
-            source_doc=str(source_doc),
+            source_doc=str(source_doc) if source_doc else None,
+            role=role,
             watched_paths=[str(p) for p in watched],
             depends_on=[str(d) for d in entry.get("depends_on") or []],
             coverage_targets=[
@@ -730,6 +778,13 @@ def lint_expected_failures() -> list[LintIssue]:
         # multi-config tests carries a trailing " (config)" suffix (e.g.
         # "foo.slang (cpu)"); strip it before resolving the file path.
         path_part = re.sub(r" \([a-z0-9-]+\)$", "", s)
+        # slang-test names the Nth //TEST directive in a file
+        # "<file>.slang.N" (the first directive keeps the bare file name), so
+        # an entry may legitimately target one directive rather than the whole
+        # file — which is what emission fan-out produces, where only one
+        # target of several is known-failing. Strip that index before
+        # resolving; "foo.slang.2" is the file "foo.slang".
+        path_part = re.sub(r"(?<=\.slang)\.\d+$", "", path_part)
         candidate = REPO_ROOT / path_part
         if not candidate.exists():
             issues.append(
@@ -985,6 +1040,8 @@ def compute_watched_digest(spec: BundleSpec) -> str:
 
 
 def compute_source_doc_digest(spec: BundleSpec) -> str | None:
+    if spec.source_doc is None:
+        return None
     p = REPO_ROOT / spec.source_doc
     if not p.exists():
         return None
@@ -1403,6 +1460,120 @@ _REQUIRED_BUNDLE_FM_KEYS = (
 )
 
 
+# --------------------------------------------------------------------------
+# Emission fan-out gate
+#
+# Enforcement of `_claims.md §2` "Meaningful back-ends": a target-dependent
+# (emission) claim must be exercised on every feasible text-emit target, or
+# account for each absent target with an Untested row. The rule existed only
+# as prose when the 2026-06 doc-scope regen silently dropped it, deleting
+# ~985 emission tests and dropping coverage 53.10% -> 51.77% undetected.
+# Making it a lint check is what turns the rule from advisory into a gate.
+#
+# NOTE: rolled out as "warning" first. Flip _FANOUT_SEVERITY to "error" once
+# the existing suite's violations are fixed or opted out — that flip is the
+# moment the regression becomes impossible to reland.
+# --------------------------------------------------------------------------
+_FANOUT_SEVERITY = "warning"
+
+# All text-emit targets (used to detect which targets a test exercises and
+# which an Untested opt-out row names).
+_EMIT_TEXT_TARGETS = frozenset(
+    {"hlsl", "glsl", "spirv-asm", "metal", "wgsl", "cuda", "cpp"}
+)
+# Shader text targets. The fan-out gate enforces these as a *set*: a claim
+# emitted to any one of them must cover them all (or opt out per target) —
+# this is the regression class (shader emission breadth). cpp/cuda are
+# general-purpose backends with different semantics and are NOT force-
+# required; a claim emitted only to cpp/cuda is backend-specific (e.g. the
+# C++ prelude/host-shim) and is not subject to the shader fan-out rule.
+_SHADER_TEXT_TARGETS = frozenset({"hlsl", "glsl", "spirv-asm", "metal", "wgsl"})
+# Untested-claims reasons that legitimately account for an absent target.
+_FANOUT_OPTOUT_REASONS = frozenset(
+    {"unsupported-on-target", "out-of-bundle"}
+    | {r for r in _ALLOWED_OOS_REASONS if r.startswith("gpu-")}
+)
+_SIMPLE_TARGET_RE = re.compile(r"//TEST:SIMPLE\([^)]*\):([^\n]*)")
+_TARGET_FLAG_RE = re.compile(r"-target\s+(\S+)")
+
+
+def _norm_target(t: str) -> str:
+    """Normalize a -target token to its text-emit spelling."""
+    return {"spirv": "spirv-asm", "dxil": "dxil-asm"}.get(t, t)
+
+
+def _emission_targets(text: str) -> set[str]:
+    """Text-emit targets named across a test file's //TEST:SIMPLE directives."""
+    out: set[str] = set()
+    for line in _SIMPLE_TARGET_RE.findall(text):
+        for t in _TARGET_FLAG_RE.findall(line):
+            t = _norm_target(t)
+            if t in _EMIT_TEXT_TARGETS:
+                out.add(t)
+    return out
+
+
+def _lint_emission_fanout(
+    spec: "BundleSpec", readme_text: str, test_files: list[Path]
+) -> list[LintIssue]:
+    """An emission claim must cover every feasible text-emit target, or
+    account for each absent target with an Untested `unsupported-on-target`
+    (or gpu-*/out-of-bundle) row whose Claim cell matches the claim.
+    """
+    issues: list[LintIssue] = []
+    # target-pipelines/* bundles are single-target *by design* — exempt.
+    if spec.dir.startswith("docs/generated/tests/design/target-pipelines/"):
+        return issues
+
+    # Group tests by claim (//META: purpose, which the README Claim cell
+    # must match verbatim); collect each claim's covered emit targets.
+    claim_targets: dict[str, set[str]] = {}
+    claim_is_emission: dict[str, bool] = {}
+    for tf in test_files:
+        t = tf.read_text(encoding="utf-8")
+        meta = parse_test_meta(t)
+        purpose = meta.get("purpose", "").strip()
+        if not purpose:
+            continue
+        tgts = _emission_targets(t)
+        claim_targets.setdefault(purpose, set()).update(tgts)
+        # Emission/target-dependent iff stamped emit AND it emits to a target.
+        if meta.get("pipeline_stage") == "emit" and tgts:
+            claim_is_emission[purpose] = True
+
+    # Opt-out targets declared per claim in the Untested-claims table.
+    optout: dict[str, set[str]] = {}
+    if "## Untested claims" in readme_text:
+        for row in _parse_tagged_table(readme_text, "## Untested claims"):
+            claim_cell, reason, _anchor, why = row
+            if reason not in _FANOUT_OPTOUT_REASONS:
+                continue
+            blob = claim_cell + " " + why
+            named = {_norm_target(m) for m in _TARGET_FLAG_RE.findall(blob)}
+            named |= {w for w in blob.split() if w in _EMIT_TEXT_TARGETS}
+            optout.setdefault(claim_cell.strip(), set()).update(named)
+
+    for purpose, covered in claim_targets.items():
+        if not claim_is_emission.get(purpose):
+            continue  # not an emission claim — fan-out rule does not apply
+        if not (covered & _SHADER_TEXT_TARGETS):
+            continue  # cpp/cuda-only: backend-specific, shader rule N/A
+        missing = _SHADER_TEXT_TARGETS - covered - optout.get(purpose, set())
+        if missing:
+            issues.append(
+                LintIssue(
+                    spec.dir,
+                    _FANOUT_SEVERITY,
+                    f"emission claim {purpose!r} covers shader targets"
+                    f" {sorted(covered & _SHADER_TEXT_TARGETS)} but is missing"
+                    f" {sorted(missing)}; add an emission test per target or an"
+                    f" Untested 'unsupported-on-target' row naming each absent"
+                    f" target (_claims.md §2 Meaningful back-ends)",
+                )
+            )
+    return issues
+
+
 def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     issues: list[LintIssue] = []
     bdir = REPO_ROOT / spec.dir
@@ -1425,7 +1596,16 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
             )
         )
     else:
-        for k in _REQUIRED_BUNDLE_FM_KEYS:
+        required_fm_keys = _REQUIRED_BUNDLE_FM_KEYS
+        if not spec.is_doc_anchored:
+            # A coverage bundle has no source_doc, so its README must not
+            # claim one; provenance rests on watched_paths_digest alone.
+            required_fm_keys = tuple(
+                k
+                for k in required_fm_keys
+                if k not in ("source_doc", "source_doc_digest")
+            )
+        for k in required_fm_keys:
             if k not in fm:
                 issues.append(
                     LintIssue(
@@ -1434,6 +1614,15 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f"front-matter missing key: {k}",
                     )
                 )
+        if not spec.is_doc_anchored and "source_doc" in fm:
+            issues.append(
+                LintIssue(
+                    f"{spec.dir}/README.md",
+                    "error",
+                    "front-matter declares source_doc, but this is a"
+                    " gap-selected coverage bundle with no source document",
+                )
+            )
         if fm.get("generated", "").lower() != "true":
             issues.append(
                 LintIssue(
@@ -1498,7 +1687,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     # with the controlled Kind vocabulary. Free-form bullets are no
     # longer accepted; the migration to the table format is one-shot.
     if "## Doc gaps observed" in text:
-        gap_rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        gap_rows = parse_gap_rows(text, spec.dir, spec.gap_group)
         if not gap_rows and not _gap_section_explicitly_empty(text):
             issues.append(
                 LintIssue(
@@ -1528,6 +1717,9 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f" {row.anchor!r}",
                     )
                 )
+
+    # Emission fan-out gate (enforces _claims.md §2 "Meaningful back-ends").
+    issues.extend(_lint_emission_fanout(spec, text, test_files))
     return issues
 
 
@@ -1623,9 +1815,32 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
     if not meta:
         issues.append(LintIssue(rel, "error", "missing //META block"))
         return issues
-    for k in _REQUIRED_TEST_META_KEYS:
+    required_meta_keys = _REQUIRED_TEST_META_KEYS
+    if not spec.is_doc_anchored:
+        # A coverage test is chosen by uncovered code, not by a documented
+        # claim, so it cannot be required to cite one. Most still carry a
+        # doc_ref pointing at the nearest related design section for
+        # orientation, and when they do it is validated below like any other.
+        required_meta_keys = tuple(
+            k
+            for k in required_meta_keys
+            if k not in ("doc_ref", "doc_section_digest")
+        )
+    for k in required_meta_keys:
         if k not in meta:
             issues.append(LintIssue(rel, "error", f"//META missing key: {k}"))
+    # coverage/METHODOLOGY.md § Per-test contract: a coverage test names the
+    # source area it characterizes in place of the doc_ref it does not have,
+    # so `covers=` is what makes it traceable at all.
+    if not spec.is_doc_anchored and not meta.get("covers", "").strip():
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                "//META missing key: covers (required for coverage bundles —"
+                " see coverage/METHODOLOGY.md § Per-test contract)",
+            )
+        )
     if meta.get("generated", "").lower() != "true":
         issues.append(LintIssue(rel, "error", "//META generated must be true"))
     intent = meta.get("intent", "")
@@ -1635,6 +1850,19 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                 rel,
                 "error",
                 f"//META intent={intent!r} not in {list(_ALLOWED_INTENTS)}",
+            )
+        )
+    # `characterization` asserts what the compiler currently does rather than
+    # what a document claims, so it is only answerable inside the gap-selected
+    # coverage tree. Allowing it in a doc-anchored bundle would let a test
+    # escape the requirement that it cite a documented claim.
+    if intent == "characterization" and spec.is_doc_anchored:
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                "//META intent='characterization' is only valid in a"
+                f" coverage bundle, but {spec.key!r} is doc-anchored",
             )
         )
     requires_tool = meta.get("requires-tool", "").strip()
@@ -1812,10 +2040,14 @@ def _classify(
     bdir = REPO_ROOT / spec.dir
     if entry is None or not (bdir / "README.md").exists():
         return "missing", "no freshness entry or README.md", cur_watched, cur_doc
-    if cur_doc is None:
-        return "stale", "source_doc missing on disk", cur_watched, cur_doc
-    if entry.get("source_doc_digest") != cur_doc:
-        return "stale", "source_doc changed since last regen", cur_watched, cur_doc
+    # A coverage bundle has no source_doc, so only its watched paths can
+    # invalidate it; skip the document checks rather than reading the absent
+    # doc as "missing on disk".
+    if spec.is_doc_anchored:
+        if cur_doc is None:
+            return "stale", "source_doc missing on disk", cur_watched, cur_doc
+        if entry.get("source_doc_digest") != cur_doc:
+            return "stale", "source_doc changed since last regen", cur_watched, cur_doc
     if entry.get("watched_paths_digest") != cur_watched:
         return "stale", "watched paths changed since last regen", cur_watched, cur_doc
     return "fresh", "", cur_watched, cur_doc
@@ -1856,11 +2088,15 @@ def cmd_show(args: argparse.Namespace) -> int:
     print(f"bundle:          {spec.key}")
     print(f"dir:             {spec.dir}")
     print(f"prompt:          {spec.prompt}")
-    print(f"source_doc:      {spec.source_doc}")
-    doc_path = REPO_ROOT / spec.source_doc
-    print(
-        f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
-    )
+    print(f"role:            {spec.role}")
+    if spec.source_doc is None:
+        print("source_doc:      (none — gap-selected coverage bundle)")
+    else:
+        print(f"source_doc:      {spec.source_doc}")
+        doc_path = REPO_ROOT / spec.source_doc
+        print(
+            f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
+        )
     print(f"size_cap_files:  {spec.size_cap_files}")
     print(f"depends_on:")
     for d in spec.depends_on:
@@ -1882,7 +2118,7 @@ def cmd_mark_fresh(args: argparse.Namespace) -> int:
         raise SystemExit(f"unknown bundle: {args.bundle}")
     cur_watched = compute_watched_digest(spec)
     cur_doc = compute_source_doc_digest(spec)
-    if cur_doc is None:
+    if spec.is_doc_anchored and cur_doc is None:
         raise SystemExit(
             f"cannot mark fresh: source_doc {spec.source_doc} not on disk"
         )
@@ -1942,6 +2178,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         "design/name-resolution/": "Name resolution",
         "design/ir-reference/": "IR reference",
         "design/target-pipelines/": "Target pipelines",
+        "coverage/": "Coverage (white-box characterization)",
     }
     section_order = [
         "Conformance (language reference)",
@@ -1952,6 +2189,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         "Name resolution",
         "IR reference",
         "Target pipelines",
+        "Coverage (white-box characterization)",
         "Top-level",
     ]
 
@@ -2002,14 +2240,22 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (in docs/generated/tests/) to the
-            # source_doc (workspace-relative). Handles both source roots:
-            #   docs/generated/design/<...>  -> ../design/<...>
-            #   docs/language-reference/<...> -> ../../language-reference/<...>
-            doc_link = os.path.relpath(spec.source_doc, "docs/generated/tests")
+            if spec.source_doc is None:
+                # A coverage bundle is gap-selected, so there is no anchoring
+                # document to link; point at the methodology that governs the
+                # whole tree instead.
+                anchor = "[`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md)"
+            else:
+                # Relative link from INDEX.md (in docs/generated/tests/) to the
+                # source_doc (workspace-relative). Handles both source roots:
+                #   docs/generated/design/<...>  -> ../design/<...>
+                #   docs/language-reference/<...> -> ../../language-reference/<...>
+                doc_link = os.path.relpath(
+                    spec.source_doc, "docs/generated/tests"
+                )
+                anchor = f"[`{spec.source_doc}`]({doc_link})"
             out.append(
-                f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
-                f" [`{spec.source_doc}`]({doc_link}) |"
+                f"| [`{spec.key}`]({spec.key}/README.md) | {count} | {anchor} |"
             )
         out.append("")
     out.append("## Catalog snapshot")
@@ -2550,7 +2796,7 @@ def cmd_lang_ref_coverage(args: argparse.Namespace) -> int:
                 if spec is None:
                     continue
                 bundle_doc = spec.source_doc
-                if bundle_doc.startswith("docs/generated/design/"):
+                if bundle_doc and bundle_doc.startswith("docs/generated/design/"):
                     edge = (ref, bundle_doc)
                     edges[edge] = edges.get(edge, 0) + 1
 
@@ -3036,9 +3282,9 @@ def cmd_doc_gaps(args: argparse.Namespace) -> int:
         if not readme.exists():
             continue
         text = readme.read_text(encoding="utf-8")
-        rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        rows = parse_gap_rows(text, spec.dir, spec.gap_group)
         if rows:
-            by_doc.setdefault(spec.source_doc, []).extend(rows)
+            by_doc.setdefault(spec.gap_group, []).extend(rows)
 
     if args.format == "json":
         import json

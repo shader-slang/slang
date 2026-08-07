@@ -1,21 +1,17 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:08:34Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
-//META: doc_section_digest=8666fb5a8a3e866e04eed6573b9b735ade91d11b88b56b96aa10b6822be031b8
+//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
 //META: purpose=Lowering an interface declaration synthesizes a thisTypeWitness placeholder certifying that ThisType conforms to the enclosing interface.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Verifies that thisTypeWitness is produced during InterfaceDecl
-// lowering rather than by a later pass: a user interface whose method
-// returns `This` forces the enclosing-interface self-conformance fact
-// into the lowered module, and the CHECK pins the thisTypeWitness
-// opcode spelling in the dump of a module containing only user code
-// plus a generic dispatch that keeps the interface live.
-
+// Verifies the abstract witness an interface needs for its own `This` type. A
+// requirement returning `This` means the interface body must treat `This` as a
+// conformer, and the CHECK asserts the placeholder witness that certifies it
+// appears in the dump.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFrob

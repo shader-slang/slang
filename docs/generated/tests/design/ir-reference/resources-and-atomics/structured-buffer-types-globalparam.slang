@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#shader-io
-//META: doc_section_digest=8ae4aee9e798a45d3d949726815fc6daf4a5c5bd25c7402ac42fe2646d68088c
+//META: doc_section_digest=3ebd10067ff5f6123adbd965e4471fda38311d82079a24af41d8faab3a3f45cc
 //META: purpose=Module-scope shader-parameter declarations surface as `global_param` lines in the IR preamble, with the resource type (`RWStructuredBuffer(...)`, `StructuredBuffer(...)`, `ByteAddressBuffer`, `RWByteAddressBuffer`) carried in the result type.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Shader IO row says `global_param` is the IR opcode for a
-// module-scope shader parameter (`uniform`, push-constant, descriptor
-// binding). One `global_param` is emitted per such declaration.
+// Verifies that one module-scope shader parameter yields one
+// `global_param`, and that the parameter's declared buffer type is
+// carried on the result type. Four buffer kinds are declared in one
+// shader so the CHECKs can pin each type spelling against its own
+// parameter name.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-and-binding
-//META: doc_section_digest=53c33072d342ae9430710df507cdde301b5918b46f7119412b00900374c8e222
-//META: purpose=Boundary - vk::location(0) at the lower edge produces glslLocation(0:Int).
+//META: doc_section_digest=928ba5f8c333b9ec8b6e55397dc87060a4d672e8f7a0cc913acb7f02d7fea184
+//META: purpose=Boundary - vk::location(0) at the lower edge produces glslLocation(0 : Int).
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary - the doc records glslLocation with operand
-// `location: IRIntLit`. 0 is the lower edge; assert it is encoded
-// exactly as `glslLocation(0 : Int)` rather than dropped or
-// reinterpreted.
+// Verifies the lower edge of the location range. Zero is the value most
+// likely to be confused with "absent", so the CHECK pins
+// `[glslLocation(0 : Int)]` to show the decoration is emitted with an
+// explicit zero operand rather than omitted.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

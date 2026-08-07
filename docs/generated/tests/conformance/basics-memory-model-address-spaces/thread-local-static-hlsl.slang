@@ -17,10 +17,12 @@
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 static int g_perThread;
 
-[__NoInline]
+[noinline]
 int readAndSet(int v)
 {
     int old = g_perThread;
@@ -43,3 +45,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 // METAL-DAG: g_perThread{{.*}}
 // WGSL maps thread-local static to var<private> (private address space = per-thread).
 // WGSL: var<private> g_perThread{{.*}}
+// GLSL emits the Thread-local static as an unqualified global; a GLSL global with no
+// storage qualifier is per-invocation (it is not `shared`, which would be group-scoped).
+// GLSL: int g_perThread_
+// SPIRV maps the Thread-local address space to the Private storage class (per-invocation).
+// SPIRV: %g_perThread = OpVariable {{.*}} Private

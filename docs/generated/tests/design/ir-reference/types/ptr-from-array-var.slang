@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#ptr-and-the-access-qualifier--address-space-operands
-//META: doc_section_digest=24583cce8243a26e6a6077b224e031406f0c718c4c1df3a220b3be0cd7b9c590
+//META: doc_section_digest=0590daabe37f0725bd791f52ce8453f35ec5ecfd6f228bf4bc3a12a46ad36613
 //META: purpose=Boundary: a local var of fixed-array type produces a value of IR type Ptr(Array(<T>, <N>)).
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `Ptr` note says `Ptr(valueType, ...)` is the pointer
-// type opcode. A local fixed-size array variable is allocated
+// a local var of fixed-array type produces a value of IR type
+// Ptr(Array(<T>, <N>)). A local fixed-size array variable is allocated
 // via `var` and its result is typed `Ptr(Array(Int, 3 : Int))` —
 // composition between `Ptr` and `Array`.
 
