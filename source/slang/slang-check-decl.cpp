@@ -14955,6 +14955,22 @@ static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
 
 void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
 {
+    // This is the header-modifier load trigger: a callable that declares itself differentiable
+    // (`[Differentiable]` / `[ForwardDifferentiable]` / `[BackwardDifferentiable]`, tested by
+    // `_callableHasDifferentiabilityHeaderModifier`) needs the supplement's derivative machinery to
+    // finish setup. A callable that only carries a custom-derivative attribute
+    // (`[ForwardDerivative]`, `[PrimalSubstituteOf]`, ...) is intentionally not covered here: those
+    // attributes do not subclass `DifferentiableAttribute`, and their supplement dependency is
+    // driven separately by the `DifferentiateExpr`/`PrimalSubstituteExpr` synthesized when the
+    // attribute is checked (see `_checkHigherOrderInvokeExpr`). If the load fails, abort the rest
+    // of the differentiable setup below (implicit `no_diff` synthesis etc.), which reads supplement
+    // declarations; `ensureAutodiffModuleLoaded` has already diagnosed the failure.
+    if (_callableHasDifferentiabilityHeaderModifier(decl) &&
+        SLANG_FAILED(ensureAutodiffModuleLoaded(decl->loc)))
+    {
+        return;
+    }
+
     _maybeAddImplicitNoDiffThisForNonDifferentiableThis(this, decl);
 
     // TODO: Need to make this not depend on the attribute, but rather on differentiability
@@ -17634,12 +17650,64 @@ void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, Extensio
     }
 }
 
+// Make the on-demand autodiff supplement `moduleDecl` visible to this context's already-built
+// aggregate views. Post-condition: on return, every candidate extension and decl association the
+// supplement declares appears in any built view exactly once, and every extended decl's extension
+// epoch has advanced. Idempotent under repeated calls and safe regardless of which other linkage
+// loaded the supplement first.
+//
+// Two distinct hazards need two distinct idempotence mechanisms, which is why both exist:
+//   1. The `m_loadedAutodiffModules` set guards against *this* context merging the same supplement
+//      twice (a second differentiability trigger in the same linkage re-calls this).
+//   2. The canonical-identity dedup inside `_mergeCandidateExtensionsFromModule` /
+//      `_mergeDeclAssociationsFromModule` guards a different case: a view that was first built
+//      *after* another linkage loaded the supplement already includes it through
+//      `Session::coreModules`, so a later incremental merge here must not append those entries a
+//      second time.
+void SharedSemanticsContext::addLoadedAutodiffModule(ModuleDecl* moduleDecl)
+{
+    if (!m_loadedAutodiffModules.add(moduleDecl))
+        return;
+
+    // This context may already have cached extensions from the base core and the module currently
+    // being checked. Rebuilding the aggregate views would discard those current-module entries;
+    // for example, the neural module would lose its Array<T, N> : IArrayAccessor<T> extension.
+    // Merge the supplement incrementally instead (hazard 2 above): another linkage may have loaded
+    // the supplement before this context built a view, so the merge uses canonical declaration
+    // identity to keep entries that normal construction already included from being appended twice.
+    // If a view has not been built yet, its normal first build will include this module through
+    // `Session::coreModules`.
+    //
+    // Extension epochs are independent of whether either aggregate view has been built. Always
+    // advance them so inheritance and subtype cache entries computed before this load are invalid.
+    for (const auto& entry : moduleDecl->mapDeclToCandidateExtensions)
+        bumpDeclExtensionEpoch(entry.first);
+
+    if (m_candidateExtensionListsBuilt)
+        _mergeCandidateExtensionsFromModule(moduleDecl);
+    if (m_associatedDeclListsBuilt)
+        _mergeDeclAssociationsFromModule(moduleDecl);
+}
+
 void SharedSemanticsContext::_addCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
 {
     for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
     {
         auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
         list.addRange(entryValue->candidateExtensions);
+    }
+}
+
+void SharedSemanticsContext::_mergeCandidateExtensionsFromModule(ModuleDecl* moduleDecl)
+{
+    for (auto& [entryKey, entryValue] : moduleDecl->mapDeclToCandidateExtensions)
+    {
+        auto& list = _getCandidateExtensionList(entryKey, m_mapDeclToCandidateExtensions);
+        for (auto extension : entryValue->candidateExtensions)
+        {
+            if (!list.contains(extension))
+                list.add(extension);
+        }
     }
 }
 
@@ -17667,6 +17735,19 @@ void SharedSemanticsContext::_addDeclAssociationsFromModule(ModuleDecl* moduleDe
     {
         auto& list = _getDeclAssociationList(entry.key, m_mapDeclToAssociatedDecls);
         list.addRange(entry.value->associations);
+    }
+}
+
+void SharedSemanticsContext::_mergeDeclAssociationsFromModule(ModuleDecl* moduleDecl)
+{
+    for (auto& entry : moduleDecl->mapDeclToAssociatedDecls)
+    {
+        auto& list = _getDeclAssociationList(entry.key, m_mapDeclToAssociatedDecls);
+        for (auto association : entry.value->associations)
+        {
+            if (!list.contains(association))
+                list.add(association);
+        }
     }
 }
 
@@ -19196,7 +19277,18 @@ static void translateFwdDerivativeAttributeToAD2(
         outermostFwdDiffDecl = outermostFwdDiffDecl->parentDecl;
     }
 
-    getModuleDecl(funcDecl)->addMember(outermostFwdDiffDecl);
+    // The primal can belong to a deserialized builtin module, which must remain immutable. Own the
+    // synthesized extension in the module that contains the derivative declaration, matching the
+    // backward-derivative path in `extendContainerDecl`.
+    //
+    // This runs while checking a custom-derivative attribute on a user-written declaration, so the
+    // context is always bound to the module being checked and `getModule()` is non-null. The
+    // release assert documents that invariant and fails loudly if a future caller ever invokes this
+    // translation without a current module, rather than silently attaching the extension nowhere.
+    auto currentModule = visitor->getShared()->getModule();
+    SLANG_RELEASE_ASSERT(currentModule);
+    auto currentModuleDecl = currentModule->getModuleDecl();
+    currentModuleDecl->addMember(outermostFwdDiffDecl);
     // End AD 2.0 translation
 }
 

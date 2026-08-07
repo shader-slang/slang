@@ -367,6 +367,20 @@ ComPtr<ISlangBlob> Session::getHLSLLibraryCode()
     return hlslLibraryCode;
 }
 
+ComPtr<ISlangBlob> Session::getAutodiffBaseLibraryCode()
+{
+#if SLANG_EMBED_CORE_MODULE_SOURCE
+    if (!autodiffBaseLibraryCode)
+    {
+        const String path = getCoreModulePath();
+        StringBuilder sb;
+#include "autodiff-base.meta.slang.h"
+        autodiffBaseLibraryCode = StringBlob::moveCreate(sb);
+    }
+#endif
+    return autodiffBaseLibraryCode;
+}
+
 ComPtr<ISlangBlob> Session::getAutodiffLibraryCode()
 {
 #if SLANG_EMBED_CORE_MODULE_SOURCE

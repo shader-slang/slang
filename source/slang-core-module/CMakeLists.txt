@@ -101,6 +101,12 @@ set(core_module_generated_header
 set(core_module_archive_without_timestamp
     ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module-without-timestamp.bin
 )
+set(autodiff_module_generated_header
+    ${core_module_generated_header_dir}/slang-autodiff-module-generated.h
+)
+set(autodiff_module_archive_without_timestamp
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-autodiff-module-without-timestamp.bin
+)
 set(glsl_module_generated_header_dir
     ${CMAKE_CURRENT_BINARY_DIR}/../slang-glsl-module
 )
@@ -142,6 +148,8 @@ add_custom_command(
     OUTPUT
         ${core_module_archive_without_timestamp}
         ${core_module_generated_header}
+        ${autodiff_module_archive_without_timestamp}
+        ${autodiff_module_generated_header}
         ${glsl_module_generated_header}
     ${bootstrap_pre_copy_command}
     COMMAND
@@ -156,6 +164,10 @@ add_custom_command(
         ${core_module_archive_without_timestamp}
         -save-core-module-bin-source
         ${core_module_generated_header}
+        -save-autodiff-module
+        ${autodiff_module_archive_without_timestamp}
+        -save-autodiff-module-bin-source
+        ${autodiff_module_generated_header}
         -save-glsl-module-bin-source
         ${glsl_module_generated_header}
     DEPENDS
@@ -170,6 +182,8 @@ add_custom_target(
     DEPENDS
         ${core_module_archive_without_timestamp}
         ${core_module_generated_header}
+        ${autodiff_module_archive_without_timestamp}
+        ${autodiff_module_generated_header}
         ${glsl_module_generated_header}
 )
 set_target_properties(generate_core_module PROPERTIES FOLDER generated)
