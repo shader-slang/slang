@@ -399,16 +399,15 @@ private:
             line.number = span.line;
             if (line.content.getLength() == 0 && !line.sourceAvailable)
             {
-                SourceLoc startLoc = span.startLoc;
-                SourceView* view = m_sourceManager
-                                       ? m_sourceManager->findSourceViewThroughExpansion(startLoc)
-                                       : nullptr;
+                SourceView* view =
+                    m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
                 {
                     line.sourceAvailable = true;
                     // Use the *actual* (non-remapped) line so that a #line
                     // directive doesn't cause us to display the wrong source.
-                    auto actualLine = view->getHumaneLoc(startLoc, SourceLocType::Actual).line;
+                    auto actualLine =
+                        view->getHumaneLoc(span.startLoc, SourceLocType::Actual).line;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(actualLine - 1));
