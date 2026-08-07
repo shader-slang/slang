@@ -4893,7 +4893,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugNoScope:
             if (shouldEmitExtendedDebugInfo)
             {
-                *emittedSpvInst = emitDebugNoScope(parent);
+                auto noScope = as<IRDebugNoScope>(inst);
+                *emittedSpvInst = emitDebugScopeRestore(parent, noScope);
+                if (!*emittedSpvInst)
+                    *emittedSpvInst = emitDebugNoScope(parent);
             }
             return true;
 
@@ -10555,12 +10558,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
     {
-        auto inlinedAt = ensureInst(debugScope->getInlinedAt());
-        if (!inlinedAt)
-            return nullptr;
-
         SpvInst* scope = ensureInst(debugScope->getScope());
         if (!scope)
+            return nullptr;
+        SpvInst* inlinedAt = ensureInst(debugScope->getInlinedAt());
+        if (!inlinedAt)
             return nullptr;
 
         return emitOpDebugScope(
@@ -10570,6 +10572,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getNonSemanticDebugInfoExtInst(),
             scope,
             inlinedAt);
+    }
+
+    /// Emit the scope-restoring form of `IRDebugNoScope`, which carries the scope to return to in
+    /// its single operand. The `Inlined` operand of NonSemantic.Shader.DebugInfo `DebugScope` is
+    /// optional, so this renders as a one-operand `DebugScope` — the same form emitFuncDefinition
+    /// emits for a function's entry scope. Returns null when the inst has no scope operand, leaving
+    /// the caller to emit a plain scope-clearing `DebugNoScope`.
+    SpvInst* emitDebugScopeRestore(SpvInstParent* parent, IRDebugNoScope* debugNoScope)
+    {
+        auto scopeInst = debugNoScope->getScope();
+        if (!scopeInst)
+            return nullptr;
+        SpvInst* scope = ensureInst(scopeInst);
+        if (!scope)
+            return nullptr;
+
+        return emitOpDebugScope(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            scope,
+            nullptr);
     }
 
 

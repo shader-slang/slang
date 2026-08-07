@@ -3683,8 +3683,10 @@ IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
     return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
 }
 
-IRInst* IRBuilder::emitDebugNoScope()
+IRInst* IRBuilder::emitDebugNoScope(IRInst* scope)
 {
+    if (scope)
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 1, &scope);
     return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 0, nullptr);
 }
 
