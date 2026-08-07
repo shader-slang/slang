@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:14:10Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#what-is-serialized
-//META: doc_section_digest=7f78048ab2d7f60f952762cba928594fc1d4e19e41781578c6ae1ab63d4c45e4
+//META: doc_section_digest=8bfabdd75a7732fc1c25f95a75f88e48e5e707f7a5d47924d3ce8e76fc6f67ce
 //META: purpose=A .slang-module written by slangc can be re-read by the compiler and its IR dumped, demonstrating the AST/IR/container round-trip the doc describes.
 //META: intent=functional
 //META: pipeline_stage=link

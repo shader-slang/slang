@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b22ae0db87266fb01a1be1ff4487019df27480bf09ff6476d416556c6388f8d4
+//META: doc_section_digest=4c42d570b7022f6aea368273b44c89c0162efacf44581dd09dea681340a92303
 //META: purpose=The synthetic tag-type inheritance on enums carries IgnoreForLookupModifier so the underlying integer type's members are not surfaced as enum members; access to such a member produces 'member not found'.
 //META: intent=negative
 //META: pipeline_stage=check

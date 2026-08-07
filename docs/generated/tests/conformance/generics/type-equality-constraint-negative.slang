@@ -13,8 +13,9 @@
 // constraint for associated type" example: `addTwoInts<T:IFace> where
 // T.PropertyType == int` requires the associated type be int, but FloatProperty
 // has PropertyType == float. Calling addTwoInts with FloatProperty values
-// cannot satisfy the equality constraint; CHECK asserts E39999 "could not
-// specialize generic" fires (non-exhaustive skips the "see declaration" note).
+// cannot satisfy the equality constraint; CHECK asserts E30440 "generic
+// constraint not satisfied" fires, naming the 'T.PropertyType == int'
+// constraint (non-exhaustive skips the constraint/function declaration notes).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
@@ -43,5 +44,6 @@ void computeMain()
     FloatProperty f1 = { 1.0 };
     FloatProperty f2 = { 2.0 };
     outputBuffer[0] = addTwoInts(f1, f2);
-    //CHECK: E39999
+//CHECK:                        ^ could not satisfy the generic constraint 'T.PropertyType == int'
+    //CHECK: E30440
 }

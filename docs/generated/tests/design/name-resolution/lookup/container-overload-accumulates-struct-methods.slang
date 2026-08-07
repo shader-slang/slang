@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#container-level-overload-accumulation
-//META: doc_section_digest=abaee536cf032e619ae16ca54b65e279f6271cecbdc254213692b2f9ca5f2f4e
+//META: doc_section_digest=4a95bcec16a9bf11be95d72b19cea0e3cb0d4b3919f3c54475a22de63564ed21
 //META: purpose=Same-named methods inside one struct container accumulate into a LookupResult via the _prevInContainerWithSameName chain; overload resolution then picks the candidate matching the argument type.
 //META: intent=functional
 //META: pipeline_stage=check

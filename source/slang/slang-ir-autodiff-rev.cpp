@@ -555,22 +555,21 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
         {
             auto key = contextTypeBuilder.createStructKey();
             auto structFieldType = applyForBwdParam->getDataType();
+            IRInst* rematContextValue = rematFuncParam;
 
             if (auto inoutParamType = as<IRBorrowInOutParamType>(applyForBwdParam->getDataType()))
             {
+                // The context stores the pointee value needed by propagation, so a borrowed-inout
+                // parameter such as a subscript setter's `self` must be loaded before storage.
                 structFieldType = inoutParamType->getValueType();
-                contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
+                rematContextValue = rematFuncBuilder.emitLoad(rematFuncParam);
             }
-            else
-            {
-                // Has to be "in" type.
-                contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
-            }
+            contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
 
             rematFuncBuilder.emitStore(
                 rematFuncBuilder
                     .emitFieldAddress(builder.getPtrType(structFieldType), rematContextVar, key),
-                rematFuncParam);
+                rematContextValue);
 
             if (as<IRVoidType>(bwdPropParam->getDataType()))
             {

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#spir-v-direct
-//META: doc_section_digest=42d7bd80dcaa52d3a64e75557163627a5a0662ae56a50368df92112952f8a0d1
+//META: doc_section_digest=799614514ad493b834b1c49840d773548f743d33a2ab4f40a07229dca8dbbe9b
 //META: purpose=The direct SPIR-V backend emits SPIR-V text with OpCapability Shader, OpEntryPoint GLCompute, OpExecutionMode LocalSize, and OpDecorate Binding/DescriptorSet for a buffer resource.
 //META: intent=functional
 //META: pipeline_stage=emit

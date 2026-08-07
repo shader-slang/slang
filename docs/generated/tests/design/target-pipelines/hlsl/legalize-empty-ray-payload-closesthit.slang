@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizeemptyraypayloadsforhlsl
-//META: doc_section_digest=a1a0698d0601593c56d2536c58849e0fa5512ebb7c81aaaa30347f38484f6c9f
+//META: doc_section_digest=491c8902f878be66375a70161ee68eb66e0c6a5fd8e062f48578e34026370db7
 //META: purpose=legalizeEmptyRayPayloadsForHLSL adds a dummy field to an empty DXR ray-payload struct so DXIL has a non-empty payload; the HLSL emission of a closesthit entry point keeps a non-empty payload struct.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

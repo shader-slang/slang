@@ -12,8 +12,9 @@
 // Verifies the non-emptiness guard's negative side: `sumNonempty<each T> where
 // nonempty(T)` requires the pack to be non-empty at specialization time.
 // Calling it with no arguments binds the pack to length 0, violating the
-// constraint. CHECK asserts E39999 "could not specialize generic" fires on the
-// empty call (non-exhaustive skips the trailing "see declaration" note).
+// constraint. CHECK asserts E30440 "generic constraint not satisfied" fires on
+// the empty call, naming the 'nonempty(T)' constraint (non-exhaustive skips
+// the trailing constraint-declaration and function-declaration notes).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl
 
@@ -35,5 +36,6 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain()
 {
     outputBuffer[0] = sumNonempty();
-    //CHECK: E39999
+//CHECK:                         ^ could not satisfy the generic constraint 'nonempty(T)'
+    //CHECK: E30440
 }

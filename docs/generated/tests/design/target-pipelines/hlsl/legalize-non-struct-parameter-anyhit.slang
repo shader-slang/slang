@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizenonstructparametertostructforhlsl
-//META: doc_section_digest=22ad05f0b82be681c3aaa0f7d4e69c88ae0c09144722950713aebddf79498241
+//META: doc_section_digest=07ae9ce54cd50947e6abefcc2cc8106d2dd41fa339b3cfc9715169b5a390779a
 //META: purpose=legalizeNonStructParameterToStructForHLSL wraps non-struct DXR-stage parameters in single-field struct types so DXC accepts them; the HLSL emission of an anyhit entry point taking a non-struct payload still produces a struct-typed payload parameter.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass

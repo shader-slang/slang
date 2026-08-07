@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T19:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#interface-internals
-//META: doc_section_digest=881ba3684ff6d20a2e1a262e82de634f0b857cc0f62fb483fbb5984cc6845bdf
+//META: doc_section_digest=5dc76a84fdd1669b550ae0adc67c151d06f4b871041e89b69aba78caf6fb2ddc
 //META: purpose=An interface with multiple method requirements emits one interface_req_entry per requirement, and the interface opcode lists all of them as its operands.
 //META: intent=functional
 //META: pipeline_stage=lower

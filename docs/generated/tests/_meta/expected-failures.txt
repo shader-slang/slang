@@ -82,6 +82,14 @@ docs/generated/tests/conformance/expressions-member-access/matrix-mij-zero-based
 # equivalent; `.` works in slangi, `::` does not.
 docs/generated/tests/conformance/expressions-member-access/static-dot-vs-colon-colon.slang
 
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-optional-none-arg-wrong-value.yaml
+# slangi VM passes an `Optional<T>` argument given as `none` with a
+# garbage (truthy) hasValue, so the callee unwraps value 0 instead of
+# taking the no-value branch. CPU compute executes the same function
+# correctly; the bug is at the VM's argument-passing boundary. The
+# if-let test's negative case (b=-1) hits this and prints b=0.
+docs/generated/tests/design/name-resolution/scopes/if-let-unwrapped-visible-in-positive-branch.slang
+
 # Pending: docs/generated/tests/_meta/findings/slangi-vm-global-var-bytecode-unsupported.yaml
 # slangi VM aborts with "unsupported global inst for vm bytecode
 # emit" when any module-scope global variable is declared (e.g.
@@ -169,3 +177,19 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 # not help; kept here so the next flip to FAILED doesn't turn the nightly
 # red.
 docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-get-string-hash-bytecode-unimplemented.yaml
+# slangi VM aborts with "unimplemented: VM bytecode gen for inst" on
+# any `getStringHash("...")` call. The doc documents the opcode as a
+# compile-time-stable literal hash folded by the emitters; the C++
+# emit path folds it correctly, only the VM bytecode emitter lacks a
+# handler. (Will become a tracking issue after human triage.)
+docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-interpret.slang
+
+# Pending: docs/generated/tests/_meta/findings/cpu-get-string-hash-slang-test-segfault.yaml
+# slang-test dies with SIGSEGV (exit 139) when executing a
+# COMPARE_COMPUTE -cpu kernel that calls `getStringHash`. Codegen is
+# healthy (-target cpp folds both call sites to the same constant);
+# the crash is in slang-test's CPU host-callable execution path.
+# (Will become a tracking issue after human triage.)
+docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang (cpu)

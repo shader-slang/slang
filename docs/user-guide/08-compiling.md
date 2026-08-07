@@ -301,6 +301,7 @@ When used, `option` is not interpreted by GCC, but is passed to the linker once 
 * `gcc` - GCC C/C++ compiler
 * `genericcpp` - A generic C++ compiler (can be any one of Visual Studio, Clang, or GCC depending on the system and availability)
 * `nvrtc` - NVRTC CUDA compiler
+* `spirv-opt` - spirv-tools SPIRV optimizer
 
 The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example, to send an option `-Gfa` through to DXC you can use:
 
@@ -349,6 +350,14 @@ And the linker would see (as passed through by GCC):
 ```
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
+
+Arguments passed via `-Xspirv-opt` are forwarded to the SPIRV-Tools optimizer as additional passes, registered on top of the passes selected by the `-O<level>` preset (they add to that level, they do not replace it). For example, to strip debug information in addition to the `-O1` passes:
+
+```
+-target spirv -O1 -Xspirv-opt --strip-debug
+```
+
+The accepted flags are the pass-selection flags of the `spirv-opt` command-line tool (for example `--strip-debug`, `--eliminate-dead-code-aggressive`, `-O`, `-Os`) — those recognized by SPIRV-Tools' `RegisterPassesFromFlags`. The full set is documented by the `spirv-opt` tool itself (see [`tools/opt/opt.cpp`](https://github.com/KhronosGroup/SPIRV-Tools/blob/main/tools/opt/opt.cpp) in the SPIRV-Tools repository, or run `spirv-opt --help`). Driver-level `spirv-opt` options that do not select a pass (such as `--target-env` or `--validate-after-all`) are not supported. An unrecognized flag is reported by SPIRV-Tools and the compilation fails. The selected passes run in addition to the `-OX` preset; because they are requested explicitly, they run even under `-O0` (which has no preset of its own, so only the selected passes run). They currently apply to the default direct SPIR-V path; they are not forwarded on the `-emit-spirv-via-glsl` path.
 
 NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 
@@ -1076,7 +1085,7 @@ meanings of their `CompilerOptionValue` encodings.
 | ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
 | ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
 | SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
-| Capability | Specify an additional capability available in the compilation target. `intValue0` encodes a capability defined in the `CapabilityName` enum. |
+| Capability | Specify an additional capability available in the compilation target. Can be a string or int value kind. `stringValue0` encodes the capability name as listed in [Capability Atoms](a4-02-reference-capability-atoms.md). `intValue0` encodes the raw capability representation returned by `IGlobalSession::findCapability`. |
 | DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
 | DisableDynamicDispatch | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting. |
 | DisableSpecialization | (Internal use only) Disables specialization pass. `intValue0` encodes a bool value for the setting. |

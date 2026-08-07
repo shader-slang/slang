@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=f394bf1461f5876676bdb5fa5c51feaa920cf5ef0986df9fe1bbf0db976d5a30
+//META: doc_section_digest=52293a26550b22915d50787927526213ba913b7231afe19be04ac5605d79d8b4
 //META: purpose=`Atomic<int>::store(0)` followed by `::load()` still lowers to the documented `atomicStore(%ptr, 0, ...)` and `atomicLoad(%ptr, ...)` opcode shapes; the zero value is preserved as `0 : Int`.
 //META: intent=boundary
 //META: pipeline_stage=lower

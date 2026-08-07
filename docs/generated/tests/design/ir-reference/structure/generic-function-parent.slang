@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T19:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#generic
-//META: doc_section_digest=de5860c73e271c909e6884da3649075d646d724d377f47e76f00e455a119f9c2
+//META: doc_section_digest=afb5058aadcf477df5d62ea29df599323aa382ac64a993536ea1cf9976ac2133
 //META: purpose=A generic function lowers to a generic parent opcode containing a func child whose signature is parameterised by the type parameter.
 //META: intent=functional
 //META: pipeline_stage=lower

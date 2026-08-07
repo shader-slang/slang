@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#complex-modifiers-take-arguments
-//META: doc_section_digest=80bd4844532fa1dfb157f799dd251a83773921d0d32ca7088915141e5b59809b
+//META: doc_section_digest=0c769c06f658e9cbe41c9112d657ab8a79a2d6825eb5ac75ef2c274d28c2b46e
 //META: purpose=`hitAttributeEXT` is a complex modifier in the raytracing family; an HLSL-style intersection shader that calls `ReportHit` with a user-defined hit-attribute struct lowers to GLSL with a `hitAttributeEXT`-decorated variable and pulls in the `GL_EXT_ray_tracing` extension.
 //META: intent=expansion
 //META: pipeline_stage=emit

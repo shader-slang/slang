@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#sibling-scopes
-//META: doc_section_digest=ed7fdf88e5d58ccf747775f1dfc045814145bf33056dcbfb7bd439f00b7e50cb
+//META: doc_section_digest=1730544025501f67efee33835c81f561c62ac7733b5e89832c526106e61b012f
 //META: purpose=Re-opening the same namespace name reuses the existing NamespaceDecl and links siblings; members from both declarations are reachable via the same qualified name.
 //META: intent=functional
 //META: pipeline_stage=check

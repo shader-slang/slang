@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#expression-keywords
-//META: doc_section_digest=44ec80292e79604a0622888241e4998ddb07e1c6a708c0c3c0b8cfa44ba7028e
+//META: doc_section_digest=5cf1a0be2720fdb7640ba4534ce97ec9428cc65b37576f2b89297596bf873eb6
 //META: purpose=`this` is an expression keyword denoting the current object inside a member function.
 //META: intent=functional
 //META: pipeline_stage=parse

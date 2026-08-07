@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:30:00+00:00
 //META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
 //META: doc_ref=docs/generated/design/pipeline/overview.md#emit
-//META: doc_section_digest=d7c5155aced5a19f1303c1d313c7cf3b21da58b38cefd801d92e52039ee02528
+//META: doc_section_digest=9515679b1e1968d4038a9e63493eb3a482f5a3bed2c8a06d6786c87b8c05f142
 //META: purpose=The [shader("compute")] entry-point attribute survives every pipeline stage and emerges as the target's compute-kernel marker.
 //META: intent=functional
 //META: pipeline_stage=emit

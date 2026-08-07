@@ -211,6 +211,62 @@ warning(
     "'-separate-debug-info' is not supported for target '~target'"
 )
 
+warning(
+    "debug-info-include-source-unsupported-for-target",
+    21,
+    "'-debug-info-include-source' is not supported for target '~target'; it only affects SPIR-V output"
+)
+
+err(
+    "separate-debug-info-requires-output-path",
+    109,
+    "`-separate-debug-info` requires an output file path; use `-o <path>` or `-separate-debug-info-output <path>`"
+)
+
+err(
+    "separate-debug-info-output-without-separate-debug-info",
+    110,
+    "`-separate-debug-info-output` requires `-separate-debug-info`"
+)
+
+err(
+    "separate-debug-info-output-collides-with-artifact",
+    111,
+    "`-separate-debug-info-output` path '~path' must differ from output path '~otherPath' emitted by this compile"
+)
+
+err(
+    "separate-debug-info-output-with-container",
+    112,
+    "`-separate-debug-info-output` is not supported when writing a container output"
+)
+
+err(
+    "separate-debug-info-output-without-debug-data",
+    113,
+    "`-separate-debug-info-output` path '~path' was requested, but the selected target did not produce separate debug information"
+)
+
+err(
+    "separate-debug-info-output-multiple-artifacts",
+    114,
+    "`-separate-debug-info-output` path '~path' cannot receive multiple separate debug-information artifacts"
+)
+
+err(
+    "spirv-validation-unavailable",
+    115,
+    "SPIR-V validation was requested, but the loaded 'slang-glslang' library does not export 'glslang_validateSPIRV'; no SPIR-V was validated",
+    span { loc = "location" }
+)
+
+err(
+    "downstream-linking-unavailable",
+    116,
+    "linking multiple SPIR-V modules was required, but the loaded 'slang-glslang' library does not export 'glslang_linkSPIRV'; no SPIR-V was linked. Install a 'slang-glslang' library matching this Slang version, which provides SPIR-V linking",
+    span { loc = "location" }
+)
+
 err(
     "unknown-source-language",
     19,
@@ -282,6 +338,12 @@ err(
 warning("same-profile-specified-more-than-once", 40, "the '~profile' was specified more than once for target '~target'")
 
 err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have been specified for target '~target'")
+
+err(
+    "conflicting-explicit-capability-and-profile",
+    46,
+    "a requested '-capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the conflicting '-capability'"
+)
 
 err(
     "profile-specification-ignored-because-no-targets",
@@ -880,10 +942,10 @@ err(
 )
 
 err(
-    "operator-name-used-as-variable-name",
+    "operator-name-on-non-function",
     20020,
-    "operator name used as variable name",
-    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+    "operator name used to declare a non-function",
+    span { loc = "location", message = "an operator name can only be used to declare an operator function, not a variable, parameter, typedef, or property" }
 )
 
 err(
@@ -1689,6 +1751,13 @@ warning(
     30082,
     "implicit float-to-double conversion",
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
+)
+
+warning(
+    "deprecated-struct-cast-from-zero",
+    30087,
+    "casting literal 0 to a struct type changes semantics in Slang 202c",
+    span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 202c. To keep the current semantics, switch to a constructor with no parameters." }
 )
 
 -- try/throw diagnostics
@@ -3326,6 +3395,13 @@ err(
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
 )
 
+err(
+    "switch-condition-not-integer",
+    30607,
+    "switch condition must be an integer or enum type",
+    span { loc = "expr:Expr", message = "'switch' condition must be of an integer or enum type, but is of type '~type:Type'" }
+)
+
 -- 310xx: link time specialization
 -- (definitions moved to slang-diagnostics-semantic-checking-7.lua)
 
@@ -3960,15 +4036,15 @@ standalone_note(
 err(
     "case-outside-switch",
     39999,
-    "'case' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'case' not allowed outside of a 'switch' statement" }
+    "'case' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'case' is only allowed in a 'switch' body" }
 )
 
 err(
     "default-outside-switch",
     39999,
-    "'default' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'default' not allowed outside of a 'switch' statement" }
+    "'default' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'default' is only allowed in a 'switch' body" }
 )
 
 err(
@@ -4063,6 +4139,13 @@ err(
     39999,
     "invalid suffix on floating-point literal",
     span { loc = "location", message = "invalid suffix '~suffix' on floating-point literal" }
+)
+
+err(
+    "invalid-floating-point-literal-number",
+    39999,
+    "invalid floating-point number",
+    span { loc = "location", message = "invalid floating-point number '~number' on floating-point literal" }
 )
 
 warning(
@@ -4243,6 +4326,13 @@ standalone_note(
     -1,
     "member '~member:Decl' cannot satisfy differentiable interface requirement '~requirement:Decl' because it does not provide the required differentiability; it may be missing an appropriate differentiability attribute, such as [Differentiable]",
     span { loc = "member:Decl" }
+)
+
+err(
+    "callable-does-not-satisfy-differentiability-requirement",
+    38110,
+    "callable differentiability requirement not satisfied",
+    span { loc = "member:Decl", message = "member '~member:Decl' does not satisfy the required ~mode:String constraint for interface requirement '~requirement:Decl'." }
 )
 
 warning(
@@ -4713,6 +4803,13 @@ err(
     39030,
     "target does not support 'DescriptorHandle' types",
     span { loc = "location", message = "the current compilation target does not support 'DescriptorHandle' types." }
+)
+
+err(
+    "target-does-not-support-ray-tracing-parameters",
+    39032,
+    "target does not support ray tracing entry point parameters",
+    span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
 )
 
 warning(
@@ -5205,7 +5302,21 @@ err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
-    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~elementSize:Int`" }
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be at least `~requiredAlignment:Int`, the natural alignment of the access type's scalar components" }
+)
+
+err(
+    "byte-address-buffer-alignment-not-power-of-two",
+    41301,
+    "byte address buffer alignment must be a power of two",
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be a power of two" }
+)
+
+err(
+    "byte-address-buffer-location-not-aligned",
+    41303,
+    "byte address buffer location is not a multiple of the specified alignment",
+    span { loc = "location", message = "the byte address buffer location `~offset:Int` is not a multiple of the specified alignment `~alignment:Int`" }
 )
 
 err(
@@ -5586,6 +5697,12 @@ err(
     span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
+warning(
+    "precise-qualifier-unsupported-on-target",
+    56005,
+    "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
+    span { loc = "location" }
+)
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
@@ -5655,7 +5772,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57005)
+-- SPIRV (57001-57007)
 
 warning(
     "spirv-opt-failed",
@@ -5695,6 +5812,12 @@ err(
     "spirv-conflicting-descriptor-heap-stride-options",
     57006,
     "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
+)
+
+err(
+    "debug-info-include-source-requires-debug-info",
+    57007,
+    "'-debug-info-include-source' cannot be used with '-g0' or when no debug information is enabled; enable at least '-g1'."
 )
 
 -- GLSL Compatibility (58001-58003)

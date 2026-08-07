@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#linking-and-validation
-//META: doc_section_digest=61134c3253681818e651a9810123d97ae5bcc929737f8bed5d159bd896cf3248
+//META: doc_section_digest=58fa3369415eb3c0f619a693173bd6b5687b7ba23f5dcacb867f675d1811ebbf
 //META: purpose=Negative: the check-optional-none-usage pass rejects `.value` access on an `Optional<int>` declared with an explicit `= none` initializer (alternative shape to the default-constructed case).
 //META: intent=negative
 //META: pipeline_stage=ir-pass
