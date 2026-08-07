@@ -3684,6 +3684,12 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 
         return ParamPassingMode::BorrowIn;
     }
+    // Unlike a payload, which maps to `BorrowIn` above, a `groupshared` parameter can be
+    // read-write, so the checker picks `RefModifier` or `BorrowModifier` per spelling and one of
+    // the branches above returns first. Reaching here means that injection was missed, and the
+    // fall-through would silently return a by-value copy -- issue #10641 again -- so this must fire
+    // in release too.
+    SLANG_RELEASE_ASSERT(!paramDecl->hasModifier<HLSLGroupSharedModifier>());
     if (paramDecl->hasModifier<InOutModifier>())
     {
         // The AST specified `inout`:

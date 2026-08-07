@@ -2262,6 +2262,18 @@ Result linkAndOptimizeIR(
         {
             // WGSL, like GLSL and SPIR-V, requires an integer `switch` selector.
             SLANG_PASS(legalizeBoolSwitchForTargetsRequiringIntSwitch);
+
+            // WGSL can represent resource parameters, but baseline WGSL cannot take a
+            // `ptr<workgroup, ...>` as a function parameter, so a `groupshared` value passed by
+            // reference (#10641) must be inlined away. This has to run *before*
+            // `legalizeIRForWGSL`: that pass's `legalizeCall` would otherwise bridge the
+            // `groupshared` global argument through a `function`-space copy-in/out temporary
+            // (it is a `BorrowInOutParam`), which silently reintroduces the per-invocation
+            // whole-array copy that #10641 exists to remove. Inlining first makes the callee and
+            // its parameter disappear, so the shared accesses land directly on the `workgroup`
+            // global. Reuse the GLSL resource-return fallback pass restricted to that single case.
+            SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram, true);
+
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
@@ -2425,6 +2437,7 @@ Result linkAndOptimizeIR(
         // As a fallback, if the above specialization steps failed to remove resource type
         // parameters, we will inline the functions in question to make sure we can produce
         // valid GLSL.
+        //
         SLANG_PASS(performGLSLResourceReturnFunctionInlining, targetProgram);
     }
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -2738,8 +2751,7 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
-    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
-        SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
+    SLANG_PASS(checkUnsupportedInst, targetProgram, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 

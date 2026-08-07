@@ -13,6 +13,7 @@
 // logic also orchestrates the overall flow and how
 // and when things get checked.
 
+#include "../core/slang-type-text-util.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-ast-iterator.h"
 #include "slang-ast-print.h"
@@ -13981,6 +13982,34 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    // A `groupshared` parameter names one thread-group-shared storage location and is therefore
+    // passed by reference, so the copy-direction modifiers are not applicable to it. Reject them at
+    // the producer rather than letting lowering revert to a per-thread copy -- the #10641 defect.
+    // `InOutModifier` derives from `OutModifier`, so it is checked first to report the most
+    // specific keyword.
+    if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
+    {
+        Modifier* directionModifier = paramDecl->findModifier<InOutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<OutModifier>();
+        if (!directionModifier)
+            directionModifier = paramDecl->findModifier<InModifier>();
+        if (directionModifier)
+            getSink()->diagnose(Diagnostics::GroupsharedParameterCannotHaveDirectionModifier{
+                .modifier = directionModifier});
+
+        // `const groupshared` cannot take `RefModifier`: `ConstModifier` clears `isLeftValue`, and
+        // the invoke check requires a mutable l-value for a `RefParamType` argument, so the
+        // parameter would be uncallable. `BorrowModifier` is what `__constref` carries.
+        if (!paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>())
+        {
+            if (paramDecl->hasModifier<ConstModifier>())
+                addModifier(paramDecl, this->getASTBuilder()->create<BorrowModifier>());
+            else
+                addModifier(paramDecl, this->getASTBuilder()->create<RefModifier>());
+        }
+    }
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
@@ -14978,6 +15007,31 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     addModifier(paramDecl, noDiffModifier);
                 }
             }
+            // A `groupshared` parameter is passed by reference, so there is nowhere to propagate a
+            // derivative back to. Span the diagnostic on the `groupshared` modifier the user wrote:
+            // the reference modifier is injected during parameter checking and carries no source
+            // location, and the `BorrowModifier` message below would name a spelling that appears
+            // nowhere in the source. This sits outside the `no_diff` check because `no_diff` does
+            // not stop the parameter being passed by reference -- without it, both spellings reach
+            // an unconditional abort in the backward-diff type builders.
+            if (auto groupSharedModifier = paramDecl->findModifier<HLSLGroupSharedModifier>())
+            {
+                // Only a differentiable parameter type is a problem: a derivative is only expected
+                // through a parameter whose type conforms to `IDifferentiable`, so
+                // `const groupshared uint[N]` is fine while `const groupshared float[N]` is not.
+                if (isTypeDifferentiable(paramDecl->type.type) &&
+                    (paramDecl->hasModifier<RefModifier>() ||
+                     paramDecl->hasModifier<BorrowModifier>()))
+                {
+                    getSink()->diagnose(
+                        Diagnostics::CannotUseGroupsharedOnDifferentiableFunctionParameter{
+                            .spelling = paramDecl->hasModifier<ConstModifier>()
+                                            ? UnownedStringSlice("const groupshared")
+                                            : UnownedStringSlice("groupshared"),
+                            .modifier = groupSharedModifier});
+                    continue;
+                }
+            }
             if (!paramDecl->hasModifier<NoDiffModifier>())
             {
                 if (auto modifier = paramDecl->findModifier<BorrowModifier>())
@@ -15572,6 +15626,7 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     addModifier(decl, prefixModifier);
 }
 
+
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
     for (auto paramDecl : decl->getParameters())
@@ -15580,6 +15635,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     maybeInferPrefixModifierForOperator(decl);
+
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;
