@@ -439,23 +439,23 @@ static bool isInterpolationModeSplitSystemValue(UnownedStringSlice baseName)
 
 // Return true if `baseName` (already lowercased and index-stripped) names a system value whose
 // trailing index picks a *distinct* binding, so that two spellings differing only in that index do
-// not collide. Three do:
+// not collide. Two do:
 //
 //   - SV_Target is not a builtin at all. A fragment output is an ordinary `out` variable whose
 //     location comes from the index (slang-emit-spirv.cpp returns no builtin for "sv_target"; the
 //     location is assigned in slang-parameter-binding.cpp), so SV_Target0 and SV_Target1 are
 //     genuinely separate render targets.
-//   - SV_ClipDistance and SV_CullDistance index into gl_ClipDistance / gl_CullDistance, which the
-//     GLSL legalization pass reads as an array index (slang-ir-glsl-legalize.cpp, `arrayIndex =
-//     int(semanticInst->getIndex())`).
+//   - SV_ClipDistance indexes into gl_ClipDistance, which the GLSL legalization pass reads as an
+//     array index (slang-ir-glsl-legalize.cpp, `arrayIndex = int(semanticInst->getIndex())`).
 //
-// Every other system value lowers to one fixed builtin and never consults the index, so a suffix on
-// those is inert: `SV_Barycentrics0` and `SV_Barycentrics1` both reach BaryCoordKHR and must be
-// treated as the same binding, or the duplicate escapes the check entirely.
+// Every other system value lowers to one fixed binding and never consults the index, so a suffix on
+// those is inert and must not separate two records: `SV_Barycentrics0` and `SV_Barycentrics1` both
+// reach BaryCoordKHR, and `SV_CullDistance0` and `SV_CullDistance1` both write an unindexed
+// gl_CullDistance (that branch, unlike the clip-distance one beside it, sets no array index), so
+// honouring the suffix on either would let a real collision escape the check.
 static bool isIndexedSystemValue(UnownedStringSlice baseName)
 {
-    return baseName == toSlice("sv_target") || baseName == toSlice("sv_clipdistance") ||
-           baseName == toSlice("sv_culldistance");
+    return baseName == toSlice("sv_target") || baseName == toSlice("sv_clipdistance");
 }
 
 // A single system-value semantic gathered while validateSystemValueSemantic walks an entry point's
@@ -590,16 +590,13 @@ static void validateSystemValueSemantic(
 
     auto astBuilder = visitor->getASTBuilder();
 
-    // Resolve the interpolation mode that actually reaches this declaration. A `noperspective` on
-    // an enclosing struct parameter applies to its fields, and a modifier on the field itself
-    // overrides the enclosing one, so the innermost declaration that carries any interpolation mode
-    // wins. This mirrors how lowering resolves it: createGLSLGlobalVaryings walks the access chain
-    // from the leaf outwards and stops at the first interpolation-mode decoration
-    // (slang-ir-glsl-legalize.cpp, "respect the decoration on the inner most node").
-    const bool declaresAnyInterpolationMode = decl->findModifier<InterpolationModeModifier>();
+    // True when `noperspective` reaches this declaration from anywhere on the access chain: an
+    // enclosing struct parameter's modifier applies to its fields, and GLSL legalization treats one
+    // such node anywhere as selecting the no-perspective barycentric builtin for the whole chain
+    // (slang-ir-glsl-legalize.cpp skips a node whose mode is something else and keeps scanning), so
+    // an inner modifier does not restore a separate binding.
     const bool effectiveNoPerspective =
-        declaresAnyInterpolationMode ? decl->findModifier<HLSLNoPerspectiveModifier>() != nullptr
-                                     : inheritedNoPerspective;
+        inheritedNoPerspective || decl->findModifier<HLSLNoPerspectiveModifier>() != nullptr;
 
     // If the type is a struct, recursively validate semantics on all fields
     if (auto declRefType = as<DeclRefType>(type))

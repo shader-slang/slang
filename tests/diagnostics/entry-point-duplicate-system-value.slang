@@ -25,6 +25,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUPBARY):-target spirv -entry dupBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUPBARYIDX):-target spirv -entry dupIndexedBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 //DIAGNOSTIC_TEST:SIMPLE(diag=DUPBARYINH):-target spirv -entry dupInheritedBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUPBARYOVR):-target spirv -entry dupOverriddenBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
+//DIAGNOSTIC_TEST:SIMPLE(diag=DUPCULL):-target spirv -entry dupCullDistance -stage vertex
 
 // Two parameters carry the same input system value (the reported repro; also the SPIR-V ICE case).
 float4 dupVertex(uint a : SV_VertexID, uint b : SV_VertexID) : SV_Position
@@ -150,14 +152,45 @@ struct InheritedDupBary
     float3 b : SV_Barycentrics;
 }
 
-// Both fields inherit the parameter's mode, so this is a duplicate under the inherited-mode rule.
-// Note it does NOT discriminate that rule on its own: reading the modifier off the field alone
-// records both as perspective-correct, which is equally a duplicate, so E30706 fires either way and
-// only the reason differs. The case that pins inheritance is the legal one it mirrors —
-// `inheritedBarycentrics` in entry-point-single-system-value.slang, which is wrongly rejected
-// without the fix. This case is kept because it is the shape a user is most likely to write.
 void dupInheritedBarycentrics(noperspective InheritedDupBary input, out float4 result : SV_Target)
 //DUPBARYINH: E30706
 {
     result = float4(input.a + input.b, 1);
+}
+
+struct OverriddenBary
+{
+    linear float3 a : SV_Barycentrics;
+    float3 b : SV_Barycentrics;
+}
+
+// An inner interpolation modifier does not restore a separate binding: GLSL legalization takes
+// gl_BaryCoordNoPerspEXT for the whole chain once any node carries `noperspective`, so both of these
+// fields name one builtin.
+void dupOverriddenBarycentrics(noperspective OverriddenBary input, out float4 result : SV_Target)
+//DUPBARYOVR: E30706
+{
+    result = float4(input.a + input.b, 1);
+}
+
+struct CullOut
+{
+    float4 pos : SV_Position;
+    float c0 : SV_CullDistance0;
+    float c1 : SV_CullDistance1;
+}
+
+// Only a system value whose index selects a distinct binding gets its index into the identity.
+// SV_ClipDistance does (its GLSL legalization sets an array index from the suffix), but the
+// SV_CullDistance branch beside it sets none, so both of these write one unindexed gl_CullDistance
+// and collide. Compare distinctClipDistances in entry-point-single-system-value.slang, where the
+// indexed spellings really are separate.
+CullOut dupCullDistance()
+//DUPCULL: E30706
+{
+    CullOut o;
+    o.pos = float4(0, 0, 0, 1);
+    o.c0 = 1;
+    o.c1 = 2;
+    return o;
 }

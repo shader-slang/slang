@@ -12,7 +12,7 @@
 //TEST:SIMPLE(filecheck=DISTINCT):-target spirv-asm -entry distinctTargets -stage fragment
 //TEST:SIMPLE(filecheck=BARY):-target spirv-asm -entry splitBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
 //TEST:SIMPLE(filecheck=BARYFIELD):-target spirv-asm -entry splitBarycentricsInStruct -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
-//TEST:SIMPLE(filecheck=BARYINHERIT):-target spirv-asm -entry inheritedBarycentrics -stage fragment -profile glsl_450+GL_EXT_fragment_shader_barycentric
+//TEST:SIMPLE(filecheck=CLIPIDX):-target glsl -entry distinctClipDistances -stage vertex
 
 // A single input system value is fine.
 float4 singleVertex(uint a : SV_VertexID) : SV_Position
@@ -62,22 +62,26 @@ void splitBarycentricsInStruct(BaryInput input, out float4 result : SV_Target)
 //BARYFIELD-DAG: BuiltIn BaryCoordKHR
 //BARYFIELD-DAG: BuiltIn BaryCoordNoPerspKHR
 
-struct InheritedBaryInput
+struct ClipOut
 {
-    // Overrides the enclosing parameter's `noperspective`, so this one is perspective-correct.
-    linear float3 bary : SV_Barycentrics;
-    // Declares no mode, so it inherits `noperspective` from the parameter below.
-    float3 baryNoPerspective : SV_Barycentrics;
+    float4 pos : SV_Position;
+    float c0 : SV_ClipDistance0;
+    float c1 : SV_ClipDistance1;
 }
 
-// The interpolation mode is inherited through the access chain, with the innermost declaration
-// winning — the same rule lowering applies when it walks from the leaf outwards. The `linear` field
-// overrides the parameter's `noperspective` while the unqualified field inherits it, so these two
-// fields still reach different builtins and must compile clean.
-void inheritedBarycentrics(noperspective InheritedBaryInput input, out float4 result : SV_Target)
+// SV_ClipDistance is one of the system values whose index does select a distinct binding: the GLSL
+// legalization pass turns the suffix into an array index, so these two reach gl_ClipDistance[0] and
+// gl_ClipDistance[1] and must stay clean. The indexed accesses below are what prove the index
+// survived. (SV_CullDistance looks symmetric but is not — see dupCullDistance in
+// entry-point-duplicate-system-value.slang.)
+ClipOut distinctClipDistances()
 {
-    result = float4(input.bary + input.baryNoPerspective, 1);
+    ClipOut o;
+    o.pos = float4(0, 0, 0, 1);
+    o.c0 = 1;
+    o.c1 = 2;
+    return o;
 }
-//BARYINHERIT-NOT: E30706
-//BARYINHERIT-DAG: BuiltIn BaryCoordKHR
-//BARYINHERIT-DAG: BuiltIn BaryCoordNoPerspKHR
+//CLIPIDX-NOT: E30706
+//CLIPIDX-DAG: gl_ClipDistance[0]
+//CLIPIDX-DAG: gl_ClipDistance[1]
