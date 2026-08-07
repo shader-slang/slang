@@ -960,7 +960,9 @@ jobs:
             // Body for the one-shot comment posted when a Community/Bot PR is
             // first auto-assigned. Mentions the assignee (already notified by
             // GitHub's assign event) but never @-mentions the suggested
-            // reviewer, so the suggestion does not ping them.
+            // reviewer, so the suggestion does not ping them. Wording is
+            // informational only: clear that the note is automated and that
+            // recipients must not reply (so bot authors do not treat it as a task).
             // autoRequestedReviewer must be the login we actually intend to
             // requestReviewers (or null). autoRequestedHasSignal is true only
             // when that login appears in committersBySignal; otherwise we avoid
@@ -970,24 +972,27 @@ jobs:
               autoRequestedReviewer, autoRequestedHasSignal,
             }) {
               let body =
-                `**PR board sync:** auto-assigned @${assignee} as shepherd ` +
-                `for this ${source} PR.`;
+                `<!-- pr-board-sync-assignment -->\n` +
+                `**Automated notice** (PR board sync) — do not reply to this comment.\n\n` +
+                `Auto-assigned @${assignee} as shepherd for this ${source} PR.`;
               if (suggestedReviewer) {
                 if (autoRequestedReviewer && autoRequestedHasSignal) {
                   body +=
-                    `\n\nCommitter signal on the changed files is higher for ` +
-                    `${suggestedReviewer} than for the auto-requested reviewer ` +
-                    `(${autoRequestedReviewer}) — consider requesting a review ` +
-                    `from them as well. They were not auto-requested.`;
+                    `\n\nFYI for maintainers: committer signal on the changed ` +
+                    `files is higher for ${suggestedReviewer} than for the ` +
+                    `auto-requested reviewer (${autoRequestedReviewer}). They ` +
+                    `were not auto-requested; a human may optionally add them ` +
+                    `as a reviewer.`;
                 } else {
                   // Assignee (and author / auto-requested when present) were
                   // excluded from the pick, so this is highest among remaining
                   // eligible collaborators — not among all collaborators.
                   body +=
-                    `\n\nCommitter signal on the changed files is highest for ` +
-                    `${suggestedReviewer} among collaborators other than the ` +
-                    `assignee — consider requesting a review from them. They ` +
-                    `were not auto-requested.`;
+                    `\n\nFYI for maintainers: committer signal on the changed ` +
+                    `files is highest for ${suggestedReviewer} among ` +
+                    `collaborators other than the assignee. They were not ` +
+                    `auto-requested; a human may optionally add them as a ` +
+                    `reviewer.`;
                 }
               }
               return body;
