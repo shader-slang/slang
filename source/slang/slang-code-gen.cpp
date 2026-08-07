@@ -631,8 +631,19 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 CASE(CUDASM, _cuda_sm_5_0, SemanticVersion(5, 0));
                 CASE(CUDASM, _cuda_sm_6_0, SemanticVersion(6, 0));
                 CASE(CUDASM, _cuda_sm_7_0, SemanticVersion(7, 0));
+                CASE(CUDASM, _cuda_sm_7_2, SemanticVersion(7, 2));
+                CASE(CUDASM, _cuda_sm_7_5, SemanticVersion(7, 5));
                 CASE(CUDASM, _cuda_sm_8_0, SemanticVersion(8, 0));
+                CASE(CUDASM, _cuda_sm_8_6, SemanticVersion(8, 6));
+                CASE(CUDASM, _cuda_sm_8_7, SemanticVersion(8, 7));
+                CASE(CUDASM, _cuda_sm_8_8, SemanticVersion(8, 8));
+                CASE(CUDASM, _cuda_sm_8_9, SemanticVersion(8, 9));
                 CASE(CUDASM, _cuda_sm_9_0, SemanticVersion(9, 0));
+                CASE(CUDASM, _cuda_sm_10_0, SemanticVersion(10, 0));
+                CASE(CUDASM, _cuda_sm_10_3, SemanticVersion(10, 3));
+                CASE(CUDASM, _cuda_sm_11_0, SemanticVersion(11, 0));
+                CASE(CUDASM, _cuda_sm_12_0, SemanticVersion(12, 0));
+                CASE(CUDASM, _cuda_sm_12_1, SemanticVersion(12, 1));
 
 #undef CASE
             }

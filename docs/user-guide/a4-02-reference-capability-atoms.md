@@ -158,6 +158,21 @@ Versions
 `GLSL_latest`
 > Represents the latest GLSL version.
 
+`cuda_sm_10_0`
+> cuda 10.0 (Blackwell) and related capabilities of other targets.
+
+`cuda_sm_10_3`
+> cuda 10.3 and related capabilities of other targets.
+
+`cuda_sm_11_0`
+> cuda 11.0 and related capabilities of other targets.
+
+`cuda_sm_12_0`
+> cuda 12.0 and related capabilities of other targets.
+
+`cuda_sm_12_1`
+> cuda 12.1 and related capabilities of other targets.
+
 `cuda_sm_1_0`
 > cuda 1.0 and related capabilities of other targets.
 
@@ -182,8 +197,23 @@ Versions
 `cuda_sm_7_0`
 > cuda 7.0 and related capabilities of other targets.
 
+`cuda_sm_7_2`
+> cuda 7.2 and related capabilities of other targets.
+
+`cuda_sm_7_5`
+> cuda 7.5 (Turing) and related capabilities of other targets.
+
 `cuda_sm_8_0`
 > cuda 8.0 and related capabilities of other targets.
+
+`cuda_sm_8_6`
+> cuda 8.6 (Ampere) and related capabilities of other targets.
+
+`cuda_sm_8_7`
+> cuda 8.7 and related capabilities of other targets.
+
+`cuda_sm_8_8`
+> cuda 8.8 and related capabilities of other targets.
 
 `cuda_sm_8_9`
 > cuda 8.9 (Ada Lovelace) and related capabilities of other targets.  Required
@@ -192,7 +222,7 @@ Versions
 > (FP8 cooperative matrices).
 
 `cuda_sm_9_0`
-> cuda 9.0 and related capabilities of other targets.
+> cuda 9.0 (Hopper) and related capabilities of other targets.
 
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.

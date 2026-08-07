@@ -245,6 +245,12 @@ alias dxil_lib = _sm_6_3;
 
 // CUDA versions
 
+// The concrete CUDA architecture atoms form a single linear implication chain
+// ordered by (major, minor) compute capability: a higher architecture implies
+// every lower one. This mirrors how a `compute_XX` virtual architecture is a
+// superset of the features available at every earlier architecture, so a
+// requirement satisfied at `_cuda_sm_A_B` is automatically satisfied at any
+// later atom in the chain.
 def _cuda_sm_1_0 : cuda;
 def _cuda_sm_2_0 : _cuda_sm_1_0;
 def _cuda_sm_3_0 : _cuda_sm_2_0;
@@ -253,9 +259,19 @@ def _cuda_sm_4_0 : _cuda_sm_3_5;
 def _cuda_sm_5_0 : _cuda_sm_4_0;
 def _cuda_sm_6_0 : _cuda_sm_5_0;
 def _cuda_sm_7_0 : _cuda_sm_6_0;
-def _cuda_sm_8_0 : _cuda_sm_7_0;
-def _cuda_sm_8_9 : _cuda_sm_8_0;
+def _cuda_sm_7_2 : _cuda_sm_7_0;
+def _cuda_sm_7_5 : _cuda_sm_7_2;
+def _cuda_sm_8_0 : _cuda_sm_7_5;
+def _cuda_sm_8_6 : _cuda_sm_8_0;
+def _cuda_sm_8_7 : _cuda_sm_8_6;
+def _cuda_sm_8_8 : _cuda_sm_8_7;
+def _cuda_sm_8_9 : _cuda_sm_8_8;
 def _cuda_sm_9_0 : _cuda_sm_8_9;
+def _cuda_sm_10_0 : _cuda_sm_9_0;
+def _cuda_sm_10_3 : _cuda_sm_10_0;
+def _cuda_sm_11_0 : _cuda_sm_10_3;
+def _cuda_sm_12_0 : _cuda_sm_11_0;
+def _cuda_sm_12_1 : _cuda_sm_12_0;
 /// Represents capabilities required for optix cooperative vector support.
 def optix_coopvec : _cuda_sm_9_0;
 /// Represents capabilities required for optix multi-level traversal support.
@@ -2257,20 +2273,60 @@ alias cuda_sm_6_0 = _cuda_sm_6_0 | cuda_sm_5_0 | sm_4_1;
 /// [Version]
 alias cuda_sm_7_0 = _cuda_sm_7_0 | cuda_sm_6_0;
 
+/// cuda 7.2 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_7_2 = _cuda_sm_7_2 | cuda_sm_7_0;
+
+/// cuda 7.5 (Turing) and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_7_5 = _cuda_sm_7_5 | cuda_sm_7_2;
+
 /// cuda 8.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_0;
+alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_5;
+
+/// cuda 8.6 (Ampere) and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_8_6 = _cuda_sm_8_6 | cuda_sm_8_0;
+
+/// cuda 8.7 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_8_7 = _cuda_sm_8_7 | cuda_sm_8_6;
+
+/// cuda 8.8 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_8_8 = _cuda_sm_8_8 | cuda_sm_8_7;
 
 /// cuda 8.9 (Ada Lovelace) and related capabilities of other targets.  Required
 /// for PTX features that landed in PTX ISA 8.7 / SM 8.9, notably the
 /// `mma.sync.m16n8k16` instruction with `.e4m3` / `.e5m2` floating-point inputs
 /// (FP8 cooperative matrices).
 /// [Version]
-alias cuda_sm_8_9 = _cuda_sm_8_9 | cuda_sm_8_0;
+alias cuda_sm_8_9 = _cuda_sm_8_9 | cuda_sm_8_8;
 
-/// cuda 9.0 and related capabilities of other targets.
+/// cuda 9.0 (Hopper) and related capabilities of other targets.
 /// [Version]
 alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_9 | sm_5_0;
+
+/// cuda 10.0 (Blackwell) and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_10_0 = _cuda_sm_10_0 | cuda_sm_9_0;
+
+/// cuda 10.3 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_10_3 = _cuda_sm_10_3 | cuda_sm_10_0;
+
+/// cuda 11.0 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_11_0 = _cuda_sm_11_0 | cuda_sm_10_3;
+
+/// cuda 12.0 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_12_0 = _cuda_sm_12_0 | cuda_sm_11_0;
+
+/// cuda 12.1 and related capabilities of other targets.
+/// [Version]
+alias cuda_sm_12_1 = _cuda_sm_12_1 | cuda_sm_12_0;
 
 /// Atomic reduction operations using PTX `red` instruction. Requires SM 7.0 on CUDA.
 /// On non-CUDA targets, falls back to regular atomic operations with no additional requirement.
