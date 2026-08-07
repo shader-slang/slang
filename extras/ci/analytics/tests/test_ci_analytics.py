@@ -6,7 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 
@@ -648,10 +648,71 @@ class TestPendingApprovals(unittest.TestCase):
         html = self._render([self._row(event="merge_group")])
         self.assertIn("<strong>merge_group</strong>", html)
 
-    def test_titles_are_escaped(self):
+    def test_titles_are_escaped_exactly_once(self):
+        # _link already escapes, so escaping the title before passing it in
+        # double-escapes: "A & B" renders as the literal text "A &amp; B".
+        # Asserting only that "<script>" is absent does not catch that, since
+        # double-escaping also hides it.
         html = self._render([self._row(title="fix <script> & co")])
         self.assertNotIn("<script>", html)
+        self.assertIn("fix &lt;script&gt; &amp; co", html)
+        self.assertNotIn("&amp;amp;", html)
 
+
+    def test_query_asks_for_waiting_runs(self):
+        # status=waiting has to be a request parameter: the default listing
+        # excludes waiting runs, so filtering client-side finds nothing.
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("status=waiting", calls[0][0])
+
+    def test_collection_error_is_partial_not_empty(self):
+        # An API failure must not look like "nothing is waiting".
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([], "HTTP 502")):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertTrue(data["partial"])
+        self.assertEqual(data["pending"], [])
+        self.assertIn("HTTP 502", data["errors"])
+
+    def test_records_are_sorted_oldest_first(self):
+        now = datetime.now(timezone.utc)
+
+        def fake_list(endpoint, key):
+            return [
+                {
+                    "id": 1,
+                    "created_at": (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "actor": {"login": "recent"},
+                },
+                {
+                    "id": 2,
+                    "created_at": (now - timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "actor": {"login": "oldest"},
+                },
+            ], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual([p["actor"] for p in data["pending"]], ["oldest", "recent"])
+        self.assertGreaterEqual(data["pending"][0]["waited_min"], 89)
+
+    def test_unparseable_timestamp_does_not_raise(self):
+        with mock.patch.object(
+            gh_api, "gh_api_list", side_effect=lambda e, k: ([{"id": 1, "created_at": "not-a-date"}], None)
+        ):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(data["pending"][0]["waited_min"], 0)
 
 class TestHealthApiBounds(unittest.TestCase):
     def test_recent_failures_query_is_bounded_by_created_range(self):

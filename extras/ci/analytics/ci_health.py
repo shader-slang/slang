@@ -1246,7 +1246,7 @@ def render_pending_approvals(data):
         html += (
             "  <tr>"
             f"<td>{p['waited_min']} min</td>"
-            f"<td>{_link(p['url'], _esc(p['title'] or str(p['run_id'])))}</td>"
+            f"<td>{_link(p['url'], p['title'] or str(p['run_id']))}</td>"
             f"<td>{_esc(p['actor'])}</td>"
             f"<td>{event_cell}</td>"
             f"<td>{_esc(p['branch'])}</td>"
