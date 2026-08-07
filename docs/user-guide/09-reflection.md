@@ -1690,15 +1690,13 @@ A scope object has a `"kind"` that names how the scope's parameters were allocat
 
 * `"none"` — the parameters bind directly, with no automatically-introduced container.
 * `"constantBuffer"` — the scope's ordinary (byte-consuming) parameters were gathered into an automatically-introduced constant buffer (the `$Globals` constant buffer, for the global scope).
-* `"parameterBlock"` — the scope was allocated into a parameter block, which additionally introduces a register space.
 
-When `"kind"` is `"constantBuffer"` or `"parameterBlock"`, the object also carries a `"binding"` — the container's *own* binding, i.e. the register / descriptor slot / space that the automatically-introduced constant buffer or parameter block occupies.
+When `"kind"` is `"constantBuffer"`, the object also carries a `"binding"` — the container's *own* binding, i.e. the register / descriptor slot / space that the automatically-introduced constant buffer occupies.
 This is the information that the flat `"parameters"` list (see below) cannot express: it explains, for example, which descriptor slot the `$Globals` constant buffer consumes, so that the indices of the remaining resources no longer appear to have unexplained holes.
 The scope object's *shape* is the same across targets, but the `"binding"` payload is target-dependent — it uses whatever category the layout system assigned for that target (e.g. `"constantBuffer"` for an HLSL constant-buffer register, `"descriptorTableSlot"` for Vulkan/SPIR-V, `"uniform"` with an offset for the CPU/CUDA targets).
 
 The scope's contained parameters appear in a nested `"parameters"` array, using the same parameter objects as elsewhere in the output.
-If a scope were itself wrapped in more than one container, the inner container would be represented as a nested `"scope"` object so that each container level records its own binding.
-That doubly-wrapped shape is part of the format contract for consumers to tolerate, but the current compiler wraps a scope at most once, so it is not emitted in practice today.
+Note that an explicit `ConstantBuffer<T>` or `ParameterBlock<T>` declared at global scope is one of the scope's *parameters*, not a wrapper around the scope: it appears in that array with its own `"binding"`, and its container/element structure is described on the parameter's own `"type"`.
 
 For example, given loose global uniforms alongside some resources:
 

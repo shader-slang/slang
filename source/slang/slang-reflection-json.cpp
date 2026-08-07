@@ -1134,29 +1134,25 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
     writer << "\n}";
 }
 
-// Emit a scope's `"parameters"` array from the fields of `elementTypeLayout` — the type layout
-// holding the scope's contents, passed by callers as either the scope's own layout (an unwrapped
-// scope) or the element layout found inside the scope's container. A scope's contents are modeled
-// as a `struct` (one field per parameter), so for every scope the current front-end produces this
-// is a `Struct`, possibly with zero fields — which correctly yields `"parameters": []`. A
-// non-`Struct` layout (which either call site could pass for an unexpected scope shape) has no
-// fields to iterate and contributes no `"parameters"` key.
+// Emit a scope's `"parameters"` array from the fields of `structTypeLayout`, which holds the
+// scope's contents: one field per parameter declared in that scope. A scope's contents are always
+// modeled as a `struct`, so this is required to be a `Struct` layout — possibly with zero fields,
+// which correctly yields `"parameters": []`.
 static void emitReflectionScopeParametersJSON(
     PrettyWriter& writer,
-    slang::TypeLayoutReflection* elementTypeLayout)
+    slang::TypeLayoutReflection* structTypeLayout)
 {
-    if (elementTypeLayout->getKind() != slang::TypeReflection::Kind::Struct)
-        return;
+    SLANG_ASSERT(structTypeLayout->getKind() == slang::TypeReflection::Kind::Struct);
 
     writer.maybeComma();
     writer << "\"parameters\": [\n";
     writer.indent();
-    auto paramCount = elementTypeLayout->getFieldCount();
+    auto paramCount = structTypeLayout->getFieldCount();
     for (auto pp : makeRange(paramCount))
     {
         if (pp != 0)
             writer << ",\n";
-        emitReflectionParamJSON(writer, elementTypeLayout->getFieldByIndex(pp));
+        emitReflectionParamJSON(writer, structTypeLayout->getFieldByIndex(pp));
     }
     writer.dedent();
     writer << "\n]";
@@ -1164,15 +1160,15 @@ static void emitReflectionScopeParametersJSON(
 
 // Describe a program scope (the global scope, or an entry point's scope) as a JSON object,
 // following the same kind-based traversal as `printScope` in `examples/reflection-api/main.cpp`.
-// The key detail the flat `parameters` list cannot express is the binding of the constant
-// buffer / parameter block that a scope's parameters are automatically gathered into: that
-// container occupies a register / descriptor slot / space of its own, reported here as the
-// scope's `binding`.
+// The key detail the flat `parameters` list cannot express is the binding of the constant buffer
+// that a scope's parameters are automatically gathered into: that container occupies a register /
+// descriptor slot / space of its own, reported here as the scope's `binding`.
 //
-// Current scope layouts (`ScopeLayoutBuilder::endLayout` in `slang-parameter-binding.cpp`) are a
-// `Struct`, optionally wrapped once in a constant buffer — so in practice `kind` is only `"none"`
-// or `"constantBuffer"`, and the `"parameterBlock"` kind and nested-`"scope"` recursion below are
-// unreachable; they complete the general kind-based traversal.
+// A scope layout is one of exactly two shapes, so both are handled explicitly and anything else
+// asserts. `ScopeLayoutBuilder::endLayout` (`slang-parameter-binding.cpp`) builds the scope as a
+// `StructTypeLayout` of its parameters, then passes it to `createConstantBufferTypeLayoutIfNeeded`,
+// which either returns that struct unchanged (an unwrapped scope, `kind: "none"`) or wraps it in a
+// parameter-group layout whose element var-layout is that same struct (`kind: "constantBuffer"`).
 static void emitReflectionScopeJSON(
     PrettyWriter& writer,
     slang::VariableLayoutReflection* scopeVarLayout)
@@ -1182,42 +1178,27 @@ static void emitReflectionScopeJSON(
     CommaTrackerRAII commaTracker(writer);
 
     auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
-    auto kind = scopeTypeLayout->getKind();
-    switch (kind)
+    switch (scopeTypeLayout->getKind())
     {
-    case slang::TypeReflection::Kind::ConstantBuffer:
-    case slang::TypeReflection::Kind::ParameterBlock:
-        {
-            writer.maybeComma();
-            writer << "\"kind\": \"";
-            writer
-                << (kind == slang::TypeReflection::Kind::ParameterBlock ? "parameterBlock"
-                                                                        : "constantBuffer");
-            writer << "\"";
-
-            emitReflectionVarBindingInfoJSON(writer, scopeTypeLayout->getContainerVarLayout());
-
-            auto elementVarLayout = scopeTypeLayout->getElementVarLayout();
-            auto elementKind = elementVarLayout->getTypeLayout()->getKind();
-            if (elementKind == slang::TypeReflection::Kind::ConstantBuffer ||
-                elementKind == slang::TypeReflection::Kind::ParameterBlock)
-            {
-                // A container directly wrapping another container records each level's binding.
-                writer.maybeComma();
-                writer << "\"scope\": ";
-                emitReflectionScopeJSON(writer, elementVarLayout);
-            }
-            else
-            {
-                emitReflectionScopeParametersJSON(writer, elementVarLayout->getTypeLayout());
-            }
-        }
-        break;
-
-    default:
+    case slang::TypeReflection::Kind::Struct:
         writer.maybeComma();
         writer << "\"kind\": \"none\"";
         emitReflectionScopeParametersJSON(writer, scopeTypeLayout);
+        break;
+
+    case slang::TypeReflection::Kind::ConstantBuffer:
+        writer.maybeComma();
+        writer << "\"kind\": \"constantBuffer\"";
+
+        emitReflectionVarBindingInfoJSON(writer, scopeTypeLayout->getContainerVarLayout());
+
+        emitReflectionScopeParametersJSON(
+            writer,
+            scopeTypeLayout->getElementVarLayout()->getTypeLayout());
+        break;
+
+    default:
+        SLANG_ASSERT(!"unexpected type layout kind for a program scope");
         break;
     }
 
