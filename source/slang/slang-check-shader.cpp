@@ -158,6 +158,34 @@ static SemanticDecl* lookUpSemanticDecl(
     return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
 }
 
+// A requirement that adds nothing beyond `stage` (e.g. a bare `[require(fragment)]`) is already
+// implied by the profile; propagating it would only make the "profile implicitly upgraded"
+// diagnostic list a redundant stage atom.
+static bool isStageOnlyRequirement(const CapabilitySetVal* capSet, Stage stage)
+{
+    if (!capSet)
+        return true;
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
+        return false;
+    return CapabilitySet((CapabilityName)stageAtom).implies(CapabilitySet{capSet});
+}
+
+// General capability inference does not traverse from a semantic to the accessor it resolves to,
+// so a requirement like `fragmentshaderbarycentric` on the `SV_Barycentrics` getter would be lost.
+// Join the matched accessor's whole `[require]` set into `*outCaps`, but only when it adds
+// something beyond the entry point's stage (see `isStageOnlyRequirement`).
+static void collectSemanticAccessorRequirement(Decl* member, Stage stage, CapabilitySet* outCaps)
+{
+    SLANG_ASSERT(outCaps);
+    auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
+    if (!requireAttr || !requireAttr->capabilitySet)
+        return;
+    if (isStageOnlyRequirement(requireAttr->capabilitySet, stage))
+        return;
+    outCaps->nonDestructiveJoin(requireAttr->capabilitySet);
+}
+
 // Validate that type being used for a system value semantic is compatible with the semantic.
 static void validateSystemValueSemanticForType(
     SemanticsVisitor* visitor,
@@ -167,7 +195,8 @@ static void validateSystemValueSemanticForType(
     HLSLSimpleSemantic* semantic,
     Stage stage,
     SemanticDirection direction,
-    Scope* scope)
+    Scope* scope,
+    CapabilitySet* outInferredCaps)
 {
     if (!semantic || !type)
         return;
@@ -270,6 +299,7 @@ static void validateSystemValueSemanticForType(
         if (isSemanticTypeCompatible(accessorType, type))
         {
             foundMatchingAccessor = true;
+            collectSemanticAccessorRequirement(member, stage, outInferredCaps);
             break;
         }
 
@@ -286,6 +316,7 @@ static void validateSystemValueSemanticForType(
                             typeArrayType->getElementType()))
                     {
                         foundMatchingAccessor = true;
+                        collectSemanticAccessorRequirement(member, stage, outInferredCaps);
                         break;
                     }
                 }
@@ -392,8 +423,11 @@ static void validateNoPerPrimitiveSemanticsInType(
 }
 
 
-// Validate system value semantics on a declaration recursively.
-// and validates any SV_ semantic against the SemanticDecl definitions in core module.
+// Validate `decl`'s SV_ semantics against the SemanticDecl definitions in the core module,
+// recursing through struct fields. When `outInferredCaps` is non-null, also fold each matched
+// accessor's capability requirement into it (non-destructive join), so a caller can enforce a
+// requirement the semantic carries but the general capability inference misses — e.g.
+// `fragmentshaderbarycentric` for `SV_Barycentrics`.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -401,6 +435,7 @@ static void validateSystemValueSemantic(
     Stage stage,
     SemanticDirection direction,
     Scope* scope,
+    CapabilitySet* outInferredCaps,
     UInt recursionDepth = 0)
 {
     if (!decl)
@@ -489,6 +524,7 @@ static void validateSystemValueSemantic(
                     stage,
                     direction,
                     scope,
+                    outInferredCaps,
                     recursionDepth + 1);
             }
         }
@@ -507,7 +543,8 @@ static void validateSystemValueSemantic(
         semantic,
         stage,
         direction,
-        scope);
+        scope,
+        outInferredCaps);
 }
 
 // Return true if `semanticName` is one of the fragment depth-output system values
@@ -1910,7 +1947,19 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // Validate system value semantics against SemanticDecl definitions in core module
+    // The entry point's effective requirements, seeded from the decl's inferred set and augmented
+    // at this boundary with two contributions the per-decl capability walk does not record: the
+    // SV_ semantic-accessor requirements (walk just below) and the signature's generic-struct
+    // requirements (`signatureStructUses` loop further below). Both are gathered into this local
+    // set — matching the existing generic-struct handling — because the accessor match is resolved
+    // here using the entry-point stage, and the decl's own `inferredCapabilityRequirements` was
+    // already frozen in the earlier CapabilityChecked phase.
+    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
+
+    // Validate system value semantics, and collect the capabilities their accessors require:
+    // general capability inference does not look through a semantic to the `[require]` on the
+    // accessor it resolves to, so a need like `fragmentshaderbarycentric` on `SV_Barycentrics`
+    // must be gathered here.
     {
         SharedSemanticsContext shared(linkage, module, sink);
         SemanticsVisitor visitor(&shared);
@@ -1931,14 +1980,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                     validateSystemValueSemantic(
                         &visitor,
                         sink,
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else if (param->hasModifier<OutModifier>())
                 {
@@ -1948,7 +1999,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
                 else
                 {
@@ -1958,7 +2010,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        &entryPointInferredCaps);
                 }
             }
 
@@ -1969,7 +2022,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 entryPointFuncDecl,
                 stage,
                 SemanticDirection::Output,
-                scope);
+                scope,
+                &entryPointInferredCaps);
         }
     }
 
@@ -2376,7 +2430,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // for both spellings. `signatureStructUses` keeps each contributing struct and
     // its use location so we can point the diagnostic at the exact use site (the
     // non-generic case is reported by `diagnoseMissingCapabilityProvenance`).
-    CapabilitySet entryPointInferredCaps{entryPointFuncDecl->inferredCapabilityRequirements};
     List<GenericStructTypeUse> signatureStructUses;
     {
         auto astBuilder = linkage->getASTBuilder();
@@ -2417,6 +2470,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // collector), so this join is unconditional.
     for (auto& use : signatureStructUses)
         entryPointInferredCaps.nonDestructiveJoin(use.structDecl->inferredCapabilityRequirements);
+
+    // The entry point's stage-specific requirements belong to the `EntryPoint`, not the
+    // stage-agnostic `FuncDecl`; store the finalized set there as the source of truth for
+    // downstream entry-point consumers.
+    entryPoint->setInferredCapabilityRequirements(
+        entryPointInferredCaps.freeze(linkage->getASTBuilder()));
 
     for (auto target : linkage->targets)
     {

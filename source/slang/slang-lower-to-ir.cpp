@@ -15287,7 +15287,13 @@ static void lowerFrontEndEntryPointToIR(
     // The SPIR-V back-end emits all three from this single decoration. Reading the inferred
     // capability set rather than the attribute directly covers the direct, call-graph, and
     // `[require(spvShader64BitIndexingEXT)]` cases uniformly.
-    if (auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements)
+    // Read the entry point's inferred requirements (which include stage-dependent contributions
+    // such as `SV_` semantic capabilities), falling back to the function declaration's own set if
+    // the entry point's set was never populated.
+    auto inferredCaps = entryPoint->getInferredCapabilityRequirements();
+    if (!inferredCaps)
+        inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements;
+    if (inferredCaps)
     {
         CapabilitySet caps{inferredCaps};
         bool requiresShader64BitIndexing = false;
@@ -16480,6 +16486,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
+    // Map each entry-point function declaration to the capability set inferred for it *as an entry
+    // point*, which can exceed the function declaration's own requirements (see
+    // `EntryPoint::getInferredCapabilityRequirements`). The layout list below is keyed by
+    // `DeclRef<FuncDecl>`, so we look up the owning `EntryPoint` here to read its stored set.
+    Dictionary<FuncDecl*, CapabilitySetVal*> entryPointInferredCaps;
+    for (Index i = 0; i < program->getEntryPointCount(); ++i)
+    {
+        auto entryPoint = program->getEntryPoint(i);
+        if (auto entryPointFuncDecl = entryPoint->getFuncDecl())
+            entryPointInferredCaps[entryPointFuncDecl] =
+                entryPoint->getInferredCapabilityRequirements();
+    }
+
     for (auto entryPointLayout : programLayout->entryPoints)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
@@ -16507,7 +16526,15 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
         auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
         SLANG_ASSERT(asFuncDecl);
-        CapabilitySet set{asFuncDecl->inferredCapabilityRequirements};
+        // Prefer the entry point's inferred set (a superset of the function declaration's own),
+        // falling back to the declaration's set when this function isn't among the program's
+        // entry points or its entry-point set was never populated.
+        CapabilitySetVal* inferredCaps = nullptr;
+        if (auto found = entryPointInferredCaps.tryGetValue(asFuncDecl))
+            inferredCaps = *found;
+        if (!inferredCaps)
+            inferredCaps = asFuncDecl->inferredCapabilityRequirements;
+        CapabilitySet set{inferredCaps};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
