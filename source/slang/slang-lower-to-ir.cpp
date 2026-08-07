@@ -11738,10 +11738,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
 
         // Emit debug info for named global constants when debug info is enabled.
-        // We reference irInitVal (the raw constant value) rather than irConstant
-        // (the GlobalConstant wrapper) so the debug instruction survives the
-        // replaceGlobalConstants pass, which removes the wrapper.
-        if (irInitVal && subContext->debugInfoLevel >= DebugInfoLevel::Standard &&
+        // Use irConstant->getValue() rather than irInitVal: the initializer expression
+        // may go through implicit casts (e.g. float literal to double), so irInitVal is
+        // not always a plain literal. emitGlobalConstant folds/interns the value, so
+        // irConstant->getValue() is the final normalized constant.
+        // We reference this folded value (not the IRGlobalConstant wrapper) so the debug
+        // instruction survives the replaceGlobalConstants pass, which removes the wrapper.
+        auto foldedVal = irConstant ? as<IRGlobalConstant>(irConstant)->getValue() : nullptr;
+        if (foldedVal && subContext->debugInfoLevel >= DebugInfoLevel::Standard &&
             decl->loc.isValid())
         {
             IRInst* debugSourceInst = getOrEmitDebugSource(subContext, decl->loc);
@@ -11759,7 +11763,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         debugSourceInst,
                         subBuilder->getIntValue(subBuilder->getUIntType(), humaneLoc.line),
                         subBuilder->getIntValue(subBuilder->getUIntType(), humaneLoc.column),
-                        irInitVal);
+                        foldedVal);
                 }
             }
         }

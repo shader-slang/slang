@@ -2136,6 +2136,11 @@ static LegalVal legalizeInst(
     case kIROp_CastUntypedSamplerHandleToUInt:
         result = LegalVal::simple(inst);
         break;
+    case kIROp_DebugGlobalConstant:
+        // Debug-info instructions are left as-is; they do not produce runtime values
+        // that need type legalization.
+        result = LegalVal::simple(inst);
+        break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
         if (result.flavor == LegalVal::Flavor::none)
