@@ -15,6 +15,7 @@
 #include "slang-ir-insts-enum.h"
 #include "slang-type-system-shared.h"
 
+#include <atomic>
 #include <functional>
 #include <mutex>
 
@@ -577,7 +578,13 @@ struct IRInst
     /// materialized. Only ever set on global values of a lazily deserialized
     /// module, and cleared once the body is decoded. Placed next to `operandCount`
     /// so it occupies existing padding rather than growing `IRInst`.
-    bool m_hasDeferredBody = false;
+    ///
+    /// Atomic because a global session is shared across threads: the flag is
+    /// cleared with release ordering after the body has been linked, and read with
+    /// acquire ordering here, so a thread that observes `false` also observes the
+    /// children. Readers that observe `true` fall into the loader, which
+    /// serialises them on its own lock.
+    std::atomic<bool> m_hasDeferredBody{false};
 
     UInt getOperandCount() { return operandCount; }
 
@@ -665,7 +672,7 @@ struct IRInst
     /// every eagerly loaded module this is a predictable not-taken branch.
     SLANG_FORCE_INLINE void ensureBodyMaterialized()
     {
-        if (m_hasDeferredBody) [[unlikely]]
+        if (m_hasDeferredBody.load(std::memory_order_acquire)) [[unlikely]]
             _materializeDeferredBody();
     }
 

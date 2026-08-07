@@ -925,6 +925,43 @@ public:
     /// (having read nothing) when the state is not a container, when the stride
     /// does not match, or when fewer than `count` elements remain, leaving the
     /// caller to fall back to the per-element path.
+    /// Points `outData` at `count` scalar elements of type `T` in the serialized
+    /// data itself, returning false if that is not possible for the current state.
+    ///
+    /// Same conditions as `tryReadContiguousScalars`, but hands back the stored
+    /// bytes rather than copying them. The caller is then reading directly out of
+    /// the serialized blob, and must keep that blob alive for as long as it uses
+    /// the result.
+    template<typename T>
+    bool tryGetContiguousScalars(T const*& outData, Count count)
+    {
+        static_assert(std::is_arithmetic<T>::value, "spans are only for scalar elements");
+
+        if (count <= 0)
+            return false;
+        auto& state = getState();
+        if (state.type != State::Type::Container)
+            return false;
+        if (state.dataStride != sizeof(T))
+            return false;
+        if (Count(state.remainingValueCount) < count)
+            return false;
+
+        T const* const base = (T const*)state.dataCursor;
+
+        // Read the first element the ordinary way so its layout is still validated,
+        // then step the cursor over the rest.
+        (void)_readSimpleVal<T>();
+        const Count remaining = count - 1;
+        if (remaining > 0)
+        {
+            state.dataCursor = (char*)state.dataCursor + size_t(remaining) * sizeof(T);
+            state.remainingValueCount -= uint32_t(remaining);
+        }
+        outData = base;
+        return true;
+    }
+
     template<typename T>
     bool tryReadContiguousScalars(T* dest, Count count)
     {

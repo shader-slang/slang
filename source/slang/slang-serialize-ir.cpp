@@ -17,6 +17,7 @@
 #include "slang.h"
 
 #include <chrono>
+#include <mutex>
 
 //
 #include "slang-serialize-ir.cpp.fiddle"
@@ -91,25 +92,25 @@ struct FlatInstTable
     // These are the same length, the number of instructions in the module
     // The instAllocInfo list is all that's necessary to allocate an instruction
     FIDDLE() List<InstAllocInfo> instAllocInfo;
-    FIDDLE() List<Int64> childCounts;
+    FIDDLE() SerializedArray<Int64> childCounts;
     FIDDLE() List<SourceLoc> sourceLocs;
 
     // The length of operandIndices is the number of instructions in the module
     // (for typeUse) + the number of operands in the module
     //
     // a nullptr operand is encoded as -1
-    FIDDLE() List<Int64> operandIndices;
+    FIDDLE() SerializedArray<Int64> operandIndices;
 
     // The length is equal to the number of strings and blobs in the module
-    FIDDLE() List<Int64> stringLengths;
+    FIDDLE() SerializedArray<Int64> stringLengths;
 
     // The length is the sum of all stringLengths, the contents is the
     // concatenation of all their data
-    FIDDLE() List<uint8_t> stringChars;
+    FIDDLE() SerializedArray<uint8_t> stringChars;
 
     // The length is number of integer/floating constants in the module, and
     // the contents are the bits of those constants
-    FIDDLE() List<UInt64> literals;
+    FIDDLE() SerializedArray<UInt64> literals;
 };
 
 // For debugging
@@ -479,7 +480,7 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
             // Update parent's child count
             if (inst->parent)
             {
-                flat.childCounts[inst->parent->scratchData]++;
+                flat.childCounts.mutableAt(inst->parent->scratchData)++;
             }
         });
 
@@ -557,6 +558,15 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// decode so that nested subtrees materialize fully.
     bool deferBodies = false;
 
+    /// Serialises deferred decoding.
+    ///
+    /// A global session is shared across threads, so two compiles can reach the
+    /// same builtin module at once. The decode mutates state that is global to the
+    /// module -- the cursors, the instruction array and the module's arena -- so it
+    /// is serialised wholesale rather than per instruction. Contention is limited
+    /// to the first touch of each body.
+    std::mutex mutex;
+
     Int64 instIndex = 0;
     Int64 operandIndex = 0;
     Int64 literalIndex = 0;
@@ -590,9 +600,14 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
 
 void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 {
+    std::lock_guard<std::mutex> lock(mutex);
+
     DeferredBody body;
     if (!deferredBodies.tryGetValue(inst, body))
+    {
+        // Another thread decoded this body while we waited for the lock.
         return;
+    }
     deferredBodies.remove(inst);
 
     // Replay this subtree from where the load walk left off, with deferral
@@ -640,6 +655,10 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
     inst->m_decorationsAndChildren.last = prev;
 
     deferBodies = savedDefer;
+
+    // Release: a thread that later observes this as false must also see every
+    // write above, so that it reads a fully linked body.
+    inst->m_hasDeferredBody.store(false, std::memory_order_release);
 }
 
 
@@ -766,7 +785,7 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
                 char* const dstChars = c->value.stringVal.chars;
                 c->value.stringVal.numChars = uint32_t(len);
                 if (len != 0)
-                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
+                    memcpy(dstChars, flat.stringChars.getBuffer() + stringDataIndex, size_t(len));
             }
             stringDataIndex += len;
             break;
@@ -1048,10 +1067,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             pending.add(deferredInst);
         }
         for (auto deferredInst : pending)
-        {
-            deferredInst->m_hasDeferredBody = false;
             decoder->materializeDeferredBody(deferredInst);
-        }
     }
 
     SLANG_RELEASE_ASSERT(as<IRModuleInst>(moduleInst));

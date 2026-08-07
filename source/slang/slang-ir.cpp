@@ -8871,9 +8871,9 @@ IRInstList<IRDecoration> IRInst::getDecorations()
 
 void IRInst::_materializeDeferredBody()
 {
-    // Clear the flag first: the loader links children onto this instruction, and
-    // anything it calls that touches children must not recurse back in here.
-    m_hasDeferredBody = false;
+    // The flag is cleared by the loader, under its lock, once the children are
+    // linked -- not here. Clearing it first would let a second thread proceed to
+    // read children that are still being built.
     if (auto module = getModule())
     {
         if (auto loader = module->getDeferredBodyLoader())

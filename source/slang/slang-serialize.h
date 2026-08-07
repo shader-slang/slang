@@ -634,6 +634,122 @@ struct SerializerSupportsBulkScalarRead<
 {
 };
 
+template<typename S, typename T, typename = void>
+struct SerializerSupportsScalarSpan : std::false_type
+{
+};
+
+template<typename S, typename T>
+struct SerializerSupportsScalarSpan<
+    S,
+    T,
+    std::void_t<decltype(std::declval<S const&>()->template tryGetContiguousScalars<T>(
+        std::declval<T const*&>(),
+        Count(0)))>> : std::true_type
+{
+};
+
+template<typename S, typename T>
+SLANG_FORCE_INLINE bool tryGetContiguousScalars(S const& serializer, T const*& outData, Count count)
+{
+    if constexpr (SerializerSupportsScalarSpan<S, T>::value)
+        return serializer->template tryGetContiguousScalars<T>(outData, count);
+    else
+        return false;
+}
+
+//
+// An array that is read as a view over the serialized data when the backend can
+// supply one, and as an owned copy otherwise.
+//
+// Fossilized arrays are contiguous at a known stride, so for a scalar element type
+// the stored bytes already have the layout the program wants. Reading them in place
+// avoids copying -- which for the IR's flat instruction table is several megabytes
+// per module, and megabytes that have to be *retained* if bodies are decoded later.
+//
+// The serialized layout is identical to `List<T>`, so switching a field between the
+// two changes nothing on disk.
+//
+template<typename T>
+struct SerializedArray
+{
+    T const* getBuffer() const { return _data; }
+    Count getCount() const { return _count; }
+    T const& operator[](Index index) const
+    {
+        SLANG_ASSERT(index >= 0 && index < _count);
+        return _data[index];
+    }
+    T const* begin() const { return _data; }
+    T const* end() const { return _data + _count; }
+
+    //
+    // Mutating operations, used when building a table to be written. They act on
+    // the owned storage; a view is read-only by construction, since it points into
+    // data this object does not own.
+    //
+    void add(T const& value)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.add(value);
+        setFromOwned();
+    }
+    void setCount(Count newCount)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.setCount(newCount);
+        setFromOwned();
+    }
+    void reserve(Count capacity)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.reserve(capacity);
+        setFromOwned();
+    }
+    /// Mutable access to an element, valid only while this owns its storage.
+    ///
+    /// Deliberately not an `operator[]` overload: a non-const `SerializedArray`
+    /// being *read* would then bind to the mutable overload and go to the owned
+    /// buffer, which for a view is empty. That reads out of bounds, and silently,
+    /// since the bounds assert compiles out in release builds.
+    T& mutableAt(Index index)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        return _owned[index];
+    }
+    void addRange(T const* values, Count valueCount)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.addRange(values, valueCount);
+        setFromOwned();
+    }
+
+    /// True if this is a view into serialized data rather than an owned copy, and
+    /// therefore depends on that data staying alive.
+    bool isView() const { return _count != 0 && _owned.getCount() == 0; }
+
+    /// Copies the referenced data into this object, so it no longer depends on the
+    /// serialized blob. A no-op if it is already owned.
+    void makeOwned()
+    {
+        if (!isView())
+            return;
+        _owned.setCount(_count);
+        ::memcpy(_owned.getBuffer(), _data, size_t(_count) * sizeof(T));
+        _data = _owned.getBuffer();
+    }
+
+    void setFromOwned()
+    {
+        _data = _owned.getBuffer();
+        _count = _owned.getCount();
+    }
+
+    T const* _data = nullptr;
+    Count _count = 0;
+    List<T> _owned;
+};
+
 template<typename S, typename T>
 SLANG_FORCE_INLINE bool tryReadContiguousScalars(S const& serializer, T* dest, Count count)
 {
@@ -889,6 +1005,47 @@ private:
 // the collection to serialize its elements (when
 // writing).
 //
+
+template<typename S, typename T>
+void serialize(S const& serializer, SerializedArray<T>& value)
+{
+    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+    if (isWriting(serializer))
+    {
+        for (Index i = 0; i < value.getCount(); ++i)
+        {
+            T element = value[i];
+            serialize(serializer, element);
+        }
+    }
+    else
+    {
+        const Count remaining = tryGetRemainingElementCount(serializer);
+        if constexpr (std::is_arithmetic<T>::value)
+        {
+            if (remaining > 0)
+            {
+                T const* view = nullptr;
+                if (tryGetContiguousScalars(serializer, view, remaining))
+                {
+                    value._data = view;
+                    value._count = remaining;
+                    return;
+                }
+            }
+        }
+        value._owned.clear();
+        if (remaining > 0)
+            value._owned.reserve(remaining);
+        while (hasElements(serializer))
+        {
+            T element;
+            serialize(serializer, element);
+            value._owned.add(element);
+        }
+        value.setFromOwned();
+    }
+}
 
 template<typename S, typename T>
 void serialize(S const& serializer, List<T>& value)
