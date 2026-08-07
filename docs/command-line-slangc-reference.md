@@ -1161,8 +1161,9 @@ Language
 Language Version 
 
 * `legacy`, `default`, `2018` : Legacy Slang language 
-* `2025` : Slang language rules for 2025 and older 
-* `2026`, `latest` : Slang language rules for 2026 and newer 
+* `2025`, `202a` : Slang language rules for 2025 and older 
+* `2026`, `202b`, `latest` : Slang language rules for 2026 
+* `202c`, `next` : Slang language rules for 202c 
 
 <a id="archive-type"></a>
 ## archive-type

@@ -1,17 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:32:24+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#differential-pair-projection
-//META: doc_section_digest=c901479d85106c278176dc14d6b22407f46e5dc12a769c4118d6b8671da0d2f1
-//META: purpose=Reading .d off a returned DifferentialPair lowers to GetDifferential(%pair).
+//META: doc_section_digest=5f50033280aec505eacac53ad283962baab159487ef0677b633a1b40a4acdceb
+//META: purpose=The .d getter of DifferentialPair<T> lowers to GetDifferential on the pair, producing the differential element type.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `.d` projection on a `DifferentialPair<float>` value lowers to a
-// `GetDifferential(%pair)` IR value whose result type is the
-// differential type (Float for float).
+// Verifies the differential half of the projection table: reading `.d` off a
+// `DifferentialPair<float>` returned by a forward-differentiated call emits
+// `GetDifferential`, whose result type is the differential type of `float` —
+// `Float` again, since the scalar is its own differential. CHECK is anchored
+// after `func %main` so the many `GetDifferential` uses in the core-module
+// autodiff preamble cannot satisfy the pattern.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

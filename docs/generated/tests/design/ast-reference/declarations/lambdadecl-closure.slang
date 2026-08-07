@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=A LambdaDecl is the closure-struct produced by a lambda expression; the closure is callable through the IFunc-constrained generic helper.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A lambda expression produces a callable closure declaration that an IFunc-constrained generic can invoke.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of LambdaDecl. The `=>` expression
-// produces a closure value; an IFunc-constrained helper invokes the
-// closure and returns its result.
+// Verifies that the checker turns a lambda expression into a callable value.
+// The lambda is passed to a generic constrained on `IFunc`, which invokes it;
+// the CHECK asserts the lambda body's result, so the closure must have been
+// materialized as a conforming callable.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/visibility.md#where-visibility-is-filtered
-//META: doc_section_digest=d1b896b6a6adec252014d2d12ba87c258c20d4783523aeec02b3767c1a892991
+//META: doc_section_digest=c54ab9dab59a428876c20360e9e45d6480dca1c6fd84d84d999b4927fa66945f
 //META: purpose=A private member declared in one `extension S` is reachable from another `extension S` because both extensions resolve to the same target type.
 //META: intent=functional
 //META: pipeline_stage=check

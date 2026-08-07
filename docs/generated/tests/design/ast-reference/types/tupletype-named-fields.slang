@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/generated/design/ast-reference/types.md#aggregate--collection-types
-//META: doc_section_digest=acec388be6a124a34086d58d95713bb5cd33eeac4b8fcf6534173cfc8ec11143
-//META: purpose=A TupleType holds a heterogeneous member-type list; the i-th element is reachable as ._i and has the i-th declared type.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
+//META: doc_section_digest=c7f55cb42aaa9e03df513fb2e3ff5bbcf380f2c09432d750a2aa9c55dfc56801
+//META: purpose=A TupleType holds a per-position member-type list; the i-th element is reachable as `._i` and has the i-th declared type.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies TupleType is Tuple<T1,T2,...> with per-position member
-// types reachable as ._0, ._1, ... Mixing int/float/bool across
-// positions exercises the per-position type carry; CHECK asserts each
-// element reads back at its declared type.
+// Verifies the per-position member list of the tuple type by mixing
+// int/float/bool across the three positions. Each element is read back
+// through `._0`/`._1`/`._2` and converted for printing; CHECK asserts
+// all three values, which requires each position to have kept its own
+// declared type.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

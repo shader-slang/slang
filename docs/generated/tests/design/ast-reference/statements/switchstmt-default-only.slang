@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#switchstmt-casestmt-defaultstmt
-//META: doc_section_digest=a1ec0803b8c128d1fa4912560d537bd7689c45ee4daaefd344406cf6fe5b8219
-//META: purpose=A SwitchStmt whose body contains only a `default:` marker (no CaseStmt) dispatches every condition value to the default body; the documented "marker-slicing" of the body still works at the lower edge of one section.
+//META: doc_section_digest=c17fa898c930ec5bd9c17383b899c278d84a084e1966bd606af453fb02db5a07
+//META: purpose=A SwitchStmt whose body holds only a `default:` marker dispatches every condition value to that default section.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary: SwitchStmt with one CaseStmtBase entry (the DefaultStmt
-// alone). The doc says the body is "sliced into per-case blocks";
-// with only a default block, every condition value hits the default.
+// Boundary: a switch body containing only a `default:` marker. Verifies
+// the marker still slices the body into a section, so every condition
+// value reaches the default block. The CHECK asserts a `switch`
+// construct survives in the emitted C++.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry computeMain -stage compute
 

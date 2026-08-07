@@ -1,22 +1,21 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:18:00Z
-//META: source_commit=ef4bd0b0d91a213b52e333ce39dfe8b73efca3d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#builtinrequirementkey--builtinrequirementkey
-//META: doc_section_digest=28df938d7b6c7f1da019467d16e8588fdfdf4490713d538aea7f26ee4dd9331f
-//META: purpose=Either requirement-key kind can appear as the lookupKey of lookupWitness: dispatching a built-in requirement (IDifferentiable's dzero) through a constrained type parameter looks the key up with a builtinRequirementKey.
+//META: doc_section_digest=d80ae21dbc525a4a7b33400fe5616ab93a1f581227fecb5e8b1b0d8433863e1a
+//META: purpose=Either requirement-key kind can occupy the lookupKey slot of witness dispatch, so a built-in requirement is looked up with a builtinRequirementKey.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a builtinRequirementKey flows through witness dispatch.
-// In `zeroOf<T : IDifferentiable>`, both the `T.Differential` result type
-// and the `T.dzero()` call must be looked up in T's witness table, and the
-// only requirement keys IDifferentiable offers are built-in ones. The
-// CHECK-DAGs assert the dump holds a `builtinRequirementKey(` definition
-// and a `lookupWitness` whose key operand is an unnamed numbered inst
-// (a StructKey key would print with its mangled x5F name) — together
-// showing the built-in key kind occupying the lookupKey slot.
+// Verifies why the `lookupKey` operand is typed as a plain inst rather than a
+// struct key. In `zeroOf<T : IDifferentiable>` both the `T.Differential` result
+// type and the `T.dzero()` call must be resolved through T's witness table, and
+// IDifferentiable offers only built-in requirements. The CHECK-DAGs require a
+// `builtinRequirementKey(` definition plus a `lookupWitness` whose key operand
+// is an unnamed numbered inst — a struct key would print with its mangled x5F
+// name instead.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

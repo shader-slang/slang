@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=90fd91b1a21860b3569e7b02fb36035ba69014ded4abafe7604e89fcb5aea51a
+//META: doc_section_digest=221e203d328edd373a1da34064baee6a2aab4c19c403c7438de72b93ad6ee5f5
 //META: purpose=Expansion: narrowing conversion from Double to Half yields a Half-typed floatCast value.
 //META: intent=expansion
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `Half`, `Float`, and `Double` as three distinct
-// floating-point scalar opcodes. A `half(v)` narrowing from a
-// `double` value produces a `floatCast` instruction whose result
-// type is `Half`, pulling from the widest to the narrowest float.
+// narrowing conversion from Double to Half yields a Half-typed
+// floatCast value. A `half(v)` narrowing from a `double` value
+// produces a `floatCast` instruction whose result type is `Half`,
+// pulling from the widest to the narrowest float.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

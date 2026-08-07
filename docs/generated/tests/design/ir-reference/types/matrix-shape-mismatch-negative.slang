@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vec-and-mat
-//META: doc_section_digest=3375fc96f25274ba6b5f61268aab7b799044240063cd3b64ac3928c13a5702fc
+//META: doc_section_digest=fede71bd73c83957c94e27eab0113790d3ae8864e230db8dde234dca52b8d824
 //META: purpose=Negative: assigning a float2x2 to a float3x3 is rejected because Mat types with different rowCount/columnCount are distinct.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `Mat(elementType, rowCount, columnCount, layout)`
-// has separate row and column operands. Two `Mat` types with
-// different row/column shapes are distinct IR types — assignment
+// assigning a float2x2 to a float3x3 is rejected because Mat types
+// with different rowCount/columnCount are distinct. Two `Mat` types
+// with different row/column shapes are distinct IR types — assignment
 // without explicit conversion fires a type-mismatch diagnostic.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main

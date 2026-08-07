@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=c0f68fbd11fbf74cffbc1af19923571c01f9108c320fe0630ddecaa337b4ac7c
-//META: purpose=The inheritance walk traverses every facet of the InheritanceInfo, including transitive super-interfaces, so a method declared on a top-most interface is reachable through a deeply derived constraint.
-//META: intent=functional
+//META: doc_section_digest=9574aa361d7b18b1da022473e0e53acd215b9af06dae0cb39490ca13610d03bf
+//META: purpose=The linearized facet list includes transitive super-interfaces, so a method declared on the topmost interface of a three-level chain is reachable through a constraint naming only the bottom one.
+//META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says the inheritance walk iterates "InheritanceInfo::facets
-// precomputed in slang-check-inheritance.cpp" — each facet is one
-// path from the source type to a super-type. With IA <- IB <- IC and
-// `Impl : IC`, the `aval()` method declared on IA must still be
-// reachable through `Impl`'s facets via the transitive chain.
+// Verifies the facet walk at inheritance depth three: IA <- IB <- IC,
+// with the generic constrained only to IC. `aval()` is declared on IA,
+// so the call resolves only if the linearized facet list carries the
+// transitive interface facets rather than just the direct base. CHECK
+// asserts 17, the conformer's implementation of that requirement.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

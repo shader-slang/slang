@@ -1,21 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#existential-destructuring
-//META: doc_section_digest=02ff34102848a32784b08786fff8eb6145699715106f91aa1145c3476f2f96f7
+//META: doc_section_digest=bfaba91cd7aecc07abcd6aed864d007e29538d6fe91106d3d1dd5e36f206a91a
 //META: purpose=Dispatching through an interface-typed value produces extractExistentialWitnessTable(%i) whose result type is witness_table_t(%I).
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### Existential destructuring` lists
-// `extractExistentialWitnessTable` as "Reads the packed witness
-// table from an existential". The result type is
-// `witness_table_t(%I)` — the table type parameterised by the
-// interface only (the implementing-type is unknown at the
-// extract site, so the type is half-applied).
-
+// Verifies the witness projection: the conformance recovered from an
+// existential is typed by the interface it witnesses, which is what the
+// downstream lookup needs. The CHECK reads the binding's declared type and
+// asserts `witness_table_t(%IFoo)`.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };
@@ -32,4 +28,4 @@ void main()
     buf[0] = i.run(inVal);
 }
 
-// CHECK: let  %{{[0-9]+}}	: witness_table_t(%IFoo)	= extractExistentialWitnessTable(%i)
+// CHECK: let  %{{[0-9]+}} : witness_table_t(%IFoo) = extractExistentialWitnessTable(%i)

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:30:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#core-module-syntax-declarations
-//META: doc_section_digest=950d7a7efcea5da748ec49fa6499555097f3093abb07ac97945a51be1ce2339c
+//META: doc_section_digest=61eae4cb09aaf55ca13e1b5adcdbe1bcd8d876e194e57de10e1861ffeb9396c7
 //META: purpose=Boundary: `float4x4` is the maximum-square matrix vocabulary and `mul` is documented as an HLSL intrinsic; combining them at the largest square boundary scales the input vector component-wise via a diagonal matrix.
 //META: intent=boundary
 //META: pipeline_stage=parse

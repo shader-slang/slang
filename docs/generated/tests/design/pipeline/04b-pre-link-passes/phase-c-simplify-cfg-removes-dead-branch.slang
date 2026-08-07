@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-c-mandatory-optimization-passes
-//META: doc_section_digest=ea5fa74562394aae8870602d7884121af11d8d0462ee86377e7d298a8422bd4b
-//META: purpose=Phase C's simplifyCFG (C3) removes empty/unreachable blocks; an `if (true) ... else ...` collapses to the taken branch with no ifElse opcode.
+//META: doc_section_digest=49feefd921e3cd705ce44340fcdfa68e653acc4e8992a6e7baac1b7332480921
+//META: purpose=Phase C's simplifyCFG (C3) removes the empty and unreachable blocks left after constant propagation resolves a branch condition.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// SCCP recognises the constant condition and simplifyCFG / peephole
-// then prune the dead branch. After Phase C only the taken arm
-// (`buf[0] = a;`) remains, with no `ifElse(...)` terminator and
-// no reference to the -1 sentinel.
+// Verifies that a statically-taken branch leaves no control flow behind.
+// C2 resolves the `true` condition, then C3 and the pre-linking peephole
+// prune the untaken arm and the now-empty blocks. The CHECKs assert the
+// taken arm's store survives while neither the `ifElse` terminator nor the
+// untaken arm's sentinel value appears in the snapshot.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

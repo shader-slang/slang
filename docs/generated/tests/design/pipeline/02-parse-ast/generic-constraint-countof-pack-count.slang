@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:28:39Z
-//META: source_commit=7a45a039cb7fb0a34e9184c7069a96bccdf08115
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#generics-ambiguity
-//META: doc_section_digest=2adc733a81916b42380544b008460df5b366206d39b999775293a73fe57f1756
+//META: doc_section_digest=078844f9de8080a010d3c70d4af44f40667b8ce158b13e5adda01e318abce99c
 //META: purpose=The `where countof(Pack) == IntExpr` spelling parses into a pack-count constraint that a call with the matching pack arity satisfies.
 //META: intent=functional
 //META: pipeline_stage=parse

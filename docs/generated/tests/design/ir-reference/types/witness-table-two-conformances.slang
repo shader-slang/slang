@@ -1,19 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#witness-table-types
-//META: doc_section_digest=49a42ed1a7e671e433233673213bd9448bafebbaf48bf140e20c8897c9e16e21
+//META: doc_section_digest=bfbd3530f0dbe36c90209d99b70c7379641a73a0001f242585f5aaef81b2437f
 //META: purpose=Stress: two distinct conformances to the same interface produce two distinct witness_table values parameterised by the same interface.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `witness_table_t(baseType: IRType)` is parameter-
-// ised by interface. Two struct conformances against the same
-// interface produce two distinct `witness_table` values whose
-// types both share `witness_table_t(%IShape)` but differ in the
-// concrete-type parenthesised application.
+// two distinct conformances to the same interface produce two distinct
+// witness_table values parameterised by the same interface. Two struct
+// conformances against the same interface produce two distinct
+// `witness_table` values whose types both share
+// `witness_table_t(%IShape)` but differ in the concrete-type
+// parenthesised application.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

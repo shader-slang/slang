@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#specialization-and-generics
-//META: doc_section_digest=48bf733638e3eef5be6628f3f74ad4bfa6b0600b0268542423d3dd43367db05c
+//META: doc_section_digest=4af16ce22c9a66bc00390c870ab8fa13bdbb68c7437a11e64d86f8f9c02cdbe4
 //META: purpose=Stress: the same generic called with three distinct type arguments (int / float / uint) is each specialized independently — the three concrete operand types `int ai_0`, `float af_0`, `uint au_0` survive in the HLSL GlobalParams struct.
 //META: intent=stress
 //META: pipeline_stage=ir-pass
