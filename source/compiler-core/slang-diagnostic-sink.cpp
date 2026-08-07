@@ -473,16 +473,20 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
                 if (macroEntry)
                 {
                     SourceLoc callSiteLoc = macroEntry->callSiteLoc;
-                    SourceView* callSiteView = sourceManager
-                        ? findSourceViewThroughMacroExpansion(sourceManager, callSiteLoc)
-                        : nullptr;
+                    SourceView* callSiteView =
+                        sourceManager
+                            ? findSourceViewThroughMacroExpansion(sourceManager, callSiteLoc)
+                            : nullptr;
                     if (!callSiteView)
                         break;
 
                     StringBuilder msg;
                     DiagnosticArg arg(macroEntry->macroName);
                     formatDiagnosticMessage(
-                        msg, MiscDiagnostics::seeExpandedFromMacro.messageFormat, 1, &arg);
+                        msg,
+                        MiscDiagnostics::seeExpandedFromMacro.messageFormat,
+                        1,
+                        &arg);
 
                     Diagnostic initiationDiagnostic;
                     initiationDiagnostic.ErrorID = MiscDiagnostics::seeExpandedFromMacro.id;
@@ -498,24 +502,27 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
                 }
 
                 // Fall back to the TokenPaste SourceView path.
-                SourceView* currentView = sourceManager
-                    ? sourceManager->findSourceViewRecursively(currentLoc)
-                    : nullptr;
+                SourceView* currentView =
+                    sourceManager ? sourceManager->findSourceViewRecursively(currentLoc) : nullptr;
                 if (!currentView || !currentView->getInitiatingSourceLoc().isValid())
                     break;
                 if (currentView->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste)
                     break;
 
                 SourceLoc initiatingLoc = currentView->getInitiatingSourceLoc();
-                SourceView* initiatingView = sourceManager
-                    ? findSourceViewThroughMacroExpansion(sourceManager, initiatingLoc)
-                    : nullptr;
+                SourceView* initiatingView =
+                    sourceManager
+                        ? findSourceViewThroughMacroExpansion(sourceManager, initiatingLoc)
+                        : nullptr;
                 if (!initiatingView)
                     break;
 
                 StringBuilder msg;
                 formatDiagnosticMessage(
-                    msg, MiscDiagnostics::seeTokenPasteLocation.messageFormat, 0, nullptr);
+                    msg,
+                    MiscDiagnostics::seeTokenPasteLocation.messageFormat,
+                    0,
+                    nullptr);
 
                 Diagnostic initiationDiagnostic;
                 initiationDiagnostic.ErrorID = MiscDiagnostics::seeTokenPasteLocation.id;
