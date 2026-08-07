@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:48:55Z
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#standard-modules
-//META: doc_section_digest=e736541fe370e6b141fb2ebd19d2f4b376079f81f8b0c4c945979076e75beca5
+//META: doc_section_digest=214348552ef6e4ffe8088c7b0cb4eb2a7428707c2251091bf17344d6d0fee1d3
 //META: purpose=Standard modules (e.g. `neural`) are loaded on demand via `import slang.<name>`; without that import, neural-namespaced names are unresolved.
 //META: intent=negative
 //META: pipeline_stage=check

@@ -207,6 +207,12 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
+// NOTE: The IR linker assumes every `AnnotationKind` is differentiability-
+// related: `cloneAnnotations` in slang-ir-link.cpp skips cloning *all*
+// module-scope annotations into the final codegen link of a program that does
+// not use auto-diff. If you add a kind that is not auto-diff-related, that
+// gate must learn to distinguish kinds, or your annotations will be silently
+// dropped from every non-differentiating program.
 enum class AnnotationKind
 {
     Unknown = 0,
@@ -229,6 +235,11 @@ enum class AnnotationKind
     DifferentialPtrPairType = 13,
     DifferentialZero = 14,
     DifferentialAdd = 15,
+
+    // Sentinel — keep last. `cloneAnnotations` in slang-ir-link.cpp
+    // static_asserts against this value so that adding a kind forces a visit
+    // to the pruning gate (see the note above this enum).
+    CountOf = 16,
 };
 
 

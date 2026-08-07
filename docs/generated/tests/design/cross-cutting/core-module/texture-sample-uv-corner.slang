@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#core-module
-//META: doc_section_digest=2bfd479afe0dc76144283c14d90b22a6ac0fd8d03be7907d3412c1e2f3944a4b
+//META: doc_section_digest=a1c3e1c21f5e7d5f5d6098ee8202f97eec56a5706e678fd2be1b3844ebe8539e
 //META: purpose=Boundary: HLSL meta-module Texture2D.Sample accepts the (0,0) corner UV and lowers per target.
 //META: intent=boundary
 //META: pipeline_stage=lower

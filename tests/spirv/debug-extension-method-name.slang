@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g3 -O0 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -g3 -emit-spirv-directly
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -stage compute
 
 // Regression test for shader-slang/slang#11563: name hints for methods declared
@@ -24,11 +24,13 @@ interface IBase
 
 struct Example : IBase
 {
+    [noinline]
     int baseMethod(int value)
     {
         return value;
     }
 
+    [noinline]
     int baseInterfaceMethod(int value)
     {
         return value;
@@ -37,6 +39,7 @@ struct Example : IBase
 
 extension Example
 {
+    [noinline]
     int extensionMethod(int value)
     {
         return value;
@@ -50,6 +53,7 @@ interface IExtension
 
 extension Example : IExtension
 {
+    [noinline]
     int extensionInterfaceMethod(int value)
     {
         return value;
@@ -67,6 +71,7 @@ struct Box<T>
 
 extension<T> Box<T>
 {
+    [noinline]
     int boxExt(int value)
     {
         return value;

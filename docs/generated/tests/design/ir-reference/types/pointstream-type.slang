@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/ir-reference/types.md#resource-and-texture-types
-//META: doc_section_digest=094f3ccbff16c121504cf60cd04ae15b937c78df94da8d568013fe4104a433b9
+//META: doc_section_digest=4995d79f1d575606442d0357f0fb015ffcc2489a1b4116d09d5d6d1d0bde2e0f
 //META: purpose=A PointStream<T> geometry-shader output parameter surfaces the PointStream opcode parameterised by its element type in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower

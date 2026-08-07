@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T18:00:00+00:00
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#layout-and-binding
-//META: doc_section_digest=06fba085c49c1b3a2b0f9fcc4941f5b7e0c382078660bd5b19c43e0aa5b68350
+//META: doc_section_digest=99ce8775511c8e573c9ac6b4b3d96b8c25c6abb194e2f731be7d249c1f4d2bc8
 //META: purpose=The collect-global-uniforms pass packages free-floating `uniform` globals into a `GlobalParams` aggregate visible in the emit on HLSL, GLSL, and CUDA.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

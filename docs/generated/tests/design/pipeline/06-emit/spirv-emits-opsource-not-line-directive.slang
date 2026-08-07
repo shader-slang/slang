@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#source-writer-abstraction
-//META: doc_section_digest=153032ddf0c4d4832addf2be03aae534b965dbfa8ee7958964ccb5dd0fe90941
+//META: doc_section_digest=5ab3f266239be1b6579f1150e2e0f0b0b3f4aacd7432b541f42ae07cd29ad3ca
 //META: purpose=Boundary/negative: SPIR-V emit does NOT produce a C `#line` directive — instead it emits `OpSource Slang 1` as the source-location anchor in the SPIR-V debug info section.
 //META: intent=negative
 //META: pipeline_stage=emit

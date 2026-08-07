@@ -1,7 +1,7 @@
 // slang-ir-marshal-native-call.h
 #pragma once
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 
 namespace Slang
 {

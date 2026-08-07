@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices
-//META: doc_section_digest=99399bec1655fc5eb538f2f70fe7d6d9093a89bbf1f86fbe5246b36cbfc141d8
+//META: doc_section_digest=68e6f8fe2ef26c5eb509b197e00cfd6b92f20ff7baca61aabbd1d7d712edf820
 //META: purpose=Boundary: a user-struct element type in a structured buffer is not wrapped, because the element is already a struct.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

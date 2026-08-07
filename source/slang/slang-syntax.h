@@ -44,6 +44,34 @@ inline SubstExpr<Expr> getPackCountConstraintPackExpr(
     return declRef.substitute(astBuilder, declRef.getDecl()->packExpr);
 }
 
+inline DeclRef<Decl> getPackCountConstraintPackDeclRef(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    // The declaration checker stores the checked pack target in `packDeclRef`;
+    // `packExpr` remains only as source syntax for diagnostics and printing.
+    if (!declRef)
+        return DeclRef<Decl>();
+
+    auto packDeclRef = declRef.getDecl()->packDeclRef;
+    if (!packDeclRef)
+        return DeclRef<Decl>();
+
+    return substituteDeclRef(SubstitutionSet(declRef), astBuilder, packDeclRef);
+}
+
+inline IntVal* getPackCountConstraintActualCount(
+    ASTBuilder* astBuilder,
+    DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
+{
+    if (!declRef)
+        return nullptr;
+    auto val = declRef.getDecl()->actualCountVal;
+    if (!val)
+        return nullptr;
+    return as<IntVal>(val->substitute(astBuilder, SubstitutionSet(declRef)));
+}
+
 inline IntVal* getPackCountConstraintExpectedCount(
     ASTBuilder* astBuilder,
     DeclRef<GenericVariadicPackCountConstraintDecl> const& declRef)
@@ -398,6 +426,9 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl);
 ///
 ParamPassingMode getParamPassingMode(ParamDecl* paramDecl);
 
+/// Returns true if `type` or one of its modified-type bases carries `no_diff`.
+bool doesTypeHaveNoDiffModifier(Type* type);
+
 inline Type* getTagType(ASTBuilder* astBuilder, DeclRef<EnumDecl> declRef)
 {
     return declRef.substitute(astBuilder, declRef.getDecl()->tagType);
@@ -507,6 +538,12 @@ ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType, Int
 ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType);
 
 NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef);
+
+/// Returns the canonical AST lookup name shared by subscript declarations and expressions.
+inline Name* getSubscriptOperatorName(ASTBuilder* astBuilder)
+{
+    return astBuilder->getNamePool()->getName("operator[]");
+}
 
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef);
 

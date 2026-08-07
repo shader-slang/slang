@@ -47,8 +47,8 @@ bool TEST_texture_float()
 
     float u = 0;
     float u2 = 0.5;
-    constexpr const float ddx = 0.0f;
-    constexpr const float ddy = 0.0f;
+    const float ddx = 0.0f;
+    const float ddy = 0.0f;
 
     uint width = 0, height = 0, depth = 0;
     float fwidth = 0.0f, fheight = 0.0f, fdepth = 0.0f;

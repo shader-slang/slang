@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T20:00:00+00:00
 //META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
+//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
 //META: purpose=A `Tuple<int8_t, float, bool>` constructor lowers to a `makeTuple(...)` whose result IR type is `tuple_type(Int8, Float, Bool)` carrying each element's lowered IR type.
 //META: intent=expansion
 //META: pipeline_stage=lower

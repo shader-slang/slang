@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T19:00:00+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#struct-internals
-//META: doc_section_digest=512fdef1e28b21588ddc2979311636aaac69bfc4ae19f152ea896102f2378207
+//META: doc_section_digest=9f8ff0ea33e7a0b5bff63c78fdd230ddcd2258d52d60334f26e9fdc4921a9308
 //META: purpose=A struct declaration lowers to a struct parent opcode whose children are field opcodes pairing a key with a fieldType.
 //META: intent=functional
 //META: pipeline_stage=lower

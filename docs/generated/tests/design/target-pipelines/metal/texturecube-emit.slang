@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=15e31694fd5ee22d184f1b99f92912686150441a720712b25e415c394b7ce97f
+//META: doc_section_digest=3b19519e792b092406320b661c62d171b0f8cdff6f282ae48cf30ac091136ae8
 //META: purpose=TextureCube<float4> emits as metal::texturecube<float, access::sample> with a positional [[texture(N)]] binding.
 //META: intent=expansion
 //META: pipeline_stage=emit

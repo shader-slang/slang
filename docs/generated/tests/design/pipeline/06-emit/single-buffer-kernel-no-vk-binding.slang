@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#backends
-//META: doc_section_digest=d646ec1bfe54ca64d7afa27f7a26e793849f961a190aeb5f3c004156a5cb2217
+//META: doc_section_digest=afa9da1872ac16bf6c1982347a2d10792a8dffe153564dac9ffdc097add1d689
 //META: purpose=Boundary: a single-buffer compute kernel with no explicit vk::binding annotation emits the default binding index per target — HLSL `register(u0)`, GLSL `binding = 0`, SPIR-V `Binding 0`, Metal `buffer(0)`, WGSL `@binding(0)`.
 //META: intent=boundary
 //META: pipeline_stage=emit

@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T15:00:00+00:00
 //META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
 //META: doc_ref=docs/generated/design/pipeline/01-lex-preprocess.md#macro-expansion
-//META: doc_section_digest=5bd3f7fd4d4aec36189e915e3bcaded5ad098fe089b37ce5114d8bfba37a75a3
+//META: doc_section_digest=cf4f1b505a333d6ccc1a3cb482330c4dde4668bd530a4d0fe4905412ffd9448a
 //META: purpose=Inside an inactive `#if` block, only directives that may toggle the active/inactive state (`#if`, `#else`, `#elif`, `#endif`) are evaluated; other directives are skipped without effect.
 //META: intent=functional
 //META: pipeline_stage=preprocess

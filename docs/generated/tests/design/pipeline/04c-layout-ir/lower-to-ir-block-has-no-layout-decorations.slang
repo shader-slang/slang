@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:02:55+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#what-this-module-is-not
-//META: doc_section_digest=c5f9bc15bef4a61077dd5dc0d9ab9b6fd48a5c67823464969cab691a0a05a86c
+//META: doc_section_digest=98e652ccdabfc883b1140a71a392d5b79042be133038ba455d1932a654abc8e2
 //META: purpose=The pre-link executable IR (### LOWER-TO-IR:) carries no [layout(...)] decorations; layout lives in a sibling module built by createIRModuleForLayout.
 //META: intent=functional
 //META: pipeline_stage=layout

@@ -1,10 +1,10 @@
 #ifndef SLANG_WIN_VISUAL_STUDIO_UTIL_H
 #define SLANG_WIN_VISUAL_STUDIO_UTIL_H
 
-#include "../../core/slang-list.h"
-#include "../../core/slang-process-util.h"
-#include "../../core/slang-string.h"
-#include "../slang-downstream-compiler-util.h"
+#include "compiler-core/slang-downstream-compiler-util.h"
+#include "core/slang-list.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string.h"
 
 namespace Slang
 {

@@ -43,6 +43,15 @@ inline bool isSlangOptimizationArg(const String& arg)
                ValueInt(-1)) != ValueInt(-1);
 }
 
+/// Returns true when an argument is a slang-test suite optimization-level option.
+///
+/// slang-test deliberately exposes only the numeric `-OX` spellings where X is from 0 to 3,
+/// while test directives may continue to use every optimization spelling accepted by slangc.
+inline bool isSlangTestOptimizationArg(const UnownedStringSlice& arg)
+{
+    return arg.getLength() == 3 && arg[0] == '-' && arg[1] == 'O' && arg[2] >= '0' && arg[2] <= '3';
+}
+
 /// Returns true when a compiler command line already specifies an optimization level.
 inline bool hasSlangOptimizationArg(const List<String>& args)
 {
@@ -59,15 +68,18 @@ inline bool hasSlangOptimizationArg(const List<String>& args)
 /// Most compiler-based tests do not need optimized output, and keeping them at `-O0` avoids
 /// optimizer time and SPIR-V optimizer output churn.
 ///
+/// `defaultLevel` controls the suite default. Test-provided optimization options still take
+/// precedence.
+///
 /// The default is inserted at the front of the argument list rather than appended, so it can
 /// never change the meaning of the test-provided arguments. For example, a diagnostic test may
 /// intentionally end with a dangling `-target` to provoke a missing-argument diagnostic; an
 /// appended `-O0` would be consumed as that option's argument and change the diagnostic.
-inline void addDefaultSlangOptimization(CommandLine& ioCmdLine)
+inline void addDefaultSlangOptimization(CommandLine& ioCmdLine, const String& defaultLevel)
 {
     if (!hasSlangOptimizationArg(ioCmdLine.m_args))
     {
-        ioCmdLine.m_args.insert(0, kTestOptimizationOption);
+        ioCmdLine.m_args.insert(0, defaultLevel);
     }
 }
 
@@ -120,20 +132,25 @@ inline bool hasRenderTestRenderApiArg(const List<String>& args, RenderApiType ap
 /// Metal render tests receive `-O1` instead of `-O0`; see
 /// `kMetalRenderTestOptimizationOption` for why.
 ///
+/// `defaultLevel` controls the suite default for non-Metal tests. Test-provided optimization
+/// options still take precedence.
+///
 /// Like `addDefaultSlangOptimization`, the default is inserted at the front of the argument
 /// list rather than appended, so a directive that accidentally leaves an option without its
 /// required parameter cannot consume the inserted default and change the command's meaning.
-inline void addDefaultRenderTestSlangOptimization(CommandLine& ioCmdLine)
+inline void addDefaultRenderTestSlangOptimization(
+    CommandLine& ioCmdLine,
+    const String& defaultLevel)
 {
     if (hasRenderTestSlangOptimizationArg(ioCmdLine.m_args))
         return;
 
     const bool isMetal = hasRenderTestRenderApiArg(ioCmdLine.m_args, RenderApiType::Metal);
+    const String optimizationOption =
+        isMetal ? String(kMetalRenderTestOptimizationOption) : defaultLevel;
 
     ioCmdLine.m_args.insert(0, "-Xslang");
-    ioCmdLine.m_args.insert(
-        1,
-        isMetal ? kMetalRenderTestOptimizationOption : kTestOptimizationOption);
+    ioCmdLine.m_args.insert(1, optimizationOption);
 }
 
 } // namespace SlangTest

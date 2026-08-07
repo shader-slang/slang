@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
 //META: doc_ref=docs/generated/design/ir-reference/types.md#resource-and-texture-types
-//META: doc_section_digest=094f3ccbff16c121504cf60cd04ae15b937c78df94da8d568013fe4104a433b9
+//META: doc_section_digest=4995d79f1d575606442d0357f0fb015ffcc2489a1b4116d09d5d6d1d0bde2e0f
 //META: purpose=Expansion: RWStructuredBuffer<uint16_t> names UInt16 as its element-type operand.
 //META: intent=expansion
 //META: pipeline_stage=lower

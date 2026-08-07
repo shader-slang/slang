@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools
-//META: doc_section_digest=03d6fe7b8f4502160d35cd7e0f89a3145a7dfe7a6680c44cb1092265f9fe4de7
+//META: doc_section_digest=619da2387b17d1b514e8cb1b82a03f336653b7502413b2205a6fc4753c4eeacd
 //META: purpose=Expansion: a Texture2DArray resource keeps its HLSL spelling and lands in a `t` register; SampleLevel takes a float3 coord (uv + slice).
 //META: intent=expansion
 //META: pipeline_stage=emit

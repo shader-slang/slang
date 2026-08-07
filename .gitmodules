@@ -64,3 +64,10 @@
 	path = external/fast_float
 	url = https://github.com/fastfloat/fast_float
 	branch = v8.2.7
+[submodule "external/mimalloc"]
+	path = external/mimalloc
+	url = https://github.com/microsoft/mimalloc.git
+	# The pinned commit (8c532c3, v2.1.7) is not reachable from microsoft/mimalloc's
+	# default branch (main3). It is reachable from the v2.1.7 tag, so this override
+	# is required: without it the pin check resolves the remote default and fails.
+	branch = v2.1.7

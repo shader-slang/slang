@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-22T00:00:00+00:00
 //META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#spir-v-direct
-//META: doc_section_digest=42d7bd80dcaa52d3a64e75557163627a5a0662ae56a50368df92112952f8a0d1
+//META: doc_section_digest=799614514ad493b834b1c49840d773548f743d33a2ab4f40a07229dca8dbbe9b
 //META: purpose=The direct SPIR-V backend emits a SPIR-V binary (no -asm) whose disassembly carries the same OpCapability/OpEntryPoint/OpExecutionMode/OpDecorate Binding markers as the assembly form.
 //META: intent=expansion
 //META: pipeline_stage=emit

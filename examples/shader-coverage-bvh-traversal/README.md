@@ -29,11 +29,14 @@ The traversal kernel has several rarely-fired branches:
 
 The host driver generates a procedural mesh, builds a BVH on CPU,
 uploads, and dispatches 4096×4096 = 16.7M rays from a synthetic camera.
-By default all rays are submitted in a single dispatch. Pass
-`--batch-size=N` to split them into batches of N rays per submission,
-which keeps each batch short and avoids OS watchdog resets (Windows TDR)
-under coverage instrumentation; `--batch-size=262144` (512×512) is a
-safe starting point on any GPU.
+`--batch-size=N` splits the rays into batches of N per submission, which
+keeps each batch short and avoids OS watchdog resets (Windows TDR /
+`VK_ERROR_DEVICE_LOST`) under coverage instrumentation. Full mode
+defaults to batches of 262144 (512×512) — a safe value on any GPU —
+because its single 16.7M-ray coverage-instrumented dispatch is long
+enough to trip the watchdog; smoke mode defaults to a single dispatch.
+Pass an explicit value to tune, or `--batch-size=0` for a single
+dispatch in full mode.
 
 ```bash
 ./shader-coverage-bvh-traversal --mode=smoke    # clean icosphere, Diffuse only
@@ -45,9 +48,11 @@ safe starting point on any GPU.
 # Hit/miss mode — non-atomic, no execution counts but same coverage map:
 ./shader-coverage-bvh-traversal --mode=full --coverage-mode=boolean
 
-# Batch dispatch to avoid GPU watchdog resets (Windows TDR) under heavy
-# coverage load. 262144 (512×512) is a safe starting point on any GPU:
-./shader-coverage-bvh-traversal --mode=full --batch-size=262144
+# Tune the batch size (full mode already batches by default; smaller if
+# you still observe TDR, larger for fewer submissions on fast hardware),
+# or force a single unbatched dispatch:
+./shader-coverage-bvh-traversal --mode=full --batch-size=65536
+./shader-coverage-bvh-traversal --mode=full --batch-size=0
 
 # Write the coverage artifacts somewhere other than the demo's source
 # directory (the default). `--output-dir` creates the directory if needed:
