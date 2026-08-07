@@ -613,7 +613,82 @@ BlobBuilder makeArrayOfStringsBlob()
     return blob;
 }
 
+/// Build a two-element array of strings whose container layout declares the given
+/// `elementStride`, with the elements laid out to match that stride.
+///
+/// `makeArrayOfStringsBlob` hard-codes the natural stride of 4 (the size of the
+/// relative pointer an out-of-line string occupies in place). This variant exists
+/// so a test can vary the stride while keeping the blob otherwise well formed,
+/// because the walk deliberately accepts any positive stride rather than requiring
+/// it to equal the element's in-place size -- see `_visitContainerObj`. The strings
+/// are parked well past the element array so that widening the stride moves the
+/// second element without colliding with them.
+///
+BlobBuilder makeArrayOfStringsBlobWithStride(uint32_t elementStride)
+{
+    BlobBuilder blob;
+    blob.resize(116);
+    blob.putHeader(52);
+
+    blob.putU32(32, uint32_t(FossilizedValKind::ArrayObj));
+    blob.putRelativePtr(36, 44);
+    blob.putU32(40, elementStride);
+
+    blob.putU32(44, uint32_t(FossilizedValKind::StringObj));
+
+    blob.putRelativePtr(48, 32);
+    blob.putRelativePtr(52, 60);
+    blob.putU32(56, 2);
+
+    blob.putRelativePtr(60, 100);
+
+    // A stride large enough to carry the second element outside the blob is one of
+    // the cases under test, and there is nowhere to write its pointer in that case.
+    // Leaving it unwritten is the point: the walk must reject on the range check for
+    // the element's location, before it ever reads whatever is there.
+    if (60 + elementStride + sizeof(FossilUInt) <= blob.getSize())
+    {
+        blob.putRelativePtr(60 + elementStride, 112);
+    }
+
+    blob.putU32(96, 3);
+    blob.bytes[100] = 'a';
+    blob.bytes[101] = 'b';
+    blob.bytes[102] = 'c';
+    blob.bytes[103] = 0;
+
+    blob.putU32(108, 3);
+    blob.bytes[112] = 'x';
+    blob.bytes[113] = 'y';
+    blob.bytes[114] = 'z';
+    blob.bytes[115] = 0;
+    return blob;
+}
+
 } // namespace
+
+SLANG_UNIT_TEST(fossilValidationAcceptsAnyPositiveContainerStride)
+{
+    // The walk requires only that the stride is positive, not that it equals the
+    // element's in-place size. That is deliberate: a wrong-but-positive stride only
+    // mis-groups elements, and each element is still re-proven in bounds from its
+    // own layout, so nothing is read out of range. These cases pin that accepting
+    // behaviour, which the rejection tests around it (zero stride, overflowing
+    // extent) do not cover -- without them, a future change that tightened the check
+    // to `stride == elementSize` would silently narrow what loads, and no test would
+    // notice.
+
+    // The natural stride for an out-of-line string: one relative pointer.
+    SLANG_CHECK(isAccepted(makeArrayOfStringsBlobWithStride(4)));
+
+    // Twice the natural stride. Every element still lies inside the blob and still
+    // points at a well-formed string, so the walk has no basis to reject it.
+    SLANG_CHECK(isAccepted(makeArrayOfStringsBlobWithStride(8)));
+
+    // The backstop: once the stride carries the last element past the end of the
+    // blob, the per-element range check is what catches it -- not a stride check.
+    SLANG_CHECK(!isAccepted(makeArrayOfStringsBlobWithStride(60)));
+}
 
 SLANG_UNIT_TEST(fossilValidationBoundsTotalWork)
 {

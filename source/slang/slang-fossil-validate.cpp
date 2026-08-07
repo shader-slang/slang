@@ -59,8 +59,14 @@ enum class ValForm
 /// relative pointer.
 ///
 /// The `default` arm below is therefore an asserted invariant on the caller, not a
-/// path a crafted blob can drive: a bad kind byte is rejected by
-/// `_validateLayoutHeader` long before it gets here.
+/// path a crafted blob can drive. Note that what establishes that invariant is
+/// `_visitVal`'s exhaustive casing, not `_validateLayoutHeader`:
+/// `_validateLayoutHeader` only bounds the kind byte to the declared range
+/// (`rawKind <= FossilizedValKind::VariantObj`), which still admits every record
+/// and object kind. So if a new `FossilizedValKind` is ever added inside that range
+/// without also being given a `case` in `_visitVal`, it will arrive here and be
+/// rejected as an unhandled kind rather than sized -- which is the safe outcome, but
+/// the fix belongs in `_visitVal`.
 ///
 static Int64 getInPlaceSizeOfVal(FossilizedValKind kind)
 {
