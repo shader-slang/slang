@@ -1,14 +1,12 @@
 // HLSL cannot pass thread-group-shared memory across a function boundary (DXC error 0043), so a
-// `groupshared` parameter is rejected on a function whose boundary survives inlining. `export` makes
-// one: the function stays reachable as its own symbol, so the parameter is still there when
-// `checkUnsupportedInst` runs (shader-slang/slang#10641).
+// `groupshared` parameter is rejected when the boundary survives: `export` keeps the function
+// reachable as its own symbol, so the parameter is still there at emit (shader-slang/slang#10641).
 //
-// The diagnostic comes from after inlining rather than from the declaration, because whether a
-// boundary survives is not knowable in the front end. See the companion case in
-// `groupshared-param-noinline-target.slang`, where `[noinline]` alone is inlined away and the
-// program is accepted.
+// The second run pins the same rejection under `-minimum-slang-optimization`, where the check would
+// be skipped if it were gated on optimizations being enabled.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=HLSL):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL):-target hlsl -entry computeMain -stage compute -minimum-slang-optimization
 
 static const uint N = 8;
 groupshared uint groupSharedData[N];

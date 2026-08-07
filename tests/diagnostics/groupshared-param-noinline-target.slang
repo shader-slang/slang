@@ -1,8 +1,6 @@
-// HLSL cannot pass thread-group-shared memory across a function boundary (DXC error 0043), but
-// `[noinline]` alone does not keep one: the callee below is still inlined into the entry point, so
-// the group-shared write lands directly on `groupSharedData` and the program is valid HLSL. The
-// check runs after inlining (`checkUnsupportedInst`) precisely so a case like this is not rejected
-// for a boundary that never survives (shader-slang/slang#10641).
+// `[noinline]` alone does not keep a function boundary: the callee below is still inlined into the
+// entry point, so the group-shared write lands directly on `groupSharedData` and the program is valid
+// HLSL. Only a boundary that actually survives is rejected (shader-slang/slang#10641).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=HLSL):-target hlsl -entry computeMain -stage compute
 

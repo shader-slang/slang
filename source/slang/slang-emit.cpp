@@ -2747,8 +2747,7 @@ Result linkAndOptimizeIR(
     }
     SLANG_PASS(collectMetadata, targetProgram, *metadata);
 
-    if (!targetProgram->getOptionSet().shouldPerformMinimumOptimizations())
-        SLANG_PASS(checkUnsupportedInst, codeGenContext->getTargetReq(), sink);
+    SLANG_PASS(checkUnsupportedInst, targetProgram, sink);
 
     return sink->getErrorCount() == 0 ? SLANG_OK : SLANG_FAIL;
 
