@@ -59,10 +59,9 @@ export uint scramble(uint seed)
 }
 
 // The `onb` call inside `buildFrame` requests exactly the `thread` address
-// spaces the seeded exported `onb` already carries, so call-site specialization
-// reuses that one canonical function instead of cloning a duplicate `thread*`
-// variant. `onb` must therefore be defined exactly once. The DEDUP prefix runs
-// as a separate FileCheck pass so this count is not perturbed by the CHECK-DAG
-// matches above.
+// spaces the seeded exported `onb` already carries, so no duplicate `thread*`
+// variant should be emitted alongside it: `onb` must be defined exactly once.
+// The DEDUP prefix runs as a separate FileCheck pass so this count is not
+// perturbed by the CHECK-DAG matches above.
 // DEDUP-COUNT-1: void onb_{{[A-Za-z0-9_]*}}(
 // DEDUP-NOT: void onb_{{[A-Za-z0-9_]*}}(
