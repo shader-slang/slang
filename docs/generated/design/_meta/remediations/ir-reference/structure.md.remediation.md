@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:14:29Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:20:00Z
 target_doc: ir-reference/structure.md
 review_report: ../../reviews/ir-reference/structure.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 1
+  fixed: 5
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,13 +18,19 @@ actions:
 
 ## Summary
 
-The review raised one critical finding (F-001), which I verified
-against source at the document's commit and fixed. The action
-breakdown is one fixed finding, with no rejections, deferrals, or
-escalations.
+All five minor findings were verified against the source at the
+recorded commit and fixed; none was rejected, deferred, or escalated.
+Four fixes are single-cell corrections in the opcode tables and the
+witness-table prose; the fifth merges the audience sentence into the
+opening paragraph as the common contract requires. The nine
+generic/existential rows this page owns were left untouched.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed against source at eb9403ef: `slang-ir-insts.lua` declares `interface` with `global = true` (not `parent = true`, unlike the neighbouring `struct`/`class` which are `parent = true`), and `slang-lower-to-ir.cpp` creates `IRInterfaceType` with `operandCount` (line ~11697) then stores each requirement via `irInterface->setOperand(entryIndex, constraintEntry)` (line ~11918). So `interface_req_entry` instances are operands of the `IRInterfaceType`, not children. Operand-vs-child shape is squarely within the IR-reference family contract. | Reworded the Interface-internals intro and `interface` table row to describe `interface_req_entry` as operands rather than children, and changed the `witness_table_entry vs interface_req_entry` notable to say `interface_req_entry` is an operand of an `InterfaceType` rather than living inside an `InterfaceType` parent. |
+| F-001 | fixed | Confirmed. `source/slang/slang-lower-to-ir.cpp:11927-11938` shows `visitVarDecl` sending only true globals to `lowerGlobalVarDecl` and function-statics to `lowerFunctionStaticVarDecl`, which at `:11825-11834` delegates a `const` to `lowerFunctionStaticConstVarDecl`. | `### Global state`: `global_var` origin now cites `lowerFunctionStaticVarDecl` for mutable function-statics; `globalConstant` origin gained function-`static` `const` via `lowerFunctionStaticConstVarDecl`. |
+| F-002 | fixed | Confirmed. `source/slang/slang-ast-decl.h:575` declares `GlobalGenericParamDecl : public AggTypeDecl`, but line 583 declares `GlobalGenericValueParamDecl : public VarDeclBase`. | `global_generic_param` row: split the shared derivation claim into the two correct base classes. |
+| F-003 | fixed | Confirmed. `docs/generated/design/_meta/prompts/ir-reference-structure.md:38` requires lambda lowering in this cell, and `source/slang/slang-check-expr.cpp:7933-7939` creates the lambda's `FuncDecl` and stores it on the lambda struct. | `func` row: added the synthesized `FuncDecl` that checking stores on a lambda to the AST-origin cell. |
+| F-004 | fixed | Confirmed. `source/slang/slang-lower-to-ir.cpp:12086-12108` counts one entry per `AccessorDecl` of a property or subscript and `continue`s past `InterfaceDefaultImplDecl`, so "one entry per direct interface member" overcounts and undercounts. | `witness_table_entry` / `interface_req_entry` prose: reworded to one entry per requirement-bearing member, with accessors contributing their own entries and default-impl decls skipped. |
+| F-005 | fixed | Confirmed. `docs/generated/design/_meta/prompts/_common.md:65-66` requires the first body paragraph to state both coverage and intended reader; the page split them across two paragraphs. | Introduction: merged the audience sentence into the opening paragraph. |

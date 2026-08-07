@@ -34,6 +34,7 @@ bool isAddressInst(IRInst* inst)
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
     case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_NodeOutputRecordGetElementPtr:
         return true;
     default:
         return false;
@@ -321,6 +322,11 @@ bool isValueType(IRInst* dataType)
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
     case kIROp_EnumType:
+    // Work-graph input records are immutable payload views, so treat them as values.
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -935,6 +941,7 @@ IRInst* getRootAddr(IRInst* addr)
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_NodeOutputRecordGetElementPtr:
             addr = addr->getOperand(0);
             continue;
         default:
@@ -953,6 +960,7 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
         {
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
+        case kIROp_NodeOutputRecordGetElementPtr:
             outAccessChain.add(addr->getOperand(1));
             if (outTypes)
                 outTypes->add(addr->getFullType());
@@ -1239,6 +1247,13 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
+    // Work-graph output records are mutable handles, so treat them as pointer-like.
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
         return true;
     }
     return false;
@@ -1475,6 +1490,8 @@ IRInst* tryFindBasePtr(IRInst* inst, IRInst* parentFunc)
         return tryFindBasePtr(as<IRGetElementPtr>(inst)->getBase(), parentFunc);
     case kIROp_FieldAddress:
         return tryFindBasePtr(as<IRFieldAddress>(inst)->getBase(), parentFunc);
+    case kIROp_NodeOutputRecordGetElementPtr:
+        return tryFindBasePtr(inst->getOperand(0), parentFunc);
     default:
         return nullptr;
     }
@@ -1623,9 +1640,12 @@ bool isPureFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
     return false;
 }
 
-bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions options)
+bool isSideEffectFreeFunctionalCall(
+    IRCall* call,
+    SideEffectAnalysisOptions options,
+    Dictionary<IRInst*, bool>* calleeSideEffectCache)
 {
-    if (!doesCalleeHaveSideEffect(call->getCallee()))
+    if (!doesCalleeHaveSideEffect(call->getCallee(), calleeSideEffectCache))
     {
         return areCallArgumentsSideEffectFree(call, options);
     }
@@ -1672,6 +1692,19 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
             });
     }
 
+    return sideEffect;
+}
+
+bool doesCalleeHaveSideEffect(IRInst* callee, Dictionary<IRInst*, bool>* cache)
+{
+    if (!cache)
+        return doesCalleeHaveSideEffect(callee);
+
+    if (auto cached = cache->tryGetValue(callee))
+        return *cached;
+
+    const bool sideEffect = doesCalleeHaveSideEffect(callee);
+    cache->add(callee, sideEffect);
     return sideEffect;
 }
 
@@ -1936,19 +1969,6 @@ void initializeScratchData(IRInst* inst)
     }
 }
 
-void resetScratchDataBit(IRInst* inst, int bitIndex)
-{
-    List<IRInst*> workList;
-    workList.add(inst);
-    while (workList.getCount() != 0)
-    {
-        auto item = workList.getLast();
-        workList.removeLast();
-        item->scratchData &= ~(1ULL << bitIndex);
-        for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
-            workList.add(child);
-    }
-}
 
 ///
 /// IRBlock related common helper methods
@@ -2420,6 +2440,24 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+/// Gets a literal thread count, unwrapping a specialization constant's default when needed.
+static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
+{
+    if (auto intLit = as<IRIntLit>(threadCount))
+        return intLit;
+
+    auto globalParam = as<IRGlobalParam>(threadCount);
+    auto defaultValueDecor =
+        globalParam ? globalParam->findDecoration<IRDefaultValueDecoration>() : nullptr;
+    if (defaultValueDecor)
+        if (auto defaultIntLit = as<IRIntLit>(defaultValueDecor->getOperand(0)))
+            return defaultIntLit;
+
+    IRBuilder builder(globalParam ? (IRInst*)globalParam : threadCount);
+    return cast<IRIntLit>(
+        builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 1));
+}
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
@@ -2436,15 +2474,9 @@ void verifyComputeDerivativeGroupModifiers(
             Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if (numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if (numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if (numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
+    IRIntegerValue x = _getDefaultThreadCount(numThreadsDecor->getOperand(0))->getValue();
+    IRIntegerValue y = _getDefaultThreadCount(numThreadsDecor->getOperand(1))->getValue();
+    IRIntegerValue z = _getDefaultThreadCount(numThreadsDecor->getOperand(2))->getValue();
 
     if (quadAttr)
     {
@@ -3045,8 +3077,39 @@ bool isIROpaqueType(IRType* type)
     }
 }
 
+// True if `addr`'s chain bottoms out at `GetOptiXSbtDataPtr` (the OptiX SBT), peeling every
+// forwarding op, including the `BitCast`/`GetOffsetPtr` that `getRootAddr` does not peel.
+static bool isAddressIntoOptiXShaderBindingTable(IRInst* addr)
+{
+    for (;;)
+    {
+        switch (addr->getOp())
+        {
+        case kIROp_GetOptiXSbtDataPtr:
+            return true;
+        case kIROp_FieldAddress:
+        case kIROp_GetElementPtr:
+        case kIROp_GetOffsetPtr:
+        case kIROp_BitCast:
+        case kIROp_Reinterpret:
+        case kIROp_PtrCast:
+            addr = addr->getOperand(0);
+            continue;
+        default:
+            return false;
+        }
+    }
+}
+
 bool isPointerToImmutableLocation(IRInst* loc)
 {
+    // The OptiX SBT (`GetOptiXSbtDataPtr`) is typed as a `ConstantBuffer<>` but is mutated
+    // in place by the host between dispatches, so it is not immutable; otherwise CUDA emit
+    // would route its loads through the read-only cache (`__ldg`) and read stale data.
+    // Genuine `ConstantBuffer<>` (not SBT-rooted) is unaffected. See shader-slang/slang#10188.
+    if (isAddressIntoOptiXShaderBindingTable(loc))
+        return false;
+
     switch (loc->getOp())
     {
     case kIROp_GetStructuredBufferPtr:
@@ -3313,6 +3376,48 @@ IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> eleme
         return builder.emitMakeTuple(resultType, elements.getCount(), elements.getBuffer());
 
     return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
+}
+
+bool isWorkGraphRecordType(IRType* type)
+{
+    SLANG_ASSERT(type);
+    switch (type->getOp())
+    {
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_EmptyNodeInputType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+    case kIROp_EmptyNodeOutputType:
+    case kIROp_EmptyNodeOutputArrayType:
+        return true;
+    default:
+        return false;
+    }
+}
+
+IRType* getWorkGraphRecordElementType(IRType* type)
+{
+    SLANG_ASSERT(type);
+
+    switch (type->getOp())
+    {
+    case kIROp_DispatchNodeInputRecordType:
+    case kIROp_ThreadNodeInputRecordType:
+    case kIROp_GroupNodeInputRecordsType:
+    case kIROp_ThreadNodeOutputRecordsType:
+    case kIROp_GroupNodeOutputRecordsType:
+    case kIROp_NodeOutputType:
+    case kIROp_NodeOutputArrayType:
+        return as<IRType>(type->getOperand(0));
+    default:
+        break;
+    }
+
+    return nullptr;
 }
 
 } // namespace Slang

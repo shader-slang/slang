@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/base.md#modifier-syntaxnode
-//META: doc_section_digest=4022b505250fb748fc38ae952be0700e371b5a3704ae0d911aa7fe1b17f68532
+//META: doc_section_digest=ce8e569744478afff097f76c56095e0d6452e8ce6193cb8b0f043fa21c0270e5
 //META: purpose=Modifier derives from SyntaxNode and therefore from SyntaxNodeBase, so a Modifier carries its own SourceLoc; a misplaced attribute is diagnosed at the attribute's column, not at the host decl's column.
 //META: intent=negative
 //META: pipeline_stage=check

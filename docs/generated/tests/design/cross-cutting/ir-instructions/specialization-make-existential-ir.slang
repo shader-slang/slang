@@ -1,23 +1,25 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T12:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#specialization-and-existentials
-//META: doc_section_digest=96937cffa7eab5a700d8fe30b96ad6032aaa2693bb26bdc6db27157e8ac98d94
-//META: purpose=Assigning a concrete type to an interface-typed local lowers to the documented `makeExistential(value, witness)` opcode that packs the value and its witness table.
-//META: intent=expansion
+//META: doc_section_digest=561db21a4ad8f3742180c521eb399a01338495f47b8085f196d3a2228c3211cf
+//META: purpose=Assigning a concrete conformer to an interface-typed location lowers to a `makeExistential` IR opcode.
+//META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `makeExistential` with C++ wrapper `MakeExistential`
-// and operand shape `(value, witness)`, "Packs a value plus its
-// witness". Assigning a concrete `A` (where `A : IFoo`) to a local
-// `IFoo` triggers this construction in lowering.
+// Verifies the doc's `makeExistential`/`MakeExistential` row ("Packs a
+// value plus its witness"). Storing a concrete `A` into an `IFoo`-typed
+// local packs the value with its witness table, which lowers to
+// `makeExistential(%value, %witness)` in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 
 interface IFoo { int getVal(); }
 struct A : IFoo { int x; int getVal() { return x; } }
+
+int useExistential(IFoo obj) { return obj.getVal(); }
 
 uniform RWStructuredBuffer<int> buf;
 
@@ -25,10 +27,8 @@ uniform RWStructuredBuffer<int> buf;
 void main(uint3 tid : SV_DispatchThreadID)
 {
     A a;
-    a.x = 42;
-    IFoo iface = a;
-    buf[0] = iface.getVal();
+    a.x = 9;
+    buf[0] = useExistential(a);
 }
 
-// IR-LABEL: func %main
 // IR: makeExistential(%{{.*}}, %{{.*}})

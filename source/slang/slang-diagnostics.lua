@@ -122,6 +122,13 @@ local err = helpers.err
 local warning = helpers.warning
 local internal = helpers.internal
 local fatal = helpers.fatal
+-- Warning-level (group) sentinel: pass one positionally to warning() to make that warning
+-- opt-in behind a -W group flag, e.g.
+--   warning("my-warning", 123, "message", span{...}, pedantic)
+-- `extra` is on by default and `pedantic` is off by default (see DiagnosticSink); `helpers.all`
+-- exists for the third group and can be bound here when a diagnostic needs it.
+local extra = helpers.extra
+local pedantic = helpers.pedantic
 
 --
 -- 0xxxx - Command line and interaction with host platform APIs.
@@ -204,6 +211,62 @@ warning(
     "'-separate-debug-info' is not supported for target '~target'"
 )
 
+warning(
+    "debug-info-include-source-unsupported-for-target",
+    21,
+    "'-debug-info-include-source' is not supported for target '~target'; it only affects SPIR-V output"
+)
+
+err(
+    "separate-debug-info-requires-output-path",
+    109,
+    "`-separate-debug-info` requires an output file path; use `-o <path>` or `-separate-debug-info-output <path>`"
+)
+
+err(
+    "separate-debug-info-output-without-separate-debug-info",
+    110,
+    "`-separate-debug-info-output` requires `-separate-debug-info`"
+)
+
+err(
+    "separate-debug-info-output-collides-with-artifact",
+    111,
+    "`-separate-debug-info-output` path '~path' must differ from output path '~otherPath' emitted by this compile"
+)
+
+err(
+    "separate-debug-info-output-with-container",
+    112,
+    "`-separate-debug-info-output` is not supported when writing a container output"
+)
+
+err(
+    "separate-debug-info-output-without-debug-data",
+    113,
+    "`-separate-debug-info-output` path '~path' was requested, but the selected target did not produce separate debug information"
+)
+
+err(
+    "separate-debug-info-output-multiple-artifacts",
+    114,
+    "`-separate-debug-info-output` path '~path' cannot receive multiple separate debug-information artifacts"
+)
+
+err(
+    "spirv-validation-unavailable",
+    115,
+    "SPIR-V validation was requested, but the loaded 'slang-glslang' library does not export 'glslang_validateSPIRV'; no SPIR-V was validated",
+    span { loc = "location" }
+)
+
+err(
+    "downstream-linking-unavailable",
+    116,
+    "linking multiple SPIR-V modules was required, but the loaded 'slang-glslang' library does not export 'glslang_linkSPIRV'; no SPIR-V was linked. Install a 'slang-glslang' library matching this Slang version, which provides SPIR-V linking",
+    span { loc = "location" }
+)
+
 err(
     "unknown-source-language",
     19,
@@ -275,6 +338,12 @@ err(
 warning("same-profile-specified-more-than-once", 40, "the '~profile' was specified more than once for target '~target'")
 
 err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have been specified for target '~target'")
+
+err(
+    "conflicting-explicit-capability-and-profile",
+    46,
+    "a requested '-capability' requires a higher target version than the explicitly requested profile '~profile'; specify a higher '-profile' or remove the conflicting '-capability'"
+)
 
 err(
     "profile-specification-ignored-because-no-targets",
@@ -873,10 +942,10 @@ err(
 )
 
 err(
-    "operator-name-used-as-variable-name",
+    "operator-name-on-non-function",
     20020,
-    "operator name used as variable name",
-    span { loc = "location", message = "an operator name cannot be used as the name of a variable; an 'operator' declaration must be a function" }
+    "operator name used to declare a non-function",
+    span { loc = "location", message = "an operator name can only be used to declare an operator function, not a variable, parameter, typedef, or property" }
 )
 
 err(
@@ -939,7 +1008,12 @@ warning(
     "keyword-used-as-name",
     20103,
     "keyword used as a name",
-    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" }
+    span { loc = "location", message = "'~name:Name' is a type keyword; using it as a name may make the name ambiguous or impossible to reference in some contexts" },
+    -- Extra: using a type keyword as a name is legal and usually works, so this is a
+    -- style/portability hint rather than a likely bug. It lives in the `extra` group (on by
+    -- default) rather than `pedantic` because the diagnostic still points at a real, if benign,
+    -- footgun in the user's own code.
+    extra
 )
 
 err(
@@ -1677,6 +1751,13 @@ warning(
     30082,
     "implicit float-to-double conversion",
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
+)
+
+warning(
+    "deprecated-struct-cast-from-zero",
+    30087,
+    "casting literal 0 to a struct type changes semantics in Slang 202c",
+    span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 202c. To keep the current semantics, switch to a constructor with no parameters." }
 )
 
 -- try/throw diagnostics
@@ -2560,6 +2641,65 @@ err(
     span { loc = "attr:Modifier", message = "expected a power of 2 between 4 and 128, inclusive, in 'WaveSize' attribute, got '~value:Int'" }
 )
 
+err(
+    "invalid-node-launch-mode",
+    31113,
+    "invalid 'NodeLaunch' mode",
+    span { loc = "attr:Modifier", message = "invalid NodeLaunch mode '~mode:String'; expected 'broadcasting', 'thread', or 'coalescing'" }
+)
+
+err(
+    "node-grid-attribute-requires-broadcasting",
+    31115,
+    "node grid attribute requires broadcasting launch mode",
+    span { loc = "decl:Decl", message = "'[NodeDispatchGrid]' and '[NodeMaxDispatchGrid]' are only valid on broadcasting-launch node shaders" }
+)
+
+err(
+    "invalid-barrier-semantic-flags-value",
+    31116,
+    "invalid 'BarrierSemanticFlags' value",
+    span { loc = "location", message = "unrecognized BarrierSemanticFlags value '~value:String'; expected REORDER (0x0) on its own, or any combination of GROUP_SYNC (0x1), GROUP_SCOPE (0x2), DEVICE_SCOPE (0x4)" }
+)
+
+err(
+    "invalid-barrier-memory-type-flags-value",
+    31117,
+    "invalid 'BarrierMemoryTypeFlags' value",
+    span { loc = "location", message = "unrecognized BarrierMemoryTypeFlags value '~value:String'; expected a combination of UAV_MEMORY (0x1), GROUP_SHARED_MEMORY (0x2), NODE_INPUT_MEMORY (0x4), NODE_OUTPUT_MEMORY (0x8), or ALL_MEMORY (0xf)" }
+)
+
+err(
+    "allow-sparse-nodes-requires-node-output-array",
+    31118,
+    "invalid 'AllowSparseNodes' target",
+    span { loc = "attr:Modifier", message = "'[AllowSparseNodes]' is only valid on NodeOutputArray parameters" }
+)
+
+err(
+    "num-threads-disallowed-on-thread-launch-node",
+    31119,
+    "invalid 'numthreads' on thread-launch node",
+    span { loc = "attr:Modifier", message = "thread-launch node shaders must not specify '[numthreads]'; they use an implicit '[numthreads(1, 1, 1)]'" }
+)
+
+err(
+    "node-launch-attribute-required",
+    31127,
+    "missing 'NodeLaunch' attribute",
+    span { loc = "decl:Decl", message = "node shader entry point '~decl:Decl' must specify a '[NodeLaunch]' attribute" }
+)
+
+err(
+    "node-num-threads-attribute-required",
+    31128,
+    "missing 'numthreads' attribute on node shader",
+    span {
+        loc = "decl:Decl",
+        message = "non-thread-launch node shader entry point '~decl:Decl' must specify a '[numthreads]' attribute"
+    }
+)
+
 warning(
     "explicit-uniform-location",
     31104,
@@ -3034,6 +3174,13 @@ err(
     span { loc = "decl:Decl", message = "initializer of static const global '~decl' does not evaluate to a compile-time constant" }
 )
 
+warning(
+    "constexpr-unsupported",
+    31227,
+    "constexpr on variable declarations is not a supported Slang feature; treating as const",
+    span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
@@ -3246,6 +3393,13 @@ err(
     30605,
     "duplicate cases in switch",
     span { loc = "stmt:Stmt", message = "duplicate cases not allowed within a 'switch' statement" }
+)
+
+err(
+    "switch-condition-not-integer",
+    30607,
+    "switch condition must be an integer or enum type",
+    span { loc = "expr:Expr", message = "'switch' condition must be of an integer or enum type, but is of type '~type:Type'" }
 )
 
 -- 310xx: link time specialization
@@ -3551,6 +3705,13 @@ err(
     30704,
     "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
     span { loc = "param:Decl" }
+)
+
+err(
+    "multiple-depth-output-semantics",
+    30705,
+    "a fragment entry point can declare at most one depth output, but '~conflictingSemantic' conflicts with the earlier '~earlierSemantic'",
+    span { loc = "location" }
 )
 
 --
@@ -3875,15 +4036,15 @@ standalone_note(
 err(
     "case-outside-switch",
     39999,
-    "'case' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'case' not allowed outside of a 'switch' statement" }
+    "'case' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'case' is only allowed in a 'switch' body" }
 )
 
 err(
     "default-outside-switch",
     39999,
-    "'default' not allowed outside of a 'switch' statement",
-    span { loc = "stmt:Stmt", message = "'default' not allowed outside of a 'switch' statement" }
+    "'default' is not allowed outside a 'switch' body",
+    span { loc = "stmt:Stmt", message = "'default' is only allowed in a 'switch' body" }
 )
 
 err(
@@ -3978,6 +4139,13 @@ err(
     39999,
     "invalid suffix on floating-point literal",
     span { loc = "location", message = "invalid suffix '~suffix' on floating-point literal" }
+)
+
+err(
+    "invalid-floating-point-literal-number",
+    39999,
+    "invalid floating-point number",
+    span { loc = "location", message = "invalid floating-point number '~number' on floating-point literal" }
 )
 
 warning(
@@ -4160,6 +4328,13 @@ standalone_note(
     span { loc = "member:Decl" }
 )
 
+err(
+    "callable-does-not-satisfy-differentiability-requirement",
+    38110,
+    "callable differentiability requirement not satisfied",
+    span { loc = "member:Decl", message = "member '~member:Decl' does not satisfy the required ~mode:String constraint for interface requirement '~requirement:Decl'." }
+)
+
 warning(
     "non-copyable-type-cannot-conform-to-interface",
     38109,
@@ -4291,6 +4466,13 @@ err(
     span { loc = "location", message = "encountered non-differentiable function '~func' during higher-order differentiation" }
 )
 
+err(
+    "cannot-differentiate-result-of-backward-differentiation",
+    38037,
+    "cannot differentiate the result of a backward-derivative call",
+    span { loc = "location", message = "the code produced by 'bwd_diff' is not itself differentiable, so a function that calls 'bwd_diff' cannot be differentiated; for higher-order derivatives, nest 'fwd_diff' calls or apply a single 'bwd_diff' to a function that uses 'fwd_diff'." }
+)
+
 --
 -- 380xx: entry point parameters
 --
@@ -4369,7 +4551,12 @@ warning(
     "vertex-shader-missing-sv-position",
     38052,
     "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
-    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output, or suppress with -warnings-disable 38052)" }
+    span { loc = "location", message = "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic; if it feeds the rasterizer directly, the rasterizer will not receive valid vertex positions (add 'SV_Position' to a vertex output)" },
+    -- Pedantic (off by default): a vertex shader may legitimately omit SV_Position when its output
+    -- feeds a geometry/tessellation/mesh stage that supplies the position itself (see #11884), and
+    -- at VS-compile time we cannot tell that case apart from a real missing-position bug. The check
+    -- is a false positive too often to run by default, so it is opt-in via -Wpedantic.
+    pedantic
 )
 
 --
@@ -4395,6 +4582,13 @@ err(
     38201,
     "'glsl' module not available",
     span { loc = "location", message = "'glsl' module is not available from the current global session. To enable GLSL compatibility mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session." }
+)
+
+err(
+    "module-already-loaded-with-different-source",
+    38202,
+    "module already loaded with different source",
+    span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
 
 -- Note: compilationCeased is a fatal diagnostic that is locationless
@@ -4609,6 +4803,13 @@ err(
     39030,
     "target does not support 'DescriptorHandle' types",
     span { loc = "location", message = "the current compilation target does not support 'DescriptorHandle' types." }
+)
+
+err(
+    "target-does-not-support-ray-tracing-parameters",
+    39032,
+    "target does not support ray tracing entry point parameters",
+    span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
 )
 
 warning(
@@ -5072,6 +5273,12 @@ err(
     "coverage counter width API option value is invalid: the `CompilerOptionName::TraceCoverageCounterByteWidth` API option accepts only `4` (uint32) or `8` (uint64), but got `~byteWidth:Int`. This is the API-path counterpart to `E45113` (the CLI parser, which validates bits 32/64 before storing the byte width here); a host setting the API option directly must pass the byte width (divide bits by 8), not the bit width."
 )
 
+warning(
+    "coverage-counter-width-capped-for-metal",
+    45115,
+    "the explicitly requested 64-bit coverage counter width is not executable on Metal targets (`metal`, `metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so counting-mode coverage counters are capped to uint32 for this compile. Pass `-trace-coverage-counter-width 32` to make the effective width explicit; uint32 counters wrap silently at 2^32 hits per slot."
+)
+
 -- 41xxx - Semantic checking (continued)
 
 warning(
@@ -5106,7 +5313,21 @@ err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",
-    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~elementSize:Int`" }
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be at least `~requiredAlignment:Int`, the natural alignment of the access type's scalar components" }
+)
+
+err(
+    "byte-address-buffer-alignment-not-power-of-two",
+    41301,
+    "byte address buffer alignment must be a power of two",
+    span { loc = "location", message = "the alignment `~alignment:Int` of a byte address buffer access must be a power of two" }
+)
+
+err(
+    "byte-address-buffer-location-not-aligned",
+    41303,
+    "byte address buffer location is not a multiple of the specified alignment",
+    span { loc = "location", message = "the byte address buffer location `~offset:Int` is not a multiple of the specified alignment `~alignment:Int`" }
 )
 
 err(
@@ -5292,6 +5513,12 @@ err(
     span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
 )
 
+err(
+    "global-param-not-supported-by-interpreter",
+    52013,
+    "global shader parameter '~name' is not supported by the Slang interpreter (slangi), which runs on the CPU and does not support global parameters or GPU resource types; compile this program with slangc to a GPU target instead."
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
@@ -5447,6 +5674,13 @@ err(
 )
 
 err(
+    "shader-terminating-intrinsic-in-noninlinable-callee",
+    55214,
+    "shader-terminating intrinsic in non-inlinable callee",
+    span { loc = "location", message = "a shader-terminating intrinsic ('IgnoreHit' or 'AcceptHitAndEndSearch') is reachable from this ray entry point only through a call that could not be inlined (for example, recursion); mark the intervening function(s) '[ForceInline]' or call the intrinsic directly in the entry point so the ray payload is written back before the ray terminates." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
@@ -5474,6 +5708,12 @@ err(
     span { loc = "location", message = "a resource or other opaque-typed value ('~type:IRInst') cannot be placed in a function-local variable for Khronos targets (SPIR-V/GLSL) or WGSL; this usually comes from selecting a resource with control flow (e.g. a '?:' or 'if'/'else') or returning one from a function" }
 )
 
+warning(
+    "precise-qualifier-unsupported-on-target",
+    56005,
+    "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
+    span { loc = "location" }
+)
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 -- (inlined from slang-diagnostics-semantic-checking-15.lua)
@@ -5543,7 +5783,7 @@ err(
     span { loc = "location", message = "SubpassInput cannot be placed inside a ParameterBlock on Metal; framebuffer fetch inputs must be direct entry-point parameters." }
 )
 
--- SPIRV (57001-57005)
+-- SPIRV (57001-57007)
 
 warning(
     "spirv-opt-failed",
@@ -5583,6 +5823,12 @@ err(
     "spirv-conflicting-descriptor-heap-stride-options",
     57006,
     "'-spirv-resource-heap-stride' and '-spirv-unified-descriptor-heap-stride' cannot be used together; an explicit resource heap stride and the unified maximum stride are mutually exclusive."
+)
+
+err(
+    "debug-info-include-source-requires-debug-info",
+    57007,
+    "'-debug-info-include-source' cannot be used with '-g0' or when no debug information is enabled; enable at least '-g1'."
 )
 
 -- GLSL Compatibility (58001-58003)

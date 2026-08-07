@@ -98,7 +98,9 @@ set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(core_module_generated_header
     ${core_module_generated_header_dir}/slang-core-module-generated.h
 )
-set(core_module_archive ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module.bin)
+set(core_module_archive_without_timestamp
+    ${CMAKE_CURRENT_BINARY_DIR}/slang-core-module-without-timestamp.bin
+)
 set(glsl_module_generated_header_dir
     ${CMAKE_CURRENT_BINARY_DIR}/../slang-glsl-module
 )
@@ -113,7 +115,7 @@ set(glsl_module_generated_header_dir
     PARENT_SCOPE
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
-set(core_module_archive ${core_module_archive} PARENT_SCOPE)
+set(core_module_archive_without_timestamp ${core_module_archive_without_timestamp} PARENT_SCOPE)
 
 # When SLANG_EMBED_CORE_MODULE=OFF, slang-without-embedded-core-module is an ALIAS
 # for slang, whose DLL (slang-compiler.dll) is placed in bin/ rather than generators/.
@@ -138,7 +140,7 @@ endif()
 
 add_custom_command(
     OUTPUT
-        ${core_module_archive}
+        ${core_module_archive_without_timestamp}
         ${core_module_generated_header}
         ${glsl_module_generated_header}
     ${bootstrap_pre_copy_command}
@@ -151,7 +153,7 @@ add_custom_command(
         -archive-type
         riff-lz4
         -save-core-module
-        ${core_module_archive}
+        ${core_module_archive_without_timestamp}
         -save-core-module-bin-source
         ${core_module_generated_header}
         -save-glsl-module-bin-source
@@ -165,7 +167,10 @@ add_custom_command(
 
 add_custom_target(
     generate_core_module
-    DEPENDS ${core_module_archive} ${core_module_generated_header} ${glsl_module_generated_header}
+    DEPENDS
+        ${core_module_archive_without_timestamp}
+        ${core_module_generated_header}
+        ${glsl_module_generated_header}
 )
 set_target_properties(generate_core_module PROPERTIES FOLDER generated)
 

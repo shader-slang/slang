@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:48:41Z
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#tie-breaking-comparator
-//META: doc_section_digest=cf4ad761e64c7c27fa923b073fa264eed8e3a5152ac4e063d5e36eba8cb6323b
+//META: doc_section_digest=dfab71819770e1c3116c8ab890c4c05608d82d83fe8f00436fcbffa88f52900d
 //META: purpose=The comparator's compareOverloadCandidateSpecificity step prefers a non-generic candidate over a generic one when both are Applicable with the same conversion cost.
 //META: intent=functional
 //META: pipeline_stage=check

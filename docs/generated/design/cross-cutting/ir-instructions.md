@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-12T10:13:27Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 48ed6f3a5c2185f6c92001fe814211a9e9a1c534cd93f7d7a112e99b17b02e52
+model: claude-opus-5
+generated_at: 2026-08-03T14:32:00Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: 32a6f83c708fb280660629cff147cc6b41bd0816fc7f889340630eb73cb6b9f1
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -28,16 +28,45 @@ This document does not duplicate it.
   is the canonical declaration of the instruction set. Each entry
   carries a name, optional `struct_name`, optional `operands`, and
   flags such as `hoistable` and `parent`.
-- [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) declares
-  the C++ wrapper structs (`struct IRFoo : IRInst`) and inline
-  accessors that match the Lua entries.
-- The build-time tool `slang-fiddle` reads the Lua file and produces
-  `slang-ir-insts-enum.h.fiddle` (under `build/source/slang/fiddle/`),
-  which defines the `IROp` enum used everywhere in the compiler.
+- [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) holds
+  the hand-written C++ wrapper structs (`struct IRFoo : IRInst`) and
+  their inline accessors — but only for opcodes that need members the
+  generator cannot derive. A FIDDLE template near the end of the file
+  calls `getAllOtherInstStructsData()` and emits a wrapper for every
+  opcode *not* explicitly defined there, complete with `isaImpl`, a
+  `kOp` constant, and one accessor per named Lua operand. So
+  `{ getNaturalStride = { operands = { { "type" } } } }` yields a
+  `struct IRGetNaturalStride : IRInst` with a `getType()` accessor
+  without anyone writing it, while `IRTypeAlignmentAttr` is written out
+  by hand because its operands are declared as a `min_operands` count
+  and its accessors have to interpret an optional trailing operand.
+- [slang-ir-insts-enum.h](../../../../source/slang/slang-ir-insts-enum.h)
+  declares `enum IROp : int32_t`, but its enumerators are not written
+  by hand: the build-time tool `slang-fiddle` expands the
+  `instEnums()` template in
+  [slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) over the
+  Lua table and emits `slang-ir-insts-enum.h.fiddle` (under
+  `build/source/slang/fiddle/`), which that header includes. Its
+  `instInfoEntries()` template likewise fills the `kIROps` table in
+  [slang-ir-insts-info.cpp](../../../../source/slang/slang-ir-insts-info.cpp)
+  with the `IROpInfo` record (mnemonic, fixed operand count, op flags)
+  that `getIROpInfo` returns. At `source_commit` the enum holds 857
+  concrete opcodes; `kIROpCount` is the sentinel that counts them and
+  `kIROp_Invalid` aliases it.
 - [slang-ir.h](../../../../source/slang/slang-ir.h) /
   [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) define
   `IRInst`, `IRBuilder`, traversal helpers, and the hoistable / global-
   value deduplication infrastructure.
+
+Several files this page has to cite are not in the manifest's
+`watched_paths` for it, so changing them will not mark this page
+stale: `slang-ir.h.lua` (which owns the Lua-key → `kIROpFlag_*`
+mapping and the generated `IROpInfo` table), `slang-ir-insts-enum.h`,
+[slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
+(which owns the serialized opcode identities described under *Module
+versioning* below), and the two `extras/` checker scripts cited under
+*Adding a new opcode*. They should be added to this document's
+`watched_paths`.
 
 ## Schema
 
@@ -57,18 +86,38 @@ A Lua entry has the form:
 },
 ```
 
+Two defaults are worth knowing, both applied by the `process`
+function at the bottom of the Lua file. When `struct_name` is
+omitted it is derived from the entry name by `to_pascal_case`, so
+`{ getNaturalStride = { ... } }` still yields `kIROp_GetNaturalStride`
+and `IRGetNaturalStride`. When a leaf entry declares neither
+`operands` nor `min_operands`, it gets `min_operands = 0`. An entry
+that wants a variable-length tail without naming every operand uses
+`min_operands = N` instead of an `operands` list — the `Attr` family
+entries such as `{ TypeAlignment = { struct_name = "TypeAlignmentAttr",
+min_operands = 1 } }` are written that way.
+
 Entries are arranged into nested tables that establish an
 inheritance hierarchy: a parent entry such as `BasicType` holds
 children (`Void`, `Bool`, `Int`, ...), and their opcodes are
 allocated as a contiguous range so that `as<IRBasicType>()` becomes a
-single integer comparison.
+single integer comparison. `process` also propagates flags down that
+hierarchy, so writing `hoistable = true` once on `BasicType` makes
+every scalar type opcode hoistable.
 
-`hoistable = true` marks instructions that the IR builder
-deduplicates and hoists to the outermost scope where their operands
-are available — see
+Four flag keys may appear on an entry. `hoistable = true` marks
+instructions that the IR builder deduplicates and hoists to the
+outermost scope where their operands are available — see
 [../../../design/ir.md](../../../design/ir.md) for the semantics.
 `parent = true` marks instructions that own children (functions,
-blocks, modules).
+blocks, modules). `global = true` marks instructions that always live
+at module scope (`global_var`, `global_param`, `globalConstant`,
+`key`, `interface`). `use_other = true` marks an opcode that stores
+extra state in the "other" bits of its opcode word; `GLSLImageType`,
+nested under `ResourceTypeBase`, is the only entry that sets it, and
+the header comment in `slang-ir-insts-enum.h` names a resource type's
+`TextureFlavor` as what those bits hold. The keys are translated to
+the `kIROpFlag_*` values by the `flagMap` in `slang-ir.h.lua`.
 
 ## Instruction families
 
@@ -124,21 +173,23 @@ declarations live in
 | `Int`, `Float`, `Bool`, ... | `IntType`, `FloatType`, `BoolType`, ... | — | Basic scalar types; see [../ir-reference/types.md](../ir-reference/types.md). |
 | `Vec` | `VectorType` | `elementType, elementCount` | Vector types; hoistable. |
 | `Mat` | `MatrixType` | `elementType, rowCount, columnCount, layout` | Matrix types; hoistable. |
+| `MetalPackedVec` | `MetalPackedVectorType` | `elementType, elementCount` | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`; hoistable. |
 | `Array` | `ArrayType` | `elementType, elementCount` | Fixed-size array; hoistable. |
-| `Ptr` | `PtrType` | `valueType, accessQualifier?, addressSpace?, dataLayout?` | Pointer type; hoistable. |
-| `Texture` | — | `elementType, shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format` | Texture types; hoistable. |
+| `Ptr` | `PtrType` | `valueType, accessQualifierOperand?, addressSpaceOperand?, dataLayout?` | Pointer type; hoistable. |
+| `TextureType` | — | `elementType, shape, isArray, isMS, sampleCount, accessOperand, isShadow, isCombined, format` | Texture types; hoistable. |
 | `struct` / `class` / `interface` | `StructType` / `ClassType` / `InterfaceType` | parent of `field` / `key` / `interface_req_entry` | Parent containers; also documented in [../ir-reference/structure.md](../ir-reference/structure.md). |
-| (...plus ~150 more type opcodes; see [../ir-reference/types.md](../ir-reference/types.md) for the full list) | | | |
+| `DispatchNodeInputRecord`, `NodeOutput`, `EmptyNodeOutput`, ... | `DispatchNodeInputRecordType`, `NodeOutputType`, ... | `elementType` (nullary for the `Empty*` cases) | The ten-opcode `WorkGraphRecordTypeBase` subfamily for work-graph node input / output records; hoistable. |
+| (...the `Type` family holds 170 opcodes at `source_commit`; see [../ir-reference/types.md](../ir-reference/types.md) for all of them) | | | |
 
 ### Value instructions
 
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
-| `IntLit`, `FloatLit`, `StringLit`, ... | `IntLit`, `FloatLit`, `StringLit`, ... | (payload stored inline on the inst) | Literal constants; hoistable. |
+| `integer_constant`, `float_constant`, `string_constant`, ... | `IntLit`, `FloatLit`, `StringLit`, ... | (payload stored inline on the inst) | Literal constants; hoistable. |
 | `add`, `sub`, `mul`, `div` | `Add`, `Sub`, `Mul`, `Div` | `left, right` | Arithmetic. |
 | `cmpEQ`, `cmpLT`, ... | `Eql`, `Less`, ... | `left, right` | Comparisons. |
 | `bitCast`, `intCast`, `floatCast`, ... | — | `val` | Conversion ops. |
-| `constexprAdd` ... `constexprEnumCast` | — | (variadic) | Compile-time-folded arithmetic / cast variants; hoistable. |
+| `constexprAdd` ... `constexprEnumCast` | — | 1-3 fixed operands; see Lua entries | Compile-time-folded arithmetic / cast variants; hoistable. |
 | (...see [../ir-reference/values.md](../ir-reference/values.md) for the full list) | | | |
 
 ### Memory instructions
@@ -160,7 +211,7 @@ declarations live in
 | `param` | `IRParam` | (variadic) | Block or function parameter; replaces SSA `phi`. |
 | `unconditionalBranch` / `conditionalBranch` / `ifElse` / `switch` / `loop` | — | (terminator-specific) | Terminators in the `TerminatorInst` family. |
 | `return_val` / `unreachable` / `discard` | — | (terminator-specific) | Return and exit terminators. |
-| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes. |
+| `RequirePrelude`, `RequireTargetExtension`, `Printf`, `Abort`, `StaticAssert`, ... | — | (variadic) | Other control-flow / backend-hint opcodes (`Abort` carries a `format` operand, like `Printf`). |
 | (...see [../ir-reference/control-flow.md](../ir-reference/control-flow.md) for the full list) | | | |
 
 ### Function and module structure
@@ -168,8 +219,8 @@ declarations live in
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
 | `module` | `ModuleInst` | (variadic) | Module root; parent of every top-level inst. |
-| `func` | `IRFunc` | (variadic) | Function; children are blocks. |
-| `generic` | `IRGeneric` | (variadic) | Type-level computation parent ending in `yield`. |
+| `func` | `IRFunc` | — | Function; children are blocks. |
+| `generic` | `IRGeneric` | — | Type-level computation parent. Its body ends in `return_val`, not `yield`: `findGenericReturnVal` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9888) reads the last block's terminator as an `IRReturn`. A `yield` terminator does exist as a sibling of `return_val` ([slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) line 1453), but it closes an `expand` body, not a generic — its only producers are `visitExpandExpr` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 6592) and [slang-ir-lower-expand-type.cpp](../../../../source/slang/slang-ir-lower-expand-type.cpp) line 107. See [../ir-reference/control-flow.md](../ir-reference/control-flow.md). |
 | `global_var`, `global_param`, `globalConstant` | `IRGlobalVar`, ... | (variadic) | Module-scope storage / parameters; `Global`. |
 | `witness_table` / `witness_table_entry` | — | (variadic) / `requirementKey, satisfyingVal` | Witness table machinery; hoistable. |
 | `key` / `builtinRequirementKey` | `StructKey` / `BuiltinRequirementKey` | — / `kindOperand` | Requirement keys: an ordinary `key` is a per-decl `global` symbol; `builtinRequirementKey` is `hoistable`, deduplicated from its `BuiltinRequirementKind` operand so a built-in requirement (e.g. an `IDifferentiable` member) resolves to one key inst. |
@@ -190,12 +241,14 @@ declarations live in
 
 | Opcode | `struct_name` | Operands | Notes |
 | --- | --- | --- | --- |
-| `NameHintDecoration` | `IRNameHintDecoration` | `name` | Carries an identifier name for debug / link output. |
-| `KeepAliveDecoration` | `IRKeepAliveDecoration` | — | Forbids DCE on the host instruction. |
-| `TargetIntrinsicDecoration` | `IRTargetIntrinsicDecoration` | `targetTokens, definition` | Maps an IR op to a target intrinsic. |
-| `EntryPointDecoration` | `IREntryPointDecoration` | `profile, name, moduleName` | Marks a function as a pipeline entry point. |
+| `nameHint` | `NameHintDecoration` | `nameOperand` | Carries an identifier name for debug / link output. |
+| `keepAlive` | `KeepAliveDecoration` | — | Forbids DCE on the host instruction. |
+| `targetIntrinsic` | `TargetIntrinsicDecoration` | `target, definitionOperand` | Maps an IR op to a target intrinsic. |
+| `entryPoint` | `EntryPointDecoration` | `profileInst, name, moduleName` | Marks a function as a pipeline entry point. |
 | `BuiltinRequirementDecoration` | `IRBuiltinRequirementDecoration` | `kindOperand` | Tags an interface requirement key with its `BuiltinRequirementKind`, so consumers find the requirement by role rather than by entry order. |
-| (...see [../ir-reference/decorations.md](../ir-reference/decorations.md) for the full list of ~180 decorations) | | | |
+| `glslFragDepthGreater` / `glslFragDepthLess` | `GLSLFragDepthGreaterDecoration` / `GLSLFragDepthLessDecoration` | — | Mark a fragment entry point whose `gl_FragDepth` is constrained to only increase / decrease (HLSL `SV_DepthGreaterEqual` / `SV_DepthLessEqual`); drives the GLSL `layout(depth_greater)` / `layout(depth_less)` redeclaration. |
+| `nodeLaunch`, `nodeID`, `nodeDispatchGrid`, `maxRecords`, ... | `NodeLaunchDecoration`, `NodeIDDecoration`, ... | `mode` (an `IRStringLit`), `name, arrayIndex`, `x, y, z`, `count` | Work-graph node attributes; the launch mode is carried as a string literal so emission can re-spell it as a quoted HLSL attribute string rather than an integer. |
+| (...the `Decoration` family holds 196 opcodes at `source_commit`; see [../ir-reference/decorations.md](../ir-reference/decorations.md) for all of them) | | | |
 
 ### Resource and shader-IO opcodes
 
@@ -206,7 +259,7 @@ declarations live in
 | `structuredBufferLoad` / `rwstructuredBufferStore` | — | `base, index, val?` | Structured-buffer access. |
 | `atomicLoad` / `atomicStore` / `atomicAdd` / ... | — | `ptr, val?` | `AtomicOperation` family. |
 | `ControlBarrier` / `GroupMemoryBarrierWithGroupSync` / `BeginFragmentShaderInterlock` / `EndFragmentShaderInterlock` | — | — | Barriers and synchronization. |
-| `waveGetActiveMask` / `waveMaskBallot` / ... | — | (variadic) | Wave intrinsics. |
+| `waveGetActiveMask` / `waveMaskBallot` / ... | — | none / `mask, condition` | Wave intrinsics; operand shape varies by opcode. |
 | (...see [../ir-reference/resources-and-atomics.md](../ir-reference/resources-and-atomics.md) for the full list) | | | |
 
 This document keeps the *conventions* — schema, op-flag bits,
@@ -230,13 +283,21 @@ enum : IROpFlags
 };
 ```
 
-- `Parent` — instruction owns a list of children (e.g. `Func`,
-  `Block`, `Module`, `StructType`).
-- `Hoistable` — deduplicated; floats up to the outermost scope where
-  its operands are defined.
-- `Global` — like `Hoistable` but always at the module level.
-- `UseOther` — the opcode encoding stores extra information in the
-  high bits of the opcode word (`IROpMeta::kIROpMeta_OtherShift = 10`).
+- `Parent` (Lua `parent`) — instruction owns a list of children (e.g.
+  `Func`, `Block`, `Module`, `StructType`).
+- `Hoistable` (Lua `hoistable`) — deduplicated; floats up to the
+  outermost scope where its operands are defined. `IROpInfo` exposes
+  it as `isHoistable()`.
+- `Global` (Lua `global`) — always hoisted to module scope but,
+  unlike `Hoistable`, never deduplicated; exposed as `isGlobal()`.
+- `UseOther` (Lua `use_other`) — the opcode encoding stores extra
+  information above the opcode field of the opcode word
+  (`IROpMeta::kIROpMeta_OtherShift = 10`).
+
+The opcode field is therefore ten bits wide: `kIROpMask_OpMask` is
+`0x3ff`, and `getIROpInfo` masks with it before indexing the info
+table, so the enum has room for 1024 opcodes against the 857 declared
+at `source_commit`.
 
 The semantics of these flags and the consequences for IR transformation
 (use of `replaceOperand`, `replaceUsesWith`, traversal safety) are
@@ -248,9 +309,14 @@ the IR.
 logical value" guarantees. For example, `builtinRequirementKey` is
 hoistable so that `IRBuilder::getBuiltinRequirementKey(kind)` in
 [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) returns the same
-key inst for a given `BuiltinRequirementKind`, regardless of which decl
-or module asks — making a witness lookup and the matching witness-table
-entry agree by construction rather than by entry order. The same flag is
+key inst for a given `BuiltinRequirementKind` on every request within
+one destination `IRModule` — making a witness lookup and the matching
+witness-table entry agree by construction rather than by entry order.
+The guarantee is module-scoped: `IRDeduplicationContext` is a member of
+`IRModule`, so separately resident modules have their own arenas and
+numbering maps, and an imported instruction is deduplicated once it
+enters the destination module rather than by sharing pointer identity
+across modules. The same flag is
 why hoistable emitters are named `get*` (`getPoison`,
 `getBuiltinRequirementKey`) rather than `emit*`: they may return an
 existing deduplicated inst instead of creating a new one.
@@ -260,10 +326,15 @@ existing deduplicated inst instead of creating a new one.
 A number of opcodes are conceptually *decorations*: every entry in the
 `Decoration` family in
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) (the
-`*Decoration` opcodes such as `NameHintDecoration` and
-`TargetIntrinsicDecoration`) is modeled as an ordinary `IRInst`,
+opcodes such as `nameHint` and `targetIntrinsic`, whose generated C++
+wrappers are named `IRNameHintDecoration` and
+`IRTargetIntrinsicDecoration`) is modeled as an ordinary `IRInst`,
 wrapped by `IRDecoration` in
-[slang-ir.h](../../../../source/slang/slang-ir.h). A decoration does
+[slang-ir.h](../../../../source/slang/slang-ir.h). The older design
+note in [../../../design/ir.md](../../../design/ir.md) still describes
+decorations-as-instructions as a planned migration; at `source_commit`
+that migration has already happened, so read that wording as history
+rather than as an active roadmap. A decoration does
 not sit in a block's instruction stream; it is attached to a host
 instruction's decoration list and reached via
 `IRInst::getFirstDecoration`, annotating the host with metadata
@@ -279,37 +350,82 @@ The comment at the top of
 > Please make sure to update the supported module versions in
 > Slang::IRModule accordingly when modifying this file.
 
-Inserting a new opcode renumbers downstream entries, which breaks
-deserialization of older `.slang-module` files unless the supported-
-version range is bumped. `IRModule` in
-[slang-ir.h](../../../../source/slang/slang-ir.h) tracks this range as
+Note what this comment is *not* about. Inserting an entry in the
+middle of the Lua table does renumber the `kIROp_*` values after it,
+but that renumbering never reaches a `.slang-module` file, because an
+opcode is not serialized as its enum value. Every entry also has a
+*stable name* — a small integer assigned once and never reused, listed
+in
+[slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
+under the entry's dotted path (`Type.BasicType.Int`,
+`Attr.TypeAlignment`, ...) — and the serializer converts through
+`getOpcodeStableName` / `getStableNameOpcode`. At `source_commit` that
+table holds 874 assignments with a maximum of 901; the difference from
+the 857 live opcodes is retired instructions, whose identities stay in
+the file so they can never be handed out again. See
+[serialization.md](serialization.md) for the read/write path and how a
+stable name the running compiler does not know becomes `Unrecognized`.
+
+What the supported-version range does track is module *semantics*: a
+module that uses a newly added instruction cannot be understood by an
+older compiler. The declaration comment in
+[slang-ir.h](../../../../source/slang/slang-ir.h) spells out the rule —
+adding an instruction bumps only the maximum, whereas *removing* one
+bumps the maximum and raises the minimum past the last version in
+which that instruction could appear, and the number "represents the
+version of module regarding semantics and doesn't have anything to do
+with serialization format". `IRModule` holds the range as
 `k_minSupportedModuleVersion` (4) and `k_maxSupportedModuleVersion`
-(20). The serialization rules are in
-[../cross-cutting/serialization.md](serialization.md)
-and
+(28), and a freshly built module records `m_version =
+k_maxSupportedModuleVersion`. The design rationale is in
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).
 
 ## Adding a new opcode
 
 1. Add an entry to
-   [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) at
-   the appropriate point in its family (see the rule above about
-   not inserting into the middle of an existing range without
-   bumping the module version).
-2. If the opcode wants a typed C++ wrapper, declare `struct IRFoo :
-   IRInst` with operand accessors in
-   [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) — the
-   FIDDLE generator can supply boilerplate for many cases.
-3. Decide whether it should be `hoistable` and/or `parent`. Choose
-   the right base in the Lua hierarchy so the opcode lands in a
-   contiguous range with its siblings.
-4. Add an emitter to `IRBuilder` in
-   [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) for ergonomic
-   creation, especially if the opcode is hoistable (the builder is
-   responsible for deduplication).
-5. Update lowering ([../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md))
+   [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
+   inside the family it belongs to, not at the end of the file: the
+   nesting is what keeps the family's opcodes in one contiguous range,
+   which is what makes an `as<IRBasicType>()`-style check a single
+   range comparison.
+2. Give it a stable name. Running
+   [extras/check-ir-stable-names.lua](../../../../extras/check-ir-stable-names.lua)
+   with the `update` command appends the new dotted path to
+   [slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)
+   with the next unused id; the `check` command verifies that the two
+   files are a bijection. CI enforces this through
+   [extras/check-ir-stable-names-gh-actions.sh](../../../../extras/check-ir-stable-names-gh-actions.sh),
+   which builds the vendored Lua, runs `check`, and fails the job with
+   the diff `update` would have written.
+3. Bump `k_maxSupportedModuleVersion` in
+   [slang-ir.h](../../../../source/slang/slang-ir.h). CI reminds you
+   via
+   [extras/check-inst-version-changes.sh](../../../../extras/check-inst-version-changes.sh),
+   which makes no GitHub API call itself: when a PR touches an IR
+   instruction Lua file without also changing one of the two version
+   constants, it writes `pr-number.txt` and `comment-body.txt` as an
+   artifact, and a privileged `workflow_run` job posts the comment.
+4. Decide whether it should be `hoistable`, `parent`, or `global`,
+   remembering that the flag may already be inherited from the parent
+   entry.
+5. Nothing more is needed for a plain typed wrapper: naming the
+   operands in the Lua entry is enough for the generator to emit
+   `struct IRFoo` with matching accessors. Hand-write `struct IRFoo :
+   IRInst` in
+   [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h),
+   marked `FIDDLE()` / `FIDDLE(leafInst())`, only when the wrapper
+   needs members the generator cannot derive.
+6. Add an emitter to `IRBuilder` for ergonomic creation — declared in
+   [slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) and
+   defined in
+   [slang-ir.cpp](../../../../source/slang/slang-ir.cpp), or written
+   inline in the header when it is a one-liner. Name it `get*` rather
+   than `emit*` when the opcode is hoistable, matching `getPoison`
+   (defined in the `.cpp`) and `getBuiltinRequirementKey` (inline in
+   the header).
+7. Update lowering ([../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md))
    and any IR pass that needs to see or skip the new opcode.
-6. If the opcode produces target-specific behaviour, extend the
+8. If the opcode produces target-specific behaviour, extend the
    relevant emit backend
    ([../pipeline/06-emit.md](../pipeline/06-emit.md)).
-7. Add tests under [tests/](../../../../tests).
+9. Add tests under [tests/](../../../../tests).

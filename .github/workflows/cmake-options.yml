@@ -102,7 +102,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["windows-2025"]'
+      runs-on: '["windows-2022"]'
       buildtool: "Visual Studio 17 2022"
 
   windows-vs2022-release:
@@ -112,7 +112,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["windows-2025"]'
+      runs-on: '["windows-2022"]'
       buildtool: "Visual Studio 17 2022"
 
   windows-vs2026-debug:

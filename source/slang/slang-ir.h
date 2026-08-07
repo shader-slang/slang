@@ -6,10 +6,10 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#include "../compiler-core/slang-source-loc.h"
-#include "../compiler-core/slang-source-map.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-memory-arena.h"
+#include "compiler-core/slang-source-loc.h"
+#include "compiler-core/slang-source-map.h"
+#include "core/slang-basic.h"
+#include "core/slang-memory-arena.h"
 #include "slang-ast-type.h"
 #include "slang-container-pool.h"
 #include "slang-ir-insts-enum.h"
@@ -775,7 +775,9 @@ struct IRInst
     /// It is possible that this instruction has side effects?
     ///
     /// This is a conservative test, and will return `true` if an exact answer can't be determined.
-    bool mightHaveSideEffects(SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None);
+    bool mightHaveSideEffects(
+        SideEffectAnalysisOptions options = SideEffectAnalysisOptions::None,
+        Dictionary<IRInst*, bool>* calleeSideEffectCache = nullptr);
 
     // RTTI support
     static bool isaImpl(IROp) { return true; }
@@ -2256,7 +2258,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 22;
+    const static UInt k_maxSupportedModuleVersion = 28;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

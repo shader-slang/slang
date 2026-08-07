@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=9833b4c0a727318f2e9ddb19a0e7c49fb0434ebb154535e0c52405c196a4547c
+//META: doc_section_digest=88de88b16c165f633a8ad6ade9438213eb05e41453c58f2679fe7e345b5df561
 //META: purpose=Negative: a non-void function missing a return triggers the `checkForMissingReturns` (Phase B, reqSet.missingReturn) diagnostic before HLSL emit.
 //META: intent=negative
 //META: pipeline_stage=check

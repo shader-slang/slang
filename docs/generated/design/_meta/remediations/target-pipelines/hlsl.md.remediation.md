@@ -1,16 +1,16 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:17:56Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T13:05:00Z
 target_doc: target-pipelines/hlsl.md
 review_report: ../../reviews/target-pipelines/hlsl.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 2
+  fixed: 7
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 0
+  deferred: 1
   escalated: 0
 ---
 
@@ -18,21 +18,17 @@ actions:
 
 ## Summary
 
-Both findings were verified against the source at `eb9403ef` and
-fixed. F-001 (critical) corrected the Phase D artifact-construction
-path: `createArtifactFromIR` is the SPIR-V-direct helper and is not
-on the HLSL path, so the intro, the Phase D diagram, and the Phase D
-table now reference `createArtifactForCompileTarget` in
-`emitEntryPointsSourceFromIR` and route DXIL/DXBytecode through
-`emitWithDownstreamForEntryPoints`. F-002 (major) added the two
-omitted Phase B `SLANG_PASS` calls (the `minimalOptimization`
-SCCP+DCE branch and `addUserTypeHintDecorations` under
-`VulkanEmitReflection`) to the diagram, the ordered table, and the
-conditional-gates section.
+All eight findings were re-verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`; every one held up. Seven were fixed and one (F-006, the missing diamond gates in the Phase A/B/C diagrams) was deferred as a broader rewrite. The document was edited. The largest fix is F-001: Phase D now shows the assembly targets recursing on their binary intermediate and then disassembling, instead of compiling directly. F-005 added three ordered rows, which forced a renumbering of the Phase B table from 70 to 73 rows; two in-page cross-references to Phase B row numbers were updated to match.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Verified at `slang-emit.cpp:3070-3072` that `createArtifactFromIR` is "used internally by emitSPIRVForEntryPointsDirectly" and is only called at line 3260 inside `emitSPIRVForEntryPointsDirectly`. The HLSL text artifact is created at `slang-emit.cpp:2752` (`createArtifactForCompileTarget`) inside `emitEntryPointsSourceFromIR`, and DXIL/DXBytecode dispatch through `emitWithDownstreamForEntryPoints` (`slang-code-gen.cpp:353`) after `_getDefaultSourceForTarget` (`slang-code-gen.cpp:246-266`) maps them to `CodeGenTarget::HLSL`. | Replaced `createArtifactFromIR` in the intro, the Phase D diagram, and Phase D table row 7 with `createArtifactForCompileTarget`; added an `emitWithDownstreamForEntryPoints` dispatch node and noted it on the DXC/fxc rows. |
-| F-002 | fixed | Verified at `slang-emit.cpp:1555-1567` that the `fastIRSimplificationOptions.minimalOptimization` branch runs `applySparseConditionalConstantPropagation` + `eliminateDeadCode` (else-arm is the already-listed `simplifyIR`), and at `slang-emit.cpp:1606-1609` that `addUserTypeHintDecorations` runs under `getBoolOption(VulkanEmitReflection)`. Both are HLSL-reachable (no sibling-target gate), so the contract's coverage rule requires them in a phase table. | Added the SCCP+DCE minimal-optimization rows and the `addUserTypeHintDecorations` row to the Phase B diagram and ordered table (renumbering subsequent rows), and added the `getBoolOption(VulkanEmitReflection)` option-set toggle. |
+| F-001 | fixed | Confirmed: `CodeGenContext::_emitEntryPoints` (`source/slang/slang-code-gen.cpp:1119-1141`) groups `DXILAssembly` / `DXBytecodeAssembly` with the other assembly targets, recurses on `_getIntermediateTarget(target)` (defined at line 1077: `DXILAssembly`->`DXIL`, `DXBytecodeAssembly`->`DXBytecode`), then calls `ArtifactOutputUtil::dissassembleWithDownstream` at line 1137. Only `DXIL` and `DXBytecode` reach `emitWithDownstreamForEntryPoints` (lines 1191-1196). | Phase D: target bullet list split so the assembly targets describe the intermediate + disassemble route; diagram gained `intermediate`, `binOut`, and `(downstream) dissassembleWithDownstream` nodes; DXC/fxc row gates narrowed to `DXIL` / `DXBytecode` and two rows added (now rows 8-11). |
+| F-002 | fixed | Confirmed: `source/slang/slang-emit.cpp:2394` and `:2404` run `validateVectorsAndMatrices` and `eliminateDeadCode`, and `:2739` runs `checkUnsupportedInst`, so Slang does validate and optimize before emitting HLSL text. | Sentence after the Phase D table now scopes the delegation to validation/optimization *of the emitted HLSL* and names the three Slang-side passes with their lines. |
+| F-003 | fixed | Confirmed: `legalizeLogicalAndOr` (`source/slang/slang-ir-legalize-binary-operator.cpp:179-298`) emits no select. It casts non-`bool` vector operands to `vector<bool,N>` (lines 200-211), rebuilds the `And`/`Or` with a bool-vector result and casts back (lines 227-245), and for lowered matrices (`IRArrayType` of vectors) extracts each element, applies per-element `And`/`Or`, and calls `emitMakeArray` (lines 246-291). | `### legalizeLogicalAndOr`: the element-wise-select sentence replaced with the bool-vector coercion and lowered-matrix array reconstruction behavior. Phase C row needed no change (its note never mentioned selects). |
+| F-004 | fixed | Confirmed: `_isOutOfScopeUse` (`source/slang/slang-ir-variable-scope-correction.cpp:137-157`) tests whether the user's block is dominated by a loop's break block, and `_processInstruction` (lines 159-201) hoists an `IRVar`, spills a storable non-address value through a function-entry var (`_processStorableInst`, lines 203-230), or clones the instruction at each use (`_processUnstorableInst`, lines 232-245). Nothing in the pass mentions live-range markers or outermost-scope declarations. | `### applyVariableScopeCorrection`: replaced the live-range-marker/outermost-scope claim with the loop-scope detection rule and the three repair strategies. |
+| F-005 | fixed | Confirmed all three call sites: `stripAutoDiffDecorations` in the `else` arm at `source/slang/slang-emit.cpp:1452`, the `else if (requiredLoweringPassSet.generics)` `eliminateDeadCode` at `:1595`, and the `if (minimalOptimization)` `eliminateDeadCode` at `:1939`. `_common.md:364-368` requires one row per reachable call. | Phase B: added three ordered rows and split the combined `s2a` / `s2c` diagram nodes into gate diamonds with two arms each; table renumbered 1-73; the two in-page references to Phase B rows updated (56->58, 49->51). |
+| F-006 | deferred | The finding is correct — the Phase A diagram states outright that gates are omitted, and Phases B and C flatten most conditional calls, against `_common.md:314-324`. Applying it fully means re-drawing all three diagrams with roughly forty gate diamonds (Phase B alone has 25+ gated calls in a 73-row table), which is far beyond the minimum-necessary edit this cycle allows and carries real risk of introducing new ordering errors. Follow-up: a dedicated diagram pass for this page, or a regeneration with the diagram convention re-emphasized in the per-document prompt. Two diamonds (`s2aGate`, `s2cGate`) were added in Phase B as a side effect of F-005. | — |
+| F-007 | fixed | Confirmed: the first body paragraph stated coverage only; `_common.md:65-66` requires the intended reader, and `prompts/target-pipelines-hlsl.md:12-15` names that reader. | Opening paragraph: added the compiler-developer audience clause taken from the per-document prompt. |
+| F-008 | fixed | Confirmed: the implementation comment at `source/slang/slang-ir-hlsl-legalize.cpp:254-255` states "DXIL/HLSL with NVAPI requires non-empty ray payload structs because the NvInvokeHitObject macro expects a Payload argument" — narrower than "DXR requires". | `### legalizeEmptyRayPayloadsForHLSL`: the DXR generalization replaced with the DXIL/HLSL-with-NVAPI requirement and its source line. The Phase B row already said "DXIL + NVAPI compatibility" and was left alone. |

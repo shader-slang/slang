@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#edge-cases-and-failure-modes
-//META: doc_section_digest=b22ae0db87266fb01a1be1ff4487019df27480bf09ff6476d416556c6388f8d4
+//META: doc_section_digest=cec0af169cdea7704c970ac20490303750b9aad97be14f4aa1d9723019cca840
 //META: purpose=When a non-overloadable lookup resolves to multiple decls (two types of the same name reachable via different namespace imports), the checker reports ambiguous-reference.
 //META: intent=negative
 //META: pipeline_stage=check

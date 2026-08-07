@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-d-wgsl-emit-and-downstream-tools
-//META: doc_section_digest=287321dc153823860396c030325e4ad4c0f6064005fa37b19c8ba53087dcd3e6
+//META: doc_section_digest=602dd96dd9a5139f2ccd4e3f857107fe47c9705a3ba52eae7e88a90893f9d664
 //META: purpose=Texture2D<float4>.Load(int3(xy, lod)) lowers to WGSL textureLoad(tex, xy, lod) (no sampler involved).
 //META: intent=expansion
 //META: pipeline_stage=emit

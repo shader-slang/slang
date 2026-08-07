@@ -1,46 +1,49 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T13:38:32+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:06:30+00:00
 target_doc: name-resolution/visibility.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 7000c50536855f3dc1b45bca7d5d1e8dd84cac67a0962f289a509743162726d3
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 94e3bb442f068e23a07ff33e9536a9fc2e08c2fa82513f4ca6488832ebf31946
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: pass
-finding_count: 3
+  front_matter_validity: partial
+finding_count: 6
 severity_breakdown:
   critical: 0
-  major: 2
-  minor: 1
+  major: 0
+  minor: 6
   nit: 0
 ---
 
 # Review report for name-resolution/visibility.md
 
 ## Summary
-The page is broadly aligned with the visibility implementation and resolves its peer links, but it has two substantive review findings. The most important issue is a factual error in the concepts section: it names `SessionDesc::minLanguageVersion`, which does not exist; the source field is `SlangGlobalSessionDesc::minLanguageVersion`. The page also omits a prompt-required re-export failure mode and gives the wrong diagnostic for duplicated visibility modifiers.
+The page is complete, well structured, and link-clean, and most claims match the recorded source commit. Six bounded inaccuracies remain; the most important workflow issue is that the recorded watched-path digest no longer matches the manifest's resolved watched files.
 
 ## Items checked
-- Ran `regenerate.py show name-resolution/visibility.md` and checked the manifest entry, per-doc prompt, ten resolved watched files, and three depends-on docs.
-- Verified target front matter, required section order, source paragraph, concepts list, rules subsections, edge cases, and peer links against the common and per-page prompt contracts.
-- Resolved the document's relative links to source files, peer name-resolution pages, AST reference pages, and the glossary; the linked peers exist in the manifest.
-- Spot-checked 16 factual/source-alignment claims at `eb9403ef595a99c2ff6def1d538dbd7a792d9371`, including the visibility modifier classes, `DeclVisibility`, `ModuleDecl::defaultVisibility`, language-version constants, `getDeclVisibility`, lookup filtering, overload filtering, private extension access, `getTypeVisibility`, `checkVisibility`, `ExternModifier`, `ExportedModifier`, `IgnoreForLookupModifier`, and the listed diagnostics.
+- Read the target, `_common.md`, the per-document prompt, all 12 resolved watched files, and all three dependency documents.
+- Confirmed that the target's recorded source commit is current `HEAD` and that the watched source files have no worktree differences from that commit.
+- Re-derived every line-number citation in the body across the watched files and spot-checked more than 30 factual and behavioral claims.
+- Resolved every relative link at the recorded commit, confirmed every generated peer is in the manifest, and ran the generated-doc linter successfully.
+- Verified all required front-matter fields and recomputed the watched-path digest.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Concepts`, `SlangLanguageVersion` bullet | The page says ``SessionDesc::minLanguageVersion`` defaults to `SLANG_LANGUAGE_VERSION_2025`, but `SessionDesc` has no such field. The field with that default is `SlangGlobalSessionDesc::minLanguageVersion`, so the cited API surface is wrong. | `include/slang.h:4244` declares `struct SessionDesc` and its fields through `skipSPIRVValidation` without `minLanguageVersion`; `include/slang.h:5565` declares `struct SlangGlobalSessionDesc`, and `include/slang.h:5574` sets `minLanguageVersion = SLANG_LANGUAGE_VERSION_2025`. | Change the concept bullet to name `SlangGlobalSessionDesc::minLanguageVersion`, or remove the session-default sentence if this page should only discuss per-module language defaults. |
-| F-002 | major | `## Edge cases and failure modes` | The per-page prompt requires an edge case for "a `using`-decl that re-exports an `internal` decl from another module: how it is rejected," but the generated edge-case list does not cover `using`, re-exporting, `FuncAliasDecl`, or the non-exported-import diagnostic path. | `docs/generated/design/_meta/prompts/name-resolution-visibility.md:93` requires this edge case. The closest source-backed rejection path checks public callable aliases: `source/slang/slang-check-decl.cpp:9012` starts `validatePublicCallableOperandVisibility`, `source/slang/slang-check-decl.cpp:9025` handles `FuncAliasDecl`, and `source/slang/slang-diagnostics.lua:2652` defines `public-custom-derivative-uses-non-exported-import`. | Add the required edge case, naming the actual source path and diagnostic if this is the intended re-export case. If the watched source no longer has a `using`-specific rejection path, state that the information was not located in the watched paths and identify the additional path or prompt correction needed. |
-| F-003 | minor | `## Edge cases and failure modes`, "Visibility modifier on a node that does not accept one" bullet | The page says `invalid-visibility-modifier-on-type-of-decl` fires when "the user writes `public public ...`", but duplicate visibility modifiers are handled by the duplicate-modifier conflict-group check, not by `InvalidVisibilityModifierOnTypeOfDecl`. | `source/slang/slang-check-modifier.cpp:1501` maps `PublicModifier`, `PrivateModifier`, and `InternalModifier` to the `VisibilityModifier` conflict group; `source/slang/slang-check-modifier.cpp:2295` checks mutually exclusive modifier conflicts and emits `Diagnostics::DuplicateModifier` at `source/slang/slang-check-modifier.cpp:2306`. The duplicate diagnostic is defined as `duplicate-modifier` in `source/slang/slang-diagnostics.lua:2709`. | Remove `public public ...` from this bullet or change it to cite `DuplicateModifier`; keep `invalid-visibility-modifier-on-type-of-decl` for the namespace/unsupported-node cases that actually emit that diagnostic. |
+| F-001 | minor | Front matter, line 6 | The recorded `watched_paths_digest` is `94e3bb...`, but the current manifest entry resolves to a digest of `e44865f09117c2ed040c2745cf741834f8cd6ea84e74a6d06b92d05d67002439`. | `docs/generated/design/_meta/manifest.yaml` lines 505-519 defines the resolved watched set; `python3 docs/generated/design/_meta/regenerate.py digest name-resolution/visibility.md` returns `e44865f09117c2ed040c2745cf741834f8cd6ea84e74a6d06b92d05d67002439`. | Regenerate the front matter against the current manifest so `watched_paths_digest` records `e44865f09117c2ed040c2745cf741834f8cd6ea84e74a6d06b92d05d67002439`. |
+| F-002 | minor | `## Concepts`, lines 64-82 | The page says `ModuleDecl::languageVersion` is set from the module declaration's version or a linkage default. A `module` declaration has no version; the compile request initializes the field from `CompilerOptionName::LanguageVersion`, and parsing selected modern constructs upgrades legacy to 2025. | `source/slang/slang-compile-request.cpp` lines 324-339 assigns the option-set version; `source/slang/slang-parser.cpp` lines 1221-1226 and 1376-1405 show the legacy upgrade and the versionless `module` syntax. | Describe the option-set initialization and parser upgrade accurately; add these two files to `watched_paths` if this lifecycle detail remains. |
+| F-003 | minor | `### Per-keyword semantics`, lines 118-120 | The text implies every `GenericTypeConstraintDecl` inherits the generic inner declaration's visibility. `getDeclVisibility` does so only when the constraint's parent is a `GenericDecl`; otherwise it returns `Default`. | `source/slang/slang-check-decl.cpp` lines 21258-21265 checks `as<GenericDecl>(decl->parentDecl)` and returns `Default` when it fails. | Qualify the rule as applying to generic parameters and constraints owned by a `GenericDecl`, and state that other `GenericTypeConstraintDecl` parents fall back to `Default`. |
+| F-004 | minor | `### Container-level cap`, lines 241-256 | The phrase “any generic type arguments” overstates `_getTypeVisibility`: it only recurses into arguments that cast to `DeclRefType`, not every type-valued generic argument. | `source/slang/slang-check-expr.cpp` lines 1114-1120 guards recursion with `as<DeclRefType>(arg)`. | Replace “any generic type arguments” with “declaration-reference type arguments,” or explain the exact operand shapes the helper traverses. |
+| F-005 | minor | `### Container-level cap`, lines 258-266 | The page says `checkVisibility` enforces that any declaration cannot exceed its parent container's visibility. For an aggregate declaration, the parent search starts at the declaration itself and immediately compares its visibility with itself; the stated parent-cap behavior applies to non-aggregate members. | `source/slang/slang-check-modifier.cpp` lines 2375-2388 initializes `parentDecl = decl` and stops at the first `AggTypeDeclBase`; `source/slang/slang-check-decl.cpp` lines 3100-3109 calls this function for structs and classes. | Narrow the claim to non-aggregate members, and avoid promising a parent-container check for aggregate declarations unless the implementation changes. |
+| F-006 | minor | `## Edge cases and failure modes`, lines 444-451 | The page says a `using` declaration only brings a namespace into scope, but the checker accepts any `NamespaceDeclBase`, including a module. | `source/slang/slang-check-decl.cpp` lines 17332-17338 explicitly says “namespace (or a module, since modules are namespace-like),” and lines 17360-17376 tests `NamespaceDeclBase`. | Say that `using` accepts namespace-like targets, including modules, while still rejecting individual declarations. |
 
 ## No-issues notes
-- The front matter has all required generated-doc keys and the watched-path digest is a well-formed SHA-256 hex string matching the manifest context shown for this review.
-- `getDeclVisibility`, `isDeclVisibleFromScope`, `filterLookupResultByVisibilityAndDiagnose`, and `TryCheckOverloadCandidateVisibility` are all cited at line ranges that match the current source layout.
-- The `IgnoreForLookupModifier` discussion matches the enum tag-type inheritance producer and the lookup-side skip.
+- All cited modifier declarations, enum values, source line ranges, diagnostic names, and diagnostic codes match the recorded commit.
+- The lookup and overload visibility paths are correctly shown as separate branches that share `isDeclVisibleFromScope`.
+- The required rules, edge cases, Mermaid flowchart, and `## See also` links satisfy the prompt contract.

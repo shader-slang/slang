@@ -3,16 +3,16 @@
 //META: generated_at=2026-05-21T00:00:00Z
 //META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#glsl-module
-//META: doc_section_digest=2f7ea7343ac21591a146336670d19bda76cac7c8591fc4af2e2833489d070e98
+//META: doc_section_digest=af07acb9006b2e6bd2486c2a95f1ca55cef989b24178836276686391dc055ee3
 //META: purpose=Boundary: under -allow-glsl, GLSL-flavoured names `min`, `max`, `clamp` resolve and lower to per-target spellings.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Boundary axis: GLSL-named intrinsic surface area — `min`, `max`,
-// and `clamp` under -allow-glsl. The doc covers the GLSL module as
-// loaded conditionally; these three are the most common arithmetic
-// helpers it provides.
+// and `clamp` under -allow-glsl. The GLSL builtin module is opt-in;
+// once enabled, these three common arithmetic helpers resolve and
+// the GLSL backend preserves their spellings.
 
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute -allow-glsl
 

@@ -2405,6 +2405,10 @@ extension vector<T,N> : IFloat
     [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
 
+    [Differentiable]
+    __intrinsic_op(0)
+    __init(This value);
+
     [OverloadRank(-1)]
     [Differentiable]
     __implicit_conversion($(kConversionCost_Default))
@@ -2468,6 +2472,10 @@ extension matrix<T,N,M,L> : IFloat
     [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
     [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+
+    [Differentiable]
+    __intrinsic_op(0)
+    __init(This value);
 
     [OverloadRank(-1)]
     [Differentiable]
@@ -2794,6 +2802,28 @@ __generic<T> __extension vector<T, 4>
     [__unsafeForceInlineEarly]
     __intrinsic_op($(kIROp_MakeVector))
     __init(T x, vector<T,3> yzw);
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int2, int) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (vector<T, 2>, T) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (vector<T, 2>, T) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(vector<T,2> xy, T z)
+    {
+        // legacy semantics with implicit promotion of z to vector<T,2>
+        this = { xy.x, xy.y, z, z };
+    }
+
+    // we need to declare this initializer explicitly to avoid implicit conversion
+    // of (int, int2) to (int2, int2)
+    [__unsafeForceInlineEarly]
+    [deprecated("Three-component initializer (T, vector<T, 2>) for vector<T, 4> is deprecated. For details, see https://github.com/shader-slang/slang/issues/12093")]
+    [RemovedSince(2026, "Three-component initializer (T, vector<T, 2>) for vector<T, 4> has been removed since Slang 2026.")]
+    __init(T x, vector<T,2> yz)
+    {
+        // legacy semantics with implicit promotion of x to vector<T,2>
+        this = { x, x, yz.x, yz.y };
+    }
 }
 
 ${
@@ -3787,6 +3817,31 @@ __prefix T operator !(T v0)
     return v0.not();
 }
 
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator &=(in out T v0, T v1)
+{
+    v0 = v0 & v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator |=(in out T v0, T v1)
+{
+    v0 = v0 | v1;
+    return v0;
+}
+__generic<T : ILogical>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator ^=(in out T v0, T v1)
+{
+    v0 = v0 ^ v1;
+    return v0;
+}
+
 // The operator overloads defined above already allows Enum types to be used
 // in logical operators, but we still provide overloads for __EnumTypes and map
 // them directly to intrinsic op to allow constant propagation at AST level to
@@ -3801,6 +3856,11 @@ __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_BitOr))
 T operator |(T v0, T v1);
+
+__generic<T : __EnumType>
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitXor))
+T operator ^(T v0, T v1);
 
 __generic<T : __EnumType>
 [__unsafeForceInlineEarly]
@@ -3934,6 +3994,23 @@ __generic<T>
 int __naturalStrideOf()
 {
     return __naturalStrideOf_impl(__declVal<T>());
+}
+
+__generic<T>
+__intrinsic_op($(kIROp_GetNaturalAlignment))
+int __naturalAlignmentOf_impl(T v);
+
+// Return the largest power-of-two byte alignment that `T`'s natural layout guarantees.
+// This is the strongest alignment a value of `T` can be promised when its address is a
+// multiple of `T`'s natural stride, e.g. 16 for `float4`, 8 for `float2`/`half4`, and 4
+// for `float3` (whose 12-byte stride is not a power of two). It is the value the implicit
+// single-argument `*Aligned` byte-address accessors forward as their alignment promise so
+// that the promise is always a valid (power-of-two) alignment.
+__generic<T>
+[__unsafeForceInlineEarly]
+int __naturalAlignmentOf()
+{
+    return __naturalAlignmentOf_impl(__declVal<T>());
 }
 
 [__unsafeForceInlineEarly]
@@ -4499,6 +4576,19 @@ attribute_syntax [instance(count: int)]         : InstanceAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [earlydepthstencil]    : EarlyDepthStencilAttribute;
 
+// SPIR-V 64-bit indexing
+/// Used on a function to require the `SPV_EXT_shader_64bit_indexing` SPIR-V extension.
+/// @remarks When this attribute is applied to a SPIR-V entry point, or to any function in the
+/// entry point's call graph, the emitted SPIR-V entry point requires the `Shader64BitIndexingEXT`
+/// capability, declares `OpExtension "SPV_EXT_shader_64bit_indexing"`, and enables the
+/// `Shader64BitIndexingEXT` execution mode. This permits 64-bit (`int64`/`uint64`) indices into
+/// arrays, buffers, and resources. The requirement propagates up the call graph like `[require()]`.
+/// @remarks This attribute is a pure opt-in marker: the requirement is honored only where the
+/// programmer applies it. The compiler does not infer it from the use of 64-bit indices, nor does
+/// it diagnose 64-bit indexing performed without the attribute.
+__attributeTarget(FuncDecl)
+attribute_syntax [Shader64BitIndexing]  : Shader64BitIndexingAttribute;
+
 // Compute Shader
 
 /// Specifies the size of the thread group a compute shader.
@@ -4903,9 +4993,6 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::NodePayloadAMDX)>;
-
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
@@ -5045,16 +5132,19 @@ semantic sv_dispatchthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5066,16 +5156,19 @@ semantic sv_groupid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 
@@ -5084,6 +5177,7 @@ semantic sv_groupindex
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 }
 
@@ -5095,16 +5189,19 @@ semantic sv_groupthreadid
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint2;
 
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
+    [require(node)]
     get : uint3;
 }
 

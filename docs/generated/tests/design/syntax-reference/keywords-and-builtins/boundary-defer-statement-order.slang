@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:30:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T00:00:00Z
+//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#statement-keywords
-//META: doc_section_digest=d6e74209f0cfcbd939127caa9bf2791387db9155c2d0b2f0a561349e2e185456
-//META: purpose=Boundary: `defer` is documented in the statement-keywords table (line 6406) but uncovered by the smoke tests; the body of the deferred statement runs after the enclosing function body completes.
+//META: doc_section_digest=4e5c787f52095c6dbdd20c8c0f4df226f6e2e9bbef0e89d6a888ac6bb5940443
+//META: purpose=Boundary: `defer` is documented in the statement-keywords table but uncovered by the smoke tests; the body of the deferred statement runs after the enclosing function body completes.
 //META: intent=boundary
 //META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

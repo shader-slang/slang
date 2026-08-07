@@ -1,17 +1,19 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-12T10:15:50Z
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-watched_paths_digest: 09bdb006642550c81ee966bcb8ea28e65ed6abdbbb21b36d0fbd18f7f1a7472b
+model: claude-opus-5
+generated_at: 2026-08-03T13:46:37Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: 00900db2297740a4e95ed1bd166180aeec693f1bbb14d06c300bedcc1eff4d63
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
 # Modifiers and Attributes Reference
 
 The reference for every concrete `Modifier` subclass in the Slang
-AST. `Modifier` itself is documented in
-[base.md](base.md#modifier-syntaxnode).
+AST, written for a contributor working in the parser, checker, or
+backend emit who needs to know which class a particular `[attr]` or
+keyword becomes, and where its semantic checking lives. `Modifier`
+itself is documented in [base.md](base.md#modifier-syntaxnode).
 
 Slang draws a deliberate distinction between two related families of
 syntax:
@@ -28,19 +30,33 @@ syntax:
 Both are linked off `ModifiableSyntaxNode::modifiers` and walked with
 `findModifier<T>()` / `hasModifier<T>()`.
 
-Audience: a contributor working in the parser, checker, or backend
-emit who needs to know which class a particular `[attr]` or keyword
-becomes, and where its semantic checking lives.
-
 ## Source
 
 Modifier classes are declared in
-[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
+[slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h),
+on top of the `Modifier` / `ModifiableSyntaxNode` pair in
+[slang-ast-base.h](../../../../source/slang/slang-ast-base.h).
 Parsing happens in
-[slang-parser.cpp](../../../../source/slang/slang-parser.cpp);
-attributes are dispatched through the `AttributeDecl` table
-documented in
+[slang-parser.cpp](../../../../source/slang/slang-parser.cpp):
+`parseAttributeName` and `ParseSquareBracketAttributes` handle the
+`[name(args)]` form, and `parseUncheckedGLSLLayoutAttribute` handles
+the valued entries of a GLSL `layout(...)` group. Attributes are
+dispatched through the `AttributeDecl` table documented in
 [../syntax-reference/keywords-and-builtins.md](../syntax-reference/keywords-and-builtins.md).
+
+The *surface spelling* of an attribute is not declared in the C++
+modifier header at all. It comes from `attribute_syntax` declarations in
+four sources — three core-module `.meta.slang` files and one
+experimental standard module: the bulk in
+[core.meta.slang](../../../../source/slang/core.meta.slang), the
+differentiability attributes in
+[diff.meta.slang](../../../../source/slang/diff.meta.slang), the
+Vulkan pointer attributes in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang), and the
+work-graph attributes in the experimental standard module
+[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang).
+The spellings quoted below were read from those four files, all of which
+this page watches, so renaming a spelling marks the page stale.
 
 ## Family hierarchy
 
@@ -110,6 +126,16 @@ Abstract intermediates: `VisibilityModifier`,
 
 ## Nodes
 
+Every attribute inherits `attributeDecl: AttributeDecl*`,
+`originalIdentifierToken: Token`, and `args: List<Expr*>` from
+`AttributeBase`, and every checked `Attribute` adds
+`intArgVals: List<Val*>`. Many attribute classes declare no members of
+their own and read their arguments straight out of those inherited
+lists; those rows name the inherited `args: List<Expr*>` in the
+**Key fields** column and leave the meaning of each argument to the
+Summary column, while `(no additional state)` marks a class that carries
+no data at all.
+
 ### Parameter-direction and storage-class modifiers
 
 | Class | Parent | Key fields | Grammar | Summary |
@@ -140,7 +166,7 @@ Abstract intermediates: `VisibilityModifier`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `OverrideModifier` | `Modifier` | (no additional state) | (none) | `override` for interface-default overrides. |
-| `IsOverridingModifier` | `Modifier` | (no additional state) | (none) | Internal flag set by checking once an override is bound. |
+| `IsOverridingModifier` | `Modifier` | `overridedDecl: Decl*` | (none) | Internal marker set by checking once an override is bound to the decl it overrides. |
 | `RequireModifier` | `Modifier` | (no additional state) | (none) | `require` (interface requirement marker). |
 | `BuiltinModifier` | `Modifier` | (no additional state) | (none) | Marks a declaration as part of the core module. |
 | `HLSLExportModifier` | `Modifier` | (no additional state) | (none) | HLSL-style `export` keyword. |
@@ -206,11 +232,11 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `HLSLLayoutSemantic` | `HLSLSemantic` | register name, component mask | (none) | Base class for HLSL semantics that affect layout (register / packoffset). |
-| `RayPayloadAccessSemantic` | `HLSLSemantic` | stage-name tokens | (none) | Base class for ray-payload read/write access semantics. |
-| `HLSLSimpleSemantic` | `HLSLSemantic` | semantic name | [semantic](../syntax-reference/grammar.md#declarations) | `: NAME` (no parenthesized arguments). |
-| `HLSLRegisterSemantic` | `HLSLLayoutSemantic` | register class, index | [register binding](../syntax-reference/grammar.md#modifiers) | `: register(...)`. |
-| `HLSLPackOffsetSemantic` | `HLSLLayoutSemantic` | offset, element | [pack offset](../syntax-reference/grammar.md#modifiers) | `: packoffset(...)`. |
+| `HLSLLayoutSemantic` | `HLSLSemantic` | `registerName: Token`, `componentMask: Token` | (none) | Base class for HLSL semantics that affect layout (register / packoffset). |
+| `RayPayloadAccessSemantic` | `HLSLSemantic` | `stageNameTokens: List<Token>` | (none) | Base class for ray-payload read/write access semantics. |
+| `HLSLSimpleSemantic` | `HLSLSemantic` | `name: Token` (on `HLSLSemantic`) | [semantic](../syntax-reference/grammar.md#declarations) | `: NAME` (no parenthesized arguments). |
+| `HLSLRegisterSemantic` | `HLSLLayoutSemantic` | `spaceName: Token`, plus inherited `registerName` | [register binding](../syntax-reference/grammar.md#modifiers) | `: register(...)`. |
+| `HLSLPackOffsetSemantic` | `HLSLLayoutSemantic` | `uniformOffset: int` | [pack offset](../syntax-reference/grammar.md#modifiers) | `: packoffset(...)`. |
 | `RayPayloadReadSemantic` | `RayPayloadAccessSemantic` | (no additional state) | (none) | `: read(...)` ray-payload semantic. |
 | `RayPayloadWriteSemantic` | `RayPayloadAccessSemantic` | (no additional state) | (none) | `: write(...)` ray-payload semantic. |
 
@@ -221,8 +247,8 @@ Abstract intermediates: `VisibilityModifier`,
 | `GLSLPrecisionModifier` | `Modifier` | (no additional state) | (none) | GLSL precision qualifier. |
 | `GLSLModuleModifier` | `Modifier` | (no additional state) | (none) | Marker for GLSL-module-origin declarations. |
 | `GLSLPreprocessorDirective` | `Modifier` | (no additional state) | (none) | Base class for GLSL preprocessor directives preserved in the AST. |
-| `GLSLVersionDirective` | `GLSLPreprocessorDirective` | version `Token` | (none) | `#version` preprocessor directive carried as AST. |
-| `GLSLExtensionDirective` | `GLSLPreprocessorDirective` | extension name, behavior | (none) | `#extension` directive. |
+| `GLSLVersionDirective` | `GLSLPreprocessorDirective` | `versionNumberToken: Token`, `glslProfileToken: Token` | (none) | `#version` preprocessor directive carried as AST. |
+| `GLSLExtensionDirective` | `GLSLPreprocessorDirective` | `extensionNameToken: Token`, `dispositionToken: Token` | (none) | `#extension` directive. |
 | `GLSLLayoutModifierGroupBegin` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | Start marker of a `layout(...)` group. |
 | `GLSLLayoutModifierGroupEnd` | `GLSLLayoutModifierGroupMarker` | (no additional state) | (none) | End marker of a `layout(...)` group. |
 | `GLSLUnparsedLayoutModifier` | `Modifier` | (no additional state) | (none) | Raw text of a layout qualifier deferred to later parsing. |
@@ -238,7 +264,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `GLSLPatchModifier` | `SimpleModifier` | (no additional state) | (none) | `patch` (tess input). |
 | `GloballyCoherentModifier` | `SimpleModifier` | (no additional state) | (none) | `globallycoherent`. |
 | `SimpleModifier` | `Modifier` | (no additional state) | (none) | Base for keyword-only modifiers parsed via the generic SimpleModifier path. |
-| `MemoryQualifierSetModifier` | `Modifier` | bitmask of memory qualifiers | (none) | Aggregated GLSL memory qualifiers (`coherent`, `volatile`, etc.) on a single decl. |
+| `MemoryQualifierSetModifier` | `Modifier` | `memoryQualifiers: uint32_t`, `memoryModifiers: List<Modifier*>` | (none) | Aggregated GLSL memory qualifiers (`coherent`, `volatile`, etc.) on a single decl. |
 
 ### Type modifiers (wrapping the type rather than the declaration)
 
@@ -250,7 +276,7 @@ Abstract intermediates: `VisibilityModifier`,
 | `UNormModifier` | `ResourceElementFormatModifier` | (no additional state) | [unorm](../syntax-reference/grammar.md#modifiers) | `unorm`. |
 | `SNormModifier` | `ResourceElementFormatModifier` | (no additional state) | [snorm](../syntax-reference/grammar.md#modifiers) | `snorm`. |
 | `NoDiffModifier` | `TypeModifier` | (no additional state) | [no_diff](../syntax-reference/grammar.md#modifiers) | `no_diff` type modifier. |
-| `BitFieldModifier` | `Modifier` | bit width | (none) | C-style bitfield specification on a member variable. |
+| `BitFieldModifier` | `Modifier` | `width: IntegerLiteralValue`, `offset: IntegerLiteralValue`, `backingDeclRef: DeclRef<VarDecl>` | (none) | C-style bitfield specification on a member variable; `offset` and `backingDeclRef` are filled in during checking. |
 | `DynamicUniformModifier` | `Modifier` | (no additional state) | (none) | Marks a parameter as dynamic-uniform. |
 
 ### Internal / synthesized modifiers
@@ -258,13 +284,13 @@ Abstract intermediates: `VisibilityModifier`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ToBeSynthesizedModifier` | `Modifier` | (no additional state) | (none) | Placeholder marking a decl that the checker should synthesize. |
-| `SynthesizedModifier` | `Modifier` | (no additional state) | (none) | Marks decls produced by checker synthesis. |
+| `SynthesizedModifier` | `Modifier` | `op: uint32_t`, `operands: List<Val*>` | (none) | Marks decls produced by checker synthesis. |
 | `SynthesizedStaticLambdaFuncModifier` | `Modifier` | (no additional state) | (none) | Marks the static-lambda function synthesized for `LambdaDecl`. |
-| `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | (no additional state) | (none) | Marks capability sets that were written by the user. |
+| `ExplicitlyDeclaredCapabilityModifier` | `Modifier` | `declaredCapabilityRequirements: CapabilitySetVal*` | (none) | Marks capability sets that were written by the user. |
 | `LocalTempVarModifier` | `Modifier` | (no additional state) | (none) | Marks compiler-introduced local temporaries. |
 | `ExistentialOpenedOnVarModifier` | `Modifier` | (no additional state) | (none) | Marks a variable as the result of opening an existential. |
 | `VarReassignedModifier` | `Modifier` | (no additional state) | (none) | Marks a variable that has been re-assigned (data-flow info). |
-| `ExtensionExternVarModifier` | `Modifier` | (no additional state) | (none) | Marks variables surfaced from an extension via `extern`. |
+| `ExtensionExternVarModifier` | `Modifier` | `originalDecl: DeclRef<Decl>` | (none) | Marks variables surfaced from an extension via `extern`. |
 | `ActualGlobalModifier` | `Modifier` | (no additional state) | (none) | Marks the real backing decl behind a global generic. |
 | `IgnoreForLookupModifier` | `Modifier` | (no additional state) | (none) | Hides a decl from ordinary name lookup. |
 | `OptionalConstraintModifier` | `Modifier` | (no additional state) | (none) | Marks a constraint as optional during inference. |
@@ -274,21 +300,21 @@ Abstract intermediates: `VisibilityModifier`,
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `IntrinsicOpModifier` | `Modifier` | `opToken: Token`, `op: uint32_t` | (none) | Binds a decl to a Slang IR opcode (core-module intrinsics). |
-| `TargetIntrinsicModifier` | `Modifier` | target name, definition text, predicate | (none) | Binds a decl to a target-backend intrinsic. |
-| `SpecializedForTargetModifier` | `Modifier` | target token | (none) | Marks a decl as specialized for a target. |
-| `RequiredGLSLExtensionModifier` | `Modifier` | extension name | (none) | Marks a required GLSL extension. |
-| `RequiredGLSLVersionModifier` | `Modifier` | minimum GLSL version | (none) | Marks the minimum GLSL version a decl requires. |
-| `RequiredSPIRVVersionModifier` | `Modifier` | SemanticVersion | (none) | Marks the minimum SPIRV version. |
-| `RequiredWGSLExtensionModifier` | `Modifier` | extension name | (none) | Required WGSL extension. |
-| `RequiredCUDASMVersionModifier` | `Modifier` | SM version | (none) | Required CUDA SM version. |
+| `TargetIntrinsicModifier` | `Modifier` | `targetToken: Token`, `definitionString: String`, `predicateToken: Token`, `scrutineeDeclRef: DeclRef<Decl>` | (none) | Binds a decl to a target-backend intrinsic. |
+| `SpecializedForTargetModifier` | `Modifier` | `targetToken: Token` | (none) | Marks a decl as specialized for a target. |
+| `RequiredGLSLExtensionModifier` | `Modifier` | `extensionNameToken: Token` | (none) | Marks a required GLSL extension. |
+| `RequiredGLSLVersionModifier` | `Modifier` | `versionNumberToken: Token` | (none) | Marks the minimum GLSL version a decl requires. |
+| `RequiredSPIRVVersionModifier` | `Modifier` | `version: SemanticVersion` | (none) | Marks the minimum SPIRV version. |
+| `RequiredWGSLExtensionModifier` | `Modifier` | `extensionNameToken: Token` | (none) | Required WGSL extension. |
+| `RequiredCUDASMVersionModifier` | `Modifier` | `version: SemanticVersion` | (none) | Required CUDA SM version. |
 | `NVAPIMagicModifier` | `Modifier` | (no additional state) | (none) | NVAPI-magic binding flag. |
-| `NVAPISlotModifier` | `Modifier` | slot info | (none) | NVAPI slot binding. |
-| `BuiltinTypeModifier` | `Modifier` | tag | (none) | Tags a decl as the canonical declaration of a built-in type. |
-| `MagicTypeModifier` | `Modifier` | tag | (none) | Tags a decl as a magic type known to checker/IR-lowering. |
-| `BuiltinRequirementModifier` | `Modifier` | requirement kind | (none) | Tags interface requirements known to the compiler. |
-| `IntrinsicTypeModifier` | `Modifier` | tag | (none) | Tags a decl as an intrinsic type. |
-| `ImplicitConversionModifier` | `Modifier` | conversion rank | (none) | Marks an implicit conversion constructor. |
-| `AttributeTargetModifier` | `Modifier` | target syntax class | (none) | Internal modifier produced by `[AttributeUsage(...)]`. |
+| `NVAPISlotModifier` | `Modifier` | `registerName: String`, `spaceName: String` | (none) | NVAPI slot binding, sourced from the `NV_SHADER_EXTN_SLOT` / `NV_SHADER_EXTN_REGISTER_SPACE` macros. |
+| `BuiltinTypeModifier` | `Modifier` | `tag: BaseType` | (none) | Tags a decl as the canonical declaration of a built-in type. |
+| `MagicTypeModifier` | `Modifier` | `magicName: String`, `tag: uint32_t`, `magicNodeType: SyntaxClass<NodeBase>` | (none) | Tags a decl as a magic type known to checker/IR-lowering. |
+| `BuiltinRequirementModifier` | `Modifier` | `kind: BuiltinRequirementKind` | (none) | Tags interface requirements known to the compiler. |
+| `IntrinsicTypeModifier` | `Modifier` | `irOp: uint32_t`, `irOperands: List<uint32_t>` | (none) | Tags a decl as an intrinsic type and names the IR opcode it lowers to. |
+| `ImplicitConversionModifier` | `Modifier` | `cost: ConversionCost`, `builtinConversionKind: BuiltinConversionKind` | (none) | Marks an implicit conversion constructor and gives its ranking cost. |
+| `AttributeTargetModifier` | `Modifier` | `syntaxClass: SyntaxClass<NodeBase>` | (none) | Internal modifier produced by `[__AttributeUsage(...)]`. |
 
 ### Implicit parameter-group machinery
 
@@ -296,27 +322,27 @@ Abstract intermediates: `VisibilityModifier`,
 | --- | --- | --- | --- | --- |
 | `ImplicitParameterGroupVariableModifier` | `Modifier` | (no additional state) | (none) | Internal marker on auto-introduced parameter-group variables. |
 | `ImplicitParameterGroupElementTypeModifier` | `Modifier` | (no additional state) | (none) | Internal marker on auto-introduced element types. |
-| `ParameterGroupReflectionName` | `Modifier` | name | (none) | Carries the reflection name for an implicit parameter group. |
+| `ParameterGroupReflectionName` | `Modifier` | `nameAndLoc: NameLoc` | (none) | Carries the reflection name for an implicit parameter group. |
 | `SharedModifiers` | `Modifier` | (no additional state) | (none) | Aggregates modifiers shared between several decls (e.g. multiple declarators in one declaration). |
-| `HasInterfaceDefaultImplModifier` | `Modifier` | (no additional state) | (none) | Marks an interface as having default-implementation requirements. |
+| `HasInterfaceDefaultImplModifier` | `Modifier` | `defaultImplDecl: Decl*` | (none) | Marks an interface as having default-implementation requirements. |
 
 ### Attributes (`AttributeBase` and `UncheckedAttribute`)
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `UncheckedAttribute` | `AttributeBase` | raw token list | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Attribute as parsed before checking has resolved it to a concrete subclass. |
-| `Attribute` | `AttributeBase` | argument expressions, parsed values | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Base for all checker-resolved attribute classes. |
-| `UserDefinedAttribute` | `Attribute` | bound `AttributeDecl` | [user attribute](../syntax-reference/grammar.md#attributes-and-decorations) | A user-declared attribute (introduced via `__attribute_syntax__`). |
-| `AttributeUsageAttribute` | `Attribute` | target syntax class | [AttributeUsage](../syntax-reference/grammar.md#attributes-and-decorations) | `[AttributeUsage(...)]` declaring where an attribute may be applied. |
+| `UncheckedAttribute` | `AttributeBase` | `scope: Scope*`, plus inherited `args` | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Attribute as parsed before checking has resolved it to a concrete subclass; `scope` records where to look the name up. |
+| `Attribute` | `AttributeBase` | `intArgVals: List<Val*>`, plus inherited `args` | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | Base for all checker-resolved attribute classes. |
+| `UserDefinedAttribute` | `Attribute` | `attributeDecl: AttributeDecl*` (on `AttributeBase`) | [user attribute](../syntax-reference/grammar.md#attributes-and-decorations) | A user-declared attribute (introduced via `attribute_syntax`). |
+| `AttributeUsageAttribute` | `Attribute` | `targetSyntaxClass: SyntaxClass<NodeBase>` | [AttributeUsage](../syntax-reference/grammar.md#attributes-and-decorations) | `[__AttributeUsage(target)]` declaring where an attribute may be applied. |
 
 ### Compile-time hint attributes (loops / branches / opt levels)
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `UnrollAttribute` | `Attribute` | optional unroll count | [unroll](../syntax-reference/grammar.md#attributes-and-decorations) | `[unroll(N)]`. |
-| `ForceUnrollAttribute` | `Attribute` | optional unroll count | (none) | `[ForceUnroll]`. |
-| `MaxItersAttribute` | `Attribute` | iteration count | (none) | `[MaxIters(N)]`. |
-| `InferredMaxItersAttribute` | `Attribute` | inferred count | (none) | Inferred iteration bound. |
+| `UnrollAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | [unroll](../syntax-reference/grammar.md#attributes-and-decorations) | `[unroll(N)]`. |
+| `ForceUnrollAttribute` | `Attribute` | `maxIterations: int32_t` | (none) | `[ForceUnroll]`. |
+| `MaxItersAttribute` | `Attribute` | `value: IntVal*` | (none) | `[MaxIters(N)]`. |
+| `InferredMaxItersAttribute` | `Attribute` | `inductionVar: DeclRef<Decl>`, `value: int32_t` | (none) | Iteration bound inferred by checking rather than written by the user. |
 | `LoopAttribute` | `Attribute` | (no additional state) | (none) | `[loop]`. |
 | `FastOptAttribute` | `Attribute` | (no additional state) | (none) | `[fastopt]`. |
 | `AllowUAVConditionAttribute` | `Attribute` | (no additional state) | (none) | `[allow_uav_condition]`. |
@@ -327,39 +353,39 @@ Abstract intermediates: `VisibilityModifier`,
 | `UnscopedEnumAttribute` | `Attribute` | (no additional state) | (none) | `[UnscopedEnum]`; added by the parser from the user-written attribute or implicitly when a non-generic plain `enum` is compiled with `-unscoped-enum`. |
 | `EnumClassModifier` | `Modifier` | (no additional state) | (none) | Marker for `enum class` declarations; used to detect conflicting explicit scoped/unscoped enum declarations (no further semantics). |
 | `FlagsAttribute` | `Attribute` | (no additional state) | (none) | `[Flags]`. |
-| `NonDynamicUniformAttribute` | `Attribute` | (no additional state) | (none) | `[NonDynamicUniform]`. |
-| `UnsafeForceInlineEarlyAttribute` | `Attribute` | (no additional state) | (none) | `[UnsafeForceInlineEarly]`. |
+| `NonDynamicUniformAttribute` | `Attribute` | (no additional state) | (none) | `[NonUniformReturn]`. |
+| `UnsafeForceInlineEarlyAttribute` | `Attribute` | (no additional state) | (none) | `[__unsafeForceInlineEarly]`. |
 | `ForceInlineAttribute` | `Attribute` | (no additional state) | [ForceInline](../syntax-reference/grammar.md#attributes-and-decorations) | `[ForceInline]`. |
-| `NoInlineAttribute` | `Attribute` | (no additional state) | (none) | `[NoInline]`. |
-| `NoRefInlineAttribute` | `Attribute` | (no additional state) | (none) | `[NoRefInline]`. |
-| `PreferRecomputeAttribute` | `Attribute` | (no additional state) | (none) | `[PreferRecompute]`. |
+| `NoInlineAttribute` | `Attribute` | (no additional state) | (none) | `[noinline]`. |
+| `NoRefInlineAttribute` | `Attribute` | (no additional state) | (none) | `[noRefInline]`. |
+| `PreferRecomputeAttribute` | `Attribute` | `sideEffectBehavior: SideEffectBehavior` | (none) | `[PreferRecompute]`; the nested enum selects whether side effects warn or are allowed. |
 | `PreferCheckpointAttribute` | `Attribute` | (no additional state) | (none) | `[PreferCheckpoint]`. |
-| `AlwaysFoldIntoUseSiteAttribute` | `Attribute` | (no additional state) | (none) | `[AlwaysFoldIntoUseSite]`. |
-| `OverloadRankAttribute` | `Attribute` | rank | (none) | `[OverloadRank(N)]`. |
-| `SpecializeAttribute` | `Attribute` | argument list | (none) | `[__specialize(...)]`. |
-| `KnownBuiltinAttribute` | `Attribute` | name | (none) | Internal: marks a decl as a known builtin. |
-| `ReadNoneAttribute` | `Attribute` | (no additional state) | (none) | `[ReadNone]`. |
+| `AlwaysFoldIntoUseSiteAttribute` | `Attribute` | (no additional state) | (none) | `[__AlwaysFoldIntoUseSiteAttribute]`. |
+| `OverloadRankAttribute` | `Attribute` | `rank: int32_t` | (none) | `[OverloadRank(N)]`. |
+| `SpecializeAttribute` | `Attribute` | (no additional state) | (none) | `[Specialize]`. |
+| `KnownBuiltinAttribute` | `Attribute` | `name: IntVal*` | (none) | `[KnownBuiltin(name)]`; marks a decl as a known builtin. |
+| `ReadNoneAttribute` | `Attribute` | (no additional state) | (none) | `[__readNone]`. |
 | `MaximallyReconvergesAttribute` | `Attribute` | (no additional state) | (none) | `[MaximallyReconverges]`. |
 | `QuadDerivativesAttribute` | `Attribute` | (no additional state) | (none) | `[QuadDerivatives]`. |
 | `RequireFullQuadsAttribute` | `Attribute` | (no additional state) | (none) | `[RequireFullQuads]`. |
-| `DeprecatedAttribute` | `Attribute` | message | (none) | `[deprecated]`. |
-| `RemovedSinceAttribute` | `Attribute` | version | (none) | `[RemovedSince]`. |
-| `NonCopyableTypeAttribute` | `Attribute` | (no additional state) | (none) | `[NonCopyableType]`. |
-| `NoSideEffectAttribute` | `Attribute` | (no additional state) | (none) | `[NoSideEffect]`. |
+| `DeprecatedAttribute` | `Attribute` | `message: String` | (none) | `[deprecated(message)]`. |
+| `RemovedSinceAttribute` | `Attribute` | `sinceVersion: int32_t`, `message: String` | (none) | `[RemovedSince(...)]`. |
+| `NonCopyableTypeAttribute` | `Attribute` | (no additional state) | (none) | `[__NonCopyableType]`. |
+| `NoSideEffectAttribute` | `Attribute` | (no additional state) | (none) | `[__NoSideEffect]`. |
 | `BuiltinAttribute` | `Attribute` | (no additional state) | (none) | `[builtin]`. |
-| `AutoDiffBuiltinAttribute` | `Attribute` | (no additional state) | (none) | Internal: marks an autodiff builtin. |
+| `AutoDiffBuiltinAttribute` | `Attribute` | (no additional state) | (none) | `[__AutoDiffBuiltin]`; marks an autodiff builtin. |
 
 ### Capability / target attributes
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `RequireCapabilityAttribute` | `Attribute` | capability atoms | [require_capability](../syntax-reference/grammar.md#attributes-and-decorations) | `[require_capability(...)]`; ties to the capability system in [../cross-cutting/targets.md](../cross-cutting/targets.md). |
-| `RequiresNVAPIAttribute` | `Attribute` | (no additional state) | (none) | `[RequiresNVAPI]`. |
-| `RequirePreludeAttribute` | `Attribute` | prelude string | (none) | `[RequirePrelude]`. |
-| `AllowAttribute` | `Attribute` | (no additional state) | (none) | `[allow]` (capability allow). |
-| `FormatAttribute` | `Attribute` | format token | (none) | `[format(...)]`. |
-| `ExternAttribute` | `Attribute` | (no additional state) | (none) | `[extern]`. |
-| `ComInterfaceAttribute` | `Attribute` | UUID, options | (none) | `[ComInterface(...)]`. |
+| `RequireCapabilityAttribute` | `Attribute` | `capabilitySet: CapabilitySetVal*` | [require](../syntax-reference/grammar.md#attributes-and-decorations) | `[require(capability)]`; ties to the capability system in [../cross-cutting/targets.md](../cross-cutting/targets.md). |
+| `RequiresNVAPIAttribute` | `Attribute` | (no additional state) | (none) | `[__requiresNVAPI]`. |
+| `RequirePreludeAttribute` | `Attribute` | `capabilitySet: CapabilitySetVal*`, `prelude: String` | (none) | `[RequirePrelude(...)]`. |
+| `AllowAttribute` | `Attribute` | `diagnostic: DiagnosticInfo const*` | (none) | `[allow("diagnostic-name")]`; suppresses one diagnostic. |
+| `FormatAttribute` | `Attribute` | `format: ImageFormat` | (none) | `[format(...)]`, also spelled `[vk::image_format(...)]`. |
+| `ExternAttribute` | `Attribute` | (no additional state) | (none) | `[__extern]`. |
+| `ComInterfaceAttribute` | `Attribute` | `guid: String` | (none) | `[COM(guid)]`. |
 
 ### Layout / binding attributes
 
@@ -367,38 +393,38 @@ Abstract intermediates: `VisibilityModifier`,
 | --- | --- | --- | --- | --- |
 | `PushConstantAttribute` | `Attribute` | (no additional state) | (none) | `[push_constant]`. |
 | `SpecializationConstantAttribute` | `Attribute` | (no additional state) | (none) | `[SpecializationConstant]`. |
-| `VkConstantIdAttribute` | `Attribute` | constant id | (none) | `[vk::constant_id(...)]`. |
+| `VkConstantIdAttribute` | `Attribute` | `location: int` | (none) | `[vk::constant_id(...)]`, and the checked form of `layout(constant_id=N)`. |
 | `ShaderRecordAttribute` | `Attribute` | (no additional state) | (none) | `[shader_record]`. |
-| `GLSLBindingAttribute` | `Attribute` | binding, set | (none) | `[vk::binding(...)]`. |
+| `GLSLBindingAttribute` | `Attribute` | `binding: int32_t`, `set: int32_t` | (none) | `[vk::binding(...)]` / `[gl::binding(...)]`; also the merged checked form of `layout(binding=..., set=...)`. |
 | `VkAliasedPointerAttribute` | `Attribute` | (no additional state) | (none) | `[vk::aliased_pointer]`. |
 | `VkRestrictPointerAttribute` | `Attribute` | (no additional state) | (none) | `[vk::restrict_pointer]`. |
-| `GLSLOffsetLayoutAttribute` | `Attribute` | offset | (none) | `[layout(offset=...)]`. |
-| `GLSLImplicitOffsetLayoutAttribute` | `AttributeBase` | (no additional state) | (none) | Implicit-offset placeholder. |
-| `GLSLSimpleIntegerLayoutAttribute` | `Attribute` | value | (none) | Base for integer-valued GLSL layout attributes. |
-| `GLSLInputAttachmentIndexLayoutAttribute` | `Attribute` | attachment index | (none) | `[vk::input_attachment_index(...)]`. |
-| `GLSLLocationAttribute` | `GLSLSimpleIntegerLayoutAttribute` | location | (none) | `[vk::location(...)]`. |
-| `GLSLIndexAttribute` | `GLSLSimpleIntegerLayoutAttribute` | index | (none) | `[vk::index(...)]`. |
-| `VkStructOffsetAttribute` | `GLSLSimpleIntegerLayoutAttribute` | offset | (none) | `[vk_offset(...)]`. |
-| `SPIRVInstructionOpAttribute` | `Attribute` | opcode | (none) | `[__spv_instruction(...)]`. |
-| `SPIRVTargetEnv13Attribute` | `Attribute` | (no additional state) | (none) | `[__spv_target_env_1_3]`. |
-| `DisableArrayFlatteningAttribute` | `Attribute` | (no additional state) | (none) | `[__disable_array_flattening]`. |
-| `GLSLLayoutLocalSizeAttribute` | `Attribute` | x/y/z dims | (none) | `layout(local_size_*)` workgroup size. |
+| `GLSLOffsetLayoutAttribute` | `Attribute` | `offset: int64_t` | (none) | Checked form of `layout(offset=N)`. |
+| `GLSLImplicitOffsetLayoutAttribute` | `AttributeBase` | (no additional state) | (none) | Placeholder the parser adds when a `layout(...)` group has no explicit `offset`; checking turns it into a `GLSLOffsetLayoutAttribute`. |
+| `GLSLSimpleIntegerLayoutAttribute` | `Attribute` | `value: int32_t` | (none) | Base for integer-valued GLSL layout attributes. |
+| `GLSLInputAttachmentIndexLayoutAttribute` | `Attribute` | `location: IntegerLiteralValue` | (none) | `[vk::input_attachment_index(...)]`. |
+| `GLSLLocationAttribute` | `GLSLSimpleIntegerLayoutAttribute` | inherited `value: int32_t` | (none) | `[vk::location(...)]`. |
+| `GLSLIndexAttribute` | `GLSLSimpleIntegerLayoutAttribute` | inherited `value: int32_t` | (none) | `[vk::index(...)]`. |
+| `VkStructOffsetAttribute` | `GLSLSimpleIntegerLayoutAttribute` | inherited `value: int32_t` | (none) | `[vk_offset(...)]`. |
+| `SPIRVInstructionOpAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | (none) | `[vk::spirv_instruction(...)]`. |
+| `SPIRVTargetEnv13Attribute` | `Attribute` | (no additional state) | (none) | `[spv_target_env_1_3]`. |
+| `DisableArrayFlatteningAttribute` | `Attribute` | (no additional state) | (none) | `[disable_array_flattening]`. |
+| `GLSLLayoutLocalSizeAttribute` | `Attribute` | `extents[3]: IntVal*`, `axisIsSpecConstId[3]: bool`, `specConstExtents[3]: DeclRef<VarDeclBase>` | (none) | `layout(local_size_*)` workgroup size. |
 | `GLSLLayoutDerivativeGroupQuadAttribute` | `Attribute` | (no additional state) | (none) | `derivative_group_quadsNV` layout. |
 | `GLSLLayoutDerivativeGroupLinearAttribute` | `Attribute` | (no additional state) | (none) | `derivative_group_linearNV` layout. |
-| `GLSLRequireShaderInputParameterAttribute` | `Attribute` | input parameter | (none) | Internal: marks a required shader input. |
+| `GLSLRequireShaderInputParameterAttribute` | `Attribute` | `parameterNumber: uint32_t` | (none) | `[__GLSLRequireShaderInputParameter(N)]`; marks a required shader input. |
 
 ### Unchecked GLSL layout attributes
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `UncheckedGLSLLayoutAttribute` | `AttributeBase` | raw arguments | (none) | Base for unchecked GLSL layout(...) entries. |
-| `UncheckedGLSLBindingLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | binding | (none) | `layout(binding=N)`. |
-| `UncheckedGLSLSetLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | set | (none) | `layout(set=N)`. |
-| `UncheckedGLSLOffsetLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | offset | (none) | `layout(offset=N)`. |
-| `UncheckedGLSLInputAttachmentIndexLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | attachment index | (none) | `layout(input_attachment_index=N)`. |
-| `UncheckedGLSLLocationLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | location | (none) | `layout(location=N)`. |
-| `UncheckedGLSLIndexLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | index | (none) | `layout(index=N)`. |
-| `UncheckedGLSLConstantIdAttribute` | `UncheckedGLSLLayoutAttribute` | id | (none) | `layout(constant_id=N)`. |
+| `UncheckedGLSLLayoutAttribute` | `AttributeBase` | `args: List<Expr*>` (inherited) | (none) | Base for unchecked GLSL layout(...) entries. |
+| `UncheckedGLSLBindingLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(binding=N)`. |
+| `UncheckedGLSLSetLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(set=N)`. |
+| `UncheckedGLSLOffsetLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(offset=N)`. |
+| `UncheckedGLSLInputAttachmentIndexLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(input_attachment_index=N)`. |
+| `UncheckedGLSLLocationLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(location=N)`. |
+| `UncheckedGLSLIndexLayoutAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(index=N)`. |
+| `UncheckedGLSLConstantIdAttribute` | `UncheckedGLSLLayoutAttribute` | `args: List<Expr*>` (inherited) | (none) | `layout(constant_id=N)`. |
 | `UncheckedGLSLRayPayloadAttribute` | `UncheckedGLSLLayoutAttribute` | (no additional state) | (none) | `layout(ray_payload)`. |
 | `UncheckedGLSLRayPayloadInAttribute` | `UncheckedGLSLLayoutAttribute` | (no additional state) | (none) | `layout(ray_payload_in)`. |
 | `UncheckedGLSLHitObjectAttributesAttribute` | `UncheckedGLSLLayoutAttribute` | (no additional state) | (none) | `layout(hit_object_attributes)`. |
@@ -409,32 +435,50 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `MaxTessFactorAttribute` | `Attribute` | max | (none) | `[maxtessfactor(...)]`. |
-| `OutputControlPointsAttribute` | `Attribute` | count | (none) | `[outputcontrolpoints(...)]`. |
-| `OutputTopologyAttribute` | `Attribute` | topology | (none) | `[outputtopology(...)]`. |
-| `PartitioningAttribute` | `Attribute` | partitioning | (none) | `[partitioning(...)]`. |
-| `PatchConstantFuncAttribute` | `Attribute` | function name | (none) | `[patchconstantfunc(...)]`. |
-| `DomainAttribute` | `Attribute` | domain | (none) | `[domain(...)]`. |
+| `MaxTessFactorAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | (none) | `[maxtessfactor(...)]`. |
+| `OutputControlPointsAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | (none) | `[outputcontrolpoints(...)]`. |
+| `OutputTopologyAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | (none) | `[outputtopology(...)]`. |
+| `PartitioningAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | (none) | `[partitioning(...)]`. |
+| `PatchConstantFuncAttribute` | `Attribute` | `patchConstantFuncDecl: FuncDecl*` | (none) | `[patchconstantfunc(...)]`. |
+| `DomainAttribute` | `Attribute` | `args: List<Expr*>` (inherited) | (none) | `[domain(...)]`. |
 | `EarlyDepthStencilAttribute` | `Attribute` | (no additional state) | (none) | `[earlydepthstencil]`. |
-| `NumThreadsAttribute` | `Attribute` | x, y, z | [numthreads](../syntax-reference/grammar.md#attributes-and-decorations) | `[numthreads(x,y,z)]`. |
-| `WaveSizeAttribute` | `Attribute` | preferred, min, max | (none) | `[WaveSize(...)]`. |
-| `MaxVertexCountAttribute` | `Attribute` | count | (none) | `[maxvertexcount(...)]`. |
-| `InstanceAttribute` | `Attribute` | (no additional state) | (none) | `[instance(...)]`. |
-| `EntryPointAttribute` | `Attribute` | stage | [shader](../syntax-reference/grammar.md#attributes-and-decorations) | `[shader("stage")]`. |
+| `Shader64BitIndexingAttribute` | `Attribute` | (no additional state) | (none) | `[Shader64BitIndexing]`. |
+| `NumThreadsAttribute` | `Attribute` | `extents[3]: IntVal*`, `specConstExtents[3]: DeclRef<VarDeclBase>` | [numthreads](../syntax-reference/grammar.md#attributes-and-decorations) | `[numthreads(x,y,z)]` (also spelled `[NumThreads(...)]`); an axis is either a constant or a specialization constant. |
+| `WaveSizeAttribute` | `Attribute` | `numLanes: IntVal*` | (none) | `[WaveSize(...)]`. |
+| `MaxVertexCountAttribute` | `Attribute` | `value: int32_t` | (none) | `[maxvertexcount(...)]`. |
+| `InstanceAttribute` | `Attribute` | `value: int32_t` | (none) | `[instance(count)]`. |
+| `EntryPointAttribute` | `Attribute` | `capabilitySet: CapabilitySetVal*` | [shader](../syntax-reference/grammar.md#attributes-and-decorations) | `[shader("stage")]`. |
 | `ExperimentalModuleAttribute` | `Attribute` | (no additional state) | (none) | `[ExperimentalModule]`. |
-| `FunctionInterfaceAttribute` | `Attribute` | (no additional state) | (none) | `[FunctionInterface]`. |
+| `FunctionInterfaceAttribute` | `Attribute` | (no additional state) | (none) | `[__FunctionInterface]`. |
+
+### Work-graph node attributes
+
+Declared as `attribute_syntax` in
+[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
+rather than in `core.meta.slang`.
+
+| Class | Parent | Key fields | Grammar | Summary |
+| --- | --- | --- | --- | --- |
+| `NodeLaunchAttribute` | `Attribute` | `mode: String` | (none) | `[NodeLaunch("broadcasting" \| "thread" \| "coalescing")]`. |
+| `NodeMaxDispatchGridAttribute` | `Attribute` | `x: IntVal*`, `y: IntVal*`, `z: IntVal*` | (none) | `[NodeMaxDispatchGrid(x,y,z)]`; upper bound for a dynamic grid. |
+| `NodeDispatchGridAttribute` | `Attribute` | `x: IntVal*`, `y: IntVal*`, `z: IntVal*` | (none) | `[NodeDispatchGrid(x,y,z)]`; fixed grid size. |
+| `MaxRecordsAttribute` | `Attribute` | `value: IntVal*` | (none) | `[MaxRecords(count)]`. |
+| `NodeIDAttribute` | `Attribute` | `name: String`, `arrayIndex: IntVal*` | (none) | `[NodeID(name, arrayIndex = 0)]`. |
+| `NodeIsProgramEntryAttribute` | `Attribute` | (no additional state) | (none) | `[NodeIsProgramEntry]`. |
+| `AllowSparseNodesAttribute` | `Attribute` | (no additional state) | (none) | `[AllowSparseNodes]` on an output-node array parameter. |
+| `NodeArraySizeAttribute` | `Attribute` | `count: IntVal*` | (none) | `[NodeArraySize(count)]`. |
 
 ### Ray-tracing attributes
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `VulkanRayPayloadAttribute` | `Attribute` | location | (none) | `[vk::ray_payload(...)]`. |
-| `VulkanRayPayloadInAttribute` | `Attribute` | location | (none) | `[vk::ray_payload_in(...)]`. |
-| `VulkanCallablePayloadAttribute` | `Attribute` | location | (none) | `[vk::callable_payload(...)]`. |
-| `VulkanCallablePayloadInAttribute` | `Attribute` | location | (none) | `[vk::callable_payload_in(...)]`. |
-| `VulkanHitAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[vk::hit_attributes]`. |
-| `VulkanHitObjectAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[vk::hit_object_attributes(...)]`. |
-| `RayPayloadAttribute` | `Attribute` | location | (none) | Older HLSL `[raypayload]`. |
+| `VulkanRayPayloadAttribute` | `Attribute` | `location: int` | (none) | `[__vulkanRayPayload(location)]`; also the checked form of `layout(ray_payload)`. |
+| `VulkanRayPayloadInAttribute` | `Attribute` | `location: int` | (none) | Checked form of `layout(ray_payload_in)`; no `attribute_syntax` spelling. |
+| `VulkanCallablePayloadAttribute` | `Attribute` | `location: int` | (none) | `[__vulkanCallablePayload(location)]`; also the checked form of `layout(callable_payload)`. |
+| `VulkanCallablePayloadInAttribute` | `Attribute` | `location: int` | (none) | Checked form of `layout(callable_payload_in)`; no `attribute_syntax` spelling. |
+| `VulkanHitAttributesAttribute` | `Attribute` | (no additional state) | (none) | `[__vulkanHitAttributes]`. |
+| `VulkanHitObjectAttributesAttribute` | `Attribute` | `location: int` | (none) | `[__vulkanHitObjectAttributes(location)]`; also the checked form of `layout(hit_object_attributes)`. |
+| `RayPayloadAttribute` | `Attribute` | (no additional state) | (none) | Older HLSL `[raypayload]`. |
 
 ### Mutability / autodiff annotations
 
@@ -442,30 +486,31 @@ Abstract intermediates: `VisibilityModifier`,
 | --- | --- | --- | --- | --- |
 | `MutatingAttribute` | `Attribute` | (no additional state) | (none) | `[mutating]`. |
 | `NonmutatingAttribute` | `Attribute` | (no additional state) | (none) | `[nonmutating]`. |
-| `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[ConstRef]`. |
-| `RefAttribute` | `Attribute` | (no additional state) | (none) | `[Ref]`. |
-| `AnyValueSizeAttribute` | `Attribute` | size | (none) | `[AnyValueSize(...)]`. |
+| `NoDiscardAttribute` | `Attribute` | (no additional state) | [attribute](../syntax-reference/grammar.md#attributes-and-decorations) | `[NoDiscard]`; flags a function whose result must not be discarded. |
+| `ConstRefAttribute` | `Attribute` | (no additional state) | (none) | `[constref]`. |
+| `RefAttribute` | `Attribute` | (no additional state) | (none) | `[__ref]`. |
+| `AnyValueSizeAttribute` | `Attribute` | `size: int32_t` | (none) | `[anyValueSize(size)]`. |
 
 ### Differentiability attributes
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DifferentiableAttribute` | `Attribute` | mode | [Differentiable](../syntax-reference/grammar.md#attributes-and-decorations) | `[Differentiable]` / `[Differentiable(...)]`. |
+| `DifferentiableAttribute` | `Attribute` | `m_associatedValMapping: OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>>` | (none) | Base of the family; has no `attribute_syntax` spelling of its own and caches each type's `IDifferentiable` witness. |
 | `TreatAsDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[TreatAsDifferentiable]`. |
 | `HasTrivialForwardDerivativeAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[HasTrivialForwardDerivative]`. |
-| `ForwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[ForwardDifferentiable]`. |
-| `UserDefinedDerivativeAttribute` | `DifferentiableAttribute` | derivative function expr | (none) | Base for explicit-derivative attributes. |
-| `ForwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | derivative function expr | (none) | `[ForwardDerivative(fn)]`. |
-| `DerivativeOfAttribute` | `DifferentiableAttribute` | primal function expr | (none) | Base for "X is the derivative of Y" attributes. |
-| `ForwardDerivativeOfAttribute` | `DerivativeOfAttribute` | primal function expr | (none) | `[ForwardDerivativeOf(fn)]`. |
-| `BackwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | (none) | `[BackwardDifferentiable]`. |
-| `BackwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | derivative function expr | (none) | `[BackwardDerivative(fn)]`. |
-| `BackwardDerivativeOfAttribute` | `DerivativeOfAttribute` | primal function expr | (none) | `[BackwardDerivativeOf(fn)]`. |
-| `PrimalSubstituteAttribute` | `Attribute` | substitute expr | (none) | `[PrimalSubstitute(fn)]`. |
-| `PrimalSubstituteOfAttribute` | `Attribute` | primal expr | (none) | `[PrimalSubstituteOf(fn)]`. |
-| `NoDiffThisAttribute` | `Attribute` | (no additional state) | (none) | `[NoDiffThis]`. |
-| `DerivativeMemberAttribute` | `Attribute` | member name | (none) | `[DerivativeMember(...)]`. |
-| `MaybeDifferentiableAttribute` | `Attribute` | (no additional state) | (none) | `[MaybeDifferentiable]`. |
+| `ForwardDifferentiableAttribute` | `DifferentiableAttribute` | (no additional state) | [ForwardDifferentiable](../syntax-reference/grammar.md#attributes-and-decorations) | `[ForwardDifferentiable]`. |
+| `UserDefinedDerivativeAttribute` | `DifferentiableAttribute` | `funcExpr: Expr*` | (none) | Base for explicit-derivative attributes. |
+| `ForwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | inherited `funcExpr: Expr*` | (none) | `[ForwardDerivative(fn)]`. |
+| `DerivativeOfAttribute` | `DifferentiableAttribute` | `funcExpr: Expr*`, `backDeclRef: Expr*` | (none) | Base for "X is the derivative of Y" attributes. |
+| `ForwardDerivativeOfAttribute` | `DerivativeOfAttribute` | inherited `funcExpr: Expr*` | (none) | `[ForwardDerivativeOf(fn)]`. |
+| `BackwardDifferentiableAttribute` | `DifferentiableAttribute` | `maxOrder: int` | [Differentiable](../syntax-reference/grammar.md#attributes-and-decorations) | Produced by **both** `[BackwardDifferentiable(order = 0)]` and the plain `[Differentiable(order = 0)]`. |
+| `BackwardDerivativeAttribute` | `UserDefinedDerivativeAttribute` | inherited `funcExpr: Expr*` | (none) | `[BackwardDerivative(fn)]`. |
+| `BackwardDerivativeOfAttribute` | `DerivativeOfAttribute` | inherited `funcExpr: Expr*` | (none) | `[BackwardDerivativeOf(fn)]`. |
+| `PrimalSubstituteAttribute` | `Attribute` | `funcExpr: Expr*` | (none) | `[PrimalSubstitute(fn)]`. |
+| `PrimalSubstituteOfAttribute` | `Attribute` | `funcExpr: Expr*`, `backDeclRef: Expr*` | (none) | `[PrimalSubstituteOf(fn)]`. |
+| `NoDiffThisAttribute` | `Attribute` | `isSynthesized: bool` | (none) | `[NoDiffThis]`; `isSynthesized` distinguishes a checker-added instance from a user-written one. |
+| `DerivativeMemberAttribute` | `Attribute` | `memberDeclRef: DeclRefExpr*` | (none) | `[DerivativeMember(...)]`. |
+| `MaybeDifferentiableAttribute` | `Attribute` | (no additional state) | (none) | `[MaybeDifferentiable]` on an interface requirement: an optional conformance to `IForwardDifferentiable<Self>` / `IBackwardDifferentiable<Self>`. |
 
 ### Inheritance-control attributes
 
@@ -478,14 +523,14 @@ Abstract intermediates: `VisibilityModifier`,
 
 | Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DllImportAttribute` | `Attribute` | library | (none) | `[DllImport(...)]`. |
+| `DllImportAttribute` | `Attribute` | `modulePath: String, functionName: String` | (none) | `[DllImport(...)]`. |
 | `DllExportAttribute` | `Attribute` | (no additional state) | (none) | `[DllExport]`. |
 | `TorchEntryPointAttribute` | `Attribute` | (no additional state) | (none) | `[TorchEntryPoint]`. |
-| `CudaDeviceExportAttribute` | `Attribute` | (no additional state) | (none) | `[CudaDeviceExport]`. |
-| `CudaKernelAttribute` | `Attribute` | (no additional state) | (none) | `[CudaKernel]`. |
-| `CudaHostAttribute` | `Attribute` | (no additional state) | (none) | `[CudaHost]`. |
-| `AutoPyBindCudaAttribute` | `Attribute` | options | (none) | `[AutoPyBindCuda]`. |
-| `PyExportAttribute` | `Attribute` | name | (none) | `[PyExport]`. |
+| `CudaDeviceExportAttribute` | `Attribute` | (no additional state) | (none) | `[CudaDeviceExport]` (also `[CUDADeviceExport]`). |
+| `CudaKernelAttribute` | `Attribute` | (no additional state) | (none) | `[CudaKernel]` (also `[CUDAKernel]`). |
+| `CudaHostAttribute` | `Attribute` | (no additional state) | (none) | `[CudaHost]` (also `[CUDAHost]`). |
+| `AutoPyBindCudaAttribute` | `Attribute` | `fwdDiffFuncDeclRef: DeclRefExpr*`, `bwdDiffFuncDeclRef: DeclRefExpr*` | (none) | `[AutoPyBindCUDA]`. |
+| `PyExportAttribute` | `Attribute` | `name: String` | (none) | `[PyExport(name)]`. |
 | `DerivativeGroupQuadAttribute` | `Attribute` | (no additional state) | (none) | `[DerivativeGroupQuad]`. |
 | `DerivativeGroupLinearAttribute` | `Attribute` | (no additional state) | (none) | `[DerivativeGroupLinear]`. |
 
@@ -503,13 +548,22 @@ looking up an `AttributeDecl` (see
 off `ModifiableSyntaxNode::modifiers`, so most consumer code does
 not need to distinguish.
 
+`ParseSquareBracketAttributes` accepts a few surface spellings that are
+easy to miss. A group may be written either `[a]` or `[[a]]`, several
+attributes may share one group, and the comma between them is optional,
+so `[a, b]` and `[a b]` parse the same way. `parseAttributeName`
+flattens a `::`-qualified name into a single identifier by replacing
+each `::` with `_`, which is why the user-facing `[vk::binding(0)]`
+resolves against an `AttributeDecl` registered under the name
+`vk_binding`. A leading `::` becomes a leading `_`.
+
 ### IntrinsicOpModifier and the core module binding
 
 `IntrinsicOpModifier` is the bridge between a Slang function
 declaration in the core module and the Slang IR opcode it will lower
 to. For example, the declaration of `sin` in
 [core.meta.slang](../../../../source/slang/core.meta.slang) carries an
-`IntrinsicOpModifier` whose `irOp` is the IR opcode for `sin`; the
+`IntrinsicOpModifier` whose `op` field is the IR opcode for `sin`; the
 IR-lowering pass uses this modifier to emit the right opcode without
 the lowering pass needing to know the function by name. See
 [../cross-cutting/core-module.md](../cross-cutting/core-module.md).
@@ -518,13 +572,15 @@ the lowering pass needing to know the function by name. See
 
 `TargetIntrinsicModifier` binds a function declaration to a textual
 intrinsic on a specific backend (e.g. `"fma"` on HLSL,
-`"OpExtInst ..."` on SPIRV). It can carry a predicate expression so
-that the binding is only applied when a capability is in effect.
+`"OpExtInst ..."` on SPIRV); its `targetToken` names the target whose
+capabilities select the binding. Separately, it can carry an optional
+predicate, which guards the intrinsic using the declaration its
+`scrutineeDeclRef` resolves to.
 `SpecializedForTargetModifier` is a per-target marker placed on
 function declarations that are specifically intended for a target
 backend; the checker prefers them when emitting.
 
-### LayoutModifier / GLSLLayout*Modifier family
+### GLSLLayout*Modifier family
 
 GLSL's `layout(...)` qualifier compiles to a chain of layout
 modifiers: a `GLSLLayoutModifierGroupBegin`, one entry per
@@ -535,6 +591,16 @@ qualifier (each a concrete subclass like
 parser-time representation; the checker resolves each entry to an
 `Attribute`-rooted equivalent (e.g.
 `GLSLBindingAttribute`, `GLSLLocationAttribute`).
+
+These modifiers are how a parameter's binding is *represented* in the
+AST. A checked `GLSLBindingAttribute` holds the resolved
+`binding: int32_t` and `set: int32_t` pair, and the HLSL side stores the
+same information as tokens: `HLSLLayoutSemantic` holds
+`registerName: Token` and `componentMask: Token`, and
+`HLSLRegisterSemantic` adds `spaceName: Token` for the register space.
+A modifier records only what the declaration said; the rules that turn
+those values into an actual binding belong to checking and layout, see
+[../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md).
 
 ### Visibility modifiers and language version
 
@@ -549,7 +615,7 @@ for visibility resolution.
 
 ### RequireCapabilityAttribute
 
-`[require_capability(...)]` ties a declaration to one or more
+`[require(...)]` ties a declaration to one or more
 capability atoms; the checker uses these to verify that calls into
 this declaration are well-formed under the surrounding capability
 set. See [../cross-cutting/targets.md](../cross-cutting/targets.md)
@@ -558,15 +624,50 @@ for the capability system.
 ### Differentiable attribute family
 
 The differentiability attributes form a small hierarchy under
-`DifferentiableAttribute`: marker attributes
-(`[ForwardDifferentiable]`, `[BackwardDifferentiable]`) describe
-*that* a function is differentiable, `UserDefinedDerivativeAttribute`
-subclasses (`[ForwardDerivative(fn)]`, `[BackwardDerivative(fn)]`)
-bind a derivative function explicitly, and the `DerivativeOf`
-subclasses (`[ForwardDerivativeOf(fn)]`, etc.) declare a function as
-the derivative of another. The checker uses this hierarchy to drive
-the autodiff IR pipeline; see
-[../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md).
+`DifferentiableAttribute` (lines 1715-1762 of the header): marker
+attributes (`[ForwardDifferentiable]`, `[BackwardDifferentiable]`)
+describe *that* a function is differentiable,
+`UserDefinedDerivativeAttribute` subclasses
+(`[ForwardDerivative(fn)]`, `[BackwardDerivative(fn)]`) bind a
+derivative function explicitly, and the `DerivativeOf` subclasses
+(`[ForwardDerivativeOf(fn)]`, etc.) declare a function as the
+derivative of another.
+
+The class-to-spelling mapping is not one-to-one, which is easy to get
+wrong when reading only the header. `DifferentiableAttribute` is an
+abstract-in-practice base with no `attribute_syntax` of its own; the
+plain `[Differentiable(order = 0)]` that most user code writes maps to
+`BackwardDifferentiableAttribute`, exactly like the explicit
+`[BackwardDifferentiable(order = 0)]`. Only `[ForwardDifferentiable]`
+maps to `ForwardDifferentiableAttribute`.
+
+The attribute is a front-end marker, not a fact that later stages
+re-read. When checking accepts a `[Differentiable]` function `f`, it
+synthesizes a conformance of the form
+`extension __func_as_type(f) : IForwardDifferentiable<__func_as_type(f)>`,
+and the checker's differentiability queries
+(`SemanticsVisitor::isFuncForwardDifferentiable` and its backward
+counterpart) hand back the resulting `SubtypeWitness*` rather than a
+boolean read off the modifier. Downstream autodiff work keys off that
+witness; see
+[../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)
+and [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md).
+
+### Work-graph node attributes
+
+The eight `Node*` / `MaxRecords` / `AllowSparseNodes` attribute classes
+have their spellings declared outside `core.meta.slang`, in the
+experimental
+[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
+standard module; the differentiability attributes
+(`diff.meta.slang`) and the Vulkan pointer attributes
+(`hlsl.meta.slang`) are the other two such groups. Reading only `slang-ast-modifier.h` therefore gives no
+hint of how they are spelled. Two of them are near-twins that are easy
+to confuse: `NodeDispatchGridAttribute` records a grid size fixed in
+the source, while `NodeMaxDispatchGridAttribute` records only an upper
+bound for a grid supplied at launch. Both carry the same `x`/`y`/`z`
+`IntVal*` triple, so the class, not the field shape, is what tells the
+two apart.
 
 ### HLSL semantics
 
@@ -597,6 +698,17 @@ with a bitmask of flags. The individual GLSL-prefixed modifiers
 (`GLSLReadOnlyModifier`, `GLSLWriteOnlyModifier`, etc.) still exist
 and may appear at parse time; checking merges them into the
 aggregated form when convenient.
+
+### Absent groupings: no HLSLAttribute or LayoutModifier base
+
+There is no `HLSLAttribute`, `LayoutModifier`, or `HLSLLayoutModifier`
+class; none of the three names appears anywhere under `source/`. HLSL
+shader-stage attributes such as `NumThreadsAttribute` and
+`EntryPointAttribute` derive directly from `Attribute` with no
+HLSL-specific intermediate, and the layout-related roles are split
+between `HLSLLayoutSemantic` (semantics that affect layout),
+`MatrixLayoutModifier` (matrix storage layout), and the
+`GLSLLayout*Modifier` group described above.
 
 ## See also
 

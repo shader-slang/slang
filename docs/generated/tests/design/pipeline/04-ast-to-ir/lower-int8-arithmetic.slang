@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T20:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-fable-5
+//META: generated_at=2026-07-08T16:30:00Z
+//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=A `BinaryExpr` on `int16_t` operands lowers to `add` whose result type carries through the narrow `Int16` IR type.
+//META: doc_section_digest=19eb09c072c556dd0799b5002c2f1b24781da93f2cebc122ca027062c24e0b84
+//META: purpose=A `BuiltinOperatorExpr` on `int16_t` operands lowers to `add` whose result type carries through the narrow `Int16` IR type.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
 // Boundary: pure-value-inst row, narrow-integer side. The doc's
-// "BinaryExpr -> IRAdd/..." claim must hold when both operands
+// "BuiltinOperatorExpr -> IRAdd/..." claim must hold when both operands
 // are narrow integer types — the resulting `add` carries `Int16`
 // in its operand types.
 

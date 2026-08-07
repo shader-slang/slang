@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:46+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#undoparametercopy-and-transformparamstoconstref
-//META: doc_section_digest=de89b59326004a5e5540df99bb073fc4604adfca7c7993a97eeeb53f850f6575
+//META: doc_section_digest=df689c12929eee6d8d33abe644229b392449cba4ea75164285db25bee7cea6e6
 //META: purpose=transformParamsToConstRef converts struct value parameters into pointer-form parameters on CUDA for pass-by-reference.
 //META: intent=functional
 //META: pipeline_stage=emit

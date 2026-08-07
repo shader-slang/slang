@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-21T00:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#cuda
-//META: doc_section_digest=aec099a690ba0cb7b3cba6485d62487754f84f320420d4d5113995c23ee1a4bb
+//META: doc_section_digest=9cfeac8f090cb9a01fdb3acef4528aeff307864f7ce250f0942e224932dda122
 //META: purpose=Boundary: a kernel with multiple module-scope uniform globals is emitted on CUDA via the GlobalParams struct + SLANG_globalParams shim (the `__constant__ GlobalParams_N SLANG_globalParams` pattern documented in the bundle's doc-gap note).
 //META: intent=boundary
 //META: pipeline_stage=emit

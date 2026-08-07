@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:00:00+00:00
 //META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#operator-precedence-and-parenthesization
-//META: doc_section_digest=71c6e6a3dd9f98cd8871ef646710647c71e8dc0f8d4f04eda428d745f76e66a0
+//META: doc_section_digest=a2e62c88cb036bd6e478b72fe0c0927a3fea8fa974753f6e229c435bd5f2db1a
 //META: purpose=The precedence helper emits the minimum parentheses needed. `a * b + c` keeps neither operator wrapped (no `(a * b) + c` and no `a * (b + c)`).
 //META: intent=functional
 //META: pipeline_stage=emit

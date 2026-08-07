@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:48:41Z
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#operator-overloading
-//META: doc_section_digest=017e2a9ca7d5b435c5665a1115eba51fbc2b30352078a8ab4c0e65601bfa2273
+//META: doc_section_digest=6c67481fccb6a5d96551c93af7509ffafa480d11451126832bec4a0352c4b938
 //META: purpose=Operator candidate sets are keyed by operand basic-type pair; two distinct user-defined operator+ overloads for different struct types each fire on their respective operand types without ambiguity.
 //META: intent=functional
 //META: pipeline_stage=check

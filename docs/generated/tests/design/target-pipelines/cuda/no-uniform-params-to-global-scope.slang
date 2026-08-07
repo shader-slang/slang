@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:46+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=f2c71c1e818a46614c1369ca340b627ac6a41920fa32fb97d4b7f11c78a611e0
+//META: doc_section_digest=8b42a0484e7164aa54875b4aaa03c568525e124c304dc81e94646c8ccd24dd6c
 //META: purpose=moveEntryPointUniformParamsToGlobalScope is skipped for CUDA so an entry-point uniform parameter is read through the GlobalParams_0 constant struct rather than a kernel argument.
 //META: intent=functional
 //META: pipeline_stage=emit

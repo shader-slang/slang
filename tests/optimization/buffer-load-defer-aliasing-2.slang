@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
+//TEST:SIMPLE(filecheck=SPV): -target spirv
 
 // Test that we can defer buffer loads across multiple basic blocks.
 

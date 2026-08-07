@@ -50,6 +50,17 @@ RWStructuredBuffer<float> outputBuffer;
 // flavor). Emitted in the debug-constants section, before any function body.
 //CHECK: OpString "UserMade.$init"
 
+// The user-written initializer (UserMade) exposes its object under construction as a
+// `this` debug variable (#11565). A synthesized initializer must NOT — so exactly one
+// `this` DebugLocalVariable may exist module-wide (UserMade's): the synthesized Pair /
+// DefaultMade member-wise/default inits contribute none. A bare CHECK-NOT on OpString
+// "this" would be wrong (the user ctor legitimately has one), so bind the name string
+// and bound the count instead. This pins the synthesized-init exclusion — the #11550
+// regression class — against a `this` var ever leaking into compiler-generated code.
+//CHECK: [[THIS_STR:%[0-9]+]] = OpString "this"
+//CHECK-COUNT-1: DebugLocalVariable [[THIS_STR]]
+//CHECK-NOT: DebugLocalVariable [[THIS_STR]]
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)

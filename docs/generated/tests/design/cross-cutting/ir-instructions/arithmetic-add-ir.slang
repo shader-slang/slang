@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#value-instructions
-//META: doc_section_digest=ddd065b774b7979630d27ec19315b658865b6fb853c55bd6e6ee0a0aced77aba
+//META: doc_section_digest=180e0aa25246196c89b6dc01c680b751b33a813ef1597e4ac18dd9fef40c0943
 //META: purpose=An integer addition expression lowers to the `add` IR opcode and emits as `+` on every C-like text-emit target.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Two `uniform` integer globals are summed and stored into a buffer.
-// In the IR dump the addition appears as `add(%a, %b)` because the
-// operands are not compile-time constants. The same addition emits as
-// `a + b` on the text targets that lower IR `add` to the C-like `+`
-// operator.
+// Verifies the doc's `add`/`Add` value-instruction row: combining two
+// non-constant integer operands lowers to the `add` opcode. The `uniform`
+// globals defeat constant folding so the IR dump shows `add(%a, %b)`, and
+// the same source emits the C-like `a + b` on every text target that
+// lowers `add` to `+`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry main

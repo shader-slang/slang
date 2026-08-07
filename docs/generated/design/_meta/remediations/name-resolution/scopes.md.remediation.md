@@ -1,26 +1,36 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-12T14:16:10Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:20:00Z
 target_doc: name-resolution/scopes.md
 review_report: ../../reviews/name-resolution/scopes.md.review.md
-target_doc_source_commit_before: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_source_commit_after: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-actions: { fixed: 5, rejected_bogus: 0, rejected_out_of_scope: 0, deferred: 0, escalated: 0 }
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+actions:
+  fixed: 4
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated: 0
 ---
 
 # Remediation report for name-resolution/scopes.md
 
 ## Summary
-
-All five review findings were verified against the source at commit `eb9403ef` and fixed. F-001 expanded the scope-bearing table to name the previously-implied concrete `ContainerDecl` subclasses (`SemanticDecl`, `AttributeDecl`, `SynthesizedStructDecl`, `GLSLInterfaceBlockDecl`, `AssocTypeDecl`, `GlobalGenericParamDecl`, `FuncAliasDecl`). F-002 and F-003 corrected the intro/rows that wrongly claimed every listed statement gets a parser-populated fresh scope and re-attributed the lambda parameter scope to `LambdaExpr`. F-004 added `using` as a sibling-scope use plus the `ExpectedANamespace` diagnostic, and F-005 refreshed the stale line-number citations.
+All four findings were re-derived against the source at the recorded
+commit and all four were fixed. The major finding was correct: the
+representative parser chain uses `PushScope` for declaration scopes and
+`pushScopeAndSetParent` only for statement-created `ScopeDecl`s. The
+three minor findings corrected an omitted concrete scope-carrying class,
+an unsupported `UsingDecl` claim, and a non sequitur in the empty-block
+edge case. Breakdown: 4 fixed, 0 rejected-bogus, 0 rejected-out-of-scope,
+0 deferred, 0 escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | Confirmed in `slang-ast-decl.h`: `SemanticDecl` (732), `AttributeDecl` (1102), `SynthesizedStructDecl` (725), `GLSLInterfaceBlockDecl` (567), `AssocTypeDecl` (420), `GlobalGenericParamDecl` (434), `FuncAliasDecl` (653) are concrete `ContainerDecl`/`AggTypeDecl`/`CallableDecl` subclasses; the prompt's quality checklist requires every scope-bearing class be named with its header. | Replaced ellipsis-laden grouped rows with explicit subclass lists and added a `SemanticDecl`/`AttributeDecl` row, each with header line cites. |
-| F-002 | fixed | Verified `ParseWhileStatement`/`ParseDoWhileStatement` (slang-parser.cpp ~7069) never create/assign a `ScopeDecl`, `ParseSwitchStmt` (6192) gives the body a `parseBlockStatement`, and `parseTargetSwitchStmtImpl` (6217) makes per-case `ScopeDecl`s; the table's "introduces a fresh `Scope`" claim was wrong for these. | Rewrote the intro to distinguish field-declaration from parser population and revised the while/do and switch/target/stage-switch rows to describe actual parser behavior. |
-| F-003 | fixed | Confirmed `paramScopeDecl` is created/pushed on `lambdaExpr` in `parseLambdaExpr` (slang-parser.cpp 8159-8160) and `LambdaDecl` (slang-ast-decl.h 682) is a `StructDecl` declaring only `funcDecl`; the row conflated the two owners. | Renamed the row to `LambdaExpr` (parameter scope), cited `parseLambdaExpr`, and noted `LambdaDecl` owns a scope only as an aggregate. |
-| F-004 | fixed | Verified `SemanticsDeclScopeWiringVisitor::visitUsingDecl` (slang-check-decl.cpp 16419) adds sibling scopes via `addSiblingScopeForContainerDecl` (16449) and emits `Diagnostics::ExpectedANamespace` (16478) for non-namespace args; the prompt's edge-case list requires the `using` scope behavior. | Added `using` as the fourth sibling-scope use and expanded the `UsingDecl` edge case with the check-time injection and the `ExpectedANamespace` diagnostic. |
-| F-005 | fixed | Verified `parseIfLetStatement` at 6897 (cited 6820), `ParseForStatement` at 7005 (cited 6928, skip at 7031-7032), `parseUsingDecl` at 4269 (cited 4198), import sibling wiring at 16163 (cited 16061), namespace sibling at 16510 (cited 16408), FileDecl import at 16129 (cited 16027). | Refreshed all the named stale line-number citations and attached function names so the references survive minor drift. |
+| F-001 | fixed | Confirmed: `source/slang/slang-parser.cpp:1794` (`parseOptGenericDecl`), `:5099`/`:5112` (`parseFuncDecl`), and `:6286` (`parseDeclBody`) call `PushScope`; only `:7142` (`parseBlockStatement`) calls `pushScopeAndSetParent`, which per `:160-164` merely sets `parentDecl` before delegating to `PushScope`. | `### Parser scope construction`: final sentence replaced with the declaration-parser (`PushScope`) versus statement-`ScopeDecl` (`pushScopeAndSetParent`) distinction, retaining the paired `PopScope`. |
+| F-002 | fixed | Confirmed: `source/slang/slang-ast-decl.h:478` declares `ThisTypeDecl : AggTypeDecl`, so it inherits `ContainerDecl::ownedScope` (`:141`); the per-doc prompt lines 46-49 require every such concrete class to be named. Citations kept inside the watched set. | `### Scope-bearing AST nodes`: `ThisTypeDecl` added to the aggregate row with line 478, identified as the synthesized interface `This` member reached via `getThisTypeDecl`, with a note that no parser path pushes its `ownedScope`. |
+| F-003 | fixed | Confirmed: `source/slang/slang-parser.cpp:4552` stores `parser->currentScope` in `decl->scope`, and `source/slang/slang-check-decl.cpp:17348-17376` passes that same pointer to `addAllSiblingScopesFromDecl` as the destination; no substitution occurs. | `UsingDecl` edge case: "may differ" sentence replaced with the accurate statement that checking augments the captured scope's `nextSibling` chain. |
+| F-004 | fixed | Confirmed: `source/slang/slang-parser.cpp:7217` builds an `EmptyStmt` for a bodyless block, and `source/slang/slang-check-stmt.cpp:106-116` sets `hiddenFromLookup` only for `DeclStmt`s inside a `SeqStmt`, so the flag cannot explain the empty-block case. | `Empty block scope`: split into the unconditional parser scope push and a separate `hiddenFromLookup` explanation scoped to blocks containing declaration statements. |

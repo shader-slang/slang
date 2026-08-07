@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:30:46+00:00
 //META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#legalizeentrypointvaryingparamsforcuda
-//META: doc_section_digest=c65a336bb0116ae8b15edc71afa3dd2f75a932f4f071b1ec88bad87a44c9547b
+//META: doc_section_digest=41dbe1933a1844ab0cb7448ab0514de60dc5a661f4d5f32fefea31f9d1b674ab
 //META: purpose=legalizeEntryPointVaryingParamsForCUDA rewrites SV_DispatchThreadID into the CUDA builtin expression blockIdx * blockDim + threadIdx.
 //META: intent=functional
 //META: pipeline_stage=emit

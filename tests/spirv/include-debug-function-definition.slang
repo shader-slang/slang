@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -g2 -O0 -emit-spirv-directly -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -g2 -emit-spirv-directly -stage compute -entry computeMain
 //
 // Regression test for Issue #9806:
 // Functions defined in a file brought in via `__include` must get SPIR-V debug info
@@ -13,6 +13,7 @@ __include "include-debug-function-definition-impl";
 
 RWStructuredBuffer<int> outputBuffer;
 
+[noinline]
 int TestFunctionB(int x)
 {
     return x + 200;

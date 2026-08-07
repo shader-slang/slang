@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-4-8
+//META: generated_at=2026-07-02T00:00:00+00:00
+//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#inheritancedecl
-//META: doc_section_digest=ba39e4dc5746ee086307f1361f8cdf3c80f1b5ff6a1f0c8ad4ac291321ad85c5
+//META: doc_section_digest=faee42cf53078ee6cd6b1f69e2f5e33966ac4159fe9a593a801ecde8862f2dc6
 //META: purpose=An InterfaceDecl declares an interface and InheritanceDecl ties a conforming type to it; interface-typed dispatch picks the conforming type's implementation.
 //META: intent=functional
 //META: pipeline_stage=check

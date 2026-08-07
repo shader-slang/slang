@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T21:00:00+00:00
 //META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#undoparametercopy-and-transformparamstoconstref
-//META: doc_section_digest=de89b59326004a5e5540df99bb073fc4604adfca7c7993a97eeeb53f850f6575
+//META: doc_section_digest=df689c12929eee6d8d33abe644229b392449cba4ea75164285db25bee7cea6e6
 //META: purpose=Verifies an inout int parameter still lowers to pass-by-pointer when the supplied value is int MAX (boundary value does not change the pass shape).
 //META: intent=boundary
 //META: pipeline_stage=emit

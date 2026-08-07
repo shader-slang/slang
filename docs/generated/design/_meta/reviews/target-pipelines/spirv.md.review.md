@@ -1,53 +1,49 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-12T13:18:12+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:03:14+00:00
 target_doc: target-pipelines/spirv.md
-target_doc_source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
-target_doc_watched_paths_digest: 33e2de2e8f7d94757701c9d2589b0e90ad221fa2f6afba49347b2d79a916ab4c
-source_commit: eb9403ef595a99c2ff6def1d538dbd7a792d9371
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 68a85e13aad997a240500c6924c43cbfb5c7a2705b13eee149bc97d9ad794aeb
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: fail
+  factual_accuracy: partial
   cross_references: pass
   completeness: partial
   style_consistency: pass
-  source_alignment: fail
-  front_matter_validity: pass
-finding_count: 4
+  source_alignment: partial
+  front_matter_validity: fail
+finding_count: 6
 severity_breakdown:
   critical: 1
   major: 2
-  minor: 1
+  minor: 3
   nit: 0
 ---
 
 # Review report for target-pipelines/spirv.md
 
 ## Summary
-
-The page has the required target-pipeline shape and most of the `linkAndOptimizeIR` SPIR-V ordering is aligned with the source, but several high-impact details are wrong. The most important issue is the `simplifyIRForSpirvLegalization` loop description: the document promises active 8 and 16 iteration bounds, while the source counters are never incremented at the reviewed commit. The downstream validation and assembly-target scope text also needs correction before remediation marks this page reliable.
+The page is detailed and mostly tracks the SPIR-V direct-emission source correctly, but it needs remediation in pipeline gating, contract coverage, citations, and front matter. The most important error is Phase D row 20: active downstream compilation is gated by the presence of the downstream compiler, not solely by `needsOptimization`.
 
 ## Items checked
-
-- Ran `regenerate.py show target-pipelines/spirv.md` and verified the prompt path, watched paths, dependency list, and target document front-matter against the manifest output.
-- Read `_common.md`, `_review.md`, `target-pipelines-spirv.md`, the target document, and the five `depends_on` generated docs.
-- Traced `linkAndOptimizeIR` from `source/slang/slang-emit.cpp` lines 895-2521 against the Phase A-C tables, including SPIR-V-only gates and sibling-target branches that should be filtered out.
-- Checked Phase D against `createArtifactFromIR`, `emitSPIRVForEntryPointsDirectly`, `emitSPIRVFromIR`, and `legalizeIRForSPIRV` in the watched source files.
-- Verified the loop, downstream validation/linking, `SPIRVAssembly`, and `shouldEmitSPIRVDirectly` claims with targeted source searches and line-range reads.
-- Checked required section order, table columns, front-matter keys, and relative-link style for the generated document.
+- Inspected the target, `_common.md`, the per-document prompt, all eight resolved watched files, and all five dependency documents from `regenerate.py show`.
+- Confirmed the watched source files match the target's recorded `source_commit`, then verified every line-number citation; three citation-bearing statements are stale and are reported below.
+- Spot-checked more than 20 factual claims, including dispatch, required-pass scans, Phase A-C ordering, SPIR-V legalization, both fixed-point loops, abort lowering, descriptor-heap handling, debug emission, capability selection, and the downstream link/validate/compile chain.
+- Ran the document linter and resolved the relative source and generated-peer links; no dangling links were reported.
+- Checked every required target-pipeline section, phase diagram/table pairing, conditional-gate grouping, loop coverage, front-matter field, and severity/count invariant.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | critical | `## Phase D` diagram and `## Loops in the pipeline`, lines 643-684 and 829-848 | The document claims `simplifyIRForSpirvLegalization` is bounded by `i<8` and `j<16`, says the loops terminate when those bounds are reached, and gives a worst-case count of `8 * 16 = 128` per-function sub-passes. At this source commit, the loop conditions mention `iterationCounter` and `funcIterationCount`, but neither counter is incremented, so the documented bound behavior is not what the source implements. | `source/slang/slang-ir-spirv-legalize.cpp:2881` declares `kMaxIterations = 8`, `source/slang/slang-ir-spirv-legalize.cpp:2883` declares `iterationCounter = 0`, `source/slang/slang-ir-spirv-legalize.cpp:2885` tests it, and `source/slang/slang-ir-spirv-legalize.cpp:2901`-`source/slang/slang-ir-spirv-legalize.cpp:2902` does the same for `funcIterationCount`, with no increment in the loop bodies through `source/slang/slang-ir-spirv-legalize.cpp:2915`. | Rewrite the loop diagram and loop prose to describe the source as it exists: the constants and guard expressions are present, but the counters are not advanced, so the document must not promise bound-based termination or a finite worst-case pass count unless the source is fixed first and the doc regenerated. |
-| F-002 | major | Phase D table row 18 and `### Downstream spirv-link / spirv-val / spirv-opt chain`, lines 725 and 955-958 | The document says `spirv-val` is enabled by `-validate-spirv` or a non-empty `SLANG_RUN_SPIRV_VALIDATION` environment variable. The reviewed source has no `-validate-spirv` option, requires the environment variable to be exactly `"1"`, and also disables validation for incomplete libraries. | `source/slang/slang-emit.cpp:3045`-`source/slang/slang-emit.cpp:3067` returns false when `SkipSPIRVValidation` or `IncompleteLibrary` is set and returns true only when `SLANG_RUN_SPIRV_VALIDATION == "1"`. `source/slang/slang-options.cpp:684`-`source/slang/slang-options.cpp:685` defines `-skip-spirv-validation`; no matching `-validate-spirv` option exists in `source/slang/slang-options.cpp`. | Replace the validation trigger text with the actual gate: validation runs only when a downstream compiler is available, `SkipSPIRVValidation` and `IncompleteLibrary` are false, and `SLANG_RUN_SPIRV_VALIDATION` equals `"1"`. Remove all `-validate-spirv` and "non-empty env var" claims. |
-| F-003 | major | Intro, lines 12-16 | The page says the direct-emit pipeline's corresponding `CodeGenTarget` values are `CodeGenTarget::SPIRV` and `CodeGenTarget::SPIRVAssembly`. In the public emit dispatcher, `SPIRVAssembly` first creates an intermediate `CodeGenContext` for `CodeGenTarget::SPIRV` and then disassembles the resulting artifact; the direct SPIR-V emit function is invoked from the `CodeGenTarget::SPIRV` case. | `source/slang/slang-code-gen.cpp:1047`-`source/slang/slang-code-gen.cpp:1057` maps `CodeGenTarget::SPIRVAssembly` to `CodeGenTarget::SPIRV`; `source/slang/slang-code-gen.cpp:1089`-`source/slang/slang-code-gen.cpp:1107` compiles the intermediate artifact and disassembles it; `source/slang/slang-code-gen.cpp:1154`-`source/slang/slang-code-gen.cpp:1158` calls `emitSPIRVForEntryPointsDirectly` only for `CodeGenTarget::SPIRV`. | Narrow the intro to `CodeGenTarget::SPIRV` with `shouldEmitSPIRVDirectly() == true`, then add a note that `SPIRVAssembly` reuses this pipeline indirectly by compiling the intermediate SPIR-V target before downstream disassembly. Adjust table notes that imply the public pipeline runs `linkAndOptimizeIR` with `target == SPIRVAssembly`. |
-| F-004 | minor | Phase D table rows 16 and 19, lines 723 and 726 | The Phase D table cites disabled `optimizeSPIRV` as if it lives in `slang-emit-spirv.cpp`, and it says the downstream `compile` step is "always invoked". The disabled `#if 0` block is in `slang-emit.cpp`, and the active downstream `compiler->compile` call is guarded by successful loading of a `PassThroughMode::SpirvOpt` downstream compiler. | `source/slang/slang-emit.cpp:3092`-`source/slang/slang-emit.cpp:3099` contains the disabled `optimizeSPIRV` call. `source/slang/slang-emit.cpp:3103`-`source/slang/slang-emit.cpp:3107` loads `PassThroughMode::SpirvOpt` and wraps the downstream chain in `if (compiler)`, with `compiler->compile` at `source/slang/slang-emit.cpp:3209`-`source/slang/slang-emit.cpp:3210`. No `optimizeSPIRV` symbol appears in `source/slang/slang-emit-spirv.cpp`. | Move the disabled `optimizeSPIRV` citation to `slang-emit.cpp` and avoid presenting it as an active downstream node. Change the downstream `compile` gate to `compiler != nullptr` plus the optimization-level options, rather than "always invoked". |
+| F-001 | critical | `## Phase D: IR-to-SPIR-V emit, simplification loop, downstream tools`, table row 20 | The row says downstream `compiler->compile` is gated by `needsOptimization`. In source the call runs whenever `compiler` was loaded; `needsOptimization` is only one contributor to `needsDownstreamCompiler`, alongside linking, validation, and separate debug info. This misstates when the final downstream compile executes. | `source/slang/slang-emit.cpp:3387-3404` computes `needsDownstreamCompiler` and loads `compiler`; `source/slang/slang-emit.cpp:3473` calls `compiler->compile` without a surrounding `needsOptimization` test. | Change the Gate cell to `compiler != nullptr` / `needsDownstreamCompiler`, and state that `needsOptimization` is one reason the compiler may be loaded rather than the direct call gate. |
+| F-002 | major | Front matter, lines 1-7 | `watched_paths_digest` is stale. The document records `68a85e...`, but the resolved watched files are clean at the recorded `source_commit` and `regenerate.py digest target-pipelines/spirv.md` computes `acce7b597096fbbe5e6eff92e308e01122e6271397aec68a4f310b729f497200`. | `docs/generated/design/target-pipelines/spirv.md:5-6`; the manifest entry's watched-path set is unchanged, and `git diff --quiet 53b76e6d... -- <resolved watched files>` succeeds. | Replace the front-matter digest with `acce7b597096fbbe5e6eff92e308e01122e6271397aec68a4f310b729f497200` during remediation and refresh it through the normal freshness workflow. |
+| F-003 | major | `## Conditional gates`, lines 825-927 | The required consolidated table does not cover every gate drawn in the phase diagrams. In particular, Phase C's `target != PyTorchCppBinding && targetCaps imply descriptor_handle` gate and Phase D's `compiler loaded?` / `needsDownstreamCompiler` gate have no rows; the explicitly required simplification-mode group is also folded into option toggles instead of appearing in prompt order. | `source/slang/slang-emit.cpp:2726-2734` contains the descriptor-handle gate; `source/slang/slang-emit.cpp:3393-3404` contains the downstream-compiler gate. The contract is `docs/generated/design/_meta/prompts/_common.md:340-348`, with group order refined by `docs/generated/design/_meta/prompts/target-pipelines-spirv.md:78-117`. | Add rows for both missing gates and split simplification-mode predicates into their required group between context predicates and SPIR-V runtime predicates. |
+| F-004 | minor | Phase tables, lines 417-484, 639-686, and 790-819 | The companion tables do not consistently use the required one-row-per-node, 1-based order. Phase B combines the separate `finalizeAutoDiffPass` and `stripAutoDiffDecorations` nodes into row 9; Phase C labels consecutive rows `44`, `44`, `46`; Phase D uses `5a` through `5g`. | `source/slang/slang-emit.cpp:1446-1452` has two distinct `SLANG_PASS` calls. The table contract at `docs/generated/design/_meta/prompts/_common.md:329-338` requires one row per pass node and a 1-based order. | Split Phase B row 9 and renumber each affected table with consecutive integer row numbers while retaining loop membership in Notes. |
+| F-005 | minor | Lines 205, 217, and 643 | Three line citations are materially stale: the metadata object is created at line 1019, not `~944`; the non-Khronos `glslSSBO` branch is at line 1057, not 983; and `translateGlobalVaryingVar` is invoked at line 2188, not `~1996`. | `source/slang/slang-emit.cpp:1015-1020`, `source/slang/slang-emit.cpp:1057-1058`, and `source/slang/slang-emit.cpp:2188`. | Refresh those three citations to the recorded source commit; retain the other verified line citations unchanged. |
+| F-006 | minor | `## Source`, lines 112-115 | The `slang-target-program.h` bullet says that header declares both `TargetProgram::shouldEmitSPIRVDirectly` and the `OptionSet` accessors. It only declares the forwarding `TargetProgram` method; the cited option accessors are in `slang-compiler-options.h`. | `source/slang/slang-target-program.h:113-116`; `source/slang/slang-compiler-options.h:340` and `source/slang/slang-compiler-options.h:380`. | Limit the existing bullet to `TargetProgram::shouldEmitSPIRVDirectly` and add or reference a `slang-compiler-options.h` source bullet for the `OptionSet` accessors. |
 
 ## No-issues notes
-
-- The required target-pipeline sections are present in the expected order, including Source, high-level diagram, four phase sections, Conditional gates, Loops, Notable passes, and See also.
-- The Phase A-C tables use the required columns and generally preserve the reachable `SLANG_PASS` order from `linkAndOptimizeIR` for the direct SPIR-V path.
-- The direct emit and legalization files named by the Source section are part of the manifest's resolved watched files.
-- The `legalizeEntryPointsForGLSL`, second `specializeFuncsForBufferLoadArgs`, and SPIR-V-specific `eliminatePhis` option callouts are supported by the checked source ranges.
+- The direct-emit dispatch and SPIR-V Assembly indirection match `slang-code-gen.cpp`.
+- The page correctly records that the nominal 8/16 simplification bounds are unenforced because neither counter is incremented.
+- The active spirv-link and spirv-val conditions, disabled in-source `optimizeSPIRV`, and validation of the freshly emitted buffer match source.

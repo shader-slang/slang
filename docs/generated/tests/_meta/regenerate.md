@@ -104,7 +104,7 @@ files as additional context):
 ## Phase B2 — Slang-test wiring
 
 Landed via
-`.github/workflows/ci-agentic-tests-nightly.yml`. The nightly job
+`.github/workflows/nightly-slang-test.yml`. The nightly job
 invokes `regenerate.py verify`, which wraps `slang-test` with
 `-test-dir docs/generated/tests` and applies the suite-level
 expected-failures list + `requires-tool` filtering. The nightly is
@@ -185,8 +185,8 @@ Then `regenerate.py mark-fresh <bundle>`.
 
 The intended attachment points:
 
-- **Nightly run.** `ci-agentic-tests-nightly.yml`, scheduled
-  `0 4 * * *` (after `coverage-nightly`'s `02:00` slot), runs
+- **Nightly run.** `nightly-slang-test.yml`, scheduled
+  `0 4 * * *` (after `nightly-slang-coverage-test.yml`'s `02:00` slot), runs
   `regenerate.py verify` which wraps
   `slang-test -test-dir docs/generated/tests`. Advisory only; never
   blocks PRs.

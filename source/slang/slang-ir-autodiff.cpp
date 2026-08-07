@@ -1,6 +1,6 @@
 #include "slang-ir-autodiff.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-pairs.h"
 #include "slang-ir-autodiff-rev.h"
@@ -147,6 +147,59 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
             return false;
     }
     return true;
+}
+
+bool isBackwardDerivativeValue(IRInst* inst)
+{
+    if (!inst)
+        return false;
+    // Unwrap any `Specialize`/generic layers on the callee first (but not the differentiation op
+    // itself), so a specialized/generic backward-derivative value such as
+    // `Specialize(BackwardDifferentiate(g), float)` is still recognized.
+    inst = getResolvedInstForDecorations(inst, /*resolveThroughDifferentiation:*/ false);
+    switch (inst->getOp())
+    {
+    // The complete set of ops that yield a backward-derivative function (a `bwd_diff` result),
+    // covering the combined form, the primal/remat/propagate split, the legacy (pre-2.0) forms, and
+    // the trivial variants. The forward-mode ops (`ForwardDifferentiate`,
+    // `ForwardDifferentiatePropagate`, `TrivialForwardDifferentiate`) are deliberately excluded,
+    // since forward-mode derivatives may be nested.
+    case kIROp_BackwardDifferentiate:
+    case kIROp_BackwardDifferentiatePrimal:
+    case kIROp_BackwardRemat:
+    case kIROp_BackwardDifferentiatePropagate:
+    case kIROp_TrivialBackwardDifferentiate:
+    case kIROp_TrivialBackwardDifferentiatePrimal:
+    case kIROp_TrivialBackwardRemat:
+    case kIROp_TrivialBackwardDifferentiatePropagate:
+    case kIROp_LegacyBackwardDifferentiate:
+    case kIROp_BackwardFromLegacyBwdDiffFunc:
+    case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+    case kIROp_BackwardRematFromLegacyBwdDiffFunc:
+    case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool diagnoseDifferentiatingBackwardDiffResult(DiagnosticSink* sink, IRGlobalValueWithCode* func)
+{
+    bool found = false;
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            auto call = as<IRCall>(inst);
+            if (call && isBackwardDerivativeValue(call->getCallee()))
+            {
+                sink->diagnose(Diagnostics::CannotDifferentiateResultOfBackwardDifferentiation{
+                    .location = inst->sourceLoc});
+                found = true;
+            }
+        }
+    }
+    return found;
 }
 
 bool isExistentialOrRuntimeInst(IRInst* inst)

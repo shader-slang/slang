@@ -5,24 +5,24 @@
 
 #include "slang-options.h"
 
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-impl.h"
-#include "../compiler-core/slang-artifact-representation-impl.h"
-#include "../compiler-core/slang-command-line-args.h"
-#include "../compiler-core/slang-core-diagnostics.h"
-#include "../compiler-core/slang-name-convention-util.h"
-#include "../compiler-core/slang-source-embed-util.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-char-util.h"
-#include "../core/slang-command-options-writer.h"
-#include "../core/slang-file-system.h"
-#include "../core/slang-hex-dump-util.h"
-#include "../core/slang-name-value.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-string-slice-pool.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-impl.h"
+#include "compiler-core/slang-artifact-representation-impl.h"
+#include "compiler-core/slang-command-line-args.h"
+#include "compiler-core/slang-core-diagnostics.h"
+#include "compiler-core/slang-name-convention-util.h"
+#include "compiler-core/slang-source-embed-util.h"
+#include "core/slang-castable.h"
+#include "core/slang-char-util.h"
+#include "core/slang-command-options-writer.h"
+#include "core/slang-file-system.h"
+#include "core/slang-hex-dump-util.h"
+#include "core/slang-name-value.h"
+#include "core/slang-platform.h"
 #include "core/slang-stream.h"
+#include "core/slang-string-slice-pool.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
@@ -33,7 +33,6 @@
 #include "slang-serialize-ir.h"
 #include "slang.h"
 
-#include <assert.h>
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>
@@ -535,6 +534,7 @@ void initCommandOptions(CommandOptions& options)
          "-o",
          "-o <path>",
          "Specify a path where generated output should be written.\n"
+         "Use `-` to write generated output to stdout. "
          "If no -target or -stage is specified, one may be inferred "
          "from file extension (see <file-extension>). "
          "If multiple -target options and a single -entry are present, each -o "
@@ -548,7 +548,7 @@ void initCommandOptions(CommandOptions& options)
          "Specify the shader profile for code generation.\n"
          "Accepted profiles are:\n"
          "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10}\n"
-         "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
+         "* glsl_{150,330,400,410,420,430,440,450,460}\n"
          "Additional profiles that include -stage information:\n"
          "* {vs,hs,ds,gs,ps}_<version>\n"
          "See -capability for information on <capability>\n"
@@ -585,6 +585,11 @@ void initCommandOptions(CommandOptions& options)
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
          "Disable specific warning ids."},
+        {OptionKind::WarningLevel,
+         "-Wall,-Wextra,-Wpedantic",
+         "-Wall | -Wextra | -Wpedantic",
+         "Enable the corresponding group of warnings (additive). The groups are independent: "
+         "-Wextra is on by default, while -Wall and -Wpedantic are off by default."},
         {OptionKind::EnableWarning, "-W...", "-W<id>", "Enable a warning with the specified id."},
         {OptionKind::DisableWarning, "-Wno-...", "-Wno-<id>", "Disable warning with <id>"},
         {OptionKind::DumpWarningDiagnostics,
@@ -676,8 +681,14 @@ void initCommandOptions(CommandOptions& options)
          "within any practical run; uint32 counters wrap silently at 2^32 hits per "
          "slot. Use `32` when targeting a runtime driver that does not support "
          "64-bit shader atomic add (notably MoltenVK on Apple Silicon, which "
-         "exposes `shaderBufferInt64Atomics = false`). Implies `-trace-coverage` "
-         "is meaningful; ignored when no coverage mode is enabled."},
+         "exposes `shaderBufferInt64Atomics = false`). Metal targets (`metal`, "
+         "`metallib`, `metallib-asm`): MSL provides no 64-bit atomic fetch-add, so "
+         "counting-mode counters are capped to 32 bits; an explicitly requested "
+         "`64` is capped with warning E45115. Boolean coverage "
+         "(`-trace-coverage-boolean`) writes plain non-atomic stores and honors "
+         "the requested width on all targets. "
+         "Implies `-trace-coverage` is meaningful; ignored when no coverage mode "
+         "is enabled."},
         {OptionKind::ReportDynamicDispatchSites,
          "-report-dynamic-dispatch-sites",
          nullptr,
@@ -938,7 +949,25 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."},
+         "Emit debug data to a separate file, and strip it from the main output file. By default, "
+         "the debug file path is derived from the main `-o <path>` output as a fallback. Use "
+         "`-separate-debug-info-output <path>` to override it or when the main artifact is written "
+         "to stdout."},
+        {OptionKind::SeparateDebugInfoOutput,
+         "-separate-debug-info-output",
+         "-separate-debug-info-output <path>",
+         "Write separate debug information to an explicit sidecar path, overriding the fallback "
+         "path derived from `-o <path>`. Requires `-separate-debug-info` and allows the main "
+         "artifact to be written to stdout. Use `-` to write the separate debug information to "
+         "stdout when the main artifact is written to a file."},
+        {OptionKind::DebugInfoIncludeSource,
+         "-debug-info-include-source",
+         nullptr,
+         "Embed the shader source text into the debug information, independently of the `-g` "
+         "debug level. At `-g1` the source is embedded via the core SPIR-V `OpSource` "
+         "instruction (no NonSemantic extension required); at `-g2`/`-g3` the source is already "
+         "embedded so this is a no-op. Requires debug information: using it with `-g0`, or without "
+         "any `-g` option, is an error. Only affects SPIR-V output."},
         {OptionKind::EmitCPUViaCPP,
          "-emit-cpu-via-cpp",
          nullptr,
@@ -2756,6 +2785,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::TraceBranchCoverage:
         case OptionKind::TraceCoverageBoolean:
         case OptionKind::SPIRVUnifiedDescriptorHeapStride:
+        case OptionKind::DebugInfoIncludeSource:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -3050,6 +3080,28 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Severity::Warning));
                 break;
             }
+        case OptionKind::WarningLevel:
+            {
+                // The flag spelling (-Wall/-Wextra/-Wpedantic) selects which warning group to
+                // enable. Exact-match options take priority over the -W<id> prefix, so these are
+                // never confused with `-W<name>`.
+                auto flag = argValue.getUnownedSlice();
+                SlangWarningLevel level;
+                if (flag == "-Wall")
+                    level = SLANG_WARNING_LEVEL_ALL;
+                else if (flag == "-Wextra")
+                    level = SLANG_WARNING_LEVEL_EXTRA;
+                else if (flag == "-Wpedantic")
+                    level = SLANG_WARNING_LEVEL_PEDANTIC;
+                else
+                {
+                    // Only the three exact flags above are registered for WarningLevel, so any
+                    // other spelling reaching here is a wiring bug, not user input.
+                    SLANG_UNEXPECTED("unhandled -W warning-level flag");
+                }
+                linkage->m_optionSet.add(OptionKind::WarningLevel, (int)level);
+                break;
+            }
         case OptionKind::VerifyDebugSerialIr:
             m_frontEndReq->verifyDebugSerialization = true;
             break;
@@ -3094,7 +3146,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 // -fvk-{b|s|t|u}-shift <binding-shift> <set>
                 const auto slice = arg.value.getUnownedSlice().subString(5, 1);
-                HLSLToVulkanLayoutOptions::Kind kind;
+                HLSLToVulkanLayoutOptions::Kind kind = HLSLToVulkanLayoutOptions::Kind::Invalid;
                 SLANG_RETURN_ON_FAIL(_getValue(arg, slice, kind));
 
                 Int shift;
@@ -3509,35 +3561,35 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::LineDirectiveMode:
             {
-                SlangLineDirectiveMode value;
+                SlangLineDirectiveMode value = SLANG_LINE_DIRECTIVE_MODE_DEFAULT;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 m_compileRequest->setLineDirectiveMode(value);
                 break;
             }
         case OptionKind::FloatingPointMode:
             {
-                FloatingPointMode value;
+                FloatingPointMode value = FloatingPointMode::Default;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 setFloatingPointMode(getCurrentTarget(), value);
                 break;
             }
         case OptionKind::DenormalModeFp16:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp16, value);
                 break;
             }
         case OptionKind::DenormalModeFp32:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp32, value);
                 break;
             }
         case OptionKind::DenormalModeFp64:
             {
-                FloatingPointDenormalMode value;
+                FloatingPointDenormalMode value = FloatingPointDenormalMode::Any;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
                 linkage->m_optionSet.set(CompilerOptionName::DenormalModeFp64, value);
                 break;
@@ -3561,7 +3613,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::FileSystem:
             {
                 typedef TypeTextUtil::FileSystemType FileSystemType;
-                FileSystemType value;
+                FileSystemType value = FileSystemType::Default;
                 SLANG_RETURN_ON_FAIL(_expectValue(value));
 
                 switch (value)
@@ -3975,6 +4027,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // This will emit a separate debug file, containing all debug info in
                 // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
+                break;
+            }
+        case OptionKind::SeparateDebugInfoOutput:
+            {
+                CommandLineArg outputPath;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(outputPath));
+                linkage->m_optionSet.set(OptionKind::SeparateDebugInfoOutput, outputPath.value);
                 break;
             }
         case OptionKind::EmitCPUViaCPP:
@@ -4416,6 +4475,67 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     .target =
                         TypeTextUtil::getCompileTargetName(SlangCompileTarget(rawTarget.format))});
             }
+
+            // Reject a `-capability` that raises the emitted version above what an explicit
+            // `-profile` pins. Only run when the profile's family matches the target's version
+            // family: a cross-family profile (e.g. `glsl_450` on a SPIR-V target) contributes
+            // version atoms that would misread as a pin, wrongly flagging `-profile
+            // glsl_450+spirv_1_4`.
+            Profile profile = rawTarget.optionSet.getProfile();
+            CapabilityAtom targetVersionFamily = CapabilityAtom::Invalid;
+            switch (profile.getFamily())
+            {
+            case ProfileFamily::SPIRV:
+                // `isSPIRV`, not `isKhronosTarget`: the GLSL text target emits no SPIR-V version.
+                if (isSPIRV(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_spirv_1_0;
+                break;
+            case ProfileFamily::METAL:
+                if (isMetalTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::metallib_2_3;
+                break;
+            case ProfileFamily::DX:
+                if (isD3DTarget(rawTarget.format))
+                    targetVersionFamily = CapabilityAtom::_sm_4_0;
+                break;
+            case ProfileFamily::GLSL:
+                if (rawTarget.format == CodeGenTarget::GLSL)
+                    targetVersionFamily = CapabilityAtom::_GLSL_130;
+                break;
+            default:
+                break;
+            }
+            if (!rawTarget.conflictingProfilesSet && targetVersionFamily != CapabilityAtom::Invalid)
+            {
+                // Collect the explicit `-capability` atoms, then ask once whether — folded in the
+                // way `getTargetCaps()` folds them — they raise the emitted target version above
+                // what the profile pins.
+                List<CapabilityName> requestedCapabilities;
+                for (auto atomVal : rawTarget.optionSet.getArray(CompilerOptionName::Capability))
+                {
+                    CapabilityName capabilityName = CapabilityName::Invalid;
+                    switch (atomVal.kind)
+                    {
+                    case CompilerOptionValueKind::Int:
+                        capabilityName = CapabilityName(atomVal.intValue);
+                        break;
+                    case CompilerOptionValueKind::String:
+                        capabilityName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
+                        break;
+                    }
+                    if (capabilityName != CapabilityName::Invalid)
+                        requestedCapabilities.add(capabilityName);
+                }
+
+                if (doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
+                        profile.getCapabilityName(),
+                        requestedCapabilities,
+                        targetVersionFamily))
+                {
+                    m_sink->diagnose(Diagnostics::ConflictingExplicitCapabilityAndProfile{
+                        .profile = profile.getName()});
+                }
+            }
         }
 
         // `-spirv-unified-descriptor-heap-stride` and an explicit non-zero
@@ -4428,6 +4548,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             linkage->m_optionSet.getIntOption(CompilerOptionName::SPIRVResourceHeapStride) != 0)
         {
             m_sink->diagnose(Diagnostics::SpirvConflictingDescriptorHeapStrideOptions{});
+        }
+
+        // `-debug-info-include-source` embeds the source into debug information, so it needs
+        // debug information to exist. At `DebugInfoLevel::None` there is no debug scaffolding to
+        // attach the source to, so reject the combination here rather than silently ignoring it.
+        // Note `getDebugInfoLevel()` cannot distinguish an explicit `-g0` from the default (no
+        // `-g`), which also resolves to `None`; both cases are a conflict for this flag.
+        if (linkage->m_optionSet.shouldIncludeSourceInDebugInfo() &&
+            linkage->m_optionSet.getDebugInfoLevel() == DebugInfoLevel::None)
+        {
+            m_sink->diagnose(Diagnostics::DebugInfoIncludeSourceRequiresDebugInfo{});
         }
 
         // TODO: do we need to require that a target must have a profile specified,
@@ -4758,6 +4889,34 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_sink->diagnose(
                     Diagnostics::SeparateDebugInfoUnsupportedForTarget{.target = targetName});
             }
+        }
+    }
+
+    // `-debug-info-include-source` only affects the SPIR-V core `OpSource` path. The producer
+    // change that carries source content into the IR runs once for all targets, so warn (rather
+    // than silently do nothing) when it is requested for a non-SPIR-V target, mirroring the
+    // `-separate-debug-info` precedent above.
+    if (linkage->m_optionSet.shouldIncludeSourceInDebugInfo())
+    {
+        // `isSPIRV` covers both the `spirv` and `spirv-asm` targets, which share the SPIR-V
+        // emitter that honors this option.
+        for (const auto& rawTarget : m_rawTargets)
+        {
+            if (!isSPIRV(rawTarget.format))
+            {
+                UnownedStringSlice targetName =
+                    TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
+                m_sink->diagnose(
+                    Diagnostics::DebugInfoIncludeSourceUnsupportedForTarget{.target = targetName});
+            }
+        }
+
+        if (m_rawTargets.getCount() == 0 && !isSPIRV(m_defaultTarget.format))
+        {
+            UnownedStringSlice targetName =
+                TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
+            m_sink->diagnose(
+                Diagnostics::DebugInfoIncludeSourceUnsupportedForTarget{.target = targetName});
         }
     }
 

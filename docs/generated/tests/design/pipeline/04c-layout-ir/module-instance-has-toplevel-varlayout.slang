@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T17:02:55+00:00
 //META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
-//META: doc_section_digest=21e70fc9b432ffb7540b46ba9ead6c9d1a1b5e21edaccd9090e6fe0740eaa77e
+//META: doc_section_digest=bea4097f3cb99e6205f4e10d4bf9ab240dde03162a3388a24e9a78e55d5c0e65
 //META: purpose=createIRModuleForLayout calls addLayoutDecoration on the module instance with irGlobalScopeVarLayout; the merged IR shows a top-level `varLayout(...)` instruction (not bound to `let`).
 //META: intent=functional
 //META: pipeline_stage=layout

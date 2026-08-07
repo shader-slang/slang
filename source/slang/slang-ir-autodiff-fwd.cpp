@@ -186,6 +186,36 @@ struct ForwardDiffTranslationContext
         return builder->getFuncType(newParameterTypes, diffReturnType);
     }
 
+    // Write each out/inout differential-pair parameter (its primal and differential slots,
+    // recorded by translateFuncParam) back into the parameter at the current insert point.
+    // For a trivial derivative pass zeroDifferentials = true: the call contributes no tangent,
+    // so every output differential is forced to zero rather than threading the incoming one.
+    void emitInOutParamWriteBacks(IRBuilder& builder, bool zeroDifferentials = false)
+    {
+        for (auto& writeBack : mapInOutParamToWriteBackValue)
+        {
+            auto param = writeBack.key;
+            auto primalVal = builder.emitLoad(writeBack.value.primal);
+            IRInst* valToStore = primalVal;
+            if (writeBack.value.differential)
+            {
+                auto pairValType = cast<IRPtrTypeBase>(param->getFullType())->getValueType();
+                auto diffVal = zeroDifferentials
+                                   ? getDifferentialZeroOfType(&builder, primalVal->getDataType())
+                                   : builder.emitLoad(writeBack.value.differential);
+                diffTypeContext.markDiffTypeInst(&builder, diffVal, primalVal->getFullType());
+                valToStore = emitMakeDiffPair(&builder, pairValType, primalVal, diffVal);
+                diffTypeContext.markDiffPairTypeInst(&builder, valToStore, pairValType);
+            }
+            auto storeInst = builder.emitStore(param, valToStore);
+            if (writeBack.value.differential)
+                diffTypeContext.markDiffPairTypeInst(
+                    &builder,
+                    storeInst,
+                    valToStore->getFullType());
+        }
+    }
+
     void generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFunc* diffFunc)
     {
         IRBuilder builder(diffFunc);
@@ -193,62 +223,36 @@ struct ForwardDiffTranslationContext
         auto block = builder.emitBlock();
         builder.markInstAsMixedDifferential(block);
 
+        // Build the trivial forward derivative: the real primal f(x) paired with a zero
+        // differential. The primal must be evaluated, not default-constructed — a zero primal
+        // poisons the chain rule, silently killing every derivative taken through this call.
+        mapInOutParamToWriteBackValue.clear();
+        List<IRInst*> primalArgs;
         for (auto param : primalFunc->getParams())
+            primalArgs.add(translateFuncParam(&builder, param, param->getFullType()).primal);
+
+        auto primalCall = builder.emitCallInst(primalFunc->getResultType(), primalFunc, primalArgs);
+        builder.markInstAsPrimal(primalCall);
+
+        emitInOutParamWriteBacks(builder, /* zeroDifferentials */ true);
+
+        auto resultType = diffFunc->getResultType();
+        if (as<IRVoidType>(resultType))
         {
-            translateFuncParam(&builder, param, param->getFullType());
+            builder.markInstAsPrimal(builder.emitReturn());
         }
-        List<IRParam*> diffParams;
-        for (auto param : diffFunc->getParams())
+        else if (isRelevantDifferentialPair(resultType))
         {
-            diffParams.add(param);
-        }
-        auto emitDiffPairVal = [&](IRDifferentialPairTypeBase* pairType)
-        {
-            auto primal = builder.emitDefaultConstruct(pairType->getValueType());
-            builder.markInstAsPrimal(primal);
+            auto pairType = as<IRDifferentialPairTypeBase>(resultType);
             auto diff = getDifferentialZeroOfType(&builder, pairType->getValueType());
-            builder.markInstAsDifferential(diff, primal->getDataType());
-
-            auto val = builder.emitMakeDifferentialPair(pairType, primal, diff);
+            builder.markInstAsDifferential(diff, primalCall->getDataType());
+            auto val = builder.emitMakeDifferentialPair(pairType, primalCall, diff);
             builder.markInstAsMixedDifferential(val);
-
-            return val;
-        };
-        for (auto param : diffParams)
-        {
-            if (auto outType = as<IROutParamTypeBase>(param->getFullType()))
-            {
-                if (isRelevantDifferentialPair(outType))
-                {
-                    auto pairType = as<IRDifferentialPairTypeBase>(outType->getValueType());
-                    auto val = emitDiffPairVal(pairType);
-                    auto store = builder.emitStore(param, val);
-                    builder.markInstAsMixedDifferential(store);
-                }
-                else
-                {
-                    auto val = builder.emitDefaultConstruct(outType->getValueType());
-                    builder.markInstAsPrimal(val);
-
-                    auto store = builder.emitStore(param, val);
-                    builder.markInstAsPrimal(store);
-                }
-            }
-        }
-        if (isRelevantDifferentialPair(diffFunc->getResultType()))
-        {
-            auto pairType = as<IRDifferentialPairTypeBase>(diffFunc->getResultType());
-            auto val = emitDiffPairVal(pairType);
-            auto returnInst = builder.emitReturn(val);
-            builder.markInstAsMixedDifferential(val);
-            builder.markInstAsMixedDifferential(returnInst);
+            builder.markInstAsMixedDifferential(builder.emitReturn(val));
         }
         else
         {
-            auto retVal = builder.emitDefaultConstruct(diffFunc->getResultType());
-            auto returnInst = builder.emitReturn(retVal);
-            builder.markInstAsPrimal(retVal);
-            builder.markInstAsPrimal(returnInst);
+            builder.markInstAsPrimal(builder.emitReturn(primalCall));
         }
     }
 
@@ -675,9 +679,9 @@ struct ForwardDiffTranslationContext
                     if (diffInst->getOp() != kIROp_VoidLit)
                         allVoid = false;
                 }
-                else if (auto operandDiffType = differentiateType(builder, operand->getDataType()))
+                else if (auto operandDiffType = differentiateType(builder, operand->getDataType());
+                         operandDiffType)
                 {
-                    SLANG_UNUSED(operandDiffType);
                     // Missing differentials for differentiable operands are constants with zero
                     // tangent, matching the generic construct fallback behavior.
                     auto operandDataType =
@@ -1915,17 +1919,20 @@ struct ForwardDiffTranslationContext
             {
                 diffBase = getDifferentialZeroOfType(builder, origBase->getDataType());
             }
+
+            // TODO: Unwrapping the attributed type here is a workaround. Lowering should instead
+            // emit an explicit instruction such as IRNoDiffCast for the conversion to `no_diff`.
+            // AD could then use the differentiable type on the other side of that instruction to
+            // form the zero without implicitly discarding the conversion here.
+            auto primalElementType = (IRType*)unwrapAttributedType(primalVal->getDataType());
             if (auto diffVal = findOrTranslateDiffInst(builder, origVal))
             {
-                auto primalElementType = primalVal->getDataType();
-
                 diffUpdateElement =
                     builder->emitUpdateElement(diffBase, diffAccessChain.getArrayView(), diffVal);
                 builder->addPrimalElementTypeDecoration(diffUpdateElement, primalElementType);
             }
             else
             {
-                auto primalElementType = primalVal->getDataType();
                 auto zeroElementDiff = getDifferentialZeroOfType(builder, primalElementType);
                 diffUpdateElement = builder->emitUpdateElement(
                     diffBase,
@@ -2522,41 +2529,7 @@ struct ForwardDiffTranslationContext
                 {
                     // Insert write backs to mutable parameters before returning.
                     builder.setInsertBefore(inst);
-                    for (auto& writeBack : mapInOutParamToWriteBackValue)
-                    {
-                        auto param = writeBack.key;
-                        auto primalVal = builder.emitLoad(writeBack.value.primal);
-                        IRInst* valToStore = nullptr;
-                        if (writeBack.value.differential)
-                        {
-                            auto pairValType =
-                                cast<IRPtrTypeBase>(param->getFullType())->getValueType();
-                            auto diffVal = builder.emitLoad(writeBack.value.differential);
-                            diffTypeContext.markDiffTypeInst(
-                                &builder,
-                                diffVal,
-                                primalVal->getFullType());
-
-                            valToStore =
-                                emitMakeDiffPair(&builder, pairValType, primalVal, diffVal);
-
-                            diffTypeContext.markDiffPairTypeInst(&builder, valToStore, pairValType);
-                        }
-                        else
-                        {
-                            valToStore = builder.emitLoad(writeBack.value.primal);
-                        }
-
-                        auto storeInst = builder.emitStore(param, valToStore);
-
-                        if (writeBack.value.differential)
-                        {
-                            diffTypeContext.markDiffPairTypeInst(
-                                &builder,
-                                storeInst,
-                                valToStore->getFullType());
-                        }
-                    }
+                    emitInOutParamWriteBacks(builder);
                 }
             }
         }
@@ -3557,6 +3530,13 @@ IRInst* maybeTranslateForwardDerivative(
         return inst;
 
     IRFunc* targetFunc = cast<IRFunc>(base);
+
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: forward-
+    // differentiating a function that calls a `bwd_diff` result is unsupported (the result of
+    // `bwd_diff` is not differentiable) and would otherwise fail with an internal error downstream.
+    // Diagnose and leave the translate inst in place rather than producing a malformed derivative.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return inst;
 
     IRInst* fwdDiffFunc;
     IRBuilder builder(sharedContext->moduleInst);

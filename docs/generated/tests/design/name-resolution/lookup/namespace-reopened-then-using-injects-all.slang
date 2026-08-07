@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T13:48:38Z
 //META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#module-and-namespace
-//META: doc_section_digest=29b1e50e76ce09df697e30313ad1997122b36545720e82abde315d7de649b1b6
+//META: doc_section_digest=79b87e67779abbbf140f9b23327c1d2acc8287e7b623e07e70e2f9c3993d2426
 //META: purpose=Multiple namespace blocks of the same name collapse into the same NamespaceDecl; a single `using namespace` then injects every accumulated member into the unqualified lookup chain.
 //META: intent=functional
 //META: pipeline_stage=check

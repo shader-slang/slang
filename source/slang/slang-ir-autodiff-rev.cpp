@@ -555,22 +555,21 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
         {
             auto key = contextTypeBuilder.createStructKey();
             auto structFieldType = applyForBwdParam->getDataType();
+            IRInst* rematContextValue = rematFuncParam;
 
             if (auto inoutParamType = as<IRBorrowInOutParamType>(applyForBwdParam->getDataType()))
             {
+                // The context stores the pointee value needed by propagation, so a borrowed-inout
+                // parameter such as a subscript setter's `self` must be loaded before storage.
                 structFieldType = inoutParamType->getValueType();
-                contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
+                rematContextValue = rematFuncBuilder.emitLoad(rematFuncParam);
             }
-            else
-            {
-                // Has to be "in" type.
-                contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
-            }
+            contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
 
             rematFuncBuilder.emitStore(
                 rematFuncBuilder
                     .emitFieldAddress(builder.getPtrType(structFieldType), rematContextVar, key),
-                rematFuncParam);
+                rematContextValue);
 
             if (as<IRVoidType>(bwdPropParam->getDataType()))
             {
@@ -1008,6 +1007,15 @@ IRInst* maybeTranslateBackwardDerivative(
             targetFunc,
             &translater.diffTypeContext);
 
+    // Backstop for when the front-end `checkAutoDiffUsages` validation is disabled: a function that
+    // itself calls a `bwd_diff` result is not differentiable and would crash the unzip pass below.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
+
     IRInst* bwdPrimalFunc;
     IRInst* bwdRematFunc;
     IRInst* bwdPropagateFunc;
@@ -1053,6 +1061,14 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
 
     auto targetFunc = cast<IRFunc>(baseFunc);
     if (diagnoseUnsupportedAbortForBackwardDiff(sink, targetFunc))
+        return emitPoisonBackwardDiffResult(
+            &builder,
+            translateInst,
+            targetFunc,
+            &translater.diffTypeContext);
+
+    // Backstop (see maybeTranslateBackwardDerivative) for when front-end validation is disabled.
+    if (diagnoseDifferentiatingBackwardDiffResult(sink, targetFunc))
         return emitPoisonBackwardDiffResult(
             &builder,
             translateInst,

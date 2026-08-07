@@ -1,8 +1,8 @@
 // Validate DebugTypeMatrix column major argument for buffer and local matrices.
 // Expect matrix layout to affect buffer matrices, but not local matrices which are always row-major (ColMajor in SPIR-V).
 //
-//TEST:SIMPLE(filecheck=CHECK,CHECK_COL):-target spirv-asm -g2 -O0 -matrix-layout-column-major
-//TEST:SIMPLE(filecheck=CHECK,CHECK_ROW):-target spirv-asm -g2 -O0 -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=CHECK,CHECK_COL):-target spirv-asm -g2 -matrix-layout-column-major
+//TEST:SIMPLE(filecheck=CHECK,CHECK_ROW):-target spirv-asm -g2 -matrix-layout-row-major
 
 struct S
 {

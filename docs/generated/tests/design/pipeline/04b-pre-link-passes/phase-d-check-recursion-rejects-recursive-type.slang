@@ -3,7 +3,7 @@
 //META: generated_at=2026-05-20T16:50:55+00:00
 //META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization
-//META: doc_section_digest=5defec5bd482a82bdf1c8601f2d3ae1514d0fd25fa9d73a9ad98b6c32be3f36c
+//META: doc_section_digest=ad77551965f16f59589941dbe50f81bd8509b595aa5ee08277212d611c118e05
 //META: purpose=Phase D's checkForRecursiveTypes (D1) rejects a self-referential struct with the cyclic-reference diagnostic.
 //META: intent=negative
 //META: pipeline_stage=ir-pass

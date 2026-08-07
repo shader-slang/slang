@@ -403,8 +403,19 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     generateUniqueIDForStmt(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    // TODO(tfoley): need to coerce condition to an integral type...
     stmt->condition = CheckExpr(stmt->condition);
+
+    // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
+    // lowering; skip when the condition already failed to check to avoid a cascade.
+    auto conditionType = stmt->condition->type.type;
+    if (conditionType && !as<ErrorType>(conditionType) &&
+        !isValidCompileTimeConstantType(conditionType))
+    {
+        getSink()->diagnose(
+            Diagnostics::SwitchConditionNotInteger{.type = conditionType, .expr = stmt->condition});
+        return;
+    }
+
     subContext.checkStmt(stmt->body);
 
     // check the case value exits within the switch
@@ -413,12 +424,11 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
 
 void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
 {
-    auto switchStmt = FindOuterStmt<SwitchStmt>();
+    // A 'case' statement must be directly enclosed by a 'switch' statement. If
+    // this is not the case, the parser has already diagnosed an error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
     if (!switchStmt)
-    {
-        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
         return;
-    }
 
     // Check that the type for the `case` is consistent with the type for the `switch`.
     auto expr = CheckExpr(stmt->expr);
@@ -432,14 +442,11 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     stmt->expr = expr;
     stmt->exprVal = exprVal;
 
-    if (switchStmt)
-    {
-        // We stash the ID of the target statement in the `case`
-        // statement so that they can be correlated later, during
-        // code generation.
-        //
-        stmt->targetOuterStmtID = switchStmt->uniqueID;
-    }
+    // We stash the ID of the target statement in the `case`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
 }
 
 void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -518,19 +525,18 @@ void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
 
 void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 {
-    auto switchStmt = FindOuterStmt<SwitchStmt>();
+    // A 'default' statement must be directly enclosed by a 'switch'
+    // statement. If this is not the case, the parser has already diagnosed an
+    // error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
     if (!switchStmt)
-    {
-        getSink()->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = stmt});
-    }
-    else
-    {
-        // We stash the ID of the target statement in the `case`
-        // statement so that they can be correlated later, during
-        // code generation.
-        //
-        stmt->targetOuterStmtID = switchStmt->uniqueID;
-    }
+        return;
+
+    // We stash the ID of the target statement in the `default`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
 }
 
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
