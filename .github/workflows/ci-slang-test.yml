@@ -50,6 +50,11 @@ on:
         type: string
         default: ""
         description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
+      api:
+        required: false
+        type: string
+        default: ""
+        description: "Override the -api expression passed to slang-test (e.g. 'dx11+dx12' or 'vk+cuda+cpu+llvm'). Overrides cpu-only and gpu-api-only when set."
 
 jobs:
   test-slang:
@@ -147,7 +152,11 @@ jobs:
           # slang-test accepts only a single -api option (a later one silently
           # overrides an earlier one), so select exactly one expression.
           # "-api all" is equivalent to the default (all APIs enabled).
-          if [[ "${{ inputs.cpu-only }}" == "true" ]]; then
+          if [[ -n "${{ inputs.api }}" ]]; then
+            # Explicit override: caller supplies the exact -api expression,
+            # e.g. "dx11+dx12" or "vk+cuda+cpu+llvm" for a per-engine split.
+            api_expr="${{ inputs.api }}"
+          elif [[ "${{ inputs.cpu-only }}" == "true" ]]; then
             # Restrict to CPU / LLVM backends; tests requiring any GPU API get
             # ignored by the test filter rather than run-and-failed.
             api_expr="cpu+llvm"

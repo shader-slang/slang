@@ -452,8 +452,13 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
 
-  # Windows GPU tests (self-hosted)
-  test-windows-debug-cl-x86_64-gpu:
+  # Windows GPU tests (self-hosted).
+  # Each config is split into two parallel jobs to reduce wall-clock time:
+  #   -gpu-dx:  dx11+dx12+wgpu + no-API tests
+  #   -gpu-vk:  vk+cuda+cpu+llvm + no-API tests
+  # The two halves run concurrently on separate runners, targeting ~half the
+  # previous single-job wall-clock time (~47 min debug, ~13 min release).
+  test-windows-debug-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -464,6 +469,21 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+
+  test-windows-debug-cl-x86_64-gpu-vk:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cuda+cpu+llvm
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-gpu-rhi:
@@ -477,7 +497,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu:
+  test-windows-release-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -488,6 +508,21 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+
+  test-windows-release-cl-x86_64-gpu-vk:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cuda+cpu+llvm
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
@@ -650,9 +685,11 @@ jobs:
         build-macos-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
-        test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-dx,
+        test-windows-release-cl-x86_64-gpu-vk,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu-dx,
+        test-windows-debug-cl-x86_64-gpu-vk,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
