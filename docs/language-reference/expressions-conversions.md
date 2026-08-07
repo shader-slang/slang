@@ -81,7 +81,7 @@ the behavior is [undefined](basics-behavior.md).
 >
 > See also GitHub issue [#12045](https://github.com/shader-slang/slang/issues/12045).
 
-#### Examples
+### Examples
 
 ```hlsl
 StructuredBuffer<double> doubleInputs;
@@ -112,13 +112,13 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 ```
 
-### Cast to Void
+## Cast to Void
 
 A cast to [`void`](types-fundamental.md) is a no-op cast producing a `void` value. The primary use of
 a `void` cast is to mark the value as consumed, suppressing related warnings. See also
 [attribute \[NoDiscard\]](../../../core-module-reference/attributes/nodiscard-02.html).
 
-#### Examples
+### Examples
 
 ```hlsl
 RWStructuredBuffer<uint> output;
@@ -147,7 +147,7 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 ```
 
-### Conversions Between Scalar, Vector, and Matrix Types
+## Conversions Between Scalar, Vector, and Matrix Types
 
 A scalar can be cast to a vector or matrix type. In this conversion, the scalar value is used to
 populate every element of the vector or matrix.
@@ -173,7 +173,7 @@ For details, see [vector initialization functions](../../../core-module-referenc
 > ⚠️ **Warning:** In Slang 2025 and previous, the construction of a 4-dimensional vector from a 2-dimensional
 > vector and an element is inconsistent with the tail-padding by 0 semantics. Instead, the element is
 > implicitly converted to a 2-dimensional vector. This constructor has been removed from Slang 2026. See
-> GitHub issue [12093](https://github.com/shader-slang/slang/issues/12093) for details.
+> GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
 
 > ⚠️ **Warning:** Constructing a vector using an initializer list with a single element is equivalent to
 > initializing with a scalar. That is:
@@ -184,7 +184,7 @@ For details, see [vector initialization functions](../../../core-module-referenc
 > int4 v2 = { 1, 1 }; // { 1, 1, 0, 0 } - tail-pad with 0
 > ```
 
-#### Examples
+### Examples
 
 ```hlsl
 RWStructuredBuffer<float> output;
@@ -287,7 +287,7 @@ trigger a diagnostic warning.
 > conversion. This has been removed in Slang 2026.
 > See GitHub issue [#12093](https://github.com/shader-slang/slang/issues/12093) for details.
 
-#### Examples
+### Examples
 
 **Scalar to vector, scalar to matrix**
 ```slang
@@ -423,7 +423,7 @@ void main()
     // to int3 when calling someFunc
     a = someFunc({ a, b });
 
-    output[0] = a.x; // 9 + 5 + 3 = 16
+    output[0] = a.x; // 9 + 5 + 3 = 17
     output[1] = a.y; // 1001
 }
 ```
@@ -457,7 +457,7 @@ union type emulation as [interface-conforming variants](types-interface.md). Tha
 packed into an AnyValue struct, which is then unpacked as the target type.
 
 
-#### Examples
+### Examples
 
 ```slang
 RWStructuredBuffer<uint> output;
