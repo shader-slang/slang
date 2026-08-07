@@ -791,7 +791,8 @@ Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
-    RefPtr<IRModule>& outIRModule)
+    RefPtr<IRModule>& outIRModule,
+    Fossil::Trust trust)
 {
     auto dataChunk = as<RIFF::DataChunk>(chunk);
     if (!dataChunk)
@@ -800,7 +801,7 @@ Result readSerializedModuleInfo(
     }
 
     Fossil::AnyValPtr rootValPtr =
-        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+        Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize(), trust);
     if (!rootValPtr)
     {
         SLANG_UNEXPECTED("invalid format for serialized module IR");
@@ -837,11 +838,13 @@ Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
-    RefPtr<IRModule>& outIRModule)
+    RefPtr<IRModule>& outIRModule,
+    Fossil::Trust trust)
 {
     SLANG_PROFILE;
 
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
+    SLANG_RETURN_ON_FAIL(
+        readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule, trust));
 
     //
     // Module is finally valid (or at least as much as it was going it) and

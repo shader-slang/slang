@@ -690,6 +690,11 @@ SlangResult Session::_readBuiltinModule(
     // Next, we set about deserializing the AST representation
     // of the module.
     //
+    // The core module ships inside the compiler binary, so it cannot have come
+    // from an attacker -- and it is the largest blob loaded, on every startup.
+    // Validating it would dominate the cost of every short-lived invocation
+    // without protecting against anything.
+    //
     auto moduleDecl = readSerializedModuleAST(
         linkage,
         astBuilder,
@@ -697,7 +702,8 @@ SlangResult Session::_readBuiltinModule(
         fileContents,
         astChunk,
         sourceLocReader,
-        SourceLoc());
+        SourceLoc(),
+        Fossil::Trust::Trusted);
     if (!moduleDecl)
     {
         return SLANG_FAIL;
@@ -709,7 +715,8 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, this, sourceLocReader, irModule));
+    SLANG_RETURN_ON_FAIL(
+        readSerializedModuleIR(irChunk, this, sourceLocReader, irModule, Fossil::Trust::Trusted));
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);

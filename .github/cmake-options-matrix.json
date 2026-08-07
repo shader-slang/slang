@@ -29,7 +29,8 @@
     { "option": "SLANG_ENABLE_REPLAYER" },
     { "option": "SLANG_ENABLE_RELEASE_DEBUG_INFO" },
     { "option": "SLANG_ENABLE_SPLIT_DEBUG_INFO" },
-    { "option": "SLANG_ENABLE_FULL_IR_VALIDATION" },
+    { "option": "SLANG_ENABLE_VALIDATION_FULL_IR" },
+    { "option": "SLANG_ENABLE_VALIDATION_FOSSIL" },
     { "option": "SLANG_ENABLE_VALIDATION_VM_BYTECODE" },
     {
       "option": "SLANG_ENABLE_IR_BREAK_ALLOC",

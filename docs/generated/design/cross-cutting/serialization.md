@@ -128,7 +128,7 @@ Fossil is the sole concrete backend at this commit.
 [slang-serialize-fossil.cpp](../../../../source/slang/slang-serialize-fossil.cpp).
 "Fossil" is a memory-mappable binary format defined in `slang-fossil.h`
 (referenced from the fossil header). Per the comments in
-[slang-serialize-fossil.h](../../../../source/slang/slang-serialize-fossil.h):
+[slang-fossil.h](../../../../source/slang/slang-fossil.h):
 
 > Deserializing data is an important place where security issues can
 > arise, so it is usually important to perform validation checks
@@ -136,13 +136,19 @@ Fossil is the sole concrete backend at this commit.
 > mal-formed data.
 
 The validation cost is configurable via the macro
-`SLANG_SERIALIZE_FOSSIL_ENABLE_VALIDATION_CHECKS` (a compile-time
-define, default 1). When enabled, validation failures call
+`SLANG_ENABLE_VALIDATION_FOSSIL` (a compile-time define, default 0),
+which is set by the CMake option of the same name. When enabled,
+validation failures call
 `SLANG_UNEXPECTED("invalid format encountered in serialized data")`;
-when the define is set to 0 the same conditions become plain
-`SLANG_ASSERT`s. The header comment notes this toggle exists to
-measure the performance cost of validation on a key serialization
-path — loading the core module from the `slang.dll` binary.
+when the define is 0 the same conditions become plain `SLANG_ASSERT`s,
+and the walk that checks the whole object graph on load
+([slang-fossil-validate.cpp](../../../../source/slang/slang-fossil-validate.cpp))
+is compiled out entirely. Validation is off by default because it is
+expensive, and because a key serialization path — loading the core
+module from the `slang.dll` binary — reads data that is already
+trusted; validating the core module costs roughly two seconds per
+process in a release build. Builds that load untrusted
+`.slang-module` data should turn the option on.
 
 The format is designed for **memory-mapped** deserialization: a pointer
 in the serialized data is a 32-bit offset relative to the address of
