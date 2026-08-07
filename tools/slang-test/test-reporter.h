@@ -106,6 +106,16 @@ public:
     bool canWriteStdError() const;
 
 
+    /// Counts any test still marked PendingRetry as a failure.
+    ///
+    /// A test reported as TestResult::PendingRetry is not counted until its
+    /// retry produces a final Pass/Fail. If the retry never re-ran it, the
+    /// pending result would otherwise be silently dropped from the totals. Call
+    /// once after all retries, before outputSummary()/didAllSucceed(), so an
+    /// unresolved failure is counted (as a normal result, subject to the
+    /// expected-failure list) rather than vanishing into an overall pass.
+    void reconcilePendingRetries();
+
     /// Returns true if all run tests succeeded
     bool didAllSucceed() const;
 
@@ -131,6 +141,11 @@ public:
     static void set(TestReporter* reporter) { s_reporter = reporter; }
 
     Slang::List<TestInfo> m_testInfos;
+
+    /// Names (commands) of tests reported as PendingRetry, accumulated across
+    /// parallel sub-reporters. reconcilePendingRetries() fails any of these that
+    /// never received a final result.
+    Slang::HashSet<Slang::String> m_pendingRetryTests;
 
     Slang::List<Slang::String> m_suiteStack;
 
