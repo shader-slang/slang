@@ -593,6 +593,66 @@ class TestHealthPartialRendering(unittest.TestCase):
         self.assertIn("Queue sample is partial", html)
 
 
+class TestPendingApprovals(unittest.TestCase):
+    """The Falcor bridge gate pauses runs until someone approves them, and a
+    stalled approval is invisible everywhere else: nothing has failed and
+    nothing is running, so it looks like a quiet afternoon."""
+
+    def _render(self, pending, partial=False, errors=None):
+        return ci_health.render_pending_approvals(
+            {"pending": pending, "partial": partial, "errors": errors or []}
+        )
+
+    def _row(self, **kw):
+        row = {
+            "run_id": 1,
+            "url": "https://github.com/o/r/actions/runs/1",
+            "actor": "someone",
+            "event": "pull_request",
+            "branch": "topic",
+            "title": "Some PR",
+            "waited_min": 5,
+        }
+        row.update(kw)
+        return row
+
+    def test_nothing_waiting_is_ok(self):
+        html = self._render([])
+        self.assertIn(">OK<", html)
+        self.assertIn("Nothing waiting for approval", html)
+
+    def test_recent_wait_is_only_a_warning(self):
+        # A couple of minutes means the approval bot is about to pick it up.
+        html = self._render([self._row(waited_min=3)])
+        self.assertIn(">WAITING<", html)
+        self.assertNotIn(">STALLED<", html)
+
+    def test_long_wait_is_stalled(self):
+        # Half an hour means nobody is coming, and the job will time out and
+        # report as a test failure rather than as an unapproved gate.
+        html = self._render([self._row(waited_min=45)])
+        self.assertIn(">STALLED<", html)
+
+    def test_partial_does_not_render_false_healthy_empty_state(self):
+        html = self._render([], partial=True, errors=["HTTP 502"])
+        self.assertIn(">PARTIAL<", html)
+        self.assertNotIn(">OK<", html)
+        self.assertIn("HTTP 502", html)
+
+    def test_oldest_first(self):
+        html = self._render([self._row(waited_min=5), self._row(waited_min=40)])
+        self.assertLess(html.index("40 min"), html.index("5 min"))
+
+    def test_merge_queue_runs_are_highlighted(self):
+        # A merge_group run holds up the whole queue, not just its own PR.
+        html = self._render([self._row(event="merge_group")])
+        self.assertIn("<strong>merge_group</strong>", html)
+
+    def test_titles_are_escaped(self):
+        html = self._render([self._row(title="fix <script> & co")])
+        self.assertNotIn("<script>", html)
+
+
 class TestHealthApiBounds(unittest.TestCase):
     def test_recent_failures_query_is_bounded_by_created_range(self):
         calls = []
