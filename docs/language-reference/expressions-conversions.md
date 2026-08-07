@@ -273,7 +273,6 @@ trigger a diagnostic warning.
 - floating-point type to a double type (possible performance issue)
 - vector to vector and matrix to matrix where the target element type is narrower or has different signedness
 - integer vector to a floating-point vector and vice versa
-- `enum` to integer type other than its tag type
 
 > 📝 **Remark:** Some common contexts for implicit type conversions:
 >
