@@ -1,13 +1,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal -whole-program
 //TEST:SIMPLE(filecheck=DEDUP): -target metal -whole-program
 
-// An `export`/library-boundary function with an `out` or `inout` parameter has
-// no caller to specialize its parameter address space from, so before this fix
-// its mutable-reference pointer parameter reached the Metal emitter still
-// carrying `AddressSpace::Generic` and hit the emitter's "Unknown addressspace
-// encountered" internal error. The address-space specialization pass now seeds
-// exported functions and defaults such parameters to the `thread` address
-// space, matching the default used for local mutable storage.
+// An `export`/library-boundary function has no caller to specialize its
+// parameter address spaces from, so an `out`/`inout` (mutable-reference
+// pointer) parameter must be defaulted to `thread` when the exported function
+// is seeded. Left as `AddressSpace::Generic` it reaches the Metal emitter's
+// pointer address-space switch, which has no case for it.
 
 // CHECK-DAG: void onb_{{[A-Za-z0-9_]*}}({{.*}}, {{.*}}thread{{.*}}* {{.*}}, {{.*}}thread{{.*}}* {{.*}})
 export void onb(float3 n, out float3 b1, out float3 b2)
@@ -23,9 +21,14 @@ export void advance(inout uint state)
     state = state * 747796405u + 2891336453u;
 }
 
-// An exported function that itself calls another exported out-param function
-// (passing local `thread` variables) must still emit.
+// An exported function calling another exported out-param function with local
+// `thread` variables must emit the call against a matching `thread*` callee,
+// and `onb` must be defined exactly once (see the DEDUP prefix below) so the
+// seeded signature is reused rather than duplicated. Emitted MSL cannot say
+// which IR node survived — specialization clones copy the export decoration
+// and name — so the invariant here is call + single definition, not identity.
 // CHECK-DAG: float3 buildFrame_{{[A-Za-z0-9_]*}}(
+// CHECK: onb_{{[A-Za-z0-9_]*}}({{.*}}&{{.*}}, {{.*}}&{{.*}})
 export float3 buildFrame(float3 n)
 {
     float3 t, b;
@@ -33,15 +36,16 @@ export float3 buildFrame(float3 n)
     return t + b;
 }
 
-// An exported root whose own signature has no pointer parameter, but whose body
-// calls a *non-exported* `out`/`inout` helper. This is the case that fails if
-// the pass only defaults an exported function's own parameters: `scramble` has
-// nothing to default, so unless its body is still traversed the internal call to
-// the non-exported `mix2` is never specialized and `mix2`'s `inout` pointer
-// reaches the emitter carrying `AddressSpace::Generic` — the same crash one call
-// level down. `mix2` is not exported, so it is emitted only as the specialized
-// `thread*` callee reached through `scramble`.
+// An exported root with no pointer parameter of its own, calling a
+// *non-exported* `out`/`inout` helper. Defaulting only an exported function's
+// own parameters is not enough: `scramble` has nothing to default, so its body
+// must still be traversed or `mix2`'s `inout` pointer stays `Generic` and hits
+// the same emitter switch one call level down. Pinning `mix2`'s two `thread*`
+// parameters and the call to it is what distinguishes a real specialization
+// from merely surviving compilation.
 // CHECK-DAG: uint scramble_{{[A-Za-z0-9_]*}}(
+// CHECK-DAG: void mix2_{{[A-Za-z0-9_]*}}(uint thread* {{.*}}, uint thread* {{.*}})
+// CHECK: mix2_{{[A-Za-z0-9_]*}}({{.*}}&{{.*}}, {{.*}}&{{.*}})
 void mix2(inout uint a, inout uint b)
 {
     a ^= b << 3u;
