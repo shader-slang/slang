@@ -50,7 +50,12 @@ secret (the `PERF_RESULTS_REPO` env overrides the target).
   Inputs: `ref` (commit SHA or branch to build; blank = master HEAD, useful for
   backfilling historical daily points), `samples`, `sweep` (default `false` — opt-in,
   ~4x runtime: dispatch with `sweep=true` to also collect the multi-size scaling
-  ladders), `only`, and `publish` (default `true`). With `publish=false` the run measures only: results are
+  ladders), `only`, `publish` (default `true`), and `notify-slack` (default
+  `false`; set `true` to send the Slack notification from a manual run too,
+  to test the path end-to-end). The trend gate is two-tier: changes
+  ≥ 10% over the trailing median fail the job (Slack: regression), changes
+  ≥ 5% are reported as warnings (annotations + step summary + a yellow
+  Slack status) without failing — early signal without alert fatigue. With `publish=false` the run measures only: results are
   uploaded as a run artifact and the results repo, tracking series, pages, and
   trend check are untouched — the mode for one-off measurements (bisect points,
   suspect commits) that must not pollute the series. Because daily labels are
@@ -134,11 +139,54 @@ nightly passes `--label` with the label it just registered, so the judged point
 is pinned to this run's registration — daily labels are keyed by the swept
 commit's date, so several points can share a date and "the latest point" can be
 a same-date sibling. Without `--label` (ad-hoc CLI use) the last point is
-judged. A metric past both a relative (`--rel`, default 1.25×) and absolute
-(`--abs`, default 2 ms) threshold is flagged — printed, emitted as a GitHub
-`::error::` annotation + step-summary row, and the job exits non-zero (after
-the push, so the data is still stored). If the judged point's runner differs
-from the history's, it warns and compares only same-runner points.
+judged.
+
+Judgement is two-tier, and both tiers are gated on the same absolute floor
+(`--abs`, default 2 ms) so a large ratio on a tiny timer stays silent in
+either band:
+
+| ratio vs trailing median                      | tier        | effect                                                                                                      |
+| --------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------- |
+| ≥ `--rel` (default 1.10×)                     | **error**   | `::error::` annotation + step-summary row, job exits non-zero (after the push, so the data is still stored) |
+| ≥ `--warn-rel` (default 1.05×), below `--rel` | **warning** | `::warning::` annotation + step-summary row, job stays green                                                |
+| below `--warn-rel`                            | —           | silent                                                                                                      |
+
+`--warn-rel` must be strictly below `--rel`; `trend.py` rejects an inverted
+pair at startup, because the error band would otherwise claim the whole
+warning band and every 5–10% move would fail the nightly. The boundaries are
+inclusive and `rel` belongs to the error tier (a metric exactly at 1.10× is an
+error); `classify_metric` owns this decision and pins each boundary with an
+import-time self-check. If the judged point's runner differs from the
+history's, it warns and compares only same-runner points.
+
+On scheduled runs (and manual runs with `notify-slack=true`) the workflow also
+posts a Slack status notification — clean / warning-level changes / regression
+detected / job failed / trend check skipped (`SLACK_WEBHOOK_COMPILE_PERF`
+secret; the step is skipped when unset, and a delivery failure only warns — it
+never fails the run). The warning state is what `trend.py`'s `warnings=`
+GitHub output exists for: warnings do not fail the job, so the exit code alone
+cannot tell a warnings-only night from a clean one.
+
+`slack_status.py` owns that five-way choice, taking the trend step's outcome,
+the job status and the warning count. It is a module rather than inline
+workflow bash so its branch order can be tested: a regression drives
+`job.status` to failure as well, so classifying on job status first would
+report every regression as a generic "job failed" — a wrong-but-plausible
+message, on a path that only runs on a scheduled nightly. The import-time
+self-checks pin that ordering along with every state, and the icons match
+trend.py's step-summary header (🔴 regression, ⚠️ warning tier) so the two
+surfaces agree on severity.
+
+**Known gap — a night that judges nothing reports green.** `trend.py` returns
+early, before any classification, when there are fewer than two points or
+fewer than `--min-baseline` comparable trailing points (the normal state for
+the first few nights after a runner change). Those returns are successful, so
+Slack receives `outcome=success` with no warning count and posts
+"No regressions detected" — indistinguishable from a genuinely clean night,
+at exactly the moment confidence in the series is lowest. The CI run itself is
+unambiguous: both paths emit a `::warning::` annotation saying judgement was
+skipped. Distinguishing them in Slack needs a sixth state carried out of
+`trend.py` on those paths; it is deliberately not part of this change.
 
 ### Runner-change procedure
 

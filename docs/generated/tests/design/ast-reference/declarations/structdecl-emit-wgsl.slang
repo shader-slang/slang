@@ -1,18 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#aggtypedecl-structdecl-classdecl-enumdecl
-//META: doc_section_digest=60c3e2924d17c23b1f3bc412881a4c5e71f81efe23ecdd996e436f61429ac8c8
-//META: purpose=A StructDecl is emitted as a struct type by each text-emit backend; the struct keyword and field names appear in the output.
+//META: doc_section_digest=ee81272d01f69d54c75b75fc6518d2ad8af9fdb4a6eed0176bdf0fe82ee19e5c
+//META: purpose=A StructDecl survives to each text-emit backend as a named struct type rather than being scalarized away.
 //META: intent=expansion
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies a Slang StructDecl reaches the WGSL backend as a WGSL struct
-// declaration. The emitted WGSL text declares `struct Point_0` with both
-// `i32` fields in `name : type` form; CHECK pins the struct keyword and each
-// mangled field name, proving the aggregate type survives to WGSL emission.
+// Verifies the same aggregate-survives-emission claim on the WGSL backend,
+// where struct members use `name : type,` syntax and `int` becomes `i32`.
+// The CHECKs pin the struct declaration and both member lines.
 
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
 

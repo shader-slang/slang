@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#meshoutputref
-//META: doc_section_digest=4f2d77f0c3719656c50a0a149420cbc2adf75e40f2372c446c7a976a5ae733e9
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#mesh-shader-outputs
+//META: doc_section_digest=bedd4b56e7e5495dfd99f9d6eab0f36c5057ff4dadfc06a01626d0c188d9d28a
 //META: purpose=A mesh-shader entry point on `-target metal` writes to `out vertices`, `out primitives`, and `out indices` arrays through the documented `metalSetVertex`, `metalSetPrimitive`, and `metalSetIndices` opcodes in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's mesh-shader-outputs table lists `metalSetVertex`,
-// `metalSetPrimitive`, and `metalSetIndices` as Metal-specific
-// output-write opcodes. The portable surface is the same `out vertices`
-// / `out primitives` / `out indices` parameters of the mesh entry
-// point; the `set` accessor's `__target_switch` selects the
-// Metal-specific opcode when lowering to Metal.
+// Verifies the Metal-specific mesh output writes. The same `out
+// vertices` / `out indices` / `out primitives` parameters are used as
+// in the portable form; compiling with `-target metal` makes the
+// `set` accessor's target switch select the Metal opcodes, and the
+// order-independent CHECKs pin all three.
 
 //TEST:SIMPLE(filecheck=IR):-target metal -dump-ir -o /dev/null -stage mesh -entry main
 

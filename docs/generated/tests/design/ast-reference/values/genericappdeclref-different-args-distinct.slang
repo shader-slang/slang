@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:13Z
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#declref-family
-//META: doc_section_digest=20c2eb71a7785d9324495ca71a49afdc3bcf69ae059047eeb0dd7dadf9b245cc
-//META: purpose=Two GenericAppDeclRefs of the same decl with different generic arguments are distinct types; assigning one to the other is rejected by the type checker.
+//META: doc_section_digest=b67d89bff5896245b545bbc405d514054390bdb74cb2116fcc2a8cceefae2e64
+//META: purpose=A generic decl-ref with its arguments applied is identified by the argument list, so the same generic decl applied to different arguments denotes distinct types and cross-assignment is rejected.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc: `GenericAppDeclRef` "wraps an existing decl-ref in
-// generic-argument substitutions". Distinct argument lists
-// produce distinct decl-refs and therefore distinct types; the
-// checker rejects cross-instantiation assignment.
+// Verifies the negative half of generic-application identity: `Box<int>`
+// and `Box<float>` share a generic decl but differ in their argument
+// list. CHECK pins the type-mismatch diagnostic (E30019) naming both
+// spellings, which proves the two applications did not collapse to one
+// type despite the shared decl.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

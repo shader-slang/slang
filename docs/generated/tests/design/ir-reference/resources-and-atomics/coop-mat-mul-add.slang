@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#coopmatmapelementifunc
-//META: doc_section_digest=e491a40c4584c9e2ef051e5d42cd61fb8fe95105a8ef0814ea10a93c9c980d08
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#cooperative-matrix-and-vector
+//META: doc_section_digest=5d8bfb7cd06d16d7e5526799f2be56c9cee4a73edf35171033b8a239608e92f4
 //META: purpose=`coopMatMulAdd` on three `CoopMat` values surfaces the documented `CoopMatMulAdd` opcode in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's cooperative-matrix-and-vector table lists `CoopMatMulAdd`
-// (operands `matA, matB, matC, saturatingAccumulation`) as the IR form
-// of the core-module `CoopMat.mulAdd`. The portable surface is the
-// `linalg::coopMatMulAdd` free function on `CoopMat<T, ...>` values.
+// Verifies that a cooperative-matrix fused multiply-add is one opcode
+// rather than a multiply followed by an add. The three matrices come
+// from loads so nothing folds, and the CHECK finds the opcode in the
+// user body.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

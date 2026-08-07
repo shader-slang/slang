@@ -1,0 +1,40 @@
+schema_version: 1
+id: slangi-vm-narrow-int-return-not-sign-extended
+bundle: design/cross-cutting/core-module
+suspected_kind: wrong-codegen
+title: "slangi: negative int8_t/int16_t function return values come back zero-extended"
+observed_at: "2026-08-04T00:00:00+00:00"
+scope: core-module
+evidence:
+  command: "./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 1 -test-dir docs/generated/tests/design/cross-cutting/core-module docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-boundary.slang"
+  source_slang: docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-boundary.slang
+  observed_summary: |
+    Under the slangi byte-code interpreter, a negative `int8_t` or `int16_t` value that is
+    returned from a function loses its sign. `int8_t f() { return int8_t(-128); }` followed by
+    `printf("%d", int(f()))` prints 128; `int8_t(-100)` returned the same way prints 156 and
+    `int8_t(-1)` prints 255. `int16_t g() { return int16_t(-32768); }` prints 32768 and
+    `int16_t(-5)` prints 65531. The same constants read directly (`int(int8_t.minValue)`,
+    `int(int8_t(-128))`) or copied between locals print correctly as -128 / -100 / -1, so the
+    value is only mis-widened when it crosses a function return. Compiling the identical
+    source with `-target cpp` emits `return int8_t(-128);` and `int32_t(minOf_0())`, i.e. the
+    non-interpreter path preserves the sign, which is what makes this look like a VM
+    widening/sign-extension bug rather than a front-end one.
+  exit_code: 0
+expected:
+  claim: |
+    `int8_t` and `int16_t` are core-module base types with the documented two's-complement
+    ranges [-128, 127] and [-32768, 32767]; a value of those types must keep its sign when it
+    is returned from a function and subsequently widened to `int`, so
+    `int(returnsInt8Min())` must print -128, matching `int(int8_t.minValue)`.
+  citation_kind: doc
+  citation: docs/generated/design/cross-cutting/core-module.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+  doc_anchor: docs/generated/design/cross-cutting/core-module.md#core-module
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug (printf %d with a narrow type): ruled out — the same int() conversion of the same constant prints -128 when the value does not pass through a return."
+    - "Front-end constant-folding bug: ruled out — the -target cpp emit of the same source keeps int8_t(-128) and the signed widening."
+    - "Deliberate unsigned semantics for int8_t: ruled out — int8_t.minValue is -128 and reads back as -128 in the same interpreter run."

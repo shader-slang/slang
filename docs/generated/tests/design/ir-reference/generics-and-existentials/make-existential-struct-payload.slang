@@ -1,20 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#makeexistential
-//META: doc_section_digest=3a7462a86fc4c15dc7bc9c9156d37eabae3d8e2c13a7f3bce50ff7cff1572439
+//META: doc_section_digest=3daf40cb35b02e6a2100ffd8b47cd886d07ea61a0d83fed32606bc5b122234d2
 //META: purpose=A makeExistential whose payload is a multi-field struct still emits the same two-operand let %i : %IFoo = makeExistential(value, witness) shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on makeExistential payload shape: concrete type is
-// a multi-field struct. `### makeExistential` "packs a value of
-// some concrete type C and a witness" — the operand shape is
-// invariant in the concrete type, including when the payload is
-// a multi-field struct.
-
+// Boundary on payload size: packing does not decompose the value. A three-field
+// struct is widened to `IFoo`, and the CHECK asserts the same single
+// two-operand inst as the trivial payload case — no per-field packing appears.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };
@@ -41,4 +37,4 @@ void main()
     buf[0] = i.run(inVal);
 }
 
-// CHECK: let  %i	: %IFoo	= makeExistential(%{{[A-Za-z0-9_]+}}, %{{[0-9]+}})
+// CHECK: let  %i : %IFoo = makeExistential(%{{[A-Za-z0-9_]+}}, %{{[0-9]+}})
