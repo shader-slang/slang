@@ -56,13 +56,32 @@ LEAK: _replayContext
 # nobody owns them. Surfaced by the repro-validator unit tests.
 LEAK: getPathInfoFromFile
 
+# #10893: Use-after-free of TypeLayoutReflection in the slang-rhi
+# ShaderObjectLayout cache during render-test CPU compute tests. The cache
+# is keyed by raw TypeLayoutReflection*, and under server-count=1 those
+# addresses are recycled across sessions, so a cached entry's
+# m_elementTypeLayout can dangle. All three SUMMARY lines below cascade
+# from that single wild pointer: the ASan overflow is the read in
+# TypeLayout::FindResourceInfo, and the two UBSan findings are the bad
+# vptr on the way into it. All three must be listed, since a log counts
+# as expected only when every SUMMARY line in it matches a pattern.
+#
+# These entries were removed on 2026-07-08 in 70b2d94417 (#11937) after
+# several quiet nightlies, then the finding resurfaced in run 30971112743
+# on 2026-08-05. It is intermittent because it depends on allocator address
+# reuse, so quiet runs do not mean it is fixed -- remove these only when
+# #10893 itself is fixed, not merely when they go unmatched for a while.
+#
+# UBSan SUMMARY lines carry only file:line -- no function name -- so these
+# two are position-dependent against the file's own guidance, and will go
+# stale whenever the surrounding code shifts (the reflection entry has
+# already moved 1384 -> 1401). Update the line numbers when that happens.
+# The begin() entry is function-name based and is the durable one.
+Slang::List<Slang::TypeLayout::ResourceInfo, Slang::StandardAllocator>::begin()
+slang-reflection-api.cpp:1401
+slang-type-layout.h:772
+
 # Historical entries:
 #   #10828 LEAK: _maybeBeginMacroInvocation -- fixed by this PR: the
 #     wrong-arg-count macro invocation error paths now free the
 #     MacroInvocation.
-#   #10893 TypeLayoutReflection use-after-free SUMMARY patterns
-#     (List<ResourceInfo>::begin / slang-reflection-api.cpp /
-#     slang-type-layout.h) -- stale: never matched in recent nightly
-#     runs (e.g. 28644605608 and the scheduled master runs), so the
-#     UBSan finding no longer reproduces there. Re-add (with current
-#     line numbers) if #10893 resurfaces.
