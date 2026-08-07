@@ -9,12 +9,13 @@ permissions:
 jobs:
   test-falcor:
     name: Test (Falcor)
-    # The Falcor run itself takes ~45 minutes, and this job also waits for the
-    # deployment gate below and for a runner. 100 minutes was set before the
-    # gate existed and leaves little room for an approval that arrives out of
-    # hours. A timeout here also surfaces as a failed Falcor test rather than
-    # as "nobody has approved it yet", which sends people looking in the wrong
-    # place.
+    # This job hands the build to separate compute and waits for a pass/fail
+    # result, so its execution time is however long the Falcor run takes --
+    # ~45 minutes today, plus however long that run queues for a GPU host on
+    # the far side. Waiting for the deployment gate below does not count: the
+    # clock starts when the job begins executing on a runner. 100 minutes left
+    # only one Falcor run plus a short queue, which is thin for a job whose
+    # duration is set elsewhere.
     timeout-minutes: 180
     runs-on: [Linux, self-hosted, X64, falcor-bridge]
     # Vet-and-approve gate: this job runs PR-controlled code on the internal
