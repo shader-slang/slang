@@ -14,3 +14,4 @@ float main() : SV_TARGET
 
 // CHECK-DAG: DebugGlobalVariable
 // CHECK-DAG: "cf1"
+// CHECK-DAG: "cf2"

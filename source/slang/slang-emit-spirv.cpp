@@ -2435,7 +2435,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto col = debugGlobalConst->getCol();
                 auto value = debugGlobalConst->getValue();
 
-                auto spvValue = ensureInst(value);
+                // Walk through float/int casts to find the underlying literal: the
+                // initializer for a constant like `static const double cf1 = 3.0` is
+                // stored as floatCast(FloatLit(3.0 : Float)) before propagateConstExpr
+                // folds it, so we peel casts here to reach the IRConstant.
+                IRInst* resolvedValue = value;
+                while (resolvedValue)
+                {
+                    if (as<IRConstant>(resolvedValue))
+                        break;
+                    auto op = resolvedValue->getOp() & kIROpMask_OpMask;
+                    if ((op == kIROp_FloatCast || op == kIROp_IntCast ||
+                         op == kIROp_CastIntToFloat || op == kIROp_CastFloatToInt) &&
+                        resolvedValue->getOperandCount() >= 1)
+                    {
+                        resolvedValue = resolvedValue->getOperand(0);
+                    }
+                    else
+                    {
+                        resolvedValue = nullptr; // not a scalar literal
+                    }
+                }
+
+                // Only emit DebugGlobalVariable for scalar literal constants: non-constant
+                // values (runtime loads, struct constructors, etc.) cannot be represented
+                // as OpConstant at global scope in SPIRV.
+                if (!resolvedValue || !as<IRConstant>(resolvedValue))
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                auto spvValue = ensureInst(resolvedValue);
                 if (!spvValue)
                 {
                     *emittedSpvInst = nullptr;
