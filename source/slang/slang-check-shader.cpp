@@ -392,8 +392,104 @@ static void validateNoPerPrimitiveSemanticsInType(
 }
 
 
-// Validate system value semantics on a declaration recursively.
-// and validates any SV_ semantic against the SemanticDecl definitions in core module.
+// The output binding space a system value binds into. Two system values conflict only when they
+// share a direction and an output space, so this distinguishes outputs that are genuinely separate:
+// most stages have a single Default space, a mesh shader has one space per output category, and a
+// geometry shader has one space per output stream.
+enum class SystemValueOutputSpaceKind
+{
+    Default,      // all inputs, and the single output space of vertex/fragment/hull/domain/compute
+    MeshVertices, // mesh `out vertices`
+    MeshPrimitives, // mesh `out primitives`
+    MeshIndices,    // mesh `out indices`
+    GeometryStream, // one per geometry output stream, identified by its parameter index
+};
+
+struct SystemValueOutputSpace
+{
+    SystemValueOutputSpaceKind kind = SystemValueOutputSpaceKind::Default;
+    // Only meaningful when kind == GeometryStream: which stream parameter this value came from
+    // (streams share an element type, so the parameter is what tells them apart).
+    Index geometryStreamParamIndex = 0;
+
+    bool operator==(SystemValueOutputSpace const& other) const
+    {
+        return kind == other.kind && geometryStreamParamIndex == other.geometryStreamParamIndex;
+    }
+};
+
+// Return true if `baseName` (already lowercased and index-stripped) names a system value whose
+// binding is selected by the `noperspective` interpolation mode, so the perspective and
+// no-perspective spellings target *different* builtins and may legitimately coexist on one entry
+// point. Only SV_Barycentrics behaves this way: a fragment shader may read both the
+// perspective-correct and the no-perspective barycentric coordinates, as in
+//
+//     float3 bary                            : SV_Barycentrics,
+//     noperspective float3 baryNoPerspective : SV_Barycentrics
+//
+// which lower to BaryCoordKHR and BaryCoordNoPerspKHR respectively (the "sv_barycentrics" case in
+// slang-emit-spirv.cpp, and gl_BaryCoordNoPerspEXT in slang-ir-glsl-legalize.cpp). For every other
+// system value the interpolation mode decorates a single binding rather than choosing between two,
+// so it must not enter the duplicate identity: `noperspective float4 a : SV_Target0` and
+// `float4 b : SV_Target0` do collide on color 0 and must still be reported.
+static bool isInterpolationModeSplitSystemValue(UnownedStringSlice baseName)
+{
+    return baseName == toSlice("sv_barycentrics");
+}
+
+// Return true if `baseName` (already lowercased and index-stripped) names a system value whose
+// trailing index picks a *distinct* binding, so that two spellings differing only in that index do
+// not collide. Two do:
+//
+//   - SV_Target is not a builtin at all. A fragment output is an ordinary `out` variable whose
+//     location comes from the index (slang-emit-spirv.cpp returns no builtin for "sv_target"; the
+//     location is assigned in slang-parameter-binding.cpp), so SV_Target0 and SV_Target1 are
+//     genuinely separate render targets.
+//   - SV_ClipDistance indexes into gl_ClipDistance, which the GLSL legalization pass reads as an
+//     array index (slang-ir-glsl-legalize.cpp, `arrayIndex = int(semanticInst->getIndex())`).
+//
+// Every other system value lowers to one fixed binding and never consults the index, so a suffix on
+// those is inert and must not separate two records: `SV_Barycentrics0` and `SV_Barycentrics1` both
+// reach BaryCoordKHR, and `SV_CullDistance0` and `SV_CullDistance1` both write an unindexed
+// gl_CullDistance (that branch, unlike the clip-distance one beside it, sets no array index), so
+// honouring the suffix on either would let a real collision escape the check.
+static bool isIndexedSystemValue(UnownedStringSlice baseName)
+{
+    return baseName == toSlice("sv_target") || baseName == toSlice("sv_clipdistance");
+}
+
+// A single system-value semantic gathered while validateSystemValueSemantic walks an entry point's
+// parameters and result, used by validateEntryPoint to reject the same system value being declared
+// more than once. Two records are duplicates when their direction, output space, base name, index,
+// and no-perspective selector all match; e.g. `float4 vs(uint a : SV_VertexID, uint b :
+// SV_VertexID)` yields two records {Input, Default, "sv_vertexid", 0, false}, which are equal ->
+// E30706.
+struct CollectedSystemValueSemantic
+{
+    SemanticDirection direction = SemanticDirection::Input;
+    SystemValueOutputSpace outputSpace;
+    // Canonical index, but only for a system value whose index selects a distinct binding (see
+    // isIndexedSystemValue): SV_Target0 -> 0, SV_Target1 -> 1, a missing suffix -> 0. Forced to 0
+    // for the rest, whose index is inert, so every spelling of one of those compares equal.
+    Index semanticIndex = 0;
+    String baseName;    // lowercased base name (SV_Target0 -> "sv_target")
+    String displayName; // original spelling (e.g. "SV_Target0"), for the diagnostic message
+    SourceLoc loc;      // location carrying the semantic, for the diagnostic
+    // Set only for a system value that `noperspective` splits into a separate binding (see
+    // isInterpolationModeSplitSystemValue), so the flag never separates two records that in fact
+    // share one binding. Resolved over the access chain, not read off one declaration.
+    bool isNoPerspective = false;
+};
+
+// Validate system value semantics on a declaration recursively, checking any SV_ semantic against
+// the SemanticDecl definitions in the core module. When `ioCollectedSemantics` is non-null, every
+// SV_ semantic encountered is appended to it (with its effective direction and output space) so the
+// caller can detect duplicates across the whole entry point. `outputSpace` carries the resolved
+// output space through the recursion (Default at the top level; set to the category/stream by the
+// mesh/geometry wrapper-type branches below). `parameterStreamIndex` is the parameter's index,
+// consumed only to identify a geometry output stream's space. `inheritedNoPerspective` is the
+// enclosing declaration's `noperspective` state, since a struct parameter's interpolation mode
+// applies to its fields unless a field overrides it.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -401,7 +497,11 @@ static void validateSystemValueSemantic(
     Stage stage,
     SemanticDirection direction,
     Scope* scope,
-    UInt recursionDepth = 0)
+    UInt recursionDepth,
+    List<CollectedSystemValueSemantic>* ioCollectedSemantics,
+    SystemValueOutputSpace outputSpace,
+    Index parameterStreamIndex,
+    bool inheritedNoPerspective = false)
 {
     if (!decl)
         return;
@@ -463,21 +563,54 @@ static void validateSystemValueSemantic(
         }
         type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
+
+        // The mesh output category is the output space: the same system value on a vertex output
+        // and a primitive output are distinct builtins (different spaces, no conflict), while two
+        // vertex outputs carrying it collide. (This detects a repeated system value only, not the
+        // separate question of whether two same-category arrays are themselves valid.)
+        if (as<VerticesType>(meshOutputType))
+            outputSpace.kind = SystemValueOutputSpaceKind::MeshVertices;
+        else if (as<PrimitivesType>(meshOutputType))
+            outputSpace.kind = SystemValueOutputSpaceKind::MeshPrimitives;
+        else if (as<IndicesType>(meshOutputType))
+            outputSpace.kind = SystemValueOutputSpaceKind::MeshIndices;
     }
     else if (auto streamOutputType = as<HLSLStreamOutputType>(type))
     {
         auto elementType = streamOutputType->getElementType();
         type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
+
+        // Each geometry output stream is a distinct binding space, identified by its parameter
+        // (streams share an element type, so nothing else distinguishes them). Two system values in
+        // one stream element collide; the same value on two different streams does not.
+        outputSpace.kind = SystemValueOutputSpaceKind::GeometryStream;
+        outputSpace.geometryStreamParamIndex = parameterStreamIndex;
     }
 
     auto astBuilder = visitor->getASTBuilder();
+
+    // True when `noperspective` reaches this declaration from anywhere on the access chain: an
+    // enclosing struct parameter's modifier applies to its fields, and GLSL legalization treats one
+    // such node anywhere as selecting the no-perspective barycentric builtin for the whole chain
+    // (slang-ir-glsl-legalize.cpp skips a node whose mode is something else and keeps scanning), so
+    // an inner modifier does not restore a separate binding.
+    const bool effectiveNoPerspective =
+        inheritedNoPerspective || decl->findModifier<HLSLNoPerspectiveModifier>() != nullptr;
 
     // If the type is a struct, recursively validate semantics on all fields
     if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
         {
+            // Per the "outer-most semantic wins" binding rule (see
+            // processEntryPointVaryingParameterDecl in slang-parameter-binding.cpp), a semantic on
+            // this aggregate masks the field semantics for binding — the fields are bound under the
+            // outer name, not their own. So those field semantics must NOT be collected as system
+            // values for the duplicate check. Validation still recurses (to report per-field
+            // issues); only the collection pointer is suppressed for the masked fields.
+            List<CollectedSystemValueSemantic>* fieldCollectedSemantics =
+                decl->findModifier<HLSLSimpleSemantic>() ? nullptr : ioCollectedSemantics;
             for (auto fieldDeclRef :
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
@@ -489,7 +622,11 @@ static void validateSystemValueSemantic(
                     stage,
                     direction,
                     scope,
-                    recursionDepth + 1);
+                    recursionDepth + 1,
+                    fieldCollectedSemantics,
+                    outputSpace,
+                    parameterStreamIndex,
+                    effectiveNoPerspective);
             }
         }
     }
@@ -508,6 +645,48 @@ static void validateSystemValueSemantic(
         stage,
         direction,
         scope);
+
+    // Record this system-value semantic for the caller's whole-entry-point duplicate check. Gate on
+    // the SV_ prefix (the same recognition boundary used by validateSystemValueSemanticForType), so
+    // user/non-SV semantics — which are legitimately re-indexed later by
+    // fixFieldSemanticsOfFlatStruct — are never treated as duplicates.
+    if (ioCollectedSemantics)
+    {
+        auto semanticNameSlice = semantic->name.getContent();
+        if (semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
+        {
+            UnownedStringSlice baseNameSlice;
+            UnownedStringSlice indexSlice;
+            splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
+
+            CollectedSystemValueSemantic collected;
+            collected.direction = direction;
+            collected.outputSpace = outputSpace;
+            collected.baseName = String(baseNameSlice).toLower();
+            collected.displayName = String(semanticNameSlice);
+            collected.loc = decl->loc;
+
+            // Only an indexed system value gets its index into the identity. For an indexed one the
+            // suffix picks a distinct binding, so canonicalize a missing suffix to 0 the way
+            // parameter binding does (decomposeSimpleSemantic) and keep distinct integers apart:
+            // SV_Position == SV_Position0, while SV_Target0 != SV_Target1. For a non-indexed one
+            // the suffix is inert — every spelling reaches the same builtin — so honouring it would
+            // let `SV_Barycentrics0` and `SV_Barycentrics1` name one builtin and escape the check.
+            collected.semanticIndex =
+                isIndexedSystemValue(collected.baseName.getUnownedSlice()) && indexSlice.getLength()
+                    ? stringToInt(String(indexSlice))
+                    : 0;
+
+            // `noperspective` selects a distinct builtin for SV_Barycentrics only, so record it as
+            // part of the identity there and nowhere else. Use the mode resolved over the access
+            // chain, not the modifier on this declaration: a `noperspective` struct parameter
+            // passes its mode to a field that declares none.
+            collected.isNoPerspective =
+                isInterpolationModeSplitSystemValue(collected.baseName.getUnownedSlice()) &&
+                effectiveNoPerspective;
+            ioCollectedSemantics->add(collected);
+        }
+    }
 }
 
 // Return true if `semanticName` is one of the fragment depth-output system values
@@ -1920,25 +2099,57 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // serialized module)
         if (auto scope = linkage->getSessionImpl()->coreLanguageScope)
         {
-            // Validate system value semantics for entry point parameters
+            // Accumulate every SV_ semantic across all parameters + the result so that, after the
+            // per-declaration validation below, we can reject the same system value being declared
+            // more than once (see the duplicate check after this loop).
+            List<CollectedSystemValueSemantic> collectedSystemValueSemantics;
+            const UInt initialRecursionDepth = 0;
+
+            // Validate system value semantics for entry point parameters. Inputs share one binding
+            // space for every stage; outputs do too, except mesh outputs (keyed by category) and
+            // geometry stream outputs (keyed by stream parameter) — both resolved inside
+            // validateSystemValueSemantic. This loop supplies the default output space and each
+            // parameter's index, which the geometry branch uses to identify its stream.
+            Index entryPointParamIndex = 0;
             for (const auto& param : entryPointFuncDecl->getParameters())
             {
+                const Index parameterStreamIndex = entryPointParamIndex++;
+
                 if (param->hasModifier<InOutModifier>())
                 {
-                    validateSystemValueSemantic(
-                        &visitor,
-                        sink,
-                        param,
-                        stage,
-                        SemanticDirection::Input,
-                        scope);
+                    // A stream or mesh output type is implicitly output-only even under `inout`, so
+                    // its input half is spurious and, worse, would collect the output semantics
+                    // twice (both halves resolve to Output inside). Skip the input call for such
+                    // parameters; the output call covers them. Genuine `inout` scalars are
+                    // unaffected.
+                    Type* paramType = unwrapConditionalType(param->getType());
+                    const bool paramIsOutputOnlyByType =
+                        as<MeshOutputType>(paramType) || as<HLSLStreamOutputType>(paramType);
+                    if (!paramIsOutputOnlyByType)
+                    {
+                        validateSystemValueSemantic(
+                            &visitor,
+                            sink,
+                            param,
+                            stage,
+                            SemanticDirection::Input,
+                            scope,
+                            initialRecursionDepth,
+                            &collectedSystemValueSemantics,
+                            SystemValueOutputSpace(),
+                            parameterStreamIndex);
+                    }
                     validateSystemValueSemantic(
                         &visitor,
                         sink,
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        initialRecursionDepth,
+                        &collectedSystemValueSemantics,
+                        SystemValueOutputSpace(),
+                        parameterStreamIndex);
                 }
                 else if (param->hasModifier<OutModifier>())
                 {
@@ -1948,7 +2159,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Output,
-                        scope);
+                        scope,
+                        initialRecursionDepth,
+                        &collectedSystemValueSemantics,
+                        SystemValueOutputSpace(),
+                        parameterStreamIndex);
                 }
                 else
                 {
@@ -1958,18 +2173,53 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         param,
                         stage,
                         SemanticDirection::Input,
-                        scope);
+                        scope,
+                        initialRecursionDepth,
+                        &collectedSystemValueSemantics,
+                        SystemValueOutputSpace(),
+                        parameterStreamIndex);
                 }
             }
 
-            // Validate the return type semantic
+            // Validate the return type semantic (no parameter, so no geometry stream index).
             validateSystemValueSemantic(
                 &visitor,
                 sink,
                 entryPointFuncDecl,
                 stage,
                 SemanticDirection::Output,
-                scope);
+                scope,
+                initialRecursionDepth,
+                &collectedSystemValueSemantics,
+                SystemValueOutputSpace(),
+                0);
+
+            // A system value denotes a single binding, so it must not be declared twice in the same
+            // direction and output space on one entry point. Two records are a duplicate when their
+            // direction, output space, base name, index, and no-perspective selector all match;
+            // report the second (and any later) occurrence. Left unchecked the duplicate reaches
+            // codegen: WGSL/HLSL emit duplicate builtins and SPIR-V hits an "Unimplemented system
+            // value" internal error (#6319). The list holds one entry per system value on the entry
+            // point (a handful), so this quadratic scan is cheap and needs no string keys.
+            for (Index i = 0; i < collectedSystemValueSemantics.getCount(); ++i)
+            {
+                const auto& current = collectedSystemValueSemantics[i];
+                for (Index j = 0; j < i; ++j)
+                {
+                    const auto& prior = collectedSystemValueSemantics[j];
+                    if (current.direction == prior.direction &&
+                        current.outputSpace == prior.outputSpace &&
+                        current.semanticIndex == prior.semanticIndex &&
+                        current.baseName == prior.baseName &&
+                        current.isNoPerspective == prior.isNoPerspective)
+                    {
+                        sink->diagnose(Diagnostics::DuplicateSystemValueSemantic{
+                            .semantic = current.displayName,
+                            .location = current.loc});
+                        break;
+                    }
+                }
+            }
         }
     }
 
