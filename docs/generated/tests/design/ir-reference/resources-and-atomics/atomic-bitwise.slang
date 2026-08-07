@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T12:00:00+00:00
-//META: source_commit=5f0e613fdd3c2890bb087d9ff76154e2605a14d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=52293a26550b22915d50787927526213ba913b7231afe19be04ac5605d79d8b4
+//META: doc_section_digest=534618adad82acb65da181567998c07a77381ecf27996abdf7535de5b49ec7b3
 //META: purpose=`Atomic<T>::and(v)` / `or(v)` / `xor(v)` lower to `atomicAnd` / `atomicOr` / `atomicXor` with the standard `(ptr, val, order)` operand shape.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's atomic-operations table lists the three bitwise atomics
-// together. Group them in one test to keep the bundle compact while
-// still asserting each opcode independently; each CHECK pins a single
-// trailing memory-order operand per the documented
-// `ptr, val, memoryOrder` shape.
+// Verifies that the three bitwise read-modify-write atomics each get
+// their own opcode. They share one file because they share one operand
+// shape; each call uses a distinct mask literal so the CHECKs cannot
+// match each other's line, and each allows exactly one trailing operand
+// — the memory order.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

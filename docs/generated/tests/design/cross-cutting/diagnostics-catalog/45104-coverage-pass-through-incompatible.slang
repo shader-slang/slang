@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=a77306016356bc8d9fdfca555712dee919e8096334564819e32f8da800749a2b
 //META: purpose=Fires diagnostic E45104 (coverage-pass-through-incompatible) - `-trace-coverage` cannot be combined with `-pass-through`
 //META: intent=negative
 //META: pipeline_stage=ir-pass
@@ -15,9 +15,9 @@
 // pipeline that performs the instrumentation, so the option pair
 // is rejected.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target dxil -entry main -stage compute -trace-coverage -pass-through dxc
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target dxil -entry main -stage compute -trace-coverage -pass-through dxc
 
 [numthreads(1,1,1)]
 void main() {}
 
-// CHECK: E45104
+//CHECK: E45104

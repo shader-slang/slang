@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:13Z
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#intval-family
-//META: doc_section_digest=8bbf4cb8daa21d5c3d6e035a494748b9ecec4dbd1090f3e9e250c4555daedc9f
-//META: purpose=A DeclRefIntVal is an unsubstituted generic value parameter; after the generic is instantiated, the IntVal collapses to its concrete value and the array carries the substituted size.
+//META: doc_section_digest=7dc220c4c4dd5c2b21296a00da8c0b8bb7caf5c69af13f6b032f0ae0e4047ecd
+//META: purpose=A generic value parameter is an unsubstituted compile-time integer that only collapses to a constant after generic application, so the array it bounds carries the substituted size.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc states `DeclRefIntVal` names "an unsubstituted generic
-// value parameter" which "collapses to a constant after
-// substitution". A generic struct parameterised by `let N : int`
-// uses N as an array bound; at instantiation, N becomes a
-// concrete integer and the array length is observable.
+// Verifies the symbolic end of the IntVal family: `let N : int` names
+// an integer that is not known while the generic is being checked, and
+// becomes concrete only at `Buf<3>`. The test writes three slots of
+// `data` and prints them; CHECK asserts all three round-trip, which
+// requires the bound to have become the constant 3 at instantiation.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

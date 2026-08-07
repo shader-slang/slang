@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=0acf92c990c51e23e6b949538b0504562447e6a609a849cd20f331b1ba8f82e3
-//META: purpose=A PtrType `T*` is a raw pointer whose pointee is reachable by dereference; a load through the pointer reads the pointed-to value and a store writes it back.
+//META: doc_section_digest=c7f55cb42aaa9e03df513fb2e3ff5bbcf380f2c09432d750a2aa9c55dfc56801
+//META: purpose=A PtrType `T*` is the raw-pointer type whose pointee is reachable by dereference; a load through the pointer reads the pointed-to value and a store writes it back.
 //META: intent=functional
-//META: pipeline_stage=check
+//META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies PtrType `T*` behaves as the raw-pointer type: the pointee
-// is read via `*p` and written via `*p = ...`. A uniform int* is fed
-// with value 5, dereferenced, mutated, and re-read into an output
-// buffer. CHECK asserts both the original and the updated pointee.
+// Verifies that `T*` behaves as a raw pointer with a mutable pointee.
+// A uniform int* is fed a buffer holding 5, read through `*p`, written
+// through `*p = 100`, then re-read. CHECK asserts 5 then 100, so a
+// pointer that copied its pointee instead of aliasing it would fail the
+// second observation.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

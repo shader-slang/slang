@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=c0f68fbd11fbf74cffbc1af19923571c01f9108c320fe0630ddecaa337b4ac7c
-//META: purpose=Member lookup walks the inheritance facets including extensions; direct members and same-name extension members of the same type accumulate into one overload set.
+//META: doc_section_digest=9574aa361d7b18b1da022473e0e53acd215b9af06dae0cb39490ca13610d03bf
+//META: purpose=The facet walk keeps an extension whose target type equals the self type, so a direct member and a same-named extension member of that type accumulate into one overload set.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The inheritance walk includes extension facets ("a special case
-// that keeps extensions targeting the same type in scope" — doc).
-// `s.twice(...)` must see both the direct member `twice(int)` and
-// the extension member `twice(float)` as candidates of one overload
-// set.
+// Verifies the extension-on-the-same-type special case of the facet
+// walk. `twice(int)` is a direct member and `twice(float)` comes from
+// an extension on S; both must survive into a single candidate set for
+// the two calls to pick different bodies. CHECK asserts 6 + 102, which
+// is only reachable if both facets contributed.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
@@ -30,7 +30,7 @@ extension S
 void main()
 {
     S s;
-    int r = s.twice(3) + s.twice(2.0f);  // 6 + 102
+    int r = s.twice(3) + s.twice(2.0f);
     // CHECK: r=108
     printf("r=%d\n", r);
 }

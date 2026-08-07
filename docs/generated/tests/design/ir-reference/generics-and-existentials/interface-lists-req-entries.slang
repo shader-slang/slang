@@ -1,20 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#interfacereqentry
-//META: doc_section_digest=649555343c205ab0c26446093b6240518a16135126c348a497fe87b34f836ad7
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
+//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
 //META: purpose=An interface declaration appears as let %I : Type = interface(%req...) whose operands are the interface_req_entry value-ids.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### interface_req_entry` says it "sits inside an
-// `InterfaceType` parent opcode" — the parent `interface(...)`
-// opcode lists the requirement entries as its operands.
-// For an interface with two methods, the `interface` opcode
-// takes two operands, both `interface_req_entry` value-ids.
-
+// Verifies that the requirement entries are reachable from the interface type
+// itself rather than floating free: the interface inst lists them as its
+// operands. The CHECK pins a two-operand list for a two-requirement interface,
+// with the closing parenthesis so a longer list would not match.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IBar
@@ -39,4 +36,4 @@ void main()
     buf[0] = s.doA(inVal) + s.doB(inVal);
 }
 
-// CHECK: let  %IBar	: Type	= interface(%{{[0-9]+}}, %{{[0-9]+}})
+// CHECK: let  %IBar : Type = interface(%{{[0-9]+}}, %{{[0-9]+}})

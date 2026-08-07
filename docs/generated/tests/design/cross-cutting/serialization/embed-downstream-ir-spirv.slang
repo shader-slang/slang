@@ -1,20 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:14:10Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#riff-container-format
-//META: doc_section_digest=bfd9e20f8387a0e2ddadf7446a8bed2df7373cdba7ea1ede802fc7577b3e1f2e
-//META: purpose=Container packaging composes AST + IR + auxiliary data; with -embed-downstream-ir a SPIR-V blob joins the container and surfaces as an EmbeddedDownstreamIR marker under -dump-module.
+//META: doc_section_digest=0c078e337fe0de98e2ce6d13119538d84997c407efe297937c76318154a68096
+//META: purpose=The container composes the AST and IR payloads with auxiliary data, and with -embed-downstream-ir a SPIR-V blob joins it and surfaces as an EmbeddedDownstreamIR entry under -dump-module.
 //META: intent=functional
 //META: pipeline_stage=link
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// "RIFF container format" describes how container orchestration
-// composes AST + IR + auxiliary payloads (e.g. an embedded downstream-
-// IR blob) into one chunked file with well-known chunk codes. The
-// user-facing observable is that when `-embed-downstream-ir` is set,
-// the container gains a downstream-IR chunk; `-dump-module` surfaces
-// it with an `EmbeddedDownstreamIR(...)` marker.
+// Verifies that the container is a composition rather than a single
+// payload: the same .slang-module can hold the module's own IR plus a
+// downstream artefact. The test compiles with -target spirv and
+// -embed-downstream-ir, then re-reads the file; the CHECKs require both
+// the module's own entry-point function and an EmbeddedDownstreamIR
+// entry carrying real SPIR-V (the OpCapability line comes from the
+// embedded blob's disassembly, not from the module IR), which only
+// holds if the extra chunk was written and found again on load.
 
 //TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/embed-downstream-ir-spirv.slang -o docs/generated/tests/design/cross-cutting/serialization/embed-downstream-ir-spirv.slang-module -target spirv -embed-downstream-ir -skip-spirv-validation
 //TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/embed-downstream-ir-spirv.slang-module
@@ -27,5 +29,6 @@ void main(uint3 tid : SV_DispatchThreadID)
 {
 }
 
-// CHECK: EmbeddedDownstreamIR
-// CHECK: OpCapability
+// CHECK: [nameHint("main")]
+// CHECK: EmbeddedDownstreamIR({{[0-9]+}} : Int,
+// CHECK: OpCapability Shader

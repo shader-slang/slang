@@ -1,20 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#floatnonuniformresourceindex
-//META: doc_section_digest=e8f525c4f3b39107c481bf03414c7c2ad6a1c96a430e84aae54c4f8e6a580692
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination
+//META: doc_section_digest=4fecf4dd0bb701e665017f724328ac296a661dcd280fb45d1f2915bcbd0fc67a
 //META: purpose=floatNonUniformResourceIndex runs for HLSL (!isSPIRV); the NonUniformResourceIndex(...) intrinsic survives in the HLSL emission of a fragment-stage bindless texture-array access.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Phase C table (row 3) lists floatNonUniformResourceIndex
-// with mode `NonUniformResourceIndexFloatMode::Textual` for the
-// HLSL `NonUniformResourceIndex(...)` intrinsic. The natural surface
-// is a bindless texture-array sample in a graphics-pipeline (fragment)
-// shader; the call site must use NonUniformResourceIndex to flag the
-// divergent index. The pass keeps the call textually intact on HLSL.
+// Verifies that `floatNonUniformResourceIndex` runs on HLSL (it is gated on
+// `!isSPIRV`) in its textual mode, which keeps the
+// `NonUniformResourceIndex(...)` marker intact in the emitted source instead
+// of lowering it away. The test samples a bindless texture array from a
+// fragment entry point with a divergent index; CHECK asserts the call
+// spelling survives into the HLSL text, which only holds if the pass chose
+// the textual float mode.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage fragment
 
