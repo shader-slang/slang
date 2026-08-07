@@ -609,8 +609,16 @@ def _repro_command(spec):
     inspecting them is usually the reason someone reaches for this. Naming a
     workload in ``--only`` also opts it in when it is an api-mode workload,
     which is otherwise excluded from the default set.
+
+    The slangc placeholder is ``/path/to/slangc`` and must NOT be written as
+    ``<path/to/slangc>``: this string exists to be pasted into a shell, where
+    ``<`` and ``>`` are redirections, not punctuation. The angled form fails
+    with "path/to/slangc: No such file or directory" — or worse, if that path
+    happens to exist, silently creates a file named ``--only``, redirects
+    stdout into it, and leaves ``--slangc`` with no value. The self-check at
+    the bottom of this module rejects shell metacharacters for that reason.
     """
-    return (f"python3 tools/compile-perf/bench.py --slangc <path/to/slangc> "
+    return (f"python3 tools/compile-perf/bench.py --slangc /path/to/slangc "
             f"--only {spec.name} --label repro --gen-dir repro-{spec.name}")
 
 
@@ -979,4 +987,16 @@ assert sum(len(s.splitlines()) for _, s in _files) > 500, \
 _CMD = _repro_command(_SPEC)
 assert "\n" not in _CMD, "the repro command must stay on one line to paste cleanly"
 assert f"--only {_SPEC.name}" in _CMD, "the repro command must name its workload"
-del _SPEC, _n, _files, _gen, _fn, _src, _CMD
+# The command's whole purpose is to be pasted into a shell, so it must contain
+# nothing the shell would interpret. This is not hypothetical punctuation
+# policing: the first version used `<path/to/slangc>` as the placeholder, which
+# bash reads as a stdin redirect followed by an stdout redirect — it fails
+# outright, and where that path exists it silently creates a file named
+# `--only` and leaves `--slangc` with no value. Testing the command with the
+# placeholder substituted for a real path (as the original test plan did) hides
+# exactly this, so the published STRING is what gets checked here.
+for _meta in "<>|&;$`\\\"'":
+    assert _meta not in _CMD, \
+        (f"repro command contains shell metacharacter {_meta!r}: it is published "
+         f"to be copy-pasted, so it must survive a shell verbatim — got {_CMD!r}")
+del _SPEC, _n, _files, _gen, _fn, _src, _CMD, _meta
