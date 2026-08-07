@@ -2397,6 +2397,74 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             return true;
 
+        case kIROp_DebugGlobalConstant:
+            if (shouldEmitExtendedDebugInfo)
+            {
+                auto debugGlobalConst = as<IRDebugGlobalConstant>(inst);
+                auto varType = as<IRType>(debugGlobalConst->getDebugType());
+                auto debugType = emitDebugType(varType, false);
+                if (!debugType)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                // Ensure the DebugCompilationUnit is processed before trying to find the scope.
+                // DebugGlobalConstant may appear in the IR before DebugCompilationUnit, so we
+                // must force it to be emitted first so the module-inst → scope mapping is
+                // registered in m_mapIRInstToSpvDebugInst before findDebugScope is called.
+                for (auto globalInst : inst->getModule()->getGlobalInsts())
+                {
+                    if (globalInst->getOp() == kIROp_DebugCompilationUnit)
+                    {
+                        ensureInst(globalInst);
+                        break;
+                    }
+                }
+
+                auto scope = findDebugScope(inst->getModule()->getModuleInst());
+                if (!scope)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                auto name = debugGlobalConst->getName();
+                auto source = debugGlobalConst->getSource();
+                auto line = debugGlobalConst->getLine();
+                auto col = debugGlobalConst->getCol();
+                auto value = debugGlobalConst->getValue();
+
+                auto spvValue = ensureInst(value);
+                if (!spvValue)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+
+                // FlagIsDefinition = 8 in NonSemantic.Shader.DebugInfo.100
+                auto flags = builder.getIntValue(builder.getUIntType(), 8);
+
+                *emittedSpvInst = emitOpDebugGlobalVariable(
+                    getSection(SpvLogicalSectionID::GlobalVariables),
+                    inst,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    name,
+                    debugType,
+                    source,
+                    line,
+                    col,
+                    scope,
+                    name, // linkageName same as name
+                    spvValue,
+                    flags);
+            }
+            return true;
+
         default:
             // Not a debug instruction, return false to signal caller to continue
             return false;
@@ -2986,6 +3054,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugCompilationUnit:
         case kIROp_DebugFunction:
         case kIROp_DebugInlinedAt:
+        case kIROp_DebugGlobalConstant:
             SLANG_UNEXPECTED(
                 "Debug instruction should have been handled by processDebugGlobalInst");
         case kIROp_GetStringHash:
@@ -12169,6 +12238,20 @@ SlangResult emitSPIRVFromIR(
         }
     }
 
+    // Pre-ensure DebugGlobalConstant instructions after the compilation units have been
+    // registered. These instructions are not referenced by any other instruction and would
+    // not be pulled in transitively; they must be explicitly iterated to generate
+    // DebugGlobalVariable entries in the SPIR-V output.
+    // This loop must run after the DebugCompilationUnit loop above (and after the module-scope
+    // debug scope fixup below) so that findDebugScope returns the correct scope.
+    // We defer the actual ensureInst calls to after the scope fixup loop.
+    List<IRInst*> debugGlobalConstInsts;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (as<IRDebugGlobalConstant>(inst))
+            debugGlobalConstInsts.add(inst);
+    }
+
     // Override m_defaultDebugSource with the entry point's source file.
     // When multiple compilation units exist (e.g., with 'import' syntax), global insts
     // may be processed in module order and m_defaultDebugSource may end up pointing to
@@ -12208,6 +12291,12 @@ SlangResult emitSPIRVFromIR(
             }
         }
     }
+
+    // Emit DebugGlobalVariable for named global constants. These were collected earlier,
+    // after the compilation-unit pre-ensure pass, so the module-scope debug scope is now
+    // registered and findDebugScope will succeed.
+    for (auto inst : debugGlobalConstInsts)
+        context.ensureInst(inst);
 
     for (auto inst : irModule->getGlobalInsts())
     {

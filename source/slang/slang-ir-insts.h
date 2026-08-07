@@ -2732,6 +2732,18 @@ struct IRDebugCompilationUnit : IRInst
 };
 
 FIDDLE()
+struct IRDebugGlobalConstant : IRInst
+{
+    FIDDLE(leafInst())
+    IRInst* getName() { return getOperand(0); }      // IRStringLit: variable name
+    IRInst* getDebugType() { return getOperand(1); } // IRType
+    IRInst* getSource() { return getOperand(2); }    // IRDebugSource
+    IRInst* getLine() { return getOperand(3); }      // IRIntLit
+    IRInst* getCol() { return getOperand(4); }       // IRIntLit
+    IRInst* getValue() { return getOperand(5); }     // the constant value (e.g., IRFloatLit)
+};
+
+FIDDLE()
 struct IRDebugLine : IRInst
 {
     FIDDLE(leafInst())
@@ -3689,6 +3701,13 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* file,
         IRInst* debugType,
         IRInst* parentScope = nullptr);
+    IRInst* emitDebugGlobalConstant(
+        IRType* type,
+        IRInst* name,
+        IRInst* source,
+        IRInst* line,
+        IRInst* col,
+        IRInst* value);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction

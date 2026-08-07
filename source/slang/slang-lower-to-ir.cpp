@@ -11700,6 +11700,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // to the module we are lowering.
 
         IRInst* irConstant = nullptr;
+        IRInst* irInitVal = nullptr;
         if (!initExpr)
         {
             // If we don't know the value we want to use, then we just create
@@ -11717,7 +11718,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+            irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
@@ -11735,6 +11736,33 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addVarDecorations(context, irConstant, decl);
 
         getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
+
+        // Emit debug info for named global constants when debug info is enabled.
+        // We reference irInitVal (the raw constant value) rather than irConstant
+        // (the GlobalConstant wrapper) so the debug instruction survives the
+        // replaceGlobalConstants pass, which removes the wrapper.
+        if (irInitVal && subContext->debugInfoLevel >= DebugInfoLevel::Standard &&
+            decl->loc.isValid())
+        {
+            IRInst* debugSourceInst = getOrEmitDebugSource(subContext, decl->loc);
+            if (debugSourceInst)
+            {
+                auto humaneLoc = _getDebugHumaneLoc(subContext, debugSourceInst, decl->loc);
+                auto declName = decl->getName();
+                if (declName)
+                {
+                    auto nameInst = subBuilder->getStringValue(declName->text.getUnownedSlice());
+                    auto irType = lowerType(subContext, decl->getType());
+                    subBuilder->emitDebugGlobalConstant(
+                        irType,
+                        nameInst,
+                        debugSourceInst,
+                        subBuilder->getIntValue(subBuilder->getUIntType(), humaneLoc.line),
+                        subBuilder->getIntValue(subBuilder->getUIntType(), humaneLoc.column),
+                        irInitVal);
+                }
+            }
+        }
 
         // Finish of generic
 
