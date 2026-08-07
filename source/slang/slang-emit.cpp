@@ -3416,6 +3416,14 @@ static SlangResult createArtifactFromIR(
                 (uint32_t)spirvFiles.getCount(),
                 linkedArtifact.writeRef());
 
+            if (linkresult == SLANG_E_NOT_AVAILABLE)
+            {
+                // The linker never ran, so the compile fails for an environmental reason the user
+                // cannot infer from a bare `SLANG_FAIL`.
+                codeGenContext->getSink()->diagnose(Diagnostics::DownstreamLinkingUnavailable{});
+                return SLANG_FAIL;
+            }
+
             if (linkresult != SLANG_OK)
             {
                 return SLANG_FAIL;
