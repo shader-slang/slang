@@ -900,6 +900,13 @@ public:
 
     bool hasElements();
 
+    /// Number of container elements not yet read.
+    ///
+    /// Exposed so that a container being deserialized can size its storage once
+    /// up front instead of growing while it reads; the fossil format records the
+    /// count, so this is known before any element is decoded.
+    Count getRemainingElementCount();
+
     void beginStruct(Scope& scope);
     void endStruct(Scope& scope);
 
@@ -1000,6 +1007,11 @@ SLANG_FORCE_INLINE void SerialReader::endDictionary(Scope& scope)
 SLANG_FORCE_INLINE bool SerialReader::hasElements()
 {
     return getState().remainingValueCount != 0;
+}
+
+SLANG_FORCE_INLINE Count SerialReader::getRemainingElementCount()
+{
+    return Count(getState().remainingValueCount);
 }
 
 SLANG_FORCE_INLINE void SerialReader::endStruct(Scope& scope)

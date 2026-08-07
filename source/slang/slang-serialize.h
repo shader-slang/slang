@@ -41,6 +41,7 @@
 #include "core/slang-basic.h"
 
 #include <optional>
+#include <type_traits>
 
 namespace Slang
 {
@@ -581,6 +582,37 @@ SLANG_FORCE_INLINE bool hasElements(S const& serializer)
     return serializer->hasElements();
 }
 
+//
+// Some serializer backends know up front how many elements a container holds --
+// the fossil format stores the count -- while others discover it only by reading.
+// `tryGetRemainingElementCount` reports the count where it is available so a
+// container can size its storage once, and returns -1 where it is not, leaving
+// the caller to grow as it goes.
+//
+// Detected structurally rather than by adding a virtual to the serializer
+// interface, so that backends which cannot answer need no changes.
+//
+template<typename S, typename = void>
+struct SerializerKnowsRemainingElementCount : std::false_type
+{
+};
+
+template<typename S>
+struct SerializerKnowsRemainingElementCount<
+    S,
+    std::void_t<decltype(std::declval<S const&>()->getRemainingElementCount())>> : std::true_type
+{
+};
+
+template<typename S>
+SLANG_FORCE_INLINE Count tryGetRemainingElementCount(S const& serializer)
+{
+    if constexpr (SerializerKnowsRemainingElementCount<S>::value)
+        return serializer->getRemainingElementCount();
+    else
+        return Count(-1);
+}
+
 template<typename S>
 SLANG_FORCE_INLINE void serialize(S const& serializer, bool& value)
 {
@@ -840,6 +872,12 @@ void serialize(S const& serializer, List<T>& value)
     else
     {
         value.clear();
+        // Size the list once where the backend knows the count. Without this the
+        // list doubles as it fills, so a large array is copied repeatedly on the
+        // way in and its transient peak is roughly twice the final size.
+        const Count remaining = tryGetRemainingElementCount(serializer);
+        if (remaining > 0)
+            value.reserve(remaining);
         while (hasElements(serializer))
         {
             T element;

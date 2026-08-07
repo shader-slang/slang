@@ -9,11 +9,14 @@
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
+#include "slang-ondemand-ir-stats.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
 #include "slang-tag-version.h"
 #include "slang.h"
+
+#include <chrono>
 
 //
 #include "slang-serialize-ir.cpp.fiddle"
@@ -522,7 +525,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 {
     IRSerialReadContext& readContext = *serializer.getContext();
     FlatInstTable flat;
+    const bool statsOn = OnDemandStats::isEnabled();
+    const auto tCopyStart = std::chrono::steady_clock::now();
+    const uint64_t rssCopyStart = statsOn ? OnDemandStats::getCurrentRSSBytes() : 0;
     serialize(serializer, flat);
+    const auto tCopyEnd = std::chrono::steady_clock::now();
+    const uint64_t rssCopyEnd = statsOn ? OnDemandStats::getCurrentRSSBytes() : 0;
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
     // dumpFlatInstTableStats(flat, "deserializing");
 
@@ -586,6 +594,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         }
         insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
+
+    const auto tAllocEnd = std::chrono::steady_clock::now();
+    const uint64_t rssAllocEnd = statsOn ? OnDemandStats::getCurrentRSSBytes() : 0;
 
     Int64 litIndex = 0;
     Int64 operandIndex = 0;
@@ -690,6 +701,49 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         return inst;
     };
     const auto moduleInst = go(go, nullptr, 0);
+
+    if (statsOn)
+    {
+        const auto tWireEnd = std::chrono::steady_clock::now();
+        using Ms = std::chrono::duration<double, std::milli>;
+        OnDemandStats::recordIRSubPhases(
+            {Ms(tCopyEnd - tCopyStart).count(),
+             Ms(tAllocEnd - tCopyEnd).count(),
+             Ms(tWireEnd - tAllocEnd).count(),
+             int64_t(rssCopyEnd) - int64_t(rssCopyStart),
+             int64_t(rssAllocEnd) - int64_t(rssCopyEnd)});
+
+        // Record the flat-table shape while it is still in scope; the caller
+        // only ever sees the materialized IRModule.
+        OnDemandStats::IRModuleShape shape;
+        shape.instCount = numInsts;
+        shape.globalInstCount = 0;
+        shape.eagerTierInstCount = 1; // the module inst itself
+        for (auto child = moduleInst->getFirstChild(); child; child = child->getNextInst())
+        {
+            shape.globalInstCount++;
+            // Size the eager tier a per-symbol lazy design would still need: each
+            // global's header, plus the linkage decoration and the string that
+            // carries its mangled name, since those are what the symbol index is
+            // built from.
+            shape.eagerTierInstCount++;
+            for (auto decoration : child->getDecorations())
+            {
+                if (decoration->getOp() == kIROp_ExportDecoration ||
+                    decoration->getOp() == kIROp_ImportDecoration)
+                {
+                    shape.eagerTierInstCount += 2; // decoration + its name operand
+                }
+            }
+        }
+        shape.operandSlotCount = operandIndicesCount;
+        shape.stringByteCount = flat.stringChars.getCount();
+        shape.literalCount = flat.literals.getCount();
+        shape.serializedByteCount = 0;
+        shape.arenaBytesUsed = 0;
+        OnDemandStats::recordIRModuleShape(shape);
+    }
+
     SLANG_RELEASE_ASSERT(instIndex == numInsts);
     SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
     // Unknown future opcodes intentionally become a recoverable read failure later.
