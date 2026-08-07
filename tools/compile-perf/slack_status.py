@@ -23,7 +23,15 @@ import sys
 # (icon, status) for each outcome. Kept as constants so the self-checks below
 # name states rather than repeat message text, and a wording change does not
 # silently turn into a classification change.
-REGRESSION = (":warning:",
+#
+# The icons are ordered by severity and deliberately match trend.py's
+# step-summary header for the same data (🔴 regression, ⚠️ warning tier): a
+# reader moving from the Slack message to the CI summary should not have to
+# re-learn the palette. Note the regression icon is RED, not the yellow
+# triangle — a job-failing >=10% regression must not read as milder than the
+# 5-10% warning tier, which is what a yellow triangle beside a yellow circle
+# conveys.
+REGRESSION = (":red_circle:",
               "Regression detected (>=10% over trailing median) — see CI run "
               "for details")
 JOB_FAILED = (":x:", "Nightly job failed — see CI run for details")
@@ -129,6 +137,17 @@ assert classify("failure", "failure", 5) == REGRESSION, \
 # rather than a yellow "0 warning-level change(s)".
 assert classify("success", "success", 1)[0] == ":large_yellow_circle:"
 assert classify("success", "success", 0)[0] == ":white_check_mark:"
+
+# Severity ordering is a contract, not decoration. The job-failing regression
+# must be visually stronger than the warning tier and must agree with
+# trend.py's step-summary header (🔴 / ⚠️) for the same data. Pinned because
+# the earlier yellow-triangle regression icon read as MILDER than the yellow
+# circle beside it, and nothing would catch that being reintroduced.
+assert REGRESSION[0] == ":red_circle:", \
+    ("a job-failing regression must not use a yellow icon: beside the warning "
+     "tier's yellow circle it reads as the lesser alert")
+assert REGRESSION[0] != warnings_status(1)[0] != CLEAN[0], \
+    "regression, warning and clean must be visually distinguishable at a glance"
 
 # A skipped trend step on a failed job is a job failure, not "did not run":
 # the failure is the more actionable of the two.

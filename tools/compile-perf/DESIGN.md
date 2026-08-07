@@ -173,7 +173,20 @@ workflow bash so its branch order can be tested: a regression drives
 `job.status` to failure as well, so classifying on job status first would
 report every regression as a generic "job failed" — a wrong-but-plausible
 message, on a path that only runs on a scheduled nightly. The import-time
-self-checks pin that ordering along with every state.
+self-checks pin that ordering along with every state, and the icons match
+trend.py's step-summary header (🔴 regression, ⚠️ warning tier) so the two
+surfaces agree on severity.
+
+**Known gap — a night that judges nothing reports green.** `trend.py` returns
+early, before any classification, when there are fewer than two points or
+fewer than `--min-baseline` comparable trailing points (the normal state for
+the first few nights after a runner change). Those returns are successful, so
+Slack receives `outcome=success` with no warning count and posts
+"No regressions detected" — indistinguishable from a genuinely clean night,
+at exactly the moment confidence in the series is lowest. The CI run itself is
+unambiguous: both paths emit a `::warning::` annotation saying judgement was
+skipped. Distinguishing them in Slack needs a sixth state carried out of
+`trend.py` on those paths; it is deliberately not part of this change.
 
 ### Runner-change procedure
 
