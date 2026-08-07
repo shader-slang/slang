@@ -915,10 +915,11 @@ String renderDiagnosticMachineReadable(
         // mirroring the logic in buildSectionLayout for rich diagnostics
         if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
         {
-            SourceView* view = sm->findSourceView(span.range.begin);
+            SourceLoc spanBegin = span.range.begin;
+            SourceView* view = sm->findSourceViewThroughExpansion(spanBegin);
             if (view)
             {
-                auto actualLine = view->getHumaneLoc(span.range.begin, SourceLocType::Actual).line;
+                auto actualLine = view->getHumaneLoc(spanBegin, SourceLocType::Actual).line;
                 UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                     view->getSourceFile()->getLineAtIndex(actualLine - 1));
                 UnownedStringSlice lineContent =

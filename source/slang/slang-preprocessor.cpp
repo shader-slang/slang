@@ -779,6 +779,24 @@ private:
     /// nested macro invocations might be in flight.
     SourceLoc m_initiatingMacroInvocationLoc;
 
+    /// Tiny source range allocated in the SourceManager side table for this invocation's body
+    /// tokens. begin.isValid() iff this invocation is being tracked for diagnostic backtrace.
+    SourceRange m_expansionRange;
+
+    /// [bodyBegin, bodyEnd]: range of the macro body definition tokens. Used as the gate and
+    /// offset base in _remapBodyLoc so only real body tokens are remapped.
+    SourceRange m_bodyTokenRange;
+
+    /// Remap a body-definition token loc into the per-invocation expansion range so that the
+    /// diagnostic side table can associate it with the right call site. Returns loc unchanged
+    /// if it does not fall within m_bodyTokenRange or if tracking is disabled.
+    SourceLoc _remapBodyLoc(SourceLoc loc) const;
+
+    /// If token.loc falls within m_bodyTokenRange, remap it into m_expansionRange so the
+    /// diagnostic renderer can walk the side table back to this invocation's call site.
+    /// Tokens from argument substitution or token-paste already carry their own locs.
+    void _maybeRemapBodyTokenLoc(Token& token) const;
+
     /// One token of lookahead
     Token m_lookaheadToken;
 
@@ -1483,6 +1501,46 @@ MacroInvocation::MacroInvocation(
     m_macroInvocationLoc = macroInvocationLoc;
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
     m_isStartOfLine = isStartOfLine;
+
+    // Register this invocation in the SourceManager side table so the diagnostic renderer can emit
+    // "expanded from macro 'X'" notes. We skip builtins (invalid body locs) and empty macros.
+    if (macro->tokens.m_tokens.getCount() > 0 && macroInvocationLoc.isValid())
+    {
+        SourceLoc bodyBegin = macro->tokens.m_tokens[0].loc;
+        if (bodyBegin.isValid())
+        {
+            SourceLoc bodyEnd = bodyBegin;
+            for (const Token& t : macro->tokens.m_tokens)
+            {
+                if (t.type != TokenType::EndOfFile && t.loc.isValid() && t.loc > bodyEnd)
+                    bodyEnd = t.loc;
+            }
+            m_bodyTokenRange = SourceRange{bodyBegin, bodyEnd};
+
+            UInt bodyRangeSize = bodyEnd.getRaw() - bodyBegin.getRaw() + 1;
+            SourceManager* sm = preprocessor->getSourceManager();
+            m_expansionRange = sm->registerMacroExpansion(
+                macro->getName()->text,
+                macroInvocationLoc,
+                bodyBegin,
+                bodyRangeSize);
+        }
+    }
+}
+
+void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
+{
+    token.loc = _remapBodyLoc(token.loc);
+}
+
+SourceLoc MacroInvocation::_remapBodyLoc(SourceLoc loc) const
+{
+    if (m_expansionRange.begin.isValid() && m_bodyTokenRange.contains(loc))
+    {
+        return SourceLoc::fromRaw(
+            m_expansionRange.begin.getRaw() + (loc.getRaw() - m_bodyTokenRange.begin.getRaw()));
+    }
+    return loc;
 }
 
 void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
@@ -2011,6 +2069,7 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            _maybeRemapBodyTokenLoc(token);
             return token;
         }
 
@@ -2041,6 +2100,7 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            _maybeRemapBodyTokenLoc(token);
             return token;
         }
 
@@ -2105,7 +2165,11 @@ Token MacroInvocation::_readTokenImpl()
                 // The more complicated case is a token paste (`##`).
                 //
                 Index tokenPasteTokenIndex = nextOp.index0;
-                SourceLoc tokenPasteLoc = m_macro->tokens.m_tokens[tokenPasteTokenIndex].loc;
+                // Remap the ## operator's loc into the expansion view so the TokenPaste
+                // SourceView's m_initiatingSourceLoc lands inside the MacroExpansion view,
+                // keeping the full diagnostic chain intact for mixed paste/expansion stacks.
+                SourceLoc tokenPasteLoc =
+                    _remapBodyLoc(m_macro->tokens.m_tokens[tokenPasteTokenIndex].loc);
 
                 // A `##` must always appear between two macro ops (whether literal tokens
                 // or macro parameters) and it is supposed to paste together the last

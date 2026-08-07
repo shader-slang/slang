@@ -121,7 +121,6 @@ struct PathInfo
     {
         return PathInfo{Type::FromString, userPath, String()};
     }
-
     Type type;             ///< The type of path
     String foundPath;      ///< The path where the file was found (might contain relative elements)
     String uniqueIdentity; ///< The unique identity of the file on the path found
@@ -577,6 +576,39 @@ struct SourceManager
     /// in the source
     SourceRange allocateSourceRange(UInt size);
 
+    /// A lightweight record of one macro invocation. Stored in a flat side table so the diagnostic
+    /// renderer can emit "expanded from macro 'X'" notes without creating a SourceFile or
+    /// SourceView per invocation.
+    struct MacroExpansionEntry
+    {
+        SourceRange range;     ///< Tiny range of remapped source locs for this invocation's body.
+        String macroName;      ///< Macro name, for "expanded from macro 'X'" note.
+        SourceLoc callSiteLoc; ///< Where this macro was invoked (may itself be in an outer range).
+        SourceLoc bodyBegin;   ///< Original loc of the first body token; allows recovering the
+                               ///< original loc from a remapped one:
+                               ///<   originalLoc = bodyBegin + (remappedLoc - range.begin)
+    };
+
+    /// Register one macro invocation. Allocates a tiny source range of bodyRangeSize bytes,
+    /// appends the entry to m_macroExpansions, and returns the allocated range. The preprocessor
+    /// remaps body token locs into this range so each invocation's tokens are distinguishable.
+    /// bodyBegin is the original loc of the first body token.
+    SourceRange registerMacroExpansion(
+        const String& macroName,
+        SourceLoc callSiteLoc,
+        SourceLoc bodyBegin,
+        UInt bodyRangeSize);
+
+    /// Return the MacroExpansionEntry whose range contains loc, searching this manager and its
+    /// parents. Returns nullptr if loc does not fall in any registered expansion range.
+    const MacroExpansionEntry* findMacroExpansion(SourceLoc loc) const;
+
+    /// Like findSourceViewRecursively but also walks through macro expansion side-table entries
+    /// when no SourceView owns loc. Updates loc in-place to the un-remapped definition-file loc
+    /// when such unmapping occurs. Returns nullptr if no SourceView can be found even after
+    /// exhausting the expansion chain.
+    SourceView* findSourceViewThroughExpansion(SourceLoc& loc) const;
+
     /// Returns the loc for start of next allocation
     SourceLoc getNextRangeStart() const { return m_nextLoc; }
 
@@ -689,6 +721,11 @@ protected:
     List<SourceView*> m_sourceViews;
     // All of the SourceFiles constructed on this SourceManager. This owns the SourceFile.
     List<SourceFile*> m_sourceFiles;
+
+    // Side table of macro expansion entries, ordered by range.begin (monotonically increasing
+    // because entries come from allocateSourceRange). Used by the diagnostic renderer to emit
+    // "expanded from macro 'X'" notes without growing m_sourceViews.
+    List<MacroExpansionEntry> m_macroExpansions;
 
     StringSlicePool m_slicePool;
 

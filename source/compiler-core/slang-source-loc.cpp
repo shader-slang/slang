@@ -765,6 +765,7 @@ void SourceManager::_resetSource()
 
     m_sourceViews.clear();
     m_sourceFiles.clear();
+    m_macroExpansions.clear();
 
     m_sourceFileMap.clear();
 }
@@ -801,6 +802,49 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     m_nextLoc = endLoc + 1;
 
     return SourceRange(beginLoc, endLoc);
+}
+
+SourceRange SourceManager::registerMacroExpansion(
+    const String& macroName,
+    SourceLoc callSiteLoc,
+    SourceLoc bodyBegin,
+    UInt bodyRangeSize)
+{
+    SourceRange range = allocateSourceRange(bodyRangeSize);
+    MacroExpansionEntry entry;
+    entry.range = range;
+    entry.macroName = macroName;
+    entry.callSiteLoc = callSiteLoc;
+    entry.bodyBegin = bodyBegin;
+    m_macroExpansions.add(std::move(entry));
+    return range;
+}
+
+const SourceManager::MacroExpansionEntry* SourceManager::findMacroExpansion(SourceLoc loc) const
+{
+    const SourceManager* manager = this;
+    do
+    {
+        if (manager->getSourceRange().contains(loc) && manager->m_macroExpansions.getCount() > 0)
+        {
+            const auto& entries = manager->m_macroExpansions;
+            // Binary search: entries are ordered by range.begin (monotone from
+            // allocateSourceRange).
+            Index lo = 0, hi = entries.getCount();
+            while (lo + 1 < hi)
+            {
+                Index mid = (lo + hi) >> 1;
+                if (entries[mid].range.begin.getRaw() <= loc.getRaw())
+                    lo = mid;
+                else
+                    hi = mid;
+            }
+            if (entries[lo].range.contains(loc))
+                return &entries[lo];
+        }
+        manager = manager->m_parent;
+    } while (manager);
+    return nullptr;
 }
 
 SourceFile* SourceManager::createSourceFileWithSize(const PathInfo& pathInfo, size_t contentSize)
@@ -1019,17 +1063,29 @@ void SourceManager::addSourceFileIfNotExist(const String& uniqueIdentity, Source
     m_sourceFileMap.addIfNotExists(uniqueIdentity, sourceFile);
 }
 
+SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
+{
+    SourceView* view = findSourceViewRecursively(loc);
+    for (int depth = 0; depth < 64 && !view; ++depth)
+    {
+        const MacroExpansionEntry* entry = findMacroExpansion(loc);
+        if (!entry)
+            break;
+        loc = SourceLoc::fromRaw(
+            entry->bodyBegin.getRaw() + (loc.getRaw() - entry->range.begin.getRaw()));
+        view = findSourceViewRecursively(loc);
+    }
+    return view;
+}
+
 HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 {
-    SourceView* sourceView = findSourceViewRecursively(loc);
+    SourceView* sourceView = findSourceViewThroughExpansion(loc);
     if (sourceView)
     {
         return sourceView->getHumaneLoc(loc, type);
     }
-    else
-    {
-        return HumaneSourceLoc();
-    }
+    return HumaneSourceLoc();
 }
 
 PathInfo SourceManager::getPathInfo(SourceLoc loc, SourceLocType type)
