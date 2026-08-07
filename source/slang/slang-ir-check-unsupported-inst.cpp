@@ -165,6 +165,30 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // any diagnostic.
     const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
+    // HLSL cannot pass thread-group-shared memory across a function boundary -- DXC rejects it with
+    // error 0043. A `groupshared` parameter surviving to here is one the inliner could not remove,
+    // so it is the case we genuinely cannot lower; diagnose it rather than handing DXC code we
+    // already know it rejects. Checking after inlining is what makes this exact: the front end
+    // would have to predict which functions keep a boundary, and a wrong guess either rejects a
+    // program that would have compiled or misses one that still emits the bad HLSL.
+    if (isD3DTarget(target))
+    {
+        for (auto param : func->getParams())
+        {
+            if (!as<IRGroupSharedRate>(param->getRate()))
+                continue;
+
+            // A mesh-shader payload also carries the group-shared rate, but HLSL has dedicated
+            // `in payload` syntax for it, so it crosses the boundary legitimately.
+            if (param->findDecoration<IRHLSLMeshPayloadDecoration>())
+                continue;
+
+            auto loc = param->sourceLoc.isValid() ? param->sourceLoc : func->sourceLoc;
+            sink->diagnose(
+                Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{.location = loc});
+        }
+    }
+
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())

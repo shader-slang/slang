@@ -1,8 +1,10 @@
-// HLSL cannot pass thread-group-shared memory across a function boundary (DXC error 0043), so a
-// function that declares a bare `groupshared` parameter and forbids inlining with `[noinline]` is
-// rejected when targeting HLSL (shader-slang/slang#10641).
+// HLSL cannot pass thread-group-shared memory across a function boundary (DXC error 0043), but
+// `[noinline]` alone does not keep one: the callee below is still inlined into the entry point, so
+// the group-shared write lands directly on `groupSharedData` and the program is valid HLSL. The
+// check runs after inlining (`checkUnsupportedInst`) precisely so a case like this is not rejected
+// for a boundary that never survives (shader-slang/slang#10641).
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL,non-exhaustive):-target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=HLSL):-target hlsl -entry computeMain -stage compute
 
 RWStructuredBuffer<uint> outputBuffer;
 
@@ -23,5 +25,3 @@ void computeMain(uint3 tid : SV_GroupThreadID)
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[tid.x] = groupSharedData[(tid.x + 1) % N];
 }
-
-// HLSL: 30708

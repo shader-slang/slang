@@ -3703,8 +3703,8 @@ err(
 err(
     "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
     30708,
-    "a 'groupshared' parameter is not allowed on a function marked '~modifierName' when targeting HLSL; HLSL cannot pass thread-group-shared memory across a function boundary",
-    span { loc = "paramDecl:Decl", message = "'groupshared' parameter here" }
+    "a 'groupshared' parameter cannot be passed across a function boundary when targeting HLSL",
+    span { loc = "location", message = "this function keeps a call boundary that could not be inlined away, and HLSL cannot pass thread-group-shared memory across one" }
 )
 
 err(

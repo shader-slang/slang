@@ -731,7 +731,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkInterfaceRequirement(Decl* decl);
 
     void checkCallableDeclCommon(CallableDecl* decl);
-    void checkGroupSharedParameterTargetPolicy(CallableDecl* decl);
     void maybeInferPrefixModifierForOperator(CallableDecl* decl);
     void checkPublicCallableOperandVisibility(CallableDecl* decl);
 
@@ -15621,48 +15620,6 @@ void SemanticsDeclHeaderVisitor::maybeInferPrefixModifierForOperator(CallableDec
     addModifier(decl, prefixModifier);
 }
 
-// A bare `groupshared` parameter is passed by reference (#10641), which lowers to a pointer into
-// the thread-group-shared address space. HLSL cannot pass that across a function boundary at all --
-// DXC rejects it with error 0043 -- so a `groupshared` parameter is rejected whenever the function
-// forces a boundary, which both `[noinline]` and `export` do (an exported function is a separately
-// compiled entry the caller reaches by call, so its parameter is never inlined away).
-//
-// Other targets are not diagnosed here: they either keep the boundary or have the parameter inlined
-// away as ordinary legalization.
-void SemanticsDeclHeaderVisitor::checkGroupSharedParameterTargetPolicy(CallableDecl* decl)
-{
-    auto noInlineModifier = decl->findModifier<NoInlineAttribute>();
-    auto exportModifier = decl->findModifier<HLSLExportModifier>();
-    if (!noInlineModifier && !exportModifier)
-        return;
-
-    ParamDecl* groupSharedParam = nullptr;
-    for (auto paramDecl : decl->getParameters())
-    {
-        if (paramDecl->hasModifier<HLSLGroupSharedModifier>())
-        {
-            groupSharedParam = paramDecl;
-            break;
-        }
-    }
-    if (!groupSharedParam)
-        return;
-
-    // Diagnose once so the same conflict is not reported for every D3D target in the list.
-    for (auto target : getLinkage()->targets)
-    {
-        // HLSL cannot pass groupshared memory across a boundary regardless of the reason the
-        // boundary exists, so both `[noinline]` and `export` trigger this (DXC 0043).
-        if (isD3DTarget(target))
-        {
-            getSink()->diagnose(Diagnostics::GroupsharedParameterNotAllowedOnHlslWithBoundary{
-                .modifierName = noInlineModifier ? UnownedStringSlice("[noinline]")
-                                                 : UnownedStringSlice("export"),
-                .paramDecl = groupSharedParam});
-            break;
-        }
-    }
-}
 
 void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 {
@@ -15673,7 +15630,6 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
 
     maybeInferPrefixModifierForOperator(decl);
 
-    checkGroupSharedParameterTargetPolicy(decl);
 
     // Check that no parameter without a default value follows a parameter with one.
     bool seenDefaultParam = false;
