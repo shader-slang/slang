@@ -613,6 +613,36 @@ SLANG_FORCE_INLINE Count tryGetRemainingElementCount(S const& serializer)
         return Count(-1);
 }
 
+//
+// Backends whose stored layout for a scalar element matches the in-memory one can
+// hand over a whole run of elements at once rather than decoding them singly.
+// `tryReadContiguousScalars` uses that where it exists and reports false
+// otherwise, so the caller falls back to the per-element loop.
+//
+template<typename S, typename T, typename = void>
+struct SerializerSupportsBulkScalarRead : std::false_type
+{
+};
+
+template<typename S, typename T>
+struct SerializerSupportsBulkScalarRead<
+    S,
+    T,
+    std::void_t<decltype(std::declval<S const&>()
+                             ->template tryReadContiguousScalars<T>(std::declval<T*>(), Count(0)))>>
+    : std::true_type
+{
+};
+
+template<typename S, typename T>
+SLANG_FORCE_INLINE bool tryReadContiguousScalars(S const& serializer, T* dest, Count count)
+{
+    if constexpr (SerializerSupportsBulkScalarRead<S, T>::value)
+        return serializer->template tryReadContiguousScalars<T>(dest, count);
+    else
+        return false;
+}
+
 template<typename S>
 SLANG_FORCE_INLINE void serialize(S const& serializer, bool& value)
 {
@@ -878,6 +908,25 @@ void serialize(S const& serializer, List<T>& value)
         const Count remaining = tryGetRemainingElementCount(serializer);
         if (remaining > 0)
             value.reserve(remaining);
+        // Where the backend stores this element type exactly as memory holds it,
+        // take the whole run in one copy; the per-element loop below costs a
+        // layout check and a bounds-checked append per value, which for the IR's
+        // multi-megabyte index arrays is most of deserialization time.
+        // Restricted to arithmetic elements: those are the ones the fossil format
+        // stores as a bare scalar of the same width, so the stored run and the
+        // destination array have identical layout. Aggregates like InstAllocInfo
+        // are stored as records and must go through the per-element path.
+        if constexpr (std::is_arithmetic<T>::value)
+        {
+            if (remaining > 0)
+            {
+                value.setCount(remaining);
+                if (tryReadContiguousScalars(serializer, value.getBuffer(), remaining))
+                    return;
+                value.clear();
+                value.reserve(remaining);
+            }
+        }
         while (hasElements(serializer))
         {
             T element;

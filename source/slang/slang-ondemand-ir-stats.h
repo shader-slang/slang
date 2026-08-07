@@ -102,6 +102,27 @@ void recordSymbolUse(const UnownedStringSlice& mangledName, const char* moduleNa
 /// would still have to materialize.
 void recordGlobalValueClone(const char* moduleName, const void* inst, int64_t subtreeInstCount);
 
+/// Checks the invariant that per-global-value lazy materialization depends on:
+/// that every instruction inside a global value's subtree references only
+/// instructions in that same subtree, or module-scope globals.
+///
+/// If it holds, a global value's body can be decoded independently of every other
+/// body, because the only things it can point at are either decoded with it or
+/// already present. If it does not, lazy materialization must also pull whatever
+/// foreign subtrees are referenced, and the design gets materially harder.
+struct CrossBodyReferenceStats
+{
+    int64_t bodyInstsExamined = 0;
+    int64_t operandsExamined = 0;
+    int64_t refsToOwnSubtree = 0;
+    int64_t refsToModuleScopeGlobal = 0;
+    int64_t refsToForeignBody = 0; ///< violations: into another global's subtree
+    int64_t refsToOtherModule = 0; ///< references leaving this module entirely
+};
+
+/// Runs the check above over `irModule` (an `IRModule*`), recording the result.
+void analyzeCrossBodyReferences(const char* moduleName, void* irModule);
+
 /// Writes the accumulated report to stderr. Registered to run at process exit
 /// when stats are enabled.
 void dumpReport();

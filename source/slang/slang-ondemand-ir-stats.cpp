@@ -3,6 +3,7 @@
 
 #include "core/slang-dictionary.h"
 #include "core/slang-list.h"
+#include "slang-ir.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -22,6 +23,7 @@ struct Registry
     List<PhaseRecord> phases;
     List<IRModuleShape> shapes;
     List<IRSubPhases> subPhases;
+    Dictionary<String, CrossBodyReferenceStats> crossBodyByModule;
     // Distinct mangled names resolved per module, so a symbol pulled repeatedly
     // counts once. The interesting figure is coverage, not traffic.
     Dictionary<String, Dictionary<String, bool>> usedSymbolsByModule;
@@ -142,6 +144,71 @@ void recordGlobalValueClone(const char* moduleName, const void* inst, int64_t su
     }
 }
 
+void analyzeCrossBodyReferences(const char* moduleName, void* irModulePtr)
+{
+    if (!isEnabled())
+        return;
+    auto* irModule = (IRModule*)irModulePtr;
+    auto* moduleInst = irModule->getModuleInst();
+    if (!moduleInst)
+        return;
+
+    CrossBodyReferenceStats stats;
+
+    // Map every instruction below module scope to the global value that owns it,
+    // so an operand can be classified by comparing owners.
+    Dictionary<IRInst*, IRInst*> ownerOfInst;
+    Dictionary<IRInst*, bool> isModuleScopeGlobal;
+    List<IRInst*> stack;
+    for (auto global : moduleInst->getDecorationsAndChildren())
+    {
+        isModuleScopeGlobal[global] = true;
+        stack.clear();
+        for (auto child : global->getDecorationsAndChildren())
+            stack.add(child);
+        while (stack.getCount())
+        {
+            auto inst = stack.getLast();
+            stack.removeLast();
+            ownerOfInst[inst] = global;
+            for (auto child : inst->getDecorationsAndChildren())
+                stack.add(child);
+        }
+    }
+
+    for (const auto& [inst, owner] : ownerOfInst)
+    {
+        stats.bodyInstsExamined++;
+        const UInt operandCount = inst->getOperandCount();
+        for (UInt i = 0; i < operandCount; ++i)
+        {
+            auto operand = inst->getOperand(i);
+            if (!operand)
+                continue;
+            stats.operandsExamined++;
+            if (operand->getModule() != irModule)
+            {
+                stats.refsToOtherModule++;
+                continue;
+            }
+            if (operand == moduleInst || isModuleScopeGlobal.containsKey(operand))
+            {
+                stats.refsToModuleScopeGlobal++;
+                continue;
+            }
+            IRInst* operandOwner = nullptr;
+            if (ownerOfInst.tryGetValue(operand, operandOwner) && operandOwner == owner)
+                stats.refsToOwnSubtree++;
+            else
+                stats.refsToForeignBody++;
+        }
+    }
+
+    Registry& registry = getRegistry();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    registry.crossBodyByModule[String(moduleName)] = stats;
+}
+
 void dumpReport()
 {
     Registry& registry = getRegistry();
@@ -244,6 +311,29 @@ void dumpReport()
             double(p.allocInstsRSSDelta) / (1024.0 * 1024.0),
             p.wireUpMs,
             total ? 100.0 * p.wireUpMs / total : 0.0);
+    }
+
+    ::fprintf(stderr, "\n-- cross-body operand references --\n");
+    for (const auto& [moduleName, c] : registry.crossBodyByModule)
+    {
+        ::fprintf(
+            stderr,
+            "%s: %lld body insts, %lld operands: own subtree %lld (%.2f%%), module-scope global"
+            " %lld (%.2f%%), FOREIGN BODY %lld (%.4f%%), other module %lld\n",
+            moduleName.getBuffer(),
+            (long long)c.bodyInstsExamined,
+            (long long)c.operandsExamined,
+            (long long)c.refsToOwnSubtree,
+            c.operandsExamined ? 100.0 * double(c.refsToOwnSubtree) / double(c.operandsExamined)
+                               : 0.0,
+            (long long)c.refsToModuleScopeGlobal,
+            c.operandsExamined
+                ? 100.0 * double(c.refsToModuleScopeGlobal) / double(c.operandsExamined)
+                : 0.0,
+            (long long)c.refsToForeignBody,
+            c.operandsExamined ? 100.0 * double(c.refsToForeignBody) / double(c.operandsExamined)
+                               : 0.0,
+            (long long)c.refsToOtherModule);
     }
 
     ::fprintf(stderr, "\n-- symbols resolved out of serialized modules --\n");

@@ -739,6 +739,7 @@ SlangResult Session::_readBuiltinModule(
              String(moduleName),
              std::chrono::duration<double, std::milli>(irEnd - irStart).count(),
              int64_t(OnDemandStats::getCurrentRSSBytes()) - int64_t(rssBeforeIR)});
+        OnDemandStats::analyzeCrossBodyReferences(String(moduleName).getBuffer(), irModule.get());
         const auto* irDataChunk = as<RIFF::DataChunk>(irChunk);
         OnDemandStats::completeLastIRModuleShape(
             String(moduleName),

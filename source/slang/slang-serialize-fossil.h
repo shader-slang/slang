@@ -16,6 +16,9 @@
 #include "slang-fossil.h"
 #include "slang-serialize.h"
 
+#include <cstring>
+#include <type_traits>
+
 namespace Slang
 {
 namespace Fossil
@@ -906,6 +909,49 @@ public:
     /// up front instead of growing while it reads; the fossil format records the
     /// count, so this is known before any element is decoded.
     Count getRemainingElementCount();
+
+    /// Reads `count` scalar elements of type `T` into `dest`, in bulk, returning
+    /// false if that is not possible for the current state.
+    ///
+    /// The fossil format stores container elements contiguously at a known
+    /// stride, so when that stride equals `sizeof(T)` the elements are already
+    /// laid out exactly as the destination array wants them and the whole run can
+    /// be copied at once instead of decoded one value at a time. For the IR's flat
+    /// instruction table that is several megabytes of `Int64` indices, which
+    /// dominates deserialization time.
+    ///
+    /// The first element is read through the ordinary path so that its layout is
+    /// validated as usual; only the remainder is copied directly. Returns false
+    /// (having read nothing) when the state is not a container, when the stride
+    /// does not match, or when fewer than `count` elements remain, leaving the
+    /// caller to fall back to the per-element path.
+    template<typename T>
+    bool tryReadContiguousScalars(T* dest, Count count)
+    {
+        static_assert(std::is_arithmetic<T>::value, "bulk read is only for scalar elements");
+
+        if (count <= 0)
+            return false;
+        auto& state = getState();
+        if (state.type != State::Type::Container)
+            return false;
+        if (state.dataStride != sizeof(T))
+            return false;
+        if (Count(state.remainingValueCount) < count)
+            return false;
+
+        // Validates the element layout, and advances the cursor by one.
+        dest[0] = _readSimpleVal<T>();
+
+        const Count remaining = count - 1;
+        if (remaining > 0)
+        {
+            ::memcpy(dest + 1, state.dataCursor, size_t(remaining) * sizeof(T));
+            state.dataCursor = (char*)state.dataCursor + size_t(remaining) * sizeof(T);
+            state.remainingValueCount -= uint32_t(remaining);
+        }
+        return true;
+    }
 
     void beginStruct(Scope& scope);
     void endStruct(Scope& scope);
