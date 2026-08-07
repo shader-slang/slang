@@ -591,8 +591,15 @@ document.addEventListener('click', function (ev) {
 def _copy_block(block_id, body_html):
     """Wrap a rendered <pre> so it carries a copy button.
 
-    `body_html` must already be escaped; `block_id` must be unique on the page
-    (the button finds its block by id)."""
+    `body_html` is TRUSTED markup — a complete `<pre id='...'>…</pre>` element
+    — whose untrusted contents the caller has already escaped. It is inserted
+    verbatim, so do not pass `esc(...)` of an element here: that would render
+    the tags as visible text rather than markup.
+
+    `block_id` must be unique on the page and must match the id on the `<pre>`
+    inside `body_html`: the delegated handler resolves its target with
+    getElementById and returns silently when it finds nothing, so a mismatch
+    is a dead button rather than an error."""
     return (f"<div class='cbox'>"
             f"<button class='copy' type='button' data-copy='{block_id}'>Copy</button>"
             f"{body_html}</div>")
@@ -987,6 +994,9 @@ assert sum(len(s.splitlines()) for _, s in _files) > 500, \
 _CMD = _repro_command(_SPEC)
 assert "\n" not in _CMD, "the repro command must stay on one line to paste cleanly"
 assert f"--only {_SPEC.name}" in _CMD, "the repro command must name its workload"
+del _SPEC, _n, _files, _gen, _fn, _src, _CMD
+
+
 # The command's whole purpose is to be pasted into a shell, so it must contain
 # nothing the shell would interpret. This is not hypothetical punctuation
 # policing: the first version used `<path/to/slangc>` as the placeholder, which
@@ -994,9 +1004,33 @@ assert f"--only {_SPEC.name}" in _CMD, "the repro command must name its workload
 # outright, and where that path exists it silently creates a file named
 # `--only` and leaves `--slangc` with no value. Testing the command with the
 # placeholder substituted for a real path (as the original test plan did) hides
-# exactly this, so the published STRING is what gets checked here.
-for _meta in "<>|&;$`\\\"'":
-    assert _meta not in _CMD, \
-        (f"repro command contains shell metacharacter {_meta!r}: it is published "
-         f"to be copy-pasted, so it must survive a shell verbatim — got {_CMD!r}")
-del _SPEC, _n, _files, _gen, _fn, _src, _CMD, _meta
+# exactly this, so the published STRING is what gets checked.
+#
+# Checked for EVERY workload, not just one: the command interpolates spec.name
+# twice and a page is rendered per workload, so a single-fixture check would
+# prove the property for one page and claim it for forty. Every current name is
+# an identifier, which is precisely why this is worth pinning — it is an
+# unenforced contract on spec.name that a future workload could quietly break.
+# Redirection, quoting, expansion, separators AND globs: "nothing the shell
+# would interpret" has to mean all of them, not just the redirects that bit.
+SHELL_METACHARACTERS = "<>|&;$`\\\"'*?[]{}~()!#\n\t "
+
+
+def _shell_unsafe(text):
+    """The shell metacharacters present in `text`, in order; empty when it is
+    safe to paste verbatim. Space is included: these commands are published as
+    a single token-separated line, so a name containing one would silently
+    split into two arguments."""
+    return [c for c in SHELL_METACHARACTERS if c in text]
+
+
+for _spec in manifest.BY_NAME.values():
+    _c = _repro_command(_spec)
+    assert not _shell_unsafe(_c.replace(" ", "")), \
+        (f"repro command for {_spec.name!r} contains shell metacharacters "
+         f"{_shell_unsafe(_c.replace(' ', ''))}: it is published to be "
+         f"copy-pasted, so it must survive a shell verbatim — got {_c!r}")
+    assert " " not in _spec.name, \
+        (f"workload name {_spec.name!r} contains a space, which would split "
+         f"its repro command into the wrong arguments")
+del _spec, _c
