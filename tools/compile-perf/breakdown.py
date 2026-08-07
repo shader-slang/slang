@@ -34,148 +34,13 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 from lib import analyze, manifest
 
-# (timer, [children]) — the nested timer tree. Each parent gets a synthetic
-# "<parent> (self)" residual = parent − Σ children, so buckets tile compileInner.
-TREE = ("compileInner", [
-    ("frontEndExecute", [
-        ("parseTranslationUnit", []),
-        ("SemanticChecking", []),
-        ("generateIR", []),
-    ]),
-    ("generateOutput", [
-        ("linkAndOptimizeIR", [
-            ("specializeModule", []),
-            ("simplifyIR", []),
-            ("linkIR", []),
-            ("unrollLoopsInModule", []),
-            ("legalizeResourceTypes", []),
-            ("legalizeExistentialTypeLayout", []),
-            ("performMandatoryEarlyInlining", []),
-            ("performForceInlining", []),
-        ]),
-        ("emitEntryPointsSourceFromIR", []),
-    ]),
-])
+from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
+                         API_BUCKET_ORDER, buckets, api_buckets, timer_ms)
 
 
-# Canonical bucket order + colors for the stacked view, grouped by stage:
-# front-end = greens, linkAndOptimizeIR subtree = blues/purples, emit = oranges,
-# residual = grey. Keeping order/colors fixed makes bars comparable across
-# workloads at a glance.
-BUCKET_ORDER = [
-    ("parseTranslationUnit", "#c7e9c0"),
-    ("SemanticChecking", "#41ab5d"),
-    ("generateIR", "#006d2c"),
-    ("frontEndExecute (self)", "#74c476"),
-    ("specializeModule", "#6baed6"),
-    ("simplifyIR", "#2171b5"),
-    ("linkIR", "#08306b"),
-    ("unrollLoopsInModule", "#9e9ac8"),
-    ("legalizeResourceTypes", "#807dba"),
-    ("legalizeExistentialTypeLayout", "#6a51a3"),
-    ("performMandatoryEarlyInlining", "#bcbddc"),
-    ("performForceInlining", "#dadaeb"),
-    ("linkAndOptimizeIR (self)", "#4a1486"),
-    ("emitEntryPointsSourceFromIR", "#fd8d3c"),
-    ("generateOutput (self)", "#e6550d"),
-    ("compileInner (self)", "#969696"),
-]
-BUCKET_COLOR = dict(BUCKET_ORDER)
-
-# API-path phase tree: the api-driver's timers nest under apiTotal the same way
-# the compiler timers nest under compileInner, so the same top-down allocator
-# renders api workloads (mode="api") as stacked areas with apiTotal as the top
-# edge. apiLoadModuleSource/apiWriteModule are deliberately absent: they time
-# module-graph-bin's SETUP, which runs outside the apiTotal scope.
-API_TREE = ("apiTotal", [
-    ("apiCreateGlobalSession", []),
-    ("apiCreateSession", []),
-    ("apiLoadModule", []),
-    ("apiFindEntryPoint", []),
-    ("apiComposite", []),
-    ("apiSpecialize", []),
-    ("apiLink", []),
-    ("apiGetCode", []),
-    ("apiReflection", []),
-])
-
-# Session setup = greens, module/entry resolution = blues, per-target work
-# (specialize/link/codegen) = oranges/purples, reflection + residual = greys —
-# fixed like BUCKET_ORDER so api panels stay comparable at a glance.
-API_BUCKET_ORDER = [
-    ("apiCreateGlobalSession", "#c7e9c0"),
-    ("apiCreateSession", "#41ab5d"),
-    ("apiLoadModule", "#2171b5"),
-    ("apiFindEntryPoint", "#6baed6"),
-    ("apiComposite", "#9e9ac8"),
-    ("apiSpecialize", "#807dba"),
-    ("apiLink", "#6a51a3"),
-    ("apiGetCode", "#fd8d3c"),
-    ("apiReflection", "#b5bdc4"),
-    ("apiTotal (self)", "#969696"),
-]
+from lib.render import esc  # noqa: F401 — canonical escaper, re-exported
 
 
-def api_buckets(timers):
-    """buckets() over the API-path tree — {bucket: ms} tiling apiTotal."""
-    return buckets(timers, API_TREE)
-
-
-
-def esc(s):
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def _t(timers, name):
-    st = timers.get(name)
-    return st if isinstance(st, (int, float)) else 0.0
-
-
-def buckets(timers, tree=TREE):
-    """Mutually-exclusive {bucket: ms} that sum to the given tree's root total
-    (compileInner for the default compiler-phase TREE, apiTotal for API_TREE),
-    allocated TOP-DOWN from that budget. Each parent places its measured
-    children within its budget; the remainder is '<parent> (self)'.
-
-    Slang's phase timers are not perfectly additive — named sub-timers can sum to
-    MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
-    linkAndOptimizeIR after the v2026.7 specialization/autodiff work). When that
-    happens the children are scaled proportionally to fit the parent's budget.
-    Proportional scaling is preferred over clamping because it preserves the
-    relative child proportions, keeping the visual stacked areas meaningful. It
-    also keeps the overshoot LOCAL: without it, a child-sum exceeding its parent
-    would produce a negative self-residual that propagates up and zeroes out an
-    ancestor's self-time (as happened with generateOutput (self) at v2026.7).
-    Either way the buckets sum exactly to compileInner."""
-    out = {}
-
-    def alloc(node, budget):
-        name, children = node
-        if budget <= 0:
-            return
-        if not children:
-            out[name] = out.get(name, 0.0) + budget
-            return
-        cm = [(c, _t(timers, c[0])) for c in children]
-        csum = sum(v for _, v in cm)
-        if csum > budget and csum > 0:
-            scale = budget / csum  # children overshoot parent -> fit proportionally
-            for c, v in cm:
-                if v > 0:
-                    alloc(c, v * scale)
-        else:
-            for c, v in cm:
-                if v > 0:
-                    alloc(c, v)
-            self_ms = budget - csum
-            # 0.05 ms: suppress rounding-noise residuals. Timers have 4-decimal-
-            # place ms precision; a self-time below ~0.05 ms is within measurement
-            # noise and would clutter the stacked chart with invisible slivers.
-            if self_ms > 0.05:
-                out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
-
-    alloc(tree, _t(timers, tree[0]))
-    return out
 
 
 def _runs(results_dir, label, metric):
@@ -203,7 +68,7 @@ def aggregate(runs):
     for _, _, timers in runs:
         for b, ms in buckets(timers).items():
             agg[b] = agg.get(b, 0.0) + ms
-        total += _t(timers, "compileInner")
+        total += timer_ms(timers, "compileInner")
     print(f"\n=== Where the benchmark spends time (sum of {len(runs)} workloads, "
           f"total compileInner = {total:,.0f} ms) ===")
     print(f"{'phase bucket':34s}{'ms':>10}{'% total':>9}  share")
@@ -218,9 +83,9 @@ def per_workload(runs):
     print(f"\n=== Per-workload dominant phase ===")
     print(f"{'workload':22s}{'N':>6}{'compileInner':>14}{'dominant bucket':>26}{'%':>7}")
     print("-" * 78)
-    rows = sorted(runs, key=lambda r: -_t(r[2], "compileInner"))
+    rows = sorted(runs, key=lambda r: -timer_ms(r[2], "compileInner"))
     for wl, size, timers in rows:
-        ci = _t(timers, "compileInner")
+        ci = timer_ms(timers, "compileInner")
         bk = buckets(timers)
         if not ci or not bk:
             continue
@@ -234,18 +99,18 @@ def tree_view(runs, workload):
     if not match:
         raise SystemExit(f"workload '{workload}' not in this label")
     _, size, timers = match[0]
-    ci = _t(timers, "compileInner") or 1.0
+    ci = timer_ms(timers, "compileInner") or 1.0
     print(f"\n=== {workload} (N={size}) — compileInner = {ci:.1f} ms ===")
 
     def show(node, depth):
         name, children = node
-        total = _t(timers, name)
+        total = timer_ms(timers, name)
         if total == 0 and name != "compileInner":
             return
         print(f"{'  ' * depth}{name:30s}{total:9.1f} ms  ({100*total/ci:5.1f}%)")
         child_sum = 0.0
         for c in children:
-            child_sum += _t(timers, c[0])
+            child_sum += timer_ms(timers, c[0])
             show(c, depth + 1)
         if children:
             self_ms = max(total, child_sum) - child_sum
@@ -260,9 +125,9 @@ def render_stacked_svg(runs, label, metric):
     """One horizontal stacked bar per workload, segments = phase buckets, bar
     length proportional to compileInner (so composition AND magnitude both read).
     Sorted by compileInner descending."""
-    rows = sorted(((wl, sz, t) for wl, sz, t in runs if _t(t, "compileInner") > 0),
-                  key=lambda r: -_t(r[2], "compileInner"))
-    max_ci = max((_t(t, "compileInner") for _, _, t in rows), default=1.0)
+    rows = sorted(((wl, sz, t) for wl, sz, t in runs if timer_ms(t, "compileInner") > 0),
+                  key=lambda r: -timer_ms(r[2], "compileInner"))
+    max_ci = max((timer_ms(t, "compileInner") for _, _, t in rows), default=1.0)
     ml, mt = 168, 56          # left margin (labels), top margin (title)
     pw = 760                  # max bar pixel width (== max_ci)
     rh, bh = 26, 17           # row pitch, bar height
@@ -280,7 +145,7 @@ def render_stacked_svg(runs, label, metric):
          f'phase; length ∝ time (max {max_ci:,.0f} ms)</text>']
     y = mt
     for wl, sz, t in rows:
-        ci = _t(t, "compileInner")
+        ci = timer_ms(t, "compileInner")
         bk = buckets(t)
         s.append(f'<text x="{ml-6}" y="{y+bh-4}" text-anchor="end" fill="#222" '
                  f'font-weight="600">{esc(wl)}</text>')
@@ -351,9 +216,9 @@ FE_GO_ORDER = [
 def coarse_buckets(timers):
     """Top-level split: frontEndExecute / generateOutput (+ residual), summing to
     compileInner. The high-level view for the per-workload index page."""
-    ci = _t(timers, "compileInner")
-    fe = _t(timers, "frontEndExecute")
-    go = _t(timers, "generateOutput")
+    ci = timer_ms(timers, "compileInner")
+    fe = timer_ms(timers, "frontEndExecute")
+    go = timer_ms(timers, "generateOutput")
     out = {}
     if fe > 0:
         out["frontEndExecute"] = fe
@@ -646,16 +511,19 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
 
                 contrib_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{d_ms:+.1f} ms</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right>{contrib:+.1f}pp</td></tr>"
                     for t, d_ms, own, contrib in contributors)
+                # d_val, not d_ms: unlike contributors (buckets partitioning
+                # compileInner, always ms), extras also carry the kb memory
+                # counters — hence fmt_qty rather than a hard-coded " ms".
                 extra_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{esc(analyze.fmt_qty(t, d_val, signed=True))}</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right style='color:#aaa'>&ndash;</td></tr>"
-                    for t, d_ms, own in extras)
+                    for t, d_val, own in extras)
                 step_rows = "".join(
                     f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
@@ -680,7 +548,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"listed, the rest fold into the remainder row. Below them, every other reported counter "
                     f"(nested/overlapping, e.g. serialized-module reads — own change only):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
-                    f"<tr><th style='text-align:left'>counter</th><th>&Delta; ms</th>"
+                    f"<tr><th style='text-align:left'>counter</th><th>&Delta;</th>"
                     f"<th>own %</th><th>of total</th></tr>{contrib_rows}"
                     f"{extra_rows}</table>"
                     f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"
@@ -849,31 +717,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# Import-time self-check for the pp-sum tiling contract between this module's
-# buckets and daily_movers.workload_progress. It lives HERE, not in
-# daily_movers, because this is the only placement safe in both import
-# orders: by this line breakdown's bucket functions exist and daily_movers
-# (imported at the top) is fully initialized, so _partition's lazy
-# `import breakdown` resolves to a complete module.
-# The fixture includes compileInner's DIRECT children (frontEndExecute,
-# generateOutput) so alloc() actually descends: named-leaf buckets, (self)
-# residuals at two levels, and the pp sum are all exercised, not just a
-# single degenerate compileInner (self) bucket.
-_T0 = ("2026-01-01", "aaaaaaaaa",
-       {("w", "compileInner"): 100.0, ("w", "frontEndExecute"): 70.0,
-        ("w", "SemanticChecking"): 40.0, ("w", "generateIR"): 20.0,
-        ("w", "generateOutput"): 25.0})
-_T1 = ("2026-01-02", "bbbbbbbbb",
-       {("w", "compileInner"): 80.0, ("w", "frontEndExecute"): 60.0,
-        ("w", "SemanticChecking"): 30.0, ("w", "generateIR"): 25.0,
-        ("w", "generateOutput"): 15.0})
-_ov, _contrib, _ex, _st = daily_movers.workload_progress([_T0, _T1], "w")
-assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
-    "workload_progress fixture: headline 100 -> 80 ms must be -20%"
-assert len(_contrib) >= 4, \
-    "workload_progress fixture must produce a MULTI-bucket partition"
-assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
-    "workload_progress fixture: contributor pp must sum to the overall %"
-del _T0, _T1, _ov, _contrib, _ex, _st
