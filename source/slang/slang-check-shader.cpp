@@ -437,6 +437,27 @@ static bool isInterpolationModeSplitSystemValue(UnownedStringSlice baseName)
     return baseName == toSlice("sv_barycentrics");
 }
 
+// Return true if `baseName` (already lowercased and index-stripped) names a system value whose
+// trailing index picks a *distinct* binding, so that two spellings differing only in that index do
+// not collide. Three do:
+//
+//   - SV_Target is not a builtin at all. A fragment output is an ordinary `out` variable whose
+//     location comes from the index (slang-emit-spirv.cpp returns no builtin for "sv_target"; the
+//     location is assigned in slang-parameter-binding.cpp), so SV_Target0 and SV_Target1 are
+//     genuinely separate render targets.
+//   - SV_ClipDistance and SV_CullDistance index into gl_ClipDistance / gl_CullDistance, which the
+//     GLSL legalization pass reads as an array index (slang-ir-glsl-legalize.cpp, `arrayIndex =
+//     int(semanticInst->getIndex())`).
+//
+// Every other system value lowers to one fixed builtin and never consults the index, so a suffix on
+// those is inert: `SV_Barycentrics0` and `SV_Barycentrics1` both reach BaryCoordKHR and must be
+// treated as the same binding, or the duplicate escapes the check entirely.
+static bool isIndexedSystemValue(UnownedStringSlice baseName)
+{
+    return baseName == toSlice("sv_target") || baseName == toSlice("sv_clipdistance") ||
+           baseName == toSlice("sv_culldistance");
+}
+
 // A single system-value semantic gathered while validateSystemValueSemantic walks an entry point's
 // parameters and result, used by validateEntryPoint to reject the same system value being declared
 // more than once. Two records are duplicates when their direction, output space, base name, index,
@@ -447,13 +468,16 @@ struct CollectedSystemValueSemantic
 {
     SemanticDirection direction = SemanticDirection::Input;
     SystemValueOutputSpace outputSpace;
-    Index semanticIndex = 0; // canonical numeric index (SV_Target0 -> 0; a missing suffix -> 0)
-    String baseName;         // lowercased base name (SV_Target0 -> "sv_target")
-    String displayName;      // original spelling (e.g. "SV_Target0"), for the diagnostic message
-    SourceLoc loc;           // location carrying the semantic, for the diagnostic
+    // Canonical index, but only for a system value whose index selects a distinct binding (see
+    // isIndexedSystemValue): SV_Target0 -> 0, SV_Target1 -> 1, a missing suffix -> 0. Forced to 0
+    // for the rest, whose index is inert, so every spelling of one of those compares equal.
+    Index semanticIndex = 0;
+    String baseName;    // lowercased base name (SV_Target0 -> "sv_target")
+    String displayName; // original spelling (e.g. "SV_Target0"), for the diagnostic message
+    SourceLoc loc;      // location carrying the semantic, for the diagnostic
     // Set only for a system value that `noperspective` splits into a separate binding (see
     // isInterpolationModeSplitSystemValue), so the flag never separates two records that in fact
-    // share one binding.
+    // share one binding. Resolved over the access chain, not read off one declaration.
     bool isNoPerspective = false;
 };
 
@@ -463,7 +487,9 @@ struct CollectedSystemValueSemantic
 // caller can detect duplicates across the whole entry point. `outputSpace` carries the resolved
 // output space through the recursion (Default at the top level; set to the category/stream by the
 // mesh/geometry wrapper-type branches below). `parameterStreamIndex` is the parameter's index,
-// consumed only to identify a geometry output stream's space.
+// consumed only to identify a geometry output stream's space. `inheritedNoPerspective` is the
+// enclosing declaration's `noperspective` state, since a struct parameter's interpolation mode
+// applies to its fields unless a field overrides it.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
@@ -474,7 +500,8 @@ static void validateSystemValueSemantic(
     UInt recursionDepth,
     List<CollectedSystemValueSemantic>* ioCollectedSemantics,
     SystemValueOutputSpace outputSpace,
-    Index parameterStreamIndex)
+    Index parameterStreamIndex,
+    bool inheritedNoPerspective = false)
 {
     if (!decl)
         return;
@@ -563,6 +590,17 @@ static void validateSystemValueSemantic(
 
     auto astBuilder = visitor->getASTBuilder();
 
+    // Resolve the interpolation mode that actually reaches this declaration. A `noperspective` on
+    // an enclosing struct parameter applies to its fields, and a modifier on the field itself
+    // overrides the enclosing one, so the innermost declaration that carries any interpolation mode
+    // wins. This mirrors how lowering resolves it: createGLSLGlobalVaryings walks the access chain
+    // from the leaf outwards and stops at the first interpolation-mode decoration
+    // (slang-ir-glsl-legalize.cpp, "respect the decoration on the inner most node").
+    const bool declaresAnyInterpolationMode = decl->findModifier<InterpolationModeModifier>();
+    const bool effectiveNoPerspective =
+        declaresAnyInterpolationMode ? decl->findModifier<HLSLNoPerspectiveModifier>() != nullptr
+                                     : inheritedNoPerspective;
+
     // If the type is a struct, recursively validate semantics on all fields
     if (auto declRefType = as<DeclRefType>(type))
     {
@@ -590,7 +628,8 @@ static void validateSystemValueSemantic(
                     recursionDepth + 1,
                     fieldCollectedSemantics,
                     outputSpace,
-                    parameterStreamIndex);
+                    parameterStreamIndex,
+                    effectiveNoPerspective);
             }
         }
     }
@@ -623,23 +662,31 @@ static void validateSystemValueSemantic(
             UnownedStringSlice indexSlice;
             splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
 
-            // Canonicalize the index so a missing suffix and an explicit "0" collapse together,
-            // matching how parameter binding decomposes semantics (decomposeSimpleSemantic: no
-            // suffix -> 0). Distinct integers (SV_Target0 vs SV_Target1) still differ.
             CollectedSystemValueSemantic collected;
             collected.direction = direction;
             collected.outputSpace = outputSpace;
-            collected.semanticIndex = indexSlice.getLength() ? stringToInt(String(indexSlice)) : 0;
             collected.baseName = String(baseNameSlice).toLower();
             collected.displayName = String(semanticNameSlice);
             collected.loc = decl->loc;
+
+            // Only an indexed system value gets its index into the identity. For an indexed one the
+            // suffix picks a distinct binding, so canonicalize a missing suffix to 0 the way
+            // parameter binding does (decomposeSimpleSemantic) and keep distinct integers apart:
+            // SV_Position == SV_Position0, while SV_Target0 != SV_Target1. For a non-indexed one
+            // the suffix is inert — every spelling reaches the same builtin — so honouring it would
+            // let `SV_Barycentrics0` and `SV_Barycentrics1` name one builtin and escape the check.
+            collected.semanticIndex =
+                isIndexedSystemValue(collected.baseName.getUnownedSlice()) && indexSlice.getLength()
+                    ? stringToInt(String(indexSlice))
+                    : 0;
+
             // `noperspective` selects a distinct builtin for SV_Barycentrics only, so record it as
-            // part of the identity there and nowhere else. The modifier sits on whichever decl
-            // carries the semantic — the parameter, or the struct field when the value arrives
-            // through an aggregate — which is `decl` in both cases.
+            // part of the identity there and nowhere else. Use the mode resolved over the access
+            // chain, not the modifier on this declaration: a `noperspective` struct parameter
+            // passes its mode to a field that declares none.
             collected.isNoPerspective =
                 isInterpolationModeSplitSystemValue(collected.baseName.getUnownedSlice()) &&
-                decl->findModifier<HLSLNoPerspectiveModifier>() != nullptr;
+                effectiveNoPerspective;
             ioCollectedSemantics->add(collected);
         }
     }
