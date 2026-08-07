@@ -43,6 +43,7 @@ regression points at a specific release.
   succeeds (`rss_kb`: `os.wait4` `ru_maxrss` on POSIX,
   `GetProcessMemoryInfo` on Windows; `None` if it fails — a gap in the
   memory charts is that, not a bug) — see the Memory footprint section
+  below.
 - **Floor + slope:** `ladder_scaling.py --workload <name>` fits
   `time = floor + slope·N` per release from `--sweep` (multi-size) runs,
   separating a fixed-cost regression (heavier stdlib) from a per-element one

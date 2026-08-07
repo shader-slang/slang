@@ -205,7 +205,7 @@ assert "root (self)" not in _b, \
 assert abs(sum(_b.values()) - 100.0) < 1e-9, \
     "buckets must tile the root even when its children overshoot it"
 
-# 5. A missing timer is a 0 ms phase, not an absent bucket key: _t defaults
+# 5. A missing timer is a 0 ms phase, not an absent bucket key: timer_ms
 # unmeasured names to 0.0, and alloc drops zero-width children.
 _b = buckets({"root": 100.0, "a": 100.0}, _FIX_TREE)
 assert _b == {"a": 100.0}, "buckets: an unmeasured child contributes nothing"
