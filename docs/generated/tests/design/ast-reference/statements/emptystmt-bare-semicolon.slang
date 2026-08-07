@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/ast-reference/statements.md#nodes
-//META: doc_section_digest=9f32f2463c3b3150d88ac333b9a732766e6f477e8e541627f6f4db0faa939a24
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/statements.md#declstmt-expressionstmt-and-emptystmt
+//META: doc_section_digest=e05101999cc6555f3e7214b2fb06744dbaf16788905b25807e20594acfdd10d6
 //META: purpose=An EmptyStmt is a bare `;` accepted in statement position; it carries no state and produces no effect.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says EmptyStmt is "a bare `;`" with no additional state. We
-// observe by placing a bare semicolon between two side-effecting
-// statements: the program must still run both and produce the same
-// result.
+// Verifies a bare `;` is a legal statement that produces no effect.
+// Semicolons are interleaved between two side-effecting statements; the
+// CHECK asserts the arithmetic result is unaffected, so the empty
+// statements parsed and executed as no-ops.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

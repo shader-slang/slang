@@ -1,20 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#interfacereqentry
-//META: doc_section_digest=649555343c205ab0c26446093b6240518a16135126c348a497fe87b34f836ad7
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
+//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
 //META: purpose=A 3-method interface emits three interface_req_entry instructions, one per method requirement.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on interface_req_entry axis: 3 requirement entries.
-// `### interface_req_entry` prose says each requirement
-// produces an `interface_req_entry` keyed by a `StructKey`. A
-// 3-method interface therefore produces three
-// `interface_req_entry(%key, FuncType)` instructions.
-
+// Boundary on requirement count: one entry per requirement, none merged. The
+// order-independent CHECK-DAGs assert an entry exists for each of the three
+// declared methods, keyed by that method's own key.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IMulti
@@ -43,6 +39,6 @@ void main()
     buf[0] = helper<S>(s, inVal);
 }
 
-// CHECK: interface_req_entry(%IMultix5FmethA, Func(Int,
-// CHECK: interface_req_entry(%IMultix5FmethB, Func(Int,
-// CHECK: interface_req_entry(%IMultix5FmethC, Func(Int,
+// CHECK-DAG: interface_req_entry(%IMultix5FmethA, Func(Int,
+// CHECK-DAG: interface_req_entry(%IMultix5FmethB, Func(Int,
+// CHECK-DAG: interface_req_entry(%IMultix5FmethC, Func(Int,

@@ -126,8 +126,6 @@ docs/generated/tests/design/target-pipelines/spirv/vector-logical-and-or.slang
 # four negative-index / prelude / nvapi entries passed (the workflow
 # treats a kept-but-passing entry as a failure), so they are removed; the
 # three below failed there and are kept.
-docs/generated/tests/design/cross-cutting/core-module/printf-float-nan.slang
-docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang
 docs/generated/tests/design/ir-reference/types/array-unsized.slang
 
 # Surfaced on nightly run 26934884546 (Linux agentic suite):
@@ -140,9 +138,9 @@ docs/generated/tests/design/ir-reference/types/array-unsized.slang
 #    output (validation/lowering differs). Newly added; test-vs-compiler
 #    cause still to be determined.
 #  - 29106: the `spirv-instruction-with-too-many-operands` diagnostic
-#    test.
+#    test. Removed 2026-08-05: the diagnostics-catalog bundle no longer
+#    generates that test, so the entry no longer resolved to a file.
 docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
-docs/generated/tests/design/cross-cutting/diagnostics-catalog/29106-spirv-instruction-with-too-many-operands.slang
 
 # Surfaced on nightly run 26936693099 (Linux agentic suite):
 # https://github.com/shader-slang/slang/actions/runs/26936693099
@@ -178,18 +176,106 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 # red.
 docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
 
-# Pending: docs/generated/tests/_meta/findings/slangi-vm-get-string-hash-bytecode-unimplemented.yaml
-# slangi VM aborts with "unimplemented: VM bytecode gen for inst" on
-# any `getStringHash("...")` call. The doc documents the opcode as a
-# compile-time-stable literal hash folded by the emitters; the C++
-# emit path folds it correctly, only the VM bytecode emitter lacks a
-# handler. (Will become a tracking issue after human triage.)
-docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-interpret.slang
-
-# Pending: docs/generated/tests/_meta/findings/cpu-get-string-hash-slang-test-segfault.yaml
-# slang-test dies with SIGSEGV (exit 139) when executing a
-# COMPARE_COMPUTE -cpu kernel that calls `getStringHash`. Codegen is
-# healthy (-target cpp folds both call sites to the same constant);
-# the crash is in slang-test's CPU host-callable execution path.
+# Pending: docs/generated/tests/_meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml
+# A `getStringHash` argument that does not fold to a string literal kills
+# slangc with SIGSEGV (exit 139, no output) instead of reporting the
+# documented "getStringHash requires string literal" error E41023.
 # (Will become a tracking issue after human triage.)
-docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang (cpu)
+docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
+
+# Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
+# `countof(a)` on a static array folds to the element type's byte size
+# instead of the array's element count (int[9] -> 4, double[6] -> 8),
+# while `countof` on a generic type pack folds correctly. The design doc
+# documents the array operand. (Will become a tracking issue after human
+# triage.)
+docs/generated/tests/design/ast-reference/expressions/countof-static-array.slang
+docs/generated/tests/design/ir-reference/misc/countof-fixed-size-array.slang (cpu)
+
+# Pending: docs/generated/tests/_meta/findings/new-expr-with-constructor-args-internal-error.yaml
+# `new T(args)` on a class that declares a matching `__init` aborts with
+# `E99997 ... InternalError ... could not resolve target declaration for
+# call` on every target tried (hlsl, cpp, host-cpp, spirv-asm, slangi).
+# The zero-argument `new T()` form compiles. (Will become a tracking issue
+# after human triage.)
+# The emission fan-out added glsl/spirv-asm/metal/wgsl directives to the same
+# file, and the abort is not target-specific, so every sub-test fails too.
+# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
+# flags the `<file>.<n>` sub-test names as unresolvable; the lint rule does not
+# yet know about slang-test's sub-test naming. Remove the whole block when the
+# abort is fixed.
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.1
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.2
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.3
+docs/generated/tests/design/ast-reference/expressions/new-expr-constructor-args.slang.4
+
+# Pending: docs/generated/tests/_meta/findings/switch-case-decl-used-in-later-case-invalid-cpp-emit.yaml
+# A local declared under one `switch` case label and used under another is
+# accepted silently by the frontend, but the C++ emitted with debug info
+# (`-g2`, which the `-cpu` COMPARE_COMPUTE path uses) references an
+# undeclared `shared_0`, so clang rejects the generated file. (Will become
+# a tracking issue after human triage.)
+docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-in-later-case.slang (cpu)
+
+# Pending: docs/generated/tests/_meta/findings/slangi-vm-narrow-int-return-not-sign-extended.yaml
+# Under slangi, a negative `int8_t` / `int16_t` value returned from a
+# function comes back zero-extended: `int8_t f() { return int8_t(-128); }`
+# prints 128 instead of -128, while the same constant read directly (or
+# emitted for `-target cpp`) keeps its sign. (Will become a tracking issue
+# after human triage.)
+docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-boundary.slang
+
+# Pending: docs/generated/tests/_meta/findings/ir-types-unorm-snorm-struct-field-sigsegv.yaml
+# A struct with a `unorm float` / `snorm float` field used as a module-scope
+# `uniform` segfaults slangc (exit 139) on every target tried (hlsl, glsl,
+# spirv-asm, metal, cpp), with and without `-dump-ir`. (Will become a
+# tracking issue after human triage.)
+docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
+
+# Pending: docs/generated/tests/_meta/findings/metal-append-buffer-params-missing-binding-slot.yaml
+# On `-target metal` the element and counter pointers that
+# `lowerAppendConsumeStructuredBuffers` synthesizes for an
+# `AppendStructuredBuffer<T>` are emitted as kernel parameters with no
+# `[[buffer(N)]]` attribute at all, while an ordinary RWStructuredBuffer
+# beside them gets `[[buffer(3)]]`. MSL requires an attribute on every
+# kernel argument. (Will become a tracking issue after human triage.)
+docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-buffer-slots.slang
+
+# Pending: docs/generated/tests/_meta/findings/metadata-unorm-structured-buffer-element-sigsegv.yaml
+# `RWStructuredBuffer<unorm float>` (and the `snorm` spelling) segfaults
+# slangc (exit 139) on `-target hlsl` and `-target spirv-asm`, with and
+# without `-dump-ir`, while the same modifier on `RWTexture2D<unorm float4>`
+# compiles and emits the attribute. Probably the same root cause as
+# ir-types-unorm-snorm-struct-field-sigsegv. (Will become a tracking issue
+# after human triage.)
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
+
+# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
+# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
+# The emission fan-out for the `ref`-accessor claim reaches the last two
+# shader targets and both are broken: `-target metal` (directive `.1`) aborts
+# with the internal error "Unknown addressspace encountered", and
+# `-target spirv-asm` (directive `.2`) declares the accessor helper as
+# `OpTypeFunction %int %_ptr_Function_Cell` while calling it as
+# `OpFunctionCall %_ptr_Function_int`, so the module fails spirv-val.
+# The entries name the two sub-tests rather than the file because the file's
+# first directive (`-target hlsl`) still passes and must keep reporting.
+# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
+# flags these two sub-test names as unresolvable; the lint rule does not yet
+# know about slang-test's `<file>.<n>` sub-test naming. Remove these entries
+# when either back-end is fixed. (Will become a tracking issue after human
+# triage.)
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
+# Pending: docs/generated/tests/_meta/findings/spirv-sample-decoration-missing-samplerateshading-capability.yaml
+# The `-target spirv-asm` directive this branch's fan-out pass added to
+# `sample-interpolation-emits-on-hlsl.slang` exposes a compiler bug rather
+# than a test bug: `sample` interpolation lowers to `OpDecorate ... Sample`
+# while the module declares only `OpCapability Shader`, so spirv-val rejects
+# it with "Operand 2 of Decorate requires one of these capabilities:
+# SampleRateShading". Only the 4th directive (`-target spirv-asm`, sub-test
+# `.3`) fails; the hlsl/glsl/metal directives pass and must keep reporting.
+# Remove this entry once the emitter declares the capability. (Will become a
+# tracking issue after human triage.)
+docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang.3

@@ -1,21 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#inlining-and-optimization
-//META: doc_section_digest=99f72cda245d99360168c24acf24a82fd577e139a911dfa073addcf5493b365a
+//META: doc_section_digest=920c2eb81b315af907f28c1ce483b160e67a9a325de3473075b6cc826161fb7b
 //META: purpose=A function decorated with __unsafe_force_inline_early carries an unsafeForceInlineEarly decoration with no operands.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc table lists unsafeForceInlineEarly with no operands and
-// AST origin "[__unsafe_force_inline_early] attribute"; summary
-// is "Inlines calls immediately after codegen." Since the
-// "immediately after codegen" inliner may run before the LOWER-
-// TO-IR snapshot is printed, the decoration appears in the dump
-// only briefly; we anchor on the helper's signature to catch the
-// pre-inline state.
+// Verifies the `unsafeForceInlineEarly` row, the marker that requests
+// inlining immediately after code generation rather than during the normal
+// IR passes. The CHECK pins the bare decoration; the dump used here is the
+// initial lowering snapshot, which is taken before that early inliner has
+// had a chance to consume the marker.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

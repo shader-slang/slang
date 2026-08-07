@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:07:37Z
-//META: source_commit=c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#abort
-//META: doc_section_digest=c7693fdd37023bb5a9e34f71071374da718341c95afdd7a9ab459dbdb06785c9
+//META: doc_section_digest=16fc1bd9386f5dae15e0833138d76a19ff43596b18ba9580dce4b003c1242672
 //META: purpose=Boundary: the minimal abort(format) call still carries both documented operands — the format string plus a variadic argument pack that is empty (a makeValuePack with no elements).
 //META: intent=boundary
 //META: pipeline_stage=lower

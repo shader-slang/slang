@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#basicexpressiontype-vectorexpressiontype-matrixexpressiontype
 //META: doc_section_digest=5f41283b162e626d8a46ba0564c2bfa3960821954aadd78336372f0416cb5f48
-//META: purpose=A uint BasicExpressionType wraps modulo 2^32 on overflow; uint(0xFFFFFFFF) + 1 wraps to 0.
+//META: purpose=A uint BasicExpressionType wraps modulo 2^32 on overflow; uint(0xFFFFFFFF) + 1u wraps to 0.
 //META: intent=boundary
-//META: pipeline_stage=check
+//META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary probe of unsigned wrap on the uint scalar
-// BasicExpressionType. MAX is fed through a uniform buffer so the
-// constant folder cannot pre-compute the add; the runtime result is
-// written to an output buffer. CHECK asserts the wrapped value 0.
+// Boundary probe of unsigned wrap at the top edge of the uint
+// arithmetic leaf. MAX arrives through an input buffer so the constant
+// folder cannot pre-compute the add, and the runtime sum is written to
+// an output buffer. CHECK asserts the wrapped value 0.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 

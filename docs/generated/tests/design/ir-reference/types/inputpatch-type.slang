@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#resource-and-texture-types
-//META: doc_section_digest=4995d79f1d575606442d0357f0fb015ffcc2489a1b4116d09d5d6d1d0bde2e0f
+//META: doc_section_digest=9bc7cd21838a70254771d6cf744cc574fc1ff6d4c25215b75c1badb8cf87e771
 //META: purpose=An InputPatch<T,N> hull-shader parameter surfaces the InputPatch opcode parameterised by element type and elementCount in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Resource and texture types" table lists `InputPatch`
-// (C++ wrapper `HLSLInputPatchType`) with operands
-// `elementType: IRType, elementCount`. A hull-shader parameter
-// `InputPatch<VS_OUT, 4>` surfaces the `InputPatch` opcode in the
-// IR dump.
+// An InputPatch<T,N> hull-shader parameter surfaces the InputPatch
+// opcode parameterised by element type and elementCount in the IR
+// dump. A hull-shader parameter `InputPatch<VS_OUT, 4>` surfaces the
+// `InputPatch` opcode in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target hlsl -stage hull -entry hullMain -dump-ir -o /dev/null
 

@@ -1,22 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#meshoutputref
-//META: doc_section_digest=4f2d77f0c3719656c50a0a149420cbc2adf75e40f2372c446c7a976a5ae733e9
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#mesh-shader-outputs
+//META: doc_section_digest=bedd4b56e7e5495dfd99f9d6eab0f36c5057ff4dadfc06a01626d0c188d9d28a
 //META: purpose=A mesh-shader entry point that writes to `out vertices`, `out primitives`, and `out indices` arrays surfaces the documented `meshOutputRef` and `meshOutputSet` opcodes in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's mesh-shader-outputs table lists `meshOutputRef(base, index)`
-// as a reference to one slot of a mesh-shader output array, and
-// `meshOutputSet(base, index, elementValue)` as the corresponding
-// single-element write. The portable surface is the `OutputVertices`
-// / `OutputIndices` / `OutputPrimitives` arrays of a `[shader("mesh")]`
-// entry point: `verts[i].field = v` lowers via the `ref` accessor to
-// `meshOutputRef`, while `triangles[i] = v` and `prims[i] = v` lower
-// via the `set` accessor to `meshOutputSet`.
+// Verifies the two mesh output-array accessors. Writing one field of a
+// vertex goes through the `ref` accessor and yields the reference
+// opcode; assigning a whole element goes through the `set` accessor and
+// yields the write opcode. Both CHECKs are order-independent because
+// the two array writes are independent.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage mesh -entry main
 

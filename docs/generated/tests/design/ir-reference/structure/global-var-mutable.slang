@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#global-state
-//META: doc_section_digest=bdc6bb6b7a39c2c8b7995b327c38de7325c97141a0323527f7daffab61b5477c
-//META: purpose=A module-scope `static int` variable lowers to a global_var opcode with a Ptr-typed result and a one-block initializer body.
+//META: doc_section_digest=100b91a908217e68795cbc9dac7393e0325718d4c3df831fe3616ee38716a45a
+//META: purpose=A module-scope static variable lowers to a global_var opcode with a Ptr-typed result and a one-block initializer body.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A module-scope mutable global like `static int gCounter = 0;`
-// should lower to `global_var %gCounter : Ptr(Int)` with a body that
-// returns the initial value.
+// Verifies that a module-scope mutable variable is addressed rather than
+// valued: the inst's result type is `Ptr(Int)`, and its initializer is not
+// folded into the declaration but lives in a child block that returns it.
+// CHECK pins the `global_var %gCounter : Ptr(Int)` header and the
+// `return_val(0 : Int)` that terminates the initializer block.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

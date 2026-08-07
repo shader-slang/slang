@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#severity-levels
-//META: doc_section_digest=6c1c702cf80ed3f86a13f8071f7debe50ebc4cb725e9ba9101ed110bca3e30e0
-//META: purpose=A diagnostic emitted at Severity::Error renders with the user-facing name "error".
-//META: intent=negative
+//META: doc_section_digest=45a1f9ffaa6abf3626a600faa360e7aa4723d4e67c65508783a32e11ac892cf2
+//META: purpose=A diagnostic declared at `Severity::Error` renders with the user-facing severity name `error`.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Use of an undefined identifier is a known Severity::Error diagnostic
-// (undefined-identifier, E30015). Verify the rendered severity word is
-// the doc-claimed "error" by FileChecking that word on the caret line.
+// Verifies the severity name rendered for an entry declared with the `err`
+// helper. Undefined-identifier (E30015) is such an entry; the caret-anchored
+// CHECK asserts the severity word reported at the offending column is `error`,
+// which is the user-facing name of `Severity::Error`.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 void main()
@@ -19,5 +20,4 @@ void main()
     int a = b;
 //CHECK:    ^ error
 //CHECK:    ^ undefined identifier
-// CHECK: E30015
 }

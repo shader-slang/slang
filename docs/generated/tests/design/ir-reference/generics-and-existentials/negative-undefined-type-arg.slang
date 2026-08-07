@@ -1,20 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
+//META: doc_section_digest=3ad6835b3f4fbf438debd857fd413ba7cce495005327d971c499cc7510fecf17
 //META: purpose=Specializing with an undefined type identifier is rejected at the check stage — no specialize IR is produced.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Negative on the `specialize` argument-validity axis: passing
-// a name that doesn't resolve as the type argument prevents the
-// `arg` operand of `specialize(base, arg, ...)` (per
-// `### specialize`) from being constructed. The compiler must
-// reject before lowering.
-
+// Verifies that a generic argument must name a resolvable type before a
+// `specialize` can be built. The identifier does not resolve, so the CHECK
+// pins the undefined-identifier diagnostic under the argument's caret span.
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv-asm -entry main -stage compute
 
 T identity<T>(T x) { return x; }

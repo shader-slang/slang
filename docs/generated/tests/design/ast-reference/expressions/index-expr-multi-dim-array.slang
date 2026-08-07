@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#nodes
-//META: doc_section_digest=5cae24401ed06bd3567242934951f344da434f10804637bdd679d55ab6b5bb2b
+//META: doc_section_digest=b4aac875016d352a73eaff212c9886fb3c6956320e3406200a947b5679edef57
 //META: purpose=An IndexExpr can chain `a[i][j]` for multi-dimensional indexing; the result is the (i,j)-th element.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says IndexExpr supports "(one or more indices)". A 2D
-// array indexed twice reads the element at the chained position;
-// `a[i][j]` is parsed as nested IndexExpr nodes.
+// Verifies that subscripting can be chained: `a[i][j]` reaches the element of
+// the inner array. Distinct values are stored at two positions and read back
+// through two-level subscripts, so a collapsed or transposed index shows up as
+// a wrong value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

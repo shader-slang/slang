@@ -1,0 +1,45 @@
+schema_version: 1
+id: glsl-domain-shader-patch-input-array-size
+bundle: coverage/legalize
+suspected_kind: wrong-codegen
+title: "Domain shader GLSL sizes patch input array to the patch, not maxPatchVertices"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: glsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc /tmp/cand/domain.slang -target spirv -emit-spirv-via-glsl -entry main -stage domain -o /tmp/cand/d2.spv"
+  source_slang: docs/generated/tests/coverage/legalize/domain-shader-patch-input-spirv.slang
+  observed_summary: |
+    The GLSL emitted for a domain (tessellation-evaluation) entry point declares the
+    per-vertex patch input with the patch's own control-point count, which GLSL does
+    not allow:
+
+      [domain("tri")]
+      [shader("domain")]
+      DsOut main(OutputPatch<HsOut, 3> patch, float3 uvw : SV_DomainLocation, HscOut pc)
+
+    glslang rejects the emitted GLSL:
+
+      glslang: <file>(2): error : '[]' : tessellation input array size must be
+      gl_MaxPatchVertices or implicitly sized
+
+    The SPIR-V arm is unaffected — the same shader compiled with -target spirv
+    validates cleanly, since SPIR-V sizes tessellation-evaluation inputs to the actual
+    patch size. Only text-GLSL output is broken.
+  exit_code: 0
+  stderr_tail: "glslang:  <file>(2): error :  '[]' : tessellation input array size must be gl_MaxPatchVertices or implicitly sized"
+expected:
+  claim: |
+    A tessellation-evaluation per-vertex input array must be declared either unsized or
+    with the size gl_MaxPatchVertices, so the GLSL emitter should drop the explicit
+    control-point count for domain-stage varying inputs.
+  citation_kind: sibling-test
+  citation: tests/spirv/tessellation.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — the shader is minimal and compiles and validates on the SPIR-V arm."
+    - "glslang being over-strict: unlikely — the GLSL spec fixes the tessellation-evaluation per-vertex input array size at gl_MaxPatchVertices, but I did not find a Slang-side statement of intent for the text-GLSL tessellation path, hence medium confidence."

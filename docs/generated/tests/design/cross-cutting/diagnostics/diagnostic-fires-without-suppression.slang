@@ -1,25 +1,24 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#diagnosticsink
-//META: doc_section_digest=9c56cd15864837ba13d0f3ca512f679e11adc378d62d03ad3125087b47fe77e6
-//META: purpose=The sink emits diagnostics by default; without an override the comma-operator warning fires as expected.
-//META: intent=negative
+//META: doc_section_digest=83632b726fecd52003cb9a007e201049bb33c66f077ab6265b07278009caca02
+//META: purpose=With no severity override registered in the sink, the comma-operator warning E41024 reaches the user unchanged.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Positive control for the suppression test: without a
-// `#pragma warning(disable: ...)` the same source triggers the
-// warning. This locks in the precondition that the suppression
-// test was actually changing behavior.
+// Positive control for the suppression tests: with no override registered the
+// same comma-operator expression that `#pragma warning(disable: 41024)`
+// silences does reach the user. CHECK pins the code and message at the comma's
+// column, so the suppression tests are known to be changing behaviour.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 int main()
 {
     int x = (1, 2);
-//CHECK:      ^ 41024
+//CHECK:      ^ E41024
 //CHECK:      ^ comma operator used in expression
-// CHECK: W41024
     return x;
 }
