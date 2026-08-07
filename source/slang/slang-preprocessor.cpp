@@ -779,30 +779,22 @@ private:
     /// nested macro invocations might be in flight.
     SourceLoc m_initiatingMacroInvocationLoc;
 
-    /// SourceView representing this specific invocation of the macro.
-    /// Its m_initiatingSourceLoc points back to m_macroInvocationLoc, establishing
-    /// the expansion chain used by the diagnostic renderer.
-    SourceView* m_expansionView = nullptr;
+    /// Tiny source range allocated in the SourceManager side table for this invocation's body
+    /// tokens. begin.isValid() iff this invocation is being tracked for diagnostic backtrace.
+    SourceRange m_expansionRange;
 
-    /// The full range of the definition SourceView.  Used as the offset base in
-    /// _maybeRemapBodyTokenLoc so that byte offsets within the expansion view
-    /// align with the same bytes in the shared content blob.
-    SourceRange m_definitionViewRange;
-
-    /// The SourceLoc range spanned by the macro's actual body tokens (first to last).
-    /// Only tokens whose loc falls in this tighter range are remapped; this prevents
-    /// argument tokens from a same-file invocation from being incorrectly attributed
-    /// to the macro expansion when they happen to fall within the definition view range.
+    /// [bodyBegin, bodyEnd]: range of the macro body definition tokens. Used as the gate and
+    /// offset base in _remapBodyLoc so only real body tokens are remapped.
     SourceRange m_bodyTokenRange;
 
-    /// Remap a body source location into this invocation's expansion view range.
-    /// Returns the original loc unchanged if it does not fall within m_bodyTokenRange.
+    /// Remap a body-definition token loc into the per-invocation expansion range so that the
+    /// diagnostic side table can associate it with the right call site. Returns loc unchanged
+    /// if it does not fall within m_bodyTokenRange or if tracking is disabled.
     SourceLoc _remapBodyLoc(SourceLoc loc) const;
 
-    /// If token.loc falls within m_bodyTokenRange, remap it into m_expansionView's range
-    /// so that the diagnostic chain can walk back to this invocation's call site.
-    /// Tokens from argument substitution or token-paste already have their own locs and
-    /// are left untouched.
+    /// If token.loc falls within m_bodyTokenRange, remap it into m_expansionRange so the
+    /// diagnostic renderer can walk the side table back to this invocation's call site.
+    /// Tokens from argument substitution or token-paste already carry their own locs.
     void _maybeRemapBodyTokenLoc(Token& token) const;
 
     /// One token of lookahead
@@ -1510,24 +1502,14 @@ MacroInvocation::MacroInvocation(
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
     m_isStartOfLine = isStartOfLine;
 
-    // Build a per-invocation SourceView so that the diagnostic renderer can walk the
-    // expansion chain back to the call site (m_macroInvocationLoc).  We only do this
-    // when the macro has body tokens whose definition SourceView we can locate; builtins
-    // and empty macros are left without an expansion view.
+    // Register this invocation in the SourceManager side table so the diagnostic renderer can emit
+    // "expanded from macro 'X'" notes. We skip builtins (invalid body locs) and empty macros.
     if (macro->tokens.m_tokens.getCount() > 0 && macroInvocationLoc.isValid())
     {
-        SourceManager* sm = preprocessor->getSourceManager();
-        SourceLoc firstBodyLoc = macro->tokens.m_tokens[0].loc;
-        SourceView* defView = sm->findSourceViewRecursively(firstBodyLoc);
-        if (defView && defView->getSourceFile()->getContentBlob())
+        SourceLoc bodyBegin = macro->tokens.m_tokens[0].loc;
+        if (bodyBegin.isValid())
         {
-            m_definitionViewRange = defView->getRange();
-
-            // Compute the tight body-token range: from the first body token to the last.
-            // This is used in _maybeRemapBodyTokenLoc to avoid remapping argument tokens
-            // that happen to share the same source file as the definition.
-            SourceLoc bodyBegin = firstBodyLoc;
-            SourceLoc bodyEnd = firstBodyLoc;
+            SourceLoc bodyEnd = bodyBegin;
             for (const Token& t : macro->tokens.m_tokens)
             {
                 if (t.type != TokenType::EndOfFile && t.loc.isValid() && t.loc > bodyEnd)
@@ -1535,17 +1517,13 @@ MacroInvocation::MacroInvocation(
             }
             m_bodyTokenRange = SourceRange{bodyBegin, bodyEnd};
 
-            // Create a fresh SourceFile that shares the macro body content but carries
-            // PathInfo::MacroExpansion so the diagnostic chain can distinguish it from
-            // regular files and token-paste synthetic content.
-            PathInfo expansionPathInfo = PathInfo::makeFromMacroExpansion(macro->getName()->text);
-            SourceFile* expansionFile = sm->createSourceFileWithBlob(
-                expansionPathInfo,
-                defView->getSourceFile()->getContentBlob());
-
-            // The expansion view's m_initiatingSourceLoc is the call site; following
-            // this chain across nested expansions gives the full macro expansion stack.
-            m_expansionView = sm->createSourceView(expansionFile, nullptr, macroInvocationLoc);
+            UInt bodyRangeSize = bodyEnd.getRaw() - bodyBegin.getRaw() + 1;
+            SourceManager* sm = preprocessor->getSourceManager();
+            m_expansionRange = sm->registerMacroExpansion(
+                macro->getName()->text,
+                macroInvocationLoc,
+                bodyBegin,
+                bodyRangeSize);
         }
     }
 }
@@ -1557,10 +1535,10 @@ void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
 
 SourceLoc MacroInvocation::_remapBodyLoc(SourceLoc loc) const
 {
-    if (m_expansionView && m_bodyTokenRange.contains(loc))
+    if (m_expansionRange.begin.isValid() && m_bodyTokenRange.contains(loc))
     {
         return SourceLoc::fromRaw(
-            m_expansionView->getRange().begin.getRaw() + m_definitionViewRange.getOffset(loc));
+            m_expansionRange.begin.getRaw() + (loc.getRaw() - m_bodyTokenRange.begin.getRaw()));
     }
     return loc;
 }
