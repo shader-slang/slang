@@ -494,8 +494,11 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
                     initiationDiagnostic.loc = callSiteLoc;
                     initiationDiagnostic.severity = MiscDiagnostics::seeExpandedFromMacro.severity;
 
-                    HumaneSourceLoc humaneLoc = callSiteView->getHumaneLoc(callSiteLoc);
-                    formatDiagnostic(humaneLoc, initiationDiagnostic, sink->getFlags(), sb);
+                    formatDiagnostic(
+                        callSiteView->getHumaneLoc(callSiteLoc),
+                        initiationDiagnostic,
+                        sink->getFlags(),
+                        sb);
 
                     currentLoc = macroEntry->callSiteLoc;
                     continue;
@@ -530,8 +533,11 @@ static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic,
                 initiationDiagnostic.loc = initiatingLoc;
                 initiationDiagnostic.severity = MiscDiagnostics::seeTokenPasteLocation.severity;
 
-                HumaneSourceLoc humaneLoc = initiatingView->getHumaneLoc(initiatingLoc);
-                formatDiagnostic(humaneLoc, initiationDiagnostic, sink->getFlags(), sb);
+                formatDiagnostic(
+                    initiatingView->getHumaneLoc(initiatingLoc),
+                    initiationDiagnostic,
+                    sink->getFlags(),
+                    sb);
 
                 // Walk from the original (pre-unmap) initiating loc so the next iteration
                 // can find the macro expansion side-table entry if needed.
