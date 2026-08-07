@@ -3359,6 +3359,7 @@ struct TypeFlowSpecializationContext
         {
             IRBuilder builder(module);
             HashSet<IRInst*>& results = *module->getContainerPool().getHashSet<IRInst>();
+            bool sawResidualMiss = false;
             forEachInSet(
                 module,
                 cast<IRWitnessTableSet>(elementOfSetType->getSet()),
@@ -3405,8 +3406,26 @@ struct TypeFlowSpecializationContext
                         return;
                     }
 
-                    results.add(findWitnessTableEntry(witnessTab, key));
+                    // Walk nested base-interface witness tables for inherited
+                    // requirements (#11487). A partial miss (some tables hit,
+                    // some miss) cannot be silently dropped: the downstream
+                    // singleton-shortcut would specialize the lookup to the
+                    // surviving entry for every runtime tag, mis-dispatching
+                    // the callers whose tables actually missed. Track residual
+                    // misses and bail to none() so the caller leaves the
+                    // lookup dynamic instead.
+                    if (auto satisfyingVal =
+                            findWitnessTableEntryInInheritanceClosure(witnessTab, key))
+                        results.add(satisfyingVal);
+                    else
+                        sawResidualMiss = true;
                 });
+
+            if (sawResidualMiss)
+            {
+                module->getContainerPool().free(&results);
+                return none();
+            }
 
             auto setOp = getSetOpFromType(inst->getDataType());
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
@@ -5760,7 +5779,16 @@ struct TypeFlowSpecializationContext
         // Handle trivial case where inst's operand is a concrete table.
         if (auto witnessTable = as<IRWitnessTable>(inst->getWitnessTable()))
         {
-            inst->replaceUsesWith(findWitnessTableEntry(witnessTable, inst->getRequirementKey()));
+            // Walk inherited witness tables (#11487). Once the operand is
+            // already a concrete IRWitnessTable, no later typeflow step can
+            // make the lookup start succeeding, and the post-pass diagnostic
+            // walker skips concrete-table operands - so a residual miss must
+            // be surfaced here as a release assert rather than silently
+            // leaving an unresolved lookup that escapes diagnostics.
+            auto satisfyingVal =
+                findWitnessTableEntryInInheritanceClosure(witnessTable, inst->getRequirementKey());
+            SLANG_RELEASE_ASSERT(satisfyingVal);
+            inst->replaceUsesWith(satisfyingVal);
             inst->removeAndDeallocate();
             return true;
         }
@@ -6504,7 +6532,21 @@ struct TypeFlowSpecializationContext
                     switch (action.kind)
                     {
                     case DispatchAction::Kind::Lookup:
-                        val = findWitnessTableEntry(cast<IRWitnessTable>(val), action.lookupKey);
+                        // Walk nested base-interface witness tables for keys
+                        // declared on an inherited interface (#11487). The
+                        // front-end conformance check requires every
+                        // registered conformance to satisfy all of its
+                        // interface's requirements (direct and inherited), so
+                        // for valid IR the closure walk always finds an entry
+                        // here. A residual miss therefore indicates internal
+                        // inconsistency in the IR rather than a user-reachable
+                        // state; the release assert surfaces it with a clear
+                        // message instead of letting the next iteration's
+                        // cast<IRGeneric>(val) deref a null.
+                        val = findWitnessTableEntryInInheritanceClosure(
+                            cast<IRWitnessTable>(val),
+                            action.lookupKey);
+                        SLANG_RELEASE_ASSERT(val);
                         break;
 
                     case DispatchAction::Kind::Specialize:
