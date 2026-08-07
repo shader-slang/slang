@@ -315,6 +315,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
             }
             break;
         case CompilerOptionName::GLSLForceScalarLayout:
+        case CompilerOptionName::VulkanUseDirectResourceParams:
         case CompilerOptionName::ForceDXLayout:
         case CompilerOptionName::ForceCLayout:
         case CompilerOptionName::MatrixLayoutRow:
