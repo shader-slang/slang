@@ -2466,6 +2466,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return true;
                 }
 
+                // If we peeled a cast chain, resolvedValue may have a different type than
+                // varType (e.g. FloatLit(3.0:Float) inside FloatCast(..., Double)).
+                // Re-materialize the literal with the declared type so the OpConstant we
+                // emit matches the DebugGlobalVariable's debug type.  The IRBuilder
+                // deduplicates constants, so this will reuse any existing OpConstant of
+                // the right type/value rather than emitting a duplicate.
+                if (resolvedValue->getDataType() != varType)
+                {
+                    IRBuilder tempBuilder(inst->getModule());
+                    if (auto floatLit = as<IRFloatLit>(resolvedValue))
+                        resolvedValue = tempBuilder.getFloatValue(varType, floatLit->getValue());
+                    else if (auto intLit = as<IRIntLit>(resolvedValue))
+                        resolvedValue = tempBuilder.getIntValue(varType, intLit->getValue());
+                }
+
                 auto spvValue = ensureInst(resolvedValue);
                 if (!spvValue)
                 {
