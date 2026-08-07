@@ -2402,17 +2402,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto debugGlobalConst = as<IRDebugGlobalConstant>(inst);
                 auto varType = as<IRType>(debugGlobalConst->getDebugType());
-                auto debugType = emitDebugType(varType, false);
-                if (!debugType)
-                {
-                    *emittedSpvInst = nullptr;
-                    return true;
-                }
 
-                // Ensure the DebugCompilationUnit is processed before trying to find the scope.
-                // DebugGlobalConstant may appear in the IR before DebugCompilationUnit, so we
-                // must force it to be emitted first so the module-inst → scope mapping is
-                // registered in m_mapIRInstToSpvDebugInst before findDebugScope is called.
+                // Ensure the DebugCompilationUnit is processed before emitDebugType or
+                // findDebugScope: DebugGlobalConstant may appear in the IR before
+                // DebugCompilationUnit, so we must force it to be emitted first so the
+                // module-inst -> scope mapping is registered in m_mapIRInstToSpvDebugInst
+                // before either call. emitSPIRVFromIR defers DebugGlobalConstant processing
+                // to after the module-scope debug-scope fixup, but processDebugGlobalInst
+                // may also be triggered transitively by ensureInst from another instruction,
+                // so we guard here as well.
                 for (auto globalInst : inst->getModule()->getGlobalInsts())
                 {
                     if (globalInst->getOp() == kIROp_DebugCompilationUnit)
@@ -2420,6 +2418,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         ensureInst(globalInst);
                         break;
                     }
+                }
+
+                auto debugType = emitDebugType(varType, false);
+                if (!debugType)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
                 }
 
                 auto scope = findDebugScope(inst->getModule()->getModuleInst());
@@ -2435,18 +2440,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto col = debugGlobalConst->getCol();
                 auto value = debugGlobalConst->getValue();
 
-                // Walk through float/int casts to find the underlying literal: the
-                // initializer for a constant like `static const double cf1 = 3.0` is
-                // stored as floatCast(FloatLit(3.0 : Float)) before propagateConstExpr
-                // folds it, so we peel casts here to reach the IRConstant.
+                // Walk through same-domain casts to find the underlying literal. For example,
+                // `static const double cf1 = 3.0` stores the value as
+                // floatCast(FloatLit(3.0 : Float), Double) before propagateConstExpr folds it.
+                // We only peel same-domain casts (FloatCast, IntCast): cross-domain casts
+                // (CastIntToFloat, CastFloatToInt) would leave resolvedValue in the wrong
+                // domain relative to varType, producing a malformed literal when
+                // re-materialized below.
                 IRInst* resolvedValue = value;
                 while (resolvedValue)
                 {
                     if (as<IRConstant>(resolvedValue))
                         break;
                     auto op = resolvedValue->getOp() & kIROpMask_OpMask;
-                    if ((op == kIROp_FloatCast || op == kIROp_IntCast ||
-                         op == kIROp_CastIntToFloat || op == kIROp_CastFloatToInt) &&
+                    if ((op == kIROp_FloatCast || op == kIROp_IntCast) &&
                         resolvedValue->getOperandCount() >= 1)
                     {
                         resolvedValue = resolvedValue->getOperand(0);
@@ -2466,10 +2473,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return true;
                 }
 
-                // If we peeled a cast chain, resolvedValue may have a different type than
-                // varType (e.g. FloatLit(3.0:Float) inside FloatCast(..., Double)).
+                // If we peeled a same-domain cast chain, resolvedValue may have a narrower
+                // type than varType (e.g. FloatLit(3.0:Float) inside FloatCast(..., Double)).
                 // Re-materialize the literal with the declared type so the OpConstant we
-                // emit matches the DebugGlobalVariable's debug type.  The IRBuilder
+                // emit matches the DebugGlobalVariable's debug type. The IRBuilder
                 // deduplicates constants, so this will reuse any existing OpConstant of
                 // the right type/value rather than emitting a duplicate.
                 if (resolvedValue->getDataType() != varType)
@@ -2491,8 +2498,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
 
-                // FlagIsDefinition = 8 in NonSemantic.Shader.DebugInfo.100
-                auto flags = builder.getIntValue(builder.getUIntType(), 8);
+                // Use flags=0 to match the behavior of maybeEmitDebugGlobalVariable.
+                auto flags = builder.getIntValue(builder.getUIntType(), 0);
 
                 *emittedSpvInst = emitOpDebugGlobalVariable(
                     getSection(SpvLogicalSectionID::GlobalVariables),

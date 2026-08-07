@@ -11739,11 +11739,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Emit debug info for named global constants when debug info is enabled.
         // Use irConstant->getValue() rather than irInitVal: the initializer expression
-        // may go through implicit casts (e.g. float literal to double), so irInitVal is
-        // not always a plain literal. emitGlobalConstant folds/interns the value, so
-        // irConstant->getValue() is the final normalized constant.
-        // We reference this folded value (not the IRGlobalConstant wrapper) so the debug
-        // instruction survives the replaceGlobalConstants pass, which removes the wrapper.
+        // may go through implicit casts (e.g. float literal to double), so the value
+        // stored in the IRGlobalConstant may be a cast instruction rather than a bare
+        // literal. The SPIRV emitter handles same-domain cast peeling to reach the
+        // underlying IRConstant. We reference this value (not the IRGlobalConstant wrapper)
+        // so the debug instruction survives the replaceGlobalConstants pass, which removes
+        // the wrapper.
+        // Use irConstant->getDataType() as the debug type to match the type that
+        // emitGlobalConstant used, avoiding a mismatch with rate-qualified types.
         auto foldedVal = irConstant ? as<IRGlobalConstant>(irConstant)->getValue() : nullptr;
         if (foldedVal && subContext->debugInfoLevel >= DebugInfoLevel::Standard &&
             decl->loc.isValid())
@@ -11756,7 +11759,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (declName)
                 {
                     auto nameInst = subBuilder->getStringValue(declName->text.getUnownedSlice());
-                    auto irType = lowerType(subContext, decl->getType());
+                    auto irType = as<IRType>(irConstant->getDataType());
                     subBuilder->emitDebugGlobalConstant(
                         irType,
                         nameInst,
