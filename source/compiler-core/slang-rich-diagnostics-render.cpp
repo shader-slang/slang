@@ -399,14 +399,16 @@ private:
             line.number = span.line;
             if (line.content.getLength() == 0 && !line.sourceAvailable)
             {
-                SourceView* view =
-                    m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
+                SourceLoc startLoc = span.startLoc;
+                SourceView* view = m_sourceManager
+                    ? m_sourceManager->findSourceViewThroughExpansion(startLoc)
+                    : nullptr;
                 if (view)
                 {
                     line.sourceAvailable = true;
                     // Use the *actual* (non-remapped) line so that a #line
                     // directive doesn't cause us to display the wrong source.
-                    auto actualLine = view->getHumaneLoc(span.startLoc, SourceLocType::Actual).line;
+                    auto actualLine = view->getHumaneLoc(startLoc, SourceLocType::Actual).line;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(actualLine - 1));
@@ -915,10 +917,11 @@ String renderDiagnosticMachineReadable(
         // mirroring the logic in buildSectionLayout for rich diagnostics
         if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
         {
-            SourceView* view = sm->findSourceView(span.range.begin);
+            SourceLoc spanBegin = span.range.begin;
+            SourceView* view = sm->findSourceViewThroughExpansion(spanBegin);
             if (view)
             {
-                auto actualLine = view->getHumaneLoc(span.range.begin, SourceLocType::Actual).line;
+                auto actualLine = view->getHumaneLoc(spanBegin, SourceLocType::Actual).line;
                 UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                     view->getSourceFile()->getLineAtIndex(actualLine - 1));
                 UnownedStringSlice lineContent =
