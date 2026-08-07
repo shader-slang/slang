@@ -167,6 +167,14 @@ never fails the run). The warning state is what `trend.py`'s `warnings=`
 GitHub output exists for: warnings do not fail the job, so the exit code alone
 cannot tell a warnings-only night from a clean one.
 
+`slack_status.py` owns that five-way choice, taking the trend step's outcome,
+the job status and the warning count. It is a module rather than inline
+workflow bash so its branch order can be tested: a regression drives
+`job.status` to failure as well, so classifying on job status first would
+report every regression as a generic "job failed" — a wrong-but-plausible
+message, on a path that only runs on a scheduled nightly. The import-time
+self-checks pin that ordering along with every state.
+
 ### Runner-change procedure
 
 When the benchmark runner is replaced or updated, `track.py runner-id` changes and

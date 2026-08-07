@@ -348,15 +348,26 @@ del _REL, _WARN, _ABS, _bad
 
 def _warnings_output_selfcheck():
     """Pin the ONE invariant that only running main() can establish: the
-    `warnings=` GITHUB_OUTPUT write happens on every path out of main().
+    `warnings=` GITHUB_OUTPUT write happens on every path out of main() that
+    FOLLOWS classification.
+
+    The qualifier is load-bearing, not hedging. Two returns leave main()
+    before any judgement happens — too few points to trend at all, and too few
+    same-runner trailing points to meet --min-baseline — and neither writes
+    the key. That is correct: no warnings have been computed at that stage, so
+    there is no count to report, and the workflow's
+    `${{ steps.trend.outputs.warnings || '0' }}` fallback yields 0. Those two
+    paths are deliberately outside this fixture's scope. (Separately, they do
+    leave the Slack step reporting a green "No regressions detected" on a
+    night where nothing was judged — a real state on a fresh runner — but that
+    is a missing Slack state, not a missing write.)
 
     The classifier checks above are pure and cannot see this. The write is the
     sole signal separating a warnings-only night from a clean one — warnings
     deliberately do not fail the job — so if a future edit moved it below the
-    clean-night `return` or the regression `SystemExit(1)`, the workflow's
-    `${{ steps.trend.outputs.warnings || '0' }}` fallback would report a
-    warnings-only night as a green "No regressions detected". Nothing else
-    would notice.
+    clean-night `return` or the regression `SystemExit(1)`, that fallback
+    would report a warnings-only night as a green "No regressions detected".
+    Nothing else would notice.
 
     Driving main() in-process rather than as a subprocess keeps this an
     ordinary import-time check (no process spawn), but it means argv, the
@@ -373,14 +384,29 @@ def _warnings_output_selfcheck():
                 "runner": "r1", "metrics": metrics}
 
     BASE = 100.0
-    # Five stable trailing points: clears --window/--min-baseline comfortably.
+    # Two metrics per point so the last case can put one in each tier at once;
+    # five stable trailing points clears --window/--min-baseline comfortably.
     history = [point(f"2026-01-0{i}-aaaaaaaaa", f"2026-01-0{i}",
-                     {"minimal|compileInner": BASE}) for i in range(1, 6)]
-    # ratio, expected (exit_code, warnings=) — one case per path out of main().
+                     {"minimal|compileInner": BASE, "parse|compileInner": BASE})
+               for i in range(1, 6)]
+    # (metrics, exit code, expected GITHUB_OUTPUT line, expected summary header)
+    # — one case per path out of main() after classification, plus the mixed
+    # case, which is the only one that renders both tables and so is the only
+    # one that can pin the header's choice between them.
     cases = [
-        (BASE, 0, "warnings=0"),          # clean: write precedes the early return
-        (BASE * 1.07, 0, "warnings=1"),   # warning band: does not fail the job
-        (BASE * 1.15, 1, "warnings=0"),   # regression: write precedes SystemExit
+        # clean: the write still happens, ahead of the early return
+        ({"minimal|compileInner": BASE, "parse|compileInner": BASE},
+         0, "warnings=0", None),
+        # warning band only: reported, does not fail the job
+        ({"minimal|compileInner": BASE * 1.07, "parse|compileInner": BASE},
+         0, "warnings=1", "⚠️"),
+        # regression only: the write precedes SystemExit(1)
+        ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE},
+         1, "warnings=0", "🔴"),
+        # both tiers at once: a regression outranks a warning in the header,
+        # and the warning is still counted rather than swallowed by it
+        ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE * 1.07},
+         1, "warnings=1", "🔴"),
     ]
 
     d = tempfile.mkdtemp(prefix="trend_selfcheck_")
@@ -391,21 +417,25 @@ def _warnings_output_selfcheck():
         os.makedirs(os.path.join(d, "tracking"))
         tpath = os.path.join(d, "tracking", "tracking.json")
         gho = os.path.join(d, "github_output")
-        # Unset: the step summary must not receive fixture rows, and the
-        # ::warning:: annotations are noise outside a real run.
-        os.environ.pop("GITHUB_STEP_SUMMARY", None)
+        summary = os.path.join(d, "step_summary")
+        # Both are redirected into the fixture's tmpdir rather than left
+        # pointing at the real ones: GITHUB_STEP_SUMMARY would otherwise
+        # append fixture tables to the actual CI job summary, and it is read
+        # back below to check which header the run chose. GITHUB_ACTIONS is
+        # unset because ::warning:: annotations are noise outside a real run.
         os.environ.pop("GITHUB_ACTIONS", None)
         os.environ["GITHUB_OUTPUT"] = gho
+        os.environ["GITHUB_STEP_SUMMARY"] = summary
 
-        for cur, want_code, want_line in cases:
+        for metrics, want_code, want_line, want_header in cases:
             with analyze.open_output(tpath) as fh:
                 json.dump({"runner": "r1",
                            "points": history + [point("2026-01-09-zzzzzzzzz",
-                                                      "2026-01-09",
-                                                      {"minimal|compileInner": cur})]},
+                                                      "2026-01-09", metrics)]},
                           fh)
-            with analyze.open_output(gho) as fh:
-                fh.write("")
+            for f in (gho, summary):
+                with analyze.open_output(f) as fh:
+                    fh.write("")
             sys.argv = ["trend.py", "--results", d, "--label", "2026-01-09-zzzzzzzzz"]
             code = 0
             with contextlib.redirect_stdout(io.StringIO()):
@@ -415,12 +445,19 @@ def _warnings_output_selfcheck():
                     code = e.code or 0
             written = analyze.read_text(gho)
             assert code == want_code, \
-                (f"trend fixture: current={cur} expected exit {want_code}, got {code}"
+                (f"trend fixture: {metrics} expected exit {want_code}, got {code}"
                  f" — the warning tier must not fail the job, and a regression must")
             assert want_line in written, \
-                (f"trend fixture: current={cur} expected '{want_line}' in GITHUB_OUTPUT,"
+                (f"trend fixture: {metrics} expected '{want_line}' in GITHUB_OUTPUT,"
                  f" got {written!r} — the warnings= write must precede every exit "
-                 f"from main(), or a warnings-only night reports as clean")
+                 f"from main() that follows classification, or a warnings-only "
+                 f"night reports as clean")
+            if want_header:
+                md = analyze.read_text(summary)
+                assert want_header in md.splitlines()[0], \
+                    (f"trend fixture: {metrics} expected the step summary to lead "
+                     f"with {want_header}, got {md.splitlines()[0]!r} — a run with "
+                     f"any regression must not be headed by the warning icon")
     finally:
         sys.argv = saved_argv
         for k, v in saved_env.items():

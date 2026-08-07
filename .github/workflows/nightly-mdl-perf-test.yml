@@ -392,33 +392,23 @@ jobs:
             exit 0
           fi
           export DATE=$(date -u +%Y-%m-%d)
-          # A regression must be classified BEFORE the generic-failure case: the
-          # trend step exits non-zero on a regression, which also drives
-          # job.status to failure, so testing JOB_STATUS first would shadow the
-          # regression message. JOB_STATUS then distinguishes "trend skipped
-          # because an earlier step failed" (job failed) from "trend skipped
-          # because this is a publish=false measurement-only run".
-          if [ "$TREND_OUTCOME" = "failure" ]; then
-            export ICON=":warning:"
-            export STATUS="Regression detected (>=10% over trailing median) — see CI run for details"
-          elif [ "$JOB_STATUS" != "success" ]; then
-            export ICON=":x:"
-            export STATUS="Nightly job failed — see CI run for details"
-          elif [ "$TREND_OUTCOME" = "success" ] && [ "${TREND_WARNINGS:-0}" != "0" ]; then
-            export ICON=":large_yellow_circle:"
-            export STATUS="$TREND_WARNINGS warning-level change(s) (>=5%, below the 10% error gate) — see CI summary"
-          elif [ "$TREND_OUTCOME" = "success" ]; then
-            export ICON=":white_check_mark:"
-            export STATUS="No regressions detected"
-          else
-            # Reached when the trend step did not run while the job stayed
-            # green: its gate (if: env.PUBLISH == 'true') makes
-            # steps.trend.outcome report "skipped", which matches neither
-            # branch above. Phrased generically so the message stays true if
-            # that gate changes.
-            export ICON=":information_source:"
-            export STATUS="Trend check did not run — see CI run for details"
+          # The five-way classification lives in slack_status.py rather than
+          # here. Its branch ORDER is load-bearing — a regression drives
+          # job.status to failure too, so testing JOB_STATUS first would report
+          # every regression as a generic "job failed" — and as bash in a
+          # workflow that only runs on a scheduled nightly, nothing could test
+          # it. As a module it is covered by the import-time self-checks that
+          # check-python-core.yml runs on every PR touching these files.
+          # One invocation, split in-shell: two calls could not disagree here,
+          # but one process is cheaper and there is no second place to keep in
+          # step. A failure warns rather than reds the run, matching the
+          # webhook-failure contract below.
+          if ! CLASSIFIED=$(python3 "$SUITE/slack_status.py"); then
+            echo "::warning title=Slack notification skipped::slack_status.py failed"
+            exit 0
           fi
+          export ICON="${CLASSIFIED%%$'\n'*}"
+          export STATUS="${CLASSIFIED#*$'\n'}"
           python3 -c "
           import json, os, urllib.request
           payload = {
