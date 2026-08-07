@@ -519,10 +519,15 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
-    // Lets a DebugFunction be scoped to the compilation unit of its own source file. Only
-    // non-included sources have a compilation unit; a function defined in an #include'd or
-    // #line-remapped source has no entry here and is left with a null parent scope (see the
-    // creation site). Populated in generateIRForTranslationUnit before any function is lowered.
+    // Maps a source's DebugSource to the compilation unit that owns it, so a DebugFunction can be
+    // scoped to the unit its source belongs to. A non-included source maps to its own compilation
+    // unit; an #include'd source maps to the unit of the non-included file its include chains
+    // terminate in, which for a nested include is an outer file rather than the immediate includer.
+    // Populated in generateIRForTranslationUnit before any function is lowered.
+    //
+    // Sources reached only through `#line` are absent, having no compilation unit of their own, and
+    // so are those reachable from more than one terminal owner; the creation site resolves the former
+    // from the function's physical location and leaves the latter with a null parent scope.
     Dictionary<IRDebugSource*, IRDebugCompilationUnit*> mapDebugSourceToCompilationUnit;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
@@ -14696,17 +14701,51 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
-                // Parent the function to the compilation unit of its own source file. Only
-                // non-included files have a compilation unit, so this is null for a function whose
-                // source is an #include'd/__include'd file or a #line-remapped source, and for
-                // every function at Minimal debug level (where no compilation unit is built at
-                // all).
+                // Parent the function to the compilation unit that compiled it, which is a different
+                // question from the source it reports. The two deliberately differ: a function from
+                // an #include'd header reports the header as its source while belonging to the
+                // includer's compilation unit, and a `#line`-remapped function reports its presumed
+                // path while belonging to the file that physically holds it.
+                //
+                // Consider a generated file containing `#line 1 "original.slang"` before a function.
+                // Its reported source is `original.slang`, which is what `#line` is for, but the
+                // compilation unit that owns it is the generated file's. Resolving from the raw
+                // SourceLoc, which `#line` does not affect, answers the ownership question directly.
+                // Doing this first also covers the case where the presumed path happens to name
+                // another of the translation unit's files: that file has a compilation unit of its
+                // own, so a lookup keyed on the reported source would find it and bind a unit that
+                // never compiled this function.
                 IRDebugCompilationUnit* parentScope = nullptr;
-                if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+                if (irFunc->sourceLoc.isValid())
                 {
-                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
-                        debugSource,
-                        parentScope);
+                    auto sourceManager = context->getLinkage()->getSourceManager();
+                    if (auto sourceView =
+                            sourceManager->findSourceViewRecursively(irFunc->sourceLoc))
+                    {
+                        IRInst* physicalDebugSource = nullptr;
+                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
+                                sourceView->getSourceFile(),
+                                physicalDebugSource))
+                        {
+                            context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                                as<IRDebugSource>(physicalDebugSource),
+                                parentScope);
+                        }
+                    }
+                }
+
+                // A function without a usable physical location — a synthesized declaration, or one
+                // whose SourceLoc does not resolve to a file of this translation unit — still has a
+                // reported source, so fall back to that. For everything other than `#line` the two
+                // agree anyway, since the reported source is the physical file.
+                if (!parentScope)
+                {
+                    if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+                    {
+                        context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                            debugSource,
+                            parentScope);
+                    }
                 }
 
                 auto debugFuncCallee = getBuilder()->emitDebugFunction(
@@ -15409,6 +15448,95 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
     }
 }
 
+// Return the nearest non-included source file that (transitively) included `sourceFile`, or null if
+// there is none. An `#include`'d file is textually part of the file that included it, so it has no
+// compilation unit of its own; the enclosing compilation unit is the one belonging to the first
+// non-included file up the include chain.
+//
+// Consider a module `m.slang` that does `#include "helper.h"`. The `SourceView` representing this
+// translation unit's include of `helper.h` carries an initiating location that points into
+// `m.slang`; following that chain reaches `m.slang`, which is non-included and therefore owns the
+// compilation unit. This is the same SourceView initiating-location hierarchy that
+// `_calcViewInitiatingHierarchy` walks in slang-compile-request.cpp.
+//
+// Resolution is anchored to `tuSourceManager`, the translation unit's source manager, rather than
+// to each file's own manager: an `#include`'d file can be a `SourceFile` owned by a parent manager
+// (reused via `findSourceFileRecursively`) while the `SourceView` that represents an include of it
+// lives in a descendant manager.
+//
+// A physical header can be included by several modules that share a linkage-wide source manager,
+// which holds one initiating view per include *occurrence*. A `SourceFile` therefore does not have
+// "an includer" — an occurrence does. Matching on the file alone would take whichever occurrence
+// happened to be registered first, so a header included by both `a.slang` and `b.slang` would
+// resolve to `a.slang` even while lowering `b`. `tuFiles` is the set of files in the translation
+// unit being lowered, and a candidate chain is accepted only when it terminates in that set, which
+// selects this translation unit's own occurrence.
+static SourceFile* findIncludingNonIncludedSourceFile(
+    SourceManager* tuSourceManager,
+    const HashSet<SourceFile*>& tuFiles,
+    SourceFile* sourceFile)
+{
+    // Every include chain reaching `sourceFile` is followed to the non-included file it terminates
+    // in, and those terminal files are collected. Chains can diverge, when two files of the
+    // translation unit include one header, and can then reconverge on a single outer file; so the
+    // decision of whether an owner is determined belongs at the terminals, not at each intermediate
+    // level, where divergence alone says nothing about the answer.
+    //
+    // A single terminal file is the owner. Several mean the owner is not determined: a declaration
+    // records the source file it came from, not the include occurrence, so when a header is expanded
+    // under more than one outer file nothing here says which expansion declared any given function.
+    // Selecting one anyway would scope conditionally-declared functions to a file that did not
+    // declare them, and a scope naming the wrong real file misleads a debugger more than the
+    // module-global fallback the caller keeps when this returns null.
+    //
+    // The view scan cannot stop at its first match: every occurrence feeds the traversal, so an early
+    // exit would hide chains and make a shared header look singly-included.
+    HashSet<SourceFile*> owners;
+    HashSet<SourceFile*> visited;
+    List<SourceFile*> pending;
+    pending.add(sourceFile);
+    while (pending.getCount())
+    {
+        SourceFile* current = pending.getLast();
+        pending.removeLast();
+
+        // Also guards against a cyclic initiating-location graph, which real include expansion never
+        // produces, so a malformed source manager cannot spin this loop forever.
+        if (!visited.add(current))
+            continue;
+
+        if (!current->isIncludedFile())
+        {
+            owners.add(current);
+            continue;
+        }
+
+        for (SourceManager* mgr = tuSourceManager; mgr; mgr = mgr->getParent())
+        {
+            for (SourceView* view : mgr->getSourceViews())
+            {
+                if (view->getSourceFile() != current || !view->getInitiatingSourceLoc().isValid())
+                    continue;
+
+                SourceView* includerView =
+                    tuSourceManager->findSourceViewRecursively(view->getInitiatingSourceLoc());
+                if (!includerView)
+                    continue;
+
+                // Restricting to this translation unit's files is what separates its own include
+                // occurrences from those of another module that shares a header through a common
+                // source manager.
+                SourceFile* includer = includerView->getSourceFile();
+                if (tuFiles.contains(includer))
+                    pending.add(includer);
+            }
+        }
+    }
+    if (owners.getCount() != 1)
+        return nullptr;
+    return *owners.begin();
+}
+
 RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
@@ -15483,6 +15611,49 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 auto compilationUnit =
                     cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));
                 context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
+            }
+        }
+
+        // Give each #include'd file's DebugSource the compilation unit of the non-included file its
+        // include chains terminate in, so a function defined in an included file is scoped to the
+        // unit that owns it rather than falling back to the module-global scope. This runs as a
+        // second pass so that every non-included file's compilation unit is already recorded above,
+        // whichever order the source files appear in.
+        if (context->debugInfoLevel >= DebugInfoLevel::Standard)
+        {
+            SourceManager* tuSourceManager = context->getLinkage()->getSourceManager();
+
+            HashSet<SourceFile*> tuFiles;
+            for (auto source : translationUnit->getSourceFiles())
+                tuFiles.add(source);
+
+            for (auto source : translationUnit->getSourceFiles())
+            {
+                if (!source->isIncludedFile())
+                    continue;
+
+                auto includer =
+                    findIncludingNonIncludedSourceFile(tuSourceManager, tuFiles, source);
+                if (!includer)
+                    continue;
+
+                IRInst* includerDebugSource = nullptr;
+                IRInst* includedDebugSource = nullptr;
+                IRDebugCompilationUnit* compilationUnit = nullptr;
+                if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
+                        includer,
+                        includerDebugSource) &&
+                    context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
+                        source,
+                        includedDebugSource) &&
+                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                        as<IRDebugSource>(includerDebugSource),
+                        compilationUnit))
+                {
+                    context->shared
+                        ->mapDebugSourceToCompilationUnit[as<IRDebugSource>(includedDebugSource)] =
+                        compilationUnit;
+                }
             }
         }
     }
