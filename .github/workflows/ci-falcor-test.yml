@@ -9,12 +9,20 @@ permissions:
 jobs:
   test-falcor:
     name: Test (Falcor)
-    timeout-minutes: 100
+    # The Falcor run itself takes ~45 minutes, and this job also waits for the
+    # deployment gate below and for a runner. 100 minutes was set before the
+    # gate existed and leaves little room for an approval that arrives out of
+    # hours. A timeout here also surfaces as a failed Falcor test rather than
+    # as "nobody has approved it yet", which sends people looking in the wrong
+    # place.
+    timeout-minutes: 180
     runs-on: [Linux, self-hosted, X64, falcor-bridge]
     # Vet-and-approve gate: this job runs PR-controlled code on the internal
     # bridge VM, so it is gated behind the `falcor-ci` environment (required
-    # reviewers = the `ci-approvers` team). A PR by a team member runs
-    # automatically; anyone else's run waits for a one-click approval.
+    # reviewers = the `ci-approvers` team). Every run waits for an approval --
+    # including team members' own PRs and merge-queue runs, because environment
+    # protection cannot be scoped to particular actors. Approvals are normally
+    # granted automatically; anything unrecognised waits for a person.
     environment: falcor-ci
     defaults:
       run:
