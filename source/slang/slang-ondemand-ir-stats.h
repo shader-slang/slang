@@ -123,6 +123,13 @@ struct CrossBodyReferenceStats
 /// Runs the check above over `irModule` (an `IRModule*`), recording the result.
 void analyzeCrossBodyReferences(const char* moduleName, void* irModule);
 
+/// True if SLANG_ONDEMAND_SKELETON=1. Enables the measurement-only load mode that
+/// materializes just the symbol-index tier; the resulting module cannot compile.
+bool isSkeletonModeEnabled();
+
+/// Records how many instructions skeleton mode kept, of how many total.
+void recordSkeletonCounts(int64_t kept, int64_t total);
+
 /// Writes the accumulated report to stderr. Registered to run at process exit
 /// when stats are enabled.
 void dumpReport();

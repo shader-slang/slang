@@ -552,6 +552,50 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRInst** const insts = &instsList[1];
     insts[-1] = nullptr;
 
+    // Skeleton mode materializes only what a symbol index needs -- the module
+    // inst, each module-scope global, and each global's decorations -- and skips
+    // allocating instructions for function bodies.
+    //
+    // This measures the eager-tier floor a per-global-value lazy loader would pay.
+    // The resulting module has no bodies and cannot compile anything; it exists to
+    // put a measured number against the design rather than a projected one.
+    const bool skeletonMode = OnDemandStats::isSkeletonModeEnabled();
+    List<uint8_t> materializeInst;
+    if (skeletonMode)
+    {
+        materializeInst.setCount(numInsts);
+        ::memset(materializeInst.getBuffer(), 0, size_t(numInsts));
+
+        // Preorder scan tracking depth, allocating nothing. `childCounts` is in the
+        // same preorder as the instructions, so a stack of remaining-child counts
+        // is enough to recover each instruction's depth.
+        List<Int64> remainingChildren;
+        Int64 depth = 0;
+        for (Int64 i = 0; i < numInsts; ++i)
+        {
+            const IROp op = flat.instAllocInfo[i].op;
+            const bool isDecoration = op >= kIROp_FirstDecoration && op <= kIROp_LastDecoration;
+            // Depth 0 is the module inst and depth 1 its globals; a global's
+            // decorations sit at depth 2 and carry the linkage names.
+            materializeInst[i] = uint8_t(depth <= 1 || (depth == 2 && isDecoration));
+
+            remainingChildren.add(flat.childCounts[i]);
+            depth++;
+            while (remainingChildren.getCount() && remainingChildren.getLast() == 0)
+            {
+                remainingChildren.removeLast();
+                depth--;
+            }
+            if (remainingChildren.getCount())
+                remainingChildren.getLast()--;
+        }
+
+        Int64 kept = 0;
+        for (Int64 i = 0; i < numInsts; ++i)
+            kept += materializeInst[i];
+        OnDemandStats::recordSkeletonCounts(kept, numInsts);
+    }
+
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
         const auto& a = flat.instAllocInfo[instIndex];
@@ -592,7 +636,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
                 break;
             }
         }
-        insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
+        // In skeleton mode the skipped instructions are never allocated; the
+        // preorder walk below still consumes their operand and payload cursors so
+        // that positions stay correct for the instructions that are kept.
+        insts[instIndex] = (skeletonMode && !materializeInst[instIndex])
+                               ? nullptr
+                               : module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
     const auto tAllocEnd = std::chrono::steady_clock::now();
@@ -618,31 +667,50 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         const auto thisInstIndex = instIndex++;
         IRInst* inst = insts[thisInstIndex];
 
+        // In skeleton mode this instruction may have been skipped. Its operand and
+        // payload entries still have to be consumed so the cursors stay aligned for
+        // the instructions that were kept.
+        const auto& allocInfo = flat.instAllocInfo[thisInstIndex];
+        const Int64 thisOperandCount =
+            inst ? Int64(inst->operandCount) : Int64(allocInfo.operandCount);
+
         // operands and sourcelocs
-        inst->sourceLoc = sourceLocs[thisInstIndex];
-        inst->typeUse.init(inst, readInstRef());
-        for (Int64 o = 0; o < inst->operandCount; ++o)
-            inst->getOperands()[o].init(inst, readInstRef());
+        if (inst)
+        {
+            inst->sourceLoc = sourceLocs[thisInstIndex];
+            inst->typeUse.init(inst, readInstRef());
+            for (Int64 o = 0; o < thisOperandCount; ++o)
+                inst->getOperands()[o].init(inst, readInstRef());
+        }
+        else
+        {
+            readInstRef(); // type use
+            for (Int64 o = 0; o < thisOperandCount; ++o)
+                readInstRef();
+        }
 
         // Handle special instructions
-        switch (inst->m_op)
+        switch (inst ? inst->m_op : allocInfo.op)
         {
         [[unlikely]] case kIROp_ModuleInst:
-            cast<IRModuleInst>(inst)->module = module;
+            if (inst)
+                cast<IRModuleInst>(inst)->module = module;
             break;
         case kIROp_BoolLit:
         case kIROp_IntLit:
             {
                 SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
                 const auto bits = flat.literals[litIndex++];
-                cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
+                if (inst)
+                    cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
                 break;
             }
         case kIROp_FloatLit:
             {
                 SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
                 const auto bits = flat.literals[litIndex++];
-                cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
+                if (inst)
+                    cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
                 break;
             }
         case kIROp_PtrLit:
@@ -650,13 +718,14 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
                 SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
                 const auto bits = flat.literals[litIndex++];
                 // Keep the compiler happy on 32 bit builds
-                cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
+                if (inst)
+                    cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
                 break;
             }
         case kIROp_StringLit:
         case kIROp_BlobLit:
             {
-                const auto c = cast<IRConstant>(inst);
+                auto* const c = inst ? cast<IRConstant>(inst) : nullptr;
                 SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
                 const auto len = flat.stringLengths[stringLengthIndex++];
                 SLANG_RELEASE_ASSERT(len >= 0);
@@ -666,17 +735,23 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
                 SLANG_RELEASE_ASSERT(stringDataIndex <= stringCharsCount);
                 SLANG_RELEASE_ASSERT(len <= stringCharsCount - stringDataIndex);
 
-                char* const dstChars = c->value.stringVal.chars;
-                c->value.stringVal.numChars = uint32_t(len);
-                if (len != 0)
-                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
+                if (c)
+                {
+                    char* const dstChars = c->value.stringVal.chars;
+                    c->value.stringVal.numChars = uint32_t(len);
+                    if (len != 0)
+                        memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
+                }
                 stringDataIndex += len;
                 break;
             }
         }
 
-        // Read in children, and fix up pointers
-        inst->parent = parent;
+        // Read in children, and fix up pointers. Children that were skipped come
+        // back as null and are simply not linked, which is what leaves a global
+        // value holding its decorations but no body.
+        if (inst)
+            inst->parent = parent;
         IRInst* prev = nullptr;
         IRInst* first = nullptr;
         IRInst* last = nullptr;
@@ -685,7 +760,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         for (Int64 i = 0; i < childCount; ++i)
         {
             auto c = go(go, inst, depth + 1);
-            if (i == 0)
+            if (!c)
+                continue;
+            if (!first)
                 first = c;
             last = c;
             c->prev = prev;
@@ -695,8 +772,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         }
         if (last)
             last->next = nullptr;
-        inst->m_decorationsAndChildren.first = first;
-        inst->m_decorationsAndChildren.last = last;
+        if (inst)
+        {
+            inst->m_decorationsAndChildren.first = first;
+            inst->m_decorationsAndChildren.last = last;
+        }
 
         return inst;
     };

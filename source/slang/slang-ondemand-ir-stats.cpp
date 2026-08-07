@@ -24,6 +24,8 @@ struct Registry
     List<IRModuleShape> shapes;
     List<IRSubPhases> subPhases;
     Dictionary<String, CrossBodyReferenceStats> crossBodyByModule;
+    int64_t skeletonKept = 0;
+    int64_t skeletonTotal = 0;
     // Distinct mangled names resolved per module, so a symbol pulled repeatedly
     // counts once. The interesting figure is coverage, not traffic.
     Dictionary<String, Dictionary<String, bool>> usedSymbolsByModule;
@@ -57,6 +59,24 @@ bool isEnabled()
         return on;
     }();
     return enabled;
+}
+
+bool isSkeletonModeEnabled()
+{
+    static const bool enabled = []
+    {
+        const char* value = ::getenv("SLANG_ONDEMAND_SKELETON");
+        return value && value[0] != '\0' && value[0] != '0';
+    }();
+    return enabled;
+}
+
+void recordSkeletonCounts(int64_t kept, int64_t total)
+{
+    Registry& registry = getRegistry();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    registry.skeletonKept += kept;
+    registry.skeletonTotal += total;
 }
 
 uint64_t getCurrentRSSBytes()
@@ -311,6 +331,17 @@ void dumpReport()
             double(p.allocInstsRSSDelta) / (1024.0 * 1024.0),
             p.wireUpMs,
             total ? 100.0 * p.wireUpMs / total : 0.0);
+    }
+
+    if (registry.skeletonTotal)
+    {
+        ::fprintf(
+            stderr,
+            "\n-- SKELETON MODE (measurement only; module has no bodies) --\n"
+            "materialized %lld insts of %lld (%.2f%%)\n",
+            (long long)registry.skeletonKept,
+            (long long)registry.skeletonTotal,
+            100.0 * double(registry.skeletonKept) / double(registry.skeletonTotal));
     }
 
     ::fprintf(stderr, "\n-- cross-body operand references --\n");
