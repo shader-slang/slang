@@ -261,6 +261,13 @@ err(
 )
 
 err(
+    "downstream-linking-unavailable",
+    116,
+    "linking multiple SPIR-V modules was required, but the loaded 'slang-glslang' library does not export 'glslang_linkSPIRV'; no SPIR-V was linked. Install a 'slang-glslang' library matching this Slang version, which provides SPIR-V linking",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -1744,6 +1751,13 @@ warning(
     30082,
     "implicit float-to-double conversion",
     span { loc = "expr:Expr", message = "implicit float-to-double conversion may cause unexpected performance issues, use explicit cast if intended." }
+)
+
+warning(
+    "deprecated-struct-cast-from-zero",
+    30087,
+    "casting literal 0 to a struct type changes semantics in Slang 202c",
+    span { loc = "expr:Expr", message = "casting literal 0 to a struct type becomes a conversion in Slang 202c. To keep the current semantics, switch to a constructor with no parameters." }
 )
 
 -- try/throw diagnostics
