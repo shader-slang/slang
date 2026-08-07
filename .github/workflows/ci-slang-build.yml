@@ -215,7 +215,7 @@ jobs:
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
                 -DSLANG_ENABLE_VALIDATION_FOSSIL=ON \
-                "-DSLANG_ENABLE_VALIDATION_FULL_IR=$(if [[ '${{ inputs.config }}' == release* ]]; then echo ON; else echo OFF; fi)" \
+                "-DSLANG_ENABLE_VALIDATION_FULL_IR=ON" \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
@@ -226,7 +226,7 @@ jobs:
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
                 -DSLANG_ENABLE_VALIDATION_FOSSIL=ON \
-                "-DSLANG_ENABLE_VALIDATION_FULL_IR=$(if [[ '${{ inputs.config }}' == release* ]]; then echo ON; else echo OFF; fi)" \
+                "-DSLANG_ENABLE_VALIDATION_FULL_IR=ON" \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
@@ -238,7 +238,7 @@ jobs:
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
                 -DSLANG_ENABLE_VALIDATION_FOSSIL=ON \
-                "-DSLANG_ENABLE_VALIDATION_FULL_IR=$(if [[ '${{ inputs.config }}' == release* ]]; then echo ON; else echo OFF; fi)" \
+                "-DSLANG_ENABLE_VALIDATION_FULL_IR=ON" \
                 $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
