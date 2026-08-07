@@ -804,6 +804,8 @@ class HigherOrderInvokeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() Expr* baseFunction;
+    /// Whether checking made the base function's receiver an explicit leading parameter.
+    FIDDLE() bool hasExplicitThisParameter = false;
     FIDDLE() List<Name*> newParameterNames;
 };
 

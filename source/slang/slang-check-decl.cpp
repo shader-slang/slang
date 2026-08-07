@@ -16236,6 +16236,66 @@ static void _moveModifiersToFunc(Decl* src, Decl* dst)
     }
 }
 
+/// Returns whether an imaginary call argument must denote writable storage for `mode`.
+///
+/// `In` and `BorrowIn` can consume a value without making the expression an l-value. `Out`,
+/// `BorrowInOut`, and `Ref` require an l-value so overload resolution applies their storage rules.
+static bool _isLeftValueParamPassingMode(ParamPassingMode mode)
+{
+    switch (mode)
+    {
+    case ParamPassingMode::In:
+    case ParamPassingMode::BorrowIn:
+        return false;
+
+    case ParamPassingMode::Out:
+    case ParamPassingMode::BorrowInOut:
+    case ParamPassingMode::Ref:
+        return true;
+
+    default:
+        SLANG_UNEXPECTED("unhandled parameter passing mode");
+    }
+}
+
+/// Creates an imaginary argument whose type and l-value state match a callable parameter.
+static Expr* _createImaginaryArgForParamType(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithModeWrapper,
+    SourceLoc loc)
+{
+    auto [argType, argDirection] =
+        splitParameterTypeAndDirection(astBuilder, paramTypeWithModeWrapper);
+    auto arg = astBuilder->create<VarExpr>();
+    arg->type.type = argType;
+    arg->type.isLeftValue = _isLeftValueParamPassingMode(argDirection);
+    arg->loc = loc;
+    return arg;
+}
+
+/// Creates the imaginary receiver argument exposed by one checked higher-order candidate.
+///
+/// Higher-order checking records when it makes a member receiver an explicit leading parameter.
+/// Use that parameter's checked type and passing mode instead of reconstructing either from the
+/// operand syntax.
+static Expr* _tryCreateImaginaryThisArgFromHigherOrderCandidate(
+    SemanticsVisitor* visitor,
+    Expr* candidateExpr,
+    SourceLoc loc)
+{
+    auto higherOrderExpr = as<HigherOrderInvokeExpr>(candidateExpr);
+    if (!higherOrderExpr || !higherOrderExpr->hasExplicitThisParameter)
+        return nullptr;
+
+    auto funcType = as<FuncType>(higherOrderExpr->type.type);
+    SLANG_ASSERT(funcType && funcType->getParamCount() != 0);
+
+    return _createImaginaryArgForParamType(
+        visitor->getASTBuilder(),
+        funcType->getParamTypeWithModeWrapper(0),
+        loc);
+}
+
 void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
 {
     // Convert a __func_extension into a regular ExtensionDecl.
@@ -16292,9 +16352,7 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
         auto arg = astBuilder->create<VarExpr>();
         arg->declRef = makeDeclRef(param);
         auto paramMode = getParamPassingMode(param);
-        arg->type.isLeftValue = paramMode == ParamPassingMode::Out ||
-                                paramMode == ParamPassingMode::BorrowInOut ||
-                                paramMode == ParamPassingMode::Ref;
+        arg->type.isLeftValue = _isLeftValueParamPassingMode(paramMode);
         arg->type.type = param->getType();
         arg->loc = decl->loc;
         fakeArgs.add(arg);
@@ -16311,23 +16369,12 @@ void SemanticsDeclBasesVisitor::visitFuncExtensionDecl(FuncExtensionDecl* decl)
     auto checkedDiffExpr = subVisitor.CheckExpr(diffExpr);
     if (auto checkedApplyExpr = as<ApplyForBwdExpr>(checkedDiffExpr))
     {
-        if (auto applyFuncType = as<FuncType>(checkedApplyExpr->type.type))
+        if (auto thisArg = _tryCreateImaginaryThisArgFromHigherOrderCandidate(
+                &subVisitor,
+                checkedApplyExpr,
+                decl->loc))
         {
-            if (checkedApplyExpr->newParameterNames.getCount() &&
-                checkedApplyExpr->newParameterNames[0] == getName("this") &&
-                applyFuncType->getParamCount() == fakeArgs.getCount() + 1)
-            {
-                auto thisArg = astBuilder->create<VarExpr>();
-                auto [thisArgType, thisArgDirection] = splitParameterTypeAndDirection(
-                    astBuilder,
-                    applyFuncType->getParamTypeWithModeWrapper(0));
-                thisArg->type.type = thisArgType;
-                thisArg->type.isLeftValue = thisArgDirection == ParamPassingMode::Out ||
-                                            thisArgDirection == ParamPassingMode::BorrowInOut ||
-                                            thisArgDirection == ParamPassingMode::Ref;
-                thisArg->loc = decl->loc;
-                fakeArgs.insert(0, thisArg);
-            }
+            fakeArgs.insert(0, thisArg);
         }
     }
 
@@ -18982,6 +19029,63 @@ static void checkDerivativeAttribute(
     FunctionDeclBase* funcDecl,
     PrimalSubstituteAttribute* attr);
 
+/// Returns whether a checked higher-order expression exposes an explicit receiver parameter.
+///
+/// An overload set needs a receiver when any candidate explicitly exposes one. The caller supplies
+/// its actual receiver type, so ordinary overload resolution still decides which candidates accept
+/// it instead of pre-filtering candidates by parameter count.
+static bool _hasExplicitThisParameter(Expr* checkedHigherOrderExpr)
+{
+    if (auto higherOrderExpr = as<HigherOrderInvokeExpr>(checkedHigherOrderExpr))
+        return higherOrderExpr->hasExplicitThisParameter;
+
+    if (auto overloadedExpr = as<OverloadedExpr2>(checkedHigherOrderExpr))
+    {
+        for (auto candidateExpr : overloadedExpr->candidateExprs)
+            if (_hasExplicitThisParameter(candidateExpr))
+                return true;
+    }
+
+    return false;
+}
+
+/// Creates the implicit derivative receiver needed by an explicitly referenced member target.
+///
+/// Consider this example:
+///
+///     struct S
+///     {
+///         [BackwardDerivativeOf(S::f)]
+///         void bwd_f(...);
+///     }
+///
+/// Checking `bwd_diff(S::f)` exposes `S::f`'s receiver as an explicit parameter, while `bwd_f`'s
+/// imaginary argument list contains only its declared parameters. Supply `bwd_f`'s actual implicit
+/// receiver here so overload resolution validates it against the checked target. An unqualified
+/// `[BackwardDerivativeOf(f)]` keeps both receivers implicit and does not need this argument.
+static Expr* _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+    SemanticsVisitor* visitor,
+    FunctionDeclBase* derivativeFuncDecl,
+    Expr* checkedHigherOrderExpr,
+    SourceLoc loc)
+{
+    if (!_hasExplicitThisParameter(checkedHigherOrderExpr))
+        return nullptr;
+
+    if (isEffectivelyStatic(derivativeFuncDecl))
+        return nullptr;
+
+    auto derivativeThisType = getTypeForThisExpr(visitor, derivativeFuncDecl);
+    // Global functions are not "effectively static," but they still have no implicit receiver.
+    if (!derivativeThisType.type)
+        return nullptr;
+
+    auto thisArg = visitor->getASTBuilder()->create<VarExpr>();
+    thisArg->type = derivativeThisType;
+    thisArg->loc = loc;
+    return thisArg;
+}
+
 template<typename TDerivativeAttr, typename TDifferentiateExpr, typename TDerivativeOfAttr>
 void checkDerivativeOfAttributeImpl(
     SemanticsVisitor* visitor,
@@ -19009,6 +19113,14 @@ void checkDerivativeOfAttributeImpl(
     }
     List<Expr*> imaginaryArgs =
         getImaginaryArgsToFunc(astBuilder, funcDecl, derivativeOfAttr->loc).args;
+    if (auto thisArg = _tryCreateImaginaryThisArgForDerivativeOfAttribute(
+            visitor,
+            funcDecl,
+            checkedHigherOrderFuncExpr,
+            derivativeOfAttr->loc))
+    {
+        imaginaryArgs.insert(0, thisArg);
+    }
     auto invokeExpr =
         visitor->constructUncheckedInvokeExpr(checkedHigherOrderFuncExpr, imaginaryArgs);
     SemanticsContext::ExprLocalScope scope;

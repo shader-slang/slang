@@ -2002,8 +2002,6 @@ public:
     bool shouldSkipChecking(Decl* decl, DeclCheckState state);
 
     // Auto-diff convenience functions for translating primal types to differential types.
-    Type* _toDifferentialParamType(Type* primalType);
-
     Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
