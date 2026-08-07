@@ -1,0 +1,39 @@
+schema_version: 1
+id: grammar-do-catch-cpu-execution-sigsegv
+bundle: design/syntax-reference/grammar
+suspected_kind: sigsegv
+title: "do...catch/throws/try shader segfaults executing on CPU compute backend"
+observed_at: "2026-06-06T13:35:16+00:00"
+scope: cpp
+evidence:
+  command: "build/RelWithDebInfo/bin/slang-test <tmp>/dc.slang  (//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type)"
+  source_slang: docs/generated/tests/design/syntax-reference/grammar/stmt-do-catch-emit.slang
+  observed_summary: |
+    A compute kernel using the documented DoCatchStmt control flow
+    (`do { v = try risky(...); } catch (MyError e) { ... }` with a `throws MyError`
+    callee) compiles cleanly to C++ (`slangc -target cpp` exit 0) but SIGSEGVs the
+    slang-test CPU execution backend (the test-server reports repeated
+    "JSON RPC failure: waitForResult()" then the process dies with signal 139).
+    The grammar test was switched to observe the production via `-target cpp`
+    emission (which is stable) instead of CPU execution, to avoid shipping a
+    crashing test.
+  exit_code: 139
+  stderr_tail: "JSON RPC failure: waitForResult() / JSON RPC failure: hasMessage() -> Segmentation fault (139)"
+expected:
+  claim: |
+    A `do ... catch` statement whose body invokes a `throws`-declared function via
+    `try`, on the success path (no error thrown), should run to completion and write
+    the non-error result to the output buffer. The construct already compiles to C++
+    without error, so executing the emitted kernel on the CPU backend should not crash.
+  citation_kind: sibling-test
+  citation: tests/language-feature/error-handling/basic.slang
+provenance:
+  agent_model: claude-opus-4-8
+  source_commit: a8f6d4f7d1b2ceb7e22201ca7523f8671c92bde8
+  doc_anchor: docs/generated/design/syntax-reference/grammar.md#statements
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: ruled out — slangc -target cpp emits the kernel with exit code 0; the crash is only in CPU execution."
+    - "slang-test harness flakiness: ruled out — the SIGSEGV (exit 139) reproduces deterministically across runs."
+    - "Bad shader (uses an unsupported feature): ruled out — error-handling is exercised on -cpu in tests/language-feature/error-handling/basic.slang."

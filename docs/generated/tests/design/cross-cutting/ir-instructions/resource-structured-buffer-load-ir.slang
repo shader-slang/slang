@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#resource-and-shader-io-opcodes
-//META: doc_section_digest=024fc8d5c2187724a0e790d2afeaa73bc24b159907ee011a7f3f338ef005a599
+//META: doc_section_digest=9e5354e38bb09fc16bac90544687941aec8ef947b56cd9f9b65ce3ddb041f315
 //META: purpose=A read from a read-only `StructuredBuffer<T>` lowers to the documented `structuredBufferLoad(base, index)` opcode.
 //META: intent=functional
 //META: pipeline_stage=lower

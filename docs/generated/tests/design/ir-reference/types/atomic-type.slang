@@ -1,19 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=a86cbda4849cf43ca676c38db72fbd5fa8f4cb2bf87a66f6e3971d66c5026c9f
+//META: doc_section_digest=54f732694185a0ac0e3a99ea776a2df81f46ad04014e1f6987caf714e9e03dcc
 //META: purpose=An Atomic<T> field surfaces the Atomic opcode parameterised by its element type in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Vectors, matrices, and composite" table lists
-// `Atomic` (C++ wrapper `AtomicType`) with operand
-// `elementType: IRType`. A struct field of type `Atomic<uint>`
-// surfaces an `Atomic(UInt)` operand on the field row in the IR
-// dump.
+// An Atomic<T> field surfaces the Atomic opcode parameterised by its
+// element type in the IR dump. A struct field of type `Atomic<uint>`
+// surfaces an `Atomic(UInt)` operand on the field row in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

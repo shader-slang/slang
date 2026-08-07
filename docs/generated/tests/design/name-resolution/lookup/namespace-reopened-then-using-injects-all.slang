@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#module-and-namespace
-//META: doc_section_digest=79b87e67779abbbf140f9b23327c1d2acc8287e7b623e07e70e2f9c3993d2426
-//META: purpose=Multiple namespace blocks of the same name collapse into the same NamespaceDecl; a single `using namespace` then injects every accumulated member into the unqualified lookup chain.
+//META: doc_section_digest=66e95bef72b71123f8c26c9d474bc27387f02bb7f3d1da7825ec57b318af2eef
+//META: purpose=Multiple same-named namespace blocks under one parent parse into a single namespace decl, so one using declaration makes members from every block reachable unqualified.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Multiple `namespace Foo {}` declarations in the
-// same module collapse into the same `NamespaceDecl` — the parser
-// explicitly reuses the first one it finds." Confirm that one
-// `using namespace M` makes BOTH alpha (from the first block) and
-// beta (from the re-opened block) unqualified-reachable, proving
-// the two blocks share the same merged NamespaceDecl.
+// Verifies the parser-level merge rather than the sibling splice: the
+// two `namespace M` blocks share a parent, so they must become one
+// decl. A single `using namespace M` then has to expose members
+// contributed by both blocks. CHECK asserts 1 + 2, which requires
+// alpha and beta to have landed in the same namespace decl.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

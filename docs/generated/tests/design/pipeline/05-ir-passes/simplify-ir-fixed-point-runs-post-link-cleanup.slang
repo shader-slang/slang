@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T00:00:00+00:00
-//META: source_commit=60b1d48ca67a51f81b5a9103949a4934e6b1c33c
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#how-the-passes-are-ordered
-//META: doc_section_digest=213ac6f0989d9adac2374fe9dcf3f5dff11ca62e30ad5f9de3fe117753c3b339
+//META: doc_section_digest=8c2399bb52b8c73672b650988472d702e960652d15b734a0320c08eaf784bc66
 //META: purpose=The post-link cleanup is carried by repeated `simplifyIR` fixed-point invocations (SSA / SCCP / SimplifyCFG / DCE) — at least two `### AFTER simplifyIR:` headers appear in the dump and the entry point survives every round.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

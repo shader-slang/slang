@@ -1,22 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#getoptixraypayloadptr
-//META: doc_section_digest=c3a35e4b5037da8ad936ccd365aac116a4da968dbaab5a0d940274845cb0ca71
-//META: purpose=`CallShader(idx, payload)` from a raygeneration entry point on `-target spirv-asm` surfaces the documented `GetVulkanRayTracingPayloadLocation` opcode in the IR dump.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#raytracing-payload
+//META: doc_section_digest=bfb83cd10d15abad13aafd042e8b0e23ed62e4221ddd83671237bccf2fbb3073
+//META: purpose=`CallShader(idx, payload)` from a `raygeneration` entry point emits `OpDecorate %p Location 0` alongside `OpCapability RayTracingKHR`, the SPIR-V artifact of the `GetVulkanRayTracingPayloadLocation` opcode that SPIR-V legalization synthesizes after the IR-dump point.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's raytracing-payload table lists
-// `GetVulkanRayTracingPayloadLocation` as the synthesized opcode that
-// returns the binding location of a Vulkan ray-tracing payload. The
-// opcode is created during SPIR-V target legalization, AFTER the
-// `-dump-ir` snapshot point, so the early IR dump cannot observe it.
-// The user-visible artifact is the SPIR-V assembly's
-// `OpDecorate %p Location 0` on the callable-data variable plus the
-// `RayTracingKHR` capability declaration; we pin those instead.
+// The payload-location opcode is created during SPIR-V target
+// legalization, after the `-dump-ir` snapshot, so this test observes
+// the assembly it produces. A `raygeneration` entry point with a
+// callable payload makes the legalizer assign a location, and the
+// CHECKs pin the resulting `Location` decoration together with the
+// raytracing capability that must accompany it.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage raygeneration -entry main
 
