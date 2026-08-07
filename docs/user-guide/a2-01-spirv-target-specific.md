@@ -448,6 +448,13 @@ For more information, see the following pages:
 Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.
 It lets you specify the descriptor for the source at a certain register.
 
+Only the $Globals cbuffer is relocated. Resources that are split out of the global-scope `uniform`
+variables (for example a `Texture2D` or `SamplerState` field inside a `uniform` struct) stay in the
+descriptor set they would otherwise be auto-assigned to (set 0 by default), regardless of the
+descriptor set requested for $Globals, matching DXC's SPIR-V CodeGen behavior. This applies to the
+SPIR-V and GLSL targets; WGSL does not currently support module-scope `uniform` structs that contain
+resources, so `-fvk-bind-globals` with such globals is out of scope there.
+
 For more information, see the following pages:
 
 - [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#hlsl-global-variables-and-vulkan-binding)

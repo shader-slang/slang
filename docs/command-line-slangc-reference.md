@@ -574,6 +574,8 @@ Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding
 
 It lets you specify the descriptor for the source at a certain register. 
 
+Only the $Globals cbuffer is moved; resources split out of the global uniforms (e.g. samplers/textures) stay in the descriptor set they would otherwise be auto-assigned to (set 0 by default), regardless of the set requested for $Globals. 
+
 Links:
 * [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
 
