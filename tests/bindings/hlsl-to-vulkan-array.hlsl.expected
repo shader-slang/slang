@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "g_data",
@@ -94,10 +95,111 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "constantBuffer",
+        "binding": {"kind": "constantBuffer", "index": 0},
+        "parameters": [
+            {
+                "name": "g_data",
+                "bindings": [
+                    {"kind": "uniform", "offset": 0, "size": 32, "elementStride": 16},
+                    {"kind": "shaderResource", "index": 10},
+                    {"kind": "unorderedAccess", "index": 100}
+                ],
+                "type": {
+                    "kind": "array",
+                    "elementCount": 2,
+                    "elementType": {
+                        "kind": "struct",
+                        "name": "Data",
+                        "fields": [
+                            {
+                                "name": "tex",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "sizes": [
+                                        {"kind": "shaderResource", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "shaderResource", "index": 0}
+                            },
+                            {
+                                "name": "structuredBuffer",
+                                "type": {
+                                    "kind": "resource",
+                                    "baseShape": "structuredBuffer",
+                                    "access": "readWrite",
+                                    "resultType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 4, "alignment": 4}
+                                        ]
+                                    },
+                                    "sizes": [
+                                        {"kind": "unorderedAccess", "value": 1}
+                                    ]
+                                },
+                                "binding": {"kind": "unorderedAccess", "index": 0}
+                            },
+                            {
+                                "name": "a",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0}
+                            },
+                            {
+                                "name": "b",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "int32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "shaderResource", "value": 1},
+                            {"kind": "unorderedAccess", "value": 1},
+                            {"kind": "uniform", "value": 16, "alignment": 16}
+                        ]
+                    },
+                    "uniformStride": 16,
+                    "sizes": [
+                        {"kind": "uniform", "value": 32, "alignment": 16},
+                        {"kind": "shaderResource", "value": 1},
+                        {"kind": "unorderedAccess", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
