@@ -219,6 +219,22 @@ For each doc:
    PATH` to override. It refuses to record the entry if
    `remediator_model` does not contain `claude` or `anthropic`.
 
+### Apply manifest changes before recording reviews, not after
+
+Remediation routinely surfaces `watched_paths` gaps — a page cites a file
+it does not watch — and the natural instinct is to fix the manifest at the
+end of the cycle, once every gap is known. Do it the other way round:
+**edit `manifest.yaml` first, then `mark-fresh`, then `mark-reviewed` and
+`mark-remediated`.**
+
+Widening a watched set changes the document's digest. If the review is
+already recorded, every affected document flips straight to `review-stale`
+even though nothing about the document, the source, or the review's
+conclusions changed — and the only way back to an accurate ledger is to
+re-run `mark-reviewed` for each one. In one cycle this needlessly
+invalidated 21 of 31 freshly recorded reviews. Doing the manifest work up
+front costs nothing and avoids the whole round-trip.
+
 ### Example session
 
 A complete cycle for one doc:
@@ -252,8 +268,18 @@ The two-stage state is recorded in
 A document is computed as:
 
 - **review-fresh** iff `last_reviewed.target_doc_watched_paths_digest`
-  equals the doc's current front-matter `watched_paths_digest` — i.e.
-  the doc has not been regenerated since the last review.
+  equals the doc's `watched_paths_digest` **in `freshness.json`** — i.e.
+  the doc has not been regenerated, and its watched set has not changed,
+  since the last review.
+
+  Note that the comparison deliberately does *not* use the digest in the
+  document's own front-matter. `mark-fresh` records the real value in
+  `freshness.json` without rewriting the document, so the front-matter
+  copy is only as current as whatever the generating agent last wrote,
+  and for an aggregator page that watches its own directory the value is
+  unstabilizable by construction. Both `mark-reviewed` and the status
+  computation therefore read `freshness.json`; `mark-reviewed` warns and
+  substitutes the authoritative value if a review report disagrees.
 - **remediation-fresh** iff review-fresh **and**
   `last_remediated.review_report_ref` points at the same review report
   that is currently in `last_reviewed`.

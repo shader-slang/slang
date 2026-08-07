@@ -2,7 +2,7 @@
 //META: model=claude-fable-5
 //META: generated_at=2026-07-08T15:00:51+00:00
 //META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops-branches-opt-levels
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels
 //META: doc_section_digest=5c5a0f355c34a9303ec2cc1c18ffbb9a6f1d4bcd8bac23383e808da27fa7169c
 //META: purpose=Compiling a non-generic plain `enum` with `-unscoped-enum` implicitly applies `[UnscopedEnum]`, so unqualified case names resolve.
 //META: intent=functional

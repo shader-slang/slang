@@ -27,7 +27,6 @@
 #include "slang-visitor.h"
 #include "slang/slang-ir.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -1326,6 +1325,13 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 switch (type->getBaseType())
                 {
+                case BaseType::Bool:
+                    // `lowerEnumType` canonicalizes every `bool`-tagged enumerator constant to
+                    // `kIROp_BoolLit`, so a `bool`-typed `IRIntLit` must never reach emit here
+                    // (it would print via the `int8_t` arm below). See shader-slang/slang#12298.
+                    SLANG_UNEXPECTED("bool-typed IRIntLit should have been lowered to IRBoolLit");
+                    break;
+
                 default:
 
                 case BaseType::Int8:

@@ -2,7 +2,7 @@
 //META: model=claude-opus-4-7
 //META: generated_at=2026-05-20T17:13:48Z
 //META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#entrypoint-entrypointdecoration
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#entrypoint--entrypointdecoration
 //META: doc_section_digest=d3d96830534992c13d27b2f3fc509ca407eb67250f8a01585d992e27d7abbae9
 //META: purpose=The entryPoint decoration's three operands are profile-tag, user-visible name, and module-name; a vertex stage uses a different profile-tag integer than compute.
 //META: intent=functional
