@@ -3420,4 +3420,25 @@ IRType* getWorkGraphRecordElementType(IRType* type)
     return nullptr;
 }
 
+bool isEntryPointScopedDecoration(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_NumThreadsDecoration:
+    case kIROp_MaximallyReconvergesDecoration:
+    case kIROp_QuadDerivativesDecoration:
+    case kIROp_RequireFullQuadsDecoration:
+    case kIROp_Shader64BitIndexingDecoration:
+    case kIROp_InstanceDecoration:
+    case kIROp_MaxVertexCountDecoration:
+    case kIROp_DomainDecoration:
+    case kIROp_OutputControlPointsDecoration:
+    case kIROp_FpDenormalPreserveDecoration:
+    case kIROp_FpDenormalFlushToZeroDecoration:
+        return true;
+    default:
+        return false;
+    }
+}
+
 } // namespace Slang
