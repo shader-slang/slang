@@ -4,6 +4,7 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 
 namespace Slang
@@ -63,6 +64,34 @@ void TargetRequest::setTargetCaps(CapabilitySet capSet)
     cookedCapabilities = capSet;
 }
 
+bool TargetRequest::isGLSLBasedTarget()
+{
+    switch (getTarget())
+    {
+    case CodeGenTarget::GLSL:
+        return true;
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+        return !optionSet.shouldEmitSPIRVDirectly();
+    default:
+        return false;
+    }
+}
+
+// static
+CapabilitySet TargetRequest::decodeCapabilityOption(const CompilerOptionValue& atomVal)
+{
+    switch (atomVal.kind)
+    {
+    case CompilerOptionValueKind::Int:
+        return CapabilitySet(CapabilityName(atomVal.intValue));
+    case CompilerOptionValueKind::String:
+        return CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
+    default:
+        return CapabilitySet();
+    }
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     // Capabilities are derived lazily and shared across entry-point compiles for the same target.
@@ -95,11 +124,10 @@ CapabilitySet TargetRequest::getTargetCaps()
     // a corresponding atom representing the target version from the profile.
     CapabilitySet profileCaps = optionSet.getProfile().getCapabilityName();
 
-    bool isGLSLTarget = false;
+    bool isGLSLTarget = isGLSLBasedTarget();
     switch (getTarget())
     {
     case CodeGenTarget::GLSL:
-        isGLSLTarget = true;
         atoms.add(CapabilityName::glsl);
         break;
     case CodeGenTarget::SPIRV:
@@ -144,7 +172,6 @@ CapabilitySet TargetRequest::getTargetCaps()
         }
         else
         {
-            isGLSLTarget = true;
             atoms.add(CapabilityName::glsl);
             profileCaps.addSpirvVersionFromOtherAsGlslSpirvVersion(profileCaps);
         }
@@ -214,16 +241,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        CapabilitySet toAdd;
-        switch (atomVal.kind)
-        {
-        case CompilerOptionValueKind::Int:
-            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
-            break;
-        case CompilerOptionValueKind::String:
-            toAdd = CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
-            break;
-        }
+        CapabilitySet toAdd = decodeCapabilityOption(atomVal);
 
         if (isGLSLTarget)
             targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
@@ -237,6 +255,97 @@ CapabilitySet TargetRequest::getTargetCaps()
     SLANG_ASSERT(!cookedCapabilities.isInvalid());
 
     return cookedCapabilities;
+}
+
+void TargetRequest::checkCapabilities(DiagnosticSink* sink)
+{
+    if (!sink)
+        return;
+
+    // For GLSL-based targets, SPIRV version and extension atoms are intentionally
+    // converted to their GLSL-SPIRV equivalents by getTargetCaps(), so they are
+    // not an error here.
+    bool isGLSLTarget = isGLSLBasedTarget();
+
+    auto cookedCaps = getTargetCaps();
+    auto& targetOptionSet = getOptionSet();
+
+    // Capabilities inherited from the session-level option set (via inheritFrom) are
+    // intentionally broad — a multi-backend application may set e.g. hlsl_nvapi at
+    // the session level to enable it for D3D12 targets while also compiling for
+    // Vulkan/SPIRV in the same session.  Only flag capabilities that were explicitly
+    // requested for this specific target, not ones that arrived via session inheritance.
+    auto sessionCapArray = getLinkage()->m_optionSet.getArray(CompilerOptionName::Capability);
+    auto isSessionLevelCap = [&](const CompilerOptionValue& atomVal) -> bool
+    {
+        for (const auto& sessionAtom : sessionCapArray)
+        {
+            if (sessionAtom.kind != atomVal.kind)
+                continue;
+            if (atomVal.kind == CompilerOptionValueKind::Int
+                    ? sessionAtom.intValue == atomVal.intValue
+                    : sessionAtom.stringValue == atomVal.stringValue)
+                return true;
+        }
+        return false;
+    };
+
+    // Use the user-specified CodeGenTarget for the diagnostic so the error says e.g.
+    // "incompatible with compilation target 'spirv'" even when the GLSL-SPIRV pipeline
+    // is in use (where cookedCaps.getCompileTarget() would return 'glsl').
+    auto userTargetName = TypeTextUtil::getCompileTargetName(asExternal(getTarget()));
+
+    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    {
+        // Decode the option value into a name string and a CapabilitySet.
+        // decodeCapabilityOption returns an empty set for unknown/invalid entries.
+        String requestedCapName;
+        switch (atomVal.kind)
+        {
+        case CompilerOptionValueKind::Int:
+            if (atomVal.intValue == SLANG_CAPABILITY_UNKNOWN)
+                continue;
+            requestedCapName = capabilityNameToString(CapabilityName(atomVal.intValue));
+            break;
+        case CompilerOptionValueKind::String:
+            {
+                auto capName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
+                if (capName == CapabilityName::Invalid)
+                    continue;
+                requestedCapName = atomVal.stringValue;
+            }
+            break;
+        default:
+            continue;
+        }
+
+        CapabilitySet toAdd = decodeCapabilityOption(atomVal);
+        if (toAdd.isEmpty())
+            continue;
+
+        // Skip capabilities that came from the session level (not target-specific).
+        if (isSessionLevelCap(atomVal))
+            continue;
+
+        // For GLSL-SPIRV pipeline targets, SPIRV version/extension caps are intentionally
+        // converted to their glsl_spirv_* equivalents by getTargetCaps(); not an error.
+        // Use containsKey rather than getCompileTarget() to avoid relying on dictionary
+        // iteration order when a capability spans multiple target families.
+        if (isGLSLTarget && toAdd.getCapabilityTargetSets().containsKey(CapabilityAtom::spirv))
+            continue;
+
+        if (!cookedCaps.isIncompatibleWith(toAdd))
+            continue;
+
+        // The requested capability is incompatible with the code-gen target.
+        maybeDiagnose(
+            sink,
+            getLinkage()->m_optionSet,
+            DiagnosticCategory::Capability,
+            Diagnostics::RequestedCapabilityIncompatibleWithTarget{
+                .requestedCap = requestedCapName,
+                .target = String(userTargetName)});
+    }
 }
 
 
