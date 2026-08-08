@@ -2206,10 +2206,12 @@ static LegalVal legalizeInst(
             .operation = getIROpInfo(inst->getOp()).name,
             .location =
                 inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
-        // That diagnostic is fatal, so it aborts compilation and control does not return here.
-        // The severity is load-bearing: a `none` result would leave the caller queueing this
-        // instruction for deallocation while its uses are still live, and the check that catches
-        // that is debug-only.
+        // The diagnostic above is fatal, so it aborts compilation and control does not reach here.
+        // That severity is load-bearing rather than incidental: returning a `none` value would
+        // leave the caller queueing this instruction for deallocation while its uses are still
+        // live, and the check that catches that is debug-only. Assert so that lowering the
+        // severity fails loudly instead of silently corrupting the module.
+        SLANG_UNEXPECTED("fatal diagnostic must abort compilation");
         UNREACHABLE_RETURN(LegalVal());
     }
     return result;

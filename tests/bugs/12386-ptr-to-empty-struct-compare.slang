@@ -46,9 +46,11 @@ void computeMain()
     output[0] = p == nullptr ? 1 : 0;
 //CPP:            ^^ operation is not supported on a value whose type has no representation on this target
 //CPP:            ^^ 'cmpEQ' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value.
-#else
+#elif defined(OP_GT)
     output[0] = p > q ? 1 : 0;
 //GT:             ^ operation is not supported on a value whose type has no representation on this target
 //GT:             ^ 'cmpGT' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value.
+#else
+#error "no operator case selected; pass one of -DOP_EQ/-DOP_NE/-DOP_LT/-DOP_GT/-DOP_CPP"
 #endif
 }
