@@ -4027,6 +4027,13 @@ standalone_note(
 )
 
 standalone_note(
+    "bfloat16-fp8-storage-type-hint",
+    40021,
+    "BFloat16, FloatE4M3, and FloatE5M2 are storage/interchange types; arithmetic and most math functions are not supported on them directly. Convert to 'float' first, e.g. 'BFloat16(float(a) + float(b))'. Directly supported operations include conversions, 'bit_cast', and (for BFloat16) 'dot'",
+    span { loc = "location" }
+)
+
+standalone_note(
     "overload-candidate-argument-type-mismatch",
     40018,
     "argument ~argIndex:Int does not match: expected '~expectedType:Type', got '~actualType:Type'",
