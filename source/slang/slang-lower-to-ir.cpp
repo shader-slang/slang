@@ -11759,7 +11759,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (declName)
                 {
                     auto nameInst = subBuilder->getStringValue(declName->text.getUnownedSlice());
-                    auto irType = as<IRType>(irConstant->getDataType());
+                    // Use lowerType(decl->getType()) for the debug metadata type: it gives a
+                    // plain, non-rate-qualified type (e.g. Double rather than @ConstExpr Double).
+                    // irConstant->getDataType() can return a rate-qualified type, which
+                    // emitDebugType does not handle and would produce wrong SPIRV debug output.
+                    auto irType = lowerType(subContext, decl->getType());
                     subBuilder->emitDebugGlobalConstant(
                         irType,
                         nameInst,
