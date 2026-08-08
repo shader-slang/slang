@@ -21,6 +21,10 @@ namespace
 // be derived by eye.
 static const uint32_t kSpvGeneratorKhronosLinker = 17 << 16;
 
+// What Slang stamps when it emits a module itself, mirroring `kSPIRVSlangCompilerId` in
+// `slang-emit-spirv.cpp`. Seeing this means no downstream link took place.
+static const uint32_t kSpvGeneratorSlang = 40 << 16;
+
 // The result code and whether any code came back are tracked separately so a compile that reports
 // success without returning a module is not read as a pass.
 struct LinkedSpirvOutcome
@@ -169,17 +173,37 @@ SLANG_UNIT_TEST(spirvValidationAcceptsDownstreamLinkedModule)
 {
     const LinkedSpirvOutcome outcome = compileImportingModuleWithValidation();
 
-    // This test is designed to bite in CI, where nobody can attach a debugger, so surface the
-    // compiler's own diagnostics rather than leaving a bare failed assertion in the log.
-    if (outcome.codeResult != SLANG_OK && outcome.diagnostics.getLength())
+    // This test is designed to bite in CI, where nobody can attach a debugger, so report everything
+    // needed to classify a failure from the log alone. Printing only on a failed `codeResult` is
+    // not enough: the link is skipped silently when the downstream compiler is missing, which
+    // leaves `codeResult` OK and the generator assertion below as the only symptom.
+    if (outcome.diagnostics.getLength())
     {
         fprintf(stderr, "compile diagnostics:\n%s\n", outcome.diagnostics.getBuffer());
     }
+    fprintf(
+        stderr,
+        "codeResult=0x%08x producedCode=%d generator=0x%08x\n",
+        (unsigned)outcome.codeResult,
+        (int)outcome.producedCode,
+        outcome.generatorMagic);
 
     SLANG_CHECK(outcome.codeResult == SLANG_OK);
     SLANG_CHECK(outcome.producedCode);
 
-    // Without this the test would still pass if a change stopped the link from happening at all,
-    // since a single-module compile also succeeds.
+    // `spirv-opt` (slang-glslang) is loaded at runtime, and `createArtifactFromIR` skips the entire
+    // link-and-validate block when it is absent, so a build or platform without that module has no
+    // downstream linker to exercise. It leaves no diagnostic -- probing several library names means
+    // a failed load is deliberately not a hard error -- so the module Slang emitted itself,
+    // carrying its own generator id, is the only available signal. Skip on it, as the sibling
+    // `unit-test-spirv-validation-unavailable.cpp` skips when the same dependency is missing.
+    if ((outcome.generatorMagic & 0xFFFF0000u) == kSpvGeneratorSlang)
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    // Otherwise the linker must have produced this module. Without this the test would still pass
+    // if a change stopped the link from happening at all, since a single-module compile also
+    // succeeds.
     SLANG_CHECK((outcome.generatorMagic & 0xFFFF0000u) == kSpvGeneratorKhronosLinker);
 }
