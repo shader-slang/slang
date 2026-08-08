@@ -2193,25 +2193,36 @@ static LegalVal legalizeInst(
             // the instruction, since there will be no value to produce.
             return LegalVal();
         }
-        // The instruction needs to produce a represented value, but an operand legalized away to
-        // nothing and there is no operation-specific rewrite for that combination. Unlike `load`
-        // and `store`, which legalize to nothing along with such an operand, there is nothing this
-        // instruction can produce. That is a limit on what this pass can express for the user's
-        // program rather than an inconsistency in the IR, so report it against their code.
+        // An operand that legalized away to nothing is a limit on what this pass can express for
+        // the user's program: unlike `load` and `store`, which legalize to nothing along with such
+        // an operand, this instruction still owes a represented result and has nothing to build it
+        // from. Report that against the user's code.
         //
-        // Prefer the instruction's own location. `findBestSourceLocFromUses` reports the location
-        // of a consumer, which names the wrong expression whenever this instruction has one of its
-        // own; it is only the fallback for an instruction that has no location to report.
-        context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
-            .operation = getIROpInfo(inst->getOp()).name,
-            .location =
-                inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
-        // The diagnostic above is fatal, so it aborts compilation and control does not reach here.
-        // That severity is load-bearing rather than incidental: returning a `none` value would
-        // leave the caller queueing this instruction for deallocation while its uses are still
-        // live, and the check that catches that is debug-only. Assert so that lowering the
-        // severity fails loudly instead of silently corrupting the module.
-        SLANG_UNEXPECTED("fatal diagnostic must abort compilation");
+        // Reaching here for any other reason -- notably an instruction whose operands are all
+        // simple but whose own type legalized to something non-simple -- is a gap in this pass
+        // rather than anything the user wrote, so keep asserting for those and do not blame the
+        // shader for a compiler bug.
+        for (auto arg : args)
+        {
+            if (arg.flavor != LegalVal::Flavor::none)
+                continue;
+
+            // Prefer the instruction's own location. `findBestSourceLocFromUses` reports the
+            // location of a consumer, which names the wrong expression whenever this instruction
+            // has one of its own; it is only the fallback for an instruction with none to report.
+            context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
+                .operation = getIROpInfo(inst->getOp()).name,
+                .location =
+                    inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
+            // That diagnostic is fatal, so it aborts compilation and control does not reach here.
+            // The severity is load-bearing rather than incidental: returning a `none` value would
+            // leave the caller queueing this instruction for deallocation while its uses are still
+            // live, and the check that catches that is debug-only. Assert so that lowering the
+            // severity fails loudly instead of silently corrupting the module.
+            SLANG_UNEXPECTED("fatal diagnostic must abort compilation");
+        }
+
+        SLANG_UNEXPECTED("non-simple operand(s)!");
         UNREACHABLE_RETURN(LegalVal());
     }
     return result;
