@@ -2207,9 +2207,10 @@ static LegalVal legalizeInst(
                                 { return arg.flavor == LegalVal::Flavor::none; }) >= 0;
         if (anyOperandEliminated)
         {
-            // Prefer the instruction's own location. `findBestSourceLocFromUses` reports the
-            // location of a consumer, which names the wrong expression whenever this instruction
-            // has one of its own; it is only the fallback for an instruction with none to report.
+            // Prefer the instruction's own location, which is the operator being reported on.
+            // `findBestSourceLocFromUses` walks to a consumer first and only falls back to this
+            // instruction, so calling it directly moves the caret onto the enclosing expression --
+            // for `p == nullptr ? 1 : 0` it names the `?` rather than the `==`.
             context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
                 .operation = getIROpInfo(inst->getOp()).name,
                 .location =
