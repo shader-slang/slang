@@ -10,7 +10,8 @@ RWStructuredBuffer<float> outputBuffer;
 // conformance checking rejects an implementation whose getter drops
 // [Differentiable], and the property still lowers normally when read through a
 // generic. Differentiating *through* an interface-declared property accessor is a
-// separate, currently unsupported case tracked by #12232.
+// separate, currently unsupported case — for both generic and existential access —
+// tracked by #12232.
 interface IValueHolder : IDifferentiable
 {
     property Value : float
