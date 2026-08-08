@@ -2193,9 +2193,24 @@ static LegalVal legalizeInst(
             // the instruction, since there will be no value to produce.
             return LegalVal();
         }
-        // TODO: produce a user-visible diagnostic here
-        SLANG_UNEXPECTED("non-simple operand(s)!");
-        break;
+        // The instruction needs to produce a represented value, but an operand legalized away to
+        // nothing and there is no operation-specific rewrite for that combination. Unlike `load`
+        // and `store`, which legalize to nothing along with such an operand, there is nothing this
+        // instruction can produce. That is a limit on what this pass can express for the user's
+        // program rather than an inconsistency in the IR, so report it against their code.
+        //
+        // Prefer the instruction's own location. `findBestSourceLocFromUses` reports the location
+        // of a consumer, which names the wrong expression whenever this instruction has one of its
+        // own; it is only the fallback for an instruction that has no location to report.
+        context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
+            .operation = getIROpInfo(inst->getOp()).name,
+            .location =
+                inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
+        // That diagnostic is fatal, so it aborts compilation and control does not return here.
+        // The severity is load-bearing: a `none` result would leave the caller queueing this
+        // instruction for deallocation while its uses are still live, and the check that catches
+        // that is debug-only.
+        UNREACHABLE_RETURN(LegalVal());
     }
     return result;
 }
