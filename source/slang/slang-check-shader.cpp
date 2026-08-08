@@ -1729,6 +1729,22 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
+    // An entry point is invoked by the pipeline, which has no channel for returning an error, so
+    // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
+    // directly because it applies the declaration reference's substitutions, which matters for a
+    // generic entry point. Two sentinel types both mean "nothing was declared": the bottom type
+    // for an absent clause, and the error type for a clause whose type failed to check -- the
+    // latter has already been diagnosed, so reporting this as well would only add noise.
+    auto astBuilder = linkage->getASTBuilder();
+    auto errorCodeType = getErrorCodeType(astBuilder, entryPoint->getFuncDeclRef());
+    if (!errorCodeType->equals(astBuilder->getBottomType()) &&
+        !errorCodeType->equals(astBuilder->getErrorType()))
+    {
+        sink->diagnose(Diagnostics::EntryPointCannotThrow{
+            .entryPoint = entryPointName,
+            .location = entryPointFuncDecl->loc});
+    }
+
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType)
