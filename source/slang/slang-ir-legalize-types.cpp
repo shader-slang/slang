@@ -2193,24 +2193,18 @@ static LegalVal legalizeInst(
             // the instruction, since there will be no value to produce.
             return LegalVal();
         }
-        // The instruction wants to produce a real value from operands that legalized away, and
-        // this pass has no rewrite for that combination. Consider this example, from
-        // shader-slang/slang#12386:
+        // The instruction needs to produce a represented value, but an operand legalized away to
+        // nothing and there is no operation-specific rewrite for that combination. Unlike `load`
+        // and `store`, which legalize to nothing along with such an operand, there is nothing this
+        // instruction can produce. That is a limit on what this pass can express for the user's
+        // program rather than an inconsistency in the IR, so report it against their code.
         //
-        //     struct Empty {}
-        //     Empty value;
-        //     Ptr<Empty> pointer = __getAddress(value);
-        //     bool isNull = pointer == nullptr;
-        //
-        // `Empty` has no fields, so on the C-family targets empty-type legalization lowers it to
-        // nothing and no storage is declared for `value`. The comparison then has an operand with
-        // no runtime value but an ordinary `bool` result, so unlike `load` and `store` -- which
-        // legalize to nothing along with their operand -- it has nothing it can produce. That is a
-        // limitation of what this pass can express for the user's program rather than an
-        // inconsistency in the IR, so report it against their code instead of asserting.
+        // Prefer the instruction's own location: `findBestSourceLocFromUses` reports a consumer's
+        // location, which names the wrong expression whenever the instruction has one of its own.
         context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
             .operation = getIROpInfo(inst->getOp()).name,
-            .location = findBestSourceLocFromUses(inst)});
+            .location =
+                inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
         return LegalVal();
     }
     return result;
