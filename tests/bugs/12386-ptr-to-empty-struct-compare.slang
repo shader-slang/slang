@@ -21,5 +21,5 @@ void computeMain()
     Ptr<Empty> pointer = __getAddress(value);
     output[0] = pointer == nullptr ? 1 : 0;
 //diag:                 ^^ operation is not supported on a value whose type has no representation on this target
-//diag:                 ^^ 'cmpEQ' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed or resource-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value.
+//diag:                 ^^ 'cmpEQ' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value.
 }

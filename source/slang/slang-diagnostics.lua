@@ -6012,7 +6012,7 @@ fatal(
     "type-legalization-unsupported-operation",
     51702,
     "operation is not supported on a value whose type has no representation on this target",
-    span { loc = "location", message = "'~operation' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed or resource-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value." }
+    span { loc = "location", message = "'~operation' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value." }
 )
 
 

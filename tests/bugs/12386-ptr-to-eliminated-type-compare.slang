@@ -5,7 +5,7 @@
 // and reaches it the same way. This pins that second path so the diagnostic's wording stays honest
 // about covering more than the empty-struct case.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag,non-exhaustive):-target cuda -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target cuda -entry computeMain -stage compute
 
 interface IFoo
 {
@@ -28,4 +28,5 @@ void computeMain()
     Ptr<IFoo> p = __getAddress(boxed);
     output[0] = p == nullptr ? 1 : 0;
 //diag:           ^^ operation is not supported on a value whose type has no representation on this target
+//diag:           ^^ 'cmpEQ' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- an empty struct, or an interface-typed value that is lowered away -- so the operand has no value to act on at runtime. Restructure the code so the operation does not read that value.
 }
