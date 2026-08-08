@@ -2202,11 +2202,11 @@ static LegalVal legalizeInst(
         // simple but whose own type legalized to something non-simple -- is a gap in this pass
         // rather than anything the user wrote, so keep asserting for those and do not blame the
         // shader for a compiler bug.
-        for (auto arg : args)
+        const bool anyOperandEliminated =
+            args.findFirstIndex([](const LegalVal& arg)
+                                { return arg.flavor == LegalVal::Flavor::none; }) >= 0;
+        if (anyOperandEliminated)
         {
-            if (arg.flavor != LegalVal::Flavor::none)
-                continue;
-
             // Prefer the instruction's own location. `findBestSourceLocFromUses` reports the
             // location of a consumer, which names the wrong expression whenever this instruction
             // has one of its own; it is only the fallback for an instruction with none to report.
