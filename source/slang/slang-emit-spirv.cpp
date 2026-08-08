@@ -2402,15 +2402,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto debugGlobalConst = as<IRDebugGlobalConstant>(inst);
                 auto varType = as<IRType>(debugGlobalConst->getDebugType());
+                auto debugType = emitDebugType(varType, false);
+                if (!debugType)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
 
-                // Ensure the DebugCompilationUnit is processed before emitDebugType or
-                // findDebugScope: DebugGlobalConstant may appear in the IR before
-                // DebugCompilationUnit, so we must force it to be emitted first so the
-                // module-inst -> scope mapping is registered in m_mapIRInstToSpvDebugInst
-                // before either call. emitSPIRVFromIR defers DebugGlobalConstant processing
-                // to after the module-scope debug-scope fixup, but processDebugGlobalInst
-                // may also be triggered transitively by ensureInst from another instruction,
-                // so we guard here as well.
+                // Ensure DebugCompilationUnit is processed so findDebugScope can find the scope.
+                // emitSPIRVFromIR defers DebugGlobalConstant to after the CU pre-ensure pass,
+                // but processDebugGlobalInst may also be triggered transitively via ensureInst.
                 for (auto globalInst : inst->getModule()->getGlobalInsts())
                 {
                     if (globalInst->getOp() == kIROp_DebugCompilationUnit)
@@ -2419,14 +2420,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     }
                 }
-
-                auto debugType = emitDebugType(varType, false);
-                if (!debugType)
-                {
-                    *emittedSpvInst = nullptr;
-                    return true;
-                }
-
                 auto scope = findDebugScope(inst->getModule()->getModuleInst());
                 if (!scope)
                 {
@@ -2498,8 +2491,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
 
-                // Use flags=0 to match the behavior of maybeEmitDebugGlobalVariable.
-                auto flags = builder.getIntValue(builder.getUIntType(), 0);
+                // FlagIsDefinition = 0x08 in NonSemantic.Shader.DebugInfo.100.
+                auto flags = builder.getIntValue(builder.getUIntType(), 8);
 
                 *emittedSpvInst = emitOpDebugGlobalVariable(
                     getSection(SpvLogicalSectionID::GlobalVariables),
