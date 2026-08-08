@@ -6,6 +6,7 @@
 #include "slang-process.h"
 
 #include <stdio.h>
+#include <sys/stat.h>
 #include <thread>
 
 namespace Slang
@@ -21,6 +22,25 @@ SlangResult Stream::readExactly(void* buffer, size_t length)
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FileStream !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+/// Return true if `path` names the host's null device. Matching on device identity rather than on
+/// the spelling recognises aliases such as a symlink to `/dev/null`, without admitting character
+/// devices in general: only the null device guarantees that a write is discarded *and* reported as
+/// succeeding (`/dev/full`, for instance, fails every write).
+static bool _isNullDevicePath(const String& path)
+{
+#ifdef _WIN32
+    // The Windows null device is reserved by name rather than existing as a filesystem entry.
+    return path.getUnownedSlice().caseInsensitiveEquals(UnownedStringSlice("NUL"));
+#else
+    struct stat pathStat;
+    struct stat nullStat;
+    if (::stat(path.getBuffer(), &pathStat) != 0 || ::stat("/dev/null", &nullStat) != 0)
+        return false;
+    return S_ISCHR(pathStat.st_mode) && S_ISCHR(nullStat.st_mode) &&
+           pathStat.st_rdev == nullStat.st_rdev;
+#endif
+}
 
 FileStream::FileStream()
     : m_handle(nullptr), m_fileAccess(FileAccess::None), m_endReached(false)
@@ -130,12 +150,17 @@ SlangResult FileStream::_init(
 
     if (File::exists(fileName))
     {
-        // Check that the path exists and is a file; not a directory.
+        // An existing path that `getPathType` cannot classify may block on open (a FIFO waits for a
+        // reader) or defer its write errors past the point this stream reports them, so only the
+        // identified null device is admitted alongside a regular file.
         SlangPathType pathType;
-        SLANG_RETURN_ON_FAIL(Path::getPathType(fileName, &pathType));
-        if (pathType != SLANG_PATH_TYPE_FILE)
+        if (SLANG_FAILED(Path::getPathType(fileName, &pathType)) ||
+            pathType != SLANG_PATH_TYPE_FILE)
         {
-            return SLANG_E_CANNOT_OPEN;
+            if (!_isNullDevicePath(fileName))
+            {
+                return SLANG_E_CANNOT_OPEN;
+            }
         }
     }
 
