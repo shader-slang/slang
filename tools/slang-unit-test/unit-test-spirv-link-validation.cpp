@@ -21,16 +21,15 @@ namespace
 // be derived by eye.
 static const uint32_t kSpvGeneratorKhronosLinker = 17 << 16;
 
-// What Slang stamps when it emits a module itself, mirroring `kSPIRVSlangCompilerId` in
-// `slang-emit-spirv.cpp`. Seeing this means no downstream link took place.
-static const uint32_t kSpvGeneratorSlang = 40 << 16;
-
 // The result code and whether any code came back are tracked separately so a compile that reports
 // success without returning a module is not read as a pass.
 struct LinkedSpirvOutcome
 {
     SlangResult codeResult;
     bool producedCode;
+    // Whether `spirv-opt` could be loaded at all. Without it `createArtifactFromIR` skips the whole
+    // link-and-validate block, so there is no downstream linker for this test to exercise.
+    bool haveSpirvOpt;
     // Header word 2 of the returned module. Only meaningful when `producedCode` is true, since 0 is
     // itself a legal tool id.
     uint32_t generatorMagic;
@@ -47,6 +46,11 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // Ask the dependency directly rather than inferring it from the output later: this attempts the
+    // real load and reports `SLANG_E_NOT_FOUND` when the module is unusable.
+    const bool haveSpirvOpt =
+        SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_SPIRV_OPT));
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -147,6 +151,7 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
         outcome.codeResult =
             linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
     }
+    outcome.haveSpirvOpt = haveSpirvOpt;
     outcome.producedCode = code && code->getBufferSize() != 0;
 
     outcome.generatorMagic = 0;
@@ -188,22 +193,22 @@ SLANG_UNIT_TEST(spirvValidationAcceptsDownstreamLinkedModule)
         (int)outcome.producedCode,
         outcome.generatorMagic);
 
-    SLANG_CHECK(outcome.codeResult == SLANG_OK);
-    SLANG_CHECK(outcome.producedCode);
-
-    // `spirv-opt` (slang-glslang) is loaded at runtime, and `createArtifactFromIR` skips the entire
-    // link-and-validate block when it is absent, so a build or platform without that module has no
-    // downstream linker to exercise. It leaves no diagnostic -- probing several library names means
-    // a failed load is deliberately not a hard error -- so the module Slang emitted itself,
-    // carrying its own generator id, is the only available signal. Skip on it, as the sibling
-    // `unit-test-spirv-validation-unavailable.cpp` skips when the same dependency is missing.
-    if ((outcome.generatorMagic & 0xFFFF0000u) == kSpvGeneratorSlang)
+    // `spirv-opt` (slang-glslang) is loaded at runtime, and `createArtifactFromIR` skips its whole
+    // link-and-validate block when it is absent, so there is no downstream linker to exercise. Key
+    // this on the dependency rather than on the emitted module's shape: a module carrying Slang's
+    // own generator id is also exactly what a regression that stopped linking would produce, and
+    // skipping on that would delete the coverage the assertion below exists to provide. The sibling
+    // `unit-test-spirv-validation-unavailable.cpp` branches on the locator's result for the same
+    // reason.
+    if (!outcome.haveSpirvOpt)
     {
         SLANG_IGNORE_TEST;
     }
 
-    // Otherwise the linker must have produced this module. Without this the test would still pass
-    // if a change stopped the link from happening at all, since a single-module compile also
-    // succeeds.
+    SLANG_CHECK(outcome.codeResult == SLANG_OK);
+    SLANG_CHECK(outcome.producedCode);
+
+    // Without this the test would still pass if a change stopped the link from happening at all,
+    // since a single-module compile also succeeds.
     SLANG_CHECK((outcome.generatorMagic & 0xFFFF0000u) == kSpvGeneratorKhronosLinker);
 }
