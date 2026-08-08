@@ -2193,9 +2193,25 @@ static LegalVal legalizeInst(
             // the instruction, since there will be no value to produce.
             return LegalVal();
         }
-        // TODO: produce a user-visible diagnostic here
-        SLANG_UNEXPECTED("non-simple operand(s)!");
-        break;
+        // The instruction wants to produce a real value from operands that legalized away, and
+        // this pass has no rewrite for that combination. Consider this example, from
+        // shader-slang/slang#12386:
+        //
+        //     struct Empty {}
+        //     Empty value;
+        //     Ptr<Empty> pointer = __getAddress(value);
+        //     bool isNull = pointer == nullptr;
+        //
+        // `Empty` has no fields, so on the C-family targets empty-type legalization lowers it to
+        // nothing and no storage is declared for `value`. The comparison then has an operand with
+        // no runtime value but an ordinary `bool` result, so unlike `load` and `store` -- which
+        // legalize to nothing along with their operand -- it has nothing it can produce. That is a
+        // limitation of what this pass can express for the user's program rather than an
+        // inconsistency in the IR, so report it against their code instead of asserting.
+        context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
+            .operation = getIROpInfo(inst->getOp()).name,
+            .location = findBestSourceLocFromUses(inst)});
+        return LegalVal();
     }
     return result;
 }

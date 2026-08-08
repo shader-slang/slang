@@ -6000,6 +6000,13 @@ err(
 )
 
 fatal(
+    "type-legalization-unsupported-operation",
+    51702,
+    "operation is not supported on a value whose type has no representation on this target",
+    span { loc = "location", message = "'~operation' cannot be applied here: one of its operands has a type that is eliminated on this target, such as an empty struct, so the operand has no value at runtime. Restructure the code so the operation does not act on such a value." }
+)
+
+fatal(
     "cooperative-matrix-unsupported-capture",
     51701,
     "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque type values",
