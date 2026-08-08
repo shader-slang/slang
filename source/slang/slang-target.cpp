@@ -78,6 +78,20 @@ bool TargetRequest::isGLSLBasedTarget()
     }
 }
 
+// static
+CapabilitySet TargetRequest::decodeCapabilityOption(const CompilerOptionValue& atomVal)
+{
+    switch (atomVal.kind)
+    {
+    case CompilerOptionValueKind::Int:
+        return CapabilitySet(CapabilityName(atomVal.intValue));
+    case CompilerOptionValueKind::String:
+        return CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
+    default:
+        return CapabilitySet();
+    }
+}
+
 CapabilitySet TargetRequest::getTargetCaps()
 {
     // Capabilities are derived lazily and shared across entry-point compiles for the same target.
@@ -227,16 +241,7 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        CapabilitySet toAdd;
-        switch (atomVal.kind)
-        {
-        case CompilerOptionValueKind::Int:
-            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
-            break;
-        case CompilerOptionValueKind::String:
-            toAdd = CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
-            break;
-        }
+        CapabilitySet toAdd = decodeCapabilityOption(atomVal);
 
         if (isGLSLTarget)
             targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
@@ -285,16 +290,21 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         return false;
     };
 
+    // Use the user-specified CodeGenTarget for the diagnostic so the error says e.g.
+    // "incompatible with compilation target 'spirv'" even when the GLSL-SPIRV pipeline
+    // is in use (where cookedCaps.getCompileTarget() would return 'glsl').
+    auto userTargetName = TypeTextUtil::getCompileTargetName(asExternal(getTarget()));
+
     for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
     {
-        CapabilitySet toAdd;
+        // Decode the option value into a name string and a CapabilitySet.
+        // decodeCapabilityOption returns an empty set for unknown/invalid entries.
         String requestedCapName;
         switch (atomVal.kind)
         {
         case CompilerOptionValueKind::Int:
             if (atomVal.intValue == SLANG_CAPABILITY_UNKNOWN)
                 continue;
-            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
             requestedCapName = capabilityNameToString(CapabilityName(atomVal.intValue));
             break;
         case CompilerOptionValueKind::String:
@@ -302,7 +312,6 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
                 auto capName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
                 if (capName == CapabilityName::Invalid)
                     continue;
-                toAdd = CapabilitySet(capName);
                 requestedCapName = atomVal.stringValue;
             }
             break;
@@ -310,6 +319,7 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
             continue;
         }
 
+        CapabilitySet toAdd = decodeCapabilityOption(atomVal);
         if (toAdd.isEmpty())
             continue;
 
@@ -317,8 +327,8 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         if (isSessionLevelCap(atomVal))
             continue;
 
-        // For GLSL targets, SPIRV-targeted capabilities are auto-converted to their
-        // glsl_spirv_* equivalents by getTargetCaps(); not an error.
+        // For GLSL-SPIRV pipeline targets, SPIRV version/extension caps are intentionally
+        // converted to their glsl_spirv_* equivalents by getTargetCaps(); not an error.
         // Use containsKey rather than getCompileTarget() to avoid relying on dictionary
         // iteration order when a capability spans multiple target families.
         if (isGLSLTarget && toAdd.getCapabilityTargetSets().containsKey(CapabilityAtom::spirv))
@@ -328,14 +338,13 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
             continue;
 
         // The requested capability is incompatible with the code-gen target.
-        auto targetCapName = capabilityNameToString((CapabilityName)cookedCaps.getCompileTarget());
         maybeDiagnose(
             sink,
             getLinkage()->m_optionSet,
             DiagnosticCategory::Capability,
             Diagnostics::RequestedCapabilityIncompatibleWithTarget{
                 .requestedCap = requestedCapName,
-                .target = String(targetCapName)});
+                .target = String(userTargetName)});
     }
 }
 

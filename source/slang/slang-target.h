@@ -174,6 +174,12 @@ private:
     /// rather than treated as incompatible. Keep in sync with getTargetCaps().
     bool isGLSLBasedTarget();
 
+    /// Decode one CompilerOptionValue (Int or String kind) from a Capability option
+    /// into a CapabilitySet.  Returns an empty set for unknown or invalid entries.
+    /// Shared between getTargetCaps() and checkCapabilities() to keep the decode
+    /// logic in one place.
+    static CapabilitySet decodeCapabilityOption(const CompilerOptionValue& atomVal);
+
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
