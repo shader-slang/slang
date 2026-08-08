@@ -3677,6 +3677,18 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
     return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedVariable, 2, args);
 }
 
+IRInst* IRBuilder::emitDebugGlobalConstant(
+    IRType* type,
+    IRInst* name,
+    IRInst* source,
+    IRInst* line,
+    IRInst* col,
+    IRInst* value)
+{
+    IRInst* args[] = {name, type, source, line, col, value};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugGlobalConstant, 6, args);
+}
+
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
     IRInst* args[] = {scope, inlinedAt};
