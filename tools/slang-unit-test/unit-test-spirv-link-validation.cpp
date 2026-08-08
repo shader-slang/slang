@@ -32,8 +32,8 @@ struct LinkedSpirvOutcome
     bool haveSpirvOpt;
     // Diagnostics from the library precompile. Carried separately because that is the compile whose
     // sink reports a failure to load `spirv-opt`, and it is the only one that does: the loader
-    // records the attempt once per session, so the entry point's later compile sees it cached and
-    // stays silent.
+    // caches its first attempt, so the entry point's later compile sees the cached answer and stays
+    // silent.
     String precompileDiagnostics;
     // Header word 2 of the returned module. Only meaningful when `producedCode` is true, since 0 is
     // itself a legal tool id.
@@ -161,11 +161,10 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
     // Ask the dependency rather than inferring it from the emitted module: this attempts the real
     // load and reports `SLANG_E_NOT_FOUND` when the module is unusable.
     //
-    // Probed down here rather than up at session creation because the loader records its attempt
-    // once per session and returns the cached answer afterwards, without re-reporting. This call
-    // passes no sink, so making it first consumes that one reporting opportunity and leaves every
-    // later compile silent -- measured: with the module removed, probing before the precompile
-    // yields empty diagnostics, probing after yields `E00100 failed to load downstream compiler`.
+    // Probed down here rather than up at session creation because the loader caches its first
+    // attempt and returns that answer afterwards without re-reporting. This call passes no sink, so
+    // making it first spends the one reporting opportunity and leaves the compiles that follow
+    // silent about a missing library.
     outcome.haveSpirvOpt =
         SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_SPIRV_OPT));
     outcome.producedCode = code && code->getBufferSize() != 0;
