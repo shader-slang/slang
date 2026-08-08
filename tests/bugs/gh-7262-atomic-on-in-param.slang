@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // Regression guard: calling a mutating method on an `in` parameter of type Atomic<T>
 // (or a struct containing one) must be a hard error (E30067), not just a warning.
@@ -10,5 +10,6 @@
 void f(Atomic<int> a)
 {
     a.add(1);
-//CHECK: mutating method 'add' called on `in` parameter 'a'
+//CHECK: error[E30067]: mutating method called on `in` parameter
+//CHECK: 'add' called on `in` parameter 'a'
 }
