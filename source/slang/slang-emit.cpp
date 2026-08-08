@@ -3240,7 +3240,14 @@ static SlangResult stripDbgSpirvFromArtifact(
                 }
             }
             // Also check if the instruction is an extended instruction containing DebugInfo.
-            if (inst.getOpCode() == SpvOpExtInst)
+            //
+            // `SpvOpExtInstWithForwardRefsKHR` counts here too: it carries the same operand layout
+            // and is what `emitOpDebugForwardRefsComposite` uses for a debug composite whose
+            // members are not emitted yet, as happens for a struct with a pointer to its own type.
+            // Matching only `SpvOpExtInst` kept those instructions while stripping the `OpString`
+            // and `DebugSource` they reference, leaving dangling ids in the stripped module.
+            if (inst.getOpCode() == SpvOpExtInst ||
+                inst.getOpCode() == SpvOpExtInstWithForwardRefsKHR)
             {
                 // Ignore this if the instruction contains DebugInfo and is from the debug import
                 if (debugExtInstNumbers.contains(inst.getOperand(3)) &&
@@ -3288,6 +3295,57 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
     }
 
     return false;
+}
+
+// The blob is loaded here rather than passed in, so the bytes validated are necessarily the bytes
+// the artifact holds; the same words feed the disassembly on the failure path, so a reported module
+// always matches the one that was rejected.
+static SlangResult validateSpirvArtifact(
+    CodeGenContext* codeGenContext,
+    IDownstreamCompiler* compiler,
+    IArtifact* artifact)
+{
+    ComPtr<ISlangBlob> spirvBlob;
+    SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, spirvBlob.writeRef()));
+    const size_t spirvByteCount = spirvBlob->getBufferSize();
+
+    // A SPIR-V module is a sequence of 32-bit words, so a size that is not a whole number of words
+    // is not a module the validator can read. An embedder can supply the `slang-glslang` this blob
+    // comes from through `ISession::setSharedLibraryLoader`, which makes a malformed size reachable
+    // input rather than a broken invariant of ours -- hence an `error` diagnostic that returns,
+    // rather than `SpirvValidationFailed`, whose `internal` severity aborts compilation.
+    if (spirvByteCount % sizeof(uint32_t) != 0)
+    {
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::SpirvBlobNotWordSized{.byteCount = Int(spirvByteCount)});
+        return SLANG_FAIL;
+    }
+
+    const auto* spirvWords = (const uint32_t*)spirvBlob->getBufferPointer();
+    const int spirvWordCount = int(spirvByteCount / sizeof(uint32_t));
+
+    const SlangResult validationResult = compiler->validate(spirvWords, spirvWordCount);
+
+    if (validationResult == SLANG_E_NOT_AVAILABLE)
+    {
+        // The validator never ran, so disassembling here would wrongly imply the SPIR-V was
+        // found invalid. Fail the compile rather than falling through: validation was
+        // requested, and publishing the artifact would hand a caller SPIR-V that nothing
+        // checked. `error` severity alone does not stop this path -- only `Severity::Fatal`
+        // and above abort a compile.
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationUnavailable{});
+        return SLANG_FAIL;
+    }
+    else if (SLANG_FAILED(validationResult))
+    {
+        // Whether a rejected module reaches the caller must not depend on the diagnostic's
+        // severity, so fail here rather than leaving it to the sink's abort.
+        compiler->disassemble(spirvWords, spirvWordCount);
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
+        return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
 }
 
 // Helper function to create an artifact from IR used internally by
@@ -3433,37 +3491,15 @@ static SlangResult createArtifactFromIR(
                 return SLANG_FAIL;
             }
 
-            ComPtr<ISlangBlob> blob;
-            linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
             artifact = _Move(linkedArtifact);
         }
 
-        if (needsValidation)
-        {
-            const SlangResult validationResult =
-                compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-
-            if (validationResult == SLANG_E_NOT_AVAILABLE)
-            {
-                // The validator never ran, so disassembling here would wrongly imply the SPIR-V was
-                // found invalid. Fail the compile rather than falling through: validation was
-                // requested, and publishing the artifact would hand a caller SPIR-V that nothing
-                // checked. `error` severity alone does not stop this path -- only `Severity::Fatal`
-                // and above abort a compile.
-                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationUnavailable{});
-                return SLANG_FAIL;
-            }
-            else if (SLANG_FAILED(validationResult))
-            {
-                // Whether a rejected module reaches the caller must not depend on the diagnostic's
-                // severity, so fail here rather than leaving it to the sink's abort.
-                compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
-                return SLANG_FAIL;
-            }
-        }
-
         ComPtr<IArtifact> optimizedArtifact;
+
+        // Outcome of the debug-strip below, kept so the failure can be reported after the
+        // downstream diagnostics have been forwarded rather than instead of them.
+        SlangResult stripResult = SLANG_OK;
+
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
@@ -3495,6 +3531,12 @@ static SlangResult createArtifactFromIR(
             SLANG_ASSERT(!"Unhandled optimization level");
             break;
         }
+        // `compile` reports an optimizer failure by attaching an error diagnostic and returning
+        // `SLANG_OK` with no blob on the artifact, so the success branch below can still replace
+        // `artifact` with something that carries no SPIR-V. Keep the module we had, so a validation
+        // report on that path describes the SPIR-V the compiler actually produced.
+        ComPtr<IArtifact> preOptimizeArtifact = artifact;
+
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
@@ -3504,10 +3546,23 @@ static SlangResult createArtifactFromIR(
             if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
             {
                 auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(
-                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
-                artifact = _Move(strippedArtifact);
-                dbgArtifact = _Move(optimizedArtifact);
+
+                // Returning here would skip the diagnostics forwarded below, and the optimizer's
+                // account of the failure is attached to `optimizedArtifact` rather than to
+                // `artifact`, which this branch has not reassigned yet. So take the optimizer's
+                // artifact as the one to report from and let the shared failure handling run: the
+                // strip reads its input before writing anything, so a failure here leaves nothing
+                // half-built to step around.
+                stripResult = stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact);
+                if (SLANG_FAILED(stripResult))
+                {
+                    artifact = _Move(optimizedArtifact);
+                }
+                else
+                {
+                    artifact = _Move(strippedArtifact);
+                    dbgArtifact = _Move(optimizedArtifact);
+                }
             }
             else
                 artifact = _Move(optimizedArtifact);
@@ -3516,8 +3571,60 @@ static SlangResult createArtifactFromIR(
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
-        SLANG_RETURN_ON_FAIL(
-            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
+        const SlangResult diagnosticsResult =
+            passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact);
+
+        // A downstream error means no artifact ships, but the module going into the optimize step
+        // is the emitter's own output, and reporting where that is malformed is more use to a
+        // caller debugging an emitter bug than the downstream tool's generic complaint.
+        if (SLANG_FAILED(diagnosticsResult))
+        {
+            if (needsValidation)
+            {
+                SLANG_RETURN_ON_FAIL(
+                    validateSpirvArtifact(codeGenContext, compiler, preOptimizeArtifact));
+            }
+            return diagnosticsResult;
+        }
+
+        // The strip failing without the artifact carrying an error diagnostic would otherwise fall
+        // into the validation below with no debug companion to validate. Reported here so the
+        // failure still propagates once the diagnostics above have had their say.
+        if (SLANG_FAILED(stripResult))
+        {
+            if (needsValidation)
+            {
+                SLANG_RETURN_ON_FAIL(
+                    validateSpirvArtifact(codeGenContext, compiler, preOptimizeArtifact));
+            }
+            return stripResult;
+        }
+
+        // Validate here, where `artifact` is final: the optimize step and the debug-strip within it
+        // each replace it, so validating any earlier inspects a predecessor rather than what the
+        // caller receives -- leaving the optimizer's output unchecked at `-O1` and above, and the
+        // stripped module unchecked under `-separate-debug-info`.
+        //
+        // Runs after the downstream diagnostics are forwarded so that a rejected module still
+        // reports what the optimizer had to say about it.
+        if (needsValidation)
+        {
+            SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, artifact));
+
+            // `-separate-debug-info` writes the debug module out as its own `.dbg.spv`, so it is a
+            // second module the caller receives and is held to the same rules. Conditioned on the
+            // requested mode, which is what makes the companion mandatory here, rather than on the
+            // companion being present, which would read as "validate it if we happen to have one".
+            if (needsSeparateDebugInfo)
+            {
+                // A successful strip under this mode always assigns the companion, and the
+                // `stripResult` check above has already returned on an unsuccessful one. Release-
+                // asserted because `SLANG_ASSERT` becomes `SLANG_ASSUME` in release builds, where a
+                // broken invariant would be undefined behaviour rather than a diagnosable abort.
+                SLANG_RELEASE_ASSERT(dbgArtifact);
+                SLANG_RETURN_ON_FAIL(validateSpirvArtifact(codeGenContext, compiler, dbgArtifact));
+            }
+        }
     }
 
     return SLANG_OK;
