@@ -2199,13 +2199,18 @@ static LegalVal legalizeInst(
         // instruction can produce. That is a limit on what this pass can express for the user's
         // program rather than an inconsistency in the IR, so report it against their code.
         //
-        // Prefer the instruction's own location: `findBestSourceLocFromUses` reports a consumer's
-        // location, which names the wrong expression whenever the instruction has one of its own.
+        // Prefer the instruction's own location. `findBestSourceLocFromUses` reports the location
+        // of a consumer, which names the wrong expression whenever this instruction has one of its
+        // own; it is only the fallback for an instruction that has no location to report.
         context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
             .operation = getIROpInfo(inst->getOp()).name,
             .location =
                 inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
-        return LegalVal();
+        // That diagnostic is fatal, so it aborts compilation and control does not return here.
+        // The severity is load-bearing: a `none` result would leave the caller queueing this
+        // instruction for deallocation while its uses are still live, and the check that catches
+        // that is debug-only.
+        UNREACHABLE_RETURN(LegalVal());
     }
     return result;
 }
