@@ -2084,6 +2084,21 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
     return LegalVal();
 }
 
+/// Handle an instruction whose operands legalized to a shape this pass has no rewrite for.
+///
+/// When the instruction's own result type legalized away there is nothing to produce, so the
+/// instruction legalizes to `none` like its result. Otherwise the combination is one type
+/// legalization does not know how to express, which is a compiler bug rather than a problem with
+/// the user's shader.
+static LegalVal legalizeUnhandledInst(LegalType type)
+{
+    if (type.flavor == LegalType::Flavor::none)
+        return LegalVal();
+
+    // TODO: produce a user-visible diagnostic here
+    SLANG_UNEXPECTED("non-simple operand(s)!");
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext* context,
     IRInst* inst,
@@ -2119,6 +2134,35 @@ static LegalVal legalizeInst(
 
     case kIROp_Store:
         result = legalizeStore(context, args[0], args[1]);
+        break;
+
+    case kIROp_Eql:
+    case kIROp_Neq:
+        // Consider this example, from shader-slang/slang#12386:
+        //
+        //     struct Empty {}
+        //     Empty value;
+        //     Ptr<Empty> pointer = __getAddress(value);
+        //     bool isNull = pointer == nullptr;
+        //
+        // `Empty` has no fields, so empty-type legalization lowers it to nothing and
+        // `legalizeLocalVar` declares no storage for `value` -- its `LegalVal` is `none`, the same
+        // representation `legalizeLoad` and `legalizeStore` already handle for such a variable.
+        // A comparison is the one consumer of that representation that cannot pass it along,
+        // because its own result is an ordinary `bool`.
+        //
+        // No storage is needed to answer it. A local's address is never null, and two locals are
+        // the same object exactly when they are the same variable, so compare the original
+        // operands for identity -- the legalized values have nothing left to distinguish them --
+        // and fold to that constant.
+        if (args[0].flavor == LegalVal::Flavor::none || args[1].flavor == LegalVal::Flavor::none)
+        {
+            const bool isSameVar = inst->getOperand(0) == inst->getOperand(1);
+            const bool isEqualityTest = inst->getOp() == kIROp_Eql;
+            result = LegalVal::simple(context->builder->getBoolValue(isEqualityTest == isSameVar));
+            break;
+        }
+        result = legalizeUnhandledInst(type);
         break;
 
     case kIROp_Call:
@@ -2186,15 +2230,7 @@ static LegalVal legalizeInst(
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
-        if (type.flavor == LegalType::Flavor::none)
-        {
-            // If the result type of the instruction is `none`, then we can
-            // just legalize to `none` without worrying about the details of
-            // the instruction, since there will be no value to produce.
-            return LegalVal();
-        }
-        // TODO: produce a user-visible diagnostic here
-        SLANG_UNEXPECTED("non-simple operand(s)!");
+        result = legalizeUnhandledInst(type);
         break;
     }
     return result;
