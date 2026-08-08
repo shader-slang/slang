@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
-//META: doc_section_digest=0acf92c990c51e23e6b949538b0504562447e6a609a849cd20f331b1ba8f82e3
-//META: purpose=An InitializerListType `{a, b, ...}` collapses into the target type once matched; a brace list fills a struct field-wise and an array element-wise.
+//META: doc_section_digest=c7f55cb42aaa9e03df513fb2e3ff5bbcf380f2c09432d750a2aa9c55dfc56801
+//META: purpose=An InitializerListType `{a, b, ...}` is a pseudo-type that collapses into the target type once matched, filling a struct field-wise and an array element-wise.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies InitializerListType's observable claim: a `{...}` list
-// carries the initializer-list pseudo-type until matched, then lowers
-// into the target. One brace list fills a struct field-wise, another
-// fills an array element-wise. CHECK asserts both collapsed results.
+// Verifies that the same brace-list syntax takes its meaning from the
+// target it is matched against: one list fills a two-field struct and
+// another fills a three-element array. CHECK asserts both collapsed
+// results, so a brace list that failed to adopt its target's shape
+// would show up as a wrong field or element value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#nonuniformresourceindex
-//META: doc_section_digest=c8195cb5c6289df6fb0a637757c98be399b3a609f4400505427ffd0e8bf7939f
+//META: doc_section_digest=859fd0b1dec68bc497f01fa8ca7af8a2359da36472f25c5cff70bfe0da629789
 //META: purpose=`NonUniformResourceIndex(i)` is a no-op at the value level: the operand and result share the same type, so the surrounding indexing expression sees an integer of the same width.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `nonUniformResourceIndex` carries a flag that
-// backends translate into the `NonUniform` decoration. At the IR
-// level, the result type matches the operand. Use a signed-index
-// shape so this exercise differs from the unsigned form covered by
-// `non-uniform-resource-index.slang`.
+// Verifies that the divergence marker is a value-level identity: it
+// wraps an index and hands back a value of the same type, which is why
+// the wrapped expression can be used directly as a buffer subscript.
+// This file uses the signed-index shape so it differs from the unsigned
+// form in `non-uniform-resource-index.slang`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

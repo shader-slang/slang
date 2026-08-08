@@ -1,0 +1,26 @@
+schema_version: 1
+id: slangi-bwd-diff-working-set-oob
+bundle: coverage/autodiff
+suspected_kind: sigsegv
+observed_at: 2026-06-11T12:00:00+00:00
+scope: ir
+title: "slangi VM aborts with working-set out-of-bounds on any __bwd_diff call"
+evidence:
+  command: "build/RelWithDebInfo/bin/slangi /tmp/tb0.slang"
+  source_slang: docs/generated/tests/coverage/autodiff/bwd-square-emits-bwd-prop-fn.slang
+  observed_summary: "Running a reverse-mode (__bwd_diff) differentiable function under the bytecode interpreter aborts with 'VM operand access out of bounds in working set section: offset=84 size=8 sectionSize=88.' (exit 5)."
+  exit_code: 5
+  stderr_tail: "VM operand access out of bounds in working set section: offset=84 size=8 sectionSize=88."
+expected:
+  claim: "A [Differentiable] scalar function reverse-differentiated with __bwd_diff and seed 1.0 should execute and produce the input derivative (e.g. d/dx of x*x at x=3 is 6); the same function compiled to a CPU compute kernel produces the correct value, so the interpreter should not abort."
+  citation_kind: sibling-test
+  citation: tests/autodiff/backward-diff-smoke.slang
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: ef1068b5485e09b3a7afadba2e25f9541e29af42
+  doc_anchor: docs/generated/design/ir-reference/differentiation.md#reverse-mode
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Forward-mode (__fwd_diff) of the same and more complex functions runs correctly under slangi, so this is specific to the reverse-mode lowering reaching the VM (not generic autodiff or generic interpreter breakage)."
+    - "The identical reverse-mode function compiles and runs correctly via -cpu COMPARE_COMPUTE, isolating the fault to the slangi bytecode path rather than the transpose/primal-hoist IR transform itself."

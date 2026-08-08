@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:40:21+00:00
-//META: source_commit=4e394f5c941b8145021611e1d3016b1f27a4ba52
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=0410773935d5331fbece0da3f2383f2a7478f2afa84b7d440d2490b07f25489f
+//META: doc_section_digest=21c9155c4ad2f346c0598d3001ce01acb069faa9bdcbd07e447c0eb95df61d51
 //META: purpose=checkStaticAssert runs as a direct call at the end of Phase B, after specialization, so a static_assert whose condition depends on a generic value parameter is evaluated with the specialized value and a satisfied assertion compiles cleanly to a CUDA kernel.
 //META: intent=functional
 //META: pipeline_stage=emit

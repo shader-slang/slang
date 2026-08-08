@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#select
-//META: doc_section_digest=1e957ad40dedfd3c52a2ed8eb2c7dd1be52c049778109f377a9197486f43c5df
+//META: doc_section_digest=e40d6712a2443477b9dd87fd4146f5ac3852042d7d571c4f7aa5a1ef274fdbc1
 //META: purpose=Boundary: `select(c, 1, 0)` with literal-integer true/false arms lowers to `select(%c, 1 : Int, 0 : Int)` with the BoolLit-equivalent literal payloads on the result operands.
 //META: intent=boundary
 //META: pipeline_stage=lower

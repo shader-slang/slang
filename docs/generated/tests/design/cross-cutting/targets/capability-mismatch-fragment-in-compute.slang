@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/targets.md#capability-system
-//META: doc_section_digest=1d4fa831ab2f05ace779c2af1584c8502fdf8d9eef12dbf22d7880065ffdd2ec
+//META: doc_section_digest=ae73a8962b418df71d4a8a3d2d9b722c9933a29ec7eefb63e8b0b9e081f0fe14
 //META: purpose=The capability system rejects use of a feature whose stage atom is incompatible with the active entry point's stage; `discard` (fragment-only) inside a compute entry point on HLSL is rejected.
 //META: intent=negative
 //META: pipeline_stage=check

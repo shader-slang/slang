@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/statements.md#deferstmt
-//META: doc_section_digest=8d7ee5a379aeb4b393aeb766e8179650d332b2a7a6bcc65b16e7e5c13a614827
-//META: purpose=Multiple DeferStmt inner statements enqueued in a single scope run on scope exit; the deferred prints land after the surrounding body's prints.
+//META: doc_section_digest=9d7a17de2e7a4cacf7a44eefe78eaa8bea0a9a617b555cc1e20d4e784f62d6bf
+//META: purpose=Multiple DeferStmt inner statements written in a single scope all run when that scope exits, after the surrounding body's own statements.
 //META: intent=boundary
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary: more than one DeferStmt in the same scope. The doc says
-// each defer is "enqueued to run when the enclosing scope exits";
-// with three defers, all three must run when the block closes. We
-// observe each defer fires by tagging them with distinct labels.
+// Verifies several deferred statements in one scope all run when that
+// scope exits. Three defers are written before the block's own print;
+// the CHECKs assert the block body printed first, then three deferred
+// prints, then the statement after the block.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

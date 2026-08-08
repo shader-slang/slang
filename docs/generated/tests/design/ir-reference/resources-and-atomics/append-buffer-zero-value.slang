@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#append-and-consume-buffers
-//META: doc_section_digest=e274afd53362e00b53effe2d33f7a820c8f72cd2555df63f0be832ce50f6509d
+//META: doc_section_digest=9b3916f6b072d28628147b6bbc63ceda33f37e485011da27f65d136633a21691
 //META: purpose=`AppendStructuredBuffer<int>::Append(0)` (literal zero element) still surfaces the documented `StructuredBufferAppend(%buf, 0 : Int)` opcode shape.
 //META: intent=boundary
 //META: pipeline_stage=lower
