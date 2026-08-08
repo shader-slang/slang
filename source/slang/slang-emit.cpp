@@ -3433,15 +3433,21 @@ static SlangResult createArtifactFromIR(
                 return SLANG_FAIL;
             }
 
-            ComPtr<ISlangBlob> blob;
-            linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
             artifact = _Move(linkedArtifact);
         }
 
         if (needsValidation)
         {
-            const SlangResult validationResult =
-                compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+            // Validate what `artifact` holds -- the linked module when a link ran above, otherwise
+            // the natively emitted blob. `spirvWords` stays valid only while `spirvBlob` is alive.
+            ComPtr<ISlangBlob> spirvBlob;
+            SLANG_RETURN_ON_FAIL(artifact->loadBlob(ArtifactKeep::No, spirvBlob.writeRef()));
+            const size_t spirvByteCount = spirvBlob->getBufferSize();
+            SLANG_RELEASE_ASSERT(spirvByteCount % sizeof(uint32_t) == 0);
+            const auto* spirvWords = (const uint32_t*)spirvBlob->getBufferPointer();
+            const int spirvWordCount = int(spirvByteCount / sizeof(uint32_t));
+
+            const SlangResult validationResult = compiler->validate(spirvWords, spirvWordCount);
 
             if (validationResult == SLANG_E_NOT_AVAILABLE)
             {
@@ -3457,7 +3463,7 @@ static SlangResult createArtifactFromIR(
             {
                 // Whether a rejected module reaches the caller must not depend on the diagnostic's
                 // severity, so fail here rather than leaving it to the sink's abort.
-                compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+                compiler->disassemble(spirvWords, spirvWordCount);
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
                 return SLANG_FAIL;
             }
