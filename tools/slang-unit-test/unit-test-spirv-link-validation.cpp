@@ -30,6 +30,11 @@ struct LinkedSpirvOutcome
     // Whether `spirv-opt` could be loaded at all. Without it `createArtifactFromIR` skips the whole
     // link-and-validate block, so there is no downstream linker for this test to exercise.
     bool haveSpirvOpt;
+    // Diagnostics from the library precompile. Carried separately because that is the compile whose
+    // sink reports a failure to load `spirv-opt`, and it is the only one that does: the loader
+    // records the attempt once per session, so the entry point's later compile sees it cached and
+    // stays silent.
+    String precompileDiagnostics;
     // Header word 2 of the returned module. Only meaningful when `producedCode` is true, since 0 is
     // itself a legal tool id.
     uint32_t generatorMagic;
@@ -46,11 +51,6 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK_ABORT(
         slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
-
-    // Ask the dependency directly rather than inferring it from the output later: this attempts the
-    // real load and reports `SLANG_E_NOT_FOUND` when the module is unusable.
-    const bool haveSpirvOpt =
-        SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_SPIRV_OPT));
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -114,6 +114,14 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
             SLANG_OK);
     }
 
+    LinkedSpirvOutcome outcome;
+    if (diagnostics && diagnostics->getBufferSize())
+    {
+        outcome.precompileDiagnostics = String(
+            (const char*)diagnostics->getBufferPointer(),
+            (const char*)diagnostics->getBufferPointer() + diagnostics->getBufferSize());
+    }
+
     diagnostics.setNull();
     auto module = session->loadModuleFromSourceString(
         "entry",
@@ -145,13 +153,21 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
 
     ComPtr<slang::IBlob> code;
     diagnostics.setNull();
-    LinkedSpirvOutcome outcome;
     {
         ScopedEnvVar validateSpirv("SLANG_RUN_SPIRV_VALIDATION", "1");
         outcome.codeResult =
             linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
     }
-    outcome.haveSpirvOpt = haveSpirvOpt;
+    // Ask the dependency rather than inferring it from the emitted module: this attempts the real
+    // load and reports `SLANG_E_NOT_FOUND` when the module is unusable.
+    //
+    // Probed down here rather than up at session creation because the loader records its attempt
+    // once per session and returns the cached answer afterwards, without re-reporting. This call
+    // passes no sink, so making it first consumes that one reporting opportunity and leaves every
+    // later compile silent -- measured: with the module removed, probing before the precompile
+    // yields empty diagnostics, probing after yields `E00100 failed to load downstream compiler`.
+    outcome.haveSpirvOpt =
+        SLANG_SUCCEEDED(globalSession->checkPassThroughSupport(SLANG_PASS_THROUGH_SPIRV_OPT));
     outcome.producedCode = code && code->getBufferSize() != 0;
 
     outcome.generatorMagic = 0;
@@ -182,6 +198,13 @@ SLANG_UNIT_TEST(spirvValidationAcceptsDownstreamLinkedModule)
     // needed to classify a failure from the log alone. Printing only on a failed `codeResult` is
     // not enough: the link is skipped silently when the downstream compiler is missing, which
     // leaves `codeResult` OK and the generator assertion below as the only symptom.
+    if (outcome.precompileDiagnostics.getLength())
+    {
+        fprintf(
+            stderr,
+            "library precompile diagnostics:\n%s\n",
+            outcome.precompileDiagnostics.getBuffer());
+    }
     if (outcome.diagnostics.getLength())
     {
         fprintf(stderr, "compile diagnostics:\n%s\n", outcome.diagnostics.getBuffer());
