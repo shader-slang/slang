@@ -37,5 +37,5 @@ void main(uint3 tid: SV_DispatchThreadID)
     outBuf[0] = get<float>(float3(tid.x, 1, 2));
 }
 
-// CHECK-NOT: OpConstantComposite %float{{$}}
 // CHECK: OpEntryPoint
+// CHECK-NOT: OpConstantComposite %float{{$}}
