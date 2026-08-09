@@ -1362,9 +1362,6 @@ Result linkAndOptimizeIR(
             return SLANG_FAIL;
     }
 
-    // Fill in default matrix layout into matrix types that left layout unspecified.
-    SLANG_PASS(specializeMatrixLayout, targetProgram);
-
     // It's important that this takes place before defunctionalization as we
     // want to be able to easily discover the cooperate and fallback funcitons
     // being passed to saturated_cooperation
@@ -1455,6 +1452,10 @@ Result linkAndOptimizeIR(
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(finalizeSpecialization);
+
+    // Fill in default matrix layout into matrix types that left layout unspecified. This runs
+    // after specialization so matrix types minted from lazily imported generics are covered.
+    SLANG_PASS(specializeMatrixLayout, targetProgram);
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
