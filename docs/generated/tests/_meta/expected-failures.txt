@@ -176,12 +176,6 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 # red.
 docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
 
-# Pending: docs/generated/tests/_meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml
-# A `getStringHash` argument that does not fold to a string literal kills
-# slangc with SIGSEGV (exit 139, no output) instead of reporting the
-# documented "getStringHash requires string literal" error E41023.
-# (Will become a tracking issue after human triage.)
-docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
 
 # Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
 # `countof(a)` on a static array folds to the element type's byte size
