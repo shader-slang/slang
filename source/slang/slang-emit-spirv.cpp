@@ -3499,6 +3499,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case IRInterpolationMode::Linear:
             return true;
         case IRInterpolationMode::Sample:
+            // Unlike Flat, NoPerspective and Centroid, which the core Shader
+            // capability covers, the Sample decoration is gated on
+            // SampleRateShading. Without this declaration the module fails
+            // spirv-val with "Operand 2 of Decorate requires one of these
+            // capabilities: SampleRateShading", so `sample` on a fragment input
+            // produced invalid SPIR-V rather than a per-sample interpolant.
+            requireSPIRVCapability(SpvCapabilitySampleRateShading);
             emitOpDecorate(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,

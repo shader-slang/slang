@@ -262,17 +262,6 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffe
 # triage.)
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
-# Pending: docs/generated/tests/_meta/findings/spirv-sample-decoration-missing-samplerateshading-capability.yaml
-# The `-target spirv-asm` directive this branch's fan-out pass added to
-# `sample-interpolation-emits-on-hlsl.slang` exposes a compiler bug rather
-# than a test bug: `sample` interpolation lowers to `OpDecorate ... Sample`
-# while the module declares only `OpCapability Shader`, so spirv-val rejects
-# it with "Operand 2 of Decorate requires one of these capabilities:
-# SampleRateShading". Only the 4th directive (`-target spirv-asm`, sub-test
-# `.3`) fails; the hlsl/glsl/metal directives pass and must keep reporting.
-# Remove this entry once the emitter declares the capability. (Will become a
-# tracking issue after human triage.)
-docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang.3
 
 # Pending: docs/generated/tests/_meta/findings/enum-cast-in-generic-array-bound-rejected.yaml
 # `Size(N)` enum construction is rejected inside a generic function's array
