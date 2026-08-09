@@ -292,42 +292,60 @@ works for any given binary.
 
 ### CMake options
 
-| Option                                | Default                       | Description                                                                                                                              |
-| ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                     |
-| `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux            |
+| Option                                | Default                       | Description                                                                                                                                                                                                                        |
+| ------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLANG_VERSION`                       | Latest `v*` tag               | The project version, detected using git if available                                                                                                                                                                               |
+| `SLANG_DXC_BINARY_URL`                | Stable DXC release URL        | URL of the prebuilt DXC binary archive to download; overrides the default release URL and skips GLIBC auto-detection on Linux                                                                                                      |
 | `SLANG_DXC_BUILD_FROM_SOURCE`         | Unset                         | `ON`: build DXC from source on Windows, Linux, and macOS; `OFF`: use prebuilt when available; unset: build from source on macOS and auto-select on native Linux x86_64 (see [DXC GLIBC auto-detection](#dxc-glibc-auto-detection)) |
-| `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                  |
-| `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
-| `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
-| `SLANG_ENABLE_ASAN`                   | `FALSE`                       | Enable ASAN (address sanitizer)                                                                                                          |
-| `SLANG_ENABLE_COVERAGE`               | `FALSE`                       | Enable code coverage instrumentation                                                                                                     |
-| `SLANG_ENABLE_FULL_IR_VALIDATION`     | `FALSE`                       | Enable full IR validation (SLOW!)                                                                                                        |
-| `SLANG_ENABLE_VALIDATION_VM_BYTECODE` | `TRUE`                        | Enable VM bytecode validation in the bytecode interpreter. Disabling skips runtime safety checks for malformed bytecode.                 |
-| `SLANG_ENABLE_IR_BREAK_ALLOC`         | `OFF` (Release), `ON` (Debug) | Enable IR BreakAlloc functionality for debugging.                                                                                        |
-| `SLANG_ENABLE_GFX`                    | `TRUE`                        | Enable gfx targets (**deprecated**)                                                                                                      |
-| `SLANG_ENABLE_SLANGD`                 | `TRUE`                        | Enable language server target                                                                                                            |
-| `SLANG_ENABLE_SLANGC`                 | `TRUE`                        | Enable standalone compiler target                                                                                                        |
-| `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                          |
-| `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                    |
-| `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                               |
-| `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                           |
-| `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                           |
-| `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                  |
-| `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                 |
-| `SLANG_ENABLE_PCH`                    | `TRUE`                        | Enable precompiled headers for faster builds (auto-disabled when using sccache)                                                          |
-| `SLANG_STANDARD_MODULE_DEVELOP_BUILD` | `TRUE`                        | Enable development build for standard modules (enables `UNIT_TEST` macro); disable for release builds                                    |
-| `SLANG_LIB_TYPE`                      | `SHARED`                      | How to build the slang library                                                                                                           |
-| `SLANG_ENABLE_RELEASE_DEBUG_INFO`     | `TRUE`                        | Enable generating debug info for Release configs                                                                                         |
-| `SLANG_ENABLE_RELEASE_LTO`            | `FALSE`                       | Enable LTO for Release builds                                                                                                            |
-| `SLANG_ENABLE_SPLIT_DEBUG_INFO`       | `TRUE`                        | Enable generating split debug info for Debug and RelWithDebInfo configs                                                                  |
-| `SLANG_SLANG_LLVM_FLAVOR`             | `FETCH_BINARY_IF_POSSIBLE`    | How to set up llvm support                                                                                                               |
-| `SLANG_SLANG_LLVM_BINARY_URL`         | System dependent              | URL specifying the location of the slang-llvm prebuilt library                                                                           |
-| `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                     |
-| `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                       |
-| `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
+| `SLANG_EMBED_CORE_MODULE`             | `TRUE`                        | Build slang with an embedded version of the core module                                                                                                                                                                            |
+| `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                                                                                                                         |
+| `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                                                                                                                   |
+| `SLANG_ENABLE_ASAN`                   | `FALSE`                       | Enable ASAN (address sanitizer)                                                                                                                                                                                                    |
+| `SLANG_ENABLE_COVERAGE`               | `FALSE`                       | Enable code coverage instrumentation                                                                                                                                                                                               |
+| `SLANG_ENABLE_FULL_IR_VALIDATION`     | `FALSE`                       | Enable full IR validation (SLOW!)                                                                                                                                                                                                  |
+| `SLANG_ENABLE_VALIDATION_VM_BYTECODE` | `TRUE`                        | Enable VM bytecode validation in the bytecode interpreter. Disabling skips runtime safety checks for malformed bytecode.                                                                                                           |
+| `SLANG_ENABLE_IR_BREAK_ALLOC`         | `OFF` (Release), `ON` (Debug) | Enable IR BreakAlloc functionality for debugging.                                                                                                                                                                                  |
+| `SLANG_ENABLE_GFX`                    | `TRUE`                        | Enable gfx targets (**deprecated**)                                                                                                                                                                                                |
+| `SLANG_ENABLE_SLANGD`                 | `TRUE`                        | Enable language server target                                                                                                                                                                                                      |
+| `SLANG_ENABLE_SLANGC`                 | `TRUE`                        | Enable standalone compiler target                                                                                                                                                                                                  |
+| `SLANG_ENABLE_SLANGI`                 | `TRUE`                        | Enable Slang interpreter target                                                                                                                                                                                                    |
+| `SLANG_ENABLE_SLANGRT`                | `TRUE`                        | Enable runtime target                                                                                                                                                                                                              |
+| `SLANG_ENABLE_SLANG_GLSLANG`          | `TRUE`                        | Enable glslang dependency and slang-glslang wrapper target                                                                                                                                                                         |
+| `SLANG_ENABLE_SLANG_PROXY`            | `TRUE`                        | Build the legacy `slang.dll` proxy and `libslang` symlink backward-compatibility outputs for `slang-compiler`                                                                                                                      |
+| `SLANG_ENABLE_TESTS`                  | `TRUE`                        | Enable test targets, requires `SLANG_ENABLE_SLANG_RHI`; some tests require other CMake options                                                                                                                                     |
+| `SLANG_ENABLE_EXAMPLES`               | `TRUE`                        | Enable example targets, requires SLANG_ENABLE_SLANG_RHI                                                                                                                                                                            |
+| `SLANG_ENABLE_REPLAYER`               | `TRUE`                        | Enable slang-replay tool                                                                                                                                                                                                           |
+| `SLANG_ENABLE_PCH`                    | `TRUE`                        | Enable precompiled headers for faster builds (auto-disabled when using sccache)                                                                                                                                                    |
+| `SLANG_STANDARD_MODULE_DEVELOP_BUILD` | `TRUE`                        | Enable development build for standard modules (enables `UNIT_TEST` macro); disable for release builds                                                                                                                              |
+| `SLANG_LIB_TYPE`                      | `SHARED`                      | How to build the slang library                                                                                                                                                                                                     |
+| `SLANG_ENABLE_RELEASE_DEBUG_INFO`     | `TRUE`                        | Enable generating debug info for Release configs                                                                                                                                                                                   |
+| `SLANG_ENABLE_RELEASE_LTO`            | `FALSE`                       | Enable LTO for Release builds                                                                                                                                                                                                      |
+| `SLANG_ENABLE_SPLIT_DEBUG_INFO`       | `TRUE`                        | Enable generating split debug info for Debug and RelWithDebInfo configs                                                                                                                                                            |
+| `SLANG_SLANG_LLVM_FLAVOR`             | `FETCH_BINARY_IF_POSSIBLE`    | How to set up llvm support                                                                                                                                                                                                         |
+| `SLANG_SLANG_LLVM_BINARY_URL`         | System dependent              | URL specifying the location of the slang-llvm prebuilt library                                                                                                                                                                     |
+| `SLANG_USE_SCCACHE`                   | `FALSE`                       | Use sccache as compiler launcher (auto-disables PCH)                                                                                                                                                                               |
+| `SLANG_GENERATORS_PATH`               | ``                            | Path to an installed `all-generators` target for cross compilation                                                                                                                                                                 |
+| `SLANG_IGNORE_ABORT_MSG`              | `FALSE`                       | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds)                                                                                           |
 
-#### DXC GLIBC auto-detection
+#### DXC acquisition
+
+When `SLANG_ENABLE_DXIL=ON`, DXC is acquired by the first applicable rule:
+
+1. `SLANG_USE_SYSTEM_DXC=ON` — `find_package(DXC)` against an installed
+   DXC. Set the standard `DXC_ROOT` variable to its installation prefix, or
+   add the prefix to `CMAKE_PREFIX_PATH`. The installation must provide
+   `include/dxc/dxcapi.h` and the `dxcompiler` shared library. On Windows,
+   both `bin/dxcompiler.dll` and `bin/dxil.dll` are required. On Linux and
+   macOS, the `dxil` shared library is optional and staged when present. A
+   version mismatch against the pinned tag is a warning, not an error.
+2. `SLANG_DXC_BUILD_FROM_SOURCE=ON` — build the pinned DXC from source.
+3. `SLANG_DXC_BINARY_URL=<url>` — download a custom prebuilt archive.
+4. Otherwise: on macOS, build from source (no Microsoft prebuilt exists);
+   elsewhere download the official Microsoft prebuilt, falling back to
+   source on native Linux x86_64 when GLIBC requirements are not met
+   (see below).
+
+##### DXC GLIBC auto-detection
 
 When `SLANG_DXC_BUILD_FROM_SOURCE` is unset on native Linux x86_64 (and
 `SLANG_DXC_BINARY_URL` is not set), CMake downloads the prebuilt DXC binary at
@@ -343,7 +361,9 @@ so the default configuration builds DXC from source unless
 
 ```mermaid
 flowchart TD
-    Start["Configure DXC support"] --> BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
+    Start["Configure DXC support"] --> UseSystem{"SLANG_USE_SYSTEM_DXC"}
+    UseSystem -->|ON| System["find_package(DXC); use installed DXC"]
+    UseSystem -->|OFF| BuildFromSource{"SLANG_DXC_BUILD_FROM_SOURCE"}
     BuildFromSource -->|ON| Source["Build DXC from source"]
     BuildFromSource -->|OFF| Prebuilt["Use a prebuilt binary when available"]
     BuildFromSource -->|unset| CustomUrl{"SLANG_DXC_BINARY_URL set?"}
@@ -389,23 +409,24 @@ error if they can't be found.
 
 ### Advanced options
 
-| Option                              | Default                              | Description                                                                                                                 |
-| ----------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| `SLANG_ENABLE_DX_ON_VK`             | `FALSE`                              | Enable running the DX11 and DX12 tests on non-WARP Windows platforms via vkd3d-proton, requires system-provided d3d headers |
-| `SLANG_ENABLE_SLANG_RHI`            | `TRUE`                               | Enable building and using [slang-rhi](https://github.com/shader-slang/slang-rhi) for tests                                  |
-| `SLANG_USE_SYSTEM_MINIZ`            | `FALSE`                              | Build using system Miniz library instead of the bundled version in [./external](./external)                                 |
-| `SLANG_USE_SYSTEM_LZ4`              | `FALSE`                              | Build using system LZ4 library instead of the bundled version in [./external](./external)                                   |
-| `SLANG_USE_SYSTEM_VULKAN_HEADERS`   | `FALSE`                              | Build using system Vulkan headers instead of the bundled version in [./external](./external)                                |
-| `SLANG_USE_SYSTEM_SPIRV_HEADERS`    | `FALSE`                              | Build using system SPIR-V headers instead of the bundled version in [./external](./external)                                |
-| `SLANG_USE_SYSTEM_UNORDERED_DENSE`  | `FALSE`                              | Build using system unordered dense instead of the bundled version in [./external](./external)                               |
-| `SLANG_USE_SYSTEM_SPIRV_TOOLS`      | `FALSE`                              | Build using system SPIR-V tools library instead of the bundled version in [./external](./external)                          |
-| `SLANG_USE_SYSTEM_GLSLANG`          | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                               |
-| `SLANG_SPIRV_HEADERS_INCLUDE_DIR`   | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                         |
-| `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                |
-| `SLANG_ENABLE_MIMALLOC`             | `FALSE` (`TRUE` on shared Windows)   | Use mimalloc for Slang-owned allocations                                                                                     |
-| `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                  |
-| `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                            |
-| `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                           |
+| Option                              | Default                              | Description                                                                                                                                                    |
+| ----------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SLANG_ENABLE_DX_ON_VK`             | `FALSE`                              | Enable running the DX11 and DX12 tests on non-WARP Windows platforms via vkd3d-proton, requires system-provided d3d headers                                    |
+| `SLANG_ENABLE_SLANG_RHI`            | `TRUE`                               | Enable building and using [slang-rhi](https://github.com/shader-slang/slang-rhi) for tests                                                                     |
+| `SLANG_USE_SYSTEM_MINIZ`            | `FALSE`                              | Build using system Miniz library instead of the bundled version in [./external](./external)                                                                    |
+| `SLANG_USE_SYSTEM_LZ4`              | `FALSE`                              | Build using system LZ4 library instead of the bundled version in [./external](./external)                                                                      |
+| `SLANG_USE_SYSTEM_VULKAN_HEADERS`   | `FALSE`                              | Build using system Vulkan headers instead of the bundled version in [./external](./external)                                                                   |
+| `SLANG_USE_SYSTEM_SPIRV_HEADERS`    | `FALSE`                              | Build using system SPIR-V headers instead of the bundled version in [./external](./external)                                                                   |
+| `SLANG_USE_SYSTEM_UNORDERED_DENSE`  | `FALSE`                              | Build using system unordered dense instead of the bundled version in [./external](./external)                                                                  |
+| `SLANG_USE_SYSTEM_SPIRV_TOOLS`      | `FALSE`                              | Build using system SPIR-V tools library instead of the bundled version in [./external](./external)                                                             |
+| `SLANG_USE_SYSTEM_GLSLANG`          | `FALSE`                              | Build using system glslang library instead of the bundled version in [./external](./external)                                                                  |
+| `SLANG_USE_SYSTEM_DXC`              | `FALSE`                              | Build using system DXC instead of the fetch / source-build paths in [`cmake/FetchDXC.cmake`](../cmake/FetchDXC.cmake); see [DXC acquisition](#dxc-acquisition) |
+| `SLANG_SPIRV_HEADERS_INCLUDE_DIR`   | ``                                   | Use this specific path to SPIR-V headers instead of the bundled version in [./external](./external)                                                            |
+| `SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC` | `FALSE` (`TRUE` on Windows)          | Enable mimalloc allocator for SPIRV-Tools to improve compilation performance                                                                                   |
+| `SLANG_ENABLE_MIMALLOC`             | `FALSE` (`TRUE` on shared Windows)   | Use mimalloc for Slang-owned allocations                                                                                                                       |
+| `SLANG_EXCLUDE_DAWN`                | `FALSE` on Windows, `TRUE` elsewhere | Exclude Dawn WebGPU support from the build                                                                                                                     |
+| `SLANG_EXCLUDE_TINT`                | `FALSE`                              | Exclude slang-tint from the build (only relevant on Windows x64)                                                                                               |
+| `SLANG_ENABLE_TIME_TRACE`           | `FALSE`                              | Enable Clang time trace profiling for build analysis (Clang only)                                                                                              |
 
 ### LLVM Support
 
