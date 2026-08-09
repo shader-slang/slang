@@ -117,6 +117,18 @@ how that doc's claims were extracted. Shared prompts —
   defects (the audit trail from "agent saw this" to "issue filed").
 - **`_meta/expected-failures.txt`** — tests that fail because of a filed
   (or pending) compiler bug, kept out of the CI failure gate.
+- **`_meta/agentic-coverage-excludes.txt`** — the narrower list of tests
+  the *coverage* run must not execute at all. `nightly-slang-coverage-test.yml`
+  runs the suite in-process (`-server-count 1`, no test server) so that the
+  compiler's own lines are instrumented, which means a test that segfaults
+  `slangc` segfaults `slang-test` and the rest of the suite never runs —
+  `expected-failures.txt` cannot catch that, because there is no surviving
+  process to report a result. Whenever a coverage run reports
+  `agentic-test pass crashed`, take the test that sorts immediately after the
+  last one it printed, add it here with the run URL, and file the crash as a
+  finding. `regenerate.py lint` fails on an entry whose path no longer
+  resolves, since a stale entry excludes nothing and silently re-arms the
+  crash.
 - **`INDEX.md`** — regenerated bundle index (`regenerate.py index --write`).
 - **The nightly CI signal** — `slang-test -test-dir docs/generated/tests`
   runs the whole suite; it is additive and does not gate per-PR.

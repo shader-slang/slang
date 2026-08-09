@@ -25,12 +25,27 @@
 # the last-printed test before the crash), so a future maintainer
 # can verify whether the underlying issue is still present.
 #
+# Reading a crash out of a coverage run
+# -------------------------------------
+# The agentic pass runs sequentially and in-process (`-server-count 1`,
+# no `-use-test-server`), so a compiler SIGSEGV is a slang-test SIGSEGV.
+# slang-test walks the suite in sorted path order and prints each result
+# as it finishes, which makes the crashing test the one that comes
+# immediately AFTER the last `passed test:`/`failed... test:` line before
+# the `Segmentation fault`/`Bus error` message — it never gets to print
+# its own result. Take that next path, add it here, and record the run
+# URL plus the last-printed test in the comment block.
+#
 # Staleness signal
 # ----------------
-# Unlike `-expected-failure-list`, `-exclude-prefix` has no
-# "passing tests that are expected to fail" reporter, so entries
-# here can rot silently once the underlying crash is fixed. To
-# audit the list periodically:
+# `regenerate.py lint` checks that every path below still resolves on
+# disk, so an entry orphaned by a regeneration round that renames or
+# moves its test now fails the lint in nightly-slang-test.yml instead of
+# silently excluding nothing. That catches the rename direction only.
+#
+# In the other direction, `-exclude-prefix` has no "passing tests that
+# are expected to fail" reporter, so entries here can still rot silently
+# once the underlying crash is fixed. To audit the list periodically:
 #   1. Compile slang with coverage instrumentation locally.
 #   2. Remove an entry below and run
 #      `./tools/coverage/run-coverage.sh --with-agentic-tests`
@@ -39,25 +54,43 @@
 #   3. If the run completes without a SIGSEGV in slang-test, the
 #      underlying crash has been fixed — drop the entry for real.
 # A green nightly-slang-test.yml run on the same test is a
-# necessary but NOT sufficient condition: the nightly uses an
-# uninstrumented binary, and the crash here is
-# coverage-instrumentation-specific.
+# necessary but NOT sufficient condition. Two things differ there:
+# the binary is uninstrumented, and the test runs in a subprocess
+# test server, so a crash is reported as a failure rather than
+# taking the orchestrator with it. Entries here fall into both
+# camps — some crash only under coverage instrumentation, others
+# (e.g. the `unorm`/`snorm` pair) crash plain `slangc` too and are
+# merely *survivable* in the nightly because of that isolation.
 
-# Run 26813684019 (sequential reproducer with -server-count 1):
-# SIGSEGV in slang-test immediately after
-# ir-reference/metadata/type-layout-base.slang passes. The same
-# test is already listed in expected-failures.txt (it fails on the
-# uninstrumented Linux nightly); coverage instrumentation
-# escalates that failure into a SIGSEGV inside the slang-test
-# orchestrator, which kills the rest of the suite.
+# `unorm`/`snorm` on a non-texture carrier SIGSEGVs slangc on Linux.
+# Tracked by _meta/findings/metadata-unorm-structured-buffer-element-sigsegv.yaml
+# and _meta/findings/ir-types-unorm-snorm-struct-field-sigsegv.yaml (both
+# `Attributed(Float, ...)` reached from a module-scope uniform; likely one
+# root cause). Both tests are in expected-failures.txt, so the subprocess
+# nightly buckets them as failed(expected); only the in-process coverage
+# pass turns them into an orchestrator SIGSEGV.
 #
-# Path note: PR #11421 reorganized the agentic suite under
-# `docs/generated/tests/design/...` and `.../conformance/...`. The
-# entry below uses the post-reorg path; the pre-reorg form
-# `docs/generated/tests/ir-reference/...` no longer matches anything
-# and silently disabled the exclude until run 26992984934 reproduced
-# the crash and surfaced the staleness.
-docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.slang
+# Identified in coverage run 31235323797, job 93046595145 (linux):
+# `Segmentation fault (core dumped)` on both attempts immediately after
+# ir-reference/metadata/unorm-attr-on-rwtexture-element.slang passed, i.e.
+# on the next test in sorted order, unorm-attr-on-structured-buffer-element.
+# The whole tail of the suite (the rest of ir-reference, pipeline,
+# syntax-reference, target-pipelines) never ran and produced no coverage.
+#
+# Path note: this entry used to read
+# `.../metadata/unorm-attr-on-buffer-element.slang`. The 2026-08-04
+# regeneration round (source_commit 7e725f1) split that bundle's unorm
+# test into an rwtexture case and a structured-buffer case, which orphaned
+# the entry and re-enabled the crash — the same silent-rot failure mode
+# PR #11421's directory move caused earlier. `regenerate.py lint` now
+# fails on an exclude path that does not resolve.
+#
+# attributed-type-unorm-snorm.slang is excluded pre-emptively: the coverage
+# suite died in `metadata` before reaching `types`, so it has not been
+# observed crashing a coverage run, but its finding records the same exit
+# 139 on `-target hlsl` and it sits in the untested tail.
+docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
+docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
 
 # Local coverage reproducer (RelWithDebInfo + -fprofile-instr-generate,
 # sequential -server-count 1): SIGSEGV in slang-test immediately after
@@ -74,6 +107,23 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-buffer-element.s
 # still buckets it as failed(expected) via expected-failures.txt.
 docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang
 
+# `getStringHash` on a String that does not fold to a literal SIGSEGVs
+# slangc during compilation instead of reporting E41023; tracked by
+# _meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml. This is a
+# distinct crash from string-hash-stable-value-cpu.slang above (that one
+# dies while *executing* a CPU kernel whose argument IS a literal).
+#
+# Identified in coverage run 31235323797, job 93046595167 (macos):
+# `Bus error: 10` on both attempts immediately after
+# ir-reference/misc/string-hash-fold-emitted-constant.slang.6 passed, i.e.
+# on the next test in sorted order. Confirmed locally on macOS aarch64 —
+# `slangc string-hash-non-literal-diagnostic.slang -target hlsl -entry main
+# -stage compute` exits 138 (128 + SIGBUS). The test arrived in the
+# 2026-08-04 regeneration round and sorts between .6 and the already-listed
+# string-hash-stable-value-cpu.slang, so it became the new first crasher in
+# this directory.
+docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
+
 # In-process HLSL-prelude state leak (NOT a crash). These four tests assert
 # that emitted HLSL contains the standard prelude's NVAPI guard
 # (`#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"`). They pass
@@ -89,7 +139,19 @@ docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang
 # nightly). This is a pre-existing in-process compiler/session-state leak in the
 # CPU host-callable downstream path; the exclude is a coverage-stability hack
 # until that leak is fixed. Identified locally 2026-07-09.
-docs/generated/tests/design/pipeline/06-emit/preludes-included-by-c-and-cuda.slang
+#
+# Update 2026-08-09: the three `target-pipelines/hlsl` tests below now fail on
+# nightly-slang-test.yml too (run 31294644845, which uses `-use-test-server
+# -server-count 4`), so the "they pass in the nightly" half of the paragraph
+# above no longer holds and the leak is probably not in-process-only. That is a
+# nightly problem to triage on its own; the excludes stay because the coverage
+# pass still cannot distinguish the failure from a real one.
+#
+# Path note: the first entry used to read
+# `.../06-emit/preludes-included-by-c-and-cuda.slang`. The 2026-08-04
+# regeneration round renamed it to `preludes-included-by-cuda-cpp-and-hlsl.slang`
+# (the bundle grew an HLSL directive), orphaning the entry.
+docs/generated/tests/design/pipeline/06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang
 docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-present-without-nv-intrinsic.slang
 docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-with-wave-intrinsic.slang
 docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditional.slang
