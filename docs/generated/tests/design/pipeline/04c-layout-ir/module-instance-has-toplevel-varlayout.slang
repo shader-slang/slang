@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
-//META: doc_section_digest=bea4097f3cb99e6205f4e10d4bf9ab240dde03162a3388a24e9a78e55d5c0e65
-//META: purpose=createIRModuleForLayout calls addLayoutDecoration on the module instance with irGlobalScopeVarLayout; the merged IR shows a top-level `varLayout(...)` instruction (not bound to `let`).
+//META: doc_section_digest=cb9b7a613d39760a93548dfbce14e96da09e14aa0f49313bd097e522bedd9206
+//META: purpose=The global-scope var layout is attached to the module instance itself, appearing as a top-level varLayout instruction rather than a let-bound one.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Global-scope type layout" section says:
-//   builder->addLayoutDecoration(irModule->getModuleInst(),
-//                                irGlobalScopeVarLayout);
-// That decoration appears in the merged IR as a standalone
-// `varLayout(%N)` line at the top of the layout block (a top-level
-// instruction, not the right-hand side of a `let`).
+// Verifies that the global-scope layout is anchored on the module
+// instruction, not just on the individual globals. A decoration on the
+// module instance prints without a `let` binding, so CHECK anchors
+// `varLayout(` at the start of a line; every other varLayout in the block
+// is the right-hand side of a `let`.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

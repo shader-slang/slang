@@ -1,21 +1,17 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:08:34Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#extractexistentialvalue--extractexistentialtype--extractexistentialwitnesstable
-//META: doc_section_digest=16045cc2106f4346cc8dfb52e07857b9a6e4297569798ffd3bcd3f5258a250c1
+//META: doc_section_digest=2831394637fc16470e6426b0ef26aa0c691647c1fa7ec6c0ecb2e6e5d269f621
 //META: purpose=Two dispatches through the same existential share a single hoistable extractExistentialWitnessTable inst that feeds both lookupWitness sites.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Verifies that the witness-table projection is hoistable: its result
-// depends only on the existential operand, so dispatching two different
-// interface methods on the same existential reuses one
-// extractExistentialWitnessTable inst. The CHECK captures the single %w
-// definition and requires both lookupWitness sites (one per method) to
-// name that same captured %w as their witness-table operand.
-
+// Boundary on the witness projection's hoistable flag. Two method calls on the
+// same existential need two different requirement keys but the same table; the
+// CHECK captures the projection once and asserts both `lookupWitness` sites
+// take that same captured value as their first operand.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); int walk(int x); };

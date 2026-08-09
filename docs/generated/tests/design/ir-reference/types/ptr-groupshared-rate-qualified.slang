@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#rates-and-rate-qualified-types
-//META: doc_section_digest=261694f2495663c52fa91ea5888b76d9946c341ceeccfee48aa2adb230c18973
+//META: doc_section_digest=c24e0f57222f24155857b18aba7c3d8c022107d36ac8d499a6b2d26735d4b98b
 //META: purpose=A groupshared declaration is typed RateQualified(GroupShared, Ptr(<T>)) in the IR.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Rates and rate-qualified types" table lists `GroupShared`
-// as a Rate opcode and `RateQualified` as the type that combines a
-// rate with a value type. A `groupshared int gs;` declaration
-// surfaces `RateQualified(GroupShared, Ptr(Int))` as its IR type
-// in the `global_var` declaration of `gs`.
+// A groupshared declaration is typed RateQualified(GroupShared,
+// Ptr(<T>)) in the IR. A `groupshared int gs;` declaration surfaces
+// `RateQualified(GroupShared, Ptr(Int))` as its IR type in the
+// `global_var` declaration of `gs`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

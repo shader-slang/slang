@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#layout-family
-//META: doc_section_digest=295e5ac09f4b7f77dd6669103c943586264fcbb5b6e2283e5226b00e48c0393b
-//META: purpose=A geometry entry point with inout TriangleStream<T> lowers to a streamOutputTypeLayout opcode in the layout dump.
-//META: intent=expansion
+//META: doc_section_digest=8133b77a147a20aa12fcc20641167e9fc2f42707469a60ef2b36207749f54a95
+//META: purpose=A geometry entry point with an inout TriangleStream parameter produces a streamOutputTypeLayout whose operand 0 is the element type layout.
+//META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Per the Layout-family table: `streamOutputTypeLayout` is the
-// layout for a geometry-shader stream-output type (variadic,
-// min=1, hoistable, synthesized). The natural Slang surface is an
-// `inout TriangleStream<T>` (or `LineStream<T>` / `PointStream<T>`)
-// parameter on a `[shader("geometry")]` entry point.
+// Verifies the geometry-stream layout record and its element operand. The
+// stream's element is the `GsOut` struct, so following operand 0 of the
+// emitted `streamOutputTypeLayout` must reach a `structTypeLayout`; that is
+// what distinguishes the stored element layout from a bare attribute tail.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage geometry
 
@@ -45,4 +44,5 @@ void main(
     }
 }
 
-// CHECK: streamOutputTypeLayout
+// CHECK: = streamOutputTypeLayout(%[[ELEM:[0-9]+]]
+// CHECK: %[[ELEM]]{{.*}}= structTypeLayout(

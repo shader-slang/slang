@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
-//META: doc_ref=docs/generated/design/ast-reference/expressions.md#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-thistypeexpr
-//META: doc_section_digest=4254abda0523877f7fb67acc9da1ad7de3884b6d869e71f92f12575587230f39
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/expressions.md#type-expression-family-pointertypeexpr-functypeexpr-tupletypeexpr-andtypeexpr-modifiedtypeexpr-packbranchtypeexpr
+//META: doc_section_digest=1d025242d1797d4e136aa1be3b95725504ad5b96bc6526725ad99442cfbb5be0
 //META: purpose=An AndTypeExpr `IA & IB` denotes a conjunction-of-conformances type; a value conforming to both can be passed where the conjunction is required.
 //META: intent=functional
 //META: pipeline_stage=check

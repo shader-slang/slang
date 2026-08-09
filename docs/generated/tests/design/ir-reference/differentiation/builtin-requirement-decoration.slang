@@ -1,41 +1,38 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:12:37+00:00
-//META: source_commit=5f0e613fdd3c2890bb087d9ff76154e2605a14d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#built-in-requirement-keys
-//META: doc_section_digest=f9fe48ae137d96b72713ab03d2eba0f40566c196098995d57df4313cf4bee2c7
-//META: purpose=Each built-in requirement key is tagged with a BuiltinRequirementDecoration recording the BuiltinRequirementKind role it represents.
+//META: doc_section_digest=8841558fe8e6bf69ddd8656a8ca07dd5edb61f8b61635bf18fcf4ba678855478
+//META: purpose=Every builtinRequirementKey is emitted with a BuiltinRequirementDecoration carrying the same requirement-kind operand, so a lookup can find a witness-table entry by role instead of by position.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that lowering tags the built-in requirement keys with the
-// BuiltinRequirement decoration (the role marker the autodiff lookup
-// helper scans, instead of relying on entry position). The dump prints
-// decorations bracketed above the decorated inst, so an ordered CHECK
-// pins a `[BuiltinRequirement...]` decoration line followed by the
-// `= builtinRequirementKey(` definition it decorates (the opcode's
-// dump name); the bracket prefix keeps the first pattern from
-// matching the definition line itself.
+// Verifies the key/decoration pairing that makes role-based requirement lookup
+// possible. Using a differentiable function pulls the recognized
+// `IDifferentiable` requirements into the module, and each key appears in the
+// dump immediately under its decoration. CHECK captures the kind operand from
+// the decoration line and then requires the very next line to be the key inst
+// built from that same kind, which is the invariant a by-role lookup depends
+// on; a decoration carrying a different kind than its key would break it.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 uniform float a;
 uniform RWStructuredBuffer<float> buf;
 
-[ForwardDifferentiable]
-float h(float x)
+[Differentiable]
+float f(float x)
 {
-    return x + x * x;
+    return x * x;
 }
 
 [numthreads(1, 1, 1)]
 void main()
 {
-    buf[0] = __fwd_diff(h)(DifferentialPair<float>(a, 1.0)).d;
+    buf[0] = __fwd_diff(f)(DifferentialPair<float>(a, 1.0)).d;
 }
 
-// The decoration line precedes the key definition it marks, so plain
-// ordered CHECKs are the property under test here (not CHECK-DAG).
-// CHECK: [BuiltinRequirement
-// CHECK: = builtinRequirementKey(
+// CHECK: {{^}}[BuiltinRequirementDecoration([[KIND:[0-9]+]] : Int)]
+// CHECK-NEXT: let {{%[A-Za-z0-9_]+}} : _ = builtinRequirementKey([[KIND]] : Int)

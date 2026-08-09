@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T12:00:00+00:00
-//META: source_commit=5f0e613fdd3c2890bb087d9ff76154e2605a14d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomiccompareexchange
-//META: doc_section_digest=71b74ee056270d4345b7257154c1737e99ecafed1d54c59932e1d630864a86cf
+//META: doc_section_digest=7df7fb40b43dccb446b1e09fcfd971cee6e54f70b1a4e2cc56f1755c4feb75a3
 //META: purpose=`Atomic<T>::compareExchange(expected, desired)` lowers to `atomicCompareExchange(%ptr, %expected, %desired, ...)` — the CAS primitive returning the previous value, with the documented trailing memory-order operand(s) left unpinned.
 //META: intent=functional
 //META: pipeline_stage=lower

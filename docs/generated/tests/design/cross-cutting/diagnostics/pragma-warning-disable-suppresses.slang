@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-codes-and-the-name-field
-//META: doc_section_digest=58de6e7299bd58eba9a686426fc010a16e2745f7e3231042be33437e83834630
-//META: purpose=Tools can suppress a specific diagnostic by integer id via overrideDiagnostic; the user-facing surface is `#pragma warning(disable: <id>)`.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#diagnosticsink
+//META: doc_section_digest=83632b726fecd52003cb9a007e201049bb33c66f077ab6265b07278009caca02
+//META: purpose=The sink's per-source warning-state tracking lets `#pragma warning(disable: 41024)` suppress that warning for the tokens that follow.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says callers can suppress a specific diagnostic by id via
-// overrideDiagnostic / overrideDiagnostics. The user-facing surface
-// for warnings is `#pragma warning(disable: <id>)`. Disable the
-// comma-operator warning (41024) and confirm it does not appear in
-// the compiled output.
+// Verifies the sink's per-source warning-state tracking: `#pragma
+// warning(disable: 41024)` adjusts the enforced severity for the tokens that
+// follow it. The same comma-operator expression that warns without the pragma
+// is compiled with it; CHECK-NOT asserts neither the code nor the message
+// appears, while CHECK asserts the entry point was still emitted.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

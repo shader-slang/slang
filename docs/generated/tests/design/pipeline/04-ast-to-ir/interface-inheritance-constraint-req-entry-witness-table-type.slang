@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T16:30:00Z
-//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
-//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generics-and-existentials
-//META: doc_section_digest=d6ee07799b141a6850f1700c9e4ae870d18815ea897d847d8fe60117b962be60
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#associated-type-bounds
+//META: doc_section_digest=71d487355c4bcb7872fbd2df16f024978d48bf90eba4da3f6bd6ba782dd68d15
 //META: purpose=An interface-level subtype constraint (`interface IDerived : IBase`) lowers as its own requirement entry whose requirement value is a WitnessTableType — `interface_req_entry(%key, witness_table_t(%IBase))`.
 //META: intent=functional
 //META: pipeline_stage=lower

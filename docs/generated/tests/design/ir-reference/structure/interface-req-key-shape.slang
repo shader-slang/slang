@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
-//META: doc_ref=docs/generated/design/ir-reference/structure.md#interface-internals
-//META: doc_section_digest=5dc76a84fdd1669b550ae0adc67c151d06f4b871041e89b69aba78caf6fb2ddc
-//META: purpose=The requirementKey operand of an interface_req_entry is the same StructKey value that names the requirement on the witness_table_entry that satisfies it.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/structure.md#witnesstableentry-vs-interfacereqentry
+//META: doc_section_digest=e214a09142215b02ab6420756675cda4aea3ee3bccc295e9aa6dbc0ccf6a4a23
+//META: purpose=The requirementKey operand of an interface_req_entry is the same key value that names the requirement on the witness_table_entry satisfying it.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `witness_table_entry vs interface_req_entry` note says
-// these two opcodes are "the interface-side and implementation-side
-// halves of the same key-driven dispatch table". The same
-// `%IFoox5Frun` key appears on both sides.
+// Verifies that the declaring side and the satisfying side are joined by inst
+// identity rather than by name or by position. The ordered CHECKs require the
+// literal same `%IFoox5Frun` value to appear as the first operand of the
+// interface's requirement entry and of the conformance's witness-table entry.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -22,12 +22,12 @@ uniform RWStructuredBuffer<int> buf;
 interface IFoo
 {
     int run(int x);
-};
+}
 
 struct A : IFoo
 {
     int run(int x) { return x + 1; }
-};
+}
 
 [numthreads(1, 1, 1)]
 void main()
