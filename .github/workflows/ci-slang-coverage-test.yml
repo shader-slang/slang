@@ -267,8 +267,9 @@ jobs:
             # syn (mtl) — a different test each time, and both pass in isolation, so it
             # is order-dependent and cannot be pinned to a small exclude list (there are
             # ~189 explicit `-mtl` test files). Subtracting the API is the only way to
-            # keep the macOS coverage job producing a report. Tracked upstream; restore
-            # Metal here once that assert is fixed.
+            # keep the macOS coverage job producing a report. Tracked in
+            # https://github.com/shader-slang/slang-rhi/issues/818; restore Metal here
+            # once that assert is fixed.
             test_args+=("-synthesizedTestApi" "-llvm-mtl")
             test_args+=("-api" "-mtl")
           fi
