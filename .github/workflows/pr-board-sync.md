@@ -109,7 +109,7 @@ merge-queued PRs.
 | Source              | Assignee             | Auto-requested reviewer                                      | Comment |
 | ------------------- | -------------------- | ------------------------------------------------------------ | ------- |
 | **Internal**        | PR author            | none                                                         | none |
-| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot note naming the assignee; may suggest a higher-signal collaborator without `@` |
+| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot automated notice naming the assignee (explicitly: do not reply); may FYI a higher-signal collaborator without `@` |
 
 **Pick order** (Community/Bot assignee / shepherd):
 
@@ -122,9 +122,10 @@ who may be chosen as shepherd. Auto-request is that shepherd only when they are
 not the PR author, not on the ignored-reviewers list, and no real reviewer is
 already requested. A collaborator with stronger committer signal than the
 auto-requested reviewer (or the top other collaborator when nobody was
-auto-requested) may be named in the assignment comment as a suggested
-additional reviewer, but is never `requestReviewers`'d — so they are not
-notified unless someone follows up.
+auto-requested) may be named in the assignment comment as an optional
+additional reviewer for a human to consider, but is never `requestReviewers`'d —
+so they are not notified unless someone follows up. The comment is labeled as an
+automated notice and asks recipients not to reply.
 
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 

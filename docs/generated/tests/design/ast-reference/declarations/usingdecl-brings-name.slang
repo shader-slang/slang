@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=A UsingDecl brings names from another scope into the current one; an unqualified use of the imported name resolves.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A UsingDecl brings names from another scope into the current one so they resolve without qualification.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of UsingDecl. `using namespace N`
-// is a UsingDecl that makes `N`'s members reachable without the
-// `N::` qualifier from the surrounding scope.
+// Verifies that `using namespace N;` makes `N`'s members reachable
+// unqualified. The call in `main` uses the bare name; the CHECK asserts the
+// namespaced function's result, so the using declaration must have injected
+// the name into the enclosing scope.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

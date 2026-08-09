@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#diagnosticsink
-//META: doc_section_digest=9c56cd15864837ba13d0f3ca512f679e11adc378d62d03ad3125087b47fe77e6
-//META: purpose=Stress: the sink emits every diagnostic from a sequence of unrelated undefined-identifier conditions; no documented cap drops later messages.
+//META: doc_section_digest=83632b726fecd52003cb9a007e201049bb33c66f077ab6265b07278009caca02
+//META: purpose=Stress: the sink's output buffer accumulates every diagnostic of a long run of undefined-identifier errors; none is dropped.
 //META: intent=stress
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says the sink owns a buffered list of Diagnostic records.
-// Stress: trigger many distinct undefined-identifier diagnostics in
-// a single translation unit; the sink must emit each one with its
-// own id and span (no silent dropping).
+// Verifies the sink's accumulating output does not drop diagnostics under
+// volume. Eight distinct undeclared names are referenced in one entry point;
+// CHECK asserts every one of the eight messages appears, so a cap or
+// dedup that silently discarded later records would fail the test.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 

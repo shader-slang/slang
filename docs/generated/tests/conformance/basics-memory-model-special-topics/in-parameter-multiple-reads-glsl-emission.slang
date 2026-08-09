@@ -19,6 +19,8 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -51,3 +53,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // WGSL: fn sumOfReads_{{[0-9]+}}( val_{{[0-9]+}} : i32)
 // WGSL: val_{{[0-9]+}} + val_{{[0-9]+}} + val_{{[0-9]+}}
+
+// HLSL: void sumOfReads_{{[0-9]+}}(int val_{{[0-9]+}})
+// HLSL: val_{{[0-9]+}} + val_{{[0-9]+}} + val_{{[0-9]+}}
+
+// SPIRV: %sumOfReads = OpFunction %void DontInline
+// SPIRV: %val = OpFunctionParameter %int
+// SPIRV: OpIAdd %int %val %val
+// SPIRV: OpIAdd %int %{{[0-9]+}} %val

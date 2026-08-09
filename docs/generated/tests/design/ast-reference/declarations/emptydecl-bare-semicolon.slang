@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=An EmptyDecl is a declaration that exists only to carry modifiers; a bare semicolon at module scope is accepted.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=An EmptyDecl is a declaration with no content of its own; a bare semicolon at module scope is accepted.
 //META: intent=functional
 //META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of EmptyDecl: a stand-alone `;` at
-// module scope parses successfully (as a modifier-bearing empty
-// declaration). The interpreter still runs the program.
+// Verifies that a stray `;` at module scope parses as an empty declaration
+// rather than a syntax error. The program still runs; the CHECK asserts the
+// entry point's output, which only prints if parsing completed.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

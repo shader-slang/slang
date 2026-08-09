@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-entry-point-steps
-//META: doc_section_digest=f1f711647a8ab7d8ff9b7722b3142e2807223fee33504a2cd14c041ae35af7c5
-//META: purpose=Per-entry-point step 8 attaches an IRLayoutDecoration to the stub IRFunc; the merged entry-point func carries a [layout(%N)] decoration that the reflection API queries.
+//META: doc_section_digest=2051f00317fddb1d324980572e90d6c58961dbf4384bdc38e7d5acf46a5ce786
+//META: purpose=The final per-entry-point step attaches an IRLayoutDecoration to the stub entry-point function, observable as a [layout(%N)] on func %main.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Row 8 of the per-entry-point steps table:
-//   builder->addLayoutDecoration(irFunc, irEntryPointLayout)
-// is what makes the entry point's layout queryable. After the
-// layout module merges into the post-link IR, `func %main` carries
-// a `[layout(%N)]` decoration whose operand resolves to an
-// EntryPointLayout(...) instruction.
+// Verifies that the entry-point stub built by the layout module carries a
+// layout decoration - the decoration reflection and the linker query.
+// CHECK asserts a `[layout(%N)]` decoration immediately precedes
+// `func %main` in the first post-link snapshot; the pre-link executable IR
+// has no such decoration, so it can only come from the layout module.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

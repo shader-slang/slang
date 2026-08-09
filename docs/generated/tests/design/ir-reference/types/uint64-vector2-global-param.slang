@@ -1,15 +1,15 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vec-and-mat
-//META: doc_section_digest=3375fc96f25274ba6b5f61268aab7b799044240063cd3b64ac3928c13a5702fc
+//META: doc_section_digest=fede71bd73c83957c94e27eab0113790d3ae8864e230db8dde234dca52b8d824
 //META: purpose=Expansion: Vec composes with UInt64 to form Vec(UInt64, 2 : Int).
 //META: intent=expansion
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc admits any scalar in `Vec(elementType, elementCount)`.
+// Vec composes with UInt64 to form Vec(UInt64, 2 : Int).
 // `vector<uint64_t, 2>` surfaces the largest unsigned scalar in a
 // minimum-multi-element vector.
 

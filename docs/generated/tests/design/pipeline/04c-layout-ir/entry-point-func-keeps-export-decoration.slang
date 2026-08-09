@@ -1,21 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-entry-point-steps
-//META: doc_section_digest=f1f711647a8ab7d8ff9b7722b3142e2807223fee33504a2cd14c041ae35af7c5
-//META: purpose=Per-entry-point step 5 attaches an addImportDecoration to the stub IRFunc; after link, the entry-point func resolves to its executable-side body and carries an [export("...mangled...")] decoration with the same mangled name.
+//META: doc_section_digest=2051f00317fddb1d324980572e90d6c58961dbf4384bdc38e7d5acf46a5ce786
+//META: purpose=The layout-module entry-point stub is wired to the executable-IR definition by mangled name, so after link the entry point carries a matching export decoration.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Row 5 of the per-entry-point steps table says:
-//   if (!irFunc->findDecoration<IRLinkageDecoration>())
-//       builder->addImportDecoration(irFunc, mangledName);
-// "Wires the stub to its real implementation in the executable IR
-//  module by mangled name." After linking, the entry-point function
-// in the merged IR has an [export("...mangled...main...")] that
-// matches the import name the layout-module stub used.
+// Verifies that the stub the layout module materialises for the entry
+// point is linked to the real definition by mangled name rather than
+// duplicating it. CHECK asserts the post-link `func %main` still carries an
+// `[export("...main...")]` linkage decoration next to its `[layout(...)]`,
+// i.e. the stub resolved against the executable-side symbol.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

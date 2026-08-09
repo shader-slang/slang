@@ -1,19 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:14:10Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#versioning-and-backwards-compatibility
-//META: doc_section_digest=d46b97e06e35009ce9c2016dabfff70a207c8c3767540db4769ba1f9398a4df7
-//META: purpose=A serialized module carries its name and version; -get-module-info reads them back, proving the version gate the doc names is recorded at write time.
+//META: doc_section_digest=cb78d732a38829923799f001491f6911d556886feef35c8b52482561b61f8caf
+//META: purpose=A serialized module stamps a serialization version into its payload at write time, and -get-module-info reads that integer back along with the module name and the writing compiler's version.
 //META: intent=functional
 //META: pipeline_stage=link
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// "Versioning and backwards compatibility" says the C++ side carries
-// a versioning gate so older modules continue to load. The user-side
-// observable for that gate is that each written module records its
-// version integer; `-get-module-info` reads it back along with the
-// module name and the compiler version string.
+// Verifies the write-side half of the version gate: the reader can only
+// compare a module's serialization version against the version it
+// supports if the writer recorded one, so every module must carry a
+// version integer. The test compiles a module and queries the container
+// with -get-module-info; the CHECKs require the module's own name, a
+// digit-only version token, and a non-empty compiler-version string.
+// Both the version integer and the compiler description change from
+// build to build, so they are matched as wildcards rather than pinned.
 
 //TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-info-name-version.slang -o docs/generated/tests/design/cross-cutting/serialization/module-info-name-version.slang-module
 //TEST:SIMPLE(filecheck=CHECK): -get-module-info docs/generated/tests/design/cross-cutting/serialization/module-info-name-version.slang-module
@@ -26,5 +29,5 @@ public int dummy()
 }
 
 // CHECK: Module Name: module_info_name_version
-// CHECK: Module Version: {{[0-9]+}}
-// CHECK: Compiler Version: {{.+}}
+// CHECK-NEXT: Module Version: {{[0-9]+}}
+// CHECK-NEXT: Compiler Version: {{.+}}

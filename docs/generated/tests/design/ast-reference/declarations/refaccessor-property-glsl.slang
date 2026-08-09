@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#accessordecl-family
 //META: doc_section_digest=7ab459ecbfa076cb34ec94ae11dca1b7bd65f74d607addf906138dac14f78530
-//META: purpose=A RefAccessorDecl is emitted by the HLSL backend as a return-by-reference helper; the ref accessor's body appears in the emitted text.
+//META: purpose=A RefAccessorDecl (`ref`) keeps the property assignable, and the HLSL backend compiles the assignment through it.
 //META: intent=expansion
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the RefAccessorDecl of a property lowers to a return-by-reference
-// helper on the GLSL backend. GLSL has no native references, so the `ref`
-// accessor is emitted as an `inout`-parameter helper `Cell_value_ref_0` whose
-// body returns the backing field; the assignment `c.value = 13` becomes a call
-// to that helper used as an l-value. CHECK pins the helper signature and its
-// body so the ref accessor is observably present in the emitted GLSL.
+// Verifies the same `ref` accessor claim on GLSL, which has no native
+// references. The accessor is emitted as a helper taking the aggregate by
+// `inout` and returning the backing field; the CHECKs pin the helper
+// signature, its body, and the call being used as the left side of the
+// assignment, so the accessor is observably still doing the write.
 
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 
