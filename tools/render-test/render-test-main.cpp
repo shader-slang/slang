@@ -1575,6 +1575,41 @@ Result RenderTestApp::update()
 }
 
 
+/// Saves one source language's prelude from `session` on construction and puts it back on
+/// destruction.
+///
+/// This exists because render-test does not own the session it is given. slang-test and the
+/// test server both create a single global session per process and hand the same one to every
+/// tool invocation — see `spawnAndWaitSharedLibrary` in `tools/slang-test/slang-test-main.cpp`,
+/// which calls `func(&stdWriters, context->getSession(), ...)`, and
+/// `TestServer::getOrCreateGlobalSession`, which caches its session in `m_session`. A prelude
+/// installed here therefore applies to every later test that process runs, not just to this
+/// one, so it has to be undone before returning.
+///
+/// slang-test already saves and restores the `StdWriters` singleton around that same call; this
+/// gives the prelude the same treatment from the tool side.
+struct ScopedSessionPrelude
+{
+    ScopedSessionPrelude(SlangSession* session, SlangSourceLanguage language)
+        : m_session(session), m_language(language)
+    {
+        ComPtr<ISlangBlob> prelude;
+        m_session->getLanguagePrelude(m_language, prelude.writeRef());
+        if (prelude)
+        {
+            m_saved = String(
+                (const char*)prelude->getBufferPointer(),
+                (const char*)prelude->getBufferPointer() + prelude->getBufferSize());
+        }
+    }
+
+    ~ScopedSessionPrelude() { m_session->setLanguagePrelude(m_language, m_saved.getBuffer()); }
+
+    SlangSession* m_session;
+    SlangSourceLanguage m_language;
+    String m_saved;
+};
+
 static SlangResult _setSessionPrelude(
     const Options& options,
     const char* exePath,
@@ -1821,6 +1856,13 @@ static SlangResult _innerMain(
             nvapiExtnSlot = Index(value);
         }
     }
+
+    // The prelude `_setSessionPrelude` installs below belongs to the caller's session, which
+    // outlives this call, so scope it to this invocation. Without this, a single render-test
+    // run leaves the HLSL prelude blank for every subsequent `-target hlsl` compile in the same
+    // process — which is why the `nvapi-guard-*` and `prelude-nvapi-include-conditional` tests
+    // fail whenever a `-cpu` COMPARE_COMPUTE test happens to run before them.
+    ScopedSessionPrelude hlslPreludeRestore(session, SLANG_SOURCE_LANGUAGE_HLSL);
 
     // If can't set up a necessary prelude make not available (which will lead to the test being
     // ignored)

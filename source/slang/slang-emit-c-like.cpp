@@ -3081,7 +3081,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_GetStringHash:
         {
             auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
+            // Checked cast, not `getStringHashInst->getStringLit()`: that accessor casts
+            // operand 0 unconditionally, so a non-literal operand would reach
+            // `getStringSlice()` below and hash unrelated memory. `checkGetStringHashInsts`
+            // should already have rejected such a module, so falling into the `else` here
+            // means an earlier pass produced a shape that check missed.
+            auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
             if (stringLit)
             {

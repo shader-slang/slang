@@ -104,7 +104,20 @@ Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink)
 
     for (auto inst : insts)
     {
-        if (inst->getStringLit() == nullptr)
+        // Ask `as<>` rather than `inst->getStringLit()`. The generated accessor is an
+        // unchecked cast of operand 0 to `IRStringLit*`, so for a `getStringHash` whose
+        // argument never folded to a literal it hands back a non-null pointer to an inst
+        // of some other type instead of null. Testing that pointer would mean this pass
+        // never reports anything, which is the opposite of its job: consider
+        //
+        //     String s = sel > 0 ? "aaa" : "bbb";
+        //     outputBuffer[0] = getStringHash(s);
+        //
+        // where operand 0 is the run-time select, not a literal. With the unchecked cast
+        // the check passes, and `CLikeSourceEmitter::defaultEmitInstExpr` later calls
+        // `getStringSlice()` on that same misinterpreted pointer and hashes whatever
+        // memory follows it, crashing the compiler instead of diagnosing the program.
+        if (as<IRStringLit>(inst->getOperand(0)) == nullptr)
         {
             if (sink)
             {

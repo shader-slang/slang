@@ -25,5 +25,6 @@ void main()
 {
     String s = sel > 0 ? "aaa" : "bbb";
     outputBuffer[0] = getStringHash(s);
+//CHECK:                           ^ getStringHash can only be called when argument is statically resolvable to a string literal
 //CHECK: E41023
 }
