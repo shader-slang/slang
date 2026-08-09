@@ -1133,24 +1133,3 @@ def gen_rt_renderer(n):
     )
     return files
 
-def _read_corpus(name):
-    d = os.path.join(_CORPUS, name)
-    if not os.path.isdir(d):
-        raise FileNotFoundError(
-            f"corpus '{name}' missing at {d}; copy .slang files there before running"
-        )
-    out = {}
-    for fn in sorted(os.listdir(d)):
-        if fn.endswith(".slang"):
-            with open(os.path.join(d, fn), "rb") as fh:
-                out[fn] = fh.read().decode("utf-8", "replace")
-    if not out:
-        raise FileNotFoundError(f"no .slang files in corpus '{name}' ({d})")
-    return out
-
-
-def gen_mdl_dxr(n):
-    """Real MDL/DXR path-tracing shaders (shader-slang/MDL-SDK). `n` is ignored
-    (fixed corpus). Compiled monolithically from hit.slang, which imports the
-    rest. This is a holistic real-world compile-time number."""
-    return _read_corpus("mdl")

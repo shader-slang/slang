@@ -29,8 +29,15 @@ from . import workloads
 class WorkloadSpec:
     name: str
     bucket: str
-    gen: object  # callable(n) -> {filename: source}
     default_size: int
+    # Exactly ONE of gen / source_dir, checked in lib/corpus.py. `gen` is
+    # callable(n) -> {filename: source}, for workloads whose point is scaling
+    # with N; `source_dir` names a directory under corpus/, for workloads that
+    # ARE real code and do not scale. corpus.py resolves either into files on
+    # disk, so bench.py sees only a directory and never learns which kind it
+    # was — which is what lets generation move elsewhere, or be skipped.
+    gen: object = None
+    source_dir: str = None
     mode: str = "target"
     # extra slangc flags appended after the standard ones
     extra_flags: list = field(default_factory=list)
@@ -54,15 +61,6 @@ class WorkloadSpec:
     # them when named explicitly in --only, failing loudly if the tool is
     # genuinely absent (downstream_required below is what enforces that).
     platforms: list = None
-    # True for workloads whose sources come from an external (third-party)
-    # corpus rather than a generator. The ASCII byte-determinism guard in
-    # bench.py applies only to GENERATED sources; external corpora are read
-    # with a tolerant decode (errors="replace") and may legitimately contain
-    # non-ASCII (license headers, author names).
-    # Contract: set True ONLY when `gen` reads a third-party corpus from disk;
-    # generators that emit source must leave it False so the determinism guard
-    # applies to them.
-    external_corpus: bool = False
     # The workload's number is meaningless without its downstream compiler:
     # missing-downstream diagnostics (E00100 etc.), which bench.py normally
     # treats as benign, fail this workload instead — otherwise a host without
@@ -93,9 +91,8 @@ WORKLOADS = [
     WorkloadSpec(
         name="mdl_dxr",
         bucket="real_world",
-        gen=workloads.gen_mdl_dxr,
-        default_size=0,  # fixed corpus; size ignored
-        external_corpus=True,
+        source_dir="mdl",
+        default_size=0,  # static corpus: nothing scales with n
         mode="target",
         extra_flags=SPIRV,
         main_file="hit.slang",

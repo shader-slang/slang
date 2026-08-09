@@ -32,7 +32,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
-from lib import analyze, manifest
+from lib import analyze, corpus, manifest
 
 # (timer, [children]) — the nested timer tree. Each parent gets a synthetic
 # "<parent> (self)" residual = parent − Σ children, so buckets tile compileInner.
@@ -534,7 +534,9 @@ def _workload_source(spec):
     height-capped and scrollable, so a long file costs scroll depth inside the
     box rather than page layout.
     """
-    return spec.default_size, list(spec.gen(spec.default_size).items())
+    # via corpus, not spec.gen: a static workload has no generator, and the
+    # page should render its real sources just the same.
+    return spec.default_size, list(corpus.sources(spec, spec.default_size).items())
 
 
 # Copy-to-clipboard support for the workload pages' code blocks. Kept as two
@@ -981,7 +983,7 @@ del _T0, _T1, _ov, _contrib, _ex, _st
 # workload would pass this even with windowing restored.
 _SPEC = manifest.BY_NAME["reflection_layout"]
 _n, _files = _workload_source(_SPEC)
-_gen = _SPEC.gen(_n)
+_gen = corpus.sources(_SPEC, _n)
 assert [fn for fn, _ in _files] == list(_gen), \
     "_workload_source must list every generated file, in generator order"
 for _fn, _src in _files:

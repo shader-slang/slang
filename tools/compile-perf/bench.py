@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tempfile
 import time
 
-from lib import analyze, manifest
+from lib import analyze, corpus, manifest
 
 
 def parse_timers(text):
@@ -281,25 +281,18 @@ def real_error(text, benign=_BENIGN):
     return None
 
 
-def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None):
-    gen_dir = os.path.join(gen_root, spec.name + f"_n{size}")
-    if os.path.exists(gen_dir):
-        shutil.rmtree(gen_dir)
-    os.makedirs(gen_dir, exist_ok=True)
-    files = spec.gen(size)
-    for fn, src in files.items():
-        # Fail-loud guard for the byte-determinism invariant (see _HEADER in
-        # workloads.py): a typographic character anywhere in a GENERATED
-        # source would silently make the corpus bytes platform-dependent.
-        # External corpora are exempt — they are third-party input read with
-        # a tolerant decode, not something our generators promise about.
-        # A raise, not an assert: the contract must hold under python -O too.
-        if not spec.external_corpus and not src.isascii():
-            raise ValueError(
-                f"generated source {fn} contains non-ASCII; generators must "
-                f"emit ASCII only so the corpus is byte-identical everywhere")
-        with analyze.open_output(os.path.join(gen_dir, fn)) as fh:
-            fh.write(src)
+def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None,
+             prepared=False):
+    gen_dir = os.path.join(gen_root, corpus.dir_name(spec, size))
+    # Where the sources come from is corpus.py's problem, not this function's:
+    # generated here, or already prepared by an earlier step / another machine
+    # (bench.py --corpus). Either way what follows measures a directory.
+    if prepared:
+        files = corpus.existing(gen_dir)
+    else:
+        if os.path.exists(gen_dir):
+            shutil.rmtree(gen_dir)
+        files = corpus.materialize(spec, size, gen_dir)
 
     # An api workload without a driver+libslang must fail loudly (not silently
     # skip): a missing host compiler or unrecognized package layout would
@@ -415,6 +408,18 @@ def main():
                          "(default: a tempdir, auto-removed — keeps the results dir, which "
                          "is committed to the perf-results repo, free of build scratch). "
                          "Pass a path to keep them for inspection.")
+    # Generation as a SEPARATE, OPTIONAL step. --prepare writes the corpus and
+    # stops; --corpus benches a corpus somebody else wrote. Together they split
+    # authoring from measurement across machines: a runner with the tree can
+    # prepare, and the quiesced perf machine only measures. Apart from that,
+    # the default path is unchanged — prepare-then-bench in one process.
+    ap.add_argument("--prepare", metavar="DIR", default=None,
+                    help="write the selected workloads' .slang sources to DIR "
+                         "and exit without benchmarking")
+    ap.add_argument("--corpus", metavar="DIR", default=None,
+                    help="bench sources already prepared in DIR (skips "
+                         "generation entirely; DIR must contain one "
+                         "<workload>_n<size>/ per run)")
     ap.add_argument("--api-driver", default=None,
                     help="prebuilt api-driver binary (default: build it from "
                          "native/api-driver.cpp with the host compiler)")
@@ -459,7 +464,29 @@ def main():
     # Generated sources + compiled outputs are large, transient build scratch; keep
     # them OUT of the results dir so it stores only results.json. Default to a
     # tempdir that is removed at the end (overridable with --gen-dir to keep them).
-    gen_root = os.path.abspath(args.gen_dir) if args.gen_dir else tempfile.mkdtemp(prefix="perfsuite_gen_")
+    if args.corpus and args.prepare:
+        sys.exit("--prepare and --corpus are opposite halves of the same split; "
+                 "pass one")
+    # --corpus reads a prepared tree; --prepare writes one; otherwise scratch.
+    gen_root = (os.path.abspath(args.corpus) if args.corpus
+                else os.path.abspath(args.prepare) if args.prepare
+                else os.path.abspath(args.gen_dir) if args.gen_dir
+                else tempfile.mkdtemp(prefix="perfsuite_gen_"))
+
+    # --prepare: materialize and stop. No slangc is invoked, so this half of
+    # the split runs anywhere — including a machine that has the tree but no
+    # business doing timing.
+    if args.prepare:
+        total = 0
+        for spec in specs:
+            for size in (spec.sweep_sizes if args.sweep and spec.sweep_sizes
+                         else [spec.default_size]):
+                dest = os.path.join(gen_root, corpus.dir_name(spec, size))
+                names = corpus.materialize(spec, size, dest)
+                total += len(names)
+                print(f"[prep] {spec.name:24s} n={size:<6} {len(names):4d} file(s)")
+        print(f"\nwrote {total} file(s) to {gen_root}")
+        return
     os.makedirs(gen_root, exist_ok=True)
 
     # Resolve the api-driver + libslang once when any api workload is selected.
@@ -484,8 +511,8 @@ def main():
             # results.json is written at the end. Record the failure and keep
             # going; bench still exits non-zero at the end via the ok-count.
             try:
-                rec = run_spec(slangc, spec, size, args.samples, args.warmup, gen_root,
-                               api=api)
+                rec = run_spec(slangc, spec, size, args.samples, args.warmup,
+                               gen_root, api=api, prepared=bool(args.corpus))
             except Exception as e:  # noqa: BLE001 — isolation is the contract
                 rec = {
                     "workload": spec.name, "bucket": spec.bucket, "size": size,
@@ -521,7 +548,10 @@ def main():
 
     # results.json is the single source of truth (all of median/min/mean/stdev per
     # timer); the analysis/report tools read it directly. No CSV is emitted.
-    if not args.gen_dir:
+    # Only a scratch tree is ours to delete. With --corpus, gen_root is the
+    # caller's prepared corpus — deleting it would destroy the input we were
+    # asked to measure, and with --prepare it is the output just written.
+    if not (args.gen_dir or args.corpus or args.prepare):
         shutil.rmtree(gen_root, ignore_errors=True)
 
     n_ok = sum(1 for r in this_run if r["ok"])
