@@ -6710,6 +6710,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
             }
+            else if (declRef.as<AssocTypeDecl>())
+            {
+                // The concrete type is unknown until specialization and may not be a struct.
+                return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+            }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
                 List<IRInst*> args;
