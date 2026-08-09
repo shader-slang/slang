@@ -176,11 +176,11 @@ docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buff
 # red.
 docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
 
-# Pending: docs/generated/tests/_meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml
-# A `getStringHash` argument that does not fold to a string literal kills
-# slangc with SIGSEGV (exit 139, no output) instead of reporting the
-# documented "getStringHash requires string literal" error E41023.
-# (Will become a tracking issue after human triage.)
+# https://github.com/shader-slang/slang/issues/12440 — a `getStringHash`
+# argument that does not fold to a string literal kills slangc (SIGSEGV on
+# Linux, SIGBUS on macOS, no output) instead of reporting E41023. The check
+# that should catch it tests an unchecked cast, so it never fires.
+# Remove this entry when 12440 is fixed.
 docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
 
 # Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
@@ -279,3 +279,30 @@ docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slan
 # Remove this entry once the emitter declares the capability. (Will become a
 # tracking issue after human triage.)
 docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang.3
+
+# https://github.com/shader-slang/slang/issues/12441 — SPIR-V emit produces
+# modules that fail spirv-val. `sample` interpolation writes
+# `OpDecorate ... Sample` without declaring the SampleRateShading capability;
+# and arithmetic on a value loaded from a `unorm`/`snorm` texture selects
+# `OpIAdd` for float data, because the `Attributed(Float, unorm)` element type
+# is not looked through when classifying. Both only fail where SPIR-V
+# validation is enabled, i.e. the nightly. Remove these entries when 12441 is
+# fixed.
+docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang.1
+docs/generated/tests/coverage/emit/spirv-unorm-snorm-image-format-by-width.slang
+
+# https://github.com/shader-slang/slang/issues/12442 — render-test blanks the
+# HLSL prelude on the shared global session and never restores it, so these
+# tests fail whenever a `-cpu` COMPARE_COMPUTE test runs before them in the
+# same process. Order-dependent, so they pass in isolation. Remove these
+# entries when 12442 is fixed.
+docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-present-without-nv-intrinsic.slang
+docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-with-wave-intrinsic.slang
+docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditional.slang
+
+# https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
+# construction is rejected inside a generic function's array bound with
+# E33070 "expected a function, got 'typeof(Size)'", while the same spelling
+# compiles in an ordinary expression. Recorded in
+# _meta/findings/enum-cast-in-generic-array-bound-rejected.yaml.
+docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
