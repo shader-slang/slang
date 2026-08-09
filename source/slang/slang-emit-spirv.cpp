@@ -10341,7 +10341,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         UInt operandCount,
         ArrayView<IRInst*> operands)
     {
-        IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
+        // Look through any type attributes before classifying the element type.
+        // `RWTexture2D<unorm float>` gives its loaded elements the type
+        // `Attributed(Float, unorm)`, and `unorm` is a storage-format annotation on
+        // the texel, not a different arithmetic type -- the loaded value is an
+        // ordinary float. Without the unwrap, `_arithmeticOpCodeConvert` sees
+        // `kIROp_AttributedType`, falls through its switch with isFloatingPoint
+        // false, and selects the integer opcode, so `u1[c] + u2[c].x` emitted
+        // `OpIAdd %float` and the module failed spirv-val with "Expected int scalar
+        // or vector type as Result Type: IAdd".
+        IRType* elementType = (IRType*)unwrapAttributedType(
+            getVectorOrCoopMatrixElementType(operands[0]->getDataType()));
 
         SpvOp opCode = _arithmeticOpCodeConvert(op, elementType);
         if (opCode == SpvOpUndef)
