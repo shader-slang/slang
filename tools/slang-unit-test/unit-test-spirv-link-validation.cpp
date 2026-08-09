@@ -33,6 +33,31 @@ struct LinkedSpirvOutcome
     String diagnostics;
 };
 
+// Report a failed setup step, with whatever the compiler said about it, before the enclosing
+// `SLANG_CHECK_ABORT` unwinds. The abort throws, so anything printed after it never runs, and the
+// harness does not surface the assert message itself -- a failure would otherwise reach CI as a
+// bare non-zero exit with both streams empty. See shader-slang/slang#12431.
+static bool reportStep(const char* step, bool ok, slang::IBlob* diagnostics)
+{
+    if (!ok)
+    {
+        StringBuilder message;
+        message << "setup step failed: " << step;
+        if (diagnostics && diagnostics->getBufferSize())
+        {
+            message << "\ndiagnostics:\n"
+                    << UnownedStringSlice(
+                           (const char*)diagnostics->getBufferPointer(),
+                           diagnostics->getBufferSize());
+        }
+        // Routed through the reporter rather than `stderr`: under `-use-test-server`, which CI
+        // uses, the reported `stdError` is the reporter's own buffer and a write to the process's
+        // stderr never reaches it.
+        getTestReporter()->message(TestMessageType::TestFailure, message.getBuffer());
+    }
+    return ok;
+}
+
 // Compile an entry point that imports a module precompiled to SPIR-V, with SPIR-V validation forced
 // on, and report what came back.
 //
@@ -41,8 +66,10 @@ struct LinkedSpirvOutcome
 LinkedSpirvOutcome compileImportingModuleWithValidation()
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(
-        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(reportStep(
+        "createGlobalSession",
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK,
+        nullptr));
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -55,7 +82,10 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
     // `precompileForTarget` is documented as not thread-safe because it mutates the module, so this
     // session and its modules stay private to this call.
     ComPtr<slang::ISession> session;
-    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(reportStep(
+        "createSession",
+        globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK,
+        nullptr));
 
     const char* librarySource = R"SLANG(
         public int addOne(int value)
@@ -82,16 +112,19 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
         "lib.slang",
         librarySource,
         diagnostics.writeRef());
-    SLANG_CHECK_ABORT(libraryModule != nullptr);
+    SLANG_CHECK_ABORT(reportStep("loadModule(library)", libraryModule != nullptr, diagnostics));
 
     // Embed SPIR-V for the library so the importing compile has a second module to link.
     // Precompilation lives on a separate experimental interface rather than on `IModule`.
     ComPtr<slang::IModulePrecompileService_Experimental> precompileService;
-    SLANG_CHECK_ABORT(
+    SLANG_CHECK_ABORT(reportStep(
+        "queryInterface(IModulePrecompileService_Experimental)",
         libraryModule->queryInterface(
             slang::IModulePrecompileService_Experimental::getTypeGuid(),
-            (void**)precompileService.writeRef()) == SLANG_OK);
-    SLANG_CHECK_ABORT(precompileService != nullptr);
+            (void**)precompileService.writeRef()) == SLANG_OK,
+        nullptr));
+    SLANG_CHECK_ABORT(
+        reportStep("precompileService non-null", precompileService != nullptr, nullptr));
 
     // Force validation off across the precompile: the validation gate does not yet know that a
     // precompile-for-target is by construction not a final module, so an ambient
@@ -101,9 +134,10 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
     diagnostics.setNull();
     {
         ScopedEnvVar skipValidationWhilePrecompiling("SLANG_RUN_SPIRV_VALIDATION", "0");
-        SLANG_CHECK_ABORT(
-            precompileService->precompileForTarget(SLANG_SPIRV, diagnostics.writeRef()) ==
-            SLANG_OK);
+        SLANG_CHECK_ABORT(reportStep(
+            "precompileForTarget(SLANG_SPIRV)",
+            precompileService->precompileForTarget(SLANG_SPIRV, diagnostics.writeRef()) == SLANG_OK,
+            diagnostics));
     }
 
     diagnostics.setNull();
@@ -112,7 +146,7 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
         "entry.slang",
         entryPointSource,
         diagnostics.writeRef());
-    SLANG_CHECK_ABORT(module != nullptr);
+    SLANG_CHECK_ABORT(reportStep("loadModule(entry)", module != nullptr, diagnostics));
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findAndCheckEntryPoint(
@@ -120,20 +154,24 @@ LinkedSpirvOutcome compileImportingModuleWithValidation()
         SLANG_STAGE_COMPUTE,
         entryPoint.writeRef(),
         diagnostics.writeRef());
-    SLANG_CHECK_ABORT(entryPoint != nullptr);
+    SLANG_CHECK_ABORT(reportStep("findAndCheckEntryPoint", entryPoint != nullptr, diagnostics));
 
     slang::IComponentType* componentTypes[2] = {module, entryPoint.get()};
     ComPtr<slang::IComponentType> composedProgram;
-    SLANG_CHECK_ABORT(
+    SLANG_CHECK_ABORT(reportStep(
+        "createCompositeComponentType",
         session->createCompositeComponentType(
             componentTypes,
             2,
             composedProgram.writeRef(),
-            diagnostics.writeRef()) == SLANG_OK);
+            diagnostics.writeRef()) == SLANG_OK,
+        diagnostics));
 
     ComPtr<slang::IComponentType> linkedProgram;
-    SLANG_CHECK_ABORT(
-        composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(reportStep(
+        "link",
+        composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK,
+        diagnostics));
 
     ComPtr<slang::IBlob> code;
     diagnostics.setNull();
