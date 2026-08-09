@@ -1,0 +1,59 @@
+schema_version: 1
+id: enum-cast-in-generic-array-bound-rejected
+bundle: design/ast-reference/values
+suspected_kind: wrong-diagnostic
+scope: check
+title: "Enum construction `E(N)` is rejected inside a generic array-bound expression"
+observed_at: "2026-08-09T00:00:00+00:00"
+evidence:
+  command: build/Release/bin/slangc docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang -target hlsl -entry main -stage compute
+  source_slang: docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
+  exit_code: 1
+  observed_summary: |
+    Constructing an enum value from an `int` works in an ordinary expression
+    but is rejected when it appears in the array-bound expression of a
+    generic function's parameter, where the operand is the generic value
+    parameter:
+
+        enum Size { Small = 2, Large = 6 }
+        int pick<let N : int>(int a[(Size(N) == Size.Large) ? 3 : 1])
+
+    produces two errors on the same construct:
+
+        error[E33070]: expected a function
+           | int pick<let N : int>(int a[(Size(N) == Size.Large) ? 3 : 1])
+           |                              ^^^^ expected a function, got 'typeof(Size)'
+        error[E30019]: type mismatch in expression
+           |                                   ^ expected an expression of type 'Size', got 'int'
+
+    So in this position `Size(...)` is resolved as a call to a value named
+    `Size` rather than as construction of the enum type. The same spelling
+    checks and folds correctly in a normal function body — both of these
+    compile cleanly with exit 0:
+
+        int n = 6;
+        (Size(n) == Size.Large)     // runtime operand
+        (Size(6) == Size.Large)     // literal operand
+
+    so the enum-construction form itself is accepted by the checker; only
+    the generic array-bound context resolves the name differently.
+expected:
+  claim: |
+    values.md's BuiltinOperationIntVal section states that the operand type
+    does not change the outcome of a folded comparison — a comparison of two
+    enum-typed values behaves as one of plain ints. Constructing the enum
+    from the generic value parameter and comparing it to an enum case should
+    therefore fold, selecting the array bound, exactly as the int-typed
+    spelling does.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/values.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 716ec597fc9c85111cd2fa06ba4e89bc4469b6b2
+  doc_anchor: docs/generated/design/ast-reference/values.md#builtinoperationintval
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Test bug: partly — the test is the only place this surface is exercised, but the construct is not obviously invalid, and the identical expression outside a generic array bound compiles, so the inconsistency is in the compiler rather than the test."
+    - "Intentional restriction on what may appear in a generic array bound: possible, but then the diagnostic is the wrong one — `expected a function, got 'typeof(Size)'` describes a name-resolution outcome, not a restriction, and gives no indication that enum construction is disallowed here."
+    - "Regression from a recent change: not established. I did not bisect; the test has failed on every nightly since it was generated on 2026-08-04, so it may never have passed."

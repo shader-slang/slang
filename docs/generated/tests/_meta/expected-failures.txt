@@ -273,3 +273,10 @@ docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slan
 # Remove this entry once the emitter declares the capability. (Will become a
 # tracking issue after human triage.)
 docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang.3
+
+# Pending: docs/generated/tests/_meta/findings/enum-cast-in-generic-array-bound-rejected.yaml
+# `Size(N)` enum construction is rejected inside a generic function's array
+# bound (E33070 "expected a function, got 'typeof(Size)'"), while the same
+# spelling compiles in an ordinary expression. (Will become a tracking issue
+# after human triage.)
+docs/generated/tests/design/ast-reference/values/builtinoperationintval-enum-operands-fold.slang
