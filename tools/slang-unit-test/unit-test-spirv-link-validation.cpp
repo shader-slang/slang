@@ -1,8 +1,5 @@
 // unit-test-spirv-link-validation.cpp
 
-// SPIR-V validation of a downstream-linked module inspects the linked result, not the pre-link
-// module Slang emitted.
-
 #include "scoped-env-var.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -193,10 +190,8 @@ SLANG_UNIT_TEST(spirvValidationAcceptsDownstreamLinkedModule)
 {
     const LinkedSpirvOutcome outcome = compileImportingModuleWithValidation();
 
-    // This test is designed to bite in CI, where nobody can attach a debugger, so report everything
-    // needed to classify a failure from the log alone. Printing only on a failed `codeResult` is
-    // not enough: the link is skipped silently when the downstream compiler is missing, which
-    // leaves `codeResult` OK and the generator assertion below as the only symptom.
+    // Report unconditionally: a skipped link leaves `codeResult` successful, so a failure here can
+    // be distinguished from a missing downstream compiler only by the values themselves.
     if (outcome.precompileDiagnostics.getLength())
     {
         fprintf(
