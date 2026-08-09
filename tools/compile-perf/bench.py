@@ -58,15 +58,32 @@ def parse_timers(text):
 
 
 def stats(values):
+    """Summarize repeated measurements, keeping the raw samples alongside.
+
+    The samples are retained, not only the summary, because any summary is
+    lossy in a way that cannot be undone: a bimodal five-sample run and a
+    tight one can share a median and a stdev, and only the samples tell them
+    apart. results.json is the archive, so a question that needs them later
+    cannot be answered by re-deriving them. They also let a consumer compute
+    statistics under its own definition instead of trusting ours — the
+    BenchView submission format, for one, computes its own summary from
+    samples and treats that as authoritative.
+
+    `max` is reported for symmetry with `min`: without it the spread cannot
+    be bounded from the summary alone, and consumers that accept a summary in
+    place of samples generally require both extrema.
+    """
     values = [v for v in values if v is not None]
     if not values:
         return None
     return {
         "median": round(statistics.median(values), 4),
         "min": round(min(values), 4),
+        "max": round(max(values), 4),
         "mean": round(statistics.mean(values), 4),
         "stdev": round(statistics.stdev(values), 4) if len(values) > 1 else 0.0,
         "n": len(values),
+        "samples": [round(v, 4) for v in values],
     }
 
 

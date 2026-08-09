@@ -67,6 +67,10 @@ jobs:
     # step at the boundary.
     runs-on:
       labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
+    outputs:
+      # Consumed by the analyze job, which runs elsewhere. The label pins the
+      # trend judgement to the point THIS run registered.
+      perf_label: ${{ steps.sweep.outputs.perf_label }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -161,6 +165,7 @@ jobs:
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
       - name: Run nightly sweep + update tracking
+        id: sweep
         shell: bash
         # Inputs arrive via env and are never interpolated into the script, so a
         # value with shell metacharacters can't break out — it's just an argv item.
@@ -193,6 +198,9 @@ jobs:
           # (daily labels share the swept commit's DATE, so several points can
           # share a date and series order alone cannot identify this run's).
           echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+          # Also a job OUTPUT, not only job-scoped env: the analyze job runs on
+          # a different machine and cannot see this job's $GITHUB_ENV.
+          echo "perf_label=$LABEL" >> "$GITHUB_OUTPUT"
 
           # publish=false: measure only — write results to a workspace dir that
           # the artifact step uploads; no tracking registration.
@@ -362,6 +370,50 @@ jobs:
           git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
             "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true
 
+  # Analysis and notification, deliberately NOT on the perf runner.
+  #
+  # Nothing below measures anything: the trend check and the Slack message
+  # only need the results repo, which the nightly job has already pushed. The
+  # perf pool sits behind an egress proxy (192.168.240.1:3128) that denies
+  # CONNECT to hooks.slack.com, so every notification from there failed with
+  # "Tunnel connection failed: 403 Forbidden" while the step still exited 0 by
+  # design. A GitHub-hosted runner has unrestricted egress, so moving the
+  # notification here fixes it without asking anyone to change a proxy ACL we
+  # do not own.
+  #
+  # It is also the first split of the suite along the line we want long term:
+  # the quiesced machine measures, and anything that merely reads results runs
+  # where it is cheap and unrestricted.
+  analyze:
+    needs: nightly
+    # always(): a failed sweep is exactly when the notification matters most.
+    if: always() && needs.nightly.result != 'skipped'
+    runs-on: ubuntu-latest
+    env:
+      # PERF_RESULTS_REPO and PUBLISH are workflow-level and inherited; only
+      # the label has to cross the job boundary, because it is computed during
+      # the sweep rather than declared up front.
+      PERF_LABEL: ${{ needs.nightly.outputs.perf_label }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          # The suite scripts only; no submodules and no history needed.
+          fetch-depth: "1"
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Checkout perf results repo
+        if: env.PUBLISH == 'true'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
       # primary timer drifts past threshold vs the trailing median. --label
@@ -374,7 +426,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cd "$SUITE"
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
           python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
 
       - name: Notify Slack
@@ -384,7 +436,10 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
           TREND_OUTCOME: ${{ steps.trend.outcome }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
-          JOB_STATUS: ${{ job.status }}
+          # The MEASUREMENT job's result, not this job's: a regression is
+          # reported by TREND_OUTCOME, while JOB_STATUS answers "did the
+          # sweep itself fail", which now happens in a different job.
+          JOB_STATUS: ${{ needs.nightly.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$SLACK_WEBHOOK" ]; then
@@ -403,7 +458,7 @@ jobs:
           # but one process is cheaper and there is no second place to keep in
           # step. A failure warns rather than reds the run, matching the
           # webhook-failure contract below.
-          if ! CLASSIFIED=$(python3 "$SUITE/slack_status.py"); then
+          if ! CLASSIFIED=$(python3 "$GITHUB_WORKSPACE/tools/compile-perf/slack_status.py"); then
             echo "::warning title=Slack notification skipped::slack_status.py failed"
             exit 0
           fi
