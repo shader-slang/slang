@@ -254,23 +254,33 @@ jobs:
           if [[ "${{ inputs.os }}" == "macos" ]]; then
             test_args+=("-expected-failure-list" "tests/expected-failure-coverage.txt")
 
-            # macOS coverage currently crashes in generated synthetic LLVM runtime tests
-            # under coverage instrumentation (for example, parameter-block.slang.6
-            # syn (llvm)). Keep explicit LLVM tests and the compile-target synthesis
-            # pass, but do not synthesize extra LLVM runtime variants in coverage CI.
+            # macOS coverage crashes under coverage instrumentation on two
+            # independent axes; each is trimmed as narrowly as possible.
             #
-            # Metal is dropped for the same reason: slang-rhi aborts on
-            # `SLANG_RHI_ASSERT(index < m_size)` in src/core/short_vector.h, which kills
-            # the whole slang-test process and the job with it (exit 134). It took out
-            # run 31142891787 on tests/compute/parameter-block.slang.4 (mtl) and run
-            # 31290797198 on tests/language-feature/tuple/tuple-parameter.slang.4
-            # syn (mtl) — a different test each time, and both pass in isolation, so it
-            # is order-dependent and cannot be pinned to a small exclude list (there are
-            # ~189 explicit `-mtl` test files). Subtracting the API is the only way to
-            # keep the macOS coverage job producing a report. Tracked in
-            # https://github.com/shader-slang/slang-rhi/issues/818; restore Metal here
-            # once that assert is fixed.
-            test_args+=("-synthesizedTestApi" "-llvm-mtl")
+            # LLVM: one generated synthetic LLVM runtime subtest crashes, and the
+            # crash kills the worker before the result can be classified, so an
+            # expected-failure entry cannot cover it — the skip has to happen
+            # before dispatch. This used to be `-synthesizedTestApi -llvm`, which
+            # dropped every synthesized LLVM runtime variant to avoid the one that
+            # crashes; slang-test can now exclude a single expanded subtest, so the
+            # rest of that coverage is kept. Add further entries here if another
+            # LLVM variant starts crashing — each is a named, individually-removable
+            # line rather than a blanket disable.
+            test_args+=("-exclude-prefix" "tests/compute/parameter-block.slang.6")
+            #
+            # Metal cannot be narrowed the same way: slang-rhi aborts on
+            # `SLANG_RHI_ASSERT(index < m_size)` in src/core/short_vector.h, which
+            # kills the whole slang-test process and the job with it (exit 134). It
+            # took out run 31142891787 on tests/compute/parameter-block.slang.4
+            # (mtl) and run 31290797198 on
+            # tests/language-feature/tuple/tuple-parameter.slang.4 syn (mtl) — a
+            # different test each time, and both pass in isolation, so it is
+            # order-dependent and cannot be pinned to a small exclude list (there
+            # are ~189 explicit `-mtl` test files). Subtracting the API is the only
+            # way to keep the macOS coverage job producing a report. Tracked in
+            # https://github.com/shader-slang/slang-rhi/issues/818; restore Metal
+            # here once that assert is fixed.
+            test_args+=("-synthesizedTestApi" "-mtl")
             test_args+=("-api" "-mtl")
           fi
 

@@ -5005,6 +5005,35 @@ static int getSubtestIndex(const String& prefix, const String& filePath)
     return index;
 }
 
+/// Does `entry` select the subtest identified by `outputStem` / `subTestIndex`?
+///
+/// One predicate for every place a command-line entry is matched against a
+/// subtest — test-order prefixes, the more-specific-prefix filter, and the
+/// per-subtest exclusion below. They previously agreed only by having the same
+/// logic written out twice; a third copy for exclusion would have made
+/// `foo.slang.6` mean something subtly different depending on which flag it
+/// arrived on.
+///
+/// An entry naming a specific subtest (`<file>.<n>`) matches that subtest
+/// only, so `foo.slang.6` never matches `foo.slang.60`. Subtest 0 is spelled
+/// without a suffix in `outputStem`, hence the special case. Anything else is
+/// a plain path prefix and matches every subtest of a matching file.
+static bool entryMatchesSubtest(
+    const String& entry,
+    const String& filePath,
+    const String& outputStem,
+    Index subTestIndex)
+{
+    const int entrySubtest = getSubtestIndex(entry, filePath);
+    if (entrySubtest >= 0)
+    {
+        if (entrySubtest == 0 && subTestIndex == 0)
+            return true;
+        return outputStem == entry;
+    }
+    return filePath.startsWith(entry);
+}
+
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 {
     // Gather a list of tests to run
@@ -5105,20 +5134,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             for (Index i = 0; i < prefixes.getCount(); i++)
             {
                 // Check if prefix matches this specific subtest
-                int prefixSubtest = getSubtestIndex(prefixes[i], filePath);
-                if (prefixSubtest >= 0)
-                {
-                    // Prefix specifies a subtest - check for exact match
-                    if (prefixSubtest == 0 && testIdx == 0)
-                        return i;
-                    if (outputStem == prefixes[i])
-                        return i;
-                }
-                else if (filePath.startsWith(prefixes[i]))
-                {
-                    // Non-specific prefix - matches all subtests in file
+                if (entryMatchesSubtest(prefixes[i], filePath, outputStem, testIdx))
                     return i;
-                }
             }
             return prefixes.getCount();
         };
@@ -5202,6 +5219,35 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                 isPrev = true;
             }
             testName << ")";
+        }
+
+        // Per-subtest exclusion, and it has to happen HERE rather than in
+        // shouldRunTest(): that runs before subtests are expanded, so it can
+        // only see the source path. A synthesized variant such as
+        // `tests/compute/parameter-block.slang.6 syn (llvm)` can crash the
+        // worker outright, which also rules out -expected-failure-list —
+        // that reclassifies a result only after the test returns, and this
+        // one never does. The skip must be pre-dispatch, so it is.
+        {
+            const auto excludes = [&](const List<String>& entries)
+            {
+                for (const auto& entry : entries)
+                {
+                    if (entryMatchesSubtest(entry, filePath, outputStem, subTestIndex))
+                        return true;
+                }
+                return false;
+            };
+            if (excludes(context->options.excludePrefixes) || excludes(context->options.skipList))
+            {
+                if (context->options.verbosity >= VerbosityLevel::Info)
+                {
+                    StringBuilder msg;
+                    msg << "skipping excluded subtest: " << testName;
+                    context->getTestReporter()->message(TestMessageType::Info, msg.produceString());
+                }
+                continue;
+            }
         }
 
         // Check if any prefix is more specific than the file path (has subtest index).
