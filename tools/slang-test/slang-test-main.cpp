@@ -5178,22 +5178,20 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // worker outright, which also rules out -expected-failure-list —
         // that reclassifies a result only after the test returns, and this
         // one never does. The skip must be pre-dispatch, so it is.
+        if (TestToolUtil::isSubtestExcluded(
+                context->options.excludePrefixes,
+                context->options.skipList,
+                filePath,
+                outputStem,
+                subTestIndex))
         {
-            if (TestToolUtil::isSubtestExcluded(
-                    context->options.excludePrefixes,
-                    context->options.skipList,
-                    filePath,
-                    outputStem,
-                    subTestIndex))
+            if (context->options.verbosity >= VerbosityLevel::Info)
             {
-                if (context->options.verbosity >= VerbosityLevel::Info)
-                {
-                    StringBuilder msg;
-                    msg << "skipping excluded subtest: " << testName;
-                    context->getTestReporter()->message(TestMessageType::Info, msg.produceString());
-                }
-                continue;
+                StringBuilder msg;
+                msg << "skipping excluded subtest: " << testName;
+                context->getTestReporter()->message(TestMessageType::Info, msg.produceString());
             }
+            continue;
         }
 
         // Check if any prefix is more specific than the file path (has subtest index).

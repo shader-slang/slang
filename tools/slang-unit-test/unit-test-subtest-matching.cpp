@@ -26,10 +26,12 @@ SLANG_UNIT_TEST(subtestIndexParsing)
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/compute/foo.slang.0", file) == 0);
 
     // Not subtest selectors: the file itself, a non-numeric suffix, a suffix
-    // with no dot, and an unrelated path.
+    // with no dot, a trailing dot with no digits, and an unrelated path.
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/compute/foo.slang", file) == -1);
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/compute/foo.slang.x", file) == -1);
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/compute/foo.slang6", file) == -1);
+    // A bare trailing dot leaves an empty suffix, exercising the `< 2` length guard.
+    SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/compute/foo.slang.", file) == -1);
     SLANG_CHECK(TestToolUtil::getSubtestIndex("tests/other", file) == -1);
 }
 
