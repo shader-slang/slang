@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=d7cf9915ec0da5de567edb118ec898dd57bb3e7b5414db216254906018825537
-//META: purpose=Boundary - a [loop] attribute on a for-loop produces loopControl with mode operand 1, the documented "loop" encoding distinct from [unroll]'s mode 0.
+//META: doc_section_digest=647327ee76a1bc33d8bcf7d2abc19a2f16ee4e63d10bad4d1d5d48c120029d9d
+//META: purpose=Boundary - a [loop] attribute on a for-loop produces loopControl with mode operand 1, the encoding distinct from [unroll]'s mode 0.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary - the doc says loopControl's modeOperand is an
-// IRConstant that records "unroll, loop, ...". The observed
-// encoding is unroll=0, loop=1. The existing functional test
-// uses a wildcard on the mode integer; this test pins the
-// specific value for [loop].
+// Verifies that the `modeOperand` of `loopControl` distinguishes the two
+// loop-control attributes. This test pins 1 for `[loop]`; the `[unroll]`
+// sibling pins 0. Pinning both endpoints is what makes the operand
+// meaningful - a single wildcarded test could not tell the two modes
+// apart.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

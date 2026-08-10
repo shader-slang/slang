@@ -1,22 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#lookupwitness-lookupwitnessmethod
-//META: doc_section_digest=c4815aeb9b6c67b5092b523e0e44f337c6c8104ecdaafadc93a47d08bdef573b
-//META: purpose=Two distinct interface methods called on the same generic-constrained value produce two distinct lookupWitness sites keyed by different requirement keys.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#lookupwitness--lookupwitnessmethod
+//META: doc_section_digest=7bee6071e4a281e3b0a360470ad403730021ec831c4724b2fe0ec4cfc70d7595
+//META: purpose=Two distinct interface methods called on the same generic-constrained value produce two lookupWitness sites keyed by different requirement keys.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on existential-dispatch axis: multi-method dispatch.
-// `### lookupWitness / LookupWitnessMethod` prose says the
-// second operand is "the `key` that identifies the requirement
-// being called". Calling two different methods on the same
-// generic-constrained value therefore produces two distinct
-// `lookupWitness` instructions, each keyed by its own
-// requirement key.
-
+// Boundary on the key operand: the same witness table serves several
+// requirements, so what distinguishes two dispatches is the key, not the
+// table. The CHECKs pin two lookups differing only in their second operand.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IMulti

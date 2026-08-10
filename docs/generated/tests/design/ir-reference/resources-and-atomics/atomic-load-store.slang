@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T12:00:00+00:00
-//META: source_commit=5f0e613fdd3c2890bb087d9ff76154e2605a14d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=52293a26550b22915d50787927526213ba913b7231afe19be04ac5605d79d8b4
+//META: doc_section_digest=534618adad82acb65da181567998c07a77381ecf27996abdf7535de5b49ec7b3
 //META: purpose=`Atomic<T>::load()` and `::store(v)` lower to the dedicated `atomicLoad(%ptr, %order)` and `atomicStore(%ptr, %val, %order)` opcodes (separate from the RMW ops).
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's atomic-operations table lists `atomicLoad` and
-// `atomicStore` as the two non-RMW members of the atomic family.
-// Both surface from the corresponding `Atomic<T>` methods. The CHECKs
-// pin the documented operand counts — `atomicLoad(ptr, memoryOrder)`
-// and `atomicStore(ptr, val, memoryOrder)` — by allowing exactly one
-// operand after the pointer (load) / value (store).
+// Verifies that the two non-read-modify-write atomics have their own
+// opcodes with their own operand counts. The CHECKs allow one operand
+// after the pointer for the load and one after the value for the store,
+// which is how the memory-order operand's position differs between
+// them.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#namespacedecl-moduledecl-filedecl
-//META: doc_section_digest=d4f66ae4ecd0c9db07c2bf1b96051aba8c0c48fb0aa33c09268b87a2b7e1d6f4
-//META: purpose=A NamespaceDecl introduces a named scope; members are reached with the namespace-qualified name.
+//META: doc_section_digest=c5234f45139405663f0d08b212b0f8f44c973502776fde1ad540f5109d04cabb
+//META: purpose=A NamespaceDecl introduces a named scope; its members are reached with the namespace-qualified name.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of NamespaceDecl: a member declared
-// inside `namespace N { ... }` is reachable as `N::f`. Two functions
-// with the same name in different namespaces stay distinct.
+// Verifies that a namespace keeps its members out of the enclosing scope and
+// reachable through `N::`. Two namespaces declare the same function name with
+// different results; the CHECK asserts both, which is only possible if each
+// qualified name resolves inside its own namespace.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

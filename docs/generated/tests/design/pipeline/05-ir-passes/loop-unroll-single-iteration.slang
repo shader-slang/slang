@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=d245d3be9942f0847c45c138b4c2780e7df19ecb
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#loop-transformations
-//META: doc_section_digest=352225772f21036f2bb726491a17e9298fba9124204787acc9180745246b4332
+//META: doc_section_digest=39b16ddaf934d7d1113295e5d32175dd04362dd53d6fdc0bf63ddf66a80ed159
 //META: purpose=Boundary: a `[ForceUnroll]` loop with exactly one static iteration is unrolled — no `for` keyword appears in the GLSL emit.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

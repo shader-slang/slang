@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#function-and-module-structure
-//META: doc_section_digest=cdcc1238b1d73cfdad47a675356ee5e312b4cda22f2d9f5d255ae4ad1e0d4b21
+//META: doc_section_digest=d6d21d15e8b14ba2b57495447b3188f156d4c4168b8574097962151b591b1497
 //META: purpose=A type that conforms to an interface produces a `witness_table` with `witness_table_entry` children mapping requirements to satisfying values.
 //META: intent=functional
 //META: pipeline_stage=lower

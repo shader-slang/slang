@@ -1002,4 +1002,119 @@ bundles:
       - source/slang/slang-emit-spirv.cpp
     size_cap_files: 30
 
+  # --- coverage (white-box characterization) -----------------------------
+  # Gap-selected, not doc-anchored: these bundles have no source_doc, and
+  # only a change to their watched compiler sources marks them stale.
+  # See docs/generated/tests/coverage/METHODOLOGY.md.
+
+  coverage/autodiff:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-ir-autodiff-fwd.cpp
+      - source/slang/slang-ir-autodiff-primal-hoist.cpp
+      - source/slang/slang-ir-autodiff-transpose.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-ir-autodiff-fwd.cpp
+      - source/slang/slang-ir-autodiff-primal-hoist.cpp
+      - source/slang/slang-ir-autodiff-transpose.cpp
+    size_cap_files: 30
+
+  coverage/check-decl:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-check-decl.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-decl.cpp
+    size_cap_files: 30
+
+  coverage/check-expr:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-check-expr.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-check-expr.cpp
+    size_cap_files: 30
+
+  coverage/cli-options:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-options.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-options.cpp
+    size_cap_files: 30
+
+  coverage/emit:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-emit-c-like.cpp
+      - source/slang/slang-emit-glsl.cpp
+      - source/slang/slang-emit-spirv.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-emit-c-like.cpp
+      - source/slang/slang-emit-glsl.cpp
+      - source/slang/slang-emit-spirv.cpp
+    size_cap_files: 30
+
+  coverage/legalize:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-ir-glsl-legalize.cpp
+      - source/slang/slang-ir-legalize-varying-params.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-ir-glsl-legalize.cpp
+      - source/slang/slang-ir-legalize-varying-params.cpp
+    size_cap_files: 30
+
+  coverage/lower-to-ir:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-lower-to-ir.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-lower-to-ir.cpp
+    size_cap_files: 30
+
+  coverage/parser:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-parser.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-parser.cpp
+    size_cap_files: 30
+
+  coverage/specialize:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-ir-specialize.cpp
+      - source/slang/slang-ir-typeflow-specialize.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-ir-specialize.cpp
+      - source/slang/slang-ir-typeflow-specialize.cpp
+    size_cap_files: 30
+
+  coverage/torch:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-ir-pytorch-cpp-binding.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-ir-pytorch-cpp-binding.cpp
+    size_cap_files: 30
+
+  coverage/type-layout:
+    role: coverage
+    watched_paths:
+      - source/slang/slang-type-layout.cpp
+    depends_on: []
+    coverage_targets:
+      - source/slang/slang-type-layout.cpp
+    size_cap_files: 30
   # --- top-level reference -----------------------------------------------

@@ -18,6 +18,8 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
 
 RWStructuredBuffer<int> output;
 
@@ -50,3 +52,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // WGSL: fn writeOut_{{[0-9]+}}( result_{{[0-9]+}} : ptr<function, i32>
 // WGSL: (*result_{{[0-9]+}}) =
+
+// HLSL: void writeOut_{{[0-9]+}}(out int result_{{[0-9]+}},
+// HLSL: result_{{[0-9]+}} =
+
+// SPIRV: %_ptr_Function_int = OpTypePointer Function %int
+// SPIRV: %writeOut = OpFunction %void DontInline
+// SPIRV: %result = OpFunctionParameter %_ptr_Function_int
+// SPIRV: OpStore %result

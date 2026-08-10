@@ -1,21 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#performmandatoryearlyinlining-and-the-surrounding-loop
-//META: doc_section_digest=6099ea29516a98dd56bbf7555d264386325993f06e86be90c03f65db44f380f5
-//META: purpose=Phase B's prelinkIR (B1) pulls in `[unsafeForceInlineEarly]` core-module bodies; the mandatory-early-inlining loop in Phase C then inlines them, so neither the core operator name nor a forwarding call survives.
+//META: doc_section_digest=334e18bcc405858cc1b138ad3c309f182a118316cbcb940b8ace0438053c2b33
+//META: purpose=The prelinkIR import of cross-module [unsafeForceInlineEarly] bodies plus the Phase C mandatory-early-inlining loop leaves the core arithmetic operator inlined rather than called.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `prelinkIR` imports `[unsafeForceInlineEarly]`
-// bodies so the mandatory-early-inlining fixed-point loop can
-// inline them. Core arithmetic operators on plain Int are marked
-// `[__unsafeForceInlineEarly]`; after Phase C the operator-level
-// helper is gone and the LOWER-TO-IR dump shows the operator's
-// expanded body (a raw `add` IR opcode) at the call site rather
-// than a `call %operator{plus}(...)`.
+// Verifies the cooperation between the pre-link import step and the
+// force-inline loop, which is the only user-visible consequence of either.
+// `a + b` on plain ints resolves to a core-module operator that is marked
+// force-inline-early; because its body was imported and then inlined, the
+// snapshot shows the raw `add` opcode at the use site instead of a call to
+// the operator function.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

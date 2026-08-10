@@ -4056,8 +4056,8 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
 
     auto parentDeclRef = callableDeclRef.getParent();
 
-    if (auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.getParent();
+    if (parentDeclRef.as<SubscriptDecl>() || parentDeclRef.as<PropertyDecl>())
+        parentDeclRef = parentDeclRef.getParent();
 
     if (auto genericDeclRef = parentDeclRef.as<GenericDecl>())
         parentDeclRef = genericDeclRef.getParent();
@@ -9371,7 +9371,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                lowerStmt(context, targetCase->body);
+                if (targetCase->body != nullptr)
+                {
+                    lowerStmt(context, targetCase->body);
+                }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
@@ -9448,7 +9451,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                lowerStmt(context, targetCase->body);
+                if (targetCase->body != nullptr)
+                {
+                    lowerStmt(context, targetCase->body);
+                }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);

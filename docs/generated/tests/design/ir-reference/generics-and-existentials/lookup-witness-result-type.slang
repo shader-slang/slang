@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-lookup
-//META: doc_section_digest=c650b6faf3dc14ee2818d838534e3aeac6e33922a0c81c58eb0231306b87654e
+//META: doc_section_digest=4508b8b8f3e8d47f0f2bbf47badad9a2eb49539f2f7232d58154356ce8e2226a
 //META: purpose=The result type of lookupWitness is the requirement's function type, including the receiver as the second parameter.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// The `### Witness lookup` table row for `lookupWitness` says it
-// "Resolves an interface requirement through a witness table".
-// The result is the requirement's function value, so its type is
-// the function type of that requirement: `Func(Int, %T, Int)` for
-// `int run(int x)` (Int return, %T receiver, Int parameter).
-
+// Verifies what a witness lookup *evaluates to*: not the value found, but a
+// value typed as the requirement's function type. The CHECK reads the `let`
+// binding's declared type and asserts it is `Func(Int, %T, Int)` — return
+// type, the still-abstract receiver type parameter, then the declared
+// parameter.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };
@@ -32,4 +30,4 @@ void main()
     buf[0] = helper<A>(a, inVal);
 }
 
-// CHECK: let  %{{[0-9]+}}	: Func(Int, %T{{[A-Za-z0-9_]*}}, Int)	= lookupWitness(
+// CHECK: let  %{{[0-9]+}} : Func(Int, %T{{[A-Za-z0-9_]*}}, Int) = lookupWitness(

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:30:00+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools
-//META: doc_section_digest=a11b0c6012622aa65eafd1deea44aaeb117d13faf8de8cf2fe2778e1dd206d36
+//META: doc_section_digest=7595db660b35cc02b10c1faff7c57997ed8dd2086bd9cc7a8a2f2cd14599f777
 //META: purpose=A RWStructuredBuffer element access outBuf[idx] lowers to OpAccessChain that indexes through the runtime array inside the wrapping struct.
 //META: intent=functional
 //META: pipeline_stage=emit
@@ -23,7 +23,7 @@ RWStructuredBuffer<int> outBuf;
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    outBuf[tid.x] = int(tid.x);
+    outBuf[tid.x + 3] = 5;
 }
 
 // CHECK: OpAccessChain %_ptr_StorageBuffer_int %outBuf

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:16:11+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination
-//META: doc_section_digest=549f8ae382ad795540f97904e8ba737a55b9729a516fa91350bc135710a2f1a2
+//META: doc_section_digest=4fecf4dd0bb701e665017f724328ac296a661dcd280fb45d1f2915bcbd0fc67a
 //META: purpose=A `static` module-scope variable retains its `static T name = initial;` declaration in HLSL emit.
 //META: intent=functional
 //META: pipeline_stage=emit
