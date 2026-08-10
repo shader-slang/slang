@@ -62,7 +62,8 @@ protected:
 SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
 {
     auto session = getSession();
-    const SlangResult loadResult = session->loadAutodiffModuleIfNeeded();
+    Module* module = nullptr;
+    const SlangResult loadResult = session->loadAutodiffModuleIfNeeded(module);
     if (SLANG_FAILED(loadResult))
     {
         // The load only fails if the embedded supplement blob is corrupt, or a source-only build
@@ -73,20 +74,18 @@ SlangResult SemanticsContext::ensureAutodiffModuleLoaded(SourceLoc location)
         return loadResult;
     }
 
-    auto module = session->getBuiltinModule(slang::BuiltinModuleName::Autodiff);
     if (module)
     {
         m_shared->addLoadedAutodiffModule(module->getModuleDecl());
         return SLANG_OK;
     }
 
-    // Reaching here means the load reported success yet produced no module. The only path that does
-    // so is the recursion guard in `loadAutodiffModuleIfNeeded`: while source-compiling a builtin
-    // module it returns SLANG_OK without loading, because that compilation already checks the
-    // supplement's declarations in the current module and there is no separate late module to
-    // merge. Returning SLANG_OK with no merge is therefore correct in that state, so this is a
-    // debug assertion documenting the invariant rather than a release guard — promoting it would
-    // turn a benign, self-consistent path into a crash.
+    // A successful load with no module means the recursion guard in `loadAutodiffModuleIfNeeded`
+    // was taken: while source-compiling a builtin module it declines to load, because that
+    // compilation already checks the supplement's declarations in the current module and there is
+    // no separate late module to merge. Returning SLANG_OK with no merge is therefore correct in
+    // that state, so this is a debug assertion documenting the invariant rather than a release
+    // guard — promoting it would turn a benign, self-consistent path into a crash.
     SLANG_ASSERT(session->isCompilingBuiltinModule());
     return SLANG_OK;
 }

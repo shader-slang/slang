@@ -175,14 +175,20 @@ Index getLoadedBuiltinModuleCountForUnitTest(slang::IGlobalSession* session)
     return static_cast<Session*>(session)->coreModules.getCount();
 }
 
-SlangResult Session::loadAutodiffModuleIfNeeded()
+SlangResult Session::loadAutodiffModuleIfNeeded(Module*& outModule)
 {
-    if (getBuiltinModule(slang::BuiltinModuleName::Autodiff))
+    outModule = nullptr;
+
+    if (auto alreadyLoaded = getBuiltinModule(slang::BuiltinModuleName::Autodiff))
+    {
+        outModule = alreadyLoaded;
         return SLANG_OK;
+    }
 
     // Loading the supplement while source-compiling either builtin module would recursively start
     // another builtin compilation. The current compilation already sees and checks its own
-    // declarations; the caller therefore has no late-loaded module to merge in this case.
+    // declarations; the caller therefore has no late-loaded module to merge in this case. This is
+    // the one path that reports success while leaving `outModule` null.
     if (m_isCompilingBuiltinModule)
         return SLANG_OK;
 
@@ -191,18 +197,27 @@ SlangResult Session::loadAutodiffModuleIfNeeded()
     // it is first requested.
     if (auto moduleBlob = slang_getEmbeddedAutodiffModule())
     {
-        return loadBuiltinModule(
+        SLANG_RETURN_ON_FAIL(loadBuiltinModule(
             slang::BuiltinModuleName::Autodiff,
             moduleBlob->getBufferPointer(),
-            moduleBlob->getBufferSize());
+            moduleBlob->getBufferSize()));
+    }
+    else
+    {
+        // Source-compile fallback, taken only in a `SLANG_EMBED_CORE_MODULE=OFF` build where
+        // `slang_getEmbeddedAutodiffModule()` is null. The standard test binaries embed the blob
+        // and take the branch above, so this runtime path has no automated regression test; it
+        // mirrors the eager core module's own source-only fallback and is exercised at build time
+        // when the no-embed bootstrap compiles the supplement.
+        SLANG_RETURN_ON_FAIL(compileBuiltinModule(slang::BuiltinModuleName::Autodiff, 0));
     }
 
-    // Source-compile fallback, taken only in a `SLANG_EMBED_CORE_MODULE=OFF` build where
-    // `slang_getEmbeddedAutodiffModule()` is null. The standard test binaries embed the blob and
-    // take the branch above, so this runtime path has no automated regression test; it mirrors the
-    // eager core module's own source-only fallback and is exercised at build time when the
-    // no-embed bootstrap compiles the supplement.
-    return compileBuiltinModule(slang::BuiltinModuleName::Autodiff, 0);
+    // Both load paths above register the module on this session, so a successful load must leave
+    // it retrievable. If that ever stops holding, failing here is better than handing the caller a
+    // silent null that it would merge as "nothing to do".
+    outModule = getBuiltinModule(slang::BuiltinModuleName::Autodiff);
+    SLANG_RELEASE_ASSERT(outModule);
+    return SLANG_OK;
 }
 
 void Session::_initCodeGenTransitionMap()

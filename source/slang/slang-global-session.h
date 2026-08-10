@@ -315,10 +315,15 @@ public:
 
     Module* getBuiltinModule(slang::BuiltinModuleName builtinModuleName);
 
-    /// Loads the autodiff builtin module if it has not already been loaded.
-    /// Returns success without loading while a builtin module is being source-compiled, because
-    /// starting another builtin compilation there would recurse.
-    SlangResult loadAutodiffModuleIfNeeded();
+    /// Loads the autodiff builtin module if it has not already been loaded, and reports which
+    /// module (if any) the caller should now merge.
+    ///
+    /// `outModule` is set to null, with `SLANG_OK` returned, while a builtin module is being
+    /// source-compiled: starting another builtin compilation there would recurse, and that
+    /// compilation already checks the supplement's declarations itself, so there is no separate
+    /// module to merge. Success therefore does *not* imply a module — the out-parameter exists so
+    /// that a caller cannot read one without confronting the possibility that there is none.
+    SlangResult loadAutodiffModuleIfNeeded(Module*& outModule);
 
     /// Returns whether this session is currently source-compiling a builtin module.
     bool isCompilingBuiltinModule() const { return m_isCompilingBuiltinModule; }

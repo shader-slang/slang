@@ -14962,16 +14962,36 @@ static void _maybeAddImplicitNoDiffThisForNonDifferentiableThis(
 
 void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl* decl)
 {
-    // This is the header-modifier load trigger: a callable that declares itself differentiable
-    // (`[Differentiable]` / `[ForwardDifferentiable]` / `[BackwardDifferentiable]`, tested by
-    // `_callableHasDifferentiabilityHeaderModifier`) needs the supplement's derivative machinery to
-    // finish setup. A callable that only carries a custom-derivative attribute
-    // (`[ForwardDerivative]`, `[PrimalSubstituteOf]`, ...) is intentionally not covered here: those
-    // attributes do not subclass `DifferentiableAttribute`, and their supplement dependency is
-    // driven separately by the `DifferentiateExpr`/`PrimalSubstituteExpr` synthesized when the
-    // attribute is checked (see `_checkHigherOrderInvokeExpr`). If the load fails, abort the rest
-    // of the differentiable setup below (implicit `no_diff` synthesis etc.), which reads supplement
-    // declarations; `ensureAutodiffModuleLoaded` has already diagnosed the failure.
+    // This is the header-modifier load trigger: a callable whose header says it participates in
+    // differentiation needs the supplement's derivative machinery to finish setup.
+    //
+    // `_callableHasDifferentiabilityHeaderModifier` draws that line by base class rather than by
+    // spelling, so it is worth being precise about which declarations land on each side:
+    //
+    //   - Covered: every `DifferentiableAttribute`, which is a larger set than its name suggests.
+    //     Besides the obvious `[Differentiable]`, `[ForwardDifferentiable]`,
+    //     `[BackwardDifferentiable]`, `[TreatAsDifferentiable]` and
+    //     `[HasTrivialForwardDerivative]`, it also covers the custom-derivative attributes
+    //     `[ForwardDerivative]`, `[BackwardDerivative]`, `[ForwardDerivativeOf]` and
+    //     `[BackwardDerivativeOf]`, which reach it through `UserDefinedDerivativeAttribute` and
+    //     `DerivativeOfAttribute` (`slang-ast-modifier.h:1883-1965`).
+    //   - Also covered, via `MaybeDifferentiableAttribute`: interface requirements marked as
+    //     optionally conforming to `IForwardDifferentiable`/`IBackwardDifferentiable`. This is the
+    //     one case where the trigger fires on a requirement rather than an implementation.
+    //   - Not covered: `[PrimalSubstitute]` and `[PrimalSubstituteOf]`, which derive directly from
+    //     `Attribute`. Their supplement dependency is driven separately, by the
+    //     `PrimalSubstituteExpr` synthesized when the attribute is checked (see
+    //     `_checkHigherOrderInvokeExpr`, which handles `DifferentiateExpr` the same way).
+    //
+    // So the two triggers overlap by design rather than partitioning the attributes: a
+    // `[ForwardDerivative]` function loads the supplement here, at its header, and the expression
+    // trigger covers the cases this one cannot see. Loading early is harmless -- such a function
+    // needs the supplement anyway -- but a maintainer changing either trigger should know the
+    // other is not the sole path.
+    //
+    // If the load fails, abort the rest of the differentiable setup below (implicit `no_diff`
+    // synthesis etc.), which reads supplement declarations; `ensureAutodiffModuleLoaded` has
+    // already diagnosed the failure.
     if (_callableHasDifferentiabilityHeaderModifier(decl) &&
         SLANG_FAILED(ensureAutodiffModuleLoaded(decl->loc)))
     {
