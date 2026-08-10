@@ -1,19 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#resource-and-texture-types
-//META: doc_section_digest=4995d79f1d575606442d0357f0fb015ffcc2489a1b4116d09d5d6d1d0bde2e0f
+//META: doc_section_digest=9bc7cd21838a70254771d6cf744cc574fc1ff6d4c25215b75c1badb8cf87e771
 //META: purpose=A uniform RaytracingAccelerationStructure declaration lowers to a global_param of IR type RaytracingAccelerationStructure.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Resource and texture types" table lists
-// `RaytracingAccelerationStructure` (C++ wrapper
-// `RaytracingAccelerationStructureType`) as a no-operand opcode for
-// the raytracing acceleration-structure resource. A
-// `uniform RaytracingAccelerationStructure` declaration surfaces
+// A uniform RaytracingAccelerationStructure declaration lowers to a
+// global_param of IR type RaytracingAccelerationStructure. A `uniform
+// RaytracingAccelerationStructure` declaration surfaces
 // `RaytracingAccelerationStructure` as the IR type of the
 // `global_param`.
 

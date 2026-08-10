@@ -1,28 +1,28 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#witness-tables-and-witness-facts
-//META: doc_section_digest=d0e5f938a162d9fc51507a4ae7ae9aab34d88afc53022d2f7fdf53ede44ac27c
-//META: purpose=A generic body that calls a method on a constrained type parameter emits a lookupWitness opcode whose operands are (witness_table, requirementKey).
+//META: doc_section_digest=1af9e6c2e01af2b94483cbd8d90b8d30f4856731a44da18cf2e68c7379930ffc
+//META: purpose=A generic body that calls a method on a constrained type parameter emits a lookupWitness opcode whose operands are (witnessTable, requirementKey).
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// In `int helper<T : IFoo>(T t, int x) { return t.run(x); }` the call
-// to `t.run(x)` is rewritten in the generic body as a
-// `lookupWitness(%witnessParam, %IFoox5Frun)` whose result is the
-// requirement's function value. The structural shape is
-// `(witnessTable, requirementKey)`.
+// Verifies the structural consumer side of a witness table. Inside
+// `helper<T : IFoo>` the call `t.run(x)` cannot name a concrete function, so
+// lowering resolves it against the generic's witness-table parameter. CHECK
+// requires `lookupWitness(<numbered witness value>, %IFoox5Frun)` — the table
+// first, the requirement key second.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo
 {
     int run(int x);
-};
+}
 
-struct A : IFoo { int run(int x) { return x + 1; } };
+struct A : IFoo { int run(int x) { return x + 1; } }
 
 int helper<T : IFoo>(T t, int x)
 {

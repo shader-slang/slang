@@ -109,4 +109,4 @@ jobs:
           cd tools/compile-perf
           python3 -c "import bench, report, breakdown, daily_movers, \
               new_release_check, sweep, sweep_report, track, trend, \
-              compare_repro, ladder_scaling, fetch_releases"
+              compare_repro, ladder_scaling, fetch_releases, slack_status"

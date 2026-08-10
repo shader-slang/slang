@@ -1,18 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=90fd91b1a21860b3569e7b02fb36035ba69014ded4abafe7604e89fcb5aea51a
+//META: doc_section_digest=221e203d328edd373a1da34064baee6a2aab4c19c403c7438de72b93ad6ee5f5
 //META: purpose=The floating-point scalar opcodes Half, Float, Double appear as struct-field types in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Basic scalar types" table lists `Half` (16-bit float),
-// `Float` (32-bit), `Double` (64-bit) as separate IR type opcodes.
-// A struct whose fields cover all three floating-point widths
-// surfaces each opcode in the IR dump.
+// The floating-point scalar opcodes Half, Float, Double appear as
+// struct-field types in the IR dump. A struct whose fields cover all
+// three floating-point widths surfaces each opcode in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

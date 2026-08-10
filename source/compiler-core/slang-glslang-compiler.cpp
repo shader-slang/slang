@@ -418,6 +418,14 @@ SlangResult GlslangDownstreamCompiler::link(
     const uint32_t moduleCount,
     IArtifact** outArtifact)
 {
+    // `init` accepts a library that exports no linker, so "cannot link" is reachable input rather
+    // than an internal error, and must stay distinguishable from a link that ran and rejected the
+    // modules.
+    if (m_link == nullptr)
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
     glslang_LinkRequest request;
     memset(&request, 0, sizeof(request));
 

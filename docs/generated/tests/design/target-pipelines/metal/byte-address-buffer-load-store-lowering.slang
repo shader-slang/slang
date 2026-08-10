@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=355a74cccddb8eb52d0513615291bc6d928b55d9bdd73146a80f6df81b210ae4
-//META: purpose=ByteAddressBuffer.Load<T>/Store<T> lower under Metal's legalizeByteAddressBufferOps options (scalarizeVectorLoadStore=true, lowerBasicTypeOps=true) into pointer-indexed accesses with as_type<T> bitcasts.
+//META: doc_section_digest=2a4c97aeaacd2a9728a83c1944ef99c7efe30fe3fe60ef075d8d47044f03eefc
+//META: purpose=`legalizeByteAddressBufferOps` runs with Metal options (`scalarizeVectorLoadStore`, `lowerBasicTypeOps`), so a `ByteAddressBuffer.Load<uint>` becomes a pointer-indexed read wrapped in `as_type<uint>`.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Metal options for `legalizeByteAddressBufferOps`:
-// scalarizeVectorLoadStore=true, lowerBasicTypeOps=true,
-// translateToStructuredBufferOps=false. The emitted text shows
-// pointer-indexed array accesses with `as_type<T>` wrappers.
+// Verifies the Metal option set for byte-address lowering: with
+// `lowerBasicTypeOps=true` the raw 32-bit word read out of the buffer has
+// to be reinterpreted rather than loaded as a typed element, which on MSL
+// is spelled `as_type<T>`. The kernel loads a word and stores a modified
+// word so both directions stay live; CHECK asserts both the load-side and
+// store-side `as_type<...>` wrappers appear.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

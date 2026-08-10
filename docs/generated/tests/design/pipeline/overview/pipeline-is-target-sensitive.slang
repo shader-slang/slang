@@ -1,32 +1,55 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ir-passes
-//META: doc_section_digest=13249cb78abda3a38ee1afe41764c16d61758bb40f808a7bfd9b26849a3a64c3
-//META: purpose=The IR pass list is target-sensitive; the same source emits target-shaped output (not just textually identical) for each backend.
+//META: doc_section_digest=b85b32233cddf5f98eaa366eca12bec6d5e63cd6b7812236112834483f589f39
+//META: purpose=The IR transformation sequence between lowering and emit is target-sensitive, so one thread-group declaration is materialized in a different form on each target and dropped entirely on the targets that take it at dispatch time.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the overview claim that "the IR pass list is
-// target-sensitive". A single source shader, with the same
-// numthreads attribute, emerges as syntactically different text in
-// HLSL ([numthreads(1, 1, 1)]), GLSL (layout(local_size_x = 1, ...)),
-// and SPIR-V (OpExecutionMode %main LocalSize 1 1 1). If the IR
-// passes did not branch on target, the emitter would not be able to
-// produce these target-shaped forms.
+// Verifies that the pass sequence branches on the target rather than
+// producing one neutral shape that emit merely re-spells. A single
+// `numthreads(16, 1, 1)` becomes an HLSL attribute, a GLSL `layout`
+// qualifier, a SPIR-V `OpExecutionMode`, a WGSL `@workgroup_size`, and a
+// C++ comment on the exported wrapper -- while Metal and CUDA, whose
+// runtimes supply the group size at dispatch, emit no `16, 1, 1` at all.
+// The CHECKs assert the five materialized forms and the two omissions, a
+// divergence only a target-sensitive pass list can produce.
 
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
+
+RWStructuredBuffer<int> gOut;
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
-void main()
+[numthreads(16, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    // HLSL: numthreads(1, 1, 1)
-    // GLSL: local_size_x = 1, local_size_y = 1, local_size_z = 1
-    // SPIRV: OpExecutionMode %main LocalSize 1 1 1
-    return;
+    gOut[0] = int(tid.x);
 }
+
+// HLSL: numthreads(16, 1, 1)
+
+// GLSL: local_size_x = 16, local_size_y = 1, local_size_z = 1
+
+// SPIRV: OpExecutionMode {{.*}} LocalSize 16 1 1
+
+// WGSL: @workgroup_size(16, 1, 1)
+
+// C++ keeps the group size only as a comment above the exported wrapper.
+// CPP: numthreads(16, 1, 1)
+
+// Metal and CUDA take the thread-group size from the host dispatch call, so
+// the pass list drops it before emit on those targets.
+// METAL: {{\[\[}}kernel{{\]\]}} void computeMain(
+// METAL-NOT: 16, 1, 1
+
+// CUDA: __global__ void computeMain(
+// CUDA-NOT: 16, 1, 1

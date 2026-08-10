@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=1d2f08dfecd3e2ccb26b50652f1294ebe4c1c5182a6aab140a589ccecd16faa1
+//META: doc_section_digest=19b077f47f71a1feb81adb9dea6ff4919edb188c235b3634dce08c45cf359e3c
 //META: purpose=Boundary: `bitfieldExtract(a, 0, 0)` lowers to `bitfieldExtract(%a, 0 : UInt, 0 : UInt)` — the count=0 edge of the bitfield-width range.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `bitfieldExtract` with `offset, count` operands.
-// This boundary probe takes the zero-width extract — count = 0 —
+// Verifies that the `bitfieldExtract` opcode keeps its `offset` and
+// `count` operands intact at the degenerate width. This boundary probe takes the zero-width extract — count = 0 —
 // as the lower edge of the bit-field width range.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main

@@ -519,45 +519,114 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
     return out
 
 
-def _workload_source(spec, head=40, tail=40, ctx=40):
-    """Return ``(default_size, [(filename, source_snippet)])`` for display.
+def _workload_source(spec):
+    """Return ``(default_size, [(filename, source)])`` — every generated file
+    for the workload, each one COMPLETE.
 
     ``default_size`` is the workload's ``spec.default_size`` integer (returned
     alongside the source so callers can show it without re-reading the spec).
-    Each ``source_snippet`` is trimmed to three windows: the first ``head`` lines,
-    the ``ctx`` lines before and ``ctx`` lines after ``computeMain`` (2*ctx+1 total), and the last
-    ``tail`` lines, with elided regions marked by a ``// … N lines omitted …``
-    comment. Overlapping windows are merged.
+
+    The source is deliberately not windowed. These files ARE the benchmark, so
+    a reader chasing a regression needs the construct that triggers it, and in
+    a generated corpus that is as likely to sit at line 900 as at line 20 — the
+    previous first-40/around-computeMain/last-40 view hid exactly the middle
+    where the repeated generated bodies live. The rendered block is
+    height-capped and scrollable, so a long file costs scroll depth inside the
+    box rather than page layout.
     """
-    n = spec.default_size
-    out = []
-    for fn, src in spec.gen(n).items():
-        lines = src.splitlines()
-        L = len(lines)
-        if L <= head + tail:
-            out.append((fn, "\n".join(lines)))
-            continue
-        ranges = [(0, head), (L - tail, L)]
-        cm = next((i for i, l in enumerate(lines) if "computeMain" in l), None)
-        if cm is not None:
-            ranges.append((max(0, cm - ctx), min(L, cm + ctx + 1)))
-        ranges.sort()
-        merged = []
-        for lo, hi in ranges:
-            # merge when overlapping or separated by a tiny gap (a 3-line elision
-            # marker to hide ≤4 lines is pointless — just show them)
-            if merged and lo <= merged[-1][1] + 4:
-                merged[-1][1] = max(merged[-1][1], hi)
-            else:
-                merged.append([lo, hi])
-        disp, prev = [], 0
-        for idx, (lo, hi) in enumerate(merged):
-            if idx > 0:
-                disp += ["", f"// … {lo - prev} lines omitted …", ""]
-            disp += lines[lo:hi]
-            prev = hi
-        out.append((fn, "\n".join(disp)))
-    return n, out
+    return spec.default_size, list(spec.gen(spec.default_size).items())
+
+
+# Copy-to-clipboard support for the workload pages' code blocks. Kept as two
+# module constants so the page-assembly f-string below stays readable.
+#
+# The button is absolutely positioned inside a relative wrapper so it floats
+# over the top-right of the block without taking part in its scrolling.
+COPY_CSS = """
+.cbox{position:relative}
+.cbox>button.copy{position:absolute;top:8px;right:8px;z-index:1;
+  font:11px/1 -apple-system,Segoe UI,Roboto,sans-serif;padding:5px 9px;
+  color:#24292f;background:#fff;border:1px solid #d0d7de;border-radius:5px;
+  cursor:pointer;opacity:.75}
+.cbox>button.copy:hover{opacity:1;background:#f3f4f6}
+.cbox>button.copy[data-done]{color:#1a7f37;border-color:#1a7f37}
+"""
+
+# navigator.clipboard needs a secure context, which the published site has but
+# a locally opened file:// page does not — hence the textarea/execCommand
+# fallback, so the buttons still work when someone opens a generated page from
+# disk. Delegated from document so one handler serves every block on the page.
+COPY_JS = """
+document.addEventListener('click', function (ev) {
+  var btn = ev.target.closest && ev.target.closest('button.copy');
+  if (!btn) return;
+  var el = document.getElementById(btn.getAttribute('data-copy'));
+  if (!el) return;
+  var text = el.textContent;
+  function flash(ok) {
+    btn.textContent = ok ? 'Copied' : 'Press Ctrl+C';
+    if (ok) btn.setAttribute('data-done', '1');
+    setTimeout(function () {
+      btn.textContent = 'Copy'; btn.removeAttribute('data-done');
+    }, 1400);
+  }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta); flash(ok);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { flash(true); }, fallback);
+  } else {
+    fallback();
+  }
+});
+"""
+
+
+def _copy_block(block_id, body_html):
+    """Wrap a rendered <pre> so it carries a copy button.
+
+    `body_html` is TRUSTED markup — a complete `<pre id='...'>…</pre>` element
+    — whose untrusted contents the caller has already escaped. It is inserted
+    verbatim, so do not pass `esc(...)` of an element here: that would render
+    the tags as visible text rather than markup.
+
+    `block_id` must be unique on the page and must match the id on the `<pre>`
+    inside `body_html`: the delegated handler resolves its target with
+    getElementById and returns silently when it finds nothing, so a mismatch
+    is a dead button rather than an error."""
+    return (f"<div class='cbox'>"
+            f"<button class='copy' type='button' data-copy='{block_id}'>Copy</button>"
+            f"{body_html}</div>")
+
+
+def _repro_command(spec):
+    """The one-line bench.py invocation that regenerates this workload's
+    sources and re-runs the measurement charted on its page.
+
+    Kept to a single line on purpose: it is rendered next to a copy button, and
+    a backslash-continued form pastes correctly into bash but not into the
+    PowerShell the perf runner uses. ``--gen-dir`` is included because the
+    sources are otherwise written to a tempdir and removed on exit, and
+    inspecting them is usually the reason someone reaches for this. Naming a
+    workload in ``--only`` also opts it in when it is an api-mode workload,
+    which is otherwise excluded from the default set.
+
+    The slangc placeholder is ``/path/to/slangc`` and must NOT be written as
+    ``<path/to/slangc>``: this string exists to be pasted into a shell, where
+    ``<`` and ``>`` are redirections, not punctuation. The angled form fails
+    with "path/to/slangc: No such file or directory" — or worse, if that path
+    happens to exist, silently creates a file named ``--only``, redirects
+    stdout into it, and leaves ``--slangc`` with no value. The self-check at
+    the bottom of this module rejects shell metacharacters for that reason.
+    """
+    return (f"python3 tools/compile-perf/bench.py --slangc /path/to/slangc "
+            f"--only {spec.name} --label repro --gen-dir repro-{spec.name}")
 
 
 def write_workload_pages(results_dir, sections, metric, outdir, back="../index.html",
@@ -693,18 +762,40 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"{step_rows}</table>")
 
         _, srcfiles = _workload_source(spec) if spec else (0, [])
-        tail_txt = ("show the first 40 lines, the area around computeMain (±40), and the last "
-                    "40 lines (gaps elided)")
-        size_note = ((f"exact compiled source; long files {tail_txt}")
-                     if spec and spec.default_size == 0
-                     else (f"exact compiled source (N = {spec.default_size}); long files {tail_txt}")
+        size_note = (("the complete compiled source, shown in full"
+                      if spec.default_size == 0
+                      else f"the complete compiled source (N = {spec.default_size}), "
+                           f"shown in full")
                      if spec else "")
         code_html = ""
-        for fn, code in srcfiles:
+        for i, (fn, code) in enumerate(srcfiles):
+            nlines = len(code.splitlines())
             code_html += (f"<h3 style='font-size:13px;margin:16px 0 4px;color:#444'>"
-                          f"{esc(fn)}</h3><pre style='{pre}'>{esc(code)}</pre>")
+                          f"{esc(fn)} "
+                          f"<span style='font-weight:400;color:#888'>"
+                          f"({nlines} lines)</span></h3>"
+                          + _copy_block(f"src{i}",
+                                        f"<pre id='src{i}' style='{pre}'>{esc(code)}</pre>"))
+
+        # The repro block sits ABOVE the source: someone who has just read a
+        # regression off the chart wants the command first, and the source
+        # below it is what that command generates.
+        repro_html = ""
+        if spec:
+            repro_html = (
+                f"<h2 style='font-size:17px;margin:26px 0 8px;"
+                f"border-bottom:2px solid #eee;padding-bottom:4px'>Reproduce</h2>"
+                f"<p style='color:#666;font-size:13px;max-width:900px'>Run from the "
+                f"slang repo root. This regenerates the sources below and re-runs "
+                f"this workload's measurement; <code>--gen-dir</code> keeps the "
+                f"generated files (they go to a tempdir and are deleted "
+                f"otherwise).</p>"
+                + _copy_block("repro",
+                              f"<pre id='repro' style='{pre};white-space:pre-wrap'>"
+                              f"{esc(_repro_command(spec))}</pre>"))
 
         html = (f"<!doctype html><meta charset=utf-8><title>{esc(wl)} — phase breakdown</title>"
+                f"<style>{COPY_CSS}</style>"
                 f"<body style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;"
                 f"margin:24px;color:#1a1a1a;max-width:1180px'>"
                 f"<p><a href='{esc(back)}'>&larr; back</a></p>"
@@ -721,9 +812,11 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                 f"<div style='border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto'>"
                 f"{svg}</div>"
                 f"{movers_html}"
+                f"{repro_html}"
                 f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:2px solid #eee;"
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
+                f"<script>{COPY_JS}</script>"
                 f"</body>")
         with analyze.open_output(os.path.join(wdir, f"{wl}.html")) as fh:
             fh.write(html)
@@ -877,3 +970,67 @@ assert len(_contrib) >= 4, \
 assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
     "workload_progress fixture: contributor pp must sum to the overall %"
 del _T0, _T1, _ov, _contrib, _ex, _st
+
+
+# Import-time self-check that the workload pages show the source WHOLE. This
+# used to be windowed (first 40 / around computeMain / last 40) and the page
+# said so, but a truncated shader that no longer says it is truncated reads as
+# the entire benchmark — the failure would be a plausible-looking page, not an
+# error. reflection_layout is the fixture because it is over a thousand lines
+# at its default size, so it would certainly have been elided before; a short
+# workload would pass this even with windowing restored.
+_SPEC = manifest.BY_NAME["reflection_layout"]
+_n, _files = _workload_source(_SPEC)
+_gen = _SPEC.gen(_n)
+assert [fn for fn, _ in _files] == list(_gen), \
+    "_workload_source must list every generated file, in generator order"
+for _fn, _src in _files:
+    assert _src == _gen[_fn], \
+        f"_workload_source must return {_fn} verbatim — no windowing, no elision"
+assert sum(len(s.splitlines()) for _, s in _files) > 500, \
+    "the fixture workload must be long enough that windowing would be visible"
+# The repro command is a single line (it sits beside a copy button, and a
+# continued form does not paste into PowerShell) and names its workload.
+_CMD = _repro_command(_SPEC)
+assert "\n" not in _CMD, "the repro command must stay on one line to paste cleanly"
+assert f"--only {_SPEC.name}" in _CMD, "the repro command must name its workload"
+del _SPEC, _n, _files, _gen, _fn, _src, _CMD
+
+
+# The command's whole purpose is to be pasted into a shell, so it must contain
+# nothing the shell would interpret. This is not hypothetical punctuation
+# policing: the first version used `<path/to/slangc>` as the placeholder, which
+# bash reads as a stdin redirect followed by an stdout redirect — it fails
+# outright, and where that path exists it silently creates a file named
+# `--only` and leaves `--slangc` with no value. Testing the command with the
+# placeholder substituted for a real path (as the original test plan did) hides
+# exactly this, so the published STRING is what gets checked.
+#
+# Checked for EVERY workload, not just one: the command interpolates spec.name
+# twice and a page is rendered per workload, so a single-fixture check would
+# prove the property for one page and claim it for forty. Every current name is
+# an identifier, which is precisely why this is worth pinning — it is an
+# unenforced contract on spec.name that a future workload could quietly break.
+# Redirection, quoting, expansion, separators AND globs: "nothing the shell
+# would interpret" has to mean all of them, not just the redirects that bit.
+SHELL_METACHARACTERS = "<>|&;$`\\\"'*?[]{}~()!#\n\t "
+
+
+def _shell_unsafe(text):
+    """The shell metacharacters present in `text`, in order; empty when it is
+    safe to paste verbatim. Space is included: these commands are published as
+    a single token-separated line, so a name containing one would silently
+    split into two arguments."""
+    return [c for c in SHELL_METACHARACTERS if c in text]
+
+
+for _spec in manifest.BY_NAME.values():
+    _c = _repro_command(_spec)
+    assert not _shell_unsafe(_c.replace(" ", "")), \
+        (f"repro command for {_spec.name!r} contains shell metacharacters "
+         f"{_shell_unsafe(_c.replace(' ', ''))}: it is published to be "
+         f"copy-pasted, so it must survive a shell verbatim — got {_c!r}")
+    assert " " not in _spec.name, \
+        (f"workload name {_spec.name!r} contains a space, which would split "
+         f"its repro command into the wrong arguments")
+del _spec, _c
