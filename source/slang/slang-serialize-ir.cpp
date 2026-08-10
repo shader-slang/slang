@@ -537,6 +537,14 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     List<IRInst*> instsList; ///< index -1 is the null slot, hence `insts()`
     IRModule* module = nullptr;
 
+    /// The context that owns `_foundUnrecognizedInstructions`.
+    ///
+    /// Retained so that a body decoded long after the load walk reports an
+    /// unrecognized opcode to the same place the load walk would have, rather than
+    /// accepting it silently. Outlives this decoder: it belongs to the read
+    /// serializer, which the module keeps alive for exactly this purpose.
+    IRSerialReadContext* readContext = nullptr;
+
     /// Where each deferred body's encoding begins.
     ///
     /// Recorded when the load walk reaches a global value's first non-decoration
@@ -608,7 +616,12 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
         // Another thread decoded this body while we waited for the lock.
         return;
     }
-    deferredBodies.remove(inst);
+    // `body` is a copy, so the entry is not needed past this point -- but it is
+    // removed only after the children are linked, below. Removing it here would
+    // mean that a decode which aborts part-way (an assertion in this file throws
+    // rather than terminating) leaves the instruction still flagged as deferred
+    // with no entry to decode: the next access would find nothing, return quietly,
+    // and hand the caller an empty body as though it were complete.
 
     // Replay this subtree from where the load walk left off, with deferral
     // disabled so nested instructions materialize in full.
@@ -656,6 +669,9 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 
     deferBodies = savedDefer;
 
+    // Drop the entry and clear the flag together, so the two never disagree.
+    deferredBodies.remove(inst);
+
     // Release: a thread that later observes this as false must also see every
     // write above, so that it reads a fully linked body.
     inst->m_hasDeferredBody.store(false, std::memory_order_release);
@@ -670,40 +686,68 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 /// inline, so their size depends on a length that is read from the payload stream;
 /// the cursor is positioned at that length here, and peeking does not disturb it
 /// because the payload switch consumes it immediately afterwards.
-IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringLengthCursor)
+/// Returns the allocation size an instruction of `op` needs beyond the base `IRInst`,
+/// advancing `stringLengthCursor` past the length entry of a string or blob constant.
+///
+/// Shared by the load-time walk and by deferred materialization so the two cannot
+/// drift: an earlier version of the deferred path duplicated this switch and, in
+/// doing so, dropped both range checks below, which are what keep a corrupt or
+/// future-version table from truncating `numChars` or overflowing the allocation
+/// size that the subsequent `memcpy` writes into.
+static size_t _calcInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64& stringLengthCursor)
 {
-    const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
-    IROp op = allocInfo.op;
-    if (op == kIROp_Invalid) [[unlikely]]
-        op = kIROp_Unrecognized;
-
-    size_t minSizeInBytes = 0;
     switch (op)
     {
     [[unlikely]] case kIROp_ModuleInst:
-        minSizeInBytes = offsetof(IRModuleInst, module) + sizeof(IRModuleInst::module);
-        break;
+        return offsetof(IRModuleInst, module) +
+               sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
     case kIROp_BoolLit:
     case kIROp_IntLit:
     case kIROp_FloatLit:
     case kIROp_PtrLit:
     case kIROp_VoidLit:
-        minSizeInBytes = offsetof(IRConstant, value) + sizeof(IRConstant::value);
-        break;
+        return offsetof(IRConstant, value) + sizeof(IRConstant::value);
+    // About 5% of instructions in the core module are strings!
     case kIROp_StringLit:
     case kIROp_BlobLit:
         {
             SLANG_RELEASE_ASSERT(stringLengthCursor < flat.stringLengths.getCount());
             const auto len = flat.stringLengths[stringLengthCursor++];
             SLANG_RELEASE_ASSERT(len >= 0);
+            // `IRConstant::StringValue::numChars` is `uint32_t`; a longer length would
+            // truncate when it is stored.
+            SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+
             const size_t headerSize =
                 offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
-            minSizeInBytes = headerSize + size_t(len);
-            break;
+            // Guard the addition itself, so a huge length cannot wrap and yield an
+            // allocation smaller than the characters later copied into it.
+            SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
+
+            return headerSize + size_t(len);
         }
+    default:
+        return 0;
     }
+}
+
+IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringLengthCursor)
+{
+    const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
+    IROp op = allocInfo.op;
+    if (op == kIROp_Invalid) [[unlikely]]
+    {
+        // Report it the same way the load-time walk does. Without this a lazily
+        // materialized module would silently accept an opcode that an eager load
+        // reports, and the end-state checks keyed on this flag would not relax.
+        op = kIROp_Unrecognized;
+        readContext->_foundUnrecognizedInstructions = true;
+    }
+
+    const size_t minSizeInBytes = _calcInstMinSizeInBytes(op, flat, stringLengthCursor);
     return module->_allocateInst(op, allocInfo.operandCount, minSizeInBytes);
 }
+
 
 IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
 {
@@ -862,6 +906,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRSerialReadContext& readContext = *serializer.getContext();
     RefPtr<FlatModuleDecoder> decoder = new FlatModuleDecoder();
     decoder->module = module;
+    decoder->readContext = &readContext;
     FlatInstTable& flat = decoder->flat;
     const bool statsOn = OnDemandStats::isEnabled();
     const auto tCopyStart = std::chrono::steady_clock::now();
@@ -947,37 +992,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             readContext._foundUnrecognizedInstructions = true;
             op = kIROp_Unrecognized;
         }
-        size_t minSizeInBytes = 0;
-        switch (op)
-        {
-        [[unlikely]] case kIROp_ModuleInst:
-            minSizeInBytes = offsetof(IRModuleInst, module) +
-                             sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
-            break;
-        case kIROp_BoolLit:
-        case kIROp_IntLit:
-        case kIROp_FloatLit:
-        case kIROp_PtrLit:
-        case kIROp_VoidLit:
-            minSizeInBytes = offsetof(IRConstant, value) + sizeof(IRConstant::value);
-            break;
-        // About 5% of instructions in the core module are strings!
-        case kIROp_StringLit:
-        case kIROp_BlobLit:
-            {
-                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
-                const auto len = flat.stringLengths[stringLengthIndex++];
-                SLANG_RELEASE_ASSERT(len >= 0);
-                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
-
-                const size_t headerSize =
-                    offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
-                SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
-
-                minSizeInBytes = headerSize + size_t(len);
-                break;
-            }
-        }
+        const size_t minSizeInBytes = _calcInstMinSizeInBytes(op, flat, stringLengthIndex);
         // In skeleton mode the skipped instructions are never allocated; the
         // preorder walk below still consumes their operand and payload cursors so
         // that positions stay correct for the instructions that are kept.

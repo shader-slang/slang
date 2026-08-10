@@ -8877,11 +8877,17 @@ void IRInst::_materializeDeferredBody()
     // The flag is cleared by the loader, under its lock, once the children are
     // linked -- not here. Clearing it first would let a second thread proceed to
     // read children that are still being built.
-    if (auto module = getModule())
-    {
-        if (auto loader = module->getDeferredBodyLoader())
-            loader->materializeDeferredBody(this);
-    }
+    auto module = getModule();
+    auto loader = module ? module->getDeferredBodyLoader() : nullptr;
+
+    // An instruction flagged as deferred with no loader to decode it is an
+    // impossible shape: only the deserializer sets the flag, and it installs the
+    // loader on the same module in the same step. Returning quietly here would
+    // hand the caller an empty body for an instruction whose children exist in the
+    // serialized blob, with no diagnostic, and leave the flag set so that every
+    // later access repeats this slow path.
+    SLANG_RELEASE_ASSERT(loader);
+    loader->materializeDeferredBody(this);
 }
 
 IRInst* IRInst::getFirstChild()

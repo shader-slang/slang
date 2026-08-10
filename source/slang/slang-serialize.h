@@ -745,6 +745,68 @@ struct SerializedArray
         _count = _owned.getCount();
     }
 
+    SerializedArray() = default;
+
+    //
+    // Copy and move have to be written out rather than defaulted. `_data` is a raw
+    // pointer that, for an owned array, points into `_owned`'s buffer; a defaulted
+    // copy would give the destination its own `_owned` while `_data` still referred
+    // to the *source's* buffer, so the copy would dangle as soon as the source was
+    // destroyed or grew. Re-deriving `_data` from the destination's own storage
+    // keeps the two fields consistent, and a view copies as a view because it has
+    // no owned storage to re-point into.
+    //
+    SerializedArray(SerializedArray const& other) { _copyFrom(other); }
+    SerializedArray(SerializedArray&& other) { _moveFrom(static_cast<SerializedArray&&>(other)); }
+
+    SerializedArray& operator=(SerializedArray const& other)
+    {
+        if (this != &other)
+            _copyFrom(other);
+        return *this;
+    }
+    SerializedArray& operator=(SerializedArray&& other)
+    {
+        if (this != &other)
+            _moveFrom(static_cast<SerializedArray&&>(other));
+        return *this;
+    }
+
+private:
+    void _copyFrom(SerializedArray const& other)
+    {
+        _owned = other._owned;
+        if (other.isView())
+        {
+            _data = other._data;
+            _count = other._count;
+        }
+        else
+        {
+            setFromOwned();
+        }
+    }
+
+    void _moveFrom(SerializedArray&& other)
+    {
+        const bool otherWasView = other.isView();
+        T const* otherData = other._data;
+        Count otherCount = other._count;
+        _owned = static_cast<List<T>&&>(other._owned);
+        if (otherWasView)
+        {
+            _data = otherData;
+            _count = otherCount;
+        }
+        else
+        {
+            setFromOwned();
+        }
+        other._data = nullptr;
+        other._count = 0;
+    }
+
+public:
     T const* _data = nullptr;
     Count _count = 0;
     List<T> _owned;
@@ -1028,6 +1090,12 @@ void serialize(S const& serializer, SerializedArray<T>& value)
                 T const* view = nullptr;
                 if (tryGetContiguousScalars(serializer, view, remaining))
                 {
+                    // Drop any storage a previous read left behind. `isView()` asks
+                    // whether `_owned` is empty, so leaving stale owned elements here
+                    // would make this object claim ownership while `_data` points into
+                    // the serialized blob -- `makeOwned()` would then do nothing and the
+                    // mutators would edit storage that `_data` does not refer to.
+                    value._owned = List<T>();
                     value._data = view;
                     value._count = remaining;
                     return;
