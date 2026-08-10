@@ -28,3 +28,106 @@ SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
     SLANG_CHECK(
         reporter.m_expectedFailureList.contains(String("tests/some/expected-failure.slang")));
 }
+
+// Retry reconciliation (issue #11911).
+//
+// A unit test that fails while slang-test runs in test-server mode is first reported as
+// `TestResult::PendingRetry`, which defers its result out of the statistics on the promise that a
+// later retry pass will report a real result for the same test. Nothing guarantees the retry
+// happens -- it can be skipped wholesale by an early abort, or fail to re-discover the test -- so
+// `reconcilePendingRetries()` must turn any deferral that no final result ever redeemed into a
+// counted failure. Without it a run that contained real failures reported "100% passed". These
+// tests pin that accounting directly on `TestReporter`, so the silent-false-green bug cannot come
+// back. The reporter is used bare (no `init()`): its constructor already zeroes the counters and
+// selects the plain-`printf` Default output mode.
+
+// A `PendingRetry` that no retry ever redeems must become a counted failure after reconciliation.
+// This is the exact bug: the deferred failure must not vanish.
+SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
+{
+    TestReporter reporter;
+    const String command("slang-unit-test-tool/probeAlwaysFails.internal");
+
+    // First pass defers the failure, which is what test-server mode does before a retry.
+    reporter.addTest(command, TestResult::PendingRetry);
+
+    // While deferred the test is invisible to the statistics -- the window the bug lived in.
+    SLANG_CHECK(reporter.m_totalTestCount == 0);
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.m_pendingRetryTests.contains(command));
+
+    // No final result ever arrived, so reconciliation must count the deferral as a failure.
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_totalTestCount == 1);
+    SLANG_CHECK(!reporter.didAllSucceed());
+}
+
+// A `PendingRetry` that a later final result redeems must NOT be counted as a failure: a flaky test
+// that passes on retry is a pass. This guards against over-correcting the bug above into counting
+// every retried test as failed.
+SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
+{
+    TestReporter reporter;
+    const String command("slang-unit-test-tool/probeFlaky.internal");
+
+    reporter.addTest(command, TestResult::PendingRetry); // first pass: deferred
+    reporter.addTest(command, TestResult::Pass);         // retry pass: redeemed as a pass
+
+    SLANG_CHECK(reporter.m_passedTestCount == 1);
+    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+
+    // The deferral is already redeemed, so reconciliation must leave the pass untouched.
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.m_passedTestCount == 1);
+    SLANG_CHECK(reporter.didAllSucceed());
+}
+
+// Reconciliation routes the synthesized failure through the ordinary `addTest(..., Fail)` path, so
+// a test on the expected-failure list is still downgraded to `ExpectedFail` and does not break the
+// run. This pins the promise made in `reconcilePendingRetries()` that the expected-failure gate
+// still applies to a reconciled deferral.
+SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
+{
+    TestReporter reporter;
+    const String command("slang-unit-test-tool/probeExpectedFail.internal");
+    reporter.m_expectedFailureList.add(command);
+
+    reporter.addTest(command, TestResult::PendingRetry);
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_expectedFailedTestCount == 1);
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.didAllSucceed());
+}
+
+// The deferral and the final result that redeems it can be recorded by two different sub-reporters,
+// because the retry pass runs on a fresh set of threads. After `consolidateWith()` unions both
+// sets, the merged reporter must see the retry as redeemed rather than failed -- this is why the
+// pending/final sets are tracked separately and reconciled only after consolidation.
+SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
+{
+    const String command("slang-unit-test-tool/probeCrossThread.internal");
+
+    TestReporter firstPass;
+    firstPass.addTest(command, TestResult::PendingRetry); // deferred on one worker
+
+    TestReporter retryPass;
+    retryPass.addTest(command, TestResult::Pass); // redeemed on another worker
+
+    TestReporter main;
+    main.consolidateWith(&firstPass);
+    main.consolidateWith(&retryPass);
+
+    SLANG_CHECK(main.m_pendingRetryTests.contains(command));
+    SLANG_CHECK(main.m_finalResultTests.contains(command));
+
+    main.reconcilePendingRetries();
+
+    SLANG_CHECK(main.m_failedTestCount == 0);
+    SLANG_CHECK(main.m_passedTestCount == 1);
+    SLANG_CHECK(main.didAllSucceed());
+}
