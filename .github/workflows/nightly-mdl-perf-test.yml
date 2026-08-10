@@ -384,6 +384,14 @@ jobs:
   # It is also the first split of the suite along the line we want long term:
   # the quiesced machine measures, and anything that merely reads results runs
   # where it is cheap and unrestricted.
+  # No setup-python here, deliberately: ubuntu-latest ships Python 3, the suite
+  # is stdlib-only, and check-python-core.yml already exercises these same
+  # scripts against the system interpreter on ubuntu-22.04/24.04 (its step is
+  # named "Verify using system Python (no setup-python)"). Pinning an
+  # interpreter here would add a network-dependent download to a job whose
+  # value is being cheap and reliable, and would test a version the suite is
+  # not otherwise verified against. The nightly job keeps its own setup-python
+  # because the Windows perf runner does need it.
   analyze:
     needs: nightly
     # always(): a failed sweep is exactly when the notification matters most.
@@ -406,11 +414,6 @@ jobs:
           persist-credentials: false
           # The suite scripts only; no submodules and no history needed.
           fetch-depth: "1"
-
-      - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.12"
 
       - name: Checkout perf results repo
         if: env.PUBLISH == 'true'
