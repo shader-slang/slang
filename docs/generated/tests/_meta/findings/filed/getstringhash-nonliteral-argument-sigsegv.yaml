@@ -3,6 +3,7 @@ id: getstringhash-nonliteral-argument-sigsegv
 bundle: design/ir-reference/misc
 suspected_kind: sigsegv
 title: "getStringHash on a non-literal String segfaults instead of E41023"
+filed_issue: "https://github.com/shader-slang/slang/issues/12440"
 observed_at: "2026-08-04T00:00:00+00:00"
 scope: diagnostics
 evidence:
