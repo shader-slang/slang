@@ -9,7 +9,6 @@
 #include "slang-compiler.h"
 #include "slang-doc-ast.h"
 #include "slang-doc-markdown-writer.h"
-#include "slang-ondemand-ir-stats.h"
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
@@ -17,7 +16,6 @@
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
 
-#include <chrono>
 
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
@@ -693,10 +691,6 @@ SlangResult Session::_readBuiltinModule(
     // Next, we set about deserializing the AST representation
     // of the module.
     //
-    const bool statsEnabled = OnDemandStats::isEnabled();
-    const uint64_t rssBeforeAST = statsEnabled ? OnDemandStats::getCurrentRSSBytes() : 0;
-    const auto astStart = std::chrono::steady_clock::now();
-
     auto moduleDecl = readSerializedModuleAST(
         linkage,
         astBuilder,
@@ -706,15 +700,6 @@ SlangResult Session::_readBuiltinModule(
         sourceLocReader,
         SourceLoc());
 
-    if (statsEnabled)
-    {
-        const auto astEnd = std::chrono::steady_clock::now();
-        OnDemandStats::recordPhase(
-            {"AST",
-             String(moduleName),
-             std::chrono::duration<double, std::milli>(astEnd - astStart).count(),
-             int64_t(OnDemandStats::getCurrentRSSBytes()) - int64_t(rssBeforeAST)});
-    }
     if (!moduleDecl)
     {
         return SLANG_FAIL;
@@ -726,33 +711,7 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    const uint64_t rssBeforeIR = statsEnabled ? OnDemandStats::getCurrentRSSBytes() : 0;
-    const auto irStart = std::chrono::steady_clock::now();
-
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, this, sourceLocReader, irModule));
-
-    if (statsEnabled)
-    {
-        const auto irEnd = std::chrono::steady_clock::now();
-        OnDemandStats::recordPhase(
-            {"IR",
-             String(moduleName),
-             std::chrono::duration<double, std::milli>(irEnd - irStart).count(),
-             int64_t(OnDemandStats::getCurrentRSSBytes()) - int64_t(rssBeforeIR)});
-    }
-    // Both of these walk the module, which materializes deferred bodies, so they
-    // are gated separately from the phase records above. They run after the IR
-    // phase is recorded, so they do not disturb its numbers -- but they do move
-    // process-level RSS, which is why they are not on by default either.
-    if (OnDemandStats::isWalkEnabled())
-    {
-        OnDemandStats::analyzeCrossBodyReferences(String(moduleName).getBuffer(), irModule.get());
-        const auto* irDataChunk = as<RIFF::DataChunk>(irChunk);
-        OnDemandStats::completeLastIRModuleShape(
-            String(moduleName),
-            irDataChunk ? int64_t(irDataChunk->getPayloadSize()) : 0,
-            int64_t(irModule->getMemoryArena().calcTotalMemoryUsed()));
-    }
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);

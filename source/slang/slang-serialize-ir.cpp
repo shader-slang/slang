@@ -9,14 +9,12 @@
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-validate.h"
-#include "slang-ondemand-ir-stats.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-source-loc.h"
 #include "slang-serialize.h"
 #include "slang-tag-version.h"
 #include "slang.h"
 
-#include <chrono>
 #include <mutex>
 
 //
@@ -531,6 +529,19 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 // table and the instruction array keeps the second use possible -- a body's
 // operands are indices into that array, and may name any module-scope global.
 //
+/// True if `SLANG_ONDEMAND_LAZY_IR` selects deferred loading of builtin-module
+/// instruction bodies. Read once, since a global session is shared across threads
+/// and `getenv` is not safe against a concurrent `setenv`.
+static bool isLazyIRLoadEnabled()
+{
+    static const bool enabled = []
+    {
+        const char* value = ::getenv("SLANG_ONDEMAND_LAZY_IR");
+        return value && value[0] != '\0' && value[0] != '0';
+    }();
+    return enabled;
+}
+
 struct FlatModuleDecoder : IRDeferredBodyLoader
 {
     FlatInstTable flat;
@@ -908,12 +919,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     decoder->module = module;
     decoder->readContext = &readContext;
     FlatInstTable& flat = decoder->flat;
-    const bool statsOn = OnDemandStats::isEnabled();
-    const auto tCopyStart = std::chrono::steady_clock::now();
-    const uint64_t rssCopyStart = statsOn ? OnDemandStats::getCurrentRSSBytes() : 0;
     serialize(serializer, flat);
-    const auto tCopyEnd = std::chrono::steady_clock::now();
-    const uint64_t rssCopyEnd = statsOn ? OnDemandStats::getCurrentRSSBytes() : 0;
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
     // dumpFlatInstTableStats(flat, "deserializing");
 
@@ -946,7 +952,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // instruction on its own is that operands, literals and strings are consumed by
     // running cursors in preorder; those cursor positions are recovered here by a
     // scan over `childCounts` that allocates nothing.
-    const bool lazyIRLoad = OnDemandStats::isLazyIRLoadEnabled();
+    const bool lazyIRLoad = isLazyIRLoadEnabled();
     List<uint8_t> materializeInst;
     if (lazyIRLoad)
     {
@@ -976,11 +982,6 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             if (remainingChildren.getCount())
                 remainingChildren.getLast()--;
         }
-
-        Int64 kept = 0;
-        for (Int64 i = 0; i < numInsts; ++i)
-            kept += materializeInst[i];
-        OnDemandStats::recordLazyLoadCounts(kept, numInsts);
     }
 
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
@@ -1001,9 +1002,6 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
                                : module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
-    const auto tAllocEnd = std::chrono::steady_clock::now();
-    const uint64_t rssAllocEnd = statsOn ? OnDemandStats::getCurrentRSSBytes() : 0;
-
     decoder->deferBodies = lazyIRLoad;
     const auto moduleInst = decoder->decodeInst(nullptr, 0);
 
@@ -1013,56 +1011,6 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     if (decoder->deferredBodies.getCount())
     {
         module->setDeferredBodyLoader(decoder);
-    }
-
-    if (statsOn)
-    {
-        const auto tWireEnd = std::chrono::steady_clock::now();
-        using Ms = std::chrono::duration<double, std::milli>;
-        OnDemandStats::recordIRSubPhases(
-            {Ms(tCopyEnd - tCopyStart).count(),
-             Ms(tAllocEnd - tCopyEnd).count(),
-             Ms(tWireEnd - tAllocEnd).count(),
-             int64_t(rssCopyEnd) - int64_t(rssCopyStart),
-             int64_t(rssAllocEnd) - int64_t(rssCopyEnd)});
-    }
-
-    // Record the flat-table shape while it is still in scope; the caller only
-    // ever sees the materialized IRModule.
-    //
-    // Off unless the walk is asked for: reading each global's decorations
-    // materializes deferred children, and this runs inside the window the IR
-    // phase record is timing, so leaving it on makes the eager tier measure
-    // larger than it is.
-    if (OnDemandStats::isWalkEnabled())
-    {
-        OnDemandStats::IRModuleShape shape;
-        shape.instCount = numInsts;
-        shape.globalInstCount = 0;
-        shape.eagerTierInstCount = 1; // the module inst itself
-        for (auto child = moduleInst->getFirstChild(); child; child = child->getNextInst())
-        {
-            shape.globalInstCount++;
-            // Size the eager tier a per-symbol lazy design would still need: each
-            // global's header, plus the linkage decoration and the string that
-            // carries its mangled name, since those are what the symbol index is
-            // built from.
-            shape.eagerTierInstCount++;
-            for (auto decoration : child->getDecorations())
-            {
-                if (decoration->getOp() == kIROp_ExportDecoration ||
-                    decoration->getOp() == kIROp_ImportDecoration)
-                {
-                    shape.eagerTierInstCount += 2; // decoration + its name operand
-                }
-            }
-        }
-        shape.operandSlotCount = operandIndicesCount;
-        shape.stringByteCount = flat.stringChars.getCount();
-        shape.literalCount = flat.literals.getCount();
-        shape.serializedByteCount = 0;
-        shape.arenaBytesUsed = 0;
-        OnDemandStats::recordIRModuleShape(shape);
     }
 
     // The walk visits every instruction and consumes every payload entry even when
@@ -1078,21 +1026,6 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         SLANG_RELEASE_ASSERT(decoder->stringLengthIndex == flat.stringLengths.getCount());
         SLANG_RELEASE_ASSERT(decoder->stringDataIndex == flat.stringChars.getCount());
     }
-    // Diagnostic: materialize everything immediately. This separates "is the
-    // deferred decode correct?" from "does every reader go through the hook?" --
-    // with this on, the module should be indistinguishable from an eager load.
-    if (::getenv("SLANG_ONDEMAND_FORCE_MATERIALIZE"))
-    {
-        List<IRInst*> pending;
-        for (const auto& [deferredInst, unused] : decoder->deferredBodies)
-        {
-            SLANG_UNUSED(unused);
-            pending.add(deferredInst);
-        }
-        for (auto deferredInst : pending)
-            decoder->materializeDeferredBody(deferredInst);
-    }
-
     SLANG_RELEASE_ASSERT(as<IRModuleInst>(moduleInst));
     return cast<IRModuleInst>(moduleInst);
 }

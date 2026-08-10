@@ -15,7 +15,6 @@
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-module-library.h"
-#include "slang-ondemand-ir-stats.h"
 #include "slang-rich-diagnostics.h"
 
 
@@ -127,15 +126,6 @@ struct IRSpecContextBase
         {
             for (auto inst : m->findSymbolByMangledName(hashedName))
             {
-                if (OnDemandStats::isEnabled())
-                {
-                    // Attribute the hit to the module that supplied it, so the
-                    // report can express coverage as a fraction of that module.
-                    auto name = m->getName();
-                    OnDemandStats::recordSymbolUse(
-                        mangledName,
-                        name ? name->text.getBuffer() : "<unnamed>");
-                }
                 insertGlobalValueSymbol(shared, inst);
             }
         }
@@ -1547,35 +1537,11 @@ IRInst* cloneInst(
     return clonedInst;
 }
 
-/// Returns the number of instructions in the subtree rooted at `inst`, counting
-/// `inst` itself, its decorations, and all nested children.
-static int64_t _countInstSubtree(IRInst* inst)
-{
-    int64_t count = 1;
-    for (auto child : inst->getDecorationsAndChildren())
-        count += _countInstSubtree(child);
-    return count;
-}
-
 IRInst* cloneGlobalValueImpl(
     IRSpecContext* context,
     IRInst* originalInst,
     IROriginalValuesForClone const& originalValues)
 {
-    if (OnDemandStats::isEnabled())
-    {
-        // Attribute this pull to the module the definition came from, so the
-        // report can size what a per-symbol lazy scheme would still materialize.
-        if (auto originalModule = originalInst->getModule())
-        {
-            auto name = originalModule->getName();
-            OnDemandStats::recordGlobalValueClone(
-                name ? name->text.getBuffer() : "<unnamed>",
-                originalInst,
-                _countInstSubtree(originalInst));
-        }
-    }
-
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
