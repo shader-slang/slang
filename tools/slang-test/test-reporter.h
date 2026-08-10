@@ -105,6 +105,16 @@ public:
     /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
+    /// Counts every test whose result is still deferred as a failure, and reports it.
+    ///
+    /// Reporting `TestResult::PendingRetry` for a test defers its result: it is left out of the
+    /// statistics on the promise that a retry will report a real result for the same test later.
+    /// Nothing guarantees the retry actually happens: it can be skipped wholesale (see the
+    /// `stopSchedulingTests` early-abort) or fail to re-discover the test. A deferral that is
+    /// never redeemed would otherwise vanish, letting a run that contained real failures report
+    /// 100% passed. Call this once after the last retry pass and before `outputSummary()` /
+    /// `didAllSucceed()`.
+    void reconcilePendingRetries();
 
     /// Returns true if all run tests succeeded
     bool didAllSucceed() const;
@@ -131,6 +141,18 @@ public:
     static void set(TestReporter* reporter) { s_reporter = reporter; }
 
     Slang::List<TestInfo> m_testInfos;
+
+    /// Names of tests whose result was deferred by a `TestResult::PendingRetry` report.
+    Slang::HashSet<Slang::String> m_pendingRetryTests;
+
+    /// Names of tests that reached a final (non-deferred) result.
+    ///
+    /// This is what redeems an entry in `m_pendingRetryTests`, and it is tracked separately rather
+    /// than read back out of `m_testInfos` for two reasons: a test can be deferred by one
+    /// sub-reporter and resolved by another (the retry pass runs on different threads than the
+    /// first pass), so the two sets have to survive `consolidateWith` independently; and a final
+    /// `Ignored` result under `-hide-ignored` never reaches `m_testInfos` at all.
+    Slang::HashSet<Slang::String> m_finalResultTests;
 
     Slang::List<Slang::String> m_suiteStack;
 

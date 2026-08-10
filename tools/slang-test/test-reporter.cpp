@@ -253,6 +253,14 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_passedTestCount += other->m_passedTestCount;
     m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
+
+    // A deferral and the final result that redeems it can be recorded by two different
+    // sub-reporters, because the retry pass is run by a fresh set of threads. Merge both sets and
+    // let reconcilePendingRetries() match them up once everything has been consolidated.
+    for (const auto& name : other->m_pendingRetryTests)
+        m_pendingRetryTests.add(name);
+    for (const auto& name : other->m_finalResultTests)
+        m_finalResultTests.add(name);
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -359,17 +367,24 @@ void TestReporter::_addResult(TestInfo info)
         return;
     }
 
-    if (info.testResult == TestResult::Ignored && m_hideIgnored)
+    // If test is pending retry, don't count it in any statistics yet.
+    // The test will be re-run and reported again with a final result; remember the deferral so
+    // reconcilePendingRetries() can fail the test if that never happens.
+    if (info.testResult == TestResult::PendingRetry)
     {
+        m_pendingRetryTests.add(info.name);
+        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
+        fflush(stdout);
         return;
     }
 
-    // If test is pending retry, don't count it in any statistics yet
-    // The test will be re-run and reported again with a final result
-    if (info.testResult == TestResult::PendingRetry)
+    // Any other result is final, and redeems an earlier deferral of the same test. Record it
+    // before the hidden-ignored case below returns, because being hidden from the output does not
+    // make the result any less final.
+    m_finalResultTests.add(info.name);
+
+    if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
-        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
-        fflush(stdout);
         return;
     }
 
@@ -679,6 +694,27 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
     message(type, String(messageContent));
 }
 
+
+void TestReporter::reconcilePendingRetries()
+{
+    for (const auto& name : m_pendingRetryTests)
+    {
+        if (m_finalResultTests.contains(name))
+            continue;
+
+        printf(
+            "error: test '%s' was marked pending retry but was never re-run, so its failure was "
+            "about to go unreported; counting it as failed\n",
+            name.getBuffer());
+        fflush(stdout);
+
+        // Report it as an ordinary failure so that it lands in the summary and, like any other
+        // failure, is still downgraded if it is on the expected-failure list.
+        addTest(name, TestResult::Fail);
+    }
+
+    m_pendingRetryTests.clear();
+}
 
 bool TestReporter::didAllSucceed() const
 {

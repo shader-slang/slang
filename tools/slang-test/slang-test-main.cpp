@@ -5736,8 +5736,10 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
+                // Note the expected-failure list is keyed by the command (the same string
+                // `TestReporter::adjustResult` looks up), not by the bare test name.
                 if (isFailed && !context->isRetry && !context->options.disableRetries &&
-                    !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
+                    !context->getTestReporter()->m_expectedFailureList.contains(test.command))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
@@ -5816,7 +5818,10 @@ static SlangResult runUnitTestModule(
             runUnitTest(t);
     }
 
-    testModule->destroy();
+    // Note `testModule->destroy()` is deliberately not called here. The registry it would empty has
+    // process lifetime and is filled in once, by the module's load-time static constructors, so
+    // this function must leave it intact for the retry pass to enumerate. (The test server, which
+    // holds the same kind of module, releases its own copy from its destructor at shutdown.)
     return SLANG_OK;
 }
 
@@ -6196,6 +6201,10 @@ SlangResult innerMain(int argc, char** argv)
                 }
             }
         }
+
+        // Every retry pass has now run, so any test whose result is still deferred is never going
+        // to get one. Turn those into failures before they reach the summary.
+        reporter.reconcilePendingRetries();
 
         reporter.outputSummary();
 
