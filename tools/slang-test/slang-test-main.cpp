@@ -14,6 +14,7 @@
 #include "core/slang-std-writers.h"
 #include "core/slang-string-escape-util.h"
 #include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -4983,57 +4984,6 @@ static String insertSubtestIndex(const String& testName, int index)
 
 // Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
 // Returns the subtest index if found, or -1 if not a subtest prefix.
-static int getSubtestIndex(const String& prefix, const String& filePath)
-{
-    if (prefix.getLength() <= filePath.getLength() || !prefix.startsWith(filePath))
-        return -1;
-
-    auto suffix = prefix.getUnownedSlice().tail(filePath.getLength());
-    if (suffix.getLength() < 2 || suffix[0] != '.')
-        return -1;
-
-    // Check all remaining chars are digits
-    int index = 0;
-    for (Index i = 1; i < suffix.getLength(); i++)
-    {
-        char c = suffix[i];
-        if (c < '0' || c > '9')
-            return -1;
-        index = index * 10 + (c - '0');
-    }
-
-    return index;
-}
-
-/// Does `entry` select the subtest identified by `outputStem` / `subTestIndex`?
-///
-/// One predicate for every place a command-line entry is matched against a
-/// subtest — test-order prefixes, the more-specific-prefix filter, and the
-/// per-subtest exclusion below. They previously agreed only by having the same
-/// logic written out twice; a third copy for exclusion would have made
-/// `foo.slang.6` mean something subtly different depending on which flag it
-/// arrived on.
-///
-/// An entry naming a specific subtest (`<file>.<n>`) matches that subtest
-/// only, so `foo.slang.6` never matches `foo.slang.60`. Subtest 0 is spelled
-/// without a suffix in `outputStem`, hence the special case. Anything else is
-/// a plain path prefix and matches every subtest of a matching file.
-static bool entryMatchesSubtest(
-    const String& entry,
-    const String& filePath,
-    const String& outputStem,
-    Index subTestIndex)
-{
-    const int entrySubtest = getSubtestIndex(entry, filePath);
-    if (entrySubtest >= 0)
-    {
-        if (entrySubtest == 0 && subTestIndex == 0)
-            return true;
-        return outputStem == entry;
-    }
-    return filePath.startsWith(entry);
-}
-
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 {
     // Gather a list of tests to run
@@ -5134,7 +5084,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             for (Index i = 0; i < prefixes.getCount(); i++)
             {
                 // Check if prefix matches this specific subtest
-                if (entryMatchesSubtest(prefixes[i], filePath, outputStem, testIdx))
+                if (TestToolUtil::entryMatchesSubtest(prefixes[i], filePath, outputStem, testIdx))
                     return i;
             }
             return prefixes.getCount();
@@ -5233,7 +5183,11 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             {
                 for (const auto& entry : entries)
                 {
-                    if (entryMatchesSubtest(entry, filePath, outputStem, subTestIndex))
+                    if (TestToolUtil::entryMatchesSubtest(
+                            entry,
+                            filePath,
+                            outputStem,
+                            subTestIndex))
                         return true;
                 }
                 return false;
@@ -5259,32 +5213,15 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
             for (auto& p : context->options.testPrefixes)
             {
-                int prefixSubtestIndex = getSubtestIndex(p, filePath);
-                if (prefixSubtestIndex >= 0)
+                // Two separate questions, and only the second is the shared
+                // matching rule: whether the entry NAMES a subtest at all
+                // (which arms the filter), and whether it matches THIS one.
+                if (TestToolUtil::getSubtestIndex(p, filePath) >= 0)
                 {
                     hasSpecificPrefix = true;
-                    // Handle .0 specially - it refers to the first test (no suffix in outputStem)
-                    if (prefixSubtestIndex == 0)
-                    {
-                        if (outputStem == filePath)
-                        {
-                            matchesSpecificPrefix = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        // outputStem must match exactly (e.g., .10 shouldn't match .100)
-                        if (outputStem == p)
-                        {
-                            matchesSpecificPrefix = true;
-                            break;
-                        }
-                    }
                 }
-                else if (filePath.startsWith(p))
+                if (TestToolUtil::entryMatchesSubtest(p, filePath, outputStem, subTestIndex))
                 {
-                    // Non-specific prefix that matches the file - always run
                     matchesSpecificPrefix = true;
                     break;
                 }
@@ -5429,7 +5366,7 @@ static bool shouldRunTest(TestContext* context, String filePath)
         }
         // Also match if the prefix specifies a subtest index
         // (e.g., prefix "foo.slang.1" should include file "foo.slang")
-        if (getSubtestIndex(p, filePath) >= 0)
+        if (TestToolUtil::getSubtestIndex(p, filePath) >= 0)
         {
             return true;
         }
@@ -5553,7 +5490,7 @@ void runTestsInDirectory(TestContext* context)
                     return i;
                 }
                 // Also match subtest prefixes (e.g., "foo.slang.1" matches file "foo.slang")
-                if (getSubtestIndex(prefixes[i], filePath) >= 0)
+                if (TestToolUtil::getSubtestIndex(prefixes[i], filePath) >= 0)
                 {
                     return i;
                 }

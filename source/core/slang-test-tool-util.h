@@ -87,6 +87,28 @@ struct TestToolUtil
     /// -load-core-module).
     static bool hasDeferredCoreModule(Index numArgs, const char* const* args);
 
+    /// If `entry` names a specific subtest of `filePath` (`<filePath>.<n>`),
+    /// return n; otherwise -1. `foo.slang.6` yields 6; `foo.slang` and
+    /// `foo.slang.x` yield -1.
+    static int getSubtestIndex(const String& entry, const String& filePath);
+
+    /// Does `entry` select the subtest identified by `outputStem` /
+    /// `subTestIndex`?
+    ///
+    /// One predicate for every place a command-line entry is matched against a
+    /// subtest, so `foo.slang.6` cannot come to mean different things
+    /// depending on which flag it arrived on.
+    ///
+    /// An entry naming a specific subtest matches only that subtest, so
+    /// `foo.slang.6` never matches `foo.slang.60`. Subtest 0 is spelled
+    /// without a suffix in `outputStem`, hence the special case. Anything else
+    /// is a plain path prefix and matches every subtest of a matching file.
+    static bool entryMatchesSubtest(
+        const String& entry,
+        const String& filePath,
+        const String& outputStem,
+        Index subTestIndex);
+
     static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);
 };
 

@@ -225,4 +225,43 @@ static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& ou
     return SLANG_OK;
 }
 
+
+/* static */ int TestToolUtil::getSubtestIndex(const String& entry, const String& filePath)
+{
+    if (entry.getLength() <= filePath.getLength() || !entry.startsWith(filePath))
+        return -1;
+
+    auto suffix = entry.getUnownedSlice().tail(filePath.getLength());
+    if (suffix.getLength() < 2 || suffix[0] != '.')
+        return -1;
+
+    // Check all remaining chars are digits
+    int index = 0;
+    for (Index i = 1; i < suffix.getLength(); i++)
+    {
+        char c = suffix[i];
+        if (c < '0' || c > '9')
+            return -1;
+        index = index * 10 + (c - '0');
+    }
+
+    return index;
+}
+
+/* static */ bool TestToolUtil::entryMatchesSubtest(
+    const String& entry,
+    const String& filePath,
+    const String& outputStem,
+    Index subTestIndex)
+{
+    const int entrySubtest = getSubtestIndex(entry, filePath);
+    if (entrySubtest >= 0)
+    {
+        if (entrySubtest == 0 && subTestIndex == 0)
+            return true;
+        return outputStem == entry;
+    }
+    return filePath.startsWith(entry);
+}
+
 } // namespace Slang
