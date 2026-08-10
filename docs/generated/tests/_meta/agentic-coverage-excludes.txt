@@ -135,14 +135,17 @@ docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic
 # the suite there is no single "leaker" to exclude, and the tests themselves are
 # correct, so they are excluded rather than weakened.
 #
-# The leak is not specific to the coverage pass being in-process. The three
-# `target-pipelines/hlsl` tests fail on nightly-slang-test.yml as well (run
-# 31294644845, `-use-test-server -server-count 4`), because the test server is
-# equally long-lived and reuses one GlobalSession across the tests it handles.
-# The `06-emit` test still passes there. They are not in expected-failures.txt
-# because whether they fail depends on what ran before them on the same server,
-# so an entry would report as spuriously-passing about as often as it applied.
-# First identified locally 2026-07-09; nightly behaviour confirmed 2026-08-09.
+# The leak is not specific to the coverage pass being in-process. These tests
+# fail on nightly-slang-test.yml as well, because the test server is equally
+# long-lived and reuses one GlobalSession across the tests it handles: the three
+# `target-pipelines/hlsl` tests failed on run 31294644845, and the `06-emit`
+# one, which passed there, failed on run 31361305751. Which of them is hit
+# depends on whether a `-cpu` test happened to run before it on the same server,
+# so the victim set moves between runs. All four are listed in
+# expected-failures.txt for the nightly; slang-test keeps expected failures out
+# of its exit code, and an entry that passes is reported in the step summary
+# rather than failing the job, so a moving victim set is safe to list.
+# First identified locally 2026-07-09; nightly behaviour confirmed 2026-08-10.
 #
 # Path note: the first entry used to read
 # `.../06-emit/preludes-included-by-c-and-cuda.slang`. The 2026-08-04
