@@ -495,8 +495,7 @@ jobs:
                   f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
                   f'{os.environ[\"STATUS\"]}\n'
                   f'• Run: {os.environ[\"RUN_URL\"]}\n'
-                  f'• Report: https://shader-slang.org/slang-compile-perf/ '
-                  f'(may take a few minutes to update after the run)'
+                  f'• Report: https://shader-slang.org/slang-compile-perf/'
               )
           }
           req = urllib.request.Request(
