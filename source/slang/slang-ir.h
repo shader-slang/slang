@@ -696,14 +696,51 @@ struct IRInst
     // to be the last field in `IRInst` and to come right before any additional
     // `IRUse` values that represent operands.
     //
+    // Because it cannot be made private, the rule it now carries has to be stated
+    // instead: **read this field through the accessors below, not directly.** On a
+    // module loaded with deferred bodies, `.first`/`.last` describe only the
+    // decorations until `ensureBodyMaterialized()` has run, so a direct read of a
+    // global value's children sees an empty body and reports success. That failure
+    // is silent and surfaces far from its cause -- two such sites were found during
+    // the deferred-loading work, and only by running the whole test suite in both
+    // modes. The accessors below all materialize; the sole exception is named
+    // `...WithoutMaterializing` and documents when it is legitimate.
+    //
     IRInstListBase m_decorationsAndChildren;
 
 
-    // Deliberately not hooked: decorations always precede children, so reading the
-    // head of the list reaches only decorations, which are never deferred. Hooking
-    // it would materialize every body during decoration lookup and defeat the
-    // point. Every accessor below can reach a child, so each one materializes.
-    IRInst* getFirstDecorationOrChild() { return m_decorationsAndChildren.first; }
+    /// Returns the head of the combined decoration/child list, materializing a
+    /// deferred body first.
+    ///
+    /// This materializes even though the returned pointer alone can only reach a
+    /// decoration, because callers overwhelmingly use it as the head of a loop
+    /// that walks on into the children. Such a loop against an unmaterialized
+    /// body would find the decorations, no children, and report that there are
+    /// none -- a silent wrong answer rather than a crash. Decoration-only
+    /// scanners that must not pay for materialization use
+    /// `getFirstDecorationOrChildWithoutMaterializing` below, whose name is
+    /// deliberately hard to reach for by accident.
+    IRInst* getFirstDecorationOrChild()
+    {
+        ensureBodyMaterialized();
+        return m_decorationsAndChildren.first;
+    }
+
+    /// Head of the combined list *without* materializing a deferred body.
+    ///
+    /// Valid only for walking decorations, which always precede children in this
+    /// list and are never deferred. Stopping at the first non-decoration is the
+    /// caller's obligation: on an instruction whose body is still encoded, the
+    /// children are simply not linked yet, so a walk that continues past the
+    /// decorations silently sees an empty body.
+    ///
+    /// This exists so that decoration lookup -- which runs on every instruction of
+    /// every module -- does not force materialization of bodies no one asked for,
+    /// which would defeat deferred loading entirely.
+    IRInst* getFirstDecorationOrChildWithoutMaterializing()
+    {
+        return m_decorationsAndChildren.first;
+    }
 
     IRInst* getLastDecorationOrChild()
     {
