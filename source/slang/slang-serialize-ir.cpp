@@ -1010,9 +1010,17 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
              Ms(tWireEnd - tAllocEnd).count(),
              int64_t(rssCopyEnd) - int64_t(rssCopyStart),
              int64_t(rssAllocEnd) - int64_t(rssCopyEnd)});
+    }
 
-        // Record the flat-table shape while it is still in scope; the caller
-        // only ever sees the materialized IRModule.
+    // Record the flat-table shape while it is still in scope; the caller only
+    // ever sees the materialized IRModule.
+    //
+    // Off unless the walk is asked for: reading each global's decorations
+    // materializes deferred children, and this runs inside the window the IR
+    // phase record is timing, so leaving it on makes the eager tier measure
+    // larger than it is.
+    if (OnDemandStats::isWalkEnabled())
+    {
         OnDemandStats::IRModuleShape shape;
         shape.instCount = numInsts;
         shape.globalInstCount = 0;

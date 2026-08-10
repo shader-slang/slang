@@ -30,6 +30,18 @@ namespace OnDemandStats
 /// True if SLANG_ONDEMAND_STATS is set to something other than 0. Read once.
 bool isEnabled();
 
+/// True if SLANG_ONDEMAND_STATS_WALK is also set to something other than 0.
+///
+/// Separate from isEnabled() because the reports that need to walk a module --
+/// its shape, and its cross-body operand references -- have to touch every
+/// global's children, which under deferred loading materializes IR that the
+/// workload never asked for. Measuring the AST/IR split with those walks on
+/// therefore reports the eager tier as larger than it is: on the combined
+/// configuration they cost ~37 MiB of peak RSS, most of it inside the window
+/// the IR phase record is timing. The walks stay available for the shape
+/// analysis they were written for; they are simply not on by default.
+bool isWalkEnabled();
+
 /// Current resident set size of this process in bytes, or 0 if unavailable.
 ///
 /// Read from /proc/self/statm. RSS is the honest measure here: the fossil blob is
