@@ -5179,20 +5179,12 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         // that reclassifies a result only after the test returns, and this
         // one never does. The skip must be pre-dispatch, so it is.
         {
-            const auto excludes = [&](const List<String>& entries)
-            {
-                for (const auto& entry : entries)
-                {
-                    if (TestToolUtil::entryMatchesSubtest(
-                            entry,
-                            filePath,
-                            outputStem,
-                            subTestIndex))
-                        return true;
-                }
-                return false;
-            };
-            if (excludes(context->options.excludePrefixes) || excludes(context->options.skipList))
+            if (TestToolUtil::isSubtestExcluded(
+                    context->options.excludePrefixes,
+                    context->options.skipList,
+                    filePath,
+                    outputStem,
+                    subTestIndex))
             {
                 if (context->options.verbosity >= VerbosityLevel::Info)
                 {

@@ -109,6 +109,21 @@ struct TestToolUtil
         const String& outputStem,
         Index subTestIndex);
 
+    /// Is the subtest identified by `outputStem` / `subTestIndex` excluded by
+    /// either list?
+    ///
+    /// `-exclude-prefix` and `-skip-list` are separate flags but mean the same
+    /// thing once a subtest has been expanded, so the caller consults both.
+    /// Keeping the disjunction here rather than at the call site is what makes
+    /// it testable: the call site is mid-way through the dispatch loop in
+    /// slang-test, where nothing else can reach it.
+    static bool isSubtestExcluded(
+        const List<String>& excludePrefixes,
+        const List<String>& skipList,
+        const String& filePath,
+        const String& outputStem,
+        Index subTestIndex);
+
     static SlangResult getDllDirectoryPath(const char* exePath, String& outDllDirectoryPath);
 };
 
