@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops-branches-opt-levels
-//META: doc_section_digest=5c5a0f355c34a9303ec2cc1c18ffbb9a6f1d4bcd8bac23383e808da27fa7169c
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels
+//META: doc_section_digest=2884135594e88fad2ff6c4fdc20d6bf694888dfaa9f666f2ac51e906fc88f826
 //META: purpose=`[ForceInline]` on a small helper inlines it into the caller; the helper's name no longer appears in emitted HLSL.
 //META: intent=functional
-//META: pipeline_stage=emit
+//META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `ForceInlineAttribute` forces inlining of the target function. After
-// inlining, the helper's body appears at the call site and the helper
-// itself is dropped from emitted HLSL.
+// Verifies `[ForceInline]` causes Slang itself to inline the callee, so no
+// call survives to the back end. CHECK asserts the entry point is emitted and
+// CHECK-NOT asserts no call to `helper(` remains -- its body having been spliced
+// into the call site.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
 
@@ -29,6 +30,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = helper(int(tid.x));
 }
 
-// The doubled-and-incremented expression appears inlined.
-//CHECK: main
+//CHECK: void main
 //CHECK-NOT: helper(

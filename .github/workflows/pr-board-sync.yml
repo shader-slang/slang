@@ -6,9 +6,11 @@ name: PR Board Sync (reusable)
 #   - classifies + sets its Source (Internal / Community / Bot),
 #   - advances its Status (In Review / Revising / Snagged / Approved / Done)
 #     on the event-driven happy path,
-#   - backfills the assignee + reviewers (an Internal PR's author; otherwise a
-#     linked-issue owner, else the top committer-signal owner, else the
-#     maintainer) and requests reviewers,
+#   - backfills the assignee + auto-requested reviewer (an Internal PR's author;
+#     otherwise a linked-issue owner, else the top committer-signal owner, else
+#     the maintainer) and auto-requests that shepherd only when they are not the
+#     author / not ignored / no real reviewer already present; a higher-signal
+#     collaborator is suggested in a PR comment (no @), never auto-requested,
 #   - when a PR has an owner, assigns any still-unassigned linked (closing)
 #     issues to that same owner (the PR's primary assignee, not the co-assigned
 #     community author), and
@@ -909,6 +911,93 @@ jobs:
               return x instanceof Set ? x : new Set(x || []);
             }
 
+            // Among committersBySignal (highest first), pick the first collaborator
+            // who is not the author / shepherd / auto-requested reviewer / bot and
+            // who outranks the auto-requested reviewer. committersBySignal must be
+            // sorted highest-signal-first; the loop stops at the auto-requested
+            // reviewer's index because later entries cannot strictly outrank them.
+            // When nobody was auto-requested, or the auto-requested login is absent
+            // from the ranking (no measured signal on these files — e.g. maintainer
+            // fallback), that baseline is treated as rank −∞ and any eligible
+            // collaborator counts as higher-signal. Used only for a suggestion
+            // comment — never for requestReviewers.
+            //
+            // Collaborator membership uses raw login equality (same as
+            // selectAssigneeAndReviewers' owners.has / collaborators.has). All three
+            // sets come from GitHub APIs with canonical login casing, so a
+            // case-insensitive check is unnecessary here.
+            function pickSuggestedReviewer({
+              committersBySignal = [],
+              collaborators,
+              author,
+              assignee,
+              autoRequestedReviewer,
+              botAuthors = [],
+            }) {
+              const collab = _toSet(collaborators);
+              const excluded = new Set(
+                [author, assignee, autoRequestedReviewer]
+                  .filter(Boolean)
+                  .map((login) => login.toLowerCase()));
+              const requestedLower = (autoRequestedReviewer || "").toLowerCase();
+              const requestedRank = requestedLower
+                ? committersBySignal.findIndex(
+                    (c) => c && c.toLowerCase() === requestedLower)
+                : -1;
+              for (let i = 0; i < committersBySignal.length; ++i) {
+                if (requestedRank >= 0 && i >= requestedRank) break;
+                const c = committersBySignal[i];
+                if (!c) continue;
+                const lower = c.toLowerCase();
+                if (excluded.has(lower)) continue;
+                if (lower.endsWith("[bot]") || classifyIsBot(c, botAuthors)) continue;
+                if (!collab.has(c)) continue;
+                return c;
+              }
+              return null;
+            }
+
+            // Body for the one-shot comment posted when a Community/Bot PR is
+            // first auto-assigned. Mentions the assignee (already notified by
+            // GitHub's assign event) but never @-mentions the suggested
+            // reviewer, so the suggestion does not ping them. Wording is
+            // informational only: clear that the note is automated and that
+            // recipients must not reply (so bot authors do not treat it as a task).
+            // autoRequestedReviewer must be the login we actually intend to
+            // requestReviewers (or null). autoRequestedHasSignal is true only
+            // when that login appears in committersBySignal; otherwise we avoid
+            // saying they have "lower" signal when they have none measured.
+            function formatAssignmentComment({
+              source, assignee, suggestedReviewer,
+              autoRequestedReviewer, autoRequestedHasSignal,
+            }) {
+              let body =
+                `<!-- pr-board-sync-assignment -->\n` +
+                `**Automated notice** (PR board sync) — do not reply to this comment.\n\n` +
+                `Auto-assigned @${assignee} as shepherd for this ${source} PR.`;
+              if (suggestedReviewer) {
+                if (autoRequestedReviewer && autoRequestedHasSignal) {
+                  body +=
+                    `\n\nFYI for maintainers: committer signal on the changed ` +
+                    `files is higher for ${suggestedReviewer} than for the ` +
+                    `auto-requested reviewer (${autoRequestedReviewer}). They ` +
+                    `were not auto-requested; a human may optionally add them ` +
+                    `as a reviewer.`;
+                } else {
+                  // Assignee (and author / auto-requested when present) were
+                  // excluded from the pick, so this is highest among remaining
+                  // eligible collaborators — not among all collaborators.
+                  body +=
+                    `\n\nFYI for maintainers: committer signal on the changed ` +
+                    `files is highest for ${suggestedReviewer} among ` +
+                    `collaborators other than the assignee. They were not ` +
+                    `auto-requested; a human may optionally add them as a ` +
+                    `reviewer.`;
+                }
+              }
+              return body;
+            }
+
             function selectAssigneeAndReviewers(opts) {
               const {
                 issueAssignees = [],
@@ -923,6 +1012,9 @@ jobs:
               const ignoredLower = new Set([..._toSet(opts.ignoredReviewers)].map((r) => r.toLowerCase()));
               const excluded = (author || "").toLowerCase();
 
+              // Linked-issue assignees who are the PR author are skipped here; they
+              // can still become shepherd via ownerCommitters if they are on the
+              // owners team.
               const issueOwnerAssignees = issueAssignees.filter(
                 (a) => owners.has(a) && a.toLowerCase() !== excluded && !a.toLowerCase().endsWith("[bot]"));
               const ownerCommitters = committersBySignal.filter((c) => owners.has(c));
@@ -932,27 +1024,38 @@ jobs:
               else if (ownerCommitters.length) assignee = ownerCommitters[0];
               else assignee = maintainer;
 
-              // A reviewer who can actually approve already requested? Then add no more.
+              // Single source of truth for who we will requestReviewers: shepherd
+              // if not the author, not ignored, and no real reviewer already present.
+              let autoRequestedReviewer =
+                (assignee && assignee.toLowerCase() !== excluded) ? assignee : null;
+              if (autoRequestedReviewer &&
+                  ignoredLower.has(autoRequestedReviewer.toLowerCase())) {
+                autoRequestedReviewer = null;
+              }
               const realExisting = existingReviewers.filter(
                 (r) => r && !ignoredLower.has(r.toLowerCase())
                   && !classifyIsBot(r, botAuthors) && !r.toLowerCase().endsWith("[bot]"));
-              if (realExisting.length) return { assignee, reviewers: [] };
+              if (realExisting.length) autoRequestedReviewer = null;
 
-              const reviewers = [assignee];
-              const extra = committersBySignal.filter((c) => collaborators.has(c) && !owners.has(c));
-              if (extra.length && extra[0] !== assignee) reviewers.push(extra[0]);
+              const autoRequestedHasSignal = !!(autoRequestedReviewer &&
+                committersBySignal.some(
+                  (c) => c && c.toLowerCase() === autoRequestedReviewer.toLowerCase()));
 
-              // GitHub rejects requesting review from the PR author; then dedupe (order-preserving).
-              const seen = new Set();
-              const deduped = [];
-              for (const r of reviewers) {
-                if (!r || r.toLowerCase() === excluded) continue;
-                if (!seen.has(r.toLowerCase())) {
-                  seen.add(r.toLowerCase());
-                  deduped.push(r);
-                }
-              }
-              return { assignee, reviewers: deduped };
+              const suggestedReviewer = pickSuggestedReviewer({
+                committersBySignal,
+                collaborators,
+                author,
+                assignee,
+                autoRequestedReviewer,
+                botAuthors,
+              });
+
+              return {
+                assignee,
+                autoRequestedReviewer,
+                autoRequestedHasSignal,
+                suggestedReviewer,
+              };
             }
             // ----- extract-js:assignment:end -----
 
@@ -1303,9 +1406,9 @@ jobs:
               warn: (message) => core.warning(message),
             });
 
-            // Logins with write+ access to this repo (the extra-reviewer pool).
+            // Logins with write+ access to this repo (the suggested-reviewer pool).
             // Empty on access error (listing collaborators needs repo admin/push),
-            // so the extra reviewer is simply skipped -- never a hard failure.
+            // so the suggestion is simply skipped -- never a hard failure.
             // Cached per run.
             let _collabCache;
             async function repoCollaborators() {
@@ -1318,7 +1421,8 @@ jobs:
                 _collabCache = new Set(
                   data.filter(c => c.permissions && c.permissions.push).map(c => c.login));
               } catch (error) {
-                core.warning(`could not list collaborators (${error.status}); no extra reviewer`);
+                core.warning(
+                  `could not list collaborators (${error.status}); no suggested reviewer`);
                 _collabCache = new Set();
               }
               return _collabCache;
@@ -1374,12 +1478,42 @@ jobs:
             }
 
             // Backfill a PR's assignee + reviewers (issue-owner -> committer-signal
-            // owner -> maintainer; reviewers = assignee + top dev-not-owner unless a
-            // real reviewer is already requested). Internal PRs go to the author with
-            // no requested reviewer. PR assignment is idempotent: only ever touches an
-            // UNASSIGNED PR. Linked-issue assignment is also idempotent: only unassigned
-            // issues are updated, including when the PR was assigned earlier or the
+            // owner -> maintainer). For Community/Bot: auto-request the shepherd
+            // only when they are not the PR author, not ignored, and no real
+            // reviewer is already present; a collaborator with stronger committer
+            // signal than that auto-requested reviewer (or the top collaborator
+            // when nobody was auto-requested) is named in a one-shot comment, not
+            // auto-requested. Internal PRs go to the author with no requested
+            // reviewer and no comment. PR assignment is idempotent: only ever
+            // touches an UNASSIGNED PR (so the comment also fires at most once).
+            // Linked-issue assignment is also idempotent: only unassigned issues
+            // are updated, including when the PR was assigned earlier or the
             // issue was linked later.
+            async function postAssignmentComment(number, {
+              source, assignee, suggestedReviewer,
+              autoRequestedReviewer, autoRequestedHasSignal,
+            }) {
+              try {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner, repo: context.repo.repo,
+                  issue_number: number,
+                  body: formatAssignmentComment({
+                    source, assignee, suggestedReviewer,
+                    autoRequestedReviewer, autoRequestedHasSignal,
+                  }),
+                });
+                if (suggestedReviewer) {
+                  console.log(
+                    `assignment comment for ${assignee}; suggested ${suggestedReviewer}`);
+                } else {
+                  console.log(`assignment comment for ${assignee}`);
+                }
+              } catch (error) {
+                core.warning(
+                  `could not post assignment comment (${error.status})`);
+              }
+            }
+
             async function reconcileAssignment(info, source, number) {
               if (!source) return;                     // Source unknown -> leave to sweep
               if (info.assignees.length) {
@@ -1390,11 +1524,11 @@ jobs:
               if (info.inMergeQueue) return;            // far enough along
               if (info.isDraft && !info.isBot) return;  // human draft: author's "not ready"
 
-              let assignee, reviewers;
+              let assignee, autoRequestedReviewer = null, autoRequestedHasSignal = false,
+                  suggestedReviewer = null;
               if (source === SOURCE_INTERNAL) {
                 // Internal: the author drives; assign them, request no reviewers.
                 assignee = info.authorLogin;
-                reviewers = [];
               } else {
                 // Community/Bot: full committer-signal selection against the
                 // relevant owners pool, with the maintainer as the final fallback.
@@ -1419,17 +1553,18 @@ jobs:
                     cache: SIGNAL_CACHE,
                     since: SIGNAL_SINCE,
                   });
-                ({ assignee, reviewers } = selectAssigneeAndReviewers({
-                  issueAssignees: info.issueAssignees,
-                  committersBySignal: ranking,
-                  owners,
-                  collaborators,
-                  author: info.authorLogin,
-                  maintainer,
-                  existingReviewers: info.requestedReviewers,
-                  botAuthors: BOT_AUTHORS,
-                  ignoredReviewers: [...IGNORED],
-                }));
+                ({ assignee, autoRequestedReviewer, autoRequestedHasSignal, suggestedReviewer } =
+                  selectAssigneeAndReviewers({
+                    issueAssignees: info.issueAssignees,
+                    committersBySignal: ranking,
+                    owners,
+                    collaborators,
+                    author: info.authorLogin,
+                    maintainer,
+                    existingReviewers: info.requestedReviewers,
+                    botAuthors: BOT_AUTHORS,
+                    ignoredReviewers: [...IGNORED],
+                  }));
               }
               if (!assignee) return;                    // no owner and no maintainer
 
@@ -1472,22 +1607,28 @@ jobs:
                 });
               }
 
-              // Request the selected reviewers (assignee + top dev-not-owner). The
-              // selection already drops the author and the case where a real
-              // reviewer is present. Also never request an ignored non-approver
-              // (e.g. the bmillsNV fallback assignee), which can legitimately leave
-              // the reviewer set empty -- that is fine.
-              const toRequest = reviewers.filter(r => !IGNORED.has(r.toLowerCase()));
-              if (toRequest.length) {
+              // autoRequestedReviewer is already filtered (not author, not ignored,
+              // no real existing reviewer) — request that login only.
+              if (autoRequestedReviewer) {
                 try {
                   await github.rest.pulls.requestReviewers({
                     owner: context.repo.owner, repo: context.repo.repo,
-                    pull_number: number, reviewers: toRequest,
+                    pull_number: number, reviewers: [autoRequestedReviewer],
                   });
                 } catch (error) {
                   core.warning(
-                    `could not request reviewers ${toRequest.join(", ")} (${error.status})`);
+                    `could not request reviewers ${autoRequestedReviewer} (${error.status})`);
                 }
+              }
+
+              // One-shot assignment note for Community/Bot (Internal has no
+              // shepherding comment). Runs only on this first-assign path, so
+              // synchronize/sweep will not re-post.
+              if (source !== SOURCE_INTERNAL) {
+                await postAssignmentComment(number, {
+                  source, assignee, suggestedReviewer,
+                  autoRequestedReviewer, autoRequestedHasSignal,
+                });
               }
 
               await syncLinkedIssueAssignees(assignee, info.linkedIssues);

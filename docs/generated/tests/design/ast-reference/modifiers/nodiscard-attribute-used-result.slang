@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:51+00:00
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability-autodiff-annotations
-//META: doc_section_digest=3959c707a386e75c3eea38b819f320935508e4d38543a0a9aeb0a01aca4d3471
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability--autodiff-annotations
+//META: doc_section_digest=a162d3ea93755dfa0e856855015bcc93b11eb24c29ad4e2f7cda299e7c6be3b7
 //META: purpose=`[NoDiscard]` is accepted on a value-returning function, and a call whose result is consumed checks and runs normally.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `NoDiscardAttribute` flags a function whose result must not be discarded.
-// This exercises the accepted path: the attribute parses on a value-returning
-// function, and a call site that consumes the result passes checking and
-// computes the expected value (the attribute must not perturb the call).
-// The rejected path (discarding the result) is doc-gapped: the doc names no
-// diagnostic code, so no DIAGNOSTIC_TEST expectation can be pinned here.
+// Verifies the permitted half of the result-use rule: consuming the returned
+// value is exactly what the attribute asks for, so the call must check and
+// evaluate unchanged. CHECK asserts the computed 42, showing the attribute does
+// not perturb an ordinary call.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

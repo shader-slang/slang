@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#what-this-module-is-not
-//META: doc_section_digest=98e652ccdabfc883b1140a71a392d5b79042be133038ba455d1932a654abc8e2
-//META: purpose=The pre-link executable IR (### LOWER-TO-IR:) carries no [layout(...)] decorations; layout lives in a sibling module built by createIRModuleForLayout.
-//META: intent=functional
+//META: doc_section_digest=205da7f598ad3d1643fab8a6fb17b6a8f761797e8d8d6da06cb330e073ca2298
+//META: purpose=The pre-link executable IR carries no layout decorations and no layout instructions, keeping the per-module IR free of target-specific layout.
+//META: intent=negative
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "What this module is not" section states that the
-// executable IR module produced by generateIRForTranslationUnit
-// is kept layout-free. A [layout(...)] decoration would only ever
-// appear once the layout-IR module is merged in, which happens
-// after the pre-link region and so does not appear in the
-// `### LOWER-TO-IR:` block.
+// Verifies the "executable IR is layout-free" property. The pre-link
+// `### LOWER-TO-IR:` block is dumped before the layout module is merged,
+// so the CHECK-NOT patterns assert that no `[layout(`, `EntryPointLayout(`
+// or `structTypeLayout(` text appears between the entry-point function and
+// the end of that block.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

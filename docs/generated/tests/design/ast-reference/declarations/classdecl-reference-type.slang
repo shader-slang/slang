@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#aggtypedecl-structdecl-classdecl-enumdecl
-//META: doc_section_digest=60c3e2924d17c23b1f3bc412881a4c5e71f81efe23ecdd996e436f61429ac8c8
-//META: purpose=A ClassDecl declares a reference-type aggregate; two variables can refer to the same instance and one's mutation is visible through the other.
+//META: doc_section_digest=ee81272d01f69d54c75b75fc6518d2ad8af9fdb4a6eed0176bdf0fe82ee19e5c
+//META: purpose=A ClassDecl declares a reference-type aggregate constructed with `new`.
 //META: intent=functional
-//META: pipeline_stage=check
+//META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of ClassDecl as "a reference-type
-// aggregate". Two locals referring to the same `new` instance share
-// state; a mutation through one is observable through the other.
-// Slang's interpreter does not implement `new` for classes, so this
-// test emits C++ text on the CPU target and FileChecks the emitted
-// source for the constructor call.
+// Verifies that a class is the reference-type aggregate variant, allocated
+// with `new` rather than copied like a struct. The interpreter cannot
+// instantiate classes, so the observation point is the emitted C++ text; the
+// CHECK pins the `new C` allocation, which only appears for a reference type.
 
 //TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute
 

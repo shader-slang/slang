@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#inlining-and-optimization
-//META: doc_section_digest=99f72cda245d99360168c24acf24a82fd577e139a911dfa073addcf5493b365a
-//META: purpose=Stress - a single function carrying many compatible inlining-and-optimization decorations stacked together produces every corresponding decoration in the dump, with no interference between them.
+//META: doc_section_digest=920c2eb81b315af907f28c1ce483b160e67a9a325de3473075b6cc826161fb7b
+//META: purpose=Stress - a single function carrying many compatible inlining-and-optimization decorations produces every corresponding decoration in the dump, with no interference between them.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Stress - the doc lists many independent decorations in the
-// inlining-and-optimization category. Stack four user-side
-// attributes on one helper ([ForceInline], [__NoSideEffect],
-// [__readNone], [__unsafe_force_inline_early]) plus the
-// front-end-attached nameHint and export. All four should appear
-// in the dump for that one function.
+// Verifies that the inlining/optimization decorations are independent
+// markers that accumulate on one inst. Four attributes are stacked on a
+// single helper and the CHECK-DAG lines assert `ForceInline`,
+// `noSideEffect`, `readNone` and `unsafeForceInlineEarly` all appear
+// alongside the helper's `nameHint`, which anchors the match at user code.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

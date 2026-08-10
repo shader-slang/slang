@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=A struct with no user __init still has a synthesized member-init constructor; positional-initializer syntax fills fields in declaration order.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A struct with no user-written `__init` still gets a synthesized member-wise constructor; a brace initializer fills fields in declaration order.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of synthesized ConstructorDecl
-// flavors. A struct without an explicit __init still accepts a
-// brace-list initializer that fills the fields in declaration order;
-// the values come back out unchanged.
+// Verifies that a constructor exists even when the user wrote none. The struct
+// declares only fields; a positional brace initializer is used and the CHECK
+// asserts a sum that distinguishes correct field ordering from any other
+// assignment of the two literals.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

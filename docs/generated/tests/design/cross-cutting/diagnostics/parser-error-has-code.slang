@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T12:30:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-codes-and-the-name-field
-//META: doc_section_digest=58de6e7299bd58eba9a686426fc010a16e2745f7e3231042be33437e83834630
-//META: purpose=Parser-stage errors carry integer ids in their own range (2xxxx) per the diagnostic-id convention.
-//META: intent=negative
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#error-code-namespace
+//META: doc_section_digest=c07669430fa1f58c4db53ae38c50d1523f8399ab4e7aa698054222ac63e9d41b
+//META: purpose=Parser diagnostics take ids from the conventional 2xxxx subsystem range.
+//META: intent=functional
 //META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc claims diagnostic ids are unique per diagnostic and are
-// assigned in conventional ranges per subsystem. Verify a parser
-// error (range 2xxxx) renders with an E2#### code.
+// Verifies that parser diagnostics draw their ids from the conventional
+// 2xxxx subsystem range. A parameter list is opened and never closed; the
+// caret-anchored CHECK pins the rendered code E20001 at the offending column,
+// so a renumbering out of the parser range would fail the test.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

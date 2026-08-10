@@ -1,22 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#existential-destructuring
-//META: doc_section_digest=02ff34102848a32784b08786fff8eb6145699715106f91aa1145c3476f2f96f7
+//META: doc_section_digest=bfaba91cd7aecc07abcd6aed864d007e29538d6fe91106d3d1dd5e36f206a91a
 //META: purpose=Interface dispatch through an existential follows the sequence extractExistentialType, extractExistentialValue, extractExistentialWitnessTable, lookupWitness, call.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### Existential destructuring` says the three projections
-// "reverse `makeExistential`" and the result of
-// `extractExistentialWitnessTable` flows into `lookupWitness`,
-// whose result is the function being dispatched. The full
-// sequence at LOWER-TO-IR is:
-//   extractExistentialType -> extractExistentialValue
-//   extractExistentialWitnessTable -> lookupWitness -> call.
-
+// Verifies that the three projections and the lookup compose into one dispatch
+// idiom rather than appearing independently. A single method call through an
+// interface-typed local is made, and the ordered CHECKs assert all five insts
+// appear in the order the dispatch needs them: recover the type, recover the
+// value, recover the witness, resolve the requirement, call it.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };
