@@ -397,6 +397,12 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          # Same suite-ref/ref priority the nightly job uses, so measurement
+          # and analysis run the SAME suite revision. A backfill dispatch
+          # (ref=<old commit>, suite-ref=<new suite>) would otherwise measure
+          # with one trend.py and judge with another — and the tracking format
+          # is exactly the kind of thing that drifts between them.
+          ref: ${{ github.event.inputs['suite-ref'] || github.event.inputs.ref || github.ref }}
           persist-credentials: false
           # The suite scripts only; no submodules and no history needed.
           fetch-depth: "1"
@@ -422,7 +428,16 @@ jobs:
       # and the series' last point may be a sibling, not this run's.
       - name: Check trend (fail on regression)
         id: trend
-        if: env.PUBLISH == 'true'
+        # The label gate is load-bearing, not belt-and-braces. A step `if`
+        # carries an implicit success() over the steps BEFORE it IN THIS JOB —
+        # which are only the checkouts here, so it no longer means "the sweep
+        # succeeded" the way it did when this step lived in the nightly job.
+        # Without the gate, a night that fails before the sweep reaches
+        # `trend.py --label ""`, which aborts on the empty value; that makes
+        # steps.trend.outcome 'failure', and classify() tests failure BEFORE
+        # job status, so Slack would announce a regression for a night that
+        # never measured anything.
+        if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
           set -euo pipefail

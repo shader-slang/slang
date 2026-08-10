@@ -83,7 +83,13 @@ def stats(values):
         "mean": round(statistics.mean(values), 4),
         "stdev": round(statistics.stdev(values), 4) if len(values) > 1 else 0.0,
         "n": len(values),
-        "samples": [round(v, 4) for v in values],
+        # NOT rounded, unlike the summary fields above. Rounding the samples
+        # would defeat their purpose twice over: a consumer recomputing
+        # statistics would be working from altered measurements, and where a
+        # consumer checks our summary against its own (BenchView does, within
+        # 1e-9) a summary derived from RAW values will not match one derived
+        # from rounded samples — measured at ~80% of five-sample sets.
+        "samples": list(values),
     }
 
 
