@@ -2,8 +2,8 @@
 """Slang compile-time perf-suite runner.
 
 Drives a given slangc over the workloads in manifest.py, parses the per-phase
-timers emitted by -report-perf-benchmark, and writes tidy per-run JSON
-(median/min/mean/stdev per timer; merge-on-write).
+timers emitted by -report-perf-benchmark, and writes per-run JSON: a summary
+(median/min/max/mean/stdev/n) AND the raw samples per timer; merge-on-write.
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
 slangc.
@@ -542,7 +542,7 @@ def main():
     with analyze.open_output(jpath) as fh:
         json.dump(records, fh, indent=2)
 
-    # results.json is the single source of truth (all of median/min/mean/stdev per
+    # results.json is the single source of truth (summary AND raw samples per
     # timer); the analysis/report tools read it directly. No CSV is emitted.
     if not args.gen_dir:
         shutil.rmtree(gen_root, ignore_errors=True)
@@ -552,6 +552,25 @@ def main():
     print(f"wrote {jpath}")
     if n_ok != len(this_run):
         sys.exit(1)
+
+
+# Import-time self-checks (the directory idiom), run by check-python-core.yml
+# on every PR touching these files. bench.py had none, which mattered here:
+# the samples are stored RAW deliberately, and nothing else in the suite reads
+# them yet, so a future edit rounding them would import cleanly, merge, and
+# surface only as silently altered measurements — and as a rejected BenchView
+# submission, since a summary computed from raw values does not match one
+# recomputed from rounded samples.
+_s = stats([1.23456, 2.0, 3.0])
+assert _s["samples"] == [1.23456, 2.0, 3.0], \
+    "samples must be stored RAW; rounding them alters what a consumer recomputes"
+assert _s["min"] == 1.2346 and _s["max"] == 3.0, \
+    "summary fields ARE rounded, and max is reported alongside min"
+assert _s["n"] == 3
+assert stats([]) is None, "no measurements yields no stats, not an empty summary"
+assert stats([5.0])["stdev"] == 0.0, "a single sample has zero deviation, not None"
+assert stats([1.0, None, 2.0])["n"] == 2, "None samples are dropped, not counted"
+del _s
 
 
 if __name__ == "__main__":

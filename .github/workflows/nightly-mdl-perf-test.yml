@@ -452,6 +452,10 @@ jobs:
         shell: bash
         env:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
+          # 'skipped' here means the sweep never minted a label (the gate
+          # above), i.e. nothing was measured — classify() reaches NOT_RUN for
+          # it only when JOB_STATUS is success, so a failed sweep still reports
+          # as a job failure rather than as a quiet "trend not run".
           TREND_OUTCOME: ${{ steps.trend.outcome }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
           # The MEASUREMENT job's result, not this job's: a regression is
