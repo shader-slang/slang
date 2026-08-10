@@ -1585,14 +1585,7 @@ struct ScopedSessionPrelude
     {
         ComPtr<ISlangBlob> prelude;
         m_session->getLanguagePrelude(m_language, prelude.writeRef());
-        // An empty prelude can come back as a blob with a null buffer pointer, so do not do pointer
-        // arithmetic on it; leaving `m_saved` empty restores the same thing.
-        if (prelude && prelude->getBufferSize() != 0)
-        {
-            m_saved = String(
-                (const char*)prelude->getBufferPointer(),
-                (const char*)prelude->getBufferPointer() + prelude->getBufferSize());
-        }
+        m_saved = StringUtil::getString(prelude);
     }
 
     ~ScopedSessionPrelude() { m_session->setLanguagePrelude(m_language, m_saved.getBuffer()); }

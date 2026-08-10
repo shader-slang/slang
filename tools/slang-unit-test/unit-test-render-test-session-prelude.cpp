@@ -22,12 +22,7 @@ static String _getLanguagePrelude(slang::IGlobalSession* session, SlangSourceLan
 {
     ComPtr<ISlangBlob> blob;
     session->getLanguagePrelude(language, blob.writeRef());
-    // An empty blob can carry a null buffer pointer, so do not do pointer arithmetic on it.
-    if (!blob || blob->getBufferSize() == 0)
-        return String();
-    return String(
-        (const char*)blob->getBufferPointer(),
-        (const char*)blob->getBufferPointer() + blob->getBufferSize());
+    return StringUtil::getString(blob);
 }
 
 /// Returns an empty string on failure.
