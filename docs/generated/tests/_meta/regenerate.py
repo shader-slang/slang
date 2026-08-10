@@ -809,6 +809,61 @@ def lint_expected_failures() -> list[LintIssue]:
     return issues
 
 
+def lint_agentic_coverage_excludes() -> list[LintIssue]:
+    """Validate that every path in `_meta/agentic-coverage-excludes.txt` still exists.
+
+    `tools/coverage/run-coverage.sh` turns each entry into a slang-test
+    `-exclude-prefix` flag for the coverage agentic pass, which runs
+    in-process (`-server-count 1`), so a test that segfaults the compiler
+    segfaults the orchestrator and the rest of the suite never runs. The
+    entries here are what keep that from happening.
+
+    `-exclude-prefix` silently matches nothing when its path is wrong, so an
+    entry orphaned by a regeneration round that renames or moves its test
+    stops excluding anything and the crash comes back. That has happened
+    twice: PR #11421's directory reorg, and the 2026-08-04 round that renamed
+    `metadata/unorm-attr-on-buffer-element.slang` (coverage run 31235323797).
+    Resolving each entry as a path on disk turns both into a lint error.
+
+    Directory prefixes are legal — `-exclude-prefix` is a prefix filter, so
+    `.../design/pipeline/` excludes everything under it — and resolve as
+    directories, which is why this checks `exists()` rather than `is_file()`.
+
+    The file is optional; absence is fine.
+    """
+    issues: list[LintIssue] = []
+    path = (
+        REPO_ROOT
+        / "docs"
+        / "generated"
+        / "tests"
+        / "_meta"
+        / "agentic-coverage-excludes.txt"
+    )
+    if not path.is_file():
+        return issues
+    rel = str(path.relative_to(REPO_ROOT))
+
+    for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
+        # Mirror run-coverage.sh's parse: strip a trailing comment, then trim.
+        s = raw.split("#", 1)[0].strip()
+        if not s:
+            continue
+        if not (REPO_ROOT / s).exists():
+            issues.append(
+                LintIssue(
+                    f"{rel}:{lineno}",
+                    "error",
+                    f"agentic-coverage-exclude path does not resolve: {s}."
+                    f" A stale entry excludes nothing, so the crash it was"
+                    f" added for will kill the coverage agentic pass again."
+                    f" Point it at the test's current path, or drop it if the"
+                    f" test is gone.",
+                )
+            )
+    return issues
+
+
 def compute_finding_title(finding: dict) -> str:
     """Return either the explicit title, or derive from scope + summary."""
     explicit = finding.get("title")
@@ -1232,6 +1287,103 @@ def _github_slug(title: str) -> str:
     title = re.sub(r"[*_~]", "", title)
     slug = re.sub(r"[^\w\- ]", "", title.strip().lower(), flags=re.UNICODE)
     return slug.replace(" ", "-")
+
+
+_DOC_SECTION_DIGEST_MOD = None
+
+
+def _doc_section_digest_module():
+    """Return `_meta/doc-section-digest.py` loaded as a module, or None.
+
+    That script is the canonical implementation of the `doc_section_digest`
+    rule and is what agents run to produce the value, so the lint has to use
+    it rather than re-deriving the rule. The two are not interchangeable:
+    the script's `slug` keeps backticks and link syntax, while `_github_slug`
+    here strips them for link checking, so a heading like ``## `Foo` bar``
+    hashes under a different anchor in each. Importing the one that generated
+    the value is what makes the comparison meaningful.
+
+    Returns None when the script is missing, so the lint degrades to skipping
+    the check rather than erroring on every test.
+    """
+    global _DOC_SECTION_DIGEST_MOD
+    if _DOC_SECTION_DIGEST_MOD is None:
+        path = REPO_ROOT / "docs/generated/tests/_meta/doc-section-digest.py"
+        if not path.is_file():
+            _DOC_SECTION_DIGEST_MOD = False
+        else:
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location("_doc_section_digest", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _DOC_SECTION_DIGEST_MOD = mod
+    return _DOC_SECTION_DIGEST_MOD or None
+
+
+def lint_doc_section_digests(specs: list) -> list[LintIssue]:
+    """Report doc sections whose text has drifted from the tests anchored to them.
+
+    `doc_section_digest` is the sha256 of the cited section's body, so editing a
+    section invalidates every test that cites it. Nothing notices today:
+    `_REQUIRED_TEST_META_KEYS` only asserts the key is *present*, never that it
+    matches, so a doc edit silently leaves those tests claiming to have been
+    written against text that no longer exists. All 16 tests anchored to
+    `grammar.md#statements` went stale that way when the `ThrowStmt` production
+    was corrected, and nothing flagged it.
+
+    Reported per doc section rather than per test, because the section is the
+    unit of work: one edit invalidates a whole group, and 386 individual lines
+    would bury the ~40 sections that actually drifted.
+
+    Warning, not error. A stale digest does not mean the test is wrong -- it
+    means nobody has re-read the claim since the prose moved, which is a review
+    task, not a build failure. Note that refreshing the digest without re-reading
+    is worse than leaving it stale: it launders the drift and destroys the only
+    record that the claim and the prose were ever checked against each other.
+    """
+    mod = _doc_section_digest_module()
+    if mod is None:
+        return []
+    # (doc target, anchor) -> [test paths]
+    stale: dict[tuple[str, str], list[str]] = {}
+    for spec in specs:
+        if not spec.is_doc_anchored:
+            continue
+        for tf in sorted((REPO_ROOT / spec.dir).glob("*.slang")):
+            meta = parse_test_meta(tf.read_text(encoding="utf-8", errors="replace"))
+            recorded = (meta.get("doc_section_digest") or "").strip()
+            doc_ref = (meta.get("doc_ref") or "").strip()
+            if not recorded or "#" not in doc_ref:
+                continue
+            target, _, anchor = doc_ref.partition("#")
+            doc = REPO_ROOT / target
+            if not doc.is_file():
+                continue
+            try:
+                body = mod.section_text(str(doc), anchor)
+            except SystemExit:
+                # Unresolvable anchor; already reported by the per-file lint.
+                continue
+            if hashlib.sha256(body.encode("utf-8")).hexdigest() != recorded:
+                stale.setdefault((target, anchor), []).append(
+                    str(tf.relative_to(REPO_ROOT))
+                )
+    issues: list[LintIssue] = []
+    for (target, anchor), tests in sorted(stale.items()):
+        sample = ", ".join(Path(t).name for t in tests[:3])
+        more = f", +{len(tests) - 3} more" if len(tests) > 3 else ""
+        issues.append(
+            LintIssue(
+                f"{target}#{anchor}",
+                "warning",
+                f"section changed since {len(tests)} test(s) were anchored to it"
+                f" ({sample}{more}). Re-read those claims against the current"
+                f" text, then refresh their //META doc_section_digest with"
+                f" `_meta/doc-section-digest.py {target} {anchor}`.",
+            )
+        )
+    return issues
 
 
 _HEADING_SLUG_CACHE: dict[Path, set[str]] = {}
@@ -2309,6 +2461,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
     if not args.bundles:
         issues.extend(lint_findings())
         issues.extend(lint_expected_failures())
+        issues.extend(lint_agentic_coverage_excludes())
+        issues.extend(lint_doc_section_digests(specs))
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
     for i in issues:
