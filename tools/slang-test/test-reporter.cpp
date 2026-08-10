@@ -704,7 +704,8 @@ void TestReporter::reconcilePendingRetries()
 
         printf(
             "error: test '%s' was marked pending retry but was never re-run, so its failure was "
-            "about to go unreported; counting it as failed\n",
+            "about to go unreported; reporting it now (as a failure, or an expected failure if it "
+            "is on the expected-failure list)\n",
             name.getBuffer());
         fflush(stdout);
 

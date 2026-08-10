@@ -143,6 +143,12 @@ public:
     Slang::List<TestInfo> m_testInfos;
 
     /// Names of tests whose result was deferred by a `TestResult::PendingRetry` report.
+    ///
+    /// The key is the test's `info.name`. For the unit-test path that is the full command string
+    /// (`moduleName/testName.internal`), the same key `adjustResult()`'s expected-failure gate uses
+    /// -- not the bare test name. `reconcilePendingRetries()` and the retry-eligibility check in
+    /// `runUnitTestModule` must look these tests up by that same command key; keying off the bare
+    /// test name instead is exactly the mismatch this fix corrects.
     Slang::HashSet<Slang::String> m_pendingRetryTests;
 
     /// Names of tests that reached a final (non-deferred) result.

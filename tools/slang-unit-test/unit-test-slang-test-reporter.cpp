@@ -131,3 +131,69 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
     SLANG_CHECK(main.m_passedTestCount == 1);
     SLANG_CHECK(main.didAllSucceed());
 }
+
+// A retry that runs and fails again reports a final `Fail`, which redeems the deferral. The failure
+// must be counted exactly once: `reconcilePendingRetries()` must not also synthesize a second
+// failure for the same test. This is the ordinary "flaky test stays broken" path.
+SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
+{
+    TestReporter reporter;
+    const String command("slang-unit-test-tool/probeRetriedStillFails.internal");
+
+    reporter.addTest(command, TestResult::PendingRetry); // first pass: deferred
+    reporter.addTest(command, TestResult::Fail);         // retry pass: ran and failed again
+
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+
+    // Already redeemed by the final Fail, so reconciliation must not count it a second time.
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_totalTestCount == 1);
+    SLANG_CHECK(!reporter.didAllSucceed());
+}
+
+// The cross-sub-reporter counterpart of the unredeemed case: a deferral recorded by one worker that
+// no worker ever redeems must, after `consolidateWith()`, still be reconciled into a failure.
+SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
+{
+    const String command("slang-unit-test-tool/probeCrossThreadUnredeemed.internal");
+
+    TestReporter firstPass;
+    firstPass.addTest(command, TestResult::PendingRetry); // deferred on one worker, never redeemed
+
+    TestReporter main;
+    main.consolidateWith(&firstPass);
+
+    SLANG_CHECK(main.m_pendingRetryTests.contains(command));
+    SLANG_CHECK(!main.m_finalResultTests.contains(command));
+
+    main.reconcilePendingRetries();
+
+    SLANG_CHECK(main.m_failedTestCount == 1);
+    SLANG_CHECK(!main.didAllSucceed());
+}
+
+// A final `Ignored` result under `-hide-ignored` never reaches the statistics or `m_testInfos`, but
+// it must still redeem a deferral -- which is why `_addResult` records `m_finalResultTests` before
+// the hide-ignored early return. Without that ordering, an ignored-on-retry test would be counted a
+// spurious failure by reconciliation.
+SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
+{
+    TestReporter reporter;
+    reporter.m_hideIgnored = true;
+    const String command("slang-unit-test-tool/probeHiddenIgnored.internal");
+
+    reporter.addTest(command, TestResult::PendingRetry); // first pass: deferred
+    reporter.addTest(command, TestResult::Ignored);      // retry pass: ignored, hidden from output
+
+    // The ignored result is hidden (not counted), but it still redeems the deferral.
+    SLANG_CHECK(reporter.m_ignoredTestCount == 0);
+    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.didAllSucceed());
+}
