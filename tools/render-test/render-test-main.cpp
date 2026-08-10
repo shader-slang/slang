@@ -1575,6 +1575,36 @@ Result RenderTestApp::update()
 }
 
 
+/// render-test usually does not own the session it compiles with: slang-test and the test server
+/// each create a single global session per process and hand the same one to every tool invocation,
+/// so a prelude left installed here applies to every later test in that process.
+struct ScopedSessionPrelude
+{
+    ScopedSessionPrelude(SlangSession* session, SlangSourceLanguage language)
+        : m_session(session), m_language(language)
+    {
+        ComPtr<ISlangBlob> prelude;
+        m_session->getLanguagePrelude(m_language, prelude.writeRef());
+        // An empty prelude can come back as a blob with a null buffer pointer, so do not do pointer
+        // arithmetic on it; leaving `m_saved` empty restores the same thing.
+        if (prelude && prelude->getBufferSize() != 0)
+        {
+            m_saved = String(
+                (const char*)prelude->getBufferPointer(),
+                (const char*)prelude->getBufferPointer() + prelude->getBufferSize());
+        }
+    }
+
+    ~ScopedSessionPrelude() { m_session->setLanguagePrelude(m_language, m_saved.getBuffer()); }
+
+    ScopedSessionPrelude(const ScopedSessionPrelude&) = delete;
+    ScopedSessionPrelude& operator=(const ScopedSessionPrelude&) = delete;
+
+    SlangSession* m_session;
+    SlangSourceLanguage m_language;
+    String m_saved;
+};
+
 static SlangResult _setSessionPrelude(
     const Options& options,
     const char* exePath,
@@ -1821,6 +1851,11 @@ static SlangResult _innerMain(
             nvapiExtnSlot = Index(value);
         }
     }
+
+    // `session` is usually the caller's and outlives this call, so scope the prelude
+    // `_setSessionPrelude` installs below to this invocation. (A `-deferred-core-module` run gets
+    // its own session instead, where restoring is merely redundant.)
+    ScopedSessionPrelude hlslPreludeRestore(session, SLANG_SOURCE_LANGUAGE_HLSL);
 
     // If can't set up a necessary prelude make not available (which will lead to the test being
     // ignored)
