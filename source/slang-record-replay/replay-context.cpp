@@ -132,6 +132,13 @@ DataMismatchException::DataMismatchException(size_t offset, size_t size)
 static std::mutex s_contextMutex;
 static ReplayContext* s_contextInstance = nullptr;
 
+// The instance destroySingleton() is currently tearing down. It has been taken
+// out of s_contextInstance already -- so exactly one caller owns the teardown
+// and a concurrent destroySingleton() finds nothing to do -- but proxy
+// destructors running inside the teardown still have to be able to reach it to
+// unregister themselves, which is what tryGet() uses this for.
+static ReplayContext* s_contextDraining = nullptr;
+
 ReplayContext& ReplayContext::get()
 {
     std::lock_guard<std::mutex> lock(s_contextMutex);
@@ -143,34 +150,39 @@ ReplayContext& ReplayContext::get()
 ReplayContext* ReplayContext::tryGet()
 {
     std::lock_guard<std::mutex> lock(s_contextMutex);
-    return s_contextInstance;
+    return s_contextInstance ? s_contextInstance : s_contextDraining;
 }
 
 void ReplayContext::destroySingleton()
 {
     ReplayContext* toDelete;
     {
+        // Claim the instance and publish it as draining in one critical section,
+        // so a concurrent destroySingleton() sees null and does not drain or
+        // delete the same context a second time.
         std::lock_guard<std::mutex> lock(s_contextMutex);
         toDelete = s_contextInstance;
+        s_contextInstance = nullptr;
+        s_contextDraining = toDelete;
     }
 
-    // Drain the orphaned playback references while `s_contextInstance` still
-    // points at this context, and outside the lock.
+    // Drain the orphaned playback references before the members holding them are
+    // destroyed, and while tryGet() still resolves to this context.
     //
     // Releasing an orphan can take a proxy to refcount 0, which runs
-    // `~ProxyBase` -> `ReplayContext::tryGet()->unregisterProxy(...)`. That
-    // unregister has to reach *this* context: it is what removes the proxy from
-    // `m_objectToHandle`, and `releaseOrphanedPlaybackProxies()` reads that map
-    // to decide whether a proxy destroyed by a cascade is still safe to release.
-    // Draining after the pointer was cleared would leave those entries behind
-    // and the sweep would release freed memory. Outside the lock because
-    // `tryGet()` takes `s_contextMutex` and it is not recursive.
+    // `~ProxyBase` -> `tryGet()->unregisterProxy(...)`. That unregister has to
+    // reach *this* context: it removes the proxy from `m_objectToHandle`, and
+    // `releaseOrphanedPlaybackProxies()` reads that map to decide whether a
+    // proxy a cascade already destroyed is still safe to release. Draining with
+    // the context unreachable would leave those entries behind and the sweep
+    // would release freed memory. Outside the lock because tryGet() takes
+    // `s_contextMutex` and it is not recursive.
     if (toDelete)
         toDelete->releaseOrphanedPlaybackProxies();
 
     {
         std::lock_guard<std::mutex> lock(s_contextMutex);
-        s_contextInstance = nullptr;
+        s_contextDraining = nullptr;
     }
     delete toDelete;
 }
@@ -834,10 +846,32 @@ void ReplayContext::releaseOrphanedPlaybackProxies()
     // Snapshot before releasing: each release runs ~ProxyBase ->
     // unregisterProxyImpl, which mutates m_playbackOrphanedProxies and the
     // handle registry. Clearing first makes that unregister a no-op on the map.
-    List<KeyValuePair<ISlangUnknown*, uint32_t>> orphans;
+    // The handle is captured here too, because the loop below destroys proxies
+    // and their registry entries go with them.
+    struct Orphan
+    {
+        uint64_t handle;
+        ISlangUnknown* proxy;
+        uint32_t count;
+    };
+    List<Orphan> orphans;
     for (const auto& kv : m_playbackOrphanedProxies)
-        orphans.add(KeyValuePair<ISlangUnknown*, uint32_t>(kv.first, kv.second));
+    {
+        const uint64_t* handle = m_objectToHandle.tryGetValue(kv.first);
+        orphans.add(Orphan{handle ? *handle : 0, kv.first, kv.second});
+    }
     m_playbackOrphanedProxies.clear();
+
+    // Release newest first. These objects are not independent: tearing one down
+    // can reach into another that was created before it. A SessionProxy holds
+    // the real Linkage, and ~Linkage releases its ASTBuilder, whose destructor
+    // writes through to the global Session that the GlobalSessionProxy holds --
+    // so releasing the global session first leaves ~Linkage writing to freed
+    // memory. A real run never hits this because the recorded release stream
+    // tears objects down in the order the user did, youngest first; the sweep
+    // has no stream to follow, so it has to reproduce that order itself.
+    // Handles are handed out in creation order, so descending handle is it.
+    orphans.sort([](const Orphan& a, const Orphan& b) { return a.handle > b.handle; });
 
     // These references were created by the replay dispatcher and never handed to
     // a user, so releasing them cannot race a caller. Suppress recording since
@@ -845,8 +879,8 @@ void ReplayContext::releaseOrphanedPlaybackProxies()
     SuppressRefCountRecording guard;
     for (const auto& orphan : orphans)
     {
-        ISlangUnknown* proxy = orphan.key;
-        for (uint32_t i = 0; i < orphan.value; ++i)
+        ISlangUnknown* proxy = orphan.proxy;
+        for (uint32_t i = 0; i < orphan.count; ++i)
         {
             // Releasing one proxy can cascade-destroy another (a session drops
             // its wrapped filesystem); the ProxyBase destructor unregisters it,

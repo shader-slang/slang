@@ -536,14 +536,28 @@ public:
 
     virtual ~TestOwningProxy()
     {
-        ctx().unregisterProxy(static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(this)));
+        s_owningProxyDestroyed++;
+        // tryGet(), mirroring ~ProxyBase: a proxy destroyed by the teardown
+        // sweep must not construct a context to unregister into.
+        if (ReplayContext* context = ReplayContext::tryGet())
+        {
+            context->unregisterProxy(
+                static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(this)));
+        }
         m_owned = nullptr;
     }
+
+    /// Counts destructions, so a test can tell that each proxy was destroyed
+    /// exactly once rather than inferring it from a refcount it can no longer
+    /// safely read.
+    static int s_owningProxyDestroyed;
 
 private:
     Slang::ComPtr<ITestCalculator> m_owned;
     uint32_t m_refCount;
 };
+
+int TestOwningProxy::s_owningProxyDestroyed = 0;
 
 // The orphan bookkeeping added for #11936 keeps the replay path from leaking a
 // proxy the dispatcher created. The production noter is the replay dispatcher,
@@ -624,12 +638,11 @@ SLANG_UNIT_TEST(replayContextUnregisterScrubsOrphanNote)
     SLANG_CHECK(proxyPtr->release() == 1);
 }
 
-// destroySingleton() has to drain the orphan set while the singleton pointer is
-// still published. Draining from ~ReplayContext instead runs the proxy
-// destructors after the pointer was cleared, and ~ProxyBase reaching for the
-// context would then construct a replacement -- leaking it, and leaving the
-// dying context's handle registry holding entries for freed proxies, which is
-// what the sweep's cascade guard reads.
+// destroySingleton() has to drain the orphan set itself: it deletes the context
+// outright and so reaches neither reset() nor switchTo*(), and without a drain
+// the noted references are dropped while still live. It also has to keep the
+// context reachable while draining, since the proxy destructors it runs
+// unregister through it -- which is what s_contextDraining is for.
 SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting)
 {
     SLANG_UNUSED(unitTestContext);
@@ -651,9 +664,14 @@ SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting)
     ctx().testsOnlyRegisterProxy(proxy);
     ctx().testsOnlyNoteOrphanedProxy(key);
 
+    const int destroyedBefore = TestOwningProxy::s_owningProxyDestroyed;
     ReplayContext::destroySingleton();
 
-    // Nothing recreated the singleton on the way out.
+    // The drain ran: the orphaned reference was released and the proxy
+    // destroyed, rather than dropped on the floor with the map.
+    SLANG_CHECK(TestOwningProxy::s_owningProxyDestroyed == destroyedBefore + 1);
+
+    // And nothing recreated the singleton on the way out.
     SLANG_CHECK(ReplayContext::tryGet() == nullptr);
 
     // Destroying the singleton took the default playback handlers with it, so
@@ -664,46 +682,44 @@ SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting)
 }
 
 // Releasing one orphan can cascade-destroy another that is also in the sweep's
-// snapshot (a session dropping its wrapped filesystem). The sweep must notice
-// the second one is gone -- it checks the handle registry, which the cascaded
-// destructor removed itself from -- instead of releasing freed memory.
+// snapshot. The sweep must notice the second one is already gone -- it checks
+// the handle registry, which the cascaded destructor removed itself from --
+// instead of releasing freed memory.
+//
+// This is the same shape as the real dependency the sweep exists to survive: a
+// SessionProxy holds the Linkage whose teardown writes through to the global
+// Session that a GlobalSessionProxy holds. So the owner has to be released
+// first, which is what the descending-handle order in the sweep guarantees;
+// registering `owned` before `owner` gives the owner the higher handle.
 SLANG_UNIT_TEST(replayContextOrphanSweepStopsAtCascadeDestroy)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     ctx().reset();
+    TestOwningProxy::s_owningProxyDestroyed = 0;
 
-    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
-    TestCalculatorProxy* owned = new TestCalculatorProxy(impl.get());
-    Slang::ComPtr<ITestCalculator> ownedPtr(Slang::INIT_ATTACH, owned);
-    ISlangUnknown* ownedKey = static_cast<ISlangUnknown*>(ownedPtr.get());
-
-    // The owner takes its own reference to `owned`, so `owned` is at two: one
-    // held here, one held by the owner.
-    TestOwningProxy* owner = new TestOwningProxy(owned);
-    ISlangUnknown* ownerKey = static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(owner));
-
-    ctx().testsOnlyRegisterProxy(owner);
+    // `owned` is deliberately left with exactly one reference, held by `owner`.
+    // That is what makes the owner's destruction destroy it outright, so the
+    // sweep reaches an entry whose object is already gone.
+    TestOwningProxy* owned = new TestOwningProxy(nullptr);
+    ISlangUnknown* ownedKey = static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(owned));
     ctx().testsOnlyRegisterProxy(owned);
-    ctx().testsOnlyNoteOrphanedProxy(ownerKey);
+
+    TestOwningProxy* owner = new TestOwningProxy(owned); // takes a reference
+    ISlangUnknown* ownerKey = static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(owner));
+    ctx().testsOnlyRegisterProxy(owner);
+    owned->release(); // owner is now the sole owner
+
     ctx().testsOnlyNoteOrphanedProxy(ownedKey);
+    ctx().testsOnlyNoteOrphanedProxy(ownerKey);
 
-    // Hand the sweep the reference it is meant to consume for `owned`, so that
-    // both entries in the snapshot carry a real orphaned reference.
-    ownedPtr->addRef();
-
-    // Releasing `owner` destroys it, which unregisters `owner` and drops its
-    // reference to `owned`. Whichever order the snapshot visits them in, the
-    // registry check is what keeps the sweep from touching a freed object.
+    // Releasing `owner` destroys it, which drops the last reference to `owned`
+    // and destroys that too. The sweep then reaches `owned`'s entry; without the
+    // registry check it would release an object that no longer exists.
     ctx().testsOnlyReleaseOrphanedProxies();
 
+    SLANG_CHECK(TestOwningProxy::s_owningProxyDestroyed == 2);
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(ownerKey) == 0);
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(ownedKey) == 0);
-
-    // `owned` survives with exactly the reference ownedPtr owns.
-    SLANG_CHECK(ownedPtr->addRef() == 2);
-    SLANG_CHECK(ownedPtr->release() == 1);
-
-    ctx().unregisterProxy(ownedKey);
 }
