@@ -809,6 +809,61 @@ def lint_expected_failures() -> list[LintIssue]:
     return issues
 
 
+def lint_agentic_coverage_excludes() -> list[LintIssue]:
+    """Validate that every path in `_meta/agentic-coverage-excludes.txt` still exists.
+
+    `tools/coverage/run-coverage.sh` turns each entry into a slang-test
+    `-exclude-prefix` flag for the coverage agentic pass, which runs
+    in-process (`-server-count 1`), so a test that segfaults the compiler
+    segfaults the orchestrator and the rest of the suite never runs. The
+    entries here are what keep that from happening.
+
+    `-exclude-prefix` silently matches nothing when its path is wrong, so an
+    entry orphaned by a regeneration round that renames or moves its test
+    stops excluding anything and the crash comes back. That has happened
+    twice: PR #11421's directory reorg, and the 2026-08-04 round that renamed
+    `metadata/unorm-attr-on-buffer-element.slang` (coverage run 31235323797).
+    Resolving each entry as a path on disk turns both into a lint error.
+
+    Directory prefixes are legal — `-exclude-prefix` is a prefix filter, so
+    `.../design/pipeline/` excludes everything under it — and resolve as
+    directories, which is why this checks `exists()` rather than `is_file()`.
+
+    The file is optional; absence is fine.
+    """
+    issues: list[LintIssue] = []
+    path = (
+        REPO_ROOT
+        / "docs"
+        / "generated"
+        / "tests"
+        / "_meta"
+        / "agentic-coverage-excludes.txt"
+    )
+    if not path.is_file():
+        return issues
+    rel = str(path.relative_to(REPO_ROOT))
+
+    for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
+        # Mirror run-coverage.sh's parse: strip a trailing comment, then trim.
+        s = raw.split("#", 1)[0].strip()
+        if not s:
+            continue
+        if not (REPO_ROOT / s).exists():
+            issues.append(
+                LintIssue(
+                    f"{rel}:{lineno}",
+                    "error",
+                    f"agentic-coverage-exclude path does not resolve: {s}."
+                    f" A stale entry excludes nothing, so the crash it was"
+                    f" added for will kill the coverage agentic pass again."
+                    f" Point it at the test's current path, or drop it if the"
+                    f" test is gone.",
+                )
+            )
+    return issues
+
+
 def compute_finding_title(finding: dict) -> str:
     """Return either the explicit title, or derive from scope + summary."""
     explicit = finding.get("title")
@@ -2309,6 +2364,7 @@ def cmd_lint(args: argparse.Namespace) -> int:
     if not args.bundles:
         issues.extend(lint_findings())
         issues.extend(lint_expected_failures())
+        issues.extend(lint_agentic_coverage_excludes())
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
     for i in issues:

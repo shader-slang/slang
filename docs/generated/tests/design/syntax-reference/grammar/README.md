@@ -2,10 +2,10 @@
 generated: true
 model: claude-opus-5[1m]
 generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: 43f63a1b499ac72053e6d0c1fcddcbdfd453ddc7f24960cef1fefa6c06465e73
+source_commit: 716ec597fc9c85111cd2fa06ba4e89bc4469b6b2
+watched_paths_digest: dac521695060d5dcbe6e1eda4f10eb6f8dcaff3a2d9144144f918cd86e5358ab
 source_doc: docs/generated/design/syntax-reference/grammar.md
-source_doc_digest: e886a3261bfbc718c54eb7d411e47a9708cf47d5406cd5d9125dfb7b7a885727
+source_doc_digest: ae3b634af866b24bc453161546365453f5057af698e2748a42cb11ae8552a801
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -101,7 +101,8 @@ the grammar names, and what shape they parse into.
 | `LabelStmt ::= IDENT ':' Stmt` names a loop that the `IDENT` arm of `BreakStmt ::= 'break' IDENT? ';'` then exits.                          | functional | [#statements](../../../../design/syntax-reference/grammar.md#statements)                                           | [`stmt-labeled-break.slang`](stmt-labeled-break.slang)                                                       |
 | `ReturnStmt` parses as `'return' Expr? ';'` and yields the expression value.                                                                | functional | [#statements](../../../../design/syntax-reference/grammar.md#statements)                                           | [`stmt-return-expr.slang`](stmt-return-expr.slang)                                                           |
 | `SwitchStmt` parses with `SwitchCase` arms — `'case' Expr ':'` and `'default' ':'`.                                                         | functional | [#statements](../../../../design/syntax-reference/grammar.md#statements)                                           | [`stmt-switch-case-default.slang`](stmt-switch-case-default.slang)                                           |
-| `ThrowStmt` parses as `'throw' Expr` without consuming a trailing `';'`.                                                                    | boundary   | [#statements](../../../../design/syntax-reference/grammar.md#statements)                                           | [`stmt-throw-no-semicolon.slang`](stmt-throw-no-semicolon.slang)                                             |
+| `ThrowStmt` parses as `'throw' Expr ';'`; the terminating semicolon is mandatory.                                                                    | boundary   | [#statements](../../../../design/syntax-reference/grammar.md#statements)                                           | [`stmt-throw-requires-semicolon.slang`](stmt-throw-requires-semicolon.slang)                                             |
+| `ThrowStmt`'s terminating `';'` is mandatory: omitting it is a parse error (E20001). | negative   | [#statements](../../../../design/syntax-reference/grammar.md#statements) | [`stmt-throw-missing-semicolon-rejected.slang`](stmt-throw-missing-semicolon-rejected.slang) |
 | `WhileStmt` parses as `'while' '(' Expr ')' Stmt`.                                                                                          | functional | [#statements](../../../../design/syntax-reference/grammar.md#statements)                                           | [`stmt-while-loop.slang`](stmt-while-loop.slang)                                                             |
 | `ModuleHeader` accepts `'module' ';'` with the name omitted, falling back to the current module name.                                       | boundary   | [#top-level-structure](../../../../design/syntax-reference/grammar.md#top-level-structure)                         | [`module-header-optional-name.slang`](module-header-optional-name.slang)                                     |
 | `ModuleName` accepts a `STRING_LIT` alternative in a `module` header.                                                                       | functional | [#top-level-structure](../../../../design/syntax-reference/grammar.md#top-level-structure)                         | [`module-name-string-literal.slang`](module-name-string-literal.slang)                                       |
