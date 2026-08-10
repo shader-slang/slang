@@ -736,26 +736,26 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         if (auto payloadType =
                 tryGetSinglePayloadType(cast<IRTypeSet>(untaggedUnionType->getSet())))
         {
-            List<IRPackAnyValue*> packsToReplace;
+            List<IRPackAnyValue*> packsToInspect;
             for (auto use = untaggedUnionType->firstUse; use; use = use->nextUse)
             {
                 if (auto pack = as<IRPackAnyValue>(use->getUser()))
                 {
                     if (pack->getDataType() == untaggedUnionType)
-                        packsToReplace.add(pack);
+                        packsToInspect.add(pack);
                 }
             }
 
             untaggedUnionType->replaceUsesWith(payloadType);
 
             // A pack into `{Foo, none}` either carries a `Foo` or supplies the irrelevant payload
-            // for the `none` tag. Preserve the concrete value in the first case. In the second,
-            // replace the old zero-sized placeholder with a well-formed default `Foo`, matching
-            // the representation expected by the now-direct payload field.
-            for (auto pack : packsToReplace)
+            // for the `none` tag. The first case is now `PackAnyValue<Foo>(foo)`; leave that
+            // identity for ordinary AnyValue marshalling to remove. In the second case, replace
+            // the old zero-sized placeholder with a well-formed default `Foo`, matching the
+            // representation expected by the now-direct payload field.
+            for (auto pack : packsToInspect)
             {
                 auto value = pack->getValue();
-                IRInst* replacement = value;
                 auto valueStorageType = value->getDataType();
                 if (auto valueUnionType = as<IRUntaggedUnionType>(valueStorageType))
                 {
@@ -763,17 +763,16 @@ struct UntaggedUnionLoweringContext : public InstPassBase
                             tryGetSinglePayloadType(cast<IRTypeSet>(valueUnionType->getSet())))
                         valueStorageType = valuePayloadType;
                 }
-                if (valueStorageType != payloadType)
-                {
-                    IRBuilder builder(pack);
-                    builder.setInsertBefore(pack);
-                    replacement = builder.emitDefaultConstruct(payloadType);
-                }
+                if (valueStorageType == payloadType)
+                    continue;
+
+                IRBuilder builder(pack);
+                builder.setInsertBefore(pack);
+                auto replacement = builder.emitDefaultConstruct(payloadType);
                 pack->replaceUsesWith(replacement);
                 pack->removeAndDeallocate();
             }
 
-            loweredSinglePayloadType = true;
             return;
         }
 
@@ -825,42 +824,12 @@ struct UntaggedUnionLoweringContext : public InstPassBase
                     return lowerUntaggedUnionType(inst);
             });
 
-        if (loweredSinglePayloadType)
-        {
-            // Earlier type-flow specialization emitted AnyValue operations while `{Foo, none}`
-            // was still a two-element payload set. After the type substitution above, operations
-            // such as `PackAnyValue<Foo>(foo)` and `UnpackAnyValue<Foo>(foo)` are identities.
-            // Remove them here before the general marshalling pass, which requires a genuine
-            // `IRAnyValueType` operand or result.
-            processAllInsts(
-                [&](IRInst* inst)
-                {
-                    if (auto pack = as<IRPackAnyValue>(inst))
-                    {
-                        if (pack->getDataType() == pack->getValue()->getDataType())
-                        {
-                            pack->replaceUsesWith(pack->getValue());
-                            pack->removeAndDeallocate();
-                        }
-                    }
-                    else if (auto unpack = as<IRUnpackAnyValue>(inst))
-                    {
-                        if (unpack->getDataType() == unpack->getValue()->getDataType())
-                        {
-                            unpack->replaceUsesWith(unpack->getValue());
-                            unpack->removeAndDeallocate();
-                        }
-                    }
-                });
-        }
-
         replaceNoneTypeElementWithVoidType();
     }
 
 private:
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
-    bool loweredSinglePayloadType = false;
 };
 
 // Lower `UntaggedUnionType(TypeSet(...))` instructions by replacing them with
