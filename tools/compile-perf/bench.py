@@ -561,15 +561,24 @@ def main():
 # surface only as silently altered measurements — and as a rejected BenchView
 # submission, since a summary computed from raw values does not match one
 # recomputed from rounded samples.
-_s = stats([1.23456, 2.0, 3.0])
-assert _s["samples"] == [1.23456, 2.0, 3.0], \
+# Both extrema carry a 5th decimal so that dropping their round() is
+# observable. A value that is already exact at 4 places (3.0, say) asserts
+# nothing about rounding: it compares equal either way, so the check would
+# pass through the very edit it exists to catch.
+_s = stats([1.23456, 2.0, 3.98769])
+assert _s["samples"] == [1.23456, 2.0, 3.98769], \
     "samples must be stored RAW; rounding them alters what a consumer recomputes"
-assert _s["min"] == 1.2346 and _s["max"] == 3.0, \
+assert _s["min"] == 1.2346 and _s["max"] == 3.9877, \
     "summary fields ARE rounded, and max is reported alongside min"
 assert _s["n"] == 3
 assert stats([]) is None, "no measurements yields no stats, not an empty summary"
 assert stats([5.0])["stdev"] == 0.0, "a single sample has zero deviation, not None"
-assert stats([1.0, None, 2.0])["n"] == 2, "None samples are dropped, not counted"
+# Pins the sample list, not just n: both are built from the same filtered
+# list today, so n alone would still hold if a later edit archived the
+# unfiltered argument, letting a None reach a consumer that cannot take one.
+assert stats([1.0, None, 2.0])["samples"] == [1.0, 2.0], \
+    "None samples are dropped from the archive, not merely uncounted"
+assert stats([1.0, None, 2.0])["n"] == 2
 del _s
 
 
