@@ -814,6 +814,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvOp _arithmeticOpCodeConvert(IROp irOpCode, IRType* basicType)
     {
+        // A texel loaded from a normalized-format texture, such as
+        // `RWTexture2D<unorm float>`, has an AttributedType wrapping the underlying
+        // scalar. The attributes do not change which arithmetic opcode applies, so
+        // classify the type they wrap.
+        basicType = as<IRType>(unwrapAttributedType(basicType));
+
         bool isFloatingPoint = false;
         bool isBool = false;
         switch (basicType->getOp())
