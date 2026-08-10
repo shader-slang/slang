@@ -496,3 +496,59 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
         slang::ISession::getTypeGuid(),
         (void**)playedBackSession.writeRef())));
 }
+
+// The orphan bookkeeping added for #11936 is what keeps the replay path from
+// either leaking a proxy the dispatcher created (note without release) or
+// releasing one that `m_returnedEntryPoints` still owns (note without unnote).
+// Both failure modes are only observable through a sanitizer, and only on a
+// path some test actually drives -- and the entry-point wrapping that motivates
+// the unnote is reached by no unit test. So the balancing is pinned directly
+// here, on the accounting itself.
+SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
+    TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
+    Slang::ComPtr<ITestCalculator> proxyPtr(Slang::INIT_ATTACH, proxy);
+    ISlangUnknown* key = static_cast<ISlangUnknown*>(proxyPtr.get());
+
+    ctx().reset();
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+
+    // A proxy can be handed back more than once in one replay, so notes
+    // accumulate rather than overwrite -- otherwise the second orphaned
+    // reference would never be released.
+    ctx().testsOnlyNoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
+    ctx().testsOnlyNoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 2);
+
+    // Unnote cancels exactly one, which is what RECORD_ENTRYPOINT_OUTPUT does
+    // when it takes an owning reference of its own: without this the teardown
+    // release would drop a reference that owner still holds.
+    ctx().testsOnlyUnnoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
+    ctx().testsOnlyUnnoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+
+    // Cancelling more times than noted must not underflow the count back to a
+    // huge number, which would make teardown over-release.
+    ctx().testsOnlyUnnoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+
+    // Nulls are ignored by both sides rather than tracked.
+    ctx().testsOnlyNoteOrphanedProxy(nullptr);
+    ctx().testsOnlyUnnoteOrphanedProxy(nullptr);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(nullptr) == 0);
+
+    // Teardown drains whatever is still noted, so nothing is left tracked.
+    // The proxy holds its own reference via proxyPtr, so the extra note below
+    // is balanced by this release rather than by the ComPtr.
+    proxyPtr->addRef();
+    ctx().testsOnlyNoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
+    ctx().testsOnlyReleaseOrphanedProxies();
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+}

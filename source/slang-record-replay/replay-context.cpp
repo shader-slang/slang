@@ -191,6 +191,14 @@ ReplayContext::ReplayContext(const void* referenceData, size_t referenceSize, bo
 
 ReplayContext::~ReplayContext()
 {
+    // Release orphaned playback proxies before the members holding them are
+    // destroyed. `reset()` and `switchTo*()` do this on their own paths, but
+    // `destroySingleton()` deletes the context outright and reaches neither, so
+    // without this the singleton's final teardown drops `m_playbackOrphanedProxies`
+    // with live references still in it -- exactly the leak this class exists to
+    // close (issue #11936).
+    releaseOrphanedPlaybackProxies();
+
     // Destructor must be defined in DLL to properly free Dictionary memory.
     // The compiler will generate calls to ~Dictionary() for each member,
     // and this ensures they run in the DLL's allocator context.
@@ -804,6 +812,12 @@ void ReplayContext::unnotePlaybackOrphanedProxy(ISlangUnknown* proxy)
         return;
     if (--(*existing) == 0)
         m_playbackOrphanedProxies.remove(proxy);
+}
+
+uint32_t ReplayContext::testOnlyGetOrphanedPlaybackRefCount(ISlangUnknown* proxy) const
+{
+    const uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
+    return existing ? *existing : 0;
 }
 
 void ReplayContext::releaseOrphanedPlaybackProxies()

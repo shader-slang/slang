@@ -622,6 +622,26 @@ public:
         return testOnlyRegisterProxyImpl(objUnknown);
     }
 
+    /// Note / cancel / count an orphaned playback reference, for tests.
+    ///
+    /// The production callers of the first two are the replay dispatcher and
+    /// RECORD_ENTRYPOINT_OUTPUT, neither of which a unit test can drive, so the
+    /// note/unnote balancing is otherwise only observable as a sanitizer leak
+    /// or double-free on a path no test reaches.
+    inline void testsOnlyNoteOrphanedProxy(ISlangUnknown* proxy)
+    {
+        notePlaybackOrphanedProxy(proxy);
+    }
+    inline void testsOnlyUnnoteOrphanedProxy(ISlangUnknown* proxy)
+    {
+        unnotePlaybackOrphanedProxy(proxy);
+    }
+    inline uint32_t testsOnlyGetOrphanedRefCount(ISlangUnknown* proxy) const
+    {
+        return testOnlyGetOrphanedPlaybackRefCount(proxy);
+    }
+    inline void testsOnlyReleaseOrphanedProxies() { releaseOrphanedPlaybackProxies(); }
+
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
     template<typename ImplT>
@@ -772,6 +792,14 @@ private:
     SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
     SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
     SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
+
+    /// Number of orphaned playback references currently tracked for `proxy`, or
+    /// 0 if none. Exists so a test can assert the note/unnote balancing
+    /// directly: the alternative is inferring it from a sanitizer leak or
+    /// double-free report, which only fires on a path some test happens to
+    /// drive, and the entry-point wrapping that motivates the `unnote` is not
+    /// driven by any of them.
+    SLANG_API uint32_t testOnlyGetOrphanedPlaybackRefCount(ISlangUnknown* proxy) const;
     SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
     SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
 
