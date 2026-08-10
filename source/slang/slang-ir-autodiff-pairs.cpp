@@ -441,8 +441,17 @@ struct DiffPairLoweringPass : InstPassBase
 
     IRInst* lowerPairType(IRBuilder* builder, IRType* pairType)
     {
-        auto loweredPairType = pairBuilder->lowerDiffPairType(builder, pairType);
-        return loweredPairType;
+        if (auto diffPairType = as<IRDifferentialPairTypeBase>(pairType))
+        {
+            // Recomputed existential operations can temporarily produce a pair whose element type
+            // is local to the function that opened the existential. Type-flow resolves or removes
+            // that pair after the concrete type becomes known. Creating a module-scope struct here
+            // would make the function-local type escape its valid scope.
+            if (isRuntimeType(diffPairType->getValueType()))
+                return nullptr;
+        }
+
+        return pairBuilder->lowerDiffPairType(builder, pairType);
     }
 
     IRInst* lowerMakePair(IRBuilder* builder, IRInst* inst)
@@ -453,24 +462,14 @@ struct DiffPairLoweringPass : InstPassBase
             builder->setInsertBefore(makePairInst);
             if (auto loweredPairType = (IRType*)lowerPairType(builder, pairType))
             {
-                if (isRuntimeType(pairType->getValueType()))
-                {
-                    // Do nothing.
-                    return makePairInst;
-                }
-                else
-                {
-                    IRInst* result = nullptr;
+                IRInst* operands[2] = {
+                    makePairInst->getPrimalValue(),
+                    makePairInst->getDifferentialValue()};
+                auto result = builder->emitMakeStruct((IRType*)loweredPairType, 2, operands);
 
-                    IRInst* operands[2] = {
-                        makePairInst->getPrimalValue(),
-                        makePairInst->getDifferentialValue()};
-                    result = builder->emitMakeStruct((IRType*)(loweredPairType), 2, operands);
-
-                    makePairInst->replaceUsesWith(result);
-                    makePairInst->removeAndDeallocate();
-                    return result;
-                }
+                makePairInst->replaceUsesWith(result);
+                makePairInst->removeAndDeallocate();
+                return result;
             }
         }
 

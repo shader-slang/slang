@@ -701,6 +701,28 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
         }
     }
 
+    if (auto pairType = as<IRDifferentialPairType>(type))
+    {
+        if (auto paramPairType = as<IRDifferentialPairType>(paramType))
+        {
+            // Consider a concrete derivative implementation that accepts
+            // `DifferentialPair<ValueHolder>` through a dynamically dispatched function whose
+            // corresponding parameter is `DifferentialPair<IValueHolder>`. Type-flow represents
+            // the abstract pair as a tuple of propagation information for its two components.
+            // Seed the concrete argument in that same structural form so every producer agrees on
+            // the representation consumed by `unionPropagationInfo`.
+            auto primalInfo = (IRType*)makeInfoForConcreteType(
+                module,
+                pairType->getValueType(),
+                paramPairType->getValueType());
+            auto differentialInfo = (IRType*)makeInfoForConcreteType(
+                module,
+                getConcreteDifferentialType(&builder, pairType),
+                paramPairType->getValueType());
+            return builder.getTupleType(primalInfo, differentialInfo);
+        }
+    }
+
     // Non-structural or mismatched structural paramType: produce a flat UntaggedUnion.
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
@@ -5690,6 +5712,8 @@ struct TypeFlowSpecializationContext
             return specializeMakeArrayFromElement(context, as<IRMakeArrayFromElement>(inst));
         case kIROp_MakeTuple:
             return specializeMakeTuple(context, inst);
+        case kIROp_GetTupleElement:
+            return specializeGetTupleElement(context, as<IRGetTupleElement>(inst));
         case kIROp_CreateExistentialObject:
             return specializeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
         case kIROp_RWStructuredBufferLoad:
@@ -6895,25 +6919,33 @@ struct TypeFlowSpecializationContext
         // This needs to be done even if the callee is not a set.
         //
         UCount extraArgCount = callArgs.getCount();
+        List<ArgumentPackWorkItem> argsToPack;
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
+            auto effectiveParamType = effectiveFuncType->getParamType(i + extraArgCount);
             const auto [paramDirection, paramType] =
-                splitParameterDirectionAndType(effectiveFuncType->getParamType(i + extraArgCount));
+                splitParameterDirectionAndType(effectiveParamType);
             if (isConcreteType(funcTypeUnionMask->getParamType(i)))
             {
                 callArgs.add(arg);
                 continue;
             }
 
+            IRBuilder argBuilder(context);
+            argBuilder.setInsertBefore(inst);
+            ArgumentPackWorkItem packWorkItem;
+            auto adaptedArg =
+                maybeUnpackArg(&argBuilder, effectiveParamType, arg, packWorkItem);
+            if (packWorkItem.concreteArg)
+                argsToPack.add(packWorkItem);
+
             switch (paramDirection.kind)
             {
             // We'll upcast any in-parameters.
             case ParameterDirectionInfo::Kind::In:
                 {
-                    IRBuilder builder(context);
-                    builder.setInsertBefore(inst);
-                    callArgs.add(upcastSet(&builder, arg, paramType));
+                    callArgs.add(upcastSet(&argBuilder, adaptedArg, paramType));
                     break;
                 }
 
@@ -6925,7 +6957,7 @@ struct TypeFlowSpecializationContext
             case ParameterDirectionInfo::Kind::BorrowIn:
             case ParameterDirectionInfo::Kind::Ref:
                 {
-                    callArgs.add(arg);
+                    callArgs.add(adaptedArg);
                     break;
                 }
             default:
@@ -6961,6 +6993,8 @@ struct TypeFlowSpecializationContext
             IRBuilderSourceLocRAII builderSourceLocRAII(&builder, inst->sourceLoc);
             auto newCall =
                 builder.emitCallInst(effectiveFuncType->getResultType(), callee, callArgs);
+            for (auto item : argsToPack)
+                writeBackUnpackedArg(&builder, item);
             inst->replaceUsesWith(newCall);
             inst->removeAndDeallocate();
         }
@@ -7189,6 +7223,50 @@ struct TypeFlowSpecializationContext
         }
 
         return false;
+    }
+
+    bool specializeGetTupleElement(IRInst* context, IRGetTupleElement* inst)
+    {
+        // A tuple projection's result type must follow the specialized type of its base tuple.
+        // This matters for nested contexts: specializing a context field from an interface to a
+        // tagged union recursively changes the outer tuple type, but does not otherwise update the
+        // existing projections that read that field.
+        //
+        // An abstract DifferentialPair<T> is also represented as a tuple during type-flow. If it
+        // later narrows to one concrete pair type, replace the tuple projection with the matching
+        // pair operation as part of the same representation update.
+        auto pairType = as<IRDifferentialPairType>(inst->getTuple()->getDataType());
+        auto elementIndex = as<IRIntLit>(inst->getElementIndex());
+        if (!pairType)
+            return replaceType(context, inst);
+        if (!elementIndex)
+            return false;
+
+        auto resultInfo = tryGetInfo(context, inst);
+        auto resultType = resultInfo ? getLoweredType(resultInfo) : nullptr;
+        if (!resultType)
+            return false;
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+
+        IRInst* result = nullptr;
+        switch (elementIndex->getValue())
+        {
+        case 0:
+            result = builder.emitDifferentialValuePairGetPrimal(resultType, inst->getTuple());
+            break;
+        case 1:
+            result =
+                builder.emitDifferentialValuePairGetDifferential(resultType, inst->getTuple());
+            break;
+        default:
+            return false;
+        }
+
+        inst->replaceUsesWith(result);
+        inst->removeAndDeallocate();
+        return true;
     }
 
     bool specializeDifferentialPairGetDifferential(

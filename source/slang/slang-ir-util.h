@@ -396,6 +396,11 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
+/// Returns the differential element type recorded by a concrete differential-pair witness.
+IRType* getConcreteDifferentialType(
+    IRBuilder* builder,
+    IRDifferentialPairType* differentialPairType);
+
 IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
 
 IRInst* getInstInBlock(IRInst* inst);

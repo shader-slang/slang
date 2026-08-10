@@ -2900,9 +2900,12 @@ HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
         }
         else
         {
-            // We may not be able to recompute due to limitations of
-            // the unzip pass. If so we will store the result.
-            if (canRecompute(use))
+            // We may not be able to recompute due to limitations of the unzip pass. If so, store
+            // the result only when its type can be represented in a context. A value whose type is
+            // produced by opening an existential cannot leave the function where it was opened, so
+            // recomputation is the only valid classification even when the unzip pass would
+            // otherwise prefer storage.
+            if (!canTypeBeStored(use.usedVal->getDataType()) || canRecompute(use))
                 return HoistResult::recompute(use.usedVal);
 
             // The fallback is to store.

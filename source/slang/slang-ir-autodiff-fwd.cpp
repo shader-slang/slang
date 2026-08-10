@@ -3486,6 +3486,11 @@ struct ForwardDiffTranslationContext
         if (isNoDiffType(origType))
             return nullptr;
 
+        // Differential type annotations can refer to function-local instructions, such as the
+        // type produced by opening an existential. Perform the lookup on the translated primal
+        // type so the resulting differential type belongs to the derivative function.
+        origType = (IRType*)findOrTranslatePrimalInst(builder, origType);
+
         if (auto origPtrType = asRelevantPtrType(origType))
         {
             if (auto diffValueType = differentiateType(builder, origPtrType->getValueType()))

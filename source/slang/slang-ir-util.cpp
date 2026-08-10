@@ -1737,6 +1737,23 @@ IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
     return nullptr;
 }
 
+IRType* getConcreteDifferentialType(
+    IRBuilder* builder,
+    IRDifferentialPairType* differentialPairType)
+{
+    // Consider DifferentialPair<Primal>, where Primal.Differential is a distinct type. The pair's
+    // witness is the source of truth for that associated type; using Primal here would only work
+    // for self-differential types.
+    auto witnessTable = as<IRWitnessTable>(differentialPairType->getWitness());
+    SLANG_RELEASE_ASSERT(witnessTable);
+
+    auto requirementKey = builder->getBuiltinRequirementKey(
+        (IRIntegerValue)BuiltinRequirementKind::DifferentialType);
+    auto differentialType = as<IRType>(findWitnessTableEntry(witnessTable, requirementKey));
+    SLANG_RELEASE_ASSERT(differentialType);
+    return differentialType;
+}
+
 IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar)
 {
     IRInst* location = nullptr;

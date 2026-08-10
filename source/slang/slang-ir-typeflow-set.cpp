@@ -7,6 +7,129 @@
 namespace Slang
 {
 
+bool isAnyValueType(IRType* type)
+{
+    return as<IRAnyValueType>(type) || as<IRUntaggedUnionType>(type);
+}
+
+// Marshals the tuple representation of an abstract differential pair into the concrete pair type
+// required by one implementation selected through type-flow.
+static IRInst* unpackDifferentialPairArg(
+    IRBuilder* builder,
+    IRDifferentialPairType* pairType,
+    IRTupleType* tupleType,
+    IRInst* arg)
+{
+    SLANG_RELEASE_ASSERT(tupleType->getOperandCount() == 2);
+
+    auto primalArg = builder->emitGetTupleElement((IRType*)tupleType->getOperand(0), arg, 0);
+    auto differentialArg =
+        builder->emitGetTupleElement((IRType*)tupleType->getOperand(1), arg, 1);
+
+    ArgumentPackWorkItem unusedPackWork;
+    auto primal = maybeUnpackArg(builder, pairType->getValueType(), primalArg, unusedPackWork);
+    SLANG_RELEASE_ASSERT(!unusedPackWork.concreteArg);
+
+    auto differentialType = getConcreteDifferentialType(builder, pairType);
+    auto differential =
+        maybeUnpackArg(builder, differentialType, differentialArg, unusedPackWork);
+    SLANG_RELEASE_ASSERT(!unusedPackWork.concreteArg);
+
+    return builder->emitMakeDifferentialPair(pairType, primal, differential);
+}
+
+IRInst* maybeUnpackArg(
+    IRBuilder* builder,
+    IRType* paramType,
+    IRInst* arg,
+    ArgumentPackWorkItem& packAfterCall)
+{
+    packAfterCall.dstArg = nullptr;
+    packAfterCall.concreteArg = nullptr;
+
+    IRType* paramValType = paramType;
+    IRType* argValType = arg->getDataType();
+    IRInst* argVal = arg;
+    if (auto ptrType = as<IRPtrTypeBase>(paramType))
+        paramValType = ptrType->getValueType();
+    if (auto argPtrType = as<IRPtrTypeBase>(arg->getDataType()))
+        argValType = argPtrType->getValueType();
+
+    if (auto pairType = as<IRDifferentialPairType>(paramValType))
+    {
+        if (auto tupleType = as<IRTupleType>(argValType))
+        {
+            // Type-flow represents an abstract differential pair as a tuple. The selected
+            // implementation is the boundary where that representation must be unpacked. For an
+            // inout pair, marshal the updated concrete pair back into the tuple after the call.
+            if (as<IRPtrTypeBase>(paramType))
+            {
+                auto tempVar = builder->emitVar(paramValType);
+                if (as<IRBorrowInOutParamType>(paramType))
+                {
+                    auto initialValue = unpackDifferentialPairArg(
+                        builder,
+                        pairType,
+                        tupleType,
+                        builder->emitLoad(arg));
+                    builder->emitStore(tempVar, initialValue);
+                }
+
+                packAfterCall.kind = ArgumentPackWorkItem::Kind::UpCast;
+                packAfterCall.dstArg = arg;
+                packAfterCall.concreteArg = tempVar;
+                return tempVar;
+            }
+
+            return unpackDifferentialPairArg(builder, pairType, tupleType, argVal);
+        }
+    }
+
+    if (!isAnyValueType(paramValType) && isAnyValueType(argValType))
+    {
+        if (as<IRPtrTypeBase>(paramType))
+        {
+            auto tempVar = builder->emitVar(paramValType);
+            if (as<IRBorrowInOutParamType>(paramType))
+                builder->emitStore(
+                    tempVar,
+                    builder->emitUnpackAnyValue(paramValType, builder->emitLoad(arg)));
+
+            packAfterCall.kind = ArgumentPackWorkItem::Kind::Pack;
+            packAfterCall.dstArg = arg;
+            packAfterCall.concreteArg = tempVar;
+            return tempVar;
+        }
+        return builder->emitUnpackAnyValue(paramValType, argVal);
+    }
+
+    if (as<IRTaggedUnionType>(paramValType) && as<IRTaggedUnionType>(argValType) &&
+        paramValType != argValType)
+    {
+        if (as<IROutParamType>(paramType))
+        {
+            auto tempVar = builder->emitVar(paramValType);
+            packAfterCall.kind = ArgumentPackWorkItem::Kind::UpCast;
+            packAfterCall.dstArg = arg;
+            packAfterCall.concreteArg = tempVar;
+            return tempVar;
+        }
+        SLANG_UNEXPECTED("Unexpected upcast for non-out parameter");
+    }
+
+    return arg;
+}
+
+void writeBackUnpackedArg(IRBuilder* builder, const ArgumentPackWorkItem& item)
+{
+    auto destType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
+    auto concreteVal = builder->emitLoad(item.concreteArg);
+    auto packedVal = item.kind == ArgumentPackWorkItem::Kind::Pack
+                         ? builder->emitPackAnyValue(destType, concreteVal)
+                         : upcastSet(builder, concreteVal, destType);
+    builder->emitStore(item.dstArg, packedVal);
+}
+
 template<typename F>
 IRInst* openOptional(IRModule* module, IRInst* arg, F innerFunc)
 {
@@ -251,6 +374,26 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
             return builder->emitMakeTuple(destTupleType, upcastedElements);
         }
+    }
+    else if (
+        auto argPairType = as<IRDifferentialPairType>(argInfo);
+        argPairType && as<IRTupleType>(destInfo))
+    {
+        // A concrete witness-table implementation returns a concrete differential pair, while
+        // type-flow represents the corresponding abstract result as a tuple. Marshal each
+        // component independently at that wrapper boundary.
+        auto destTupleType = cast<IRTupleType>(destInfo);
+        SLANG_RELEASE_ASSERT(destTupleType->getOperandCount() == 2);
+
+        auto primal = builder->emitDifferentialValuePairGetPrimal(argPairType->getValueType(), arg);
+        auto differentialType = getConcreteDifferentialType(builder, argPairType);
+        auto differential =
+            builder->emitDifferentialValuePairGetDifferential(differentialType, arg);
+
+        List<IRInst*> elements;
+        elements.add(upcastSet(builder, primal, (IRType*)destTupleType->getOperand(0)));
+        elements.add(upcastSet(builder, differential, (IRType*)destTupleType->getOperand(1)));
+        return builder->emitMakeTuple(destTupleType, elements);
     }
     else if (as<IROptionalType>(argInfo) && as<IROptionalType>(destInfo))
     {
