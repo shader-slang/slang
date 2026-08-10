@@ -11,13 +11,19 @@
 
 // Verifies the abstract witness described in the opcode table: the witness
 // that `ThisType` conforms to the enclosing interface, which a `lookupWitness`
-// stays abstract through. The witness is materialized by a requirement that
-// forces such a lookup during the interface's own lowering -- here
-// `associatedtype A : IBar`, whose bound has to be resolved on `This`. A
-// requirement that merely mentions `This` in its signature (`This frob()`,
-// kept below) needs no conformance lookup and does not on its own put the
-// placeholder in the dump, so the associated type is what makes the claim
-// observable.
+// stays abstract through.
+//
+// `createThisTypeWitness` runs for every interface (slang-lower-to-ir.cpp:12139),
+// so what this test can observe is not whether the witness is *created* but
+// whether it survives to the dump. Measured on the commit this test was updated
+// against, `associatedtype A : IBar` -- whose bound has to be resolved on `This`
+// -- leaves it in the dump, and an interface whose only ThisType contact is the
+// `This frob()` signature (kept below) does not. That signature-only form did
+// surface the placeholder on a build from 2026-07-08 and no longer does, so the
+// behaviour changed in between; which change is responsible has not been
+// bisected, and the "needs no conformance lookup" reading of it is inferred
+// rather than established. The associated type is used here because it is the
+// form that is observable today.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -60,4 +66,7 @@ void main()
     buf[0] = useFrob(f, inVal);
 }
 
-// CHECK: thisTypeWitness
+// Anchored rather than a bare substring match: the result type ties the witness
+// to IFrob, and end-of-line requires the inst to have no operand list, which is
+// what makes it the abstract placeholder rather than a concrete table.
+// CHECK: witness_table_t(%IFrob){{.*}}= thisTypeWitness{{$}}
