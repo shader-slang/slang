@@ -69,6 +69,31 @@ IRType* getMatrixElementType(IRType* type)
     return type;
 }
 
+// Returns the value type of the memory location operated on by an atomic instruction.
+IRType* getAtomicOperationValueType(IRInst* inst)
+{
+    auto valueType = inst->getDataType();
+    if (valueType && valueType->getOp() != kIROp_VoidType)
+        return valueType;
+
+    // Some front-end atomic operations return the original value through an `out` argument.
+    // SPIR-V legalization rewrites those operations so the IR instruction itself returns
+    // `void`, but later validation and capability emission still need the atomic element type.
+    // Recover that type from the pointer operand instead of treating the operation as void.
+    if (inst->getOperandCount() == 0)
+        return nullptr;
+
+    IRBuilder builder(inst);
+    auto ptrOperand = inst->getOperand(0);
+    if (!ptrOperand)
+        return nullptr;
+
+    auto ptrValueType = tryGetPointedToType(&builder, ptrOperand->getDataType());
+    if (auto atomicType = as<IRAtomicType>(ptrValueType))
+        return atomicType->getElementType();
+    return ptrValueType;
+}
+
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType)
 {
     Dictionary<IRInst*, IRInst*> result;
