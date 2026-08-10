@@ -135,7 +135,19 @@ def _safe_extract(archive, names, dest):
         target = os.path.realpath(os.path.join(dest, name))
         if target != base and not target.startswith(base + os.sep):
             raise SystemExit(f"refusing unsafe archive member '{name}' (escapes {dest})")
-    if isinstance(archive, zipfile.ZipFile) and os.name != "nt":
+    if isinstance(archive, zipfile.ZipFile):
+        if os.name == "nt":
+            # Both release zips (windows-x86_64, macos-*) can land here, but a
+            # Windows HOST cannot recreate the macOS dylib symlinks anyway:
+            # os.symlink needs SeCreateSymbolicLinkPrivilege, which the perf
+            # runner does not have. The Windows asset carries none, and a
+            # macOS asset is never run from Windows, so extract plainly — the
+            # member-name check above is the whole guard. This branch must
+            # exist: zipfile.extractall takes no filter= kwarg and ZipFile has
+            # no getmembers(), so falling through to the tar path below is a
+            # TypeError on every Windows release fetch.
+            archive.extractall(dest)
+            return
         links, regular = [], []
         for i in archive.infolist():
             (links if (i.external_attr >> 16) & 0o170000 == 0o120000
@@ -153,12 +165,13 @@ def _safe_extract(archive, names, dest):
                 os.unlink(path)
             os.symlink(linkto, path)
         return
-    # Tar (the Linux and Windows release assets). The member-NAME check above
-    # is not sufficient on its own: a tar can carry a symlink `link ->
-    # ../outside` followed by a regular member `link/evil`, and at validation
-    # time `dest/link` does not exist yet, so realpath resolves it lexically
-    # and the name passes. Extraction then creates the symlink and writes
-    # through it, landing the file outside dest.
+    # Tar (the Linux release assets — Windows and macOS both ship zips, which
+    # returned above). The member-NAME check is not sufficient on its own: a
+    # tar can carry a symlink `link -> ../outside` followed by a regular
+    # member `link/evil`, and at validation time `dest/link` does not exist
+    # yet, so realpath resolves it lexically and the name passes. Extraction
+    # then creates the symlink and writes through it, landing the file
+    # outside dest.
     #
     # tarfile's "data" filter rejects exactly that (absolute and escaping link
     # targets). It became the DEFAULT in 3.14, but this suite runs on whatever
@@ -313,9 +326,9 @@ if os.name != "nt":
         shutil.rmtree(_d, ignore_errors=True)
     del _d, _mkzip
 
-    # The same escape, through the TAR branch — the one the Linux and Windows
-    # release assets take. This shape defeats the member-name check on its
-    # own: `dest/link` does not exist when the names are validated, so
+    # The same escape, through the TAR branch — the one the Linux release
+    # assets take. This shape defeats the member-name check on its own:
+    # `dest/link` does not exist when the names are validated, so
     # realpath resolves `link/evil` lexically inside dest and it passes. Only
     # the extraction filter stops the write.
     def _mktar(linkto):
@@ -382,6 +395,40 @@ if os.name != "nt":
     finally:
         shutil.rmtree(_d, ignore_errors=True)
     del _d, _dest, _outside, _mktar, _try_extract_slip
+
+
+# The Windows-HOST zip path, checked from every platform by faking os.name.
+# ASSET_SUFFIXES["windows"] is a .zip, so this IS the branch the release sweep
+# takes on its Windows runner, and nothing else reaches it: check-python-core
+# runs on Linux, and the sweep itself only reports the failure a whole run
+# later. Faking the attribute is the same surgical patching
+# _tar_filter_supported exists for — os.name is read at call time, and on
+# POSIX os.path stays bound to posixpath, so only the branch under test moves.
+# Without its own return a ZipFile falls into the tar code, whose `filter=`
+# kwarg and getmembers() call ZipFile does not have.
+#
+# Imported again here rather than relied on from the block above: that one is
+# guarded on POSIX, and on a real Windows host these names would be unbound.
+import io
+import shutil
+import tempfile
+
+_saved_os_name = os.name
+_zbuf = io.BytesIO()
+with zipfile.ZipFile(_zbuf, "w") as _z:
+    _z.writestr("bin/slangc.exe", b"x")
+_zbuf.seek(0)
+_d = tempfile.mkdtemp(prefix="fetch_selfcheck_nt_")
+try:
+    os.name = "nt"
+    with zipfile.ZipFile(_zbuf) as _z:
+        _safe_extract(_z, _z.namelist(), _d)
+    assert os.path.isfile(os.path.join(_d, "bin", "slangc.exe")), \
+        "a zip on a Windows host must extract, not fall through to the tar path"
+finally:
+    os.name = _saved_os_name
+    shutil.rmtree(_d, ignore_errors=True)
+del _saved_os_name, _zbuf, _z, _d
 
 
 if __name__ == "__main__":

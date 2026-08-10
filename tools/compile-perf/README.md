@@ -343,6 +343,22 @@ slangc floor from an api-driver peak would fold the two binaries'
 differing startup cost into the workload's own-memory curve, so a change
 in either baseline would read as a workload regression.
 
+**The RSS reader checks itself before it is trusted.** `currentRssKb` in
+`native/api-driver.cpp` has three platform branches and is compiled ad
+hoc by `bench.py`, so it never reaches the `tests/` harness and
+`check-python-core` (Python-only, Linux-only) cannot see it either. Its
+plausible failures are silent _scalings_ — a dropped
+`sysconf(_SC_PAGESIZE)` multiply, a bytes-vs-KB divide on the wrong
+side, a reader returning address space instead of resident memory — and
+each of those charts a believable curve rather than raising anything.
+So `build_api_driver` runs `api-driver --selfcheck-mem` immediately
+after compiling: it measures the reader against a 64 MiB touched
+allocation (catching the 1024×/4096× errors) and a 512 MiB untouched one
+(catching address-space-vs-resident), and a driver that fails is
+discarded like a missing one. Measuring a known allocation is what keeps
+this independent of Slang — a plausibility band on the session footprint
+would just hardcode a guess a real memory optimization could falsify.
+
 The site presents memory on `memory-{tot,releases}.html` as a compact
 dashboard of line panels — the session floors (the absolute charts),
 the createGlobalSession delta, then each tracked workload's OWN memory

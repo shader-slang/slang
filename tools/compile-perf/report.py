@@ -223,9 +223,12 @@ MEMORY_FLOOR = {
 FLOOR_WORKLOADS = {wl for wl, _t in MEMORY_FLOOR.values()}
 
 # How many createGlobalSession-delta series the memory page draws before it
-# starts naming the rest instead of plotting them. Matches the colour list in
-# memory_page; raise both together.
+# starts naming the rest instead of plotting them, and the colours it draws
+# them in. One binding, used by both memory_page and the self-check below: a
+# second copy of the literal to assert against would agree with itself forever
+# while the list the panel actually reads drifted.
 MAX_DELTA_SERIES = 4
+DELTA_COLORS = ["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]
 
 
 def own_memory(peaks, floors):
@@ -385,8 +388,7 @@ def main():
             # track_memory took this from two series to three, so the next
             # track_memory api workload reaches the cap.
             shown, dropped = cap_delta_series(sorted(sc), MAX_DELTA_SERIES)
-            colors = ["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]
-            series = [(wl, colors[i % len(colors)], mib(vs))
+            series = [(wl, DELTA_COLORS[i % len(DELTA_COLORS)], mib(vs))
                       for i, (wl, vs) in enumerate(shown)]
             title = "createGlobalSession RSS delta (api driver)"
             if dropped:
@@ -573,6 +575,18 @@ assert _per[("mdl_dxr", "peakRssKb")] == [None, 900.0, 950.0], \
 del _per
 
 
+# mib: the kb -> MiB conversion every memory panel's y-axis is drawn in, and
+# the third independent /1024.0 in the suite (analyze.fmt_qty and the axis
+# unit label are the others). Pinned for the same reason _maxrss_to_kb and
+# _pmc_peak_kb are: a dropped or doubled divide renders a perfectly plausible
+# chart rather than an error. The None case is half the contract — gaps must
+# survive as gaps, because a gap coerced to 0.0 draws the series down to the
+# axis and reads as memory that was freed.
+assert mib([2048.0, None, 1024.0]) == [2.0, None, 1.0], \
+    "mib: kb/1024 with None gaps preserved, not interpolated or zeroed"
+assert mib([]) == [], "mib: an empty series stays empty"
+
+
 # memory_page composes these two helpers, but it is nested inside main() and
 # so unreachable from here; pinning the pieces it delegates to is what keeps
 # its two silent-if-wrong decisions covered.
@@ -594,7 +608,7 @@ assert [w for w, _ in _shown] == ["a", "b", "c", "d"], "cap keeps the first N"
 assert [w for w, _ in _dropped] == ["e"], "cap returns the remainder to be named"
 assert cap_delta_series(_o[:2], MAX_DELTA_SERIES)[1] == [], \
     "cap_delta_series: under the limit nothing is dropped"
-assert len(["#e6550d", "#6a51a3", "#41ab5d", "#2171b5"]) == MAX_DELTA_SERIES, \
+assert len(DELTA_COLORS) == MAX_DELTA_SERIES, \
     "MAX_DELTA_SERIES must match memory_page's colour list; raise both together"
 del _o, _shown, _dropped
 

@@ -184,7 +184,39 @@ def build_api_driver(out_dir):
         sys.stderr.write("compile-perf: api-driver build failed:\n"
                          + r.stdout.decode("utf-8", "replace") + "\n")
         return None
-    return out
+    return out if _driver_rss_reader_ok(out) else None
+
+
+def _driver_rss_reader_ok(driver):
+    """Run the driver's --selfcheck-mem and report whether currentRssKb reads
+    true units on this host.
+
+    currentRssKb is the C++ producer of every memory number here, and its
+    three platform branches are the one part of the feature with no
+    import-time coverage: this module compiles that file ad hoc, so it never
+    enters the tests/ harness, and check-python-core is Python-only and Linux-
+    only. The check measures the reader against a KNOWN allocation, which is
+    why it can run here at all — it needs no libslang, no corpus, and nothing
+    true about Slang's own footprint.
+
+    Failing the DRIVER (returning None, so api workloads record
+    "api-driver or libslang unavailable") rather than raising is deliberate:
+    a mis-scaled reader is exactly as unusable as a missing one, and this way
+    the target-mode half of the suite still produces its numbers."""
+    try:
+        r = subprocess.run([driver, "--selfcheck-mem"], stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        sys.stderr.write(f"compile-perf: api-driver --selfcheck-mem did not run: {e}\n")
+        return False
+    if r.returncode != 0:
+        sys.stderr.write(
+            "compile-perf: api-driver RSS reader self-check failed; refusing to "
+            "measure memory with it (every [MEM] value would be wrong by the "
+            "same factor and would chart as a believable curve):\n"
+            + r.stdout.decode("utf-8", "replace") + "\n")
+        return False
+    return True
 
 
 def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
@@ -706,6 +738,26 @@ assert parse_mem("[MEM] apiCreateGlobalSessionRssDeltaKb\t20480kb\nnoise\n[*] x\
     {"apiCreateGlobalSessionRssDeltaKb": 20480.0}, \
     "parse_mem: [MEM] line contract drifted vs api-driver.cpp"
 assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed lines"
+
+# The Kb-suffix branch, which the two checks above never reach: "malformed" is
+# rejected on token COUNT, so nothing so far drives a line that is structurally
+# fine but whose counter NAME breaks the analyze.unit_of contract. Note the
+# value token parses cleanly, so the `except ValueError: continue` above does
+# not shadow the assertion — this really does reach it.
+#
+# Loud rather than skipped, deliberately, and the asymmetry with the value path
+# is the point: a bad VALUE loses one sample, while a name that does not end in
+# Kb is classified as milliseconds by unit_of, so ~200,000 kb charts as 200,000
+# ms and trend gates it on a 2 ms floor. Wrong units are worse than no units.
+_rejected = None
+try:
+    parse_mem("[MEM] badname\t100kb")
+except AssertionError as _e:
+    _rejected = str(_e)
+assert _rejected and "unit_of contract" in _rejected, \
+    ("parse_mem must REJECT a counter name not ending in Kb, citing the "
+     f"unit_of contract; got {_rejected!r}")
+del _rejected
 
 # Tie the parser to its PRODUCER, not to a restatement of it. The assertion
 # above proves parse_mem is self-consistent with a literal typed in this file,

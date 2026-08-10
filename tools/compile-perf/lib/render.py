@@ -33,9 +33,9 @@ def line_panel(labels, series, title, unit="", width=620, height=300):
     vals = [v for _n, _c, vs in series for v in vs if v is not None]
     # The y domain always includes 0 (honest panel-to-panel comparison) and
     # extends below it when values are negative (e.g. an RSS delta can be).
-    top = max([v for v in vals] + [0.0]) * 1.08 if vals else 1.0
+    top = max(vals + [0.0]) * 1.08 if vals else 1.0
     top = top or 1.0
-    bot = min([v for v in vals] + [0.0])
+    bot = min(vals + [0.0])
     bot = bot * 1.08 if bot < 0 else 0.0
     n = max(len(labels), 2)
 
@@ -116,4 +116,26 @@ assert len(_grid) >= 2, "line_panel must draw gridlines at the domain bounds"
 assert min(_grid) <= min(_ys) and max(_ys) <= max(_grid), \
     f"line_panel: negative values must stay inside the plotted domain " \
     f"(points {_ys} outside band [{min(_grid)}, {max(_grid)}])"
+del _svg, _grid, _ys
+
+# The other half of the same domain rule, and the half the negative case above
+# cannot see: with every value POSITIVE, `bot` must still be 0 — the docstring's
+# "Y always starts at 0 so panel-to-panel comparisons stay honest". Two separate
+# lines currently enforce that (the `+ [0.0]` in the min, and the `else 0.0`),
+# so it survives either one regressing alone and neither is pinned. A domain
+# rebased onto min(vals) still draws a smooth, well-scaled, entirely believable
+# chart — it just turns a 4% memory wobble into a curve that looks like a
+# doubling, which is precisely the reading these pages exist to support.
+#
+# SVG y grows DOWNWARD, so a large value is a SMALL y: 100..104 against a
+# 0-based domain must sit near the top of the band, whereas a rebased domain
+# spreads those same two points across its full height.
+_svg = line_panel(["a", "b"], [("s", "#000", [100.0, 104.0])], "t")
+_grid = [float(v) for v in re.findall(r'<line [^>]*y1="([-\d.]+)"', _svg)]
+_ys = [float(p.split(",")[1])
+       for p in re.search(r'<polyline points="([^"]+)"', _svg).group(1).split()]
+assert max(_ys) < min(_grid) + (max(_grid) - min(_grid)) * 0.5, \
+    "line_panel: on a 0-based domain an all-positive series sits in the top " \
+    f"half of the band; points {_ys} against [{min(_grid)}, {max(_grid)}] say " \
+    "the y-axis was rebased onto min(vals)"
 del _svg, _grid, _ys

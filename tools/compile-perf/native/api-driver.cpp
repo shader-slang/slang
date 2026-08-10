@@ -22,6 +22,11 @@
 //     api-driver <libslang> specialize        --dir DIR --root MODULENAME [--impl-prefix P]
 //     api-driver <libslang> rt-composite      --dir DIR --root MODULENAME
 //
+// Plus one mode that takes no libslang, because it measures this file's own
+// RSS reader rather than Slang (bench.py runs it right after building):
+//
+//     api-driver --selfcheck-mem
+//
 // Exit code 0 on success; on any Slang failure, diagnostics are printed to
 // stdout (bench.py's real_error() recognizes "error" lines) and the exit code
 // is 1.
@@ -136,6 +141,116 @@ static long currentRssKb()
         return -1;
     return resident * sysconf(_SC_PAGESIZE) / 1024;
 #endif
+}
+
+// Self-test for currentRssKb, invoked as `api-driver --selfcheck-mem` and run
+// by bench.py right after it builds this file. currentRssKb is the sole
+// producer of every memory number in the suite and had no coverage of its
+// VALUE anywhere: this file is compiled ad hoc by bench.py so it never enters
+// the tests/ harness, and check-python-core is Python-only and Linux-only,
+// which leaves all three platform branches unexercised on the machines that
+// actually run them.
+//
+// The failures worth catching are silent SCALINGS, not crashes — a dropped
+// sysconf(_SC_PAGESIZE) multiply, a bytes-vs-KB divide on the wrong side —
+// and every one of them returns a positive number that sails through
+// reportMemDeltas' `rssNow <= 0` floor and charts a believable curve.
+//
+// Measuring a KNOWN allocation is what keeps this independent of Slang: a
+// plausibility band on the cold-session delta ("is it more than 1 MiB?") would
+// hardcode a guess about libslang's footprint that a real memory optimization
+// could falsify, turning a success into a failed nightly. The tolerance is
+// deliberately loose because the errors it catches are factors of 1024 and
+// 4096; anything tighter only buys false failures from allocator slack, page
+// granularity, or a Windows working-set trim.
+//
+// NOT covered: a field-order slip in the /proc/self/statm fscanf (reading the
+// first column, total program size, instead of `resident`). A touched
+// allocation grows both by the same amount, so no delta test can separate
+// them — that one needs the untouched phase below, which is why there are two.
+static int runSelfCheckMem()
+{
+    const long expectKb = 64 * 1024; // 64 MiB, touched
+    long before = currentRssKb();
+    if (before <= 0)
+    {
+        printf(
+            "error: --selfcheck-mem: currentRssKb() returned %ld in a live "
+            "process; the RSS reader is broken or unavailable here\n",
+            before);
+        return 1;
+    }
+
+    // VOLATILE, and this is load-bearing rather than defensive: bench.py builds
+    // this file with -O2, where the whole allocate/touch/free sequence is dead
+    // code the optimizer is entitled to delete outright. It does — measured,
+    // not assumed: the plain version reads a 0 KB delta at -O2 and the correct
+    // 65568 KB at -O0. Volatile stores may not be elided, which pins the malloc
+    // down with them.
+    const size_t bytes = (size_t)expectKb * 1024;
+    volatile unsigned char* buf = (volatile unsigned char*)malloc(bytes);
+    if (!buf)
+    {
+        printf("error: --selfcheck-mem: cannot allocate %ld KB to measure against\n", expectKb);
+        return 1;
+    }
+    // Touch every page — RSS counts RESIDENT pages, and a fresh large malloc
+    // is typically an untouched mmap that has never been faulted in. The 4096
+    // stride is the smallest page size in play, so it touches every page on
+    // 16 KB-page hosts (Apple silicon) too.
+    for (size_t i = 0; i < bytes; i += 4096)
+        buf[i] = (unsigned char)(i & 0xff);
+    long touchedDelta = currentRssKb() - before;
+    free((void*)buf);
+
+    if (touchedDelta < expectKb / 4 || touchedDelta > expectKb * 4)
+    {
+        printf(
+            "error: --selfcheck-mem: touching %ld KB moved currentRssKb() by "
+            "%ld KB. A ~1024x or ~4096x miss is a unit error in the reader "
+            "(a dropped page-size multiply or a bytes/KB divide on the wrong "
+            "side); every [MEM] value would be scaled by the same factor\n",
+            expectKb,
+            touchedDelta);
+        return 1;
+    }
+
+    // Phase two, for the field-order slip the phase above cannot see. A large
+    // UNTOUCHED mapping grows the process's address space but not its resident
+    // set, so a reader returning total program size moves by ~reserveKb while a
+    // correct one barely moves. A failed allocation is not a failure of the
+    // reader, so it skips rather than reports.
+    const long reserveKb = 512 * 1024; // 512 MiB, deliberately 8x the band above
+    long beforeReserve = currentRssKb();
+    volatile unsigned char* reserved = (volatile unsigned char*)malloc((size_t)reserveKb * 1024);
+    if (reserved && beforeReserve > 0)
+    {
+        // One volatile byte: enough to stop -O2 deleting the mapping (nothing
+        // else here reads it), and one page of residency is noise against a
+        // quarter-of-512-MiB threshold.
+        reserved[0] = 1;
+        long reserveDelta = currentRssKb() - beforeReserve;
+        free((void*)reserved);
+        if (reserveDelta > reserveKb / 4)
+        {
+            printf(
+                "error: --selfcheck-mem: reserving %ld KB without touching it "
+                "moved currentRssKb() by %ld KB. An untouched mapping is not "
+                "resident, so the reader is reporting address space rather "
+                "than resident memory (on Linux, /proc/self/statm's first "
+                "column instead of the second)\n",
+                reserveKb,
+                reserveDelta);
+            return 1;
+        }
+    }
+    else if (reserved)
+    {
+        free((void*)reserved);
+    }
+
+    printf("currentRssKb self-check ok: %ld KB touched read as %ld KB\n", expectKb, touchedDelta);
+    return 0;
 }
 
 // Memory deltas recorded around selected phases, reported next to the timers
@@ -1102,6 +1217,14 @@ static bool hasFlag(int argc, char** argv, const char* flag)
 
 int main(int argc, char** argv)
 {
+    // Ahead of the argc check and the libslang load, both deliberately: the
+    // RSS reader is plain platform code with no Slang dependency, so bench.py
+    // can run this straight after building the driver, before it has resolved
+    // any library. A unit error then fails the build step rather than shipping
+    // a scaled chart.
+    if (argc == 2 && strcmp(argv[1], "--selfcheck-mem") == 0)
+        return runSelfCheckMem();
+
     if (argc < 3)
     {
         printf("usage: api-driver <libslang> session-create    --iters N\n"
@@ -1110,7 +1233,8 @@ int main(int argc, char** argv)
                "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME\n"
                "       api-driver <libslang> specialize        --dir DIR --root NAME "
                "[--impl-prefix P]\n"
-               "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n");
+               "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n"
+               "       api-driver --selfcheck-mem   (no libslang; checks the RSS reader)\n");
         return 2;
     }
     LibSlang lib;
