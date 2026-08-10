@@ -605,16 +605,12 @@ public:
         unregisterProxyImpl(proxyIdentity);
     }
 
-    /// Cancel one notePlaybackOrphanedProxy for `proxy`. Call this from a proxy
-    /// method that recorded an output/return proxy and then adopts that proxy
-    /// into an internal owning member (e.g. m_returnedEntryPoints): the member
-    /// now owns the reference and releases it when the owning proxy is
-    /// destroyed, so releaseOrphanedPlaybackProxies() must not also release it
-    /// (issue #11936). Safe to call outside playback (no-op if not noted).
-    SLANG_API void unnotePlaybackOrphanedProxy(ISlangUnknown* proxy);
-
-    /// Register an interface object and get its handle.
-    /// Used when creating proxy objects to register them for handle tracking.
+    /// Registers `obj` in the handle registry and returns its handle, for tests.
+    ///
+    /// A production proxy is registered by wrapObject() as part of being
+    /// created; a test that needs a proxy the orphan bookkeeping will treat as
+    /// live has to register it explicitly, because
+    /// releaseOrphanedPlaybackProxies() skips anything absent from the registry.
     template<typename ProxyT>
     inline uint64_t testsOnlyRegisterProxy(ProxyT* obj)
     {
@@ -622,24 +618,26 @@ public:
         return testOnlyRegisterProxyImpl(objUnknown);
     }
 
-    /// Note / cancel / count an orphaned playback reference, for tests.
+    /// Notes an orphaned playback reference for `proxy`, for tests.
     ///
-    /// The production callers of the first two are the replay dispatcher and
-    /// RECORD_ENTRYPOINT_OUTPUT, neither of which a unit test can drive, so the
-    /// note/unnote balancing is otherwise only observable as a sanitizer leak
-    /// or double-free on a path no test reaches.
+    /// The production caller is the replay dispatcher, which a unit test cannot
+    /// drive, so without these wrappers the bookkeeping is only observable as a
+    /// sanitizer leak or double-free on a path no test reaches.
     inline void testsOnlyNoteOrphanedProxy(ISlangUnknown* proxy)
     {
         notePlaybackOrphanedProxy(proxy);
     }
-    inline void testsOnlyUnnoteOrphanedProxy(ISlangUnknown* proxy)
-    {
-        unnotePlaybackOrphanedProxy(proxy);
-    }
+
+    /// Returns how many orphaned playback references are noted for `proxy`, for
+    /// tests. Zero when the proxy is not tracked at all.
     inline uint32_t testsOnlyGetOrphanedRefCount(ISlangUnknown* proxy) const
     {
         return testOnlyGetOrphanedPlaybackRefCount(proxy);
     }
+
+    /// Runs the playback-teardown sweep that releases every noted orphaned
+    /// reference, for tests. Production runs it from reset(), switchTo*(), and
+    /// destroySingleton().
     inline void testsOnlyReleaseOrphanedProxies() { releaseOrphanedPlaybackProxies(); }
 
     /// Get or create a proxy for an implementation.

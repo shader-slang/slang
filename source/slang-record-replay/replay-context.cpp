@@ -152,6 +152,24 @@ void ReplayContext::destroySingleton()
     {
         std::lock_guard<std::mutex> lock(s_contextMutex);
         toDelete = s_contextInstance;
+    }
+
+    // Drain the orphaned playback references while `s_contextInstance` still
+    // points at this context, and outside the lock.
+    //
+    // Releasing an orphan can take a proxy to refcount 0, which runs
+    // `~ProxyBase` -> `ReplayContext::tryGet()->unregisterProxy(...)`. That
+    // unregister has to reach *this* context: it is what removes the proxy from
+    // `m_objectToHandle`, and `releaseOrphanedPlaybackProxies()` reads that map
+    // to decide whether a proxy destroyed by a cascade is still safe to release.
+    // Draining after the pointer was cleared would leave those entries behind
+    // and the sweep would release freed memory. Outside the lock because
+    // `tryGet()` takes `s_contextMutex` and it is not recursive.
+    if (toDelete)
+        toDelete->releaseOrphanedPlaybackProxies();
+
+    {
+        std::lock_guard<std::mutex> lock(s_contextMutex);
         s_contextInstance = nullptr;
     }
     delete toDelete;
@@ -191,13 +209,13 @@ ReplayContext::ReplayContext(const void* referenceData, size_t referenceSize, bo
 
 ReplayContext::~ReplayContext()
 {
-    // Release orphaned playback proxies before the members holding them are
-    // destroyed. `reset()` and `switchTo*()` do this on their own paths, but
-    // `destroySingleton()` deletes the context outright and reaches neither, so
-    // without this the singleton's final teardown drops `m_playbackOrphanedProxies`
-    // with live references still in it -- exactly the leak this class exists to
-    // close (issue #11936).
-    releaseOrphanedPlaybackProxies();
+    // Note the orphaned playback references are deliberately not drained here.
+    // Doing so would run `~ProxyBase` after `destroySingleton()` had already
+    // cleared `s_contextInstance`, so the proxies would unregister from a
+    // different context than the one being destroyed. `destroySingleton()`
+    // drains while the pointer is still published instead; `reset()` and
+    // `switchTo*()` drain on their own paths.
+    SLANG_ASSERT(m_playbackOrphanedProxies.getCount() == 0);
 
     // Destructor must be defined in DLL to properly free Dictionary memory.
     // The compiler will generate calls to ~Dictionary() for each member,
@@ -800,18 +818,6 @@ void ReplayContext::notePlaybackOrphanedProxy(ISlangUnknown* proxy)
         ++(*existing);
     else
         m_playbackOrphanedProxies[proxy] = 1;
-}
-
-void ReplayContext::unnotePlaybackOrphanedProxy(ISlangUnknown* proxy)
-{
-    if (proxy == nullptr)
-        return;
-
-    uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
-    if (!existing)
-        return;
-    if (--(*existing) == 0)
-        m_playbackOrphanedProxies.remove(proxy);
 }
 
 uint32_t ReplayContext::testOnlyGetOrphanedPlaybackRefCount(ISlangUnknown* proxy) const

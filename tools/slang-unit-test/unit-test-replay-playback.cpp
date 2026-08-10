@@ -497,15 +497,61 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
         (void**)playedBackSession.writeRef())));
 }
 
-// The orphan bookkeeping added for #11936 is what keeps the replay path from
-// either leaking a proxy the dispatcher created (note without release) or
-// releasing one that `m_returnedEntryPoints` still owns (note without unnote).
-// Both failure modes are only observable through a sanitizer, and only on a
-// path some test actually drives -- and the entry-point wrapping that motivates
-// the unnote is reached by no unit test. So the balancing is pinned directly
-// here, on the accounting itself.
+// A test-only proxy that owns another ITestCalculator, so that releasing it
+// cascade-destroys the one it holds. It mirrors the two things ProxyBase does
+// that the orphan sweep depends on: it unregisters itself from the context when
+// it is destroyed, and it drops its owned reference at the same time.
+class TestOwningProxy : public ITestCalculator
+{
+public:
+    TestOwningProxy(ITestCalculator* owned)
+        : m_owned(owned), m_refCount(1)
+    {
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) override
+    {
+        if (uuid == ITestCalculator::getTypeGuid() || uuid == ISlangUnknown::getTypeGuid())
+        {
+            *outObject = this;
+            addRef();
+            return SLANG_OK;
+        }
+        *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ++m_refCount; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override
+    {
+        uint32_t count = --m_refCount;
+        if (count == 0)
+            delete this;
+        return count;
+    }
+
+    int32_t SLANG_MCALL add(int32_t a, int32_t b) override { return a + b; }
+    void SLANG_MCALL setOffset(int32_t offset) override { SLANG_UNUSED(offset); }
+
+    virtual ~TestOwningProxy()
+    {
+        ctx().unregisterProxy(static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(this)));
+        m_owned = nullptr;
+    }
+
+private:
+    Slang::ComPtr<ITestCalculator> m_owned;
+    uint32_t m_refCount;
+};
+
+// The orphan bookkeeping added for #11936 keeps the replay path from leaking a
+// proxy the dispatcher created. The production noter is the replay dispatcher,
+// which no unit test can drive, so the accounting is pinned directly here.
 SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting)
 {
+    // REPLAY_TEST declares the fixture that resets the context; this test drives
+    // the context through ctx() and never needs unitTestContext itself.
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
@@ -515,6 +561,9 @@ SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting)
     ISlangUnknown* key = static_cast<ISlangUnknown*>(proxyPtr.get());
 
     ctx().reset();
+    // The sweep only releases proxies that are in the handle registry, so a test
+    // proxy has to be registered the way wrapObject() would have registered it.
+    ctx().testsOnlyRegisterProxy(proxy);
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
 
     // A proxy can be handed back more than once in one replay, so notes
@@ -525,30 +574,136 @@ SLANG_UNIT_TEST(replayContextOrphanedProxyAccounting)
     ctx().testsOnlyNoteOrphanedProxy(key);
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 2);
 
-    // Unnote cancels exactly one, which is what RECORD_ENTRYPOINT_OUTPUT does
-    // when it takes an owning reference of its own: without this the teardown
-    // release would drop a reference that owner still holds.
-    ctx().testsOnlyUnnoteOrphanedProxy(key);
-    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
-    ctx().testsOnlyUnnoteOrphanedProxy(key);
-    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
-
-    // Cancelling more times than noted must not underflow the count back to a
-    // huge number, which would make teardown over-release.
-    ctx().testsOnlyUnnoteOrphanedProxy(key);
-    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
-
-    // Nulls are ignored by both sides rather than tracked.
+    // Nulls are ignored rather than tracked.
     ctx().testsOnlyNoteOrphanedProxy(nullptr);
-    ctx().testsOnlyUnnoteOrphanedProxy(nullptr);
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(nullptr) == 0);
 
-    // Teardown drains whatever is still noted, so nothing is left tracked.
-    // The proxy holds its own reference via proxyPtr, so the extra note below
-    // is balanced by this release rather than by the ComPtr.
+    // Teardown releases exactly as many references as were noted. Two notes were
+    // recorded above, so take two references here for the sweep to consume; the
+    // proxy must survive with the single reference proxyPtr owns.
     proxyPtr->addRef();
-    ctx().testsOnlyNoteOrphanedProxy(key);
-    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
+    proxyPtr->addRef();
     ctx().testsOnlyReleaseOrphanedProxies();
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+    // Still alive and owned solely by proxyPtr: releasing once more would
+    // destroy it, so query instead and check the count came back to one.
+    SLANG_CHECK(proxyPtr->addRef() == 2);
+    SLANG_CHECK(proxyPtr->release() == 1);
+
+    ctx().unregisterProxy(key);
+}
+
+// A proxy that the replayed release stream drives to refcount 0 destroys itself
+// through ~ProxyBase -> unregisterProxy. That has to scrub the orphan note too,
+// or the teardown sweep would release an object that is already freed.
+SLANG_UNIT_TEST(replayContextUnregisterScrubsOrphanNote)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
+    TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
+    Slang::ComPtr<ITestCalculator> proxyPtr(Slang::INIT_ATTACH, proxy);
+    ISlangUnknown* key = static_cast<ISlangUnknown*>(proxyPtr.get());
+
+    ctx().reset();
+    ctx().testsOnlyRegisterProxy(proxy);
+    ctx().testsOnlyNoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
+
+    // Stands in for ~ProxyBase running because the replayed stream released the
+    // last reference.
+    ctx().unregisterProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+
+    // With the note scrubbed the sweep has nothing to do, so the reference
+    // proxyPtr still owns is untouched -- without the scrub this would release
+    // it and the ComPtr below would release freed memory.
+    ctx().testsOnlyReleaseOrphanedProxies();
+    SLANG_CHECK(proxyPtr->addRef() == 2);
+    SLANG_CHECK(proxyPtr->release() == 1);
+}
+
+// destroySingleton() has to drain the orphan set while the singleton pointer is
+// still published. Draining from ~ReplayContext instead runs the proxy
+// destructors after the pointer was cleared, and ~ProxyBase reaching for the
+// context would then construct a replacement -- leaking it, and leaving the
+// dying context's handle registry holding entries for freed proxies, which is
+// what the sweep's cascade guard reads.
+SLANG_UNIT_TEST(replayContextDestroySingletonDrainsWithoutResurrecting)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Deliberately not REPLAY_TEST: that fixture calls reset() on scope exit,
+    // and reset() drains the orphan set, so the set would be empty before
+    // destroySingleton() ever ran and there would be nothing to observe.
+    ctx().reset();
+
+    // TestOwningProxy is the proxy here whose destructor reaches for the context
+    // to unregister itself, the way ~ProxyBase does. That is what makes the
+    // ordering observable: a proxy that never touches the context on the way out
+    // cannot tell the two implementations apart.
+    TestOwningProxy* proxy = new TestOwningProxy(nullptr);
+    ISlangUnknown* key = static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(proxy));
+
+    // One reference, registered and noted, so the sweep in destroySingleton()
+    // releases it and runs that destructor during teardown.
+    ctx().testsOnlyRegisterProxy(proxy);
+    ctx().testsOnlyNoteOrphanedProxy(key);
+
+    ReplayContext::destroySingleton();
+
+    // Nothing recreated the singleton on the way out.
+    SLANG_CHECK(ReplayContext::tryGet() == nullptr);
+
+    // Destroying the singleton took the default playback handlers with it, so
+    // put them back for the rest of the suite (same restore the shutdown-leak
+    // test does after resetHandlers()).
+    ctx().registerDefaultHandlers();
+    SLANG_CHECK(ctx().getHandlerCount() > 0);
+}
+
+// Releasing one orphan can cascade-destroy another that is also in the sweep's
+// snapshot (a session dropping its wrapped filesystem). The sweep must notice
+// the second one is gone -- it checks the handle registry, which the cascaded
+// destructor removed itself from -- instead of releasing freed memory.
+SLANG_UNIT_TEST(replayContextOrphanSweepStopsAtCascadeDestroy)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
+    TestCalculatorProxy* owned = new TestCalculatorProxy(impl.get());
+    Slang::ComPtr<ITestCalculator> ownedPtr(Slang::INIT_ATTACH, owned);
+    ISlangUnknown* ownedKey = static_cast<ISlangUnknown*>(ownedPtr.get());
+
+    // The owner takes its own reference to `owned`, so `owned` is at two: one
+    // held here, one held by the owner.
+    TestOwningProxy* owner = new TestOwningProxy(owned);
+    ISlangUnknown* ownerKey = static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(owner));
+
+    ctx().testsOnlyRegisterProxy(owner);
+    ctx().testsOnlyRegisterProxy(owned);
+    ctx().testsOnlyNoteOrphanedProxy(ownerKey);
+    ctx().testsOnlyNoteOrphanedProxy(ownedKey);
+
+    // Hand the sweep the reference it is meant to consume for `owned`, so that
+    // both entries in the snapshot carry a real orphaned reference.
+    ownedPtr->addRef();
+
+    // Releasing `owner` destroys it, which unregisters `owner` and drops its
+    // reference to `owned`. Whichever order the snapshot visits them in, the
+    // registry check is what keeps the sweep from touching a freed object.
+    ctx().testsOnlyReleaseOrphanedProxies();
+
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(ownerKey) == 0);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(ownedKey) == 0);
+
+    // `owned` survives with exactly the reference ownedPtr owns.
+    SLANG_CHECK(ownedPtr->addRef() == 2);
+    SLANG_CHECK(ownedPtr->release() == 1);
+
+    ctx().unregisterProxy(ownedKey);
 }
