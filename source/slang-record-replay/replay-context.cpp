@@ -212,6 +212,10 @@ void ReplayContext::ensureInitialized()
 
 void ReplayContext::reset()
 {
+    // Release proxies the playback dispatcher orphaned before we drop the
+    // registries that keep them findable (issue #11936). Must run before the
+    // clear() calls below, since releasing relies on the handle registry.
+    releaseOrphanedPlaybackProxies();
     closeRecordingMirror(); // Close any active mirror file
     m_stream.reset();
     m_indexStream.reset();
@@ -230,6 +234,9 @@ void ReplayContext::reset()
 
 void ReplayContext::switchToPlayback()
 {
+    // Release proxies orphaned by a previous playback pass before we clear the
+    // registries that keep them findable (issue #11936).
+    releaseOrphanedPlaybackProxies();
     // Clear all local state
     m_referenceStream.reset();
     m_arena.reset();
@@ -252,6 +259,9 @@ void ReplayContext::switchToPlayback()
 
 void ReplayContext::switchToSync()
 {
+    // Release any proxies orphaned by a previous playback pass before we clear
+    // the registries that keep them findable (issue #11936).
+    releaseOrphanedPlaybackProxies();
     // Copy recorded data to reference stream for comparison
     m_referenceStream = ReplayStream(m_stream.getData(), m_stream.getSize());
 
@@ -760,6 +770,72 @@ void ReplayContext::unregisterProxyImpl(ISlangUnknown* proxy)
     {
         m_handleToObject.remove(*handle);
         m_objectToHandle.remove(proxy);
+    }
+
+    // If the recorded release stream already brought this playback-created
+    // proxy to refcount 0, it balanced its own orphaned creation reference;
+    // drop the bookkeeping so releaseOrphanedPlaybackProxies() does not release
+    // a freed object (issue #11936).
+    m_playbackOrphanedProxies.remove(proxy);
+}
+
+void ReplayContext::notePlaybackOrphanedProxy(ISlangUnknown* proxy)
+{
+    if (proxy == nullptr)
+        return;
+
+    // One additional orphaned creation reference for this proxy. A proxy can be
+    // wrapped more than once during a replay (e.g. the same module handed back
+    // twice), so accumulate rather than overwrite.
+    uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
+    if (existing)
+        ++(*existing);
+    else
+        m_playbackOrphanedProxies[proxy] = 1;
+}
+
+void ReplayContext::unnotePlaybackOrphanedProxy(ISlangUnknown* proxy)
+{
+    if (proxy == nullptr)
+        return;
+
+    uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
+    if (!existing)
+        return;
+    if (--(*existing) == 0)
+        m_playbackOrphanedProxies.remove(proxy);
+}
+
+void ReplayContext::releaseOrphanedPlaybackProxies()
+{
+    if (m_playbackOrphanedProxies.getCount() == 0)
+        return;
+
+    // Snapshot before releasing: each release runs ~ProxyBase ->
+    // unregisterProxyImpl, which mutates m_playbackOrphanedProxies and the
+    // handle registry. Clearing first makes that unregister a no-op on the map.
+    List<KeyValuePair<ISlangUnknown*, uint32_t>> orphans;
+    for (const auto& kv : m_playbackOrphanedProxies)
+        orphans.add(KeyValuePair<ISlangUnknown*, uint32_t>(kv.first, kv.second));
+    m_playbackOrphanedProxies.clear();
+
+    // These references were created by the replay dispatcher and never handed to
+    // a user, so releasing them cannot race a caller. Suppress recording since
+    // we are past the recorded stream.
+    SuppressRefCountRecording guard;
+    for (const auto& orphan : orphans)
+    {
+        ISlangUnknown* proxy = orphan.key;
+        for (uint32_t i = 0; i < orphan.value; ++i)
+        {
+            // Releasing one proxy can cascade-destroy another (a session drops
+            // its wrapped filesystem); the ProxyBase destructor unregisters it,
+            // so stop once this proxy is no longer registered to avoid a
+            // release of freed memory.
+            if (!m_objectToHandle.containsKey(proxy))
+                break;
+            proxy->release();
+        }
     }
 }
 

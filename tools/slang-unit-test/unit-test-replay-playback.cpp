@@ -150,9 +150,13 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     s_testCalcOffset = 0;
 
     // Create implementation and proxy
-    Slang::ComPtr<ITestCalculator> impl(new TestCalculatorImpl());
+    // TestCalculatorImpl's constructor starts the refcount at 1, so attach
+    // rather than add a second reference the test never releases (#11936).
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
     TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
-    Slang::ComPtr<ITestCalculator> proxyPtr(proxy);
+    // The constructor starts the refcount at 1; adopt that reference with attach
+    // semantics rather than adding a second one the test never releases (#11936).
+    Slang::ComPtr<ITestCalculator> proxyPtr(Slang::INIT_ATTACH, proxy);
 
     // Build a recorded stream manually with known signatures
     ctx().reset();
@@ -260,9 +264,13 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     s_testCalcOffset = 0;
 
     // Create implementation and proxy
-    Slang::ComPtr<ITestCalculator> impl(new TestCalculatorImpl());
+    // TestCalculatorImpl's constructor starts the refcount at 1, so attach
+    // rather than add a second reference the test never releases (#11936).
+    Slang::ComPtr<ITestCalculator> impl(Slang::INIT_ATTACH, new TestCalculatorImpl());
     TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
-    Slang::ComPtr<ITestCalculator> proxyPtr(proxy);
+    // The constructor starts the refcount at 1; adopt that reference with attach
+    // semantics rather than adding a second one the test never releases (#11936).
+    Slang::ComPtr<ITestCalculator> proxyPtr(Slang::INIT_ATTACH, proxy);
 
     // ========== RECORDING PHASE ==========
     ctx().reset();
@@ -299,9 +307,13 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     s_testCalcOffset = 0;
 
     // Create new implementation and proxy for playback
-    Slang::ComPtr<ITestCalculator> impl2(new TestCalculatorImpl());
+    // TestCalculatorImpl's constructor starts the refcount at 1, so attach
+    // rather than add a second reference the test never releases (#11936).
+    Slang::ComPtr<ITestCalculator> impl2(Slang::INIT_ATTACH, new TestCalculatorImpl());
     TestCalculatorProxy* proxy2 = new TestCalculatorProxy(impl2.get());
-    Slang::ComPtr<ITestCalculator> proxyPtr2(proxy2);
+    // The constructor starts the refcount at 1; adopt that reference with attach
+    // semantics rather than adding a second one the test never releases (#11936).
+    Slang::ComPtr<ITestCalculator> proxyPtr2(Slang::INIT_ATTACH, proxy2);
 
     // Switch to playback mode
     ctx().switchToPlayback();

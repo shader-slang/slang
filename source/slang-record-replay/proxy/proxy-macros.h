@@ -134,6 +134,11 @@ struct BlobOutputTempReleaser
 // Wraps the returned object via RECORD_COM_OUTPUT, then stores a reference in
 // m_returnedEntryPoints so the proxy outlives user code that doesn't properly
 // track the reference (matching Slang's internal lifetime behaviour).
+// Because m_returnedEntryPoints now owns the proxy and releases it when this
+// component proxy is destroyed, we cancel the replay-orphan note that
+// RECORD_COM_OUTPUT added on the playback path, otherwise the proxy would be
+// released both here (via the owner) and by releaseOrphanedPlaybackProxies()
+// at teardown (issue #11936).
 // Requires: RECORD_CALL() has been called (provides _ctx), and the class has
 //           m_returnedEntryPoints.
 // Usage: RECORD_ENTRYPOINT_OUTPUT(outEntryPoint)
@@ -143,6 +148,7 @@ struct BlobOutputTempReleaser
     {                                                                       \
         SuppressRefCountRecording _guard;                                   \
         m_returnedEntryPoints.add(Slang::ComPtr<slang::IEntryPoint>(*arg)); \
+        _ctx.unnotePlaybackOrphanedProxy(toSlangUnknown(*arg));             \
     }
 
 // Record a blob output parameter (ISlangBlob**)
