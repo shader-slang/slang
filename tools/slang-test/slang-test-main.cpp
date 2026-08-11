@@ -1289,7 +1289,21 @@ static RPCAttemptOutcome _executeRPCOnce(
         // verdict this function exists to stop, just moved one step earlier. Asked of the
         // process rather than the transport because nothing has been read on this connection,
         // so the read state has no opinion to give.
-        const bool serverGone = !rpcConnection->isActive();
+        //
+        // Give the OS a moment to answer, rather than asking once and believing a "no". The
+        // write can fail before the peer's exit has been observed, and WinProcess's
+        // isTerminated() is a zero-timeout wait that then reports a dead server as running --
+        // which classified the loss as SendFailed, skipped the retry, and failed a test that
+        // had not run. Only on the failure path, so a healthy run pays nothing.
+        bool serverGone = !rpcConnection->isActive();
+        if (!serverGone)
+        {
+            if (auto* process = rpcConnection->getProcess())
+            {
+                static const Int kServerExitGraceInMs = 250;
+                serverGone = process->waitForTermination(kServerExitGraceInMs);
+            }
+        }
         const RPCAttemptOutcome outcome =
             serverGone ? RPCAttemptOutcome::Lost : RPCAttemptOutcome::SendFailed;
 

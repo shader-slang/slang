@@ -108,6 +108,26 @@ static String _allOutput(const ExecuteResult& res)
     return builder.produceString();
 }
 
+/// Print the child's exit code and output.
+///
+/// Called whenever a case is about to fail. Without it a failure says only which assertion
+/// tripped, and the run that actually misbehaved -- a whole slang-test invocation, with its
+/// per-loss diagnostics and its summary -- is discarded. That happened: the first CI failure
+/// of these tests reported "res.resultCode == 0" and nothing else, on a platform that cannot
+/// be reproduced locally, which is the worst possible combination.
+static void _dumpChildRun(const char* caseName, int dieOnRequest, const ExecuteResult& res)
+{
+    const String output = _allOutput(res);
+    printf(
+        "\n--- %s: inner slang-test (SLANG_TEST_SERVER_DIE_ON_REQUEST=%d) exited %d ---\n"
+        "%s\n--- end inner run ---\n",
+        caseName,
+        dieOnRequest,
+        res.resultCode,
+        output.getBuffer());
+    fflush(stdout);
+}
+
 /// A healthy server: the control. Whatever the other cases prove, they prove nothing unless
 /// the untouched path is unchanged -- no losses reported, every test passing, exit 0.
 SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
@@ -121,6 +141,10 @@ SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
     SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithDyingServer(unitTestContext, 0, res)));
 
     const String output = _allOutput(res);
+    if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
+    {
+        _dumpChildRun("healthy", 0, res);
+    }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
     // The loss block must be absent, not merely zero: a healthy run should look exactly as
@@ -146,6 +170,10 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
     SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithDyingServer(unitTestContext, 3, res)));
 
     const String output = _allOutput(res);
+    if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
+    {
+        _dumpChildRun("innocent", 3, res);
+    }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
 
@@ -174,6 +202,10 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
     // deferred tests still have to reach the totals. When that was broken, this run printed
     // "0% of tests passed (0/0)" and exited 0 -- a green run for a suite that verified
     // nothing.
+    if (res.resultCode == 0)
+    {
+        _dumpChildRun("killer", 1, res);
+    }
     SLANG_CHECK(res.resultCode != 0);
 
     const String output = _allOutput(res);
