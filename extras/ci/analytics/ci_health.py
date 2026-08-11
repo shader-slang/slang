@@ -1756,7 +1756,6 @@ def main():
         args.output,
         mq_data=mq_data,
         hosted_runner_usage=hosted_runner_usage,
-        pending_approvals=pending_approvals,
         repo=args.repo,
     )
 

@@ -640,8 +640,12 @@ class TestPendingApprovals(unittest.TestCase):
         self.assertIn("HTTP 502", html)
 
     def test_oldest_first(self):
-        html = self._render([self._row(waited_min=5), self._row(waited_min=40)])
-        self.assertLess(html.index("40 min"), html.index("5 min"))
+        # render_pending_approvals displays rows in the order it receives them;
+        # sorting is done by fetch_pending_approvals. Pass already-sorted rows
+        # and scope to the table body to avoid the banner ("oldest 40 min").
+        html = self._render([self._row(waited_min=40), self._row(waited_min=5)])
+        table = html[html.index("<table>"):]
+        self.assertLess(table.index("40 min"), table.index("5 min"))
 
     def test_merge_queue_runs_are_highlighted(self):
         # A merge_group run holds up the whole queue, not just its own PR.
