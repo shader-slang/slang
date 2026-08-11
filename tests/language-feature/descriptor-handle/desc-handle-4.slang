@@ -11,6 +11,10 @@ bool test()
 {
     CHECK(getAccess<Texture2D>() == DescriptorAccess.Read);
     CHECK(getAccess<SamplerState>() == DescriptorAccess.Unknown);
+    // RasterizerOrdered *buffers* report ReadWrite (per hlsl.meta.slang's
+    // kDynamicResourceCastableTypes), while RasterizerOrdered *textures* report
+    // DescriptorAccess.RasterizerOrdered. Whether buffers should also use the distinct
+    // RasterizerOrdered access level is deferred to #12488; this pins current behavior.
     CHECK(getAccess<RasterizerOrderedStructuredBuffer<int>>() == DescriptorAccess.ReadWrite);
     CHECK(getAccess<RWStructuredBuffer<int>>() == DescriptorAccess.ReadWrite);
     CHECK(getAccess<AppendStructuredBuffer<int>>() == DescriptorAccess.ReadWrite);
