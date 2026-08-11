@@ -519,6 +519,12 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
     Dictionary<IRInst*, DebugSourceLineColumnCache> mapDebugSourceToLineColumnCache;
 
+    // Lets a DebugFunction be scoped to the compilation unit of its own source file. Only
+    // non-included sources have a compilation unit; a function defined in an #include'd or
+    // #line-remapped source has no entry here and is left with a null parent scope (see the
+    // creation site). Populated in generateIRForTranslationUnit before any function is lowered.
+    Dictionary<IRDebugSource*, IRDebugCompilationUnit*> mapDebugSourceToCompilationUnit;
+
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
     // Concrete pack-count witnesses prove facts that have already been checked
@@ -4050,8 +4056,8 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
 
     auto parentDeclRef = callableDeclRef.getParent();
 
-    if (auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.getParent();
+    if (parentDeclRef.as<SubscriptDecl>() || parentDeclRef.as<PropertyDecl>())
+        parentDeclRef = parentDeclRef.getParent();
 
     if (auto genericDeclRef = parentDeclRef.as<GenericDecl>())
         parentDeclRef = genericDeclRef.getParent();
@@ -9109,6 +9115,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Has anything been emitted to the current "active" case block?
         bool anythingEmittedToCurrentCaseBlock = false;
 
+        bool warnedUnreachableBeforeFirstCase = false;
+
         // The collected (value, label) pairs for
         // all the `case` statements.
         List<IRInst*> cases;
@@ -9304,14 +9312,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // emitted to the current case block.
             if (!info->currentCaseLabel)
             {
-                // It possible in full C/C++ to have statements
-                // before the first `case`. Usually these are
-                // unreachable, unless they start with a label.
-                //
-                // We'll ignore them here, figuring they are
-                // dead. If we ever add `LabelStmt` then we'd
-                // need to emit these statements to a dummy
-                // block just in case.
+                // Control can enter a switch body only through the dispatch to a
+                // case/default label (Slang has no `goto` into the body), so
+                // statements before the first label are unreachable. Warn once
+                // for the leading run.
+                if (!info->warnedUnreachableBeforeFirstCase)
+                {
+                    context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = stmt});
+                    info->warnedUnreachableBeforeFirstCase = true;
+                }
             }
             else
             {
@@ -9362,7 +9371,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                lowerStmt(context, targetCase->body);
+                if (targetCase->body != nullptr)
+                {
+                    lowerStmt(context, targetCase->body);
+                }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
@@ -9439,7 +9451,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
             {
                 caseBlock = builder->emitBlock();
-                lowerStmt(context, targetCase->body);
+                if (targetCase->body != nullptr)
+                {
+                    lowerStmt(context, targetCase->body);
+                }
                 mapCaseStmtToBlock.add(targetCase->body, caseBlock);
                 if (!builder->getBlock()->getTerminator())
                     builder->emitBranch(breakLabel);
@@ -14681,12 +14696,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (locationDecor && debugType)
             {
+                // Parent the function to the compilation unit of its own source file. Only
+                // non-included files have a compilation unit, so this is null for a function whose
+                // source is an #include'd/__include'd file or a #line-remapped source, and for
+                // every function at Minimal debug level (where no compilation unit is built at
+                // all).
+                IRDebugCompilationUnit* parentScope = nullptr;
+                if (auto debugSource = as<IRDebugSource>(locationDecor->getSource()))
+                {
+                    context->shared->mapDebugSourceToCompilationUnit.tryGetValue(
+                        debugSource,
+                        parentScope);
+                }
+
                 auto debugFuncCallee = getBuilder()->emitDebugFunction(
                     nameOperand,
                     locationDecor->getLine(),
                     locationDecor->getCol(),
                     locationDecor->getSource(),
-                    debugType);
+                    debugType,
+                    parentScope);
 
                 // Add a decoration to link the function to its debug function
                 getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
@@ -15437,12 +15466,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         {
             // For Standard and Maximal level, include the source content, otherwise just the
             // path
-            auto debugSource = builder->emitDebugSource(
+            auto debugSource = cast<IRDebugSource>(builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
                 (context->debugInfoLevel >= DebugInfoLevel::Standard || includeSource)
                     ? source->getContent()
                     : UnownedStringSlice(),
-                source->isIncludedFile());
+                source->isIncludedFile()));
             context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
 
             // For Standard and Maximal debug info, emit a DebugCompilationUnit for each
@@ -15451,7 +15480,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // SPIR-V emission.
             if (context->debugInfoLevel >= DebugInfoLevel::Standard && !source->isIncludedFile())
             {
-                builder->emitDebugCompilationUnit(debugSource);
+                auto compilationUnit =
+                    cast<IRDebugCompilationUnit>(builder->emitDebugCompilationUnit(debugSource));
+                context->shared->mapDebugSourceToCompilationUnit[debugSource] = compilationUnit;
             }
         }
     }
@@ -16022,6 +16053,19 @@ static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, Type
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
+    }
+
+    // Preserve the byte alignment the front-end computed (the `uniformAlignment`
+    // field, whose historical name uses "uniform" to mean bytes). We record it
+    // for any layout that occupies the byte unit at all; the builder decides
+    // whether an attribute is actually emitted (it drops the default alignment of
+    // 1 and any unit with zero size), so this side only needs to supply the
+    // value when the byte unit is present.
+    if (typeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+    {
+        builder->addAlignment(
+            LayoutResourceKind::Uniform,
+            IRIntegerValue(typeLayout->uniformAlignment.getValidValue()));
     }
 
     return builder->build();

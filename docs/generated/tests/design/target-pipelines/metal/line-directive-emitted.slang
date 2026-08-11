@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=3b19519e792b092406320b661c62d171b0f8cdff6f282ae48cf30ac091136ae8
-//META: purpose=SourceWriter emits `#line N "file"` directives by default in Metal output so downstream tools can map errors back to the original source.
+//META: doc_section_digest=0c4ba248635633393b51ae889f226e3b5f86a549ad5be4af6f827414819fb357
+//META: purpose=The `SourceWriter` emits `#line N "file"` directives into Metal output by default so downstream errors map back to Slang source.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The Metal source emitter inherits the C-like SourceWriter
-// behavior of writing `#line` directives. We verify a `#line`
-// directive appears in the output; file names may reference the
-// user source or core-module files.
+// Verifies the Metal emitter inherits the shared C-like source writer's
+// line-mapping behavior. Slang does not check the MSL it produces -- all
+// grammar checking is delegated to the Apple tool -- so the line
+// directives are what makes a downstream error message traceable. CHECK
+// asserts a `#line <number>` directive is present; the file name is left
+// unmatched because core-module-sourced items reference other files.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

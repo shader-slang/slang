@@ -1,20 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry
-//META: doc_section_digest=8793675da78b4d53076ff119e26b6c1db6781408b92a1cb0ac85f2df7ce46cf0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
+//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
 //META: purpose=Each row inside a witness_table body is witness_table_entry(requirementKey, satisfyingVal) — first operand is the key, second is the satisfying value.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### witness_table and witness_table_entry`: "Each entry maps
-// a `requirementKey` (a `StructKey` declared on the interface
-// type) to a `satisfyingVal` (a function, type, or value)". For
-// `struct A : IFoo { int run(int x) { ... } }` the row is
-// `witness_table_entry(%IFoox5Frun, %Ax5Frun)`.
-
+// Verifies the row shape a lookup resolves against: a requirement key paired
+// with the value that satisfies it. The CHECK pins both operands by their
+// user-derived names, so a row that stored the implementing function without
+// its key, or in the other order, would fail.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };

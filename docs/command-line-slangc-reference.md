@@ -1163,8 +1163,9 @@ Language
 Language Version 
 
 * `legacy`, `default`, `2018` : Legacy Slang language 
-* `2025` : Slang language rules for 2025 and older 
-* `2026`, `latest` : Slang language rules for 2026 and newer 
+* `2025`, `202a` : Slang language rules for 2025 and older 
+* `2026`, `202b`, `latest` : Slang language rules for 2026 
+* `202c`, `next` : Slang language rules for 202c 
 
 <a id="archive-type"></a>
 ## archive-type
@@ -1370,6 +1371,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_2_4` 
 * `metallib_3_0` 
 * `metallib_3_1` 
+* `metallib_3_2` 
 * `metallib_4_0` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
@@ -1800,9 +1802,11 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_size` 
 * `texture_querylod` 
 * `texture_querylevels` 
+* `texture_shadow` 
 * `texture_shadowlod` 
 * `texture_shadowlod_ext` 
 * `texture_shadowgrad` 
+* `texture_shadowbias` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
 * `atomic_glsl_halfvec` 

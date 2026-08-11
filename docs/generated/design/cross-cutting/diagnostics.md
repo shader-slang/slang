@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-29T13:27:59Z
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-watched_paths_digest: d89a8a5a54b52ca27bf1790e4d64b99d371b4099edbd608a872c47d632d6eb05
+model: claude-opus-5
+generated_at: 2026-08-03T13:18:32Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: 72308d5b1cf5b2f873570484f93cd6c423c9d145955c7dd61b2a25d788038770
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -18,21 +18,37 @@ integrating Slang into a tool that consumes its diagnostics.
 
 The central abstraction is `DiagnosticSink`, declared in
 [slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h).
-Every front-end and back-end stage receives a sink pointer (carried on
-`CompileRequestBase`, see
-[../architecture/overview.md](../architecture/overview.md)) and emits
-diagnostics through it.
+Front-end work obtains its sink from `FrontEndCompileRequest` /
+`CompileRequestBase`, which stores it; back-end work obtains it from
+`CodeGenContext::getSink`, which reads it out of the shared code-gen
+state (see
+[../architecture/overview.md](../architecture/overview.md)). Either
+way, a stage emits diagnostics through the sink pointer it is handed.
 
 The sink owns:
 
-- A `Severity` filter that can suppress, downgrade, or upgrade
-  diagnostics by id.
+- A `Dictionary<int, Severity>` of per-id severity overrides
+  (`m_severityOverrides`) that can upgrade any diagnostic and can
+  suppress or downgrade notes and warnings; an override may not lower a
+  diagnostic that is already at `Error` or above.
+- A bitmask of enabled warning groups (`m_enabledWarningLevels`), which
+  gates the opt-in `-Wall` / `-Wextra` / `-Wpedantic` warnings described
+  under [Warning groups](#warning-groups) below.
 - A `SourceManager` reference (for decoding `SourceLoc` values).
-- A buffered list of `Diagnostic` records, plus a writer for stream
-  output.
+- An `outputBuffer` that accumulates formatted text when no `writer` is
+  set, and an `ISlangWriter* writer` for stream output when one is.
 - Per-source warning-state tracking (`SourceWarningStateTrackerBase`)
   so that pragmas / per-file overrides can adjust the severity
   enforcement on a token-by-token basis.
+
+A nested sink can inherit settings from an enclosing one: the
+`DiagnosticSink(SourceManager*, SourceLocationLexer, DiagnosticSink*
+parentSink)` constructor copies the flags, color mode, unicode setting,
+enabled warning groups, and severity overrides from `parentSink`. This
+is distinct from `setParentSink`, which routes diagnostics upward: a
+legacy diagnostic is forwarded as already-formatted text, while a rich
+`GenericDiagnostic` is forwarded structurally and re-rendered by the
+parent with its own settings.
 
 A `Diagnostic` is a small record:
 
@@ -55,12 +71,136 @@ struct DiagnosticInfo
     int id;
     Severity severity;
     char const* name;          // unique identifier
-    char const* messageFormat; // printf-style format
+    char const* messageFormat; // legacy $0-style argument format
+    WarningLevel level = WarningLevel::Default; // warning group
 };
 ```
 
 The `DiagnosticInfo` instances are generated from the Lua tables
-described below.
+described below. The `level` field has a default so that the older
+`DIAGNOSTIC(code, severity, name, messageFormat)` macro catalogs under
+[source/compiler-core/](../../../../source/compiler-core) — for example
+the one consumed by
+[slang-core-diagnostics.h](../../../../source/compiler-core/slang-core-diagnostics.h)
+— keep compiling as four-element aggregate initializers.
+
+## Diagnostic definitions
+
+Diagnostics are declared in Lua source files and turned into C++
+structs / message tables at build time by `slang-fiddle`. There is a
+single catalog, and every entry in it is a rich diagnostic:
+
+1. [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
+   declares the compiler's diagnostics by calling the `err`, `warning`,
+   `standalone_note`, `internal`, and `fatal` helpers.
+2. [slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua)
+   collects those calls, validates them, and parses each message into
+   typed parameters and spans. The file ends by calling
+   `helpers.process_diagnostics` and returning the processed list,
+   raising a Lua error if validation failed.
+3. [slang-rich-diagnostics.h.lua](../../../../source/slang/slang-rich-diagnostics.h.lua)
+   loads that processed list and supplies the mapping helpers used by
+   the templates (`toPascalCase`, `getCppType`, `getSeverityEnum`,
+   `getWarningLevelEnum`).
+4. The FIDDLE templates embedded in
+   [slang-rich-diagnostics.h](../../../../source/slang/slang-rich-diagnostics.h)
+   and
+   [slang-rich-diagnostics.cpp](../../../../source/slang/slang-rich-diagnostics.cpp)
+   emit, per entry, a `struct` in `namespace Slang::Diagnostics` with
+   one member per parameter and location, a `toGenericDiagnostic()`
+   method that interpolates the message and builds the spans, and a
+   `DiagnosticInfo` constant carrying the code, severity, name, and
+   warning group.
+
+`Diagnostics::getRichDiagnosticsInfo()` /
+`getRichDiagnosticsInfoCount()` hand that generated `DiagnosticInfo`
+array to `DiagnosticsLookup`, which
+[slang-diagnostics.cpp](../../../../source/slang/slang-diagnostics.cpp)
+then augments with the non-conflicting entries from
+`getCoreDiagnosticsLookup()` and the single alias
+`overlappingBindings` → `parameterBindingsOverlap`.
+
+The header that consumes the generated tables is
+[slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
+Note its comment:
+
+> All diagnostics are now defined in slang-diagnostics.lua and
+> generated via slang-rich-diagnostics.h. The old
+> slang-diagnostic-defs.h has been removed.
+
+Note that steps 2 and 3 rest on `slang-diagnostics-helpers.lua` and
+`slang-rich-diagnostics.h.lua`, neither of which is in this page's
+watched paths even though the manifest already watches
+`slang-diagnostics.lua` and both `slang-rich-diagnostics` C++ files.
+Both should be added to the manifest so changes to the schema or the
+generator helpers mark this page stale.
+
+### Anatomy of a diagnostic entry
+
+An entry has a kebab-case `name`, an integer `code`, a short title, and
+an optional primary `span` followed by any additional spans, notes, and
+a warning-group sentinel:
+
+```lua
+err(
+    "function-redeclaration-with-different-return-type",
+    30202,
+    "function return type mismatch",
+    span { loc = "decl:Decl", message = "function '~decl' declared to return '~newReturnType:Type' was previously declared to return '~prevReturnType:Type'" }
+)
+```
+
+The primary span is optional: locationless diagnostics (e.g.
+command-line errors such as `cannot-deduce-source-language`) omit it
+entirely.
+
+The `err`, `warning`, `internal`, `fatal`, `standalone_note`, `span`,
+`note`, `variadic_span`, and `variadic_note` helpers are defined in
+[slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua);
+their signatures (e.g. `err(name, code, message, primary_span, ...)`)
+fix the argument order shown above. A `~name:Type` token in a message
+is a typed interpolation parameter the call site must supply; the
+helper's `parse_message` also understands member access such as
+`~decl.name`. `validate_diagnostic` rejects a name that is not valid
+kebab-case and a `severity` outside `error`, `warning`, `note`,
+`internal`, and `fatal`.
+
+To put a warning in an opt-in group, pass one of the sentinel values
+`helpers.all`, `helpers.extra`, or `helpers.pedantic` as a trailing
+positional argument.
+[slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
+binds `extra` and `pedantic` as locals near the top of the file; `all`
+has no user yet and would need the same one-line binding.
+`add_diagnostic` recognises the sentinel by its `is_warning_level`
+marker, records it as the entry's `level`, and does not mistake it for a
+span:
+
+```lua
+warning(
+    "vertex-shader-missing-sv-position",
+    38052,
+    "vertex shader '~entryPoint:Name' has no output with the 'SV_Position' system value semantic",
+    span { loc = "location", message = "..." },
+    pedantic
+)
+```
+
+`getWarningLevelEnum` in `slang-rich-diagnostics.h.lua` maps the string
+`"default"` / `"all"` / `"extra"` / `"pedantic"` to the matching
+`WarningLevel::` enumerator that the generated `DiagnosticInfo` carries.
+
+### The prototype schema under `source/slang/diagnostics/`
+
+[diagnostics/type-errors.lua](../../../../source/slang/diagnostics/type-errors.lua)
+uses a different, declarative schema — `diagnostic "name" { code = ...,
+severity = ..., flag = ..., params = ..., primary_label = ...,
+secondary_labels = ..., notes = ..., helps = ... }` — and describes
+itself as a "guinea pig" for prototyping the multi-span diagnostic
+system. At `source_commit` no build rule, FIDDLE template, or Lua
+`dofile` in the repository loads this file, and no other file in that
+directory exists, so nothing in the shipped compiler is generated from
+it. Treat `slang-diagnostics.lua` as the live catalog; in particular the
+`flag` key shown there has no consumer in the current pipeline.
 
 ## Severity levels
 
@@ -79,7 +219,7 @@ enum class Severity
 };
 ```
 
-The `static_assert` block immediately following the declaration
+A `static_assert` block in the same header
 ensures the enum values match the `SLANG_SEVERITY_*` constants
 exposed by [slang.h](../../../../include/slang.h), so callers using the
 public API see the same numeric values.
@@ -88,105 +228,86 @@ The names rendered to the user (`getSeverityName`) are:
 `ignored`, `note`, `warning`, `error`, `fatal error`,
 `internal error`.
 
-## Diagnostic definitions in Lua
+`DiagnosticSink::getEffectiveMessageSeverity` in
+[slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
+turns the static `DiagnosticInfo::severity` into the severity actually
+used, in this order: the per-source warning-state tracker may adjust a
+note/warning first; then a per-id entry in `m_severityOverrides` wins if
+one exists — except that it may not lower a severity that has already
+reached `Error`, `Fatal`, or `Internal`, where only an override at least
+as severe applies — otherwise an un-enabled warning group demotes the warning to
+`Severity::Disable`; finally the `TreatWarningsAsErrors` flag promotes
+any surviving warning to `Severity::Error`. A per-id override therefore
+takes precedence over group gating, which is what lets `-W<name>`
+force-enable a single warning from a group that is off.
 
-Diagnostics are declared in Lua source files and turned into C++
-structs / message tables at build time by `slang-fiddle`.
+### Warning groups
 
-Two layers exist:
+Warnings can be tagged with a group so they are only emitted when the
+user opts in. The groups are declared as `WarningLevel` in
+[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h),
+modeled on the clang/gcc `-Wall` / `-Wextra` / `-Wpedantic` groups:
 
-1. **Legacy / message-table diagnostics** declared in
-   [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-   and processed by
-   [slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua).
-   These produce `DiagnosticInfo` entries with a printf-style
-   `messageFormat` and integer ids.
-2. **Rich diagnostics** declared per-area under
-   [diagnostics/](../../../../source/slang/diagnostics) (currently
-   `type-errors.lua`). These describe multi-span errors with primary
-   and secondary labels, typed parameters, and notes; the FIDDLE
-   pipeline generates strongly-typed C++ diagnostic structs.
-
-The header that consumes the generated tables is
-[slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
-Note its comment:
-
-> All diagnostics are now defined in slang-diagnostics.lua and
-> generated via slang-rich-diagnostics.h. The old
-> slang-diagnostic-defs.h has been removed.
-
-The rich-diagnostics consumer lives in
-[slang-rich-diagnostics.h](../../../../source/slang/slang-rich-diagnostics.h)
-/
-[slang-rich-diagnostics.cpp](../../../../source/slang/slang-rich-diagnostics.cpp).
-The header file is itself partially generated (note the companion
-`.h.lua`).
-
-### Anatomy of a rich diagnostic
-
-A rich diagnostic entry, abbreviated, looks like:
-
-```lua
-diagnostic "argument_type_mismatch" {
-    code = "E30019",
-    severity = "error",
-    flag = "type-mismatch",
-    message = "cannot convert argument of type `{found}` to parameter of type `{expected}`",
-    params = {
-        { name = "func_name", type = "String" },
-        { name = "param_name", type = "String" },
-        { name = "param_index", type = "int" },
-        { name = "expected", type = "Type" },
-        { name = "found", type = "Type" },
-    },
-    primary_label = { loc = "arg_loc", message = "expected `{expected}`, found `{found}`" },
-    -- secondary labels, notes, ...
-}
+```cpp
+enum class WarningLevel
+{
+    Default = 0,
+    All = 1,
+    Extra = 2,
+    Pedantic = 3,
+};
 ```
 
-The FIDDLE templates in
-[slang-rich-diagnostics.h](../../../../source/slang/slang-rich-diagnostics.h)
-turn the table into a C++ `struct` with one member per `params`
-entry. A code path that wants to emit the diagnostic constructs the
-struct and calls `sink->diagnose(...)`, which chooses message text
-and labels accordingly.
+A `static_assert` block keeps these values in step with the
+`SLANG_WARNING_LEVEL_*` constants of the public `SlangWarningLevel` enum
+in [slang.h](../../../../include/slang.h), just as the neighbouring
+block does for `Severity`.
 
-### Anatomy of a legacy diagnostic
+The groups are **independent, not nested**: a warning is gated on
+exactly the one group it carries. `Default` is the implicit group of
+every untagged diagnostic and is always emitted. The sink's
+`m_enabledWarningLevels` bitmask starts with only the `Extra` bit set,
+so `Extra` warnings fire out of the box while `All` and `Pedantic`
+warnings stay silent until enabled. `DiagnosticSink::enableWarningLevel`
+sets a bit (bounds-checked before shifting, so a bogus integer coming
+through the public API cannot cause an out-of-range shift), and
+`isWarningLevelEnabled` is the predicate
+`getEffectiveMessageSeverity` consults. `getEnabledWarningLevels` /
+`setEnabledWarningLevels` expose the raw mask so it can be copied
+between sinks, mirroring `getFlags` / `setFlags`.
 
-Legacy entries in
-[slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-follow the simpler pattern of a kebab-case `name`, an integer `code`,
-a short title, and an optional primary `span` plus any additional
-spans / notes. The primary span is optional: locationless
-diagnostics (e.g. command-line errors such as
-`cannot-deduce-source-language`) omit it entirely:
+Because enabling is per-group rather than cumulative,
+`overrideDiagnosticSeverity` cannot treat "override equals the nominal
+severity" as a no-op for grouped warnings. It only drops such an
+override when `info->level == WarningLevel::Default`; for a grouped
+warning, overriding it back to `Warning` is the meaningful act of
+force-enabling it, so the entry must be kept.
 
-```lua
-err(
-    "function-redeclaration-with-different-return-type",
-    30202,
-    "function return type mismatch",
-    span { loc = "decl:Decl", message = "function '~decl' declared to return '~newReturnType:Type' was previously declared to return '~prevReturnType:Type'" }
-)
-```
-
-The `err`, `warning`, `fatal`, `standalone_note`, `span`, and `note`
-helpers are defined in
-[slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua);
-their signatures (e.g. `err(name, code, message, primary_span, ...)`)
-fix the argument order shown above. A `~name:Type` token in a message
-is a typed interpolation parameter the call site must supply.
+The plumbing that turns a user request into `enableWarningLevel` calls
+(the `-Wall` / `-Wextra` / `-Wpedantic` command-line spellings, the
+`SlangWarningLevel` enum, and the `CompilerOptionName::WarningLevel`
+option that carries the group as `intValue0`) lives in
+[include/slang.h](../../../../include/slang.h),
+[slang-options.cpp](../../../../source/slang/slang-options.cpp), and
+[slang-compiler-options.cpp](../../../../source/slang/slang-compiler-options.cpp),
+all three of which this page watches.
 
 ## Source locations and message rendering
 
 When the sink formats a diagnostic, it uses the `SourceManager` to
 decode the `SourceLoc` into `file:line:column` and to retrieve the
-original source line for caret rendering. Macro-expanded locations
-are rendered with their expansion stack so that errors triggered
-inside a macro point at both the use site and the macro body.
+original source line for caret rendering. When the location falls in a
+synthesized token-paste view (`PathInfo::Type::TokenPaste`), the
+`formatDiagnostic` helper in
+[slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
+loops back through `SourceView::getInitiatingSourceLoc()`, emitting a
+`MiscDiagnostics::seeTokenPasteLocation` note for each hop, so an error
+inside a `##` paste points at both the pasted text and the macro that
+produced it.
 
-The sink's writer (`StdWriters::stdError` by default, or any
-`ISlangWriter`) receives the formatted text. Tools that consume
+The formatted text goes to the sink's `writer` if one is set, and
+otherwise accumulates in `outputBuffer`, from which
+`getBlobIfNeeded` can hand it back as an `ISlangBlob`. Tools that consume
 diagnostics in machine-readable form can set the
 `DiagnosticSink::Flag::MachineReadableDiagnostics` flag declared in
 [slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h),
@@ -194,39 +315,69 @@ which switches rendering to a tab-separated record of the form
 `E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>`
 (this is not a JSON schema).
 
-## Error codes and the `name` field
+## Error code namespace
 
-Diagnostic ids live in a single shared integer namespace (`code =
-"E30019"` or `30007` in the examples above) that is intended to be
-managed centrally, alongside a unique `name`. Ids are normally
-unique, but some are intentionally shared by more than one
-diagnostic: `getDiagnosticById` in
-[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h)
-notes that "it is possible for multiple diagnostics to have the same
-id" and returns only the first added, and
+Diagnostic ids live in a single shared integer namespace (`30202` in the
+example above) that is managed centrally, alongside a unique `name`.
+`process_diagnostics` in
 [slang-diagnostics-helpers.lua](../../../../source/slang/slang-diagnostics-helpers.lua)
-keeps an `intentional_shared_code_list` exempting those ids from the
-uniqueness check. Because of this, a tool that needs to target a
-precise diagnostic should prefer the `name` or `flag` group over the
-integer id. Tools suppress diagnostics by passing the id, name, or
-`flag` group through `overrideDiagnostic` / `overrideDiagnostics`
-declared in
-[slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
+enforces three rules over that namespace at generation time:
+
+- Names and codes must both be unique
+  (`allow_duplicate_diagnostic_codes` is `false`).
+- Diagnostics that do share a code must share a severity
+  (`allow_severity_conflicts` is `false`), because
+  `-warnings-disable <id>` resolves the id to a single entry and then
+  checks its severity.
+- A code must not be bound to one name in the Lua catalog and a
+  different name in one of the C++ `DIAGNOSTIC(...)` catalogs listed in
+  `cpp_diagnostic_defs_files` (the `slang-misc-`, `slang-lexer-`, and
+  `slang-json-diagnostic-defs.h` files under
+  [source/compiler-core/](../../../../source/compiler-core)).
+
+A short `intentional_shared_code_list` exempts deliberately multi-bound
+codes — negative sentinels, the `10000` illegal-character variants, the
+`39999` overload/lookup umbrella, the `99999` internal-error catch-all,
+and the JSON catalog's `20001`-`20012` range — from the uniqueness and
+cross-catalog checks. Because
+`getDiagnosticById` in
+[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h)
+notes that "it is possible for multiple diagnostics to have the same id"
+and returns only the first added, a tool that needs to target a precise
+diagnostic should prefer the `name` over the integer id.
+
+Tools suppress or promote diagnostics through `overrideDiagnostic` /
+`overrideDiagnostics`, declared in
+[slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h) and
+implemented in
+[slang-diagnostics.cpp](../../../../source/slang/slang-diagnostics.cpp).
+Each accepts a single identifier (or a comma-separated list) that is
+either an integer id or a name. An unrecognised name is reported as
+`UnknownDiagnosticName`, whereas an unrecognised numeric id is silently
+ignored so that a build script can disable a warning without knowing
+which compiler version introduced it. If `originalSeverity` is anything
+other than `Severity::Disable`, the looked-up diagnostic's severity must
+match it, so `-warnings-disable` cannot be used to silence an error.
+Name lookup is convention-insensitive: `findDiagnosticByName` accepts
+the kebab-case spelling from the Lua entry as well as the lower-camel
+`DiagnosticInfo::name` the generator produces from it.
 
 The user-facing diagnostic style guide is
 [../../../diagnostic-guidelines.md](../../../diagnostic-guidelines.md);
 this document does not duplicate it. The conventions document covers
 how to choose error codes and how to write good messages.
 
-## Internal-compiler errors and assertions
+## Internal-compiler errors
 
 The macros `SLANG_INTERNAL_ERROR`, `SLANG_UNIMPLEMENTED`, and
 `SLANG_DIAGNOSE_UNEXPECTED` (defined in
 [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h))
 funnel internal-compiler errors through the same sink as ordinary
-diagnostics with `Severity::Internal`. In debug builds they emit a
-companion note that records the C++ source location where the macro
-fired:
+diagnostics with `Severity::Internal`. In debug builds
+`SLANG_INTERNAL_ERROR` and `SLANG_UNIMPLEMENTED` — but not
+`SLANG_DIAGNOSE_UNEXPECTED`, which is defined outside the debug
+conditional — emit a companion note that records the C++ source
+location where the macro fired:
 
 ```cpp
 (sink)->diagnoseRaw(
@@ -240,11 +391,16 @@ governed by the `SLANG_ASSERT` environment variable (see
 `system`, `debugbreak`, `release-assert-only`, or unset). On Windows
 the build option `SLANG_IGNORE_ABORT_MSG` further suppresses modal
 abort dialogs in unattended runs. These mechanisms are independent of
-the diagnostic sink. `SLANG_ASSERT` / `SLANG_RELEASE_ASSERT` (and
-`SLANG_ASSERT_FAILURE`, which an assert expands to on failure) route
-through `::Slang::handleAssert`, while `SLANG_UNREACHABLE` routes
-through `::Slang::handleSignal` with `SignalType::Unreachable`; both
-are declared via the `slang-signal.h` include in
+the diagnostic sink. `SLANG_RELEASE_ASSERT` always calls
+`::Slang::handleAssert` directly; `SLANG_ASSERT` does the same in
+debug builds but expands to `SLANG_ASSUME(VALUE)` in release builds,
+so it becomes an optimizer hint rather than a check.
+`SLANG_ASSERT_FAILURE` is a separate macro that calls
+`::Slang::handleAssert` unconditionally, not something an assert
+expands to. `SLANG_UNREACHABLE` routes
+through `::Slang::handleSignal` with `SignalType::Unreachable`;
+`handleAssert` and `handleSignal` are both declared via the
+`slang-signal.h` include in
 [slang-common.h](../../../../source/core/slang-common.h) and bypass
 the sink entirely. The sink-based internal-error path is the
 `SLANG_INTERNAL_ERROR`, `SLANG_UNIMPLEMENTED`, and
@@ -252,24 +408,33 @@ the sink entirely. The sink-based internal-error path is the
 
 ## Adding a new diagnostic
 
-1. Choose between rich and legacy. New diagnostics with multi-span
-   labels or typed parameters should be **rich** (Lua tables under
-   [diagnostics/](../../../../source/slang/diagnostics)). Simple
-   diagnostics may continue to use the legacy form in
-   [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua).
+1. Add an `err`, `warning`, `standalone_note`, `internal`, or `fatal`
+   call to
+   [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua),
+   next to the other diagnostics in the same numeric range.
 2. Allocate a unique integer id in the conventional range for the
    subsystem (parser, checker, lowering, IR pass, emit) — the
    conventions are in
    [../../../diagnostic-guidelines.md](../../../diagnostic-guidelines.md).
-3. Choose a unique snake_case `name` (rich) or string id (legacy).
-4. Write the message text. Use `~param` interpolation in the
-   legacy form or `{param}` in the rich form. Fill in `params`,
-   `primary_label`, and any secondary labels / notes (rich only).
-5. Rebuild — `slang-fiddle` regenerates the consumer headers so the
+   `process_diagnostics` will fail the build if the id collides with
+   another Lua entry or with a C++ `DIAGNOSTIC(...)` catalog.
+3. Choose a unique kebab-case `name`; the generator derives the C++
+   `PascalCase` struct name and the `lowerCamelCase`
+   `DiagnosticInfo::name` from it.
+4. Write the message text, using `~param` / `~param:Type` interpolation,
+   and add a primary `span` plus any secondary spans, `note`s, or
+   variadic spans/notes.
+5. For a warning that should not fire by default, append the `all` or
+   `pedantic` sentinel as the last positional argument; the warning then
+   requires `-Wall` or `-Wpedantic`. Do not use `extra` for this: the
+   sink initializes `m_enabledWarningLevels` with the `Extra` bit
+   already set, so an `extra` warning fires without any `-W` flag.
+6. Rebuild — `slang-fiddle` regenerates the consumer headers so the
    diagnostic appears in `Slang::Diagnostics::<Name>`.
-6. Call `sink->diagnose(Slang::Diagnostics::<Name>{...})` from the
-   site that detects the condition.
-7. Add a `DIAGNOSTIC_TEST` regression test under
+7. Call `sink->diagnose(Slang::Diagnostics::<Name>{...})` from the
+   site that detects the condition, including
+   `slang-rich-diagnostics.h` in that translation unit.
+8. Add a `DIAGNOSTIC_TEST` regression test under
    [tests/](../../../../tests) (see
    [CLAUDE.md](../../../../CLAUDE.md) for the test directive
    conventions).
@@ -280,7 +445,16 @@ the sink entirely. The sink-based internal-error path is the
   [../../../diagnostic-guidelines.md](../../../diagnostic-guidelines.md).
 - The full enumeration of every diagnostic id. The authoritative
   source is
-  [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua)
-  and the files under
-  [diagnostics/](../../../../source/slang/diagnostics). Listing them
-  here would replicate the build artefact and drift on every change.
+  [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua),
+  plus the C++ `DIAGNOSTIC(...)` catalogs it cross-checks against under
+  [source/compiler-core/](../../../../source/compiler-core). Listing
+  them here would replicate the build artefact and drift on every
+  change.
+- The command-line and API surfaces that drive the sink
+  (`-warnings-disable`, `-warnings-as-errors`, `-Wno-<name>`, `-Wall` /
+  `-Wextra` / `-Wpedantic`, and the matching `CompilerOptionName`
+  entries). These live in
+  [slang-options.cpp](../../../../source/slang/slang-options.cpp),
+  [slang-compiler-options.cpp](../../../../source/slang/slang-compiler-options.cpp),
+  and [include/slang.h](../../../../include/slang.h); the option
+  surface itself is documented in the user guide rather than here.

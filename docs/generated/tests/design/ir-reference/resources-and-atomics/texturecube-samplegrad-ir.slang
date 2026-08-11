@@ -1,16 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T09:40:00+00:00
-//META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#sampling-and-combined-samplers
-//META: doc_section_digest=6abec3bf0db83e786c6abe3cd9da9484056f015e4a5f0072a103fdda00cee022
+//META: doc_section_digest=a0ab646bb8b7c3f2d7e5acb9f418e3f9850e9bd5e2a629c46fdeeeb725e4652c
 //META: purpose=`TextureCube::SampleGrad(samp, uv, dx, dy)` surfaces in `main` as a `call specialize(%SampleGrad, ..., TextureShapeCubeDType, ...)(%tex, %samp, %uv, %dx, %dy)` — the explicit-gradient overload of the doc's `sampleGrad` opcode.
 //META: intent=expansion
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `sampleGrad` opcode is variadic (gradX, gradY, optional
-// offset/bias). The cube variant takes 3-component gradients.
+// Verifies the explicit-gradient sampling shape on a cube texture,
+// where each gradient is three-component rather than two. At this stage
+// the sample is still a call on the specialized core-module function,
+// so the CHECK pins the cube shape tag together with the texture,
+// sampler, and both gradient arguments.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

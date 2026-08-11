@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T16:30:00Z
-//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
-//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generics-and-existentials
-//META: doc_section_digest=d6ee07799b141a6850f1700c9e4ae870d18815ea897d847d8fe60117b962be60
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#requirement-keys
+//META: doc_section_digest=e9382240af63f219a58e7c63fe673b0ab63a2f07e00bd9fea6cb148728ad0738
 //META: purpose=Two structs conforming to IDifferentiable share one hoistable `builtinRequirementKey` inst per built-in requirement — both witness tables carry an entry keyed by the same key inst.
 //META: intent=boundary
 //META: pipeline_stage=lower

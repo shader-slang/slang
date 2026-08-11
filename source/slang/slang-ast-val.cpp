@@ -12,7 +12,6 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
-#include <assert.h>
 #include <typeinfo>
 
 namespace Slang
@@ -2140,6 +2139,10 @@ Val* TypeCastIntVal::tryFoldImpl(
             return true;
         case BaseType::UInt8:
             resultValue = (uint8_t)resultValue;
+            return true;
+        case BaseType::Bool:
+            // Match the C `(bool)` cast: any nonzero value is `true`, not a low-bit mask.
+            resultValue = (resultValue != 0);
             return true;
         default:
             return false;

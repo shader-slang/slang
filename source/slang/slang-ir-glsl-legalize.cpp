@@ -5096,7 +5096,11 @@ void legalizeEntryPointsForGLSL(
 
 // Rewrite a single `switch` on a `bool` condition into the equivalent integer switch:
 // cast the condition bool->int (Khronos emitters lower this to an OpSelect) and replace
-// each `IRBoolLit` case value with the matching `IRIntLit` (`true`->1, `false`->0).
+// each case value with the matching `IRIntLit` (`true`->1, `false`->0).
+//
+// A case value on a bool-conditioned switch is a canonical `IRBoolLit`, whether written
+// literally (`case true:`/`case false:`) or produced by a `switch` on an `enum : bool` (whose
+// labels `lowerEnumType` canonicalizes from the enum type to `IRBoolLit`).
 static void legalizeBoolSwitch(IRSwitch* switchInst)
 {
     if (!as<IRBoolType>(switchInst->getCondition()->getDataType()))
@@ -5111,14 +5115,14 @@ static void legalizeBoolSwitch(IRSwitch* switchInst)
 
     for (UInt i = 0; i < switchInst->getCaseCount(); i++)
     {
-        auto boolLit = as<IRBoolLit>(switchInst->getCaseValue(i));
-        SLANG_ASSERT(boolLit);
-        auto intLit = builder.getIntValue(intType, boolLit->getValue() ? 1 : 0);
+        auto caseConstant = as<IRBoolLit>(switchInst->getCaseValue(i));
+        SLANG_RELEASE_ASSERT(caseConstant);
+        auto intLit = builder.getIntValue(intType, caseConstant->value.intVal != 0 ? 1 : 0);
         switchInst->getCaseValueUse(i)->set(intLit);
     }
 }
 
-void legalizeBoolSwitchForKhronos(IRModule* module)
+void legalizeBoolSwitchForTargetsRequiringIntSwitch(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {

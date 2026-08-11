@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
-//META: doc_ref=docs/language-reference/generics.md#parameter-binding
-//META: doc_section_digest=5fefa3cf4076961bde4d84e979866a0fe46244475e81339e0cd6922ed4777a7a
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#implicit-parameter-binding-ambiguous-type-argument
+//META: doc_section_digest=5a242a0b2f3a0ce246085c303baec4847733bd0badeaee717cbb03060d2a52a9
 //META: purpose=When inference for a generic type parameter is ambiguous and the candidates are non-fundamental types, specialization fails with an error.
 //META: intent=negative
 //META: pipeline_stage=check

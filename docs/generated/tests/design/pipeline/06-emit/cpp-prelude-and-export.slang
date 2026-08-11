@@ -1,31 +1,34 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#c
-//META: doc_section_digest=56fb593cc69a3ab3311c7c4481d138ffc0af6f678b9289b2a5e75f9670abbce2
-//META: purpose=The C++ backend emits C++ source that includes slang-cpp-prelude.h and exports the entry point with SLANG_PRELUDE_EXPORT.
+//META: doc_section_digest=3b18f76865892822e5e99d93d6ae89f550064767414bd96151ede2d71030fdc5
+//META: purpose=The C++ backend emits C++ source paired with `slang-cpp-prelude.h` and exports the compute entry point through `SLANG_PRELUDE_EXPORT` shims.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The C++ backend (slang-emit-cpp.{h,cpp}) pairs the emitted source
-// with the C++ shader prelude (prelude/slang-cpp-prelude.h) and
-// wraps the compute entry point with SLANG_PRELUDE_EXPORT-tagged
-// host shim functions. The runtime support these shims call into
-// lives in source/slang-rt/.
+// Verifies the C++ backend emits code that depends on the shipped C++ prelude
+// and that the kernel is reachable from a host. CHECK asserts the prelude
+// include (matched by filename because the emitted path is absolute and
+// machine-specific), the prelude-provided `RWStructuredBuffer` template used
+// for the global-parameter field, and the exported per-thread and per-group
+// dispatch shims a host runtime calls.
 
-//TEST:SIMPLE(filecheck=CHECK):-target cpp -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
-RWStructuredBuffer<int> outBuf;
+RWStructuredBuffer<float> outBuf;
 
 [shader("compute")]
-[numthreads(1, 1, 1)]
+[numthreads(4, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    outBuf[tid.x] = int(tid.x);
+    outBuf[tid.x] = float(tid.x) * 0.5f;
 }
 
-// CHECK: #include {{.*}}slang-cpp-prelude.h
-// CHECK: SLANG_PRELUDE_EXPORT
-// CHECK: void main_{{[0-9]+}}(ComputeVaryingInput
+// CPP: slang-cpp-prelude.h
+// CPP-DAG: RWStructuredBuffer<float> outBuf_{{[0-9]+}};
+// CPP-DAG: SLANG_PRELUDE_EXPORT
+// CPP-DAG: void main_{{[0-9]+}}_Thread(ComputeThreadVaryingInput*
+// CPP-DAG: void main_{{[0-9]+}}_Group(ComputeVaryingInput*

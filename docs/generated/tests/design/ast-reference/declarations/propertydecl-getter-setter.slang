@@ -1,7 +1,7 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#accessordecl-family
 //META: doc_section_digest=7ab459ecbfa076cb34ec94ae11dca1b7bd65f74d607addf906138dac14f78530
 //META: purpose=A PropertyDecl holds GetterDecl/SetterDecl children; reading and writing the property fires the respective accessor.
@@ -9,10 +9,10 @@
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented roles of PropertyDecl, GetterDecl, and
-// SetterDecl together. Writing to the property fires the SetterDecl
-// (which doubles the input); reading fires the GetterDecl. The
-// observed value reflects both accessors having run.
+// Verifies that an explicit `get`/`set` pair on a property is what runs on
+// read and write. The setter deliberately doubles the incoming value, so the
+// CHECK's expected number is only produced when the write went through the
+// setter body and the read through the getter body.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

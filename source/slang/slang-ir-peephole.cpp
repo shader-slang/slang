@@ -1237,6 +1237,26 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_CastDescriptorHandleToUInt2:
+            {
+                if (auto wrap = as<IRCastUInt2ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
+        case kIROp_CastDescriptorHandleToUInt64:
+            {
+                if (auto wrap = as<IRCastUInt64ToDescriptorHandle>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(wrap->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_UnpackAnyValue:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_PackAnyValue)

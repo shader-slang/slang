@@ -1,21 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
-//META: doc_section_digest=8666fb5a8a3e866e04eed6573b9b735ade91d11b88b56b96aa10b6822be031b8
+//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
 //META: purpose=A struct conforming to an interface with zero methods emits an empty witness_table (no witness_table_entry rows).
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on witness_table_entry axis: empty interface (zero
-// requirements). `### witness_table and witness_table_entry`
-// says entries are "one per interface requirement" — zero
-// requirements implies zero entries. The dump shape is
-// `witness_table %N : witness_table_t(%IEmpty)(%E);` with no
-// body, terminated by `;`.
-
+// Boundary at zero requirements. The conformance still exists as a table so a
+// constrained generic can take it as an argument, but there is nothing to key;
+// the CHECK pins the semicolon-terminated form the dump uses for a childless
+// witness table.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IEmpty { };
@@ -34,4 +30,4 @@ void main()
     buf[0] = useEmpty<E>(e, inVal);
 }
 
-// CHECK: witness_table %{{[0-9]+}}	: witness_table_t(%IEmpty)(%E);
+// CHECK: witness_table %{{[0-9]+}} : witness_table_t(%IEmpty)(%E);

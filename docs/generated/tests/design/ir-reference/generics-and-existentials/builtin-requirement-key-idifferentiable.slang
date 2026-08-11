@@ -1,22 +1,18 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:08:34Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#builtinrequirementkey-builtinrequirementkey
-//META: doc_section_digest=d1fa25ce7ebb01fb9d1853fcc53938fdbbb6f34baa348e767217ad026e5899b0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#builtinrequirementkey--builtinrequirementkey
+//META: doc_section_digest=a9bcf0b3a1c96a8a7af583493f9d96eada67178a808d63e7785a842e550af6b2
 //META: purpose=A struct conforming to IDifferentiable produces witness-table rows keyed by builtinRequirementKey insts carrying an integer BuiltinRequirementKind operand.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Verifies that requirements the front end recognizes as built-in
-// interface members (the IDifferentiable roles) are keyed by
-// builtinRequirementKey rather than by a named StructKey. A struct
-// declared as conforming to IDifferentiable is routed through a
-// constrained generic so its witness table stays live; the CHECKs pin
-// the table for the user struct plus at least one builtinRequirementKey
-// whose sole operand is an integer literal (the BuiltinRequirementKind).
-
+// Verifies the second requirement-key spelling. Conformance to a built-in
+// interface is keyed by kind rather than by a per-declaration symbol, so the
+// key inst carries an integer operand instead of a name. The CHECK-DAGs assert
+// the conformance table for the user struct and at least one integer-operand
+// key exist.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 struct DiffData : IDifferentiable { float v; };

@@ -1815,7 +1815,7 @@ void GLDevice::debugCallback(
     switch (format)
     {
     default:
-        assert(!"unexpected");
+        SLANG_ASSERT_FAILURE("unexpected");
         return VertexAttributeFormat();
 
 #define CASE(NAME, COUNT, TYPE, NORMALIZED)                           \
@@ -1848,7 +1848,7 @@ void GLDevice::bindBufferImpl(
         BufferResourceImpl* buffer = static_cast<BufferResourceImpl*>(buffers[ii]);
         GLuint bufferID = buffer ? buffer->m_handle : 0;
 
-        assert(!offsets || !offsets[ii]);
+        SLANG_ASSERT(!offsets || !offsets[ii]);
 
         glBindBufferBase(target, (GLuint)slot, bufferID);
     }
@@ -2831,7 +2831,7 @@ void GLDevice::setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offse
 
 void GLDevice::setViewports(GfxCount count, Viewport const* viewports)
 {
-    assert(count == 1);
+    SLANG_ASSERT(count == 1);
     auto viewport = viewports[0];
     glViewport(
         (GLint)viewport.originX,
@@ -2843,7 +2843,7 @@ void GLDevice::setViewports(GfxCount count, Viewport const* viewports)
 
 void GLDevice::setScissorRects(GfxCount count, ScissorRect const* rects)
 {
-    assert(count <= 1);
+    SLANG_ASSERT(count <= 1);
     if (count)
     {
         // TODO: this isn't goign to be quite right because of the
