@@ -381,10 +381,17 @@ void TestReporter::_addResult(TestInfo info)
         return;
     }
 
-    // Any other result is final, and redeems an earlier deferral of the same test. Record it
-    // before the hidden-ignored case below returns, because being hidden from the output does not
-    // make the result any less final.
-    m_finalResultTests.add(info.name);
+    // A verdict -- Pass, Fail, ExpectedFail -- redeems an earlier deferral of the same test.
+    // Ignored does not. A test is deferred because it *ran and failed*; a retry that skips it
+    // produces no verdict and so refutes nothing, leaving the first-pass failure standing for
+    // reconcilePendingRetries() to count. Treating Ignored as final is how a real failure
+    // disappeared from a run: deferred on the first pass, ignored on the retry, and under
+    // -hide-ignored not even counted as ignored, so it left no trace in the totals at all.
+    //
+    // Recorded before the hidden-ignored return below, because being hidden from the output does
+    // not make a verdict any less final.
+    if (info.testResult != TestResult::Ignored)
+        m_finalResultTests.add(info.name);
 
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {

@@ -192,29 +192,55 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
     SLANG_CHECK(!main.didAllSucceed());
 }
 
-// A final `Ignored` result under `-hide-ignored` never reaches the statistics or `m_testInfos`, but
-// it must still redeem a deferral -- which is why `_addResult` records `m_finalResultTests` before
-// the hide-ignored early return. Without that ordering, an ignored-on-retry test would be counted a
-// spurious failure by reconciliation.
-SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
+// A retry that skips the test does not redeem the deferral. The test was deferred because it ran
+// and failed; an ignore produces no verdict and refutes nothing, so the first-pass failure has to
+// survive to be counted.
+//
+// This is not hypothetical: gfx-unit-test-tool/computeTrivialD3D11 failed with an RPC failure (the
+// test server died), was deferred, and the retry reported it ignored -- so it left the failure
+// count and landed in the ignored tally, and the run reported only the two unrelated file-test
+// failures. Under -hide-ignored it would not have been counted at all.
+SLANG_UNIT_TEST(slangTestReporterIgnoredRetryDoesNotRedeemDeferral)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
     reporter.m_suppressConsoleOutput = true;
-    reporter.m_hideIgnored = true;
-    const String command("slang-unit-test-tool/probeHiddenIgnored.internal");
+    const String command("gfx-unit-test-tool/probeIgnoredOnRetry.internal");
 
-    reporter.addTest(command, TestResult::PendingRetry); // first pass: deferred
-    reporter.addTest(command, TestResult::Ignored);      // retry pass: ignored, hidden from output
+    reporter.addTest(command, TestResult::PendingRetry); // first pass: ran and failed
+    reporter.addTest(command, TestResult::Ignored);      // retry: skipped, no verdict
 
-    // The ignored result is hidden (not counted), but it still redeems the deferral.
-    SLANG_CHECK(reporter.m_ignoredTestCount == 0);
-    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+    // The ignore is still reported as an ignore, but it does not redeem anything.
+    SLANG_CHECK(reporter.m_ignoredTestCount == 1);
+    SLANG_CHECK(!reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(reporter.m_pendingRetryTests.contains(command));
 
     reporter.reconcilePendingRetries();
 
-    SLANG_CHECK(reporter.m_failedTestCount == 0);
-    SLANG_CHECK(reporter.didAllSucceed());
+    // The first-pass failure survives instead of being laundered into a skip.
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(!reporter.didAllSucceed());
+}
+
+// The same, with the ignore hidden from the output: -hide-ignored is what made the earlier
+// behaviour leave no trace at all, since the redeeming ignore was never counted either.
+SLANG_UNIT_TEST(slangTestReporterHiddenIgnoredRetryStillLeavesAFailure)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    reporter.m_hideIgnored = true;
+    const String command("gfx-unit-test-tool/probeHiddenIgnoredOnRetry.internal");
+
+    reporter.addTest(command, TestResult::PendingRetry);
+    reporter.addTest(command, TestResult::Ignored);
+
+    SLANG_CHECK(reporter.m_ignoredTestCount == 0); // hidden, so not counted
+    SLANG_CHECK(!reporter.m_finalResultTests.contains(command));
+
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(!reporter.didAllSucceed());
 }
 
 // The retry-eligibility gate in `runUnitTestModule` keys off the reporter's test key -- the full
