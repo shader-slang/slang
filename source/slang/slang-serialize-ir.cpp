@@ -1029,13 +1029,24 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // is enough to recover each instruction's depth.
         List<Int64> remainingChildren;
         Int64 depth = 0;
+        // True while the scan is inside a global's decoration, including anything
+        // nested under it. A decoration is kept eager because the symbol index reads
+        // it without materializing, so its children have to be kept too: they are
+        // reachable only through the decoration, and nothing on that path would ever
+        // trigger a materialization to supply them. Keeping just the decoration inst
+        // would silently give a decoration-with-children no children under lazy load.
+        bool inDecorationSubtree = false;
         for (Int64 i = 0; i < numInsts; ++i)
         {
             const IROp op = flat.instAllocInfo[i].op;
             const bool isDecoration = op >= kIROp_FirstDecoration && op <= kIROp_LastDecoration;
             // Depth 0 is the module inst and depth 1 its globals; a global's
             // decorations sit at depth 2 and carry the linkage names.
-            materializeInst[i] = uint8_t(depth <= 1 || (depth == 2 && isDecoration));
+            if (depth <= 2)
+                inDecorationSubtree = false;
+            if (depth == 2 && isDecoration)
+                inDecorationSubtree = true;
+            materializeInst[i] = uint8_t(depth <= 1 || inDecorationSubtree);
 
             remainingChildren.add(flat.childCounts[i]);
             depth++;
