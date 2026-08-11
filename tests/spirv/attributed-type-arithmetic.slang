@@ -8,9 +8,9 @@
 //
 // Two constraints keep this test from passing without the fix. The element type
 // must be scalar, because `unorm float2` and `unorm float4` already emit float
-// opcodes. And each operation must consume the loaded texel directly: an
-// expression built from plain `float` locals is not attributed, so it emits a
-// float opcode either way.
+// opcodes. And each operation must consume a texel-derived value: the attribute
+// survives a copy into a local, but not a result already computed from one, so
+// folding the operands together would emit float opcodes either way.
 
 //TEST:SIMPLE(filecheck=CHECK-SPIRV):-target spirv -entry computeMain -stage compute
 
@@ -47,9 +47,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     uint2 p = tid.xy;
 
-    // The divisor is loaded rather than a literal: dividing by a constant is
-    // strength-reduced to a multiply after the opcode is chosen, so a constant
-    // divisor never reaches the emitted module as a division at all.
+    // The divisor is loaded rather than a literal so that the division survives
+    // as one: a float division by a constant is strength-reduced to a multiply,
+    // which would leave no OpFDiv to assert once the classification is correct.
     float divisor = outBuf[9];
 
     outBuf[0] = u1[p] + 0.25;
