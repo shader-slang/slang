@@ -175,8 +175,18 @@ expressed by the wrapper's accessors, such as
 | `global_var` | `IRGlobalVar` | — | G | a module-scope `VarDecl` that is neither a shader parameter nor `static const`, via `lowerGlobalVarDecl`, and a mutable function-`static` local, via `lowerFunctionStaticVarDecl` | Module-scope mutable variable; its type is a `PtrType` and an initializer lives in child blocks. |
 | `global_param` | `IRGlobalParam` | — | G | a module-scope shader-parameter `VarDecl`, via `lowerGlobalShaderParam` | Module-scope uniform parameter; unlike `global_var` it *is* the value, not its address. |
 | `globalConstant` | `IRGlobalConstant` | `value` (optional; unnamed in Lua, read by `getValue()`) | G | a `static const` module-scope `VarDecl`, via `lowerGlobalConstantDecl`, and a function-`static` `const`, via `lowerFunctionStaticConstVarDecl` | Module-scope constant; with no operand it is an `extern` constant defined in another module. |
-| `global_generic_param` | `IRGlobalGenericParam` | — | G | `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl` | Declares a generic parameter at module level; bound by `bind_global_generic_param`. Note the producer is *not* `GenericTypeParamDecl` — `GlobalGenericParamDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 10878) derives from `AggTypeDecl` while `GlobalGenericValueParamDecl` (line 10885) derives from `VarDeclBase`, and constraint decls parented by one also lower here. [generics-and-existentials.md](generics-and-existentials.md) owns the declaration/binding pair in full. |
+| `global_generic_param` | `IRGlobalGenericParam` | — | G | `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl`, written `type_param T : IFoo;` at module scope | Declares a generic parameter at module level; bound by `bind_global_generic_param`. Note the producer is *not* `GenericTypeParamDecl` — `GlobalGenericParamDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 10878) derives from `AggTypeDecl` while `GlobalGenericValueParamDecl` (line 10885) derives from `VarDeclBase`, and constraint decls parented by one also lower here. [generics-and-existentials.md](generics-and-existentials.md) owns the declaration/binding pair in full. |
 | `global_hashed_string_literals` | `IRGlobalHashedStringLiterals` | (variadic) | | (synthesized) | Container for the module's hashed-string-literal pool; a module holds at most one. |
+
+A constrained `type_param` lowers to **two** module-scope insts, not
+one: the parameter itself, typed `Type`, and a second
+`global_generic_param` typed `witness_table_t(<interface>)` carrying
+the constraint's witness table. The constraint decl is parented by the
+`GlobalGenericParamDecl`, and the visitors for those constraint decls
+emit their own `emitGlobalGenericParam(witnessType)`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+lines 10854-10858 and 10877-10881). The witness inst is what lets a
+body call an interface method on `T` before `T` is bound.
 
 ### Struct internals
 
@@ -247,6 +257,18 @@ block exists at all. Function-level decorations
 `TargetIntrinsicDecoration`, ...) attach to the `func` inst rather
 than to its body.
 
+A dump renders the signature as the inst's type clause,
+`func %addPair : Func(Int, Int, Int)`, and the operand order of
+`IRFuncType` is the thing to know when reading one: operand 0 is the
+*result* type and operands 1 onward are the parameter types in source
+order, so the leading `Int` above is the return type and only the two
+that follow are parameters
+([slang-ir.h](../../../../source/slang/slang-ir.h) lines 1626-1640).
+A `Func(...)` list may also carry one trailing `IRAttr` — an
+`IRFuncThrowTypeAttr`, say — which is neither result nor parameter;
+`getParamCount()` and `getParamType()` skip it, so prefer them to
+counting operands.
+
 ### `generic`
 
 `generic` is structurally the same as `func` — a parent opcode
@@ -287,6 +309,14 @@ other module-scope instruction — `func`, `generic`, `global_var`,
 import / export information used by the linker; the module is also the
 unit that serialization writes and reads (see
 [../cross-cutting/serialization.md](../cross-cutting/serialization.md)).
+
+The containment is real but invisible in a dump: `dumpIRModule`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 8401)
+iterates `getGlobalInsts()` and dumps each child, and never emits a
+line for the `module` inst itself. So a reader of `-dump-ir` output
+observes the container only through the presence of its children at
+the top level, and should not expect to find a `module` line to anchor
+on.
 
 The `IRModule` owning the `module` inst (in
 [slang-ir.h](../../../../source/slang/slang-ir.h)) can build a
@@ -388,7 +418,11 @@ positionally.
 The requirement list on an `InterfaceType` is one entry per
 requirement-bearing direct member: a property or subscript
 contributes one entry per accessor rather than one for itself, and
-an `InterfaceDefaultImplDecl` member is skipped entirely. An
+a requirement with a default implementation still contributes exactly
+one entry — the synthesized `InterfaceDefaultImplDecl` that carries the
+default body is what gets skipped, and it adds no second entry
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 12101, in the loop that counts the interface's operands). An
 associated-type bound such as `associatedtype A :
 IBar` is represented as a *sibling* requirement of `A` rather than a
 member of it, so no extra entries are synthesized for it; its entry
@@ -408,6 +442,19 @@ import or export linkage decoration for the name it stands in for. The
 linking pass in `slang-ir-link.cpp` resolves an alias by cloning the
 value of its `symbol` operand instead of the alias itself, so no
 `SymbolAlias` survives past linking.
+
+The two aliases that one such declaration produces are told apart by
+their result types, not by their names:
+
+```
+let %5 : Type                  = SymbolAlias(%FooImpl)
+let %6 : witness_table_t(%IFoo) = SymbolAlias(%4)
+```
+
+The `Type`-typed one stands in for the type and the
+`witness_table_t(...)`-typed one for the nested conformance. Neither
+prints under the source-level alias name — an alias inst carries no
+name hint, so a dump numbers it like any other unnamed value.
 
 ## See also
 
