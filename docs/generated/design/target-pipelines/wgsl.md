@@ -427,7 +427,7 @@ flowchart TD
 | 21 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-redundancy-removal.cpp](../../../../source/slang/slang-ir-redundancy-removal.cpp) | `codeGenContext->removeAvailableInDownstreamIR` | |
 | 22 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
 | 23 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
-| 24 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
+| 24 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | A constant index outside a fixed-size array is an error: `E30029`, *array index out of bounds*. |
 | 25 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `reqSet.missingReturn` (under non-essential validation) | |
 | 26 | `checkForInvalidShaderParameterType` | [slang-ir-check-shader-parameter-type.cpp](../../../../source/slang/slang-ir-check-shader-parameter-type.cpp) | `shouldRunNonEssentialValidation()` | |
 | 27 | `inferAnyValueSizeWhereNecessary` | [slang-ir-any-value-inference.cpp](../../../../source/slang/slang-ir-any-value-inference.cpp) | (always) | |
@@ -457,7 +457,7 @@ flowchart TD
 | 51 | `eliminateDeadCode` | [slang-ir-dce.cpp](../../../../source/slang/slang-ir-dce.cpp) | `minimalOptimization` | |
 | 52 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | `defaultIRSimplificationOptions`. |
 | 53 | `reportCheckpointIntermediates` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `codeGenContext->shouldReportCheckpointIntermediates()` (line 1725) | Direct call at line 1727 to the static helper defined at line 226; diagnostic only, it reports autodiff checkpointing information and does not transform the IR. |
-| 54 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` (line 1753) | The `reqSet` conjunct is new; the `target != HLSL` half is unchanged and true for WGSL. |
+| 54 | `lowerAppendConsumeStructuredBuffers` | [slang-ir-lower-append-consume-structured-buffer.cpp](../../../../source/slang/slang-ir-lower-append-consume-structured-buffer.cpp) | `target != HLSL && reqSet.appendConsumeStructuredBuffer` (line 1753) | The `reqSet` conjunct is new; the `target != HLSL` half is unchanged and true for WGSL. `AppendStructuredBuffer<T>` is **not** front-end-rejected on WGSL: the pass replaces the buffer with a two-field struct whose fields are name-hinted `elements` and `counter`, which legalize into two separate storage buffers — `<name>_elements_<id> : array<T>` and `<name>_counter_<id> : array<atomic<i32>>`. `.Append(v)` becomes an `AtomicInc` on `counter[0]` (relaxed order, emitted as `atomicAdd`) followed by a store into `elements[<old counter>]`. |
 | 55 | `lowerCombinedTextureSamplers` | [slang-ir-lower-combined-texture-sampler.cpp](../../../../source/slang/slang-ir-lower-combined-texture-sampler.cpp) | `reqSet.combinedTextureSamplers` (WGSL is in the HLSL / Metal / WGSL arm at line 1768) | |
 | 56 | `addUserTypeHintDecorations` | [slang-ir-user-type-hint.cpp](../../../../source/slang/slang-ir-user-type-hint.cpp) | `getBoolOption(VulkanEmitReflection)` | Rare for WGSL. |
 | 57 | `legalizeEmptyArray` | [slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) | (always) | |
@@ -475,7 +475,7 @@ flowchart TD
 | 69 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | (always, first invocation) | |
 | 70 | `deferBufferLoad` | [slang-ir-defer-buffer-load.cpp](../../../../source/slang/slang-ir-defer-buffer-load.cpp) | (always) | |
 | 71 | `specializeArrayParameters` | [slang-ir-specialize-arrays.cpp](../../../../source/slang/slang-ir-specialize-arrays.cpp) | (always) | |
-| 72 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call at line 1986 (helper at line 655); runs after specialization so static-assert info is available. |
+| 72 | `checkStaticAssert` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Direct call at line 1986 (helper at line 655); runs after specialization so static-assert info is available. A failed assertion is `E41400` when the `static_assert` carried a message and `E41401` when it did not; a condition that is still not a constant after specialization is `E41402`, *static assertion condition not compile-time constant*. |
 
 Filtered out for WGSL in this phase: the
 `CUDASource / CUDAHeader / PyTorchCppBinding` derivative-wrapper
@@ -622,7 +622,7 @@ flowchart TD
 | 18 | `legalizeMeshOutputTypes` | [slang-ir-legalize-mesh-outputs.cpp](../../../../source/slang/slang-ir-legalize-mesh-outputs.cpp) | `reqSet.meshOutput` | |
 | 19 | `lowerBitCast` | [slang-ir-lower-bit-cast.cpp](../../../../source/slang/slang-ir-lower-bit-cast.cpp) | `reqSet.bitcast` | |
 | 20 | `legalizeArrayReturnType` | [slang-ir-legalize-array-return-type.cpp](../../../../source/slang/slang-ir-legalize-array-return-type.cpp) | `!isMetalTarget && !isSPIRV` (true for WGSL) | |
-| 21 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always; line 2476) | `loweringPolicyKind = BufferElementTypeLoweringPolicyKind::WGSL`, selected at lines 2464-2466. |
+| 21 | `lowerBufferElementTypeToStorageType` | [slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp) | (always; line 2476) | `loweringPolicyKind = BufferElementTypeLoweringPolicyKind::WGSL`, selected at lines 2464-2466. The policy replaces a buffer's element type with a generated storage struct named after the layout rule: `<Name>_std430` for a structured buffer and `<Name>_std140` for a `ConstantBuffer`. A matrix element gets its own wrapper, `_MatrixStorage_<elem><R>x<C>_ColMajor<rule>`, holding one field name-hinted `data` of type `array<vector<T,R>, C>` (column-major is the WGSL default, so the array runs over the Slang *columns*). Field alignment is not part of the struct name: `WGSLSourceEmitter::emitStructFieldAttributes` writes an `@align(N)` attribute per field, computed as the GCD of the field's offset and the struct's alignment. |
 | 22 | `specializeAddressSpaceForWGSL` | [slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp) | `isWGPUTarget` (line 2493) | Defined at line 352 of the WGSL legalizer, **not** in `slang-ir-specialize-address-space.cpp`; it constructs a `WGSLAddressSpaceAssigner` and delegates to the shared `specializeAddressSpace`. |
 | 23 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 24 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
@@ -716,6 +716,98 @@ flowchart TD
 The bare `WGSL` target stops at the text artifact; no validation
 is performed inside Slang. Tint enforces WGSL's grammar and
 semantic rules when invoked.
+
+### Emitted spellings
+
+Row 6 above ("walks IR and writes WGSL text") is where expectations
+carried over from Slang syntax stop applying, so the literal and
+type spellings the emitter produces are worth pinning. Line numbers
+below are in
+[slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp).
+
+| Slang | Emitted WGSL | Where |
+| --- | --- | --- |
+| `int` literal `N` | `i32(N)` — a constructor call, not a bare literal | `emitSimpleValueImpl`, line 1082 |
+| `uint` literal `N` | `u32(N)` | line 1089 |
+| `int64_t` / `uint64_t` literal | `i64(N)` / `u64(N)` | lines 1094-1106 |
+| `intptr_t` / `uintptr_t` literal | `i64` / `u64` or `i32` / `u32`, chosen by target pointer size | lines 1110-1140 |
+| `int16_t` / `uint16_t` literal | *nothing* — reports `Int16NotSupportedInWgsl` | lines 1070-1078 |
+| `float` literal `x` | `xf` | line 1195 |
+| `half` literal `x` | `xh`, and `enable f16;` is added to the front matter | lines 1163-1167 |
+| `float` NaN | `_slang_getNan()`, a generated prelude function | lines 1176-1179 |
+| `float` infinity | `_slang_getInfinity(true)` / `_slang_getInfinity(false)` | lines 1182-1191 |
+| `vector<T,N>`, N > 1 | `vecN<T>` | `emitVectorTypeNameImpl`, line 1793 |
+| `vector<T,1>` | the bare scalar type | line 1793 |
+| `matrix<T,R,C>` | `matRxC<T>` — the same two digits in the same order, but WGSL reads `matAxB` as A *columns* by B *rows*, so the emitted matrix is deliberately the transpose of the Slang one | lines 580-588, `emitMatrixType` at line 253 |
+| `T[N]` | `array<T, i32(N)>` — the extent is itself an `int` literal, so it takes the constructor spelling too | lines 617-624 |
+| `T[]` (unsized) | `array<T>` | lines 626-632 |
+| `Atomic<T>` | `atomic<T>` | line 716 |
+| `Ptr<T>` in address space `A` | `ptr<A, T>` | lines 602-615 |
+
+So `outBuf[tid.x] = float2(0.0f, -0.0f);` emits
+`vec2<f32>(0.0f, -0.0f)`, and a local `int arr[1024];` emits
+`array<i32, i32(1024)>`.
+
+### Texture, sampler, and texture-intrinsic spellings
+
+Resource surfaces are emitted by the `kIROp_TextureType` arm of
+`emitSimpleTypeImpl` (lines 633-714), which assembles the WGSL type
+name in pieces: `texture` or `texture_storage`, then `_depth` for a
+shadow texture, `_multisampled` for a multisample texture, the shape
+suffix, and `_array` for an array texture.
+
+| Slang | Emitted WGSL |
+| --- | --- |
+| `Texture1D<float4>` | `texture_1d<f32>` |
+| `Texture2D<float4>` | `texture_2d<f32>` |
+| `Texture3D<float4>` | `texture_3d<f32>` |
+| `TextureCube<float4>` | `texture_cube<f32>` |
+| `Texture2DArray<float4>` | `texture_2d_array<f32>` |
+| `Texture2DMS<float4>` | `texture_multisampled_2d<f32>` |
+| a shadow texture (`isShadow`) | `texture_depth_2d` — no type parameter at all |
+| `RWTexture2D<float4>` | `texture_storage_2d<rgba32float, read_write>` |
+| `SamplerState` | `sampler` |
+| `SamplerComparisonState` | `sampler_comparison` |
+
+A sampled texture's type parameter is the *scalar* element type, not
+the vector: `Texture2D<float4>` emits `texture_2d<f32>` (lines
+703-707). A storage texture takes a texel format and an access mode
+in that position instead. The format is the type's `[format(...)]`
+attribute when it carries one, and is otherwise inferred from the
+element type by `getWgslImageFormat` (line 393): `float` becomes
+`r32float`, `float2` becomes `rg32float`, `float4` becomes
+`rgba32float`. The access mode is `read_write` for a `RWTexture*`
+and `write` for a write-only texture; `rgba16f` is not a valid
+`read_write` format and is reported as
+`StorageTextureAccessModeNotSupportedInWgsl` (lines 688-694).
+
+The access intrinsics are not emitter arms at all. Each is a
+`case wgsl:` arm of a `__target_switch` in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) whose
+body is an `__intrinsic_asm` template:
+
+| Slang method | WGSL builtin | hlsl.meta.slang |
+| --- | --- | --- |
+| `Sample(s, uv)` | `textureSample` | line 2615 |
+| `SampleLevel(s, uv, lod)` | `textureSampleLevel` | line 3748 |
+| `SampleBias` | `textureSampleBias` | line 2830 |
+| `SampleGrad` | `textureSampleGrad` | line 3503 |
+| `SampleCmp` | `textureSampleCompare` | line 2978 |
+| `SampleCmpLevelZero` | `textureSampleCompareLevel` | line 3009 |
+| `Gather*` | `textureGather` / `textureGatherCompare` | lines 3952, 4181 |
+| `Load(int3(xy, lod))` | `textureLoad` | line 4677 |
+| `RWTexture*` subscript store | `textureStore`, with the stored value widened to a `vec4` | lines 5322-5334 |
+
+For an array texture the template splits the coordinate rather than
+passing it whole: the trailing component becomes a separate layer
+argument. `Texture2DArray.Sample(s, uvw)` emits
+`textureSample(t, s, (uvw).xy, i32((uvw).z))` (line 2608), and
+`Texture2DArray.Load(int4(xy, layer, lod))` emits
+`textureLoad(t, (c).xy, i32((c).z), (c).w)` (line 4669). The gather
+family spells that layer index `u32(...)` rather than `i32(...)`
+(line 3945). WGSL has no `textureLoad` or `textureStore` for cube
+textures, so those combinations are rejected by a `static_assert`
+inside the intrinsic body (lines 4662 and 5303).
 
 ## Conditional gates
 
@@ -902,7 +994,23 @@ The `processInst` switch (line 154) handles three kinds of inst:
   its break label — the IR spelling of "no default" — the pass
   synthesizes an empty block that branches straight to the break
   label, rebuilds the `switch` with that block as its default, and
-  transfers the original decorations onto the replacement.
+  transfers the original decorations onto the replacement. A source
+  `switch` that omits `default:` therefore still emits one — for
+
+  ```slang
+  switch (i)
+  {
+  case 0: v = 10; break;
+  case 1: v = 20; break;
+  }
+  ```
+
+  the emitted WGSL carries `case i32(0):`, `case i32(1):`, and then
+  a `default :` arm holding the synthesized block.
+  (`WGSLSourceEmitter::emitSwitchCaseSelectorsImpl`, lines 74-101 of
+  [slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp),
+  writes `case ` plus the comma-separated selector values, or the
+  bare keyword `default `, and then the `:`.)
 - the binary arithmetic/comparison/bitwise opcodes → the shared
   `legalizeBinaryOp` from
   [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp),
@@ -963,6 +1071,29 @@ results to `vector<bool,N>` and rebuilds the `And` / `Or`, and for
 array-lowered matrices loops over the array elements emitting a
 per-element `And` / `Or` and reassembling the array.
 
+WGSL has no vector `&&` / `||`, so the legalized inst is emitted
+with `select`, whose WGSL signature is `select(f, t, cond)`
+(`slang-emit-wgsl.cpp:1494-1525`): an `And` over `vector<bool,N>`
+becomes `select(vecN<bool>(false), <rhs>, <lhs>)` and an `Or`
+becomes `select(<rhs>, vecN<bool>(true), <lhs>)`. For two `bool3`
+values `a`, `b`, the expression `a && b` emits
+
+```wgsl
+select(vec3<bool>(false), b, a)
+```
+
+and for two `int3` values the operand casts the pass inserted show
+up inline in the same `select`, as
+`select(vec3<bool>(false), vec3<bool>(vec3<i32>(...)), vec3<bool>(vec3<i32>(...)))`.
+
+The array-lowered-matrix arm has a narrower entry condition than the
+vector arm: the operand-cast loop above it only casts operands of
+`IRVectorType`, and the array arm then asserts that both operands
+are already `array<vector<bool,N>>`
+(`slang-ir-legalize-binary-operator.cpp:200-210` and `246-263`), so
+only an operand pair that was *already* boolean before
+`legalizeMatrixTypes` lowered it to an array can reach it.
+
 ### `floatNonUniformResourceIndex`
 
 Runs at line 2272 for every `!isSPIRV` target in
@@ -974,6 +1105,21 @@ annotation, so the `CLikeSourceEmitter` base drops the wrapper at
 emit time (it emits operand 0). The full decoration machinery in
 [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp)
 is SPIR-V-only.
+
+That emit-time drop is not, however, what a shader author writing
+`NonUniformResourceIndex(...)` on WGSL will see. The core-module
+declaration carries
+`[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+13946-13949), and that capability alias does not include `wgsl`, so
+the entry point is rejected during capability checking — long before
+`linkAndOptimizeIR` runs — with `E36107`, *entrypoint ... uses
+features that are not available in ... for 'wgsl' compilation
+target*. The pass and the emitter arm above therefore only apply to
+a `NonUniformResourceIndex` inst that reaches WGSL by some other
+route; the core module's `nonuniform(DescriptorHandle<T>)` overload
+(same file, lines 27817-27818) maps to the same opcode and carries
+no `[require(...)]` clause of its own.
 
 ### `legalizeByteAddressBufferOps` with WGSL options
 
@@ -1001,7 +1147,32 @@ there is no behavioral contrast with direct SPIR-V here. WGSL's
 lack of a textual phi
 construct means the emitted output uses explicit per-branch
 assignments to a function-local variable, which is what the
-default elimination produces.
+default elimination produces. For a value merged by an
+`if` / `else`:
+
+```slang
+int v;
+if (cond) { v = 10; } else { v = 20; }
+```
+
+the merged value becomes a single `var` declared ahead of the
+branch and written in each arm:
+
+```wgsl
+var v_0 : i32;
+if(/* cond */)
+{
+    v_0 = i32(10);
+}
+else
+{
+    v_0 = i32(20);
+}
+```
+
+The variable name is the merged value's name hint plus a uniquing
+suffix, and the literals take the `i32(N)` constructor spelling
+described under [Phase D](#emitted-spellings).
 
 ### `WGSLSourceEmitter` module-scope array constants
 
@@ -1070,7 +1241,13 @@ diagnostic rather than a WGSL invention — the Metal
 (`slang-emit-cpp.cpp:1311`) emitters use the same one for the same
 reason. Note this is a *warning-style* report of a silently dropped
 qualifier, not an error: compilation continues and the emitted WGSL
-simply has no precision guarantee.
+simply has no precision guarantee. The user-visible id is `E56005`,
+*'precise' qualifier is not supported on target 'wgsl' and will be
+ignored; Slang does not currently preserve it in generated code, so
+the value may be optimized with fused/contracted arithmetic*. The
+override calls plain `diagnose`, not `diagnoseOnce`, so the report
+appears once per `precise`-qualified value rather than once per
+module.
 
 **Bool-to-int casts use `select`.** WGSL will not implicitly convert
 a `bool` to an integer, and a `T(cond)` constructor call is not

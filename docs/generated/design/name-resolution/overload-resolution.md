@@ -261,6 +261,18 @@ The individual steps:
      specialization failure gets `Diagnostics::CannotSpecializeGeneric`
      ([slang-check-overload.cpp lines
      406-426](../../../../source/slang/slang-check-overload.cpp)).
+     Only a *too short* list actually reaches that arity diagnostic:
+     step 1 forces `paramCounts.required` to 0 for a `Flavor::Generic`
+     candidate but leaves `allowed` at the declared parameter count
+     (line 166), so a list with too *many* arguments has already been
+     rejected there with `Diagnostics::TooManyArguments` (line 199) —
+     `g<int, float, int>` on `int g<T, U>(T, U)` reports "too many
+     arguments to call (got 3, expected 2)", not the generic-argument
+     message. A too-short list gets past step 1 and lands here only
+     when the generic cannot be partially applied, that is when its
+     inner declaration is not a `CallableDecl` (lines 316-320);
+     otherwise it becomes a partial generic application rather than an
+     error.
      These are distinct from the `UnspecializedGeneric` failure
      diagnostics selected later by the reporting path.
    - For every argument, the step calls `canCoerce(paramType,
@@ -406,7 +418,11 @@ in [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)
   expression to carry, the sibling `AddFuncExprOverloadCandidate`
   (line 2625) is used instead, which additionally stores it in
   `exprVal`; that is the path a function-typed `ParamDecl` takes
-  (line 3151).
+  (line 3151). A parameter reaches that path only when its declared
+  type is a `FuncType` (line 3150), which source spells with
+  `functype`: the `Reduce(functype(T, T) -> T combineOp)` parameter at
+  [hlsl.meta.slang line
+  28642](../../../../source/slang/hlsl.meta.slang) is one.
 - `AddHigherOrderOverloadCandidates` (line 3254) — `__fwd_diff`,
   `__bwd_diff`-style operators that wrap a callee.
 
@@ -587,10 +603,20 @@ candidate wins:
   `core.meta.slang` now declares the `(vector<T,2>, T)` and
   `(T, vector<T,2>)` forms outright, so overload resolution binds to
   them instead of promoting, and marks them `[deprecated]` (Slang
-  ≤ 2025) and `[RemovedSince(2026, ...)]`. Making that reachable
-  required the explicit-constructor path to stop swallowing
-  diagnostics: `createInvokeExprForExplicitCtor` type-checks the
-  constructor against a temporary `DiagnosticSink` so a genuine
+  ≤ 2025) and `[RemovedSince(2026, ...)]`. Both forms are still
+  declared at `source_commit` ([core.meta.slang lines
+  2806-2826](../../../../source/slang/core.meta.slang)), so under the
+  default language version — which is earlier than 2026 — `float4(f2,
+  f)` written today still resolves to one of them, gets the legacy
+  duplicate-the-scalar semantics, and reports the `[deprecated]`
+  warning. Compiling the module with language version 2026 or later
+  turns the same call into an error instead, because `[RemovedSince]`
+  fires and its message supersedes the deprecation one (see its
+  documentation at [core.meta.slang lines
+  4907-4930](../../../../source/slang/core.meta.slang)).
+  Making that reachable required the explicit-constructor path to stop
+  swallowing diagnostics: `createInvokeExprForExplicitCtor` type-checks
+  the constructor against a temporary `DiagnosticSink` so a genuine
   overload-match failure can fall back to the legacy initializer-list
   path, and now forwards the temporary sink's contents to the real sink
   once it commits to the constructor — including warning-severity
@@ -650,9 +676,10 @@ candidates are `Status::Applicable`:
    (that is step 7). It prefers a concrete member over an interface
    requirement it satisfies, a non-`extern` decl over an `extern` one,
    a non-extension decl over an extension member (and an ordinary
-   extension over a free-form `extension<T> T` one), any decl over a
-   module decl, and the more derived interface when both candidates
-   are interface requirements. It returns "equal" outright when either
+   extension over a free-form one — an `extension` whose target type
+   is a generic type parameter, spelled `extension<T : IFoo> T`, lines
+   1929-1942), any decl over a module decl, and the more derived
+   interface when both candidates are interface requirements. It returns "equal" outright when either
    candidate is a generic callable. This is the step that
    collapses the multiple `LookupResult` items that
    [lookup.md](lookup.md) deliberately does *not* deduplicate; see
@@ -693,9 +720,17 @@ candidates are `Status::Applicable`:
    rather than actual applicability, so several structurally
    unrelated generics survive it, and ranking them by scope would
    pick the wrong one before the second pass has narrowed the set.
-8. **`getOverloadRank`.** A final `__prefer` / overload-rank
-   comparison on the decl-refs, again only for non-generic flavors
-   (lines 2433-2436).
+8. **`getOverloadRank`.** A final overload-rank comparison on the
+   decl-refs, again only for non-generic flavors (lines 2433-2436).
+   The rank is carried by the `[OverloadRank(N)]` attribute
+   ([slang-check-overload.cpp lines
+   2222-2228](../../../../source/slang/slang-check-overload.cpp)); a
+   declaration without it ranks 0, and the higher rank wins. The
+   attribute is declared `@internal` in
+   [core.meta.slang](../../../../source/slang/core.meta.slang) (line
+   4783) as a stop-gap for breaking ambiguity between core-module
+   overloads, and `core.meta.slang` / `hlsl.meta.slang` are its only
+   users in the tree.
 
 If every step returns zero, the candidates are considered equally
 good; the caller will eventually emit an ambiguous-overload
@@ -881,9 +916,12 @@ it as documentation of current behavior.
 
 Operators that the fast path declines reach overload resolution through
 the same `OverloadResolveContext` machinery as named calls. The
-candidate set is collected via lookup of the operator-keyed `Name` (so
-a user-declared `operator+` on a `struct` is found as an ordinary
-member), and every step of the pipeline in
+candidate set is collected via *ordinary* lookup of the operator-keyed
+`Name` in the call site's scope chain — `visitInvokeExpr` hands the
+operator's `functionExpr` to `CheckTerm` exactly like any other callee
+([slang-check-expr.cpp line
+5124](../../../../source/slang/slang-check-expr.cpp)) — and every step
+of the pipeline in
 [Algorithm](#algorithm) applies unchanged, including
 `TryCheckOverloadCandidateFixity`, which exists specifically for this
 case: it rejects a candidate whose `prefix` / `postfix` modifiers do
@@ -893,15 +931,39 @@ not match the call form, emitting
 ([slang-check-overload.cpp lines
 241 and 254](../../../../source/slang/slang-check-overload.cpp)).
 
-Implicit `this` is supplied automatically for non-static member
-operator overloads: the lookup that produced the candidate left a
-`Breadcrumb::Kind::This` step on the item (carrying a
-`ThisParameterMode` of `ImmutableValue`, `MutableValue`, or `Type` —
-see [lookup.md](lookup.md)), and `CompleteOverloadCandidate` replays
-that breadcrumb chain through `ConstructLookupResultExpr` when it
-builds the `InvokeExpr` callee (line 1656). Rejecting a `[mutating]`
-operator overload applied to an immutable left operand is a separate
-concern, handled by `TryCheckOverloadCandidateDirections`: it tests
+The operand types therefore play no part in *finding* the candidates:
+there is no member lookup on the left operand's type and no
+argument-dependent lookup. A user-declared infix, prefix, or postfix
+operator has to be a free function that is in scope at the call site —
+`V operator+(V a, V b)` at file scope resolves, while an `operator+`
+declared inside `struct V` or in an `extension V` is not a name a call
+site outside the type can see, and `v1 + v2` there reports no
+applicable overload. A non-static member form could not match anyway:
+the implicit `this` is not one of the call's arguments, so
+`TryCheckOverloadCandidateArity` weighs the two operands against a
+*declared* parameter list of one
+([slang-check-overload.cpp lines
+145-183](../../../../source/slang/slang-check-overload.cpp)).
+
+The operators that *are* resolved by member lookup keep the implicit
+`this`. `visitInvokeExpr` looks `operator()` up on the callee's type
+when the callee is a value of `DeclRefType`
+([slang-check-expr.cpp lines
+5126-5145](../../../../source/slang/slang-check-expr.cpp); the
+requirement itself is declared on `IMutatingFunc` / `IFunc` at
+[core.meta.slang lines
+2027-2041](../../../../source/slang/core.meta.slang)), and
+`visitIndexExpr` looks `__subscript` up the same way for `a[i]`
+([slang-check-expr.cpp lines
+3646-3654](../../../../source/slang/slang-check-expr.cpp)). For those,
+the lookup leaves a `Breadcrumb::Kind::This` step on the item
+(carrying a `ThisParameterMode` of `ImmutableValue`, `MutableValue`,
+or `Type` — see [lookup.md](lookup.md)), and
+`CompleteOverloadCandidate` replays that breadcrumb chain through
+`ConstructLookupResultExpr` when it builds the `InvokeExpr` callee
+(line 1656). Rejecting a `[mutating]` member operator applied to an
+immutable base is a separate concern, handled by
+`TryCheckOverloadCandidateDirections`: it tests
 `context.baseExpr->type.isLeftValue` for any callee that
 `isEffectivelyStatic` says is a member and `isEffectivelyMutating`
 says mutates (lines 1101-1113).
@@ -968,7 +1030,7 @@ says mutates (lines 1101-1113).
   | `VariadicPackCountMismatch` | `Diagnostics::VariadicPackCountDoesNotMatch` — "expected N elements, but pack argument has M" |
   | `GenericArityMismatch` | `Diagnostics::GenericSpecializationArityMismatch` — "wrong number of arguments in call to generic function" |
   | `OrdinaryGenericParamNotInferred` | `Diagnostics::GenericParameterCouldNotBeInferred` — names the parameter that stayed undetermined |
-  | `GenericConstraintNotSatisfied` | `Diagnostics::GenericArgumentDoesNotSatisfyConstraint`, plus a `SeeGenericConstraintDeclaration` note |
+  | `GenericConstraintNotSatisfied` | `Diagnostics::GenericArgumentDoesNotSatisfyConstraint`, plus a `SeeGenericConstraintDeclaration` note. The fallback for every witness-solver constraint kind *except* interface conformance — equality (`where T == X`), type coercion (`where U(T)`), non-empty pack (`where nonempty(P)`) — because an unsatisfied `T : IFoo` is recorded as `InterfaceConformanceNotSatisfied` instead ([slang-check-impl.h lines 270-283](../../../../source/slang/slang-check-impl.h)) |
   | `GenericParamUnificationConflict` | `Diagnostics::GenericParameterUnificationConflict` — reports both conflicting deductions |
   | `InterfaceConformanceNotSatisfied` | `Diagnostics::TypeArgumentDoesNotConformToInterface` |
   | `None` (nothing recorded) | fallback `Diagnostics::GenericArgumentInferenceFailed` — "could not specialize generic for arguments of type ..." |

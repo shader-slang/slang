@@ -153,10 +153,10 @@ see the conditional-gates table below for the full set.)
 | 5 | `translateEntryPointInParamToBorrow` | [slang-ir-transform-params-to-constref.cpp](../../../../source/slang/slang-ir-transform-params-to-constref.cpp) | (always) | |
 | 6 | `replaceGlobalConstants` | [slang-ir-link.cpp](../../../../source/slang/slang-ir-link.cpp) | (always) | |
 | 7 | `bindExistentialSlots` | [slang-ir-bind-existentials.cpp](../../../../source/slang/slang-ir-bind-existentials.cpp) | `reqSet.bindExistential` | |
-| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Receives a counter byte-width (`TraceCoverageCounterByteWidth`, default uint64; only 4 or 8 are valid — anything else raises `CoverageCounterWidthBytesInvalid`) and a boolean-coverage flag (`TraceCoverageBoolean`, off by default) resolved inside the `reqSet.coverageTracing` block that opens at line 1109; the pass call itself is at line 1216. |
+| 8 | `instrumentCoverage` | [slang-ir-coverage-instrument.cpp](../../../../source/slang/slang-ir-coverage-instrument.cpp) | `reqSet.coverageTracing` | Receives a counter byte-width (`TraceCoverageCounterByteWidth`, default uint64; only 4 or 8 are valid — anything else raises `CoverageCounterWidthBytesInvalid`, **E45114**) and a boolean-coverage flag (`TraceCoverageBoolean`, off by default, spelled `-trace-coverage-boolean`) resolved inside the `reqSet.coverageTracing` block that opens at line 1109; the pass call itself is at line 1216. The `slangc` spelling of the width option is `-trace-coverage-counter-width`, which takes *bits* (32 or 64) and stores the corresponding byte width; the CLI parser rejects any other bit count as **E45113** before the byte width reaches this block, so E45114 is reachable only from a host that sets the API option directly. |
 | 9 | `collectGlobalUniformParameters` | [slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp) | (always) | |
 | 10 | `checkEntryPointDecorations` | [slang-ir-entry-point-decorations.cpp](../../../../source/slang/slang-ir-entry-point-decorations.cpp) | (always) | |
-| 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper. |
+| 11 | `addDenormalModeDecorations` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | (always) | Static helper (line 754). The call is unconditional but the body returns immediately unless one of the fp16 / fp32 / fp64 denormal modes is something other than `FloatingPointDenormalMode::Any` (line 764). The `FpDenormalPreserve` / `FpDenormalFlushToZero` decorations it then attaches to entry points are consumed only by the SPIR-V emitter ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) lines 6425 and 6443); nothing in the HLSL emitter reads them, so they leave no marker in emitted HLSL text. |
 | 12 | `collectEntryPointUniformParams` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
 | 13 | `moveEntryPointUniformParamsToGlobalScope` | [slang-ir-entry-point-uniforms.cpp](../../../../source/slang/slang-ir-entry-point-uniforms.cpp) | (always, HLSL via `default` arm) | |
 | 14 | `removeTorchAndCUDAEntryPoints` | [slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) | (always, HLSL via `default` arm) | |
@@ -503,7 +503,7 @@ flowchart TD
 | 3 | `translateGlobalVaryingVar` | [slang-ir-translate-global-varying-var.cpp](../../../../source/slang/slang-ir-translate-global-varying-var.cpp) | `reqSet.globalVaryingVar` (line 2187) | Runs after specialization, not in Phase A. |
 | 4 | `resolveVaryingInputRef` | [slang-ir-resolve-varying-input-ref.cpp](../../../../source/slang/slang-ir-resolve-varying-input-ref.cpp) | `reqSet.resolveVaryingInputRef` (line 2190) | |
 | 5 | `fixEntryPointCallsites` | [slang-ir-fix-entrypoint-callsite.cpp](../../../../source/slang/slang-ir-fix-entrypoint-callsite.cpp) | (always) | Line 2193. |
-| 6 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (line 2270) | `NonUniformResourceIndexFloatMode::Textual` for the `NonUniformResourceIndex(...)` HLSL intrinsic. |
+| 6 | `floatNonUniformResourceIndex` | [slang-ir-float-non-uniform-resource-index.cpp](../../../../source/slang/slang-ir-float-non-uniform-resource-index.cpp) | `!isSPIRV(target)` (line 2270) | `NonUniformResourceIndexFloatMode::Textual` for the `NonUniformResourceIndex(...)` HLSL intrinsic: the marker is kept as a call in the emitted text rather than lowered away, so a user-written `textures[NonUniformResourceIndex(idx)].Sample(samp, uv)` reaches DXC with the wrapper intact. No stage restricts the idiom — `NonUniformResourceIndex` is declared `[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) (line 13949) and the pass gate is only `!isSPIRV(target)`. |
 | 7 | `legalizeLogicalAndOr` | [slang-ir-legalize-binary-operator.cpp](../../../../source/slang/slang-ir-legalize-binary-operator.cpp) | `isD3DTarget \|\| isKhronosTarget \|\| isWGPUTarget \|\| isMetalTarget` (lines 2275-2277; HLSL qualifies as `isD3DTarget`) | DXC short-circuit-evaluates `&&` and `\|\|` on scalars only. |
 | 8 | `moveGlobalVarInitializationToEntryPoints` | [slang-ir-explicit-global-init.cpp](../../../../source/slang/slang-ir-explicit-global-init.cpp) | HLSL / GLSL / WGSL arm at lines 2319-2322 | |
 | 9 | `stripLegalizationOnlyInstructions` | [slang-ir-strip-legalization-insts.cpp](../../../../source/slang/slang-ir-strip-legalization-insts.cpp) | (always) | Line 2365. |
@@ -643,6 +643,60 @@ Slang still validates and optimizes its own IR before emitting text
 2739 — but validation and optimization *of the emitted HLSL* is
 delegated to DXC or fxc.
 
+### Shape of the emitted file
+
+The module text produced by `emitModule` is not the whole artifact.
+`emitEntryPointsSourceFromIR` stitches the file together in a fixed
+order at lines 2938-2969 of
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp): front
+matter, then the language prelude, then `emitPreModule`, then the
+module code. So every HLSL artifact opens with whatever
+`HLSLSourceEmitter::emitFrontMatterImpl`
+([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+line 2534) wrote:
+
+- A `#pragma pack_matrix(...)` directive, always, whose argument
+  follows `CompilerOptionSet::getMatrixLayoutMode()` (lines
+  2588-2597). Under `slangc` that resolves to `column_major`.
+- Immediately *before* the pragma, and only when emit found an
+  `IRRequiresNVAPIDecoration` on some instruction,
+  `#define SLANG_HLSL_ENABLE_NVAPI 1` and
+  `#define NV_HITOBJECT_USE_MACRO_API 1` (lines 2536-2547), plus
+  `#define NV_SHADER_EXTN_SLOT` / `NV_SHADER_EXTN_REGISTER_SPACE`
+  when an `IRNVAPISlotDecoration` supplies them.
+
+The HLSL prelude that follows guards its `#include "nvHLSLExtns.h"`
+behind `#ifdef SLANG_HLSL_ENABLE_NVAPI`, so the include is present
+in every artifact but inert unless the front matter defined the
+macro. `emitGlobalInstImpl` (line 2600) mirrors that: a global
+carrying `IRNVAPIMagicDecoration` is wrapped in
+`#ifndef SLANG_HLSL_ENABLE_NVAPI` so the prelude's NVAPI
+declarations win when the header is live.
+
+Within the module text, resource types keep their HLSL native
+spellings rather than being renamed.
+`HLSLSourceEmitter::_emitHLSLTextureType` (line 320) composes the
+name from an access prefix (`RW`, `RasterizerOrdered`, `Append`,
+`Consume`, `Feedback`), a base shape (`Texture1D`, `Texture2D`,
+`Texture3D`, `TextureCube`, `Buffer`), then `MS`, then `Array`, then
+`<ElementType>` with the sample count appended when it is non-zero —
+so `Texture2DArray`, `TextureCubeArray`, `Texture2DMS<T, N>` and
+`RWTexture1D/2D/3D` all fall out of one composition rather than a
+per-variant table. Samplers emit as `SamplerState` /
+`SamplerComparisonState` (lines 1931-1943). Each binds through
+`_emitHLSLRegisterSemantic` (line 83), which maps
+`LayoutResourceKind` to the register class letter: `ConstantBuffer`
+to `b`, `ShaderResource` to `t`, `UnorderedAccess` to `u`,
+`SamplerState` to `s` (lines 170-183). An unhandled kind is a
+diagnosed internal error, not a silent fallback. Intrinsic method
+spellings are not rewritten at emit
+either; `Sample`, `SampleLevel`, `SampleGrad`, `Load`, the `Gather*`
+family, `SampleCmp` and `SampleCmpLevelZero` are carried through as
+the `__intrinsic_asm` strings attached to their declarations in
+[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) — line
+1408 for `.Sample`, line 4370 for the spliced
+`.Gather$(compareFunc)$(componentFunc)` family.
+
 ### Emitting HLSL named constants rather than integers
 
 DXC resolves HLSL's named constants (attribute strings, barrier
@@ -694,7 +748,16 @@ pattern are worth knowing when reading emitter output:
   lines 553 and 586). Those write the all-bits shorthand
   (`ALL_MEMORY`, `REORDER`) when the value matches it exactly, and
   otherwise a `|`-joined list of per-bit names from
-  `getBarrierMemoryTypeFlagName` (line 432). Both assert that the
+  `getBarrierMemoryTypeFlagName` (line 432). Each helper wraps its
+  own output in parentheses regardless of which form it took, so
+  the flag argument always arrives parenthesised at the call site:
+
+  ```
+  Barrier((ALL_MEMORY), (REORDER));
+  Barrier((UAV_MEMORY | NODE_INPUT_MEMORY), (GROUP_SYNC | DEVICE_SCOPE));
+  ```
+
+  Both assert that the
   emit-side name table covers every known flag bit and that the
   incoming value is a valid flag set, which is why
   `validateBarrierFlagsForHLSL` (Phase B row 51) must run first: it
@@ -776,8 +839,8 @@ short-circuits the flag).
 | `getBoolOption(PreserveParameters)` | DCE keep-alive option. |
 | `getBoolOption(VulkanInvertY)` | `invertYOfPositionOutput` (also applies under the HLSL arm for cross-API workflows). |
 | `getBoolOption(VulkanUseDxPositionW)` | `rcpWOfPositionInput`. |
-| `getBoolOption(VulkanEmitReflection)` | `addUserTypeHintDecorations` (Phase B). |
-| `getBoolOption(EmbedDownstreamIR)` | `unexportNonEmbeddableIR`. |
+| `getBoolOption(VulkanEmitReflection)` | `addUserTypeHintDecorations` (Phase B). Set by `-fspv-reflect`. The `IRUserTypeNameDecoration` it adds is read only by the SPIR-V emitter, so on the HLSL path the option changes nothing in the emitted text. |
+| `getBoolOption(EmbedDownstreamIR)` | `unexportNonEmbeddableIR`. Set by `-embed-downstream-ir`. The pass only strips `IRPublicDecoration` / `IRDownstreamModuleExportDecoration` from functions whose signature mentions a structured-buffer or matrix type (lines 707-752), neither of which has an HLSL spelling — it narrows the export set of the embedded IR and leaves the emitted HLSL text unchanged. |
 | `shouldRunNonEssentialValidation()` | `checkForOptionalNoneUsage`, `checkForRecursive*`, `checkForOutOfBoundAccess`, `checkForInvalidShaderParameterType`, `checkGetStringHashInsts`. |
 | `shouldPerformMinimumOptimizations()` | Gates `fuseCallsToSaturatedCooperation` and `checkUnsupportedInst`. |
 | `fastIRSimplificationOptions.minimalOptimization` | Selects between full `simplifyIR` and minimal SCCP+DCE. |
@@ -793,7 +856,7 @@ honored.
 | --- | --- | --- |
 | `profile.getFamily() == ProfileFamily::DX && profile.getVersion() <= ProfileVersion::DX_5_0` | `case CodeGenTarget::HLSL` arm of the second `legalizeByteAddressBufferOps` options switch (lines 2102-2121) | Sets `useBitCastFromUInt = true` for fxc / early-DXC profiles, since they lack templated `.Load<T>` on byte-address buffers. |
 | `profile.getFamily() == ProfileFamily::DX && profile.getVersion() >= ProfileVersion::DX_6_7` | Inside the `isD3DTarget` arm of the existential/resource legalization block (lines 1862-1868) | Selects `legalizeRayPayloadAccessQualifiersForHLSL`. Shader model 6.7 requires every member of a `[raypayload]` struct to carry both a `read(...)` and a `write(...)` qualifier. |
-| `profile.getVersion() >= ProfileVersion::DX_6_1 \|\| stage == Stage::Node` | `emitEntryPointAttributesImpl` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) line 438) | Selects whether `[shader("<stage>")]` is emitted at all. A `node` entry point always gets it, independent of the declared profile version. |
+| `profile.getVersion() >= ProfileVersion::DX_6_1 \|\| stage == Stage::Node` | `emitEntryPointAttributesImpl` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp) line 438) | Selects whether `[shader("<stage>")]` is emitted at all. A `node` entry point always gets it, independent of the declared profile version. The `node` disjunct is defensive rather than reachable: the public `node` stage atom is `_node + _sm_6_8`, so a capability-checked node compile is already at shader model 6.8 and the version test decides first. Do not go looking for a sub-6.1 node compile. |
 
 ### Context predicates and capability gates
 
@@ -803,7 +866,7 @@ honored.
 | `codeGenContext->shouldTrackLiveness()` | `LivenessUtil::addVariableRangeStarts/addRangeEnds`. |
 | `codeGenContext->removeAvailableInDownstreamIR` | `removeAvailableInDownstreamModuleDecorations`. |
 | `targetCaps` implies `cooperative_matrix` or `cooperative_vector` | `collectCooperativeMetadata`. |
-| `targetCaps` implies `descriptor_handle` (and `target != PyTorchCppBinding`) | `getOrCreateLayout` before `collectMetadata`. |
+| `targetCaps` implies `descriptor_handle` (and `target != PyTorchCppBinding`) | `getOrCreateLayout` before `collectMetadata`. The `descriptor_handle` atom is an alias over `glsl_spirv \| _sm_6_6 \| cpp \| cuda \| metal \| wgsl`, so on an HLSL target the only disjunct that can fire is `_sm_6_6` — a DX profile at shader model 6.6 or newer turns the gate on, and nothing else does. The user-facing construct it exists for is `DescriptorHandle<T>` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27478), whose operations carry `[require(glsl_hlsl_spirv_wgsl, descriptor_handle)]`. |
 
 ### HLSL-specific runtime predicates
 
@@ -869,7 +932,15 @@ barrier flag operand against `isValidBarrierMemoryTypeFlags` /
 `isValidBarrierSemanticFlags` from
 [slang-ir-util-hlsl.cpp](../../../../source/slang/slang-ir-util-hlsl.cpp)
 and reports a diagnostic for a set that has no HLSL named-constant
-spelling. `linkAndOptimizeIR` then returns `SLANG_FAIL` at line
+spelling: **E31117** (`invalid 'BarrierMemoryTypeFlags' value`) for
+the memory-type arm and **E31116**
+(`invalid 'BarrierSemanticFlags' value`) for the semantic arm. The
+attached message enumerates the spellable bits with their hex
+values — for the memory-type arm, "expected a combination of
+`UAV_MEMORY` (0x1), `GROUP_SHARED_MEMORY` (0x2),
+`NODE_INPUT_MEMORY` (0x4), `NODE_OUTPUT_MEMORY` (0x8), or
+`ALL_MEMORY` (0xf)" — so the diagnostic doubles as the name table's
+documentation. `linkAndOptimizeIR` then returns `SLANG_FAIL` at line
 1737 rather than continuing, because the corresponding emit path in
 `emitNamedMemoryTypeFlagSet` asserts validity rather than
 degrading. This front-half/back-half split is what lets the emitter
@@ -912,6 +983,23 @@ qualifier set and DXC rejects it. This pass therefore walks every
 `[raypayload]` struct structurally and fills whichever side is
 missing, rather than relying on reachability from a call site.
 
+The fill is not a copy of the author-written side: it is always the
+full stage list `caller, anyhit, closesthit, miss`
+(`addDefaultPayloadAccessQualifiersToField`, lines 91-122 of
+[slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)),
+and a field that already carries both sides is left untouched. So
+
+```slang
+[raypayload]
+struct HitPayload { float3 readSide : read(caller); };
+```
+
+emits at shader model 6.7 as a field spelled
+`read(caller) : write(caller, anyhit, closesthit, miss)` — the
+author's `read(caller)` preserved exactly, the absent `write` side
+filled wide. At shader model 6.6 the pass does not run and no
+qualifiers are emitted at all.
+
 ### `wrapStructuredBuffersOfMatrices`
 
 Lines 1990-1999, HLSL-only. fxc (and to a lesser extent DXC) does
@@ -919,6 +1007,18 @@ not respect the `#pragma pack_matrix` directive when a
 `StructuredBuffer<T>` has element type `T == matrixNxM<...>`.
 This pass wraps such structured buffers in a single-field struct
 so the `#pragma` applies correctly.
+
+The wrapper struct is synthesized without a name hint, so it picks
+up the emitter's fallback name for an unnamed instruction — `_S`
+followed by the instruction id
+([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+lines 1290-1292). That is what a reader should look for:
+`RWStructuredBuffer<float4x4> outBuf;` reaches the emitted HLSL as a
+`struct _S<N> { float4x4 _S<M>; };` declaration followed by
+`RWStructuredBuffer<_S<N> > outBuf_<K> : register(u0)`, not as any
+`row_major` / `column_major` keyword on the buffer. The same
+fallback naming rule applies to every anonymous struct the backend
+synthesizes, not just this pass.
 
 ### `legalizeUniformBufferLoad`
 
@@ -959,6 +1059,27 @@ operands are lowered matrices — arrays of vectors — it extracts
 each element, applies a per-element `And` / `Or`, and reassembles
 the array with `emitMakeArray` (lines 246-291).
 
+What lands in the HLSL text is decided later, in
+`tryEmitInstExprImpl`
+([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+lines 1262-1288), and the operand shape is what selects the form:
+
+- A scalar `bool` `And` / `Or` takes the `as<IRBasicType>` early
+  return and falls through to the shared C-like path, which writes
+  the infix `&&` / `||`
+  ([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+  lines 2605-2616).
+- A vector result — the shape the `vector<bool,N>` cast above
+  produces — is written as the HLSL 2021 intrinsic call
+  `and(a, b)` / `or(a, b)` instead, because `&&` and `||` are
+  scalar-only there. This form requires shader model 6.0 or newer
+  *and* `isTargetHLSL2018`; when either fails the emitter returns
+  `false` and the infix operator is used after all.
+- A lowered matrix reaches emit as the `MakeArray` the pass built,
+  so each row is its own `And` / `Or` — spelled by the same rule as
+  the vector case — inside an array-construction expression, rather
+  than one whole-matrix operator.
+
 ### `eliminatePhis` with default options
 
 HLSL accepts the default `PhiEliminationOptions`. The overrides at
@@ -983,6 +1104,19 @@ instruction of storable type is spilled through a
 function-entry variable and reloaded at each out-of-scope use; and
 anything else is cloned immediately before each use, with its
 operands pushed back onto the worklist.
+
+The first two repairs share an insertion point,
+`entryBlock->getFirstOrdinaryInst()` (line 116), and an `IRVar` is
+on the emitter's never-fold list
+([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+lines 1462-1470), so both surface in the emitted HLSL the same way:
+a local declaration lifted to the top of the function body, ahead
+of the loop that computes the value, with the loop body assigning
+into it and the post-loop use reading it back. There is no marker
+of any kind for the repair — the only signature is a declaration
+that sits outside the block its initializer belongs to. The third
+repair leaves no declaration at all; the instruction is simply
+duplicated at each use site.
 
 ### Downstream DXC / fxc
 

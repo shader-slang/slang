@@ -105,7 +105,7 @@ flowchart TD
 | --- | --- | --- | --- | --- | --- |
 | `nameHint` | `IRNameHintDecoration` | `nameOperand: IRStringLit` | | Decl / parameter name, via `addNameHintDecoration` in `slang-lower-to-ir.cpp` | Carries a human-readable name across IR passes; backends use it for variable / function naming. |
 | `highLevelDecl` | `IRHighLevelDeclDecoration` | `declOperand: IRPtrLit` | | `slang-lower-to-ir.cpp` lowering (records source `Decl*`) | Records a pointer to the originating AST `Decl` (debug / diagnostic aid). |
-| `BuiltinDecoration` | `IRBuiltinDecoration` | — | | Core-module lowering | Marks an inst as a compiler-builtin. |
+| `BuiltinDecoration` | `IRBuiltinDecoration` | — | | `[builtin]` attribute (`BuiltinAttribute`) on an `interface` declaration, via `visitInterfaceDecl` | Marks a core-module interface as a compiler builtin — for example the `IBufferDataLayout` that every `RWStructuredBuffer` links in. |
 | `KnownBuiltinDecoration` | `IRKnownBuiltinDecoration` | `nameOperand: IRIntLit` | | `[KnownBuiltin(name)]` attribute (`KnownBuiltinAttribute`) | Names a builtin by enum tag so later passes can find it. |
 | `UserTypeName` | `IRUserTypeNameDecoration` | `userTypeName: IRStringLit` | | (synthesized by the user-type-hint pass in `slang-ir-user-type-hint.cpp`) | Records the original user type name for a shader parameter. |
 | `COMInterface` | `IRComInterfaceDecoration` | — | | `[COM(guid)]` attribute (`ComInterfaceAttribute`) | Marks an interface as a COM interface declaration. |
@@ -122,7 +122,7 @@ flowchart TD
 | `SizeAndAlignment` | `IRSizeAndAlignmentDecoration` | `layoutNameOperand, sizeOperand: IRIntLit, alignmentOperand: IRIntLit` | | (synthesized) | Records size/alignment of a type under a named layout. |
 | `Offset` | `IROffsetDecoration` | `layoutNameOperand, offsetOperand: IRIntLit` | | (synthesized) | Records the offset of a struct field under a named layout. |
 | `packoffset` | `IRPackOffsetDecoration` | `registerOffset: IRIntLit, componentOffset: IRIntLit` | | `packoffset(...)` HLSL semantic (`HLSLPackOffsetSemantic`) | HLSL packoffset binding. |
-| `glslLocation` | `IRGLSLLocationDecoration` | `location: IRIntLit` | | `[vk_location(...)]` attribute (`GLSLLocationAttribute`) | GLSL / Vulkan location binding. |
+| `glslLocation` | `IRGLSLLocationDecoration` | `location: IRIntLit` | | `[vk::location(N)]`, declared as `vk_location` in `core.meta.slang` (`GLSLLocationAttribute`) | GLSL / Vulkan location binding. |
 | `glslOffset` | `IRGLSLOffsetDecoration` | `offset: IRIntLit` | | `GLSLOffsetLayoutAttribute` (GLSL `layout(offset=...)`) | GLSL / Vulkan offset binding. |
 | `vkStructOffset` | `IRVkStructOffsetDecoration` | `offset: IRIntLit` | | `[vk_offset(index)]` attribute (`VkStructOffsetAttribute`) | Vulkan struct-member offset. |
 | `HasExplicitHLSLBinding` | `IRHasExplicitHLSLBindingDecoration` | — | | An `HLSLLayoutSemantic` (e.g. `register(...)`) on a global parameter | Marks a parameter as having an explicit HLSL register binding. |
@@ -142,7 +142,7 @@ flowchart TD
 | `loopControl` | `IRLoopControlDecoration` | `modeOperand: IRConstant` | | `[unroll]` / `[loop]` attributes | Records loop-control mode (unroll, loop, ...). |
 | `loopMaxIters` | `IRLoopMaxItersDecoration` | (variadic, `min=1`) | | `[MaxIters(count)]` attribute (`MaxItersAttribute`) | Records the maximum-iteration bound for a loop. |
 | `loopExitPrimalValue` | `IRLoopExitPrimalValueDecoration` | `targetInst, loopExitValInst` | | (synthesized by autodiff) | Records the primal value of an exit-condition for reverse-mode use. |
-| `ForceUnroll` | `IRForceUnrollDecoration` | — | | `[ForceUnroll]` attribute | Forces loop unrolling. |
+| `ForceUnroll` | `IRForceUnrollDecoration` | — (builder appends `count: IRIntLit`) | | `[ForceUnroll(count = 0)]` attribute (`ForceUnrollAttribute`), declared `__attributeTarget(LoopStmt)` and so valid only on a loop statement | Forces loop unrolling; the operand is the requested count, `0` when omitted. |
 | `loopCounterDecoration` | `IRLoopCounterDecoration` | — | | (synthesized by autodiff) | Marks an instruction as a loop counter. |
 | `loopCounterUpdateDecoration` | `IRLoopCounterUpdateDecoration` | — | | (synthesized by autodiff) | Marks the per-iteration update of a loop counter. |
 
@@ -160,7 +160,7 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `requireCapabilityAtom` | `IRRequireCapabilityAtomDecoration` | `capabilityAtomOperand: IRConstant` | | `require(...)` / capability declarations | Requires one capability atom to be available. |
+| `requireCapabilityAtom` | `IRRequireCapabilityAtomDecoration` | `capabilityAtomOperand: IRConstant` | | Layout-IR lowering (`TargetProgram::createIRModuleForLayout`), from the entry point's *inferred* capability set — not from a `[require(...)]` attribute directly | Requires one capability atom; only SPIR-V version and Metal-library atoms are recorded. |
 | `requireSPIRVVersion` | `IRRequireSPIRVVersionDecoration` | `SPIRVVersionOperand: IRConstant` | | `__spirv_version` modifier (`RequiredSPIRVVersionModifier`) | Records a minimum SPIR-V version. |
 | `requireGLSLVersion` | `IRRequireGLSLVersionDecoration` | `languageVersionOperand: IRConstant` | | `__glsl_version` modifier (`RequiredGLSLVersionModifier`) | Records a minimum GLSL version. |
 | `requireGLSLExtension` | `IRRequireGLSLExtensionDecoration` | `extensionNameOperand: IRStringLit` | | `__glsl_extension` modifier (`RequiredGLSLExtensionModifier`) | Records a required GLSL extension. |
@@ -177,7 +177,7 @@ flowchart TD
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `interpolationMode` | `IRInterpolationModeDecoration` | `modeOperand: IRConstant` | | `linear` / `noperspective` / etc. modifiers | Records the interpolation mode of a varying parameter. |
+| `interpolationMode` | `IRInterpolationModeDecoration` | `modeOperand: IRConstant` (an `IRInterpolationMode` value) | | `linear` / `noperspective` / etc. modifiers, via `addVarDecorations` | Records the interpolation mode of a varying parameter; see the callout for the encoding. |
 | `TargetSystemValue` | `IRTargetSystemValueDecoration` | `semanticOperand: IRStringLit, index: IRIntLit` | | (synthesized by varying-parameter and Metal legalization) | Records the target-specific system-value binding. |
 | `semantic` | `IRSemanticDecoration` | `semanticNameOperand: IRStringLit, semanticIndexOperand: IRIntLit` | | `HLSLSimpleSemantic` and `HLSLLayoutSemantic` AST nodes | Records the HLSL semantic on a parameter or field. |
 | `raypayload` | `IRRayPayloadDecoration` | — | | `[raypayload]` attribute (`RayPayloadAttribute`) | Marks a type as usable as a ray payload. |
@@ -191,7 +191,7 @@ flowchart TD
 | `glslFragDepthGreater` | `IRGLSLFragDepthGreaterDecoration` | — | | (synthesized by GLSL legalization from `SV_DepthGreaterEqual`) | Marks a fragment entry point whose `gl_FragDepth` only ever increases the fixed-function depth. |
 | `glslFragDepthLess` | `IRGLSLFragDepthLessDecoration` | — | | (synthesized by GLSL legalization from `SV_DepthLessEqual`) | Marks a fragment entry point whose `gl_FragDepth` only ever decreases the fixed-function depth. |
 | `precise` | `IRPreciseDecoration` | — | | `precise` modifier (`PreciseModifier`) | Requests bit-precise math. |
-| `format` | `IRFormatDecoration` | `formatOperand: IRConstant` | | `[format(...)]` / `[vk_image_format(...)]` attribute | Records the image format for a UAV. |
+| `format` | `IRFormatDecoration` | `formatOperand: IRConstant` | | `[format("rgba32f")]` / `[vk_image_format("rgba32f")]` attribute (`FormatAttribute`); the argument is a format-name *string*, not a bare identifier | Records the image format for a UAV as the integer `ImageFormat` value the string resolves to. |
 | `perprimitive` | `IRGLSLPrimitivesRateDecoration` | — | | (synthesized by GLSL legalization in `slang-ir-glsl-legalize.cpp`) | GLSL `per_primitiveEXT` rate qualifier. |
 
 ### Mesh shader, geometry shader, and per-vertex
@@ -378,7 +378,7 @@ ones by `addVarDecorations` (line 3258 onward) in
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `BitFieldAccessorDecoration` | `IRBitFieldAccessorDecoration` | (variadic, `min=3`) | | `BitFieldModifier` on the field owning an `AccessorDecl` (`int x : 3` syntax) | Records bitfield accessor info (backing key, width, offset). |
-| `constructor` | `IRConstructorDecoration` | (variadic, `min=1`) | | `__init` declaration | Marks a function as a constructor. |
+| `constructor` | `IRConstructorDecoration` | (1 unnamed: an `IRBoolLit`, read by `getSynthesizedStatus()`) | | `__init` declaration | Marks a function as a constructor; `true` means the compiler-synthesized default rather than a user-written `__init`. |
 | `method` | `IRMethodDecoration` | — | | Member-function declaration | Marks a function as a method. |
 | `FloatingPointModeOverride` | `IRFloatingPointModeOverrideDecoration` | (variadic, `min=1`) | | (synthesized: forward-mode autodiff forces `FloatingPointMode::Fast` on the generated derivative function) | Overrides the floating-point mode for one function. |
 | `experimentalModule` | `IRExperimentalModuleDecoration` | — | | `[ExperimentalModule]` attribute | Marks a module as experimental. |
@@ -450,9 +450,16 @@ that need to preserve insts across rewrites.
 
 `entryPoint` marks a function as a shader entry point. Its three
 operands are the profile (an `IRIntLit` tag), the user-visible
-name, and an optional module name. The link-time pass walks every
-`entryPoint` decoration to select the functions exposed in the
-final binary.
+name, and an optional module name. The tag is a `Profile::RawVal`,
+not a bare stage code: `IREntryPointDecoration::getProfile`
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
+355) rebuilds a `Profile` from it, and `Profile`
+([slang-profile.h](../../../../source/slang/slang-profile.h) lines
+68-115) packs the `ProfileVersion` in the high 16 bits and the
+`Stage` in the low 16. An entry point compiled with `-stage vertex`
+and no explicit profile version therefore prints as `1`, the raw
+`Stage` value. The link-time pass walks every `entryPoint`
+decoration to select the functions exposed in the final binary.
 
 ### `nodeLaunch` and the work-graph node decorations
 
@@ -512,6 +519,19 @@ make sense for a source-authored group, such as the warning that a
 special type leaks out of a parameter group, are suppressed when it is
 present. Type legalization propagates it when it rebuilds the struct, so
 the marker survives the legalization rewrite.
+
+### `interpolationMode`
+
+The `modeOperand` is a plain integer `IRInterpolationMode` value, not
+a bit mask: `Linear` 0, `NoPerspective` 1, `NoInterpolation` 2,
+`Centroid` 3, `Sample` 4, `PerVertex` 5
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) lines
+154-164). `addVarDecorations`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+lines 3125-3149) maps one source modifier to one value —
+`linear`, `noperspective`, `nointerpolation`, `centroid`, `sample`,
+and Slang's own `pervertex` respectively — so a dump that shows
+`[interpolationMode(2 : Int)]` was written `nointerpolation`.
 
 ### `glslFragDepthGreater` / `glslFragDepthLess`
 

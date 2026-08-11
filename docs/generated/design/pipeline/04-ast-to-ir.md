@@ -27,7 +27,11 @@ opcode that the lowering step must produce.
   `externalSymbolsToPrelink` (line 13811) and `prelinkIR` (line 15544)
   clones their bodies into this module before it is returned, so the
   mandatory optimization passes can see them (see
-  [04b-pre-link-passes.md](04b-pre-link-passes.md)).
+  [04b-pre-link-passes.md](04b-pre-link-passes.md)). That clone and the
+  whole mandatory pass block run *before* the `LOWER-TO-IR` snapshot
+  `-dump-ir` prints (line 15797), so the first dump is not the raw
+  output of the lowering walk: a prelinked body is already there,
+  normally inlined into its caller.
 
 ## Lowering driver
 
@@ -67,11 +71,21 @@ A lowered expression is not always a plain `IRInst*`, so lowering
 returns a `LoweredValInfo` (line 120). Its `Flavor` enum distinguishes
 `None`, a `Simple` r-value, a `Ptr` l-value, and the compound forms
 lowering must keep symbolic until a use site decides how to read or
-write them: `BoundMember`, `Subscript`, `BoundStorage`,
-`SwizzledLValue`, `SwizzledMatrixLValue`, `ExtractedExistential`, and
-`ImplicitCastedLValue`. `getSimpleVal` is the funnel that forces any
-flavor down to a single `IRInst*` (emitting a load or an accessor call
-where needed).
+write them:
+
+| Compound flavor | Slang surface that produces it |
+| --- | --- |
+| `BoundMember` | `obj.method` as a value before the call (line 6394), or a field whose base is itself deferred |
+| `BoundStorage` | a `property` / `__subscript` access whose accessor set is more than a lone `get` (line 1124) — `c.doubled`, `buf[i]` |
+| `SwizzledLValue` | a vector swizzle in l-value position — `v.xy = ...` (line 7880) |
+| `SwizzledMatrixLValue` | a matrix swizzle in l-value position — `m._m00_m11 = ...` (line 7795) |
+| `ExtractedExistential` | an interface-typed value opened in l-value position (line 7739) |
+| `ImplicitCastedLValue` | an implicit conversion on an `out` / `inout` argument (line 7768) |
+
+`Subscript` is declared but has no construction site. `getSimpleVal`
+forces any flavor down to a single `IRInst*`: a `BoundStorage` read
+becomes a `call` to the getter, a `SwizzledLValue` write one
+`swizzledStore`.
 
 Per-environment caches sit on `IRGenEnv`: `mapDeclToValue` for decls
 and `mapValToValue` (line 472) for `Val`s. `lowerVal` and `lowerType`
@@ -141,6 +155,11 @@ is authoritative.
 | `BuiltinOperatorExpr` (checker fast-path arithmetic / comparison / bitwise / unary) | A single pure value inst (`kIROp_Add`, `kIROp_Mul`, `kIROp_Eql`, `kIROp_BitAnd`, `kIROp_Neg`, ...) emitted directly by `lowerBuiltinOperatorExpr` |
 | `InvokeExpr` (general operator / function call) | An `IRCall` (after callable resolution) |
 | `MemberExpr` | A `IRFieldAddress` / `IRFieldExtract` (lvalue vs rvalue) |
+| `IndexExpr` | `subscriptValue` (line 7481) emits `getElement` for a value base, `getElementPtr` for a pointer base; a `__subscript` arrives as an `InvokeExpr`, routed through `lowerStorageReference` |
+| `AssignExpr` | `assignExpr` writes through the left side's `LoweredValInfo` — `store` for a `Ptr`, `swizzledStore` for a swizzle, a setter `call` for `BoundStorage` |
+| `BuiltinCastExpr` (checked form of `T(x)` and of implicit numeric conversion) | The one conversion inst picked by `IRBuilder::emitCast`'s style table: `intCast`, `floatCast`, `castIntToFloat`, `castFloatToInt`, ... |
+| `BreakStmt`, `ContinueStmt` | An `unconditionalBranch` to the enclosing statement's break / continue label block |
+| `Optional<T>`, `Tuple<...>`, `ParameterBlock<T>` | The matching hoistable type inst — `Optional(...)`, `tuple_type(...)`, `ParameterBlock(...)`; scalar / vector / matrix / array spellings are catalogued in [../ir-reference/types.md](../ir-reference/types.md) |
 | `LiteralExpr` | A constant inst (`IRIntLit`, `IRFloatLit`, ...) |
 | `CastOptionalExpr` | An `if`/`else` diamond around a temporary: `visitCastOptionalExpr` tests `emitOptionalHasValue`, coerces the unwrapped value on the true side, and propagates `emitMakeOptionalNone` on the false side |
 | `WitnessTable` (synthesized in checking) | An `IRWitnessTable`, or — for a `SynthesizedModifier`-tagged conformance — a single intrinsic inst (see [Generics and existentials](#generics-and-existentials)) |
@@ -186,6 +205,15 @@ on its `BuiltinOperationKind` (`emitConstexprAdd`, `emitConstexprDiv`,
 `emitConstexprSelect`, ...). Keying on the enum replaced an older path
 that matched the operator's source name string; the `constexpr*` ops are
 hoistable so equal compile-time expressions deduplicate to one inst.
+
+The surface that reaches these opcodes is arithmetic on a *generic value
+parameter*, whose result is needed as a type-level value: the extent in
+`int b[N + 1]` inside `f<let N : int>` lowers to
+`constexprAdd(1 : Int, %N)`. A literal-only expression instead folds to
+a `ConstantIntVal` during checking and arrives as a plain `IRIntLit`.
+`+`, `-`, `*` and unary `-` never form a `BuiltinOperationIntVal` at
+all; they arrive as a `PolynomialIntVal`, which `visitPolynomialIntVal`
+(line 2009) lowers to those same opcodes.
 
 ## Generics and existentials
 
@@ -340,7 +368,8 @@ places:
 - **The conformance itself.** `visitInheritanceDecl` treats an
   `InheritanceDecl` carrying a `SynthesizedModifier` specially: instead of
   a real `IRWitnessTable` it emits one intrinsic inst whose opcode is the
-  modifier's `op` (for the forward case `kIROp_ForwardDifferentiate`),
+  modifier's `op` (for the forward case
+  `kIROp_SynthesizedForwardDerivativeWitnessTable`),
   typed `WitnessTableType(IForwardDifferentiable<...>)`, with the
   conformance's `Val` operands lowered as the inst's operands. Back-end
   passes reconstruct a table from those operands if one is needed. Because
@@ -354,7 +383,8 @@ places:
 - **The interface members.** A `SynthesizedFuncDecl` (line 13847) — the
   `fwd_diff` member the interface requires — is lowered by creating an
   `IRFunc`, replacing it with `emitIntrinsicInst` of the decl's stored
-  `irOp`, and rewriting the decl→value mapping to that inst.
+  `irOp` (`kIROp_ForwardDifferentiate` here), and rewriting the
+  decl→value mapping to that inst.
 - **Associated values.** `lowerAssociatedVals` (line 4944) reads the
   `DifferentiableAttribute` of the function currently being lowered and
   attaches each associated value with `IRBuilder::addAnnotation` (an
@@ -374,7 +404,8 @@ this-type.
 
 ### Variadic pack-count witnesses
 
-A `countof(Pack) == Count` constraint on a variadic generic is recorded
+A `countof(Pack) == Count` constraint on a variadic generic — spelled
+`void f<let N : int, each T>(T x) where countof(T) == N` — is recorded
 during checking as a `GenericVariadicPackCountConstraintDecl` whose
 satisfaction is a *proof-only* witness — the front end has already
 verified the relationship, and the witness carries no runtime data.
@@ -450,9 +481,11 @@ an entry point:
 - The entry-point IR functions and their decorations are children of
   that module — the loop at line 15467 lowers each registered entry
   point into it.
-- Layout intent on global parameters is likewise recorded in the module;
-  actual layout assignment is performed later by IR passes
-  (`slang-ir-layout`, `slang-ir-collect-global-uniforms`, ...).
+- Layout intent on global parameters is *not* materialized here: no
+  `IRLayoutDecoration` is attached during translation-unit lowering.
+  Layout assignment happens later, in IR passes (`slang-ir-layout`,
+  `slang-ir-collect-global-uniforms`, ...) and in the separate module of
+  [04c-layout-ir.md](04c-layout-ir.md).
 
 The caller in
 [slang-compile-request.cpp](../../../../source/slang/slang-compile-request.cpp)
@@ -485,7 +518,12 @@ path: `NodeLaunchAttribute`, `NodeIDAttribute`,
 `MaxRecordsAttribute` and `NodeIsProgramEntryAttribute` each lower to
 their matching decoration, with the launch mode kept as an
 `IRStringLit` rather than an integer so HLSL emit can re-emit the source
-name.
+name. Those attributes are not core-language syntax: their
+`attribute_syntax` declarations live in the `experimental.workgraph`
+standard module, so the shader must `import experimental.workgraph` and
+the compile must pass `-experimental-feature` (alongside `-stage node`
+and a `lib_6_8` profile). Without the import, `[NodeLaunch("...")]` is
+only an unknown-attribute warning.
 
 ### Debug-info gating
 

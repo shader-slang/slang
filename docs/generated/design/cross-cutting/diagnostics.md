@@ -39,7 +39,15 @@ The sink owns:
   set, and an `ISlangWriter* writer` for stream output when one is.
 - Per-source warning-state tracking (`SourceWarningStateTrackerBase`)
   so that pragmas / per-file overrides can adjust the severity
-  enforcement on a token-by-token basis.
+  enforcement on a token-by-token basis. The user surface is
+  `#pragma warning`: `(push)` / `(pop)` bracket a region and
+  `(<specifier> : <id-list>)` — `disable` and `suppress` among the
+  specifiers — changes the state for the tokens that follow. What the
+  directive itself reports is the `pragma-warning-*` block
+  (15611-15616) of
+  [slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua).
+  It is parsed in `slang-preprocessor.cpp`, which this page does not
+  watch.
 
 A nested sink can inherit settings from an enclosing one: the
 `DiagnosticSink(SourceManager*, SourceLocationLexer, DiagnosticSink*
@@ -118,7 +126,11 @@ array to `DiagnosticsLookup`, which
 [slang-diagnostics.cpp](../../../../source/slang/slang-diagnostics.cpp)
 then augments with the non-conflicting entries from
 `getCoreDiagnosticsLookup()` and the single alias
-`overlappingBindings` → `parameterBindingsOverlap`.
+`overlappingBindings` → `parameterBindingsOverlap`. An alias is only
+observable where a user names a diagnostic — `-warnings-disable`,
+`-warnings-as-errors`, `-W<id>`, and `-Wno-<id>` resolve their operand
+through `findDiagnosticByName` — so `-warnings-disable
+overlappingBindings` keeps working alongside the canonical name.
 
 The header that consumes the generated tables is
 [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
@@ -164,6 +176,27 @@ helper's `parse_message` also understands member access such as
 `~decl.name`. `validate_diagnostic` rejects a name that is not valid
 kebab-case and a `severity` outside `error`, `warning`, `note`,
 `internal`, and `fatal`.
+
+The declaring helper fixes the entry's severity, and with it the kind
+of condition the entry describes. `err`, `warning`, and
+`standalone_note` entries report on the input; `fatal` entries do too,
+but on a condition the compiler cannot continue past (e.g.
+`cyclic-reference`). `internal` entries report the compiler's own
+failure: `internal-compiler-error`, `unimplemented`, and `unexpected`
+— all code `99999` — are what the macros under
+[Internal-compiler errors](#internal-compiler-errors) raise, so input
+that reaches one is a compiler defect, not a supported reproduction.
+
+A `variadic_span` or `variadic_note` becomes a nested struct plus a
+`List<>` member on the generated struct, and `toGenericDiagnostic()`
+loops over that list adding one `DiagnosticSpan` or `DiagnosticNote`
+per element — so a variadic note renders as one note record per
+supplied item, not one joined record.
+`ambiguous-overload-for-name-with-args` uses one for its candidates:
+
+```lua
+variadic_note { cpp_name = "Candidate", message = "candidate: ~candidateSignature", span { loc = "candidate:Decl" } }
+```
 
 To put a warning in an opt-in group, pass one of the sentinel values
 `helpers.all`, `helpers.extra`, or `helpers.pedantic` as a trailing
@@ -226,7 +259,12 @@ public API see the same numeric values.
 
 The names rendered to the user (`getSeverityName`) are:
 `ignored`, `note`, `warning`, `error`, `fatal error`,
-`internal error`.
+`internal error`. Only five of the six are ever printed: a diagnostic
+whose effective severity is `Severity::Disable` returns from
+`diagnoseImpl` / `diagnoseRichImpl` before rendering, so `ignored`
+names a state of the severity machinery, not a form of output.
+`fatal error` and `internal error` are printed and then abort the
+compile through `SLANG_ABORT_COMPILATION`.
 
 `DiagnosticSink::getEffectiveMessageSeverity` in
 [slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
@@ -238,8 +276,11 @@ reached `Error`, `Fatal`, or `Internal`, where only an override at least
 as severe applies — otherwise an un-enabled warning group demotes the warning to
 `Severity::Disable`; finally the `TreatWarningsAsErrors` flag promotes
 any surviving warning to `Severity::Error`. A per-id override therefore
-takes precedence over group gating, which is what lets `-W<name>`
-force-enable a single warning from a group that is off.
+takes precedence over group gating, which is what lets `-W<id>`
+force-enable a single warning from a group that is off. The option
+table spells these `-W<id>` / `-Wno-<id>`, but the operand goes
+through `overrideDiagnostic`, which accepts an integer id or a
+diagnostic name.
 
 ### Warning groups
 
@@ -296,22 +337,56 @@ all three of which this page watches.
 
 When the sink formats a diagnostic, it uses the `SourceManager` to
 decode the `SourceLoc` into `file:line:column` and to retrieve the
-original source line for caret rendering. When the location falls in a
-synthesized token-paste view (`PathInfo::Type::TokenPaste`), the
+original source line for caret rendering. Two formatting paths differ
+here. The legacy path (`diagnoseImpl`, taken only when the
+`AlwaysGenerateRichDiagnostics` flag is not set) calls the
 `formatDiagnostic` helper in
-[slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp)
-loops back through `SourceView::getInitiatingSourceLoc()`, emitting a
-`MiscDiagnostics::seeTokenPasteLocation` note for each hop, so an error
-inside a `##` paste points at both the pasted text and the macro that
-produced it.
+[slang-diagnostic-sink.cpp](../../../../source/compiler-core/slang-diagnostic-sink.cpp),
+which, when the location falls in a synthesized token-paste view
+(`PathInfo::Type::TokenPaste`), loops back through
+`SourceView::getInitiatingSourceLoc()` emitting a
+`MiscDiagnostics::seeTokenPasteLocation` note for each hop. The rich
+path (`diagnoseRichImpl`, which is how every catalog entry is
+reported) renders through `renderDiagnostic` and has no such loop, so
+a rich diagnostic inside a `##` paste points only at the pasted text.
+
+A rendered diagnostic opens with a header of the form
+`<severity>[E<5-digit id>]: <message>`. The id is zero-padded and
+always carries an `E` prefix whatever the severity, so a warning with
+id 41016 prints as `warning[E41016]`, not `W41016`; an entry with a
+negative code (`seeTokenPasteLocation` is `-1`) prints no bracket. The
+location, source excerpt, and notes follow:
+
+```
+warning[E41016]: use of uninitialized variable
+ --> uninit.slang:6:13
+```
+
+`-diagnostic-color always|never|auto` selects more than colour:
+unless a host sets the unicode flag explicitly through
+`setEnableUnicode`, the renderer picks its frame glyphs with the same
+predicate. With colour off the frame is ASCII (`-->`, `|`, `^`, `-`);
+with colour on it is Unicode box drawing (`╭╼`, `│`, `━`, `┬`)
+wrapped in ANSI SGR escapes. `auto` asks the writer whether it is a
+console, so piped output gets the ASCII form.
+
+Diagnostics raised while parsing the command line are attached to a
+synthetic source, not to a file in the translation unit: the options
+parser gives its own sink the `CommandLineContext`'s source manager,
+whose one `SourceView` carries `PathInfo::Type::CommandLine`. The
+renderer special-cases that type and prints the path (`command line`)
+with no `line:column`, so a position- or caret-anchored matcher has
+nothing to bind to — pin such a diagnostic by its error code.
 
 The formatted text goes to the sink's `writer` if one is set, and
 otherwise accumulates in `outputBuffer`, from which
 `getBlobIfNeeded` can hand it back as an `ISlangBlob`. Tools that consume
 diagnostics in machine-readable form can set the
 `DiagnosticSink::Flag::MachineReadableDiagnostics` flag declared in
-[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h),
-which switches rendering to a tab-separated record of the form
+[slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h)
+(`-enable-machine-readable-diagnostics` sets it, plus
+`AlwaysGenerateRichDiagnostics`), which switches rendering to a
+tab-separated record of the form
 `E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>`
 (this is not a JSON schema).
 
@@ -344,7 +419,12 @@ cross-catalog checks. Because
 [slang-diagnostic-sink.h](../../../../source/compiler-core/slang-diagnostic-sink.h)
 notes that "it is possible for multiple diagnostics to have the same id"
 and returns only the first added, a tool that needs to target a precise
-diagnostic should prefer the `name` over the integer id.
+diagnostic should prefer the `name` over the integer id. The same
+caveat applies when *reading* output: `39999` is carried by about two
+dozen entries, `no-applicable-overload-for-name-with-args` and
+`ambiguous-overload-for-name-with-args` among them, and the rendered
+header carries the id and the message but never the name, so for a
+multi-bound code the message text is the only discriminator.
 
 Tools suppress or promote diagnostics through `overrideDiagnostic` /
 `overrideDiagnostics`, declared in
@@ -358,6 +438,12 @@ ignored so that a build script can disable a warning without knowing
 which compiler version introduced it. If `originalSeverity` is anything
 other than `Severity::Disable`, the looked-up diagnostic's severity must
 match it, so `-warnings-disable` cannot be used to silence an error.
+The mismatch is rejected here, at the option layer, not by
+`getEffectiveMessageSeverity`, and is reported as
+`unknown-diagnostic-name` (`31111`) naming the requested identifier —
+the same diagnostic an absent name gets. Since that entry is an `err`,
+the request fails the compile rather than leaving the diagnostic
+un-silenced.
 Name lookup is convention-insensitive: `findDiagnosticByName` accepts
 the kebab-case spelling from the Lua entry as well as the lower-camel
 `DiagnosticInfo::name` the generator produces from it.
