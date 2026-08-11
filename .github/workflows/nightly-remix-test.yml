@@ -66,7 +66,10 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
-        # force its node20 runtime onto node24 to clear the deprecation warning.
+        # run its node20 bundle on the node24 runtime. This restates the
+        # deprecation annotation ("forced to run on Node.js 24") rather than
+        # silencing it — the point is to exercise the runtime that survives the
+        # retirement, so a break surfaces now instead of when Node 20 is removed.
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 

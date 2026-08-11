@@ -80,8 +80,10 @@ Exit codes
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as _dt
 import hashlib
+import io
 import json
 import os
 import re
@@ -441,6 +443,23 @@ class BundleSpec:
         `watched_paths` can. See `coverage/METHODOLOGY.md`.
         """
         return self.role != "coverage"
+
+    @property
+    def is_diagnostics_catalog(self) -> bool:
+        """Whether this is the diagnostics catalog, the one doc-anchored
+        bundle whose `doc_ref` names a source definition instead of prose.
+
+        Its tests cite the `err()` call in `slang-diagnostics.lua` or the
+        `DIAGNOSTIC()` macro in a `*-diagnostic-defs.h`, so their `doc_ref`
+        carries no `#anchor` and `lint_doc_section_digests` cannot check them.
+        `lint_catalog_entry_digests` checks them instead, against the catalog
+        entry rather than a doc section.
+
+        Matched by key rather than by testing `dir` for a substring, so a
+        future bundle that merely has "diagnostics-catalog" in its path does
+        not silently inherit catalog-only lint rules.
+        """
+        return self.key == "design/cross-cutting/diagnostics-catalog"
 
     @property
     def prompt(self) -> str:
@@ -804,6 +823,61 @@ def lint_expected_failures() -> list[LintIssue]:
                     f" '# https://github.com/shader-slang/slang/issues/NNNN'"
                     f" above the entry (or above the group it belongs to)"
                     f" so the entry is removable when the bug is fixed.",
+                )
+            )
+    return issues
+
+
+def lint_agentic_coverage_excludes() -> list[LintIssue]:
+    """Validate that every path in `_meta/agentic-coverage-excludes.txt` still exists.
+
+    `tools/coverage/run-coverage.sh` turns each entry into a slang-test
+    `-exclude-prefix` flag for the coverage agentic pass, which runs
+    in-process (`-server-count 1`), so a test that segfaults the compiler
+    segfaults the orchestrator and the rest of the suite never runs. The
+    entries here are what keep that from happening.
+
+    `-exclude-prefix` silently matches nothing when its path is wrong, so an
+    entry orphaned by a regeneration round that renames or moves its test
+    stops excluding anything and the crash comes back. That has happened
+    twice: PR #11421's directory reorg, and the 2026-08-04 round that renamed
+    `metadata/unorm-attr-on-buffer-element.slang` (coverage run 31235323797).
+    Resolving each entry as a path on disk turns both into a lint error.
+
+    Directory prefixes are legal — `-exclude-prefix` is a prefix filter, so
+    `.../design/pipeline/` excludes everything under it — and resolve as
+    directories, which is why this checks `exists()` rather than `is_file()`.
+
+    The file is optional; absence is fine.
+    """
+    issues: list[LintIssue] = []
+    path = (
+        REPO_ROOT
+        / "docs"
+        / "generated"
+        / "tests"
+        / "_meta"
+        / "agentic-coverage-excludes.txt"
+    )
+    if not path.is_file():
+        return issues
+    rel = str(path.relative_to(REPO_ROOT))
+
+    for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
+        # Mirror run-coverage.sh's parse: strip a trailing comment, then trim.
+        s = raw.split("#", 1)[0].strip()
+        if not s:
+            continue
+        if not (REPO_ROOT / s).exists():
+            issues.append(
+                LintIssue(
+                    f"{rel}:{lineno}",
+                    "error",
+                    f"agentic-coverage-exclude path does not resolve: {s}."
+                    f" A stale entry excludes nothing, so the crash it was"
+                    f" added for will kill the coverage agentic pass again."
+                    f" Point it at the test's current path, or drop it if the"
+                    f" test is gone.",
                 )
             )
     return issues
@@ -1232,6 +1306,254 @@ def _github_slug(title: str) -> str:
     title = re.sub(r"[*_~]", "", title)
     slug = re.sub(r"[^\w\- ]", "", title.strip().lower(), flags=re.UNICODE)
     return slug.replace(" ", "-")
+
+
+_DOC_SECTION_DIGEST_MOD = None
+
+
+def _doc_section_digest_module():
+    """Return `_meta/doc-section-digest.py` loaded as a module, or None.
+
+    That script is the canonical implementation of the `doc_section_digest`
+    rule and is what agents run to produce the value, so the lint has to use
+    it rather than re-deriving the rule. The two are not interchangeable:
+    the script's `slug` keeps backticks and link syntax, while `_github_slug`
+    here strips them for link checking, so a heading like ``## `Foo` bar``
+    hashes under a different anchor in each. Importing the one that generated
+    the value is what makes the comparison meaningful.
+
+    Returns None when the script is missing, so the lint degrades to skipping
+    the check rather than erroring on every test.
+    """
+    global _DOC_SECTION_DIGEST_MOD
+    if _DOC_SECTION_DIGEST_MOD is None:
+        path = REPO_ROOT / "docs/generated/tests/_meta/doc-section-digest.py"
+        if not path.is_file():
+            _DOC_SECTION_DIGEST_MOD = False
+        else:
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location("_doc_section_digest", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _DOC_SECTION_DIGEST_MOD = mod
+    return _DOC_SECTION_DIGEST_MOD or None
+
+
+def lint_doc_section_digests(specs: list) -> list[LintIssue]:
+    """Report doc sections whose text has drifted from the tests anchored to them.
+
+    `doc_section_digest` is the sha256 of the cited section's body, so editing a
+    section invalidates every test that cites it. Nothing notices today:
+    `_REQUIRED_TEST_META_KEYS` only asserts the key is *present*, never that it
+    matches, so a doc edit silently leaves those tests claiming to have been
+    written against text that no longer exists. All 16 tests anchored to
+    `grammar.md#statements` went stale that way when the `ThrowStmt` production
+    was corrected, and nothing flagged it.
+
+    Reported per doc section rather than per test, because the section is the
+    unit of work: one edit invalidates a whole group, and 386 individual lines
+    would bury the ~40 sections that actually drifted.
+
+    Warning, not error. A stale digest does not mean the test is wrong -- it
+    means nobody has re-read the claim since the prose moved, which is a review
+    task, not a build failure. Note that refreshing the digest without re-reading
+    is worse than leaving it stale: it launders the drift and destroys the only
+    record that the claim and the prose were ever checked against each other.
+    """
+    mod = _doc_section_digest_module()
+    if mod is None:
+        return []
+    # (doc target, anchor) -> [test paths]
+    stale: dict[tuple[str, str], list[str]] = {}
+    for spec in specs:
+        if not spec.is_doc_anchored:
+            continue
+        for tf in sorted((REPO_ROOT / spec.dir).glob("*.slang")):
+            meta = parse_test_meta(tf.read_text(encoding="utf-8", errors="replace"))
+            recorded = (meta.get("doc_section_digest") or "").strip()
+            doc_ref = (meta.get("doc_ref") or "").strip()
+            if not recorded or "#" not in doc_ref:
+                continue
+            target, _, anchor = doc_ref.partition("#")
+            doc = REPO_ROOT / target
+            if not doc.is_file():
+                continue
+            try:
+                body = mod.section_text(str(doc), anchor)
+            except SystemExit:
+                # Unresolvable anchor; already reported by the per-file lint.
+                continue
+            if hashlib.sha256(body.encode("utf-8")).hexdigest() != recorded:
+                stale.setdefault((target, anchor), []).append(
+                    str(tf.relative_to(REPO_ROOT))
+                )
+    issues: list[LintIssue] = []
+    for (target, anchor), tests in sorted(stale.items()):
+        sample = ", ".join(Path(t).name for t in tests[:3])
+        more = f", +{len(tests) - 3} more" if len(tests) > 3 else ""
+        issues.append(
+            LintIssue(
+                f"{target}#{anchor}",
+                "warning",
+                f"section changed since {len(tests)} test(s) were anchored to it"
+                f" ({sample}{more}). Re-read those claims against the current"
+                f" text, then refresh their //META doc_section_digest with"
+                f" `_meta/doc-section-digest.py {target} {anchor}`.",
+            )
+        )
+    return issues
+
+
+CATALOG_SNAPSHOT_PATH = META_DIR / "diagnostics-catalog/catalog.txt"
+
+
+def parse_catalog_snapshot(path: Path | None = None) -> dict[str, tuple[str, str, str]]:
+    """Return the catalog snapshot as `code -> (severity, name, message)`.
+
+    `catalog.txt` is the committed, tab-separated extraction of every
+    diagnostic the compiler defines, with the columns named in its own header:
+    `code, covered, severity, name, source, message`. The message is the
+    remainder of the line rather than one field, because a message may itself
+    contain a tab.
+
+    Rows are keyed by code because that is the identity a catalog test records
+    (`//META: catalog_code`) and the one that survives a rename.
+    """
+    rows: dict[str, tuple[str, str, str]] = {}
+    src = path or CATALOG_SNAPSHOT_PATH
+    if not src.is_file():
+        return rows
+    for line in src.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) < 6:
+            continue
+        code, _covered, severity, name = parts[0], parts[1], parts[2], parts[3]
+        message = "\t".join(parts[5:])
+        rows[code] = (severity, name, message)
+    return rows
+
+
+def catalog_entry_digest(code: str, severity: str, name: str, message: str) -> str:
+    """Return the `doc_section_digest` for one catalog entry.
+
+    The catalog bundle's tests cite a diagnostic definition rather than a doc
+    section, so the digest pins the entry's rendered identity -- code,
+    severity, name and message joined by tabs -- instead of a section body.
+    Editing a diagnostic's message or renaming it changes the digest, which is
+    what lets `lint_catalog_entry_digests` tell that a test was written against
+    text that has since moved.
+
+    This is the rule stated in the bundle's README; it lives here so that lint
+    and the generation prompt share one implementation rather than each
+    re-deriving it. `regenerate.py catalog-digest <code>` prints it.
+    """
+    return hashlib.sha256(
+        f"{code}\t{severity}\t{name}\t{message}".encode("utf-8")
+    ).hexdigest()
+
+
+def lint_catalog_entry_digests(
+    specs: list,
+    root: Path | None = None,
+    snapshot: Path | None = None,
+) -> list[LintIssue]:
+    """Report catalog tests whose cited diagnostic has drifted from them.
+
+    The counterpart to `lint_doc_section_digests` for the one bundle that
+    cites source definitions instead of anchored prose. That function requires
+    a `#anchor` to locate a section body, and a catalog `doc_ref` has none, so
+    until now every catalog digest went unchecked -- which is what #11410
+    observed, first as all-zero placeholders and then, after the corpus was
+    regenerated, as well-formed values nothing recomputed.
+
+    Warning, not error, for the same reason as the doc-section check: a
+    mismatch means nobody has re-read the claim since the diagnostic moved,
+    which is a review task, not a build failure. Refreshing the digest without
+    re-reading launders the drift and destroys the only record that the test
+    and the diagnostic were ever checked against each other.
+
+    A code that is missing from the snapshot entirely is reported once for the
+    whole group rather than per test, because the cause is shared: either the
+    snapshot predates those diagnostics or they have been removed, and the
+    answer in both cases is to re-extract `catalog.txt`.
+
+    `root` and `snapshot` default to the real tree and are parameters only so
+    that `selftest` can run the drift and unknown-code branches against a
+    fixture, which the committed corpus cannot produce.
+    """
+    root = root or REPO_ROOT
+    snapshot = snapshot or CATALOG_SNAPSHOT_PATH
+    catalog = parse_catalog_snapshot(snapshot)
+    if not catalog:
+        # An absent or empty snapshot must not read as "nothing to report". Every
+        # digest is checked by looking its code up in here, so returning silently
+        # would leave the whole bundle unverified while lint claims success --
+        # the same unnoticed-unverified state #11410 was filed about, reached by
+        # deleting a file instead of by skipping a code path. The unknown-code
+        # warning below cannot cover this: with no rows there are no lookups, so
+        # it never fires.
+        unchecked = [spec for spec in specs if spec.is_diagnostics_catalog]
+        if not unchecked:
+            return []
+        count = sum(len(list((root / spec.dir).glob("*.slang"))) for spec in unchecked)
+        return [
+            LintIssue(
+                _rel_to_repo(snapshot),
+                "warning",
+                f"catalog snapshot is missing or empty, so the doc_section_digest"
+                f" of {count} catalog test(s) went unchecked. Re-extract it:"
+                f" without it this lint passes whatever those tests record",
+            )
+        ]
+    issues: list[LintIssue] = []
+    unknown: list[tuple[str, str]] = []
+    for spec in specs:
+        if not spec.is_diagnostics_catalog:
+            continue
+        for tf in sorted((root / spec.dir).glob("*.slang")):
+            meta = parse_test_meta(tf.read_text(encoding="utf-8", errors="replace"))
+            recorded = (meta.get("doc_section_digest") or "").strip()
+            code = (meta.get("catalog_code") or "").strip()
+            if not recorded or not code:
+                continue
+            rel = str(tf.relative_to(root))
+            entry = catalog.get(code)
+            if entry is None:
+                unknown.append((code, rel))
+                continue
+            if catalog_entry_digest(code, *entry) != recorded:
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "warning",
+                        f"catalog entry {code} changed since this test was"
+                        " anchored to it. Re-read the claim against the"
+                        " current entry, then refresh //META"
+                        " doc_section_digest with `_meta/regenerate.py"
+                        f" catalog-digest {code}`",
+                    )
+                )
+    if unknown:
+        codes = ", ".join(sorted({c for c, _ in unknown}, key=_code_sort_key))
+        issues.append(
+            LintIssue(
+                _rel_to_repo(snapshot),
+                "warning",
+                f"{len(unknown)} test(s) cite catalog code(s) the snapshot does"
+                f" not contain ({codes}). Either the snapshot predates those"
+                " diagnostics and needs re-extracting, or the codes were"
+                " removed and their tests are now testing nothing",
+            )
+        )
+    return issues
+
+
+def _code_sort_key(code: str):
+    """Sort diagnostic codes numerically when they are numeric."""
+    return (0, int(code)) if code.isdigit() else (1, code)
 
 
 _HEADING_SLUG_CACHE: dict[Path, set[str]] = {}
@@ -1949,8 +2271,7 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             re.search(r"/\*\s*CHECK[^:]*:.*?\^.*?\*/", text, re.DOTALL)
         )
         # Catalog bundle tests use bare numeric for some codes.
-        is_catalog = "diagnostics-catalog" in spec.dir
-        has_bare_numeric = is_catalog and bool(
+        has_bare_numeric = spec.is_diagnostics_catalog and bool(
             re.search(r"CHECK[^:]*:\s*\d{4,}\b", text)
         )
         if not (
@@ -2309,6 +2630,9 @@ def cmd_lint(args: argparse.Namespace) -> int:
     if not args.bundles:
         issues.extend(lint_findings())
         issues.extend(lint_expected_failures())
+        issues.extend(lint_agentic_coverage_excludes())
+        issues.extend(lint_doc_section_digests(specs))
+        issues.extend(lint_catalog_entry_digests(specs))
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
     for i in issues:
@@ -3535,6 +3859,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_dg.set_defaults(func=cmd_doc_gaps)
 
+    p_cd = sub.add_parser(
+        "catalog-digest",
+        help="print the doc_section_digest for a diagnostics-catalog code",
+    )
+    p_cd.add_argument("code", help="diagnostic code, e.g. 30019")
+    p_cd.set_defaults(func=cmd_catalog_digest)
+
     p_st = sub.add_parser(
         "selftest",
         help="unit-check the slug / link / table helpers used by lint",
@@ -3618,6 +3949,30 @@ def _build_parser() -> argparse.ArgumentParser:
     p_fd.set_defaults(func=cmd_findings_dup)
 
     return p
+
+
+def cmd_catalog_digest(args: argparse.Namespace, snapshot: Path | None = None) -> int:
+    """Print the `doc_section_digest` a diagnostics-catalog test should carry.
+
+    Exists so that the generation prompt can name one command instead of
+    describing a hashing rule an agent then re-implements by hand -- which is
+    how the corpus ended up with values nothing could reproduce (#11410).
+
+    `snapshot` defaults to the real one and is a parameter only so that
+    `selftest` can drive the missing-snapshot and success paths against a
+    fixture; the argparse entry point never passes it.
+    """
+    snapshot = snapshot or CATALOG_SNAPSHOT_PATH
+    catalog = parse_catalog_snapshot(snapshot)
+    if not catalog:
+        print(f"error: no catalog snapshot at {_rel_to_repo(snapshot)}")
+        return 1
+    entry = catalog.get(args.code)
+    if entry is None:
+        print(f"error: code {args.code} is not in the catalog snapshot")
+        return 1
+    print(catalog_entry_digest(args.code, *entry))
+    return 0
 
 
 def cmd_selftest(args: argparse.Namespace) -> int:
@@ -3724,6 +4079,158 @@ def cmd_selftest(args: argparse.Namespace) -> int:
             "nope.md" in errors[0].message if errors else False,
             True,
         )
+
+    # The catalog snapshot parser and the digest rule it feeds. The committed
+    # corpus only shows entries that already agree, so the drift and
+    # unknown-code branches below are the ones `lint` cannot reach on its own.
+    with tempfile.TemporaryDirectory() as td:
+        snap = Path(td) / "catalog.txt"
+        snap.write_text(
+            "# header line, ignored\n"
+            "\n"
+            "1\tUNCOVERED\terr\tcannot-open-file\tslang-diagnostics.lua"
+            "\tcannot open file '~path'\n"
+            # A message containing a tab: everything past the source column is
+            # the message, so this must not be truncated at the tab.
+            "2\tCOVERED\twarning\ttabbed\tslang-diagnostics.lua\tone\ttwo\n"
+            # Too few columns to be an entry.
+            "junk\trow\n",
+            encoding="utf-8",
+        )
+        rows = parse_catalog_snapshot(snap)
+        check("catalog rows parsed", sorted(rows), ["1", "2"])
+        check(
+            "catalog message keeps embedded tab",
+            rows["2"],
+            ("warning", "tabbed", "one\ttwo"),
+        )
+        check(
+            "catalog digest matches the documented rule",
+            catalog_entry_digest("1", *rows["1"]),
+            hashlib.sha256(
+                b"1\terr\tcannot-open-file\tcannot open file '~path'"
+            ).hexdigest(),
+        )
+
+    # lint_catalog_entry_digests over a fixture holding an agreeing test, a
+    # drifted test, and one citing an unknown code. Drift and unknown-code are
+    # the branches the kept-clean corpus never reaches, so the check that they
+    # each warn (and that the agreeing test stays silent) lives only here. The
+    # count of exactly two issues is what keeps the agreeing test out.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        bundle = root / "docs/generated/tests/design/cross-cutting/diagnostics-catalog"
+        bundle.mkdir(parents=True)
+        snap_dir = root / "docs/generated/tests/_meta/diagnostics-catalog"
+        snap_dir.mkdir(parents=True)
+        (snap_dir / "catalog.txt").write_text(
+            "1\tUNCOVERED\terr\tcannot-open-file\tsrc\tcannot open file\n",
+            encoding="utf-8",
+        )
+
+        def _write(name: str, code: str, digest: str) -> None:
+            (bundle / name).write_text(
+                f"//META: catalog_code={code}\n"
+                f"//META: doc_section_digest={digest}\n",
+                encoding="utf-8",
+            )
+
+        good = catalog_entry_digest("1", "err", "cannot-open-file", "cannot open file")
+        _write("agree.slang", "1", good)
+        _write("drifted.slang", "1", "cd" * 32)
+        _write("gone.slang", "9999", "ef" * 32)
+        # A test mid-generation that has a code but no digest yet is skipped
+        # rather than counted, which is what keeps the count below at two.
+        (bundle / "partial.slang").write_text("//META: catalog_code=1\n", encoding="utf-8")
+
+        # The non-catalog bundle gets a populated directory holding a test that
+        # *would* be flagged, so "skips non-catalog bundles" fails when the
+        # guard is dropped instead of passing on an empty glob.
+        sibling = root / "docs/generated/tests/design/cross-cutting/diagnostics"
+        sibling.mkdir(parents=True)
+        (sibling / "drifted.slang").write_text(
+            "//META: catalog_code=1\n//META: doc_section_digest=" + "cd" * 32 + "\n",
+            encoding="utf-8",
+        )
+
+        spec = BundleSpec(
+            key="design/cross-cutting/diagnostics-catalog",
+            source_doc=None,
+            watched_paths=[],
+        )
+        other = BundleSpec(
+            key="design/cross-cutting/diagnostics",
+            source_doc=None,
+            watched_paths=[],
+        )
+        snap = snap_dir / "catalog.txt"
+        found = lint_catalog_entry_digests([spec], root=root, snapshot=snap)
+
+        # Two warnings -- the drifted test and the unknown code -- and neither
+        # the agreeing test nor the digest-less one contributes.
+        check("catalog lint reports two issues", len(found), 2)
+        check(
+            "catalog lint is warn-only",
+            {i.severity for i in found},
+            {"warning"},
+        )
+        drift = [i for i in found if i.where.endswith("drifted.slang")]
+        check("catalog lint flags the drifted test", len(drift), 1)
+        unknown = [i for i in found if "9999" in i.message]
+        check("catalog lint groups the unknown code", len(unknown), 1)
+        check(
+            "catalog lint skips non-catalog bundles",
+            lint_catalog_entry_digests([other], root=root, snapshot=snap),
+            [],
+        )
+
+        # An absent snapshot must be reported, not silently treated as "nothing
+        # to check" -- that would leave the bundle unverified while lint passes.
+        missing = snap_dir / "does-not-exist.txt"
+        absent = lint_catalog_entry_digests([spec], root=root, snapshot=missing)
+        check("missing snapshot warns", len(absent), 1)
+        check(
+            "missing snapshot names the count",
+            "4 catalog test(s) went unchecked" in absent[0].message if absent else False,
+            True,
+        )
+        check(
+            "missing snapshot is silent without a catalog bundle",
+            lint_catalog_entry_digests([other], root=root, snapshot=missing),
+            [],
+        )
+
+        # The catalog-digest subcommand is what the prompt and README tell an
+        # agent to run, so its exit status and output are part of the contract.
+        def _run_catalog_digest(code: str, snapshot_path: Path):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_catalog_digest(argparse.Namespace(code=code), snapshot=snapshot_path)
+            return rc, buf.getvalue().strip()
+
+        rc, out = _run_catalog_digest("1", snap)
+        check("catalog-digest succeeds for a known code", rc, 0)
+        check("catalog-digest prints the digest", out, good)
+        rc, out = _run_catalog_digest("999999", snap)
+        check("catalog-digest fails for an unknown code", rc, 1)
+        check("catalog-digest names the unknown code", "999999" in out, True)
+        rc, out = _run_catalog_digest("1", missing)
+        check("catalog-digest fails without a snapshot", rc, 1)
+        check("catalog-digest names the missing snapshot", "no catalog snapshot" in out, True)
+
+    # The catalog bundle is matched by exact manifest key, so a bundle whose path
+    # merely contains "diagnostics-catalog" does not inherit catalog-only rules.
+    def _is_catalog(key: str) -> bool:
+        return BundleSpec(key=key, source_doc=None, watched_paths=[]).is_diagnostics_catalog
+
+    check("catalog matched by exact key", _is_catalog("design/cross-cutting/diagnostics-catalog"), True)
+    check("lookalike suffix is not the catalog", _is_catalog("design/cross-cutting/diagnostics-catalog-extra"), False)
+    check("prefix is not the catalog", _is_catalog("design/cross-cutting/diagnostics"), False)
+
+    # _code_sort_key exists to order codes numerically; plain string sort would
+    # put "100" before "99".
+    check("code sort key orders numerically", sorted(["100", "99", "3001"], key=_code_sort_key), ["99", "100", "3001"])
+    check("code sort key puts non-numeric last", sorted(["W123", "42"], key=_code_sort_key), ["42", "W123"])
 
     for f in failures:
         print(f"FAIL {f}")
