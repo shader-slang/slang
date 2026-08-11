@@ -437,9 +437,10 @@ ContinueStmt    ::= 'continue' ';'                             -- ParseContinueS
 ReturnStmt      ::= 'return' Expr? ';'                          -- ParseReturnStatement
 DiscardStmt     ::= 'discard' ';'                               -- ParseStatement (inline)
 DeferStmt       ::= 'defer' Stmt                                -- ParseDeferStatement
-ThrowStmt       ::= 'throw' Expr                                -- ParseThrowStatement
-                                                              -- (does not consume ';'; a trailing
-                                                              --   ';' is parsed as a separate EmptyStmt)
+ThrowStmt       ::= 'throw' Expr ';'                            -- ParseThrowStatement
+                                                              -- (the ';' is mandatory:
+                                                              --   ParseThrowStatement ends with
+                                                              --   ReadToken(TokenType::Semicolon))
 LabelStmt       ::= IDENT ':' Stmt                              -- parseLabelStatement; chosen when an
                                                               --   identifier is followed by ':'
                                                               --   (the label BreakStmt refers to)

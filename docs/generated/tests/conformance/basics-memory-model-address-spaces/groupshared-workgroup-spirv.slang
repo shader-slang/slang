@@ -16,6 +16,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 static groupshared float sharedData[32];
 
@@ -32,3 +34,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<float> outp
 // METAL: threadgroup {{.*}} sharedData{{.*}}
 // WGSL maps Workgroup to var<workgroup>.
 // WGSL: var<workgroup> sharedData{{.*}}
+// GLSL emits the same Workgroup-class array with the `shared` storage qualifier.
+// GLSL: shared float{{.*}} sharedData_
+// HLSL emits it with the `groupshared` qualifier.
+// HLSL: static groupshared float{{.*}} sharedData_

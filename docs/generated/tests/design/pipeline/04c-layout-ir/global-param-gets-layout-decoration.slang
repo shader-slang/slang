@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-global-parameter-steps
-//META: doc_section_digest=985e0bab98cb696d50c51a3509833524406afcf6cfdcb16668a11fd5c51bd2d9
-//META: purpose=Each per-global-parameter step in createIRModuleForLayout attaches an IRLayoutDecoration to the stub IRGlobalVar; observable as a [layout(%N)] on the global_param.
+//META: doc_section_digest=71acd681692af8dc698e27f4202784a0fdd9ad10068cb56ebbb1ea587605026a
+//META: purpose=Each per-global-parameter step attaches an IRLayoutDecoration to the stub IRGlobalVar, observable as a [layout(%N)] on the global_param in the first post-link IR snapshot.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's per-global-parameter table row 3 says:
-// "Attach IRLayoutDecoration via builder->addLayoutDecoration(irVar, irLayout)."
-// After the layout-IR module is merged into the post-link IR,
-// the stub global_param for `buf` carries a [layout(%N)] decoration.
+// Verifies that the layout-IR module attaches a layout decoration to the
+// stub global variable it materialises for every global shader parameter.
+// The dump is taken at the first post-link snapshot, where the layout
+// module has already been merged in; CHECK asserts the `buf` global_param
+// carries a [layout(%N)] decoration, which is the only place that
+// decoration can come from.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

@@ -1,47 +1,72 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:08:34Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
-//META: doc_section_digest=8666fb5a8a3e866e04eed6573b9b735ade91d11b88b56b96aa10b6822be031b8
-//META: purpose=Lowering an interface declaration synthesizes a thisTypeWitness placeholder certifying that ThisType conforms to the enclosing interface.
+//META: doc_section_digest=55d24b9cb1e17ce70457d4ac3ad5c2fd829e24b2244903cc228160630ca43d8f
+//META: purpose=A lookup that has to resolve a conformance on ThisType while the interface is still being defined goes through a thisTypeWitness, which stays abstract until specialization.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that thisTypeWitness is produced during InterfaceDecl
-// lowering rather than by a later pass: a user interface whose method
-// returns `This` forces the enclosing-interface self-conformance fact
-// into the lowered module, and the CHECK pins the thisTypeWitness
-// opcode spelling in the dump of a module containing only user code
-// plus a generic dispatch that keeps the interface live.
+// Verifies the abstract witness described in the opcode table: the witness
+// that `ThisType` conforms to the enclosing interface, which a `lookupWitness`
+// stays abstract through.
+//
+// `createThisTypeWitness` runs for every interface (slang-lower-to-ir.cpp:12139),
+// so what this test can observe is not whether the witness is *created* but
+// whether it survives to the dump. Measured on the commit this test was updated
+// against, `associatedtype A : IBar` -- whose bound has to be resolved on `This`
+// -- leaves it in the dump, and an interface whose only ThisType contact is the
+// `This frob()` signature (kept below) does not. That signature-only form did
+// surface the placeholder on a build from 2026-07-08 and no longer does, so the
+// behaviour changed in between; which change is responsible has not been
+// bisected, and the "needs no conformance lookup" reading of it is inferred
+// rather than established. The associated type is used here because it is the
+// form that is observable today.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
-interface IFrob
+interface IBar
 {
-    This frob();
-    int get();
+    int bar();
 };
 
-struct A : IFrob
+interface IFrob
+{
+    associatedtype A : IBar;
+    A make(int x);
+    This frob();
+};
+
+struct BarImpl : IBar
 {
     int v;
-    A frob() { A r; r.v = v + 1; return r; }
-    int get() { return v; }
+    int bar() { return v; }
+};
+
+struct FrobImpl : IFrob
+{
+    typedef BarImpl A;
+    int v;
+    A make(int x) { BarImpl b; b.v = x; return b; }
+    FrobImpl frob() { FrobImpl r; r.v = v + 1; return r; }
 };
 
 uniform int inVal;
 uniform RWStructuredBuffer<int> buf;
 
-int useFrob<T : IFrob>(T t) { return t.frob().get(); }
+int useFrob<T : IFrob>(T t, int x) { return t.make(x).bar(); }
 
 [numthreads(1, 1, 1)]
 void main()
 {
-    A a;
-    a.v = inVal;
-    buf[0] = useFrob<A>(a);
+    FrobImpl f;
+    f.v = inVal;
+    buf[0] = useFrob(f, inVal);
 }
 
-// CHECK: thisTypeWitness
+// Anchored rather than a bare substring match: the result type ties the witness
+// to IFrob, and end-of-line requires the inst to have no operand list, which is
+// what makes it the abstract placeholder rather than a concrete table.
+// CHECK: witness_table_t(%IFrob){{.*}}= thisTypeWitness{{$}}

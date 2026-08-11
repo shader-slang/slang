@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-switches
-//META: doc_section_digest=417ae366d1846ca418a679faf16ce1ba5835ea98eecce720cd5f530619796001
+//META: doc_section_digest=4820552ad726706a9ebecdf715453f85eb93c80c7a2decca221f929866c46c78
 //META: purpose=Boundary: the source-text position of `default:` (before or after the case-arms) does not affect the switch terminator's operand layout — the default label is still the third operand.
 //META: intent=boundary
 //META: pipeline_stage=lower

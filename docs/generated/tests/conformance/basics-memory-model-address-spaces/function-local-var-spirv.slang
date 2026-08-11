@@ -17,6 +17,8 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 struct Counter { int val; };
 
@@ -43,3 +45,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID, RWStructuredBuffer<int> output
 // METAL: thread Counter_
 // WGSL passes function-local structs as ptr<function,...> arguments.
 // WGSL: ptr<function, Counter_
+// GLSL emits the Function-address-space local as an unqualified declaration inside main()
+// (GLSL has no storage qualifier for function scope; the absence of one is the Function space).
+// GLSL: void main()
+// GLSL: Counter_{{[0-9]+}} c_{{[0-9]+}};
+// HLSL likewise emits the local inside the entry point with no storage-class qualifier.
+// HLSL: void computeMain(
+// HLSL: Counter_{{[0-9]+}} c_{{[0-9]+}};

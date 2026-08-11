@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-global-parameter-steps
-//META: doc_section_digest=985e0bab98cb696d50c51a3509833524406afcf6cfdcb16668a11fd5c51bd2d9
-//META: purpose=globalStructTypeLayoutBuilder.addField(irVar, irLayout) feeds the IRStructTypeLayout; each global parameter becomes a structFieldLayout(field, varLayout) entry in the merged layout block.
+//META: doc_section_digest=71acd681692af8dc698e27f4202784a0fdd9ad10068cb56ebbb1ea587605026a
+//META: purpose=Recording each stub global in the global type-layout builder yields one structFieldLayout entry naming that stub variable and its lowered varLayout.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Row 4 of the per-global-parameter steps table:
-//   globalStructTypeLayoutBuilder.addField(irVar, irLayout)
-// produces a structFieldLayout(...) entry per global, naming the
-// stub IRGlobalVar and its lowered varLayout.
+// Verifies the fourth per-global-parameter step: each stub global is fed
+// into the module-level struct-type-layout builder. CHECK asserts a
+// `structFieldLayout(%buf, %N)` entry exists, which names the stub global
+// itself as the field key and its lowered varLayout as the value - the
+// pairing that step produces.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

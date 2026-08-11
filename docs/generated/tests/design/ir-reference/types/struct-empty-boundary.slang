@@ -1,18 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#struct-and-class-containers
-//META: doc_section_digest=b49b3d499615e99101dda545c0f7fef50e62178dcf5f11f8dcef9ff0becec030
+//META: doc_section_digest=0a354de05012835336b3c276acede5bc3e74e766304e49cb482449117371f325
 //META: purpose=Boundary: an empty struct still surfaces a parent `struct %Name` opcode (no field children).
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says the `struct` opcode is the parent container for
-// `field` children. A struct with zero fields still emits the
-// parent `struct %Name` IR opcode — the container exists even
-// when empty.
+// an empty struct still surfaces a parent `struct %Name` opcode (no
+// field children). A struct with zero fields still emits the parent
+// `struct %Name` IR opcode — the container exists even when empty.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

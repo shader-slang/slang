@@ -655,17 +655,29 @@ public:
             break;
         case kIROp_Store:
             {
+                auto storeInst = as<IRStore>(inst);
+                IRBuilder builder(inst);
+
+                // A HostVM store must have a typed destination. NativePtr/ComPtr are opaque handle
+                // values and RawPointer is untyped, so none is a valid store destination here.
+                auto pointeeType =
+                    tryGetPointedToType(&builder, storeInst->getPtr()->getDataType());
+                SLANG_RELEASE_ASSERT(pointeeType);
+
+                // Use the destination type to determine how many bytes the store writes. For
+                // example, StringType has no configured HostVM size, but a NativeString field is
+                // pointer-sized.
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
                     codeGenContext->getTargetReq(),
-                    inst->getOperand(1)->getDataType(),
+                    pointeeType,
                     &sizeAlignment);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
                     (uint32_t)sizeAlignment.getStride(),
-                    ensureInst(inst->getOperand(0)),
-                    ensureInst(inst->getOperand(1)));
+                    ensureInst(storeInst->getPtr()),
+                    ensureInst(storeInst->getVal()));
             }
             break;
         case kIROp_Add:

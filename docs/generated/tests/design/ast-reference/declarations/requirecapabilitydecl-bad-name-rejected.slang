@@ -1,18 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=1e2fffffe548d3dd55e164e2d482dadafc2362dd7c8b9d5b1675743c8d5fa05c
-//META: purpose=A RequireCapabilityDecl with a non-existent capability name is diagnosed; the decl carries through to capability resolution.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A `__require_capability` naming a capability that does not exist is diagnosed at the name.
 //META: intent=negative
-//META: pipeline_stage=check
+//META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the negative form of the RequireCapabilityDecl role: an
-// unknown capability name in a `__require_capability` declaration is
-// rejected. The parser resolves each named capability and diagnoses
-// E36105 when the name is not a known capability atom.
+// Verifies that the capability names in a requirement declaration are resolved
+// rather than stored verbatim. An invented name is used; the CHECKs pin the
+// unknown-capability diagnostic spanning the name.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

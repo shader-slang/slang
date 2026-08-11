@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=d7cf9915ec0da5de567edb118ec898dd57bb3e7b5414db216254906018825537
+//META: doc_section_digest=647327ee76a1bc33d8bcf7d2abc19a2f16ee4e63d10bad4d1d5d48c120029d9d
 //META: purpose=A [branch] attribute on a conditional lowers to a branch decoration with no operands.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `branch` ("Hints the backend to emit a branching
-// select") with no operands. The IR dump emits a bare `[branch]`
-// line on the decorated inst.
+// Verifies the `branch` row's operand shape: the decoration is nullary, so
+// the dump prints a bare `[branch]` line on the conditional it annotates.
+// The condition reads the dispatch thread id and the selected value escapes
+// through a buffer write, so neither folding nor DCE can remove the
+// conditional before the CHECK sees its decoration.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

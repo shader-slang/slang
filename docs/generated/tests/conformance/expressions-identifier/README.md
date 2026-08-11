@@ -20,6 +20,10 @@ establishing basic lookup and l-value rules. Coverage strategy: one functional t
 claim, one negative/diagnostic test for the "is rejected" overload-ambiguity claim (with
 pinned `E39999`), emission tests for the cbuffer/tbuffer implicit-lookup claim and for
 the overload-disambiguation claim, and extension-method as a secondary dimension for implicit-`this`.
+The three emission claims are target-dependent (each back-end has its own constant-buffer
+lowering and its own function-name mangling), so each fans out across every shader text
+target — `hlsl`, `glsl`, `spirv-asm`, `metal`, `wgsl` — except `tbuffer` on `spirv-asm`,
+which the SPIR-V emitter cannot express (see `## Untested claims`).
 
 ## Claims
 
@@ -52,7 +56,9 @@ the overload-disambiguation claim, and extension-method as a secondary dimension
 
 ## Untested claims
 
-NA
+| Claim                                                                                                      | Reason                | Anchor                                                                                       | Why untested                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A bare identifier resolves to a field declared inside a global-scope tbuffer, via implicit tbuffer lookup. | unsupported-on-target | [#implicit-lookup](../../../../language-reference/expressions-identifier.md#implicit-lookup) | Target spirv-asm cannot express this claim: the SPIR-V emitter has no lowering for the `TextureBuffer` global a `tbuffer` expands to and aborts with `error[E99997] ... unimplemented: Unhandled global inst in spirv-emit`. Tracked by the pending finding `docs/generated/tests/_meta/findings/declarations-tbuffer-spirv-cuda-cpp-crash.yaml`. `hlsl`, `glsl`, `metal`, and `wgsl` are all exercised in [`implicit-tbuffer-lookup-emission.slang`](implicit-tbuffer-lookup-emission.slang). |
 
 ## Doc gaps observed
 

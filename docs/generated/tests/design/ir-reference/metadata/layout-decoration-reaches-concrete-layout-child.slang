@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:09:48Z
-//META: source_commit=f39188078fe010048714735213c24a7cb15532b9
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#layout
-//META: doc_section_digest=603eb96e45583a4aaf05d861ab8c093cb01e3cf0104ce403f82a3847e5c5a8bd
-//META: purpose=Following a [layout(...)] decoration's operand reaches a concrete Layout child definition (varLayout / typeLayout / EntryPointLayout) that holds the offset/size/binding data.
+//META: doc_section_digest=191c3cf4521ced3200561deb00c6eb3357c4d39bab0db9c1eb01023ed957cfe2
+//META: purpose=A laid-out instruction is connected to its layout by a layout decoration whose operand is a concrete Layout child.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that the layout decoration is the link from a laid-out inst to
-// its layout record: the id inside a `[layout(%N)]` decoration must be
-// defined by one of the concrete Layout children, never by the abstract
-// parent. The test captures the referenced id from a decoration in the
-// dump and asserts its definition is a varLayout / EntryPointLayout /
-// typeLayout inst.
+// Verifies the documented navigation step from a laid-out inst to its layout
+// data. The CHECK captures the id referenced by a `[layout(...)]` decoration
+// and then requires that id's defining instruction to be one of the concrete
+// layout opcodes -- which is what makes "follow the decoration to reach the
+// offset/size data" a valid rule for a reader walking the IR.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -27,4 +26,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // CHECK: [layout(%[[L:[0-9]+]])]
-// CHECK: %[[L]]{{[^0-9].*}}= {{(varLayout|EntryPointLayout|typeLayout)}}(
+// CHECK: %[[L]]{{[^0-9].*}}= {{(varLayout|EntryPointLayout|typeLayout|structTypeLayout)}}

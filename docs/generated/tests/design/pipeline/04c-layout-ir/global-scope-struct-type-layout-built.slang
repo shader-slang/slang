@@ -1,21 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#global-scope-type-layout
-//META: doc_section_digest=bea4097f3cb99e6205f4e10d4bf9ab240dde03162a3388a24e9a78e55d5c0e65
-//META: purpose=After the per-global-parameter loop, _lowerTypeLayoutCommon builds an IRStructTypeLayout for the global scope; with no cbuffer wrapping, the merged IR shows a top-level structTypeLayout(...) for the global struct (no parameterGroupTypeLayout).
+//META: doc_section_digest=cb9b7a613d39760a93548dfbce14e96da09e14aa0f49313bd097e522bedd9206
+//META: purpose=With no parameter-group wrapping, the global scope's type layout is a plain structTypeLayout instruction built after the per-global-parameter loop.
 //META: intent=functional
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says:
-//   auto irGlobalStructTypeLayout =
-//       _lowerTypeLayoutCommon(&globalStructTypeLayoutBuilder,
-//                              globalStructLayout);
-// When the global scope is NOT wrapped in a parameter group, the
-// module's global-scope type layout is a plain
-// structTypeLayout(...) and no parameterGroupTypeLayout appears.
+// Verifies the unwrapped branch of the global-scope type layout: when no
+// constant buffer wraps the global scope, the module-level layout is a
+// plain struct layout. CHECK asserts a `structTypeLayout(` instruction is
+// present before the entry-point function, which is the shape the
+// unwrapped path produces.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
