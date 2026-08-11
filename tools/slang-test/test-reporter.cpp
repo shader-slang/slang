@@ -769,6 +769,13 @@ void TestReporter::reconcilePendingRetries()
     m_pendingRetryTests.clear();
     m_redeemingResultTests.clear();
     m_ignoredTests.clear();
+
+    // The dispatch-failure *names* are only read above, to decide redemption, so they are cleared
+    // with everything else: leaving them would let a stale key redeem an unrelated later ignore if
+    // the reporter were ever reused. The *count* deliberately survives -- outputSummary() runs
+    // after this and reports it, and it is a tally of everything that happened in the run rather
+    // than state to be reconciled.
+    m_dispatchFailures.clear();
 }
 
 void TestReporter::noteDispatchFailure(const String& testKey)

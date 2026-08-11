@@ -225,6 +225,9 @@ public:
 
     /// How many dispatch failures were seen, including ones a retry went on to resolve. Reported in
     /// the summary so a connection dying is never merely a line in the middle of the log.
+    ///
+    /// Unlike the tracking sets, this is not cleared by `reconcilePendingRetries()`: it is a tally
+    /// of the run, and `outputSummary()` reads it afterwards.
     int m_dispatchFailureCount = 0;
 
     Slang::List<Slang::String> m_suiteStack;

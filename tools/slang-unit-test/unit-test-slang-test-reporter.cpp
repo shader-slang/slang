@@ -500,3 +500,73 @@ SLANG_UNIT_TEST(slangTestReporterUnredeemedRetryDiagnosticNamesTheTest)
     // It must not claim the retry did not run, which is only one of the two ways this happens.
     SLANG_CHECK(message.indexOf(UnownedStringSlice("was never re-run")) < 0);
 }
+
+// Dispatch failures are summed across sub-reporters, not overwritten. One contribution each from
+// two workers has to merge to two: with a single contributor an accumulation and an assignment are
+// indistinguishable, and under -server-count > 1 more than one connection can die in a run.
+SLANG_UNIT_TEST(slangTestReporterDispatchFailureCountsAccumulate)
+{
+    const String first("gfx-unit-test-tool/probeDispatchA.internal");
+    const String second("gfx-unit-test-tool/probeDispatchB.internal");
+
+    TestReporter workerA;
+    workerA.m_suppressConsoleOutput = true;
+    workerA.noteDispatchFailure(first);
+
+    TestReporter workerB;
+    workerB.m_suppressConsoleOutput = true;
+    workerB.noteDispatchFailure(second);
+
+    TestReporter main;
+    main.m_suppressConsoleOutput = true;
+    main.consolidateWith(&workerA);
+    main.consolidateWith(&workerB);
+
+    SLANG_CHECK(main.m_dispatchFailureCount == 2);
+    SLANG_CHECK(main.m_dispatchFailures.contains(first));
+    SLANG_CHECK(main.m_dispatchFailures.contains(second));
+}
+
+// A dispatch failure whose retry reaches the test and gets a real verdict: the connection dying is
+// still tallied, and the verdict is the test's result like any other.
+SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedByVerdict)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    const String command("gfx-unit-test-tool/probeDispatchThenFailed.internal");
+
+    reporter.noteDispatchFailure(command);
+    reporter.addTest(command, TestResult::PendingRetry);
+    reporter.addTest(command, TestResult::Fail); // retry reached it, and it genuinely failed
+
+    reporter.reconcilePendingRetries();
+
+    // Counted once -- from the retry's verdict, not synthesized a second time by reconciliation.
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_totalTestCount == 1);
+    SLANG_CHECK(reporter.m_dispatchFailureCount == 1);
+}
+
+// Reconciliation clears the dispatch-failure names along with the other tracking state, so a stale
+// key cannot redeem a later unrelated ignore -- but the tally survives, because outputSummary()
+// reads it afterwards.
+SLANG_UNIT_TEST(slangTestReporterReconcileKeepsDispatchTallyAndClearsKeys)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    const String command("gfx-unit-test-tool/probeDispatchIdempotent.internal");
+
+    reporter.noteDispatchFailure(command);
+    reporter.addTest(command, TestResult::PendingRetry);
+    reporter.addTest(command, TestResult::Ignored);
+
+    reporter.reconcilePendingRetries();
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.m_dispatchFailureCount == 1);
+    SLANG_CHECK(reporter.m_dispatchFailures.getCount() == 0);
+
+    // A second pass changes nothing, and the tally still stands for the summary.
+    reporter.reconcilePendingRetries();
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.m_dispatchFailureCount == 1);
+}
