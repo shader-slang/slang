@@ -266,13 +266,16 @@ public:
             // right (empty) size and there is nothing to append.
             break;
         default:
-            // The IRConstant group (see the `Constant` block in slang-ir-insts.lua) has
-            // seven ops; the arms above cover six. The only one that reaches here is
-            // BlobLit, which VM emission does not support: rather than reserve a slot and
-            // leave it unbacked (the #11375 bug), fail loudly at emit time. This is a
-            // live guard, not just future-proofing — if a BlobLit ever flows into VM
-            // constants it must be handled here explicitly.
-            SLANG_UNEXPECTED("unhandled IRConstant op in VM emitter");
+            {
+                // The only IRConstant op (the `Constant` block in slang-ir-insts.lua) not
+                // handled above is BlobLit, which VM emission does not support. This is a
+                // live guard, not just future-proofing: rather than reserve a slot and
+                // leave it unbacked (the #11375 bug), fail loudly at emit time. Name the
+                // op so a future unsupported constant is identified in the report.
+                StringBuilder sb;
+                sb << "unhandled IRConstant op in VM emitter: " << getIROpInfo(inst->getOp()).name;
+                SLANG_UNEXPECTED(sb.getBuffer());
+            }
         }
         return operand;
     }
