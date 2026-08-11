@@ -22,7 +22,7 @@ uniform RWStructuredBuffer<int> buf;
 [ForceInline]
 [__NoSideEffect]
 [__readNone]
-[__unsafe_force_inline_early]
+[__unsafeForceInlineEarly]
 int superHelper(int x) { return x + 1; }
 
 [numthreads(1, 1, 1)]
