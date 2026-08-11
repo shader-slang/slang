@@ -300,7 +300,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
 // Each uses a string the surrounding slang-test run cannot itself produce, so a leak is
 // attributable to this reporter rather than to the harness reporting on the test.
 
-SLANG_UNIT_TEST(slangTestReporterSuppressesSuiteMarkers)
+SLANG_UNIT_TEST(slangTestReporterSuiteMarkerSuppressionKeepsAccounting)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -319,7 +319,7 @@ SLANG_UNIT_TEST(slangTestReporterSuppressesSuiteMarkers)
     SLANG_CHECK(reporter.m_passedTestCount == 1);
 }
 
-SLANG_UNIT_TEST(slangTestReporterSuppressesSummary)
+SLANG_UNIT_TEST(slangTestReporterSummarySuppressionKeepsAccounting)
 {
     TestReporter reporter;
     reporter.m_suppressConsoleOutput = true;
@@ -356,7 +356,10 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure)
     reporter.addTest(command, TestResult::PendingRetry); // deferred
     reporter.addTest(command, TestResult::Ignored);      // retry reached it; not applicable here
 
-    SLANG_CHECK(reporter.m_redeemingResultTests.contains(command));
+    // The ignore is recorded as an ignore, not as something that redeems. Whether it redeems is
+    // decided at reconciliation, the only point that can see both this and the dispatch failure.
+    SLANG_CHECK(reporter.m_ignoredTests.contains(command));
+    SLANG_CHECK(!reporter.m_redeemingResultTests.contains(command));
 
     reporter.reconcilePendingRetries();
 
@@ -422,4 +425,78 @@ SLANG_UNIT_TEST(slangTestReporterUnitTestKeyIsTheExpectedFailureKey)
 
     SLANG_CHECK(reporter.isExpectedFailure(key));
     SLANG_CHECK(!reporter.isExpectedFailure(String("replayRecord_triangle")));
+}
+
+// The topology the real thing runs in: with -server-count > 1 the first pass and the retry pass get
+// different sub-reporters, so the dispatch failure is recorded on one and the retry's ignore on
+// another, and only consolidation brings them together. Deciding redemption when the result is
+// recorded cannot work here -- the reporter seeing the ignore has never heard of the dispatch
+// failure -- which is why reconcilePendingRetries() decides it instead.
+SLANG_UNIT_TEST(slangTestReporterDispatchFailureRedeemedAcrossSubReporters)
+{
+    const String command("gfx-unit-test-tool/probeCrossPassDispatch.internal");
+
+    // First pass, worker A: the call never reached the test, so it is deferred.
+    TestReporter firstPass;
+    firstPass.m_suppressConsoleOutput = true;
+    firstPass.noteDispatchFailure(command);
+    firstPass.addTest(command, TestResult::PendingRetry);
+
+    // Retry pass, worker B: reaches the test, which skips itself as inapplicable. B knows nothing
+    // about the dispatch failure.
+    TestReporter retryPass;
+    retryPass.m_suppressConsoleOutput = true;
+    retryPass.addTest(command, TestResult::Ignored);
+    SLANG_CHECK(!retryPass.m_dispatchFailures.contains(command));
+
+    TestReporter main;
+    main.m_suppressConsoleOutput = true;
+    main.consolidateWith(&firstPass);
+    main.consolidateWith(&retryPass);
+
+    main.reconcilePendingRetries();
+
+    // No failure invented for a test that was never applicable, and the dead connection is still
+    // on the record.
+    SLANG_CHECK(main.m_failedTestCount == 0);
+    SLANG_CHECK(main.didAllSucceed());
+    SLANG_CHECK(main.m_dispatchFailureCount == 1);
+}
+
+// The same topology without a dispatch failure still fails: there the test ran and failed on worker
+// A, and a skip on worker B refutes nothing.
+SLANG_UNIT_TEST(slangTestReporterIgnoredAcrossSubReportersStillFails)
+{
+    const String command("gfx-unit-test-tool/probeCrossPassRanAndFailed.internal");
+
+    TestReporter firstPass;
+    firstPass.m_suppressConsoleOutput = true;
+    firstPass.addTest(command, TestResult::PendingRetry);
+
+    TestReporter retryPass;
+    retryPass.m_suppressConsoleOutput = true;
+    retryPass.addTest(command, TestResult::Ignored);
+
+    TestReporter main;
+    main.m_suppressConsoleOutput = true;
+    main.consolidateWith(&firstPass);
+    main.consolidateWith(&retryPass);
+
+    main.reconcilePendingRetries();
+
+    SLANG_CHECK(main.m_failedTestCount == 1);
+    SLANG_CHECK(!main.didAllSucceed());
+}
+
+// The diagnostic itself. Every other test here suppresses console output, so without this the
+// string a maintainer actually reads when a run goes red is never produced under test.
+SLANG_UNIT_TEST(slangTestReporterUnredeemedRetryDiagnosticNamesTheTest)
+{
+    const String command("slang-unit-test-tool/probeDiagnostic.internal");
+    const String message = TestReporter::describeUnredeemedRetry(command);
+
+    SLANG_CHECK(message.indexOf(command.getUnownedSlice()) >= 0);
+    SLANG_CHECK(message.indexOf(UnownedStringSlice("never produced a verdict")) >= 0);
+    // It must not claim the retry did not run, which is only one of the two ways this happens.
+    SLANG_CHECK(message.indexOf(UnownedStringSlice("was never re-run")) < 0);
 }

@@ -139,6 +139,12 @@ public:
     /// is what may redeem the retry -- see `m_dispatchFailures`.
     void noteDispatchFailure(const Slang::String& testKey);
 
+    /// Returns the diagnostic printed for a deferral that no result ever redeemed.
+    ///
+    /// Separate from the printing so a test can assert the text: every reporter test suppresses
+    /// console output, so this string is otherwise never produced under test.
+    static Slang::String describeUnredeemedRetry(const Slang::String& testKey);
+
     /// Counts every test whose result is still deferred as a failure, and reports it.
     ///
     /// Reporting `TestResult::PendingRetry` for a test defers its result: it is left out of the
@@ -191,25 +197,21 @@ public:
     /// name is exactly the mismatch this fix corrects.
     Slang::HashSet<Slang::String> m_pendingRetryTests;
 
-    /// Names of every test whose result redeems a deferral -- a verdict (Pass, Fail or
-    /// ExpectedFail), or an `Ignored` for a test the harness never reached.
+    /// Names of every test that reached a verdict -- Pass, Fail or ExpectedFail.
     ///
-    /// `Ignored` is excluded even though it is also a final, non-deferred result. A test is
-    /// deferred because it ran and failed, and a retry that skips it produces no verdict and so
-    /// refutes nothing; letting an ignore redeem the deferral is how a real failure went missing
-    /// (see the recording site in `_addResult`).
-    ///
-    /// Every other result lands here, so this holds roughly one entry per test in the run rather
-    /// than just the handful that redeem something. Reconciliation reads only the intersection with
-    /// `m_pendingRetryTests`; recording unconditionally is what makes that order-independent across
-    /// sub-reporters.
-    ///
-    /// This is what redeems an entry in `m_pendingRetryTests`, and it is tracked separately rather
-    /// than read back out of `m_testInfos` for two reasons: a test can be deferred by one
-    /// sub-reporter and resolved by another (the retry pass runs on different threads than the
-    /// first pass), so the two sets have to survive `consolidateWith` independently; and a final
-    /// `Ignored` result under `-hide-ignored` never reaches `m_testInfos` at all.
+    /// A verdict always redeems a deferral. `Ignored` is not a verdict and is tracked separately in
+    /// `m_ignoredTests`, because whether it redeems depends on something this set cannot express:
+    /// see `reconcilePendingRetries()`.
     Slang::HashSet<Slang::String> m_redeemingResultTests;
+
+    /// Names of every test that reported `Ignored`.
+    ///
+    /// Kept apart from the verdicts because an ignore redeems a deferral only when the harness
+    /// never reached the test on the first attempt (`m_dispatchFailures`). That pairing cannot be
+    /// evaluated when the result is recorded -- the deferral and the retry are reported by
+    /// different sub-reporters -- so both sets are carried through `consolidateWith()` and matched
+    /// once, in `reconcilePendingRetries()`.
+    Slang::HashSet<Slang::String> m_ignoredTests;
 
     /// Names deferred after the harness failed to reach the test at all, rather than after the test
     /// ran and failed.

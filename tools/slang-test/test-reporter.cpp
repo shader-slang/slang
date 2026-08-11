@@ -268,6 +268,8 @@ void TestReporter::consolidateWith(TestReporter* other)
         m_pendingRetryTests.add(name);
     for (const auto& name : other->m_redeemingResultTests)
         m_redeemingResultTests.add(name);
+    for (const auto& name : other->m_ignoredTests)
+        m_ignoredTests.add(name);
     for (const auto& name : other->m_dispatchFailures)
         m_dispatchFailures.add(name);
     m_dispatchFailureCount += other->m_dispatchFailureCount;
@@ -400,9 +402,13 @@ void TestReporter::_addResult(TestInfo info)
     //
     // Recorded before the hidden-ignored return below, because being hidden from the output does
     // not make a verdict any less final.
-    // Ignored redeems a deferral only when the first attempt never reached the test. See
-    // m_dispatchFailures for why the two cases differ.
-    if (info.testResult != TestResult::Ignored || m_dispatchFailures.contains(info.name))
+    // Record what this result *is*; whether it redeems a deferral is decided by
+    // reconcilePendingRetries(), after consolidation. It cannot be decided here: the deferral and
+    // the retry are reported by different sub-reporters, so this one does not know whether the
+    // first attempt ever reached the test.
+    if (info.testResult == TestResult::Ignored)
+        m_ignoredTests.add(info.name);
+    else
         m_redeemingResultTests.add(info.name);
 
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
@@ -722,24 +728,36 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
 }
 
 
+String TestReporter::describeUnredeemedRetry(const String& testKey)
+{
+    // Built rather than printed so a test can read it: this is the diagnostic a maintainer sees
+    // when a run goes red for this reason, and it is otherwise never produced under test, since
+    // every reporter test suppresses console output.
+    StringBuilder message;
+    message << "error: test '" << testKey
+            << "' failed and its retry never produced a verdict, so the failure was about to go "
+               "unreported; counting it now (as a failure, or an expected failure if it is on the "
+               "expected-failure list). Either the retry did not run the test, or it ran and "
+               "reported it ignored -- the retry's own line above says which";
+    return message.produceString();
+}
+
 void TestReporter::reconcilePendingRetries()
 {
     for (const auto& name : m_pendingRetryTests)
     {
-        if (m_redeemingResultTests.contains(name))
+        // A verdict always redeems. An ignore redeems only a deferral whose first attempt never
+        // reached the test -- there is no failure for the skip to refute. Both halves are read
+        // here, after consolidation, because the two facts are recorded by different
+        // sub-reporters.
+        const bool redeemed = m_redeemingResultTests.contains(name) ||
+                              (m_ignoredTests.contains(name) && m_dispatchFailures.contains(name));
+        if (redeemed)
             continue;
 
         if (!m_suppressConsoleOutput)
         {
-            // Same name formatting as the "failed(pending retry)" notice this one answers, so
-            // the pair reads as a pair.
-            printf(
-                "error: test '%S' failed and its retry never produced a verdict, so the failure "
-                "was about to go unreported; counting it now (as a failure, or an expected "
-                "failure if it is on the expected-failure list). Either the retry did not run the "
-                "test, or it ran and reported it ignored -- the retry's own line above says "
-                "which\n",
-                name.toWString().begin());
+            printf("%s\n", describeUnredeemedRetry(name).getBuffer());
             fflush(stdout);
         }
 
@@ -748,13 +766,9 @@ void TestReporter::reconcilePendingRetries()
         addTest(name, TestResult::Fail);
     }
 
-    // Clear both halves, not just the pending one. If the redeemers survived while the
-    // deferrals were dropped, a deferral reported after this point would be matched against a
-    // stale redeemer, counted as already resolved, and vanish from the failure count -- the exact
-    // false-green this function exists to prevent. Clearing both also makes a second call a
-    // genuine no-op rather than one that only happens to find nothing pending.
     m_pendingRetryTests.clear();
     m_redeemingResultTests.clear();
+    m_ignoredTests.clear();
 }
 
 void TestReporter::noteDispatchFailure(const String& testKey)
