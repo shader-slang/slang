@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8[1m]
-//META: generated_at=2026-06-11T09:43:32Z
-//META: source_commit=4a91b58b87e4619ffd76f313e7ae2164d1bd288a
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops-branches-opt-levels
-//META: doc_section_digest=bb776d675adb7c4e2a9412ec7d3dac41d5686e57228edbe14f81c6b4581f05ae
-//META: purpose=`[unroll]` on a loop appears as an `[unroll]` attribute in emitted HLSL.
-//META: intent=expansion
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels
+//META: doc_section_digest=2884135594e88fad2ff6c4fdc20d6bf694888dfaa9f666f2ac51e906fc88f826
+//META: purpose=`[unroll]` on a loop appears as an unroll attribute in the emitted code.
+//META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Fan-out of the `[unroll]` loop-hint claim onto GLSL. The attribute lowers
-// to a `[[unroll]]` control-flow attribute on the emitted loop; CHECK pins
-// the emitted `[[unroll]]` token, proving the loop hint survives GLSL codegen.
+// Fan-out of the same loop-hint claim onto the GLSL back end, where the hint
+// is spelled with the C++-attribute syntax. CHECK pins that token with the
+// brackets escaped, since FileCheck reads a bare double bracket as a variable
+// reference, proving the hint survives GLSL codegen too.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry main -stage compute
 

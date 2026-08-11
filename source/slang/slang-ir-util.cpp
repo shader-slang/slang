@@ -1969,19 +1969,6 @@ void initializeScratchData(IRInst* inst)
     }
 }
 
-void resetScratchDataBit(IRInst* inst, int bitIndex)
-{
-    List<IRInst*> workList;
-    workList.add(inst);
-    while (workList.getCount() != 0)
-    {
-        auto item = workList.getLast();
-        workList.removeLast();
-        item->scratchData &= ~(1ULL << bitIndex);
-        for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
-            workList.add(child);
-    }
-}
 
 ///
 /// IRBlock related common helper methods
@@ -2453,6 +2440,24 @@ IRType* dropNormAttributes(IRType* const t)
     return t;
 }
 
+/// Gets a literal thread count, unwrapping a specialization constant's default when needed.
+static IRIntLit* _getDefaultThreadCount(IRInst* threadCount)
+{
+    if (auto intLit = as<IRIntLit>(threadCount))
+        return intLit;
+
+    auto globalParam = as<IRGlobalParam>(threadCount);
+    auto defaultValueDecor =
+        globalParam ? globalParam->findDecoration<IRDefaultValueDecoration>() : nullptr;
+    if (defaultValueDecor)
+        if (auto defaultIntLit = as<IRIntLit>(defaultValueDecor->getOperand(0)))
+            return defaultIntLit;
+
+    IRBuilder builder(globalParam ? (IRInst*)globalParam : threadCount);
+    return cast<IRIntLit>(
+        builder.getIntValue(globalParam ? globalParam->getDataType() : builder.getIntType(), 1));
+}
+
 void verifyComputeDerivativeGroupModifiers(
     DiagnosticSink* sink,
     SourceLoc errorLoc,
@@ -2469,15 +2474,9 @@ void verifyComputeDerivativeGroupModifiers(
             Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
-    IRIntegerValue x = 1;
-    IRIntegerValue y = 1;
-    IRIntegerValue z = 1;
-    if (numThreadsDecor->getX())
-        x = numThreadsDecor->getX()->getValue();
-    if (numThreadsDecor->getY())
-        y = numThreadsDecor->getY()->getValue();
-    if (numThreadsDecor->getZ())
-        z = numThreadsDecor->getZ()->getValue();
+    IRIntegerValue x = _getDefaultThreadCount(numThreadsDecor->getOperand(0))->getValue();
+    IRIntegerValue y = _getDefaultThreadCount(numThreadsDecor->getOperand(1))->getValue();
+    IRIntegerValue z = _getDefaultThreadCount(numThreadsDecor->getOperand(2))->getValue();
 
     if (quadAttr)
     {

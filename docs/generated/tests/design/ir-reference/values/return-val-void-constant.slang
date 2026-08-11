@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literals-constant-group
-//META: doc_section_digest=918df95e795705d19fc754f327c05c827640af724b9f88ca647e64093fd4e807
+//META: doc_section_digest=a21e27fcb958e56d332244ee6c703427ccee0763e9b85ea940b9fe964f929d86
 //META: purpose=A `void`-returning function's terminator is `return_val(void_constant)`, surfacing the unique `void` value the doc lists as `VoidLit`.
 //META: intent=functional
 //META: pipeline_stage=lower

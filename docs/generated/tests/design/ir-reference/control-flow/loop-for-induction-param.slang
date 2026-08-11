@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#loop
-//META: doc_section_digest=04d0daf0564c731241b1f5e0a49a1a7dc27737ec3435d045559640aef919740e
+//META: doc_section_digest=41069943e707403bf4e509b55db22b8e4cad325fff0b4de1f2732b878f000ad2
 //META: purpose=A for-loop lowers to loop(body, break, continue, ...) with the three structured-join operands plus initial values for body-block induction params.
 //META: intent=functional
 //META: pipeline_stage=lower

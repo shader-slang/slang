@@ -10,7 +10,6 @@
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <type_traits>
 
 //

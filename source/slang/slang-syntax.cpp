@@ -4,7 +4,6 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
-#include <assert.h>
 #include <typeinfo>
 
 namespace Slang
@@ -1119,11 +1118,17 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         paramTypes.add(paramType);
     };
     auto parent = declRef.getParent();
-    if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
+    // An accessor includes parameters from a callable storage parent before its own parameters.
+    // For example, a subscript setter receives the subscript index before the value being set.
+    // A property is not callable, so it contributes no parameters here.
+    if (declRef.as<AccessorDecl>())
     {
-        for (auto paramDeclRef : getParameters(astBuilder, parent.as<CallableDecl>()))
+        if (auto callableParent = parent.as<CallableDecl>())
         {
-            visitParamDecl(paramDeclRef);
+            for (auto paramDeclRef : getParameters(astBuilder, callableParent))
+            {
+                visitParamDecl(paramDeclRef);
+            }
         }
     }
     for (auto paramDeclRef : getParameters(astBuilder, declRef))

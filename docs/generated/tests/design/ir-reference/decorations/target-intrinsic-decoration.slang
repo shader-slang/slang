@@ -1,21 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#targetintrinsic-targetintrinsicdecoration
-//META: doc_section_digest=cb8a8327f83d2f0346939069b3bffffc9403ae749340d6d2499128810dc798f5
-//META: purpose=Calling a core-module built-in pulls in its [targetIntrinsic(capSet, "spelling")] decoration in the IR dump's core-module section.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#targetintrinsic--targetintrinsicdecoration
+//META: doc_section_digest=bcecad90942aef58e93b23cf4b28f81f01866d858ac796d92eb622fc5b09a36c
+//META: purpose=Calling a core-module built-in pulls in its targetIntrinsic decoration, whose operands are a capability-set reference and the target-language spelling string.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Per the doc: "targetIntrinsic is the IR's encoding of 'this
-// function is implemented by a target-specific spelling'. The two
-// operands are a capability-set operand identifying the target(s)
-// it applies to, and an IRStringLit operand carrying the
-// target-language source code or instruction name." Calling
-// `pow(x, y)` from user code forces the core-module declaration
-// (and its targetIntrinsic decorations) into the dump.
+// Verifies the two-operand form of `targetIntrinsic`: a capability-set
+// operand naming the targets it applies to and a string carrying the
+// target-language spelling. Calling `pow` links the core-module declaration
+// into the module; the CHECK pins the string `"pow"` and wildcards the
+// capability-set reference, whose inst id is unstable.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

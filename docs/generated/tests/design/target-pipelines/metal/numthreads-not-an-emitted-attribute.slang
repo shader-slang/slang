@@ -1,19 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=3b19519e792b092406320b661c62d171b0f8cdff6f282ae48cf30ac091136ae8
-//META: purpose=Metal expresses the threadgroup size at dispatch time, so `[numthreads(X,Y,Z)]` does not survive as a `numthreads(...)` attribute in the emitted MSL (contrast with HLSL).
+//META: doc_section_digest=0c4ba248635633393b51ae889f226e3b5f86a549ad5be4af6f827414819fb357
+//META: purpose=Negative: `[numthreads(X,Y,Z)]` does not survive into Metal text because Metal takes the threadgroup size from the dispatch call.
 //META: intent=negative
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `[numthreads(8,4,2)]` is HLSL-specific. On Metal the
-// dimensions come from the dispatch call, so no `numthreads`
-// token appears in the emitted Metal text. The kernel just
-// carries the standard `[[thread_position_in_grid]]` entry
-// parameter.
+// Verifies that the HLSL threadgroup-size attribute is dropped rather than
+// translated: MSL has no source-level equivalent, and the dimensions are
+// supplied by the host at dispatch time. A non-trivial 8x4x2 size is used
+// so a partial translation would still be visible; CHECK asserts the
+// kernel carries its system-value parameter but no `numthreads(` token
+// appears anywhere.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

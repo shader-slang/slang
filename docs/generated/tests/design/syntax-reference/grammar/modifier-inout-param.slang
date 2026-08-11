@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:32+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#modifiers
-//META: doc_section_digest=70ceb760c32425b92d6d86403d9499a01d3afd02e92cf1d5ef7c2c183d0ee9ff
+//META: doc_section_digest=f7b0ae9b07f0675cd756d6bc3597c976e818c75e0b93ae38cb59ab21c210ef82
 //META: purpose=`ModifierKeyword` includes `inout`, which attaches to a `Param`.
 //META: intent=functional
 //META: pipeline_stage=parse

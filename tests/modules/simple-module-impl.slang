@@ -3,6 +3,7 @@
 
 implementing simple_module;
 
+[noinline]
 public int TestFunctionA(int x)
 {
     return x + 100;

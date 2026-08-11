@@ -16,6 +16,8 @@
 // (tracked separately; -skip-spirv-validation lets the CHECK observation proceed).
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry computeMain -stage compute -skip-spirv-validation
+//TEST:SIMPLE(filecheck=METALCHECK):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSLCHECK):-target wgsl -entry computeMain -stage compute
 
 RWStructuredBuffer<Atomic<uint>> atomicBuf;
 RWStructuredBuffer<uint> outBuf;
@@ -30,3 +32,21 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // This is the documented behavior; SPIRV validity is tracked as a separate finding.
 // CHECK: OpAtomicLoad
 // CHECK-SAME: %uint_72
+
+// Metal: `Atomic<uint>` maps to `atomic<uint>` and the ordered load is emitted as
+// atomic_load_explicit with memory_order_seq_cst — Metal has no separate
+// acquire-release ordering, so the closest ordering that still forbids memory
+// accesses from crossing the operation is seq_cst.
+// METALCHECK: atomic_load_explicit
+// METALCHECK-SAME: memory_order_seq_cst
+
+// WGSL: `Atomic<uint>` maps to `atomic<u32>` and the load is emitted as atomicLoad.
+// WGSL has no per-operation ordering parameter; every WGSL atomic is sequentially
+// consistent, which subsumes the acquire-release constraint.
+// WGSLCHECK: atomicLoad
+
+// Targets not covered by emission directives (see README `## Untested claims`):
+//   hlsl   - `Atomic<T>.load` lowers to a plain RWStructuredBuffer read; HLSL has no
+//            atomic-load intrinsic and no memory-order operand to pin.
+//   glsl   - Same: plain SSBO element read, no ordering operand on this emit path.
+//   cuda   - Plain pointer dereference; the ordering operand is not preserved.

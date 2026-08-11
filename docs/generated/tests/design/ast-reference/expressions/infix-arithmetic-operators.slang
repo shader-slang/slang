@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/expressions.md#nodes
-//META: doc_section_digest=5cae24401ed06bd3567242934951f344da434f10804637bdd679d55ab6b5bb2b
+//META: doc_section_digest=b4aac875016d352a73eaff212c9886fb3c6956320e3406200a947b5679edef57
 //META: purpose=An InfixExpr evaluates a binary arithmetic operator; each operator yields the expected numeric result.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists InfixExpr as binary operator (`a + b`). The four
-// integer operators below each parse as an InfixExpr and each
-// evaluates to the documented arithmetic result.
+// Verifies that each binary arithmetic operator evaluates to its documented
+// result. Four operators are applied to the same operand pair and printed
+// separately, so a single mis-mapped operator shows up as exactly one failing
+// CHECK.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

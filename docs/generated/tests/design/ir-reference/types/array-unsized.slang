@@ -1,20 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#array-vs-unsizedarray
-//META: doc_section_digest=3a34a70cd8512ec6be2ec7cc1f7561654dfdb9f02b11880c6bcb79480abf474b
+//META: doc_section_digest=8d861464d52d5973316dc6cf7fb88f9d4e6d9a20f1c42ebaf22ceb34ed960ce4
 //META: purpose=An unsized array (runtime extent) is typed UnsizedArray(elementType) in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "`Array` vs `UnsizedArray`" note says `UnsizedArray`
-// "omits the `elementCount` operand and represents an array of
-// runtime extent — the common form on the GPU side of variable-
-// size buffer access." A module-scope `uniform float tail[];`
-// surfaces `UnsizedArray(Float)` in the dump on the `global_param`
-// that holds it.
+// An unsized array (runtime extent) is typed UnsizedArray(elementType)
+// in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

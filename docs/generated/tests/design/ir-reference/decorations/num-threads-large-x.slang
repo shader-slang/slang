@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entry-point-and-stage
-//META: doc_section_digest=a78fa1c65d9e97005484d3326f0e07d9af56a6dadaad4955b0d779effe950727
+//META: doc_section_digest=babb40e44ba0eb7addfafeddc37185c8c3bbed4c27b3b7fc8a2469d95b33aca1
 //META: purpose=Boundary - a large workgroup dimension (1024) on numthreads flows through unchanged into the numThreads decoration's first integer operand.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary - the doc does not pin an upper bound on individual
-// dimensions, only specifies (variadic, min=3). Pass a large value
-// (1024, the typical D3D/Vulkan upper-bound for a single dim) and
-// assert it flows through unchanged.
+// Verifies the upper end of the workgroup-dimension range is carried
+// through as a plain integer operand. 1024 is the largest single dimension
+// the common APIs accept; the CHECK pins it exactly, so a narrowing or
+// clamping of the operand would fail.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
