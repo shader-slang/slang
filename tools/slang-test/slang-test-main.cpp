@@ -1161,11 +1161,11 @@ Result spawnAndWaitProxy(
 /// recorded as "this test failed", which is simply false.
 enum class RPCAttemptOutcome
 {
-    Ok,        ///< A result came back (whatever the test's own verdict is).
-    Lost,      ///< The connection closed or errored: the server is gone.
-    TimedOut,  ///< The server is alive but did not answer in connectionTimeOutInMs.
-    Protocol,  ///< A reply arrived but was not the expected result message.
-    SendFailed ///< The request could not even be written.
+    Ok,            ///< A result came back (whatever the test's own verdict is).
+    Lost,          ///< The connection closed or errored: the server is gone.
+    TimedOut,      ///< The server is alive but did not answer in connectionTimeOutInMs.
+    ProtocolError, ///< A reply arrived but was not the expected result message.
+    SendFailed     ///< The request could not even be written.
 };
 
 /// Describe the death of a test server as precisely as the OS will let us.
@@ -1195,7 +1195,7 @@ static void _reportServerLoss(
     case RPCAttemptOutcome::TimedOut:
         detail << "no reply within the timeout";
         break;
-    default:
+    case RPCAttemptOutcome::Lost:
         if (!connection)
         {
             detail << "no transport";
@@ -1214,6 +1214,12 @@ static void _reportServerLoss(
             // this is a server that died BETWEEN requests rather than during one.
             detail << "the server is gone";
         }
+        break;
+    default:
+        // Ok and ProtocolError are not losses. Reaching here means a caller labelled an
+        // outcome wrongly, and the result would be a "test server lost" line for a server
+        // that is fine -- the same misreporting this whole change exists to remove.
+        SLANG_RELEASE_ASSERT(!"_reportServerLoss called with a non-loss outcome");
         break;
     }
 
@@ -1324,7 +1330,7 @@ static RPCAttemptOutcome _executeRPCOnce(
             "JSON RPC failure: getMessageType() != JSONRPCMessageType::Result");
 
         context->destroyRPCConnection();
-        return RPCAttemptOutcome::Protocol;
+        return RPCAttemptOutcome::ProtocolError;
     }
 
     // Get the result
@@ -1336,7 +1342,7 @@ static RPCAttemptOutcome _executeRPCOnce(
             "JSON RPC failure: getMessage()");
 
         context->destroyRPCConnection();
-        return RPCAttemptOutcome::Protocol;
+        return RPCAttemptOutcome::ProtocolError;
     }
 
     outRes.resultCode = exeRes.returnCode;
@@ -1397,7 +1403,7 @@ static Result _executeRPC(
         // The test is fine; the server was not. Record the loss so it stays countable --
         // silently absorbing these is how a rate that climbs from 14 a night to 140 stays
         // invisible -- but do not charge it to the test.
-        context->getTestReporter()->reportTestServerLoss();
+        context->getTestReporter()->recordTestServerLoss();
         return SLANG_OK;
     }
 

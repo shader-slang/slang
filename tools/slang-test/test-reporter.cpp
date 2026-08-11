@@ -257,7 +257,7 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_testServerLossTests.addRange(other->m_testServerLossTests);
 }
 
-void TestReporter::reportTestServerLoss()
+void TestReporter::recordTestServerLoss()
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
 

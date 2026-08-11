@@ -108,7 +108,7 @@ public:
     /// counted, and named, because the alternative -- absorbing it into the pass -- is how a
     /// loss rate grows without anyone noticing. Reported by outputSummary as a warning; it
     /// does not fail the run, since there is not yet a baseline to say what rate is normal.
-    void reportTestServerLoss();
+    void recordTestServerLoss();
 
     /// True if can write output directly to stderr
     bool canWriteStdError() const;
