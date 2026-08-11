@@ -6,7 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 
@@ -592,6 +592,131 @@ class TestHealthPartialRendering(unittest.TestCase):
 
         self.assertIn("Queue sample is partial", html)
 
+
+class TestPendingApprovals(unittest.TestCase):
+    """The Falcor bridge gate pauses runs until someone approves them, and a
+    stalled approval is invisible everywhere else: nothing has failed and
+    nothing is running, so it looks like a quiet afternoon."""
+
+    def _render(self, pending, partial=False, errors=None):
+        return ci_health.render_pending_approvals(
+            {"pending": pending, "partial": partial, "errors": errors or []}
+        )
+
+    def _row(self, **kw):
+        row = {
+            "run_id": 1,
+            "url": "https://github.com/o/r/actions/runs/1",
+            "actor": "someone",
+            "event": "pull_request",
+            "branch": "topic",
+            "title": "Some PR",
+            "waited_min": 5,
+        }
+        row.update(kw)
+        return row
+
+    def test_nothing_waiting_is_ok(self):
+        html = self._render([])
+        self.assertIn(">OK<", html)
+        self.assertIn("Nothing waiting for approval", html)
+
+    def test_recent_wait_is_only_a_warning(self):
+        # A couple of minutes means the approval bot is about to pick it up.
+        html = self._render([self._row(waited_min=3)])
+        self.assertIn(">WAITING<", html)
+        self.assertNotIn(">STALLED<", html)
+
+    def test_long_wait_is_stalled(self):
+        # Half an hour means nobody is coming, and the job will time out and
+        # report as a test failure rather than as an unapproved gate.
+        html = self._render([self._row(waited_min=45)])
+        self.assertIn(">STALLED<", html)
+
+    def test_partial_does_not_render_false_healthy_empty_state(self):
+        html = self._render([], partial=True, errors=["HTTP 502"])
+        self.assertIn(">PARTIAL<", html)
+        self.assertNotIn(">OK<", html)
+        self.assertIn("HTTP 502", html)
+
+    def test_oldest_first(self):
+        # render_pending_approvals displays rows in the order it receives them;
+        # sorting is done by fetch_pending_approvals. Pass already-sorted rows
+        # and scope to the table body to avoid the banner ("oldest 40 min").
+        html = self._render([self._row(waited_min=40), self._row(waited_min=5)])
+        table = html[html.index("<table>"):]
+        self.assertLess(table.index("40 min"), table.index("5 min"))
+
+    def test_merge_queue_runs_are_highlighted(self):
+        # A merge_group run holds up the whole queue, not just its own PR.
+        html = self._render([self._row(event="merge_group")])
+        self.assertIn("<strong>merge_group</strong>", html)
+
+    def test_titles_are_escaped_exactly_once(self):
+        # _link already escapes, so escaping the title before passing it in
+        # double-escapes: "A & B" renders as the literal text "A &amp; B".
+        # Asserting only that "<script>" is absent does not catch that, since
+        # double-escaping also hides it.
+        html = self._render([self._row(title="fix <script> & co")])
+        self.assertNotIn("<script>", html)
+        self.assertIn("fix &lt;script&gt; &amp; co", html)
+        self.assertNotIn("&amp;amp;", html)
+
+
+    def test_query_asks_for_waiting_runs(self):
+        # status=waiting has to be a request parameter: the default listing
+        # excludes waiting runs, so filtering client-side finds nothing.
+        calls = []
+
+        def fake_list(endpoint, key):
+            calls.append((endpoint, key))
+            return [], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(calls[0][1], "workflow_runs")
+        self.assertIn("status=waiting", calls[0][0])
+
+    def test_collection_error_is_partial_not_empty(self):
+        # An API failure must not look like "nothing is waiting".
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([], "HTTP 502")):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertTrue(data["partial"])
+        self.assertEqual(data["pending"], [])
+        self.assertIn("HTTP 502", data["errors"])
+
+    def test_records_are_sorted_oldest_first(self):
+        now = datetime.now(timezone.utc)
+
+        def fake_list(endpoint, key):
+            return [
+                {
+                    "id": 1,
+                    "created_at": (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "actor": {"login": "recent"},
+                },
+                {
+                    "id": 2,
+                    "created_at": (now - timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "actor": {"login": "oldest"},
+                },
+            ], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=fake_list):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual([p["actor"] for p in data["pending"]], ["oldest", "recent"])
+        self.assertGreaterEqual(data["pending"][0]["waited_min"], 89)
+
+    def test_unparseable_timestamp_does_not_raise(self):
+        with mock.patch.object(
+            gh_api, "gh_api_list", side_effect=lambda e, k: ([{"id": 1, "created_at": "not-a-date"}], None)
+        ):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(data["pending"][0]["waited_min"], 0)
 
 class TestHealthApiBounds(unittest.TestCase):
     def test_recent_failures_query_is_bounded_by_created_range(self):
@@ -2156,6 +2281,49 @@ class TestHostedRunnerRender(unittest.TestCase):
             with open(os.path.join(tmp, ci_health.SNAPSHOTS_FILE), encoding="utf-8") as f:
                 snapshot = json.loads(f.readline())
         self.assertEqual(snapshot["hosted_runner_usage"], usage)
+
+
+class TestPendingApprovalsLive(unittest.TestCase):
+    """The pending approvals section is now rendered by client-side JS that
+    fetches the GitHub API on page load, so the generated HTML contains a
+    placeholder div and a script tag rather than static content."""
+
+    def _health_html(self, repo="shader-slang/slang"):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0, "jobs_running": 0,
+                "runs_queued": 0, "runs_in_progress": 0,
+            },
+            "partial": False,
+            "list_errors": [],
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp, repo=repo)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                return f.read()
+
+    def test_pending_approvals_section_uses_js_placeholder(self):
+        html = self._health_html()
+        self.assertIn('id="pending-approvals-section"', html)
+        self.assertIn("fetch(url)", html)
+
+    def test_pending_approvals_placeholder_embeds_repo(self):
+        html = self._health_html(repo="shader-slang/slang")
+        self.assertIn('data-repo="shader-slang/slang"', html)
+
+    def test_pending_approvals_section_shows_loading_placeholder(self):
+        # The placeholder div shows a loading message before JS runs.
+        # Server-side rendering is gone; all content arrives via fetch().
+        html = self._health_html()
+        self.assertIn("Loading", html)
+        # No server-rendered approval rows exist as real HTML elements —
+        # the Python render_pending_approvals function is no longer called.
+        # The fetch_pending_approvals call was removed from main(), so the
+        # pending_approvals kwarg is never passed to generate_health_html.
+        self.assertNotIn("render_pending_approvals", html)
 
 
 if __name__ == "__main__":
