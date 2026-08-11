@@ -160,11 +160,25 @@ void ReplayContext::destroySingleton()
         // Claim the instance and publish it as draining in one critical section,
         // so a concurrent destroySingleton() sees null and does not drain or
         // delete the same context a second time.
+        //
+        // Teardown is single-threaded: the context's own maps take no locks, so
+        // concurrent use of one context is already outside this code's model.
+        // Only the caller that actually claims the instance may touch
+        // s_contextDraining; guarding the write on `toDelete` keeps a stray
+        // concurrent no-op caller from clobbering the owner's draining pointer
+        // mid-drain, rather than promising real concurrent-teardown support.
         std::lock_guard<std::mutex> lock(s_contextMutex);
         toDelete = s_contextInstance;
         s_contextInstance = nullptr;
-        s_contextDraining = toDelete;
+        if (toDelete)
+            s_contextDraining = toDelete;
     }
+
+    // A concurrent no-op caller (found the instance already claimed) has nothing
+    // to drain, clear, or delete, and must leave the owner's s_contextDraining
+    // untouched.
+    if (!toDelete)
+        return;
 
     // Drain the orphaned playback references before the members holding them are
     // destroyed, and while tryGet() still resolves to this context.
@@ -177,8 +191,7 @@ void ReplayContext::destroySingleton()
     // the context unreachable would leave those entries behind and the sweep
     // would release freed memory. Outside the lock because tryGet() takes
     // `s_contextMutex` and it is not recursive.
-    if (toDelete)
-        toDelete->releaseOrphanedPlaybackProxies();
+    toDelete->releaseOrphanedPlaybackProxies();
 
     {
         std::lock_guard<std::mutex> lock(s_contextMutex);
@@ -822,9 +835,11 @@ void ReplayContext::notePlaybackOrphanedProxy(ISlangUnknown* proxy)
     if (proxy == nullptr)
         return;
 
-    // One additional orphaned creation reference for this proxy. A proxy can be
-    // wrapped more than once during a replay (e.g. the same module handed back
-    // twice), so accumulate rather than overwrite.
+    // One additional orphaned creation reference for this proxy. The same
+    // implementation can be handed back as an output by more than one replayed
+    // call: wrapObject() returns the existing proxy for it each time, and the
+    // isOutput path notes it again. Accumulate rather than overwrite, or the
+    // second orphaned reference would never be released.
     uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
     if (existing)
         ++(*existing);
@@ -832,7 +847,7 @@ void ReplayContext::notePlaybackOrphanedProxy(ISlangUnknown* proxy)
         m_playbackOrphanedProxies[proxy] = 1;
 }
 
-uint32_t ReplayContext::testOnlyGetOrphanedPlaybackRefCount(ISlangUnknown* proxy) const
+uint32_t ReplayContext::testOnlyGetOrphanedRefCountImpl(ISlangUnknown* proxy) const
 {
     const uint32_t* existing = m_playbackOrphanedProxies.tryGetValue(proxy);
     return existing ? *existing : 0;
@@ -869,8 +884,11 @@ void ReplayContext::releaseOrphanedPlaybackProxies()
     }
     m_playbackOrphanedProxies.clear();
 
-    // Release newest first. These objects are not independent: tearing one down
-    // can reach into another that was created before it. A SessionProxy holds
+    // Release newest first. These orphans are not independent, and the general
+    // invariant across every orphan-able proxy is that a proxy only ever holds a
+    // reference on, or writes through to, proxies created *before* it -- creation
+    // order is the only ordering the replayed stream establishes among them -- so
+    // a safe teardown is always youngest first. Concretely: a SessionProxy holds
     // the real Linkage, and ~Linkage releases its ASTBuilder, whose destructor
     // writes through to the global Session that the GlobalSessionProxy holds --
     // so releasing the global session first leaves ~Linkage writing to freed
@@ -889,10 +907,15 @@ void ReplayContext::releaseOrphanedPlaybackProxies()
         ISlangUnknown* proxy = orphan.proxy;
         for (uint32_t i = 0; i < orphan.count; ++i)
         {
-            // Releasing one proxy can cascade-destroy another (a session drops
-            // its wrapped filesystem); the ProxyBase destructor unregisters it,
-            // so stop once this proxy is no longer registered to avoid a
-            // release of freed memory.
+            // This proxy may already be gone along either of two paths: (a) an
+            // earlier release() in this same inner loop drove its own refcount to
+            // 0; or (b) releasing an *earlier* orphan cascade-destroyed it (a
+            // session drops its wrapped filesystem) before its own outer-loop
+            // turn -- the snapshot still holds its now-dangling pointer, used here
+            // only as a hash key. Either way ~ProxyBase already unregistered it,
+            // so a missing registry entry means the object is freed; stop rather
+            // than release freed memory. Case (b) is what makes the
+            // snapshot-then-release design safe.
             if (!m_objectToHandle.containsKey(proxy))
                 break;
             proxy->release();

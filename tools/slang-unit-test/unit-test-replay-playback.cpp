@@ -490,6 +490,15 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     ISlangUnknown* playedBackSessionUnk = ctx().getProxy(recordedSessionHandle);
     SLANG_CHECK(playedBackSessionUnk != nullptr);
 
+    // Replaying createSession wrapped the recreated session on the real
+    // recordInterfaceImpl isOutput path, which notes the orphaned creation
+    // reference (#11936). Pin that the production dispatcher-to-bookkeeping wiring
+    // actually fired here -- the other orphan tests drive the bookkeeping through
+    // testsOnly* stand-ins, so without this a regression that stopped the
+    // dispatcher noting orphans would pass every unit assertion and only surface
+    // as a sanitizer leak. (The teardown drain is covered by the sweep tests.)
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(playedBackSessionUnk) > 0);
+
     // Verify we can query the ISession interface
     Slang::ComPtr<slang::ISession> playedBackSession;
     SLANG_CHECK(SLANG_SUCCEEDED(playedBackSessionUnk->queryInterface(

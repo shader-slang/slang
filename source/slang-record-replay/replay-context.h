@@ -632,7 +632,7 @@ public:
     /// tests. Zero when the proxy is not tracked at all.
     inline uint32_t testsOnlyGetOrphanedRefCount(ISlangUnknown* proxy) const
     {
-        return testOnlyGetOrphanedPlaybackRefCount(proxy);
+        return testOnlyGetOrphanedRefCountImpl(proxy);
     }
 
     /// Runs the playback-teardown sweep that releases every noted orphaned
@@ -797,7 +797,7 @@ private:
     /// double-free report, which only fires on a path some test happens to
     /// drive, and the entry-point wrapping that motivates the `unnote` is not
     /// driven by any of them.
-    SLANG_API uint32_t testOnlyGetOrphanedPlaybackRefCount(ISlangUnknown* proxy) const;
+    SLANG_API uint32_t testOnlyGetOrphanedRefCountImpl(ISlangUnknown* proxy) const;
     SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
     SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
 
