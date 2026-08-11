@@ -8849,10 +8849,11 @@ void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
 
 IRDecoration* IRInst::getFirstDecoration()
 {
-    // Decoration lookup runs on every instruction of every module, so it reads the
-    // list head without materializing: decorations precede children and are never
-    // deferred, and `as<IRDecoration>` stops this walk at the first non-decoration.
-    return as<IRDecoration>(getFirstDecorationOrChildWithoutMaterializing());
+    // Decoration lookup runs on every instruction of every module, so it does not
+    // materialize: decorations precede children, and `as<IRDecoration>` stops this
+    // walk at the first non-decoration. The load is acquire because a deferred body
+    // attaches here on a global that has no decorations.
+    return as<IRDecoration>(irLoadDecorationLink(m_decorationsAndChildren.first));
 }
 
 IRDecoration* IRInst::getLastDecoration()

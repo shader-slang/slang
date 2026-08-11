@@ -43,6 +43,38 @@ class TargetRequest;
 /// the rest encoded. Whoever deserialized the module installs one of these on the
 /// `IRModule`, and the first access to a global value's children asks it to decode
 /// that one body.
+//
+// Publication of a deferred body, and the one link it attaches to.
+//
+// A deferred body is built as a detached chain and attached with a single release
+// store, so a reader either sees no body or sees one whose instructions are fully
+// written. The decoration walk is the only reader that can observe that link without
+// going through `ensureBodyMaterialized`, by design -- materializing during decoration
+// lookup would defeat lazy loading entirely -- so it loads the link with acquire.
+//
+// Alternatives were implemented and measured before settling here. Relying on the
+// address dependency instead of acquire is free but formally a data race; taking the
+// loader's mutex in the walk is safe but serialises the hottest lookup in the compiler
+// on the very workload that motivates the laziness; and checking the deferred flag once
+// per walk to skip the barriers needs the *parent's* flag on every link, which costs a
+// `getParent()` load per step and gives back what it saves. On x86-64 all of them
+// measured within noise of each other, since an acquire load is a plain `mov` there.
+// If an ARM64 profile ever shows `ldar` mattering here, the fix is to have the
+// decoration iterator carry the decision once, not to consult the parent per link.
+//
+
+/// Release-store `value` into `slot`, publishing everything written before it.
+SLANG_FORCE_INLINE void irPublishDecorationLink(IRInst*& slot, IRInst* value)
+{
+    std::atomic_ref<IRInst*>(slot).store(value, std::memory_order_release);
+}
+
+/// Acquire-load a link that a deferred body may be attaching to.
+SLANG_FORCE_INLINE IRInst* irLoadDecorationLink(IRInst* const& slot)
+{
+    return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
+}
+
 struct IRDeferredBodyLoader : RefObject
 {
     virtual ~IRDeferredBodyLoader() = default;

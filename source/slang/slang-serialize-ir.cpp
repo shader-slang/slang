@@ -709,25 +709,42 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
     stringLengthIndex = body.stringLengthCursor;
     stringDataIndex = body.stringDataCursor;
 
-    // The decorations are already linked; the body appends after them.
-    IRInst* prev = inst->m_decorationsAndChildren.last;
-    IRInst* first = inst->m_decorationsAndChildren.first;
+    // Build the body as a detached chain first, then attach it with a single store.
+    //
+    // The children are unreachable by any other thread while they are being built, so
+    // linking them to each other needs no synchronization. Attaching is the only
+    // publication, and it is one store: previously the chain was spliced onto the last
+    // decoration on the first iteration, which let a concurrent decoration walk follow
+    // that link into a chain that was still being decoded.
+    IRInst* const lastDecoration = inst->m_decorationsAndChildren.last;
+    IRInst* bodyFirst = nullptr;
+    IRInst* bodyLast = nullptr;
     for (Int64 i = 0; i < body.childCount; ++i)
     {
         auto child = decodeInst(inst, 2);
         if (!child)
             continue;
-        if (!first)
-            first = child;
-        child->prev = prev;
-        if (prev)
-            prev->next = child;
-        prev = child;
+        child->prev = bodyLast;
+        if (bodyLast)
+            bodyLast->next = child;
+        else
+            bodyFirst = child;
+        bodyLast = child;
     }
-    if (prev)
-        prev->next = nullptr;
-    inst->m_decorationsAndChildren.first = first;
-    inst->m_decorationsAndChildren.last = prev;
+    if (bodyLast)
+        bodyLast->next = nullptr;
+
+    if (bodyFirst)
+    {
+        bodyFirst->prev = lastDecoration;
+        inst->m_decorationsAndChildren.last = bodyLast;
+        // The publishing store. Release so that a reader which observes the link also
+        // observes every field of every instruction in the chain behind it.
+        if (lastDecoration)
+            irPublishDecorationLink(lastDecoration->next, bodyFirst);
+        else
+            irPublishDecorationLink(inst->m_decorationsAndChildren.first, bodyFirst);
+    }
 
     deferBodies = savedDefer;
 

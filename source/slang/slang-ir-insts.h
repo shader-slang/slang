@@ -36,7 +36,13 @@ struct IRDecoration : IRInst
 {
     FIDDLE(baseInst())
 
-    IRDecoration* getNextDecoration() { return as<IRDecoration>(getNextInst()); }
+    IRDecoration* getNextDecoration()
+    {
+        // The last decoration's `next` is the link a deferred body attaches to, so
+        // this step can race a concurrent materialization; acquire pairs with the
+        // release store that publishes the chain.
+        return as<IRDecoration>(irLoadDecorationLink(next));
+    }
 };
 
 // Associates an IR-level decoration with a source declaration
