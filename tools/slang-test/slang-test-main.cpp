@@ -1184,7 +1184,8 @@ static void _reportServerLoss(
 {
     StringBuilder detail;
 
-    auto* connection = rpcConnection ? rpcConnection->getUnderlyingConnection() : nullptr;
+    SLANG_RELEASE_ASSERT(rpcConnection);
+    auto* connection = rpcConnection->getUnderlyingConnection();
 
     switch (outcome)
     {
@@ -1219,7 +1220,7 @@ static void _reportServerLoss(
     // The exit status separates the leading explanations at a glance: a signal means the
     // server was killed (137 = SIGKILL, typically the OOM killer; 139 = SIGSEGV, a crash),
     // whereas a small non-zero code means it chose to exit.
-    if (auto* process = rpcConnection ? rpcConnection->getProcess() : nullptr)
+    if (auto* process = rpcConnection->getProcess())
     {
         if (process->isTerminated())
         {
@@ -1231,11 +1232,17 @@ static void _reportServerLoss(
         }
     }
 
+    // "died ON request N", not "after serving N": nextRPCRequestOrdinal() numbers the request
+    // being sent, so the server had answered N-1 of them. Stated as the ordinal it died on
+    // because that is the number worth comparing across runs -- if deaths cluster near a fixed
+    // ordinal the server is accumulating something per request, and an off-by-one in the
+    // instrument would misplace exactly that clustering.
     context->getTestReporter()->messageFormat(
         TestMessageType::RunError,
-        "test server lost in %s after serving %d request(s) on this connection: %s",
+        "test server lost in %s on request #%d of this connection (it had answered %d): %s",
         phase,
         requestOrdinal,
+        requestOrdinal - 1,
         detail.produceString().getBuffer());
 }
 
@@ -5998,6 +6005,24 @@ static void cleanupRenderTestDeviceCache(TestContext& context)
     }
 }
 
+/// Give every deferred file test a verdict of Fail.
+///
+/// A test held for retry is recorded only as "pending retry", which is a placeholder rather
+/// than a result; the retry loop is what normally turns it into one. Both paths that skip
+/// that loop -- the consecutive-failure abort and the too-many-failures cutoff -- have to do
+/// this themselves, or the tests are dropped from the totals entirely and the run reports
+/// success having verified nothing.
+static void _recordDeferredTestsAsFailed(TestContext& context, TestReporter& reporter)
+{
+    for (auto& test : context.failedFileTests)
+    {
+        FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+        TestReporter::SuiteScope suiteScope(&reporter, "tests");
+        TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+        reporter.addResult(TestResult::Fail);
+    }
+}
+
 SlangResult innerMain(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
@@ -6328,15 +6353,8 @@ SlangResult innerMain(int argc, char** argv)
             // 0 announcing "0% of tests passed (0/0)".
             //
             // That made the systemic collapse this branch exists to shout about the one
-            // outcome CI could not see -- a green run. Recorded the same way the
-            // too-many-failures branch below records its own skipped retries.
-            for (auto& test : context.failedFileTests)
-            {
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                reporter.addResult(TestResult::Fail);
-            }
+            // outcome CI could not see -- a green run.
+            _recordDeferredTestsAsFailed(context, reporter);
         }
 
         if (!context.options.disableRetries && !context.stopSchedulingTests.load())
@@ -6374,13 +6392,7 @@ SlangResult innerMain(int argc, char** argv)
                     "Too many failed tests for retry(%d) - setting all to failed\n",
                     (int)context.failedFileTests.getCount());
                 fflush(stdout);
-                for (auto& test : context.failedFileTests)
-                {
-                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                    reporter.addResult(TestResult::Fail);
-                }
+                _recordDeferredTestsAsFailed(context, reporter);
             }
         }
 
