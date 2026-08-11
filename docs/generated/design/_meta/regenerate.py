@@ -379,6 +379,19 @@ _GAP_STATUSES = (
 
 _GAP_ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
+# Mirrors `_ALLOWED_GAP_KINDS` in the tests driver and the `kind` enum in
+# doc-gap-state.schema.json. Duplicated rather than imported because the two
+# drivers are deliberately separate programs; `lint_doc_gap_state` checks it
+# so the hand-rolled validator and the committed schema cannot disagree.
+_GAP_KINDS = (
+    "missing-example",
+    "missing-surface",
+    "undocumented-behavior",
+    "cascading-only-mention",
+    "ambiguous-claim",
+    "drift-from-source",
+)
+
 
 def load_doc_gap_state() -> dict:
     if not DOC_GAP_STATE_PATH.exists():
@@ -393,8 +406,13 @@ def save_doc_gap_state(state: dict) -> None:
 
 
 def load_gap_queue(source_doc: str | None = None) -> dict[str, list[dict]]:
-    """Return the open-or-not gap rows the test suite currently reports,
-    keyed by the document each is anchored to.
+    """Return every gap row the test suite currently reports, keyed by the
+    document each is anchored to.
+
+    This is the raw queue *before* any ledger decision is applied: it never
+    reads `doc-gap-state.json`. The open/decided split happens in
+    `cmd_gap_status`, which joins this against the ledger. A caller wanting
+    only open gaps has to do that join itself.
 
     Shells out to the tests driver rather than importing it: the two drivers
     are separate programs with separate manifests and separate notions of
@@ -431,6 +449,12 @@ def load_gap_queue(source_doc: str | None = None) -> dict[str, list[dict]]:
 
 TESTS_FRESHNESS_PATH = REPO_ROOT / "docs/generated/tests/_meta/freshness.json"
 
+# The three verdicts `_classify_fixed_gap` returns. Named so the renderers
+# and any future consumer share one spelling rather than repeating literals.
+_FIX_REOPENED = "reopened"
+_FIX_AWAITING_REGEN = "awaiting-regen"
+_FIX_UNVERIFIABLE = "unverifiable"
+
 
 def load_bundle_source_doc_digests() -> dict[str, str | None]:
     """Return each test bundle's recorded `source_doc_digest`.
@@ -452,10 +476,13 @@ def load_bundle_source_doc_digests() -> dict[str, str | None]:
     }
 
 
-def _verify_fixed_gap(
+def _classify_fixed_gap(
     doc: str, reported_by: list[str], bundle_digests: dict[str, str | None]
 ) -> str:
-    """Say whether a gap the ledger calls `fixed` has actually been retested.
+    """Classify whether a gap the ledger calls `fixed` has been retested.
+
+    Returns one of `_FIX_REOPENED` / `_FIX_AWAITING_REGEN` /
+    `_FIX_UNVERIFIABLE` -- a verdict, not a pass/fail.
 
     Fixing a gap edits the document, which changes the reporting bundle's
     `source_doc_digest` and marks it stale; regenerating the bundle
@@ -482,15 +509,15 @@ def _verify_fixed_gap(
     """
     doc_path = REPO_ROOT / doc
     if not doc_path.exists():
-        return "unverifiable"
+        return _FIX_UNVERIFIABLE
     current = hashlib.sha256(doc_path.read_bytes()).hexdigest()
     anchored = [b for b in reported_by if bundle_digests.get(_bundle_key(b))]
     if not anchored:
-        return "unverifiable"
+        return _FIX_UNVERIFIABLE
     for bundle in anchored:
         if bundle_digests.get(_bundle_key(bundle)) != current:
-            return "awaiting-regen"
-    return "reopened"
+            return _FIX_AWAITING_REGEN
+    return _FIX_REOPENED
 
 
 def _bundle_key(bundle_dir: str) -> str:
@@ -1710,15 +1737,15 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
             status = _gap_status(g["gap_id"], ledger_gaps)
             counts[status] = counts.get(status, 0) + 1
             # A `fixed` gap that is still in the queue has not necessarily
-            # failed; whether it has is the question `_verify_fixed_gap`
+            # failed; whether it has is the question `_classify_fixed_gap`
             # answers. A gap that has left the queue is counted as
             # `retired` below and needs no verification -- its absence is
             # the confirmation.
             if status == "fixed":
-                verification[g["gap_id"]] = _verify_fixed_gap(
+                verification[g["gap_id"]] = _classify_fixed_gap(
                     doc, g["reported_by"], bundle_digests
                 )
-        reopened = sum(1 for v in verification.values() if v == "reopened")
+        reopened = sum(1 for v in verification.values() if v == _FIX_REOPENED)
         # Decisions whose gap no longer appears in the queue. The healthy
         # cause is a fix that landed and a bundle that was then regenerated,
         # so the row is gone; the other cause is an id that churned when its
@@ -1769,10 +1796,11 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
         if not open_n and not decided and not row["retired"] and args.only_open:
             continue
         line = f"{open_n:>4} open  {decided:>4} decided"
-        if row["retired"]:
-            line += f"  {row['retired']:>3} retired"
-        else:
-            line += " " * 13
+        retired_field = f"  {row['retired']:>3} retired"
+        # Pad with the retired column's own width so the REOPENED column
+        # stays aligned when a row has none -- derived rather than a magic
+        # constant, so a change to the format above cannot silently drift.
+        line += retired_field if row["retired"] else " " * len(retired_field)
         if row["reopened"]:
             line += f"  {row['reopened']:>3} REOPENED"
         suffix = "" if row["in_manifest"] else "   (not in manifest)"
@@ -1922,7 +1950,18 @@ def cmd_mark_gap(args, manifest: Manifest) -> int:
     if args.report:
         entry["report_path"] = args.report
     if args.finding:
-        entry["finding_id"] = args.finding
+        # Run the operator's spelling through the same resolver the intake
+        # path uses, so the ledger holds one canonical form (a bare id that
+        # resolves under findings/) no matter which command wrote it.
+        canonical = _finding_ref(args.finding) or _finding_ref(f"`{args.finding}`")
+        if not canonical:
+            print(
+                f"error: --finding {args.finding!r} does not resolve to a file"
+                f" under {_rel_to_repo(FINDINGS_DIR)}",
+                file=sys.stderr,
+            )
+            return 2
+        entry["finding_id"] = canonical
     gaps[args.gap_id] = entry
     save_doc_gap_state(state)
     verb = "updated" if prev else "recorded"
@@ -2222,6 +2261,13 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
             "report_path": report_rel,
             "rationale": row["Evidence"].strip(),
         }
+        # The schema says `rationale` explains the status, and for a fix that
+        # means naming the edit -- which lives in `Fix summary`, not
+        # `Evidence`. Carry it so an intake-written entry says the same kind
+        # of thing a hand-written one does.
+        fix_summary = (row.get("Fix summary") or "").strip()
+        if fix_summary and fix_summary not in ("—", "-"):
+            entry["fix_summary"] = fix_summary
         finding = _finding_ref(row.get("Evidence", ""))
         if finding:
             entry["finding_id"] = finding
@@ -2233,12 +2279,23 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
 
 FINDINGS_DIR = REPO_ROOT / "docs/generated/tests/_meta/findings"
 
-_FINDING_REF_RE = re.compile(r"findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml")
+# `(?<![\w/])` keeps the path form from matching inside a longer token -- a
+# URL such as `https://…/findings/filed/test.yaml/comments` would otherwise
+# yield `test`. `(?![\w.])` does the same on the right.
+_FINDING_REF_RE = re.compile(
+    r"(?<![\w/])findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml(?![\w.])"
+)
 _FINDING_ID_RE = re.compile(r"`([a-z0-9][a-z0-9-]{4,})`")
 
 
+def _finding_exists(candidate: str) -> bool:
+    return any(
+        (FINDINGS_DIR / sub / f"{candidate}.yaml").exists() for sub in ("", "filed")
+    )
+
+
 def _finding_ref(evidence: str) -> str | None:
-    """Return the finding id an Evidence cell cites, if any.
+    """Return the finding id an Evidence cell cites, if the finding exists.
 
     Escalations point at `docs/generated/tests/_meta/findings/<id>.yaml`;
     the id is pulled out of the prose rather than given its own column
@@ -2247,24 +2304,21 @@ def _finding_ref(evidence: str) -> str | None:
     report.
 
     An agent that names the finding by its bare id rather than its path
-    has still named it, so the bare form is accepted too -- but only when
-    it resolves to a file that actually exists under `findings/`. That
-    keeps the check precise rather than merely lenient: the point of
-    requiring a reference at all is that someone can follow it, and a
-    filesystem hit proves they can. The first cycle to escalate anything
-    was rejected over exactly this spelling difference, with the finding
-    sitting in the directory the whole time.
+    has still named it, so the bare form is accepted too. Either way the
+    id must resolve to a file that actually exists under `findings/`.
+    That is the whole point of demanding a reference: someone has to be
+    able to follow it, and only a filesystem hit proves they can. A
+    mistyped path is exactly as useless as a mistyped id, so both are
+    checked the same way -- an earlier version trusted the path form
+    unconditionally, which let `findings/typo.yaml` through the
+    escalation gate.
     """
     m = _FINDING_REF_RE.search(evidence or "")
-    if m:
+    if m and _finding_exists(m.group(1)):
         return m.group(1)
     for candidate in _FINDING_ID_RE.findall(evidence or ""):
-        for path in (
-            FINDINGS_DIR / f"{candidate}.yaml",
-            FINDINGS_DIR / "filed" / f"{candidate}.yaml",
-        ):
-            if path.exists():
-                return candidate
+        if _finding_exists(candidate):
+            return candidate
     return None
 
 
@@ -2312,6 +2366,15 @@ def lint_doc_gap_state() -> list[LintIssue]:
                 issues.append(
                     LintIssue(rel, "error", f"{gap_id}: missing {required}")
                 )
+        kind = entry.get("kind")
+        if kind is not None and kind not in _GAP_KINDS:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"{gap_id}: kind={kind!r} not in {list(_GAP_KINDS)}",
+                )
+            )
         target = entry.get("target_doc")
         if target and not (REPO_ROOT / target).exists():
             issues.append(
@@ -2438,6 +2501,163 @@ def cmd_lint(args, manifest: Manifest) -> int:
             if issue.severity == "error":
                 any_error = True
     return 1 if any_error else 0
+
+
+def cmd_selftest(args, manifest: Manifest) -> int:
+    """Unit-check the ledger helpers `lint` and `gap-status` depend on.
+
+    `lint` only ever runs these against the committed tree, where
+    `doc-gap-state.json` is valid by construction and every gap-intake
+    report reconciles -- so a green CI run proves the happy path and
+    nothing else. Every contract-enforcing branch below is one that the
+    committed corpus cannot reach: the malformed-ledger cases, the
+    report-validation failures that stop a bad report from
+    half-populating the ledger, and the three-way fixed-gap verdict whose
+    whole purpose is to distinguish "the fix failed" from "not retested
+    yet". A regression inverting any of them would otherwise pass CI.
+    """
+    _ = manifest, args
+    failures: list[str] = []
+
+    def check(what: str, got, want) -> None:
+        if got != want:
+            failures.append(f"{what}: got {got!r}, want {want!r}")
+
+    # -- _finding_ref -------------------------------------------------
+    # Both spellings must resolve, and both must require the file to
+    # exist: a mistyped path is exactly as useless as a mistyped id.
+    real = None
+    for cand in sorted(FINDINGS_DIR.glob("*.yaml"))[:1]:
+        real = cand.stem
+    if real:
+        check("finding path form", _finding_ref(f"see findings/{real}.yaml"), real)
+        check("finding bare id", _finding_ref(f"covered by `{real}`"), real)
+        check(
+            "finding embedded in URL is not a match",
+            _finding_ref(f"https://x/findings/{real}.yaml/comments"),
+            None,
+        )
+    check("finding missing path rejected", _finding_ref("see findings/nope.yaml"), None)
+    check("finding missing bare id rejected", _finding_ref("`no-such-finding`"), None)
+    check("finding absent entirely", _finding_ref("this is a compiler bug"), None)
+
+    # -- _gap_summary -------------------------------------------------
+    check("summary short passthrough", _gap_summary("  a   b "), "a b")
+    long = "word " * 60
+    out = _gap_summary(long)
+    check("summary truncated", len(out) <= _GAP_SUMMARY_CAP + 4, True)
+    check("summary ends on a word boundary", out.endswith(" ..."), True)
+
+    # -- _bundle_key --------------------------------------------------
+    check(
+        "bundle key strips the tests prefix",
+        _bundle_key("docs/generated/tests/design/x"),
+        "design/x",
+    )
+    check("bundle key passes through", _bundle_key("design/x"), "design/x")
+
+    # -- _classify_fixed_gap ------------------------------------------
+    # The verdict turns on whether the reporting bundle has been
+    # regenerated against the document's *current* text.
+    # Resolved against REPO_ROOT, so this needs a real committed document
+    # rather than a temp file.
+    real_doc = next(
+        (
+            spec.path
+            for spec in manifest.docs.values()
+            if (REPO_ROOT / spec.path).exists()
+        ),
+        None,
+    )
+    if real_doc:
+        cur = hashlib.sha256((REPO_ROOT / real_doc).read_bytes()).hexdigest()
+        b = "docs/generated/tests/design/x"
+        check(
+            "fixed gap reopens once its bundle is regenerated",
+            _classify_fixed_gap(real_doc, [b], {"design/x": cur}),
+            _FIX_REOPENED,
+        )
+        check(
+            "fixed gap awaits a stale bundle",
+            _classify_fixed_gap(real_doc, [b], {"design/x": "0" * 64}),
+            _FIX_AWAITING_REGEN,
+        )
+        check(
+            "coverage-only reporter cannot be verified",
+            _classify_fixed_gap(real_doc, [b], {"design/x": None}),
+            _FIX_UNVERIFIABLE,
+        )
+    check(
+        "missing document is unverifiable",
+        _classify_fixed_gap("docs/generated/design/does-not-exist.md", [], {}),
+        _FIX_UNVERIFIABLE,
+    )
+
+    # -- lint_doc_gap_state -------------------------------------------
+    # Each malformed shape must produce an error; the committed ledger
+    # reaches none of these.
+    good = {
+        "status": "fixed",
+        "target_doc": "docs/generated/design/glossary.md",
+        "kind": "missing-example",
+        "decided_at": "2026-08-11T00:00:00Z",
+        "rationale": "because",
+    }
+
+    def lint_state(entries: dict, version: int = 1) -> list[str]:
+        saved = DOC_GAP_STATE_PATH.read_text(encoding="utf-8")
+        try:
+            DOC_GAP_STATE_PATH.write_text(
+                json.dumps({"schema_version": version, "gaps": entries}),
+                encoding="utf-8",
+            )
+            return [i.message for i in lint_doc_gap_state() if i.severity == "error"]
+        finally:
+            DOC_GAP_STATE_PATH.write_text(saved, encoding="utf-8")
+
+    check("ledger accepts a well-formed entry", lint_state({"a" * 12: good}), [])
+    check(
+        "ledger rejects a bad gap id",
+        any("12-hex" in m for m in lint_state({"NOTHEX": good})),
+        True,
+    )
+    check(
+        "ledger rejects an unknown status",
+        any("status=" in m for m in lint_state({"a" * 12: {**good, "status": "x"}})),
+        True,
+    )
+    check(
+        "ledger rejects an unknown kind",
+        any("kind=" in m for m in lint_state({"a" * 12: {**good, "kind": "invented"}})),
+        True,
+    )
+    for missing in ("target_doc", "decided_at", "rationale"):
+        entry = {k: v for k, v in good.items() if k != missing}
+        check(
+            f"ledger requires {missing}",
+            any(missing in m for m in lint_state({"a" * 12: entry})),
+            True,
+        )
+    check(
+        "ledger requires a finding id for an escalation",
+        any(
+            "finding_id" in m
+            for m in lint_state(
+                {"a" * 12: {**good, "status": "escalated-to-finding"}}
+            )
+        ),
+        True,
+    )
+    check(
+        "ledger rejects a wrong schema_version",
+        any("schema_version" in m for m in lint_state({}, version=2)),
+        True,
+    )
+
+    for f in failures:
+        print(f"FAIL {f}")
+    print(f"selftest: {len(failures)} failure(s)")
+    return 1 if failures else 0
 
 
 def _require_doc(manifest: Manifest, key: str) -> DocSpec:
@@ -2579,6 +2799,11 @@ def build_parser() -> argparse.ArgumentParser:
         " _meta/gap-intake/<doc>.gap-intake.md",
     )
 
+    sub.add_parser(
+        "selftest",
+        help="unit-check the ledger helpers lint and gap-status depend on",
+    )
+
     return p
 
 
@@ -2599,6 +2824,7 @@ def main(argv: list[str] | None = None) -> int:
         "gap-status": cmd_gap_status,
         "mark-gap": cmd_mark_gap,
         "mark-gap-intake": cmd_mark_gap_intake,
+        "selftest": cmd_selftest,
     }
     return handlers[args.cmd](args, manifest)
 

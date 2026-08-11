@@ -24,20 +24,21 @@ All commands run from the repository root.
 python3 docs/generated/design/_meta/regenerate.py <subcommand> [args...]
 ```
 
-| Subcommand                                                                | Purpose                                                                                                                  |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `list`                                                                    | Print every doc in the manifest                                                                                          |
-| `list-stale [--include-review]`                                           | Classify each doc as `missing`, `stale`, or `fresh`; with the flag, annotate each row with its review/remediation status |
-| `digest <doc>`                                                            | Compute the current digest of a doc's watched paths                                                                      |
-| `show <doc>`                                                              | Show the manifest entry plus the resolved source files                                                                   |
-| `mark-fresh <doc> [--commit SHA] [--model NAME]`                          | Record a fresh entry                                                                                                     |
-| `lint [<doc>...]`                                                         | Structural linter (front-matter, link resolution, size cap; also lints every review and remediation report)              |
-| `review-status [<doc>...] [--show-counts]`                                | Per-doc review/remediation freshness (see "Review and remediation workflow" below)                                       |
-| `mark-reviewed <doc> [--report PATH]`                                     | Record a review entry from a review report (see below)                                                                   |
-| `mark-remediated <doc> [--report PATH]`                                   | Record a remediation entry from a remediation report (see below)                                                         |
-| `gap-status [<doc>...] [--show-gaps] [--only-open] [--format text\|json]` | Per-doc count of doc gaps the agentic test suite reports against this tree (see "Doc gaps from the test suite" below)    |
-| `mark-gap <gap-id> --status <s> --rationale <text>`                       | Record a decision about one gap by hand                                                                                  |
-| `mark-gap-intake <doc> [--report PATH]`                                   | Write a gap-intake report's decisions into the ledger in bulk                                                            |
+| Subcommand                                                                                          | Purpose                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list`                                                                                              | Print every doc in the manifest                                                                                                                        |
+| `list-stale [--include-review]`                                                                     | Classify each doc as `missing`, `stale`, or `fresh`; with the flag, annotate each row with its review/remediation status                               |
+| `digest <doc>`                                                                                      | Compute the current digest of a doc's watched paths                                                                                                    |
+| `show <doc>`                                                                                        | Show the manifest entry plus the resolved source files                                                                                                 |
+| `mark-fresh <doc> [--commit SHA] [--model NAME]`                                                    | Record a fresh entry                                                                                                                                   |
+| `lint [<doc>...]`                                                                                   | Structural linter (front-matter, link resolution, size cap; also lints every review and remediation report)                                            |
+| `review-status [<doc>...] [--show-counts]`                                                          | Per-doc review/remediation freshness (see "Review and remediation workflow" below)                                                                     |
+| `mark-reviewed <doc> [--report PATH]`                                                               | Record a review entry from a review report (see below)                                                                                                 |
+| `mark-remediated <doc> [--report PATH]`                                                             | Record a remediation entry from a remediation report (see below)                                                                                       |
+| `gap-status [<doc>...] [--show-gaps] [--only-open] [--format text\|json\|markdown]`                 | Per-doc count of doc gaps the agentic test suite reports against this tree; `markdown` is the form CI posts (see "Doc gaps from the test suite" below) |
+| `mark-gap <gap-id> --status <s> --rationale <text> [--finding <id>] [--report PATH] [--model NAME]` | Record a decision about one gap by hand. `--finding` is **required** when `--status escalated-to-finding`, and must name an existing finding           |
+| `mark-gap-intake <doc> [--report PATH]`                                                             | Write a gap-intake report's decisions into the ledger in bulk                                                                                          |
+| `selftest`                                                                                          | Unit-check the ledger helpers `lint` and `gap-status` depend on                                                                                        |
 
 `<doc>` is the manifest key (e.g. `pipeline/05-ir-passes.md`), not the full
 workspace path.
