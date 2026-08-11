@@ -9,12 +9,20 @@
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a geometry-shader `TriangleStream<...>` output parameter
-// records its stream type as a decoration on the entry point. The dump
-// spells the inst `streamOutputTypeLayout` at this phase rather than with
-// the reference's `streamOutputTypeDecoration` name, so the CHECK matches
-// the printed spelling and the entry point's `nameHint` anchors the match
-// at user code; the spelling difference is recorded as a doc gap.
+// Observes the `streamOutputTypeLayout` inst a geometry-shader
+// `TriangleStream<...>` output parameter produces.
+//
+// CORRECTION (gap-intake cycle 1): an earlier version of this comment
+// claimed `streamOutputTypeLayout` was merely how the dump spells
+// `streamOutputTypeDecoration` at this phase, and filed the difference as a
+// documentation gap. That was wrong on both counts. They are two distinct
+// insts: `streamOutputTypeLayout` is an `IRTypeLayout`
+// (`slang-ir-insts.lua:2888`, `IRStreamOutputTypeLayout : IRTypeLayout` at
+// `slang-ir-insts.h:1406`), while `streamOutputTypeDecoration` is a
+// decoration (`slang-ir-insts.lua:2081`). This test therefore does NOT
+// verify the decoration; it verifies the layout inst. The gap it produced
+// was rejected as bogus. A test for the decoration itself still needs
+// writing, and needs a compiler run to pin the printed form.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -dump-ir -o /dev/null -entry main -stage geometry
 
