@@ -6360,6 +6360,13 @@ SlangResult innerMain(int argc, char** argv)
             //
             // That made the systemic collapse this branch exists to shout about the one
             // outcome CI could not see -- a green run.
+            //
+            // NOTE: #12453 (fixing #11911) introduces reconcilePendingRetries(), which turns
+            // ANY still-deferred result into a failure just before the summary. That is the
+            // general form of this rule, and it should subsume this call once it lands --
+            // both loops here can go, while the `aborted` term in the exit code below still
+            // cannot: an abort tripped on a path that deferred nothing leaves reconcile with
+            // nothing to fail.
             _recordDeferredTestsAsFailed(context, reporter);
         }
 
