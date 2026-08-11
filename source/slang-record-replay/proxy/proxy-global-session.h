@@ -68,6 +68,13 @@ public:
         // file system used, and on reading we use that to decide whether to look for an existing
         // proxy, wrap the OS, or wrap a new dummy 'NULL' filesystem.
         slang::SessionDesc desc2 = desc;
+        // wrapObject returns an owning reference (see proxy-base.h). When we
+        // create the wrapper here we are its caller, so we own that reference
+        // and must release it once the real createSession has taken its own, or
+        // the proxy leaks (issue #11936). The reading `default` branch instead
+        // reuses an already-registered proxy via toSlangInterface, which is a
+        // borrowed pointer, so it must not be released here.
+        bool ownsFileSystemWrapper = false;
         if (_ctx.isWriting())
         {
             uint64_t handle = 0;
@@ -90,6 +97,7 @@ public:
                 desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
                 handle = kDefaultFileSystemHandle;
             }
+            ownsFileSystemWrapper = true;
             RECORD_INFO(handle);
         }
         else if (_ctx.isReading())
@@ -101,6 +109,7 @@ public:
             case kDefaultFileSystemHandle:
                 {
                     desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
+                    ownsFileSystemWrapper = true;
                     break;
                 }
             case kCustomFileSystemHandle:
@@ -108,6 +117,7 @@ public:
                     auto nfs = new NULLFileSystem();
                     nfs->addRef();
                     desc2.fileSystem = wrapObject(nfs);
+                    ownsFileSystemWrapper = true;
                     break;
                 }
             default:
@@ -121,6 +131,16 @@ public:
         // Call create session with our wrapped file system
         PREPARE_POINTER_OUTPUT(outSession);
         auto result = getActual<slang::IGlobalSession>()->createSession(desc2, outSession);
+
+        // The created session holds its own reference to the file system for its
+        // lifetime, so drop the creation reference we still hold on the wrapper.
+        // Suppress recording: this is our internal bookkeeping, not a user
+        // release that belongs in the stream (issue #11936).
+        if (ownsFileSystemWrapper && desc2.fileSystem)
+        {
+            SuppressRefCountRecording guard;
+            desc2.fileSystem->release();
+        }
 
         RECORD_COM_OUTPUT(outSession);
         RECORD_RETURN(result);
