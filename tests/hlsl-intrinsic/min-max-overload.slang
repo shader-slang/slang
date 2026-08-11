@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -O0
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv
 
 // Test that min/max with IInteger and IFloat constraints emit optimized intrinsics (issue #9395)
 // This verifies that the IArithmetic overload routes to the correct SPIR-V instructions.
@@ -53,15 +53,18 @@ T genericMaxArithmetic<T : IArithmetic>(T a, T b)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+    // Keep the operands runtime-dependent so that the operations remain in the SPIR-V at every
+    // optimization level.
+
     // Test IInteger constraint - should emit SMin
-    int intA = 5;
-    int intB = 3;
+    int intA = int(dispatchThreadID.x) + 5;
+    int intB = int(dispatchThreadID.y) + 3;
     int intMin = genericMin<int>(intA, intB);
     // CHECK: SMin
 
     // Test IFloat constraint - should emit FMax
-    float floatA = 2.5f;
-    float floatB = 4.0f;
+    float floatA = float(dispatchThreadID.y) + 2.5f;
+    float floatB = float(dispatchThreadID.z) + 4.0f;
     float floatMax = genericMax<float>(floatA, floatB);
     // CHECK: FMax
 
@@ -69,15 +72,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[1] = int(floatMax * 10);
 
     // Test direct calls - should also emit optimized intrinsics
-    outputBuffer[2] = min(10, 20);
+    outputBuffer[2] = min(int(dispatchThreadID.z) + 10, int(dispatchThreadID.x) + 20);
     // CHECK: SMin
 
-    outputBuffer[3] = int(max(1.5f, 2.5f) * 10);
+    outputBuffer[3] =
+        int(max(float(dispatchThreadID.x) + 1.5f, float(dispatchThreadID.y) + 2.5f) * 10);
     // CHECK: FMax
 
     // Test custom IArithmetic type - should use lessThan comparison + Select
-    MyNumber numA = MyNumber(15);
-    MyNumber numB = MyNumber(7);
+    MyNumber numA = MyNumber(int(dispatchThreadID.x) + 15);
+    MyNumber numB = MyNumber(int(dispatchThreadID.z) + 7);
     MyNumber customMin = genericMinArithmetic<MyNumber>(numA, numB);
     MyNumber customMax = genericMaxArithmetic<MyNumber>(numA, numB);
     // CHECK: OpSLessThan

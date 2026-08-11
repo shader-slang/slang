@@ -1,0 +1,49 @@
+//META: generated=true
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools
+//META: doc_section_digest=7595db660b35cc02b10c1faff7c57997ed8dd2086bd9cc7a8a2f2cd14599f777
+//META: purpose=Eight distinct RWStructuredBuffer globals receive sequential Binding 0..Binding 7 decorations with DescriptorSet 0 — stresses the sequential-binding allocation past the small-count case.
+//META: intent=stress
+//META: pipeline_stage=emit
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Stress: many sequential resources. The bundle pins the 2-resource
+// case; this exercises 8 RWStructuredBuffer parameters, all of
+// which should receive ascending Binding 0..7 decorations under
+// DescriptorSet 0.
+
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -entry main -stage compute
+
+RWStructuredBuffer<int> b0;
+RWStructuredBuffer<int> b1;
+RWStructuredBuffer<int> b2;
+RWStructuredBuffer<int> b3;
+RWStructuredBuffer<int> b4;
+RWStructuredBuffer<int> b5;
+RWStructuredBuffer<int> b6;
+RWStructuredBuffer<int> b7;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    b0[tid.x] = 0;
+    b1[tid.x] = 1;
+    b2[tid.x] = 2;
+    b3[tid.x] = 3;
+    b4[tid.x] = 4;
+    b5[tid.x] = 5;
+    b6[tid.x] = 6;
+    b7[tid.x] = 7;
+}
+
+// CHECK-DAG: OpDecorate %b0 Binding 0
+// CHECK-DAG: OpDecorate %b1 Binding 1
+// CHECK-DAG: OpDecorate %b2 Binding 2
+// CHECK-DAG: OpDecorate %b3 Binding 3
+// CHECK-DAG: OpDecorate %b4 Binding 4
+// CHECK-DAG: OpDecorate %b5 Binding 5
+// CHECK-DAG: OpDecorate %b6 Binding 6
+// CHECK-DAG: OpDecorate %b7 Binding 7

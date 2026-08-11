@@ -1,9 +1,9 @@
 // slang-compile-request.cpp
 #include "slang-compile-request.h"
 
-#include "../core/slang-performance-profiler.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-util.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ast-dump.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
@@ -174,9 +174,8 @@ static void _outputIncludesRec(
     case PathInfo::Type::TokenPaste:
     case PathInfo::Type::CommandLine:
     case PathInfo::Type::TypeParse:
-    case PathInfo::Type::MacroExpansion:
         {
-            // Synthetic views — not real files, don't output.
+            // If any of these types we don't output
             return;
         }
     default:

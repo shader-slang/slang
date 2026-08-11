@@ -20,7 +20,7 @@ Slang-specific:
 
 - **Linux / macOS**: LLVM coverage tools (`llvm-profdata`, `llvm-cov`) installed
 - **Windows**:
-  - [OpenCppCoverage](https://github.com/OpenCppCoverage/OpenCppCoverage/releases) (the `ci-slang-coverage.yml` workflow installs it via `choco install opencppcoverage --version 0.9.9.0`; for local dev either install the `.exe` from GitHub releases or `winget install --id OpenCppCoverage.OpenCppCoverage`).
+  - [OpenCppCoverage](https://github.com/OpenCppCoverage/OpenCppCoverage/releases) (the `ci-slang-coverage-test.yml` workflow installs it via `choco install opencppcoverage --version 0.9.9.0`; for local dev either install the `.exe` from GitHub releases or `winget install --id OpenCppCoverage.OpenCppCoverage`).
   - [ReportGenerator](https://github.com/danielpalme/ReportGenerator) for HTML rendering. Install via `dotnet tool install -g dotnet-reportgenerator-globaltool` and make sure `$env:USERPROFILE\.dotnet\tools` is on `PATH`. Requires a .NET SDK; the workflow uses the SDK preinstalled on `windows-latest`.
 
 ## Quick Start (HTML report)

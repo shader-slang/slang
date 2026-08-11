@@ -1,7 +1,7 @@
 #ifndef SLANG_PROXY_GLOBAL_SESSION_H
 #define SLANG_PROXY_GLOBAL_SESSION_H
 
-#include "../../core/slang-file-system.h"
+#include "core/slang-file-system.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
 #include "proxy-mutable-file-system.h"
@@ -68,6 +68,13 @@ public:
         // file system used, and on reading we use that to decide whether to look for an existing
         // proxy, wrap the OS, or wrap a new dummy 'NULL' filesystem.
         slang::SessionDesc desc2 = desc;
+        // wrapObject returns an owning reference (see proxy-base.h). When we
+        // create the wrapper here we are its caller, so we own that reference
+        // and must release it once the real createSession has taken its own, or
+        // the proxy leaks (issue #11936). The reading `default` branch instead
+        // reuses an already-registered proxy via toSlangInterface, which is a
+        // borrowed pointer, so it must not be released here.
+        bool ownsFileSystemWrapper = false;
         if (_ctx.isWriting())
         {
             uint64_t handle = 0;
@@ -90,6 +97,7 @@ public:
                 desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
                 handle = kDefaultFileSystemHandle;
             }
+            ownsFileSystemWrapper = true;
             RECORD_INFO(handle);
         }
         else if (_ctx.isReading())
@@ -101,6 +109,7 @@ public:
             case kDefaultFileSystemHandle:
                 {
                     desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
+                    ownsFileSystemWrapper = true;
                     break;
                 }
             case kCustomFileSystemHandle:
@@ -108,6 +117,7 @@ public:
                     auto nfs = new NULLFileSystem();
                     nfs->addRef();
                     desc2.fileSystem = wrapObject(nfs);
+                    ownsFileSystemWrapper = true;
                     break;
                 }
             default:
@@ -121,6 +131,16 @@ public:
         // Call create session with our wrapped file system
         PREPARE_POINTER_OUTPUT(outSession);
         auto result = getActual<slang::IGlobalSession>()->createSession(desc2, outSession);
+
+        // The created session holds its own reference to the file system for its
+        // lifetime, so drop the creation reference we still hold on the wrapper.
+        // Suppress recording: this is our internal bookkeeping, not a user
+        // release that belongs in the stream (issue #11936).
+        if (ownsFileSystemWrapper && desc2.fileSystem)
+        {
+            SuppressRefCountRecording guard;
+            desc2.fileSystem->release();
+        }
 
         RECORD_COM_OUTPUT(outSession);
         RECORD_RETURN(result);
@@ -254,6 +274,34 @@ public:
         RECORD_CALL();
         RECORD_INPUT(passThrough);
         auto result = getActual<slang::IGlobalSession>()->checkPassThroughSupport(passThrough);
+        RECORD_RETURN(result);
+    }
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDownstreamCompilerVersion(
+        SlangPassThrough passThrough,
+        int* outMajor,
+        int* outMinor) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT(passThrough);
+        PREPARE_POINTER_OUTPUT(outMajor);
+        PREPARE_POINTER_OUTPUT(outMinor);
+        auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerVersion(
+            passThrough,
+            outMajor,
+            outMinor);
+        // On failure the actual API returns without writing *outMajor/*outMinor. The record
+        // stream has a fixed schema and must still serialize both output slots, so redirect to the
+        // zero-initialized temporaries created by PREPARE_POINTER_OUTPUT above and record a defined
+        // 0 instead of reading the caller's uninitialized memory (see issue #11865). The caller's
+        // memory is left untouched.
+        if (SLANG_FAILED(result))
+        {
+            outMajor = &_temp_outMajor;
+            outMinor = &_temp_outMinor;
+        }
+        RECORD_OUTPUT(outMajor);
+        RECORD_OUTPUT(outMinor);
         RECORD_RETURN(result);
     }
 

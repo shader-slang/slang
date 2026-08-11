@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gdwarf -g3 -O0 -line-directive-mode glsl -stage fragment -entry main -emit-spirv-directly -matrix-layout-row-major
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -gdwarf -g3 -line-directive-mode glsl -stage fragment -entry main -emit-spirv-directly -matrix-layout-row-major
 
 struct VSOutput {
     int x;

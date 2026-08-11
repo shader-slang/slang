@@ -1,0 +1,42 @@
+schema_version: 1
+id: check-decl-int8-positive-overflow-not-warned
+bundle: coverage/check-decl
+suspected_kind: wrong-diagnostic
+title: "positive literal overflowing int8_t is silent; the negative one warns"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/check-decl/_repro/int8-positive-overflow-silent.slang -target hlsl"
+  source_slang: docs/generated/tests/coverage/check-decl/_repro/int8-positive-overflow-silent.slang
+  exit_code: 0
+  observed_summary: |
+    `int8_t` has the range [-128, 127]. Passing or assigning `-200` produces the
+    expected overflow warning:
+
+      warning[E40016]: integer constant overflow in conversion
+        | takesInt8(-200);
+        |            ^^^ integer value '-200' does not fit in type 'int8_t'
+
+    Passing or assigning `200` — equally outside the range — produces no
+    diagnostic at all, in either argument or initializer position. The value is
+    silently reinterpreted: `void main() { int8_t a = 200; printf("a=%d\n", int(a)); }`
+    run under `build/RelWithDebInfo/bin/slangi` prints `a=-56`.
+
+    The same asymmetry holds for the other signed narrow types tried
+    (`int16_t`: `-40000` warns, `40000` is silent).
+expected:
+  claim: |
+    A folded integer constant that does not fit the signed target type should
+    produce the E40016 overflow warning regardless of sign; `takesInt8(200)`
+    should warn exactly as `takesInt8(-200)` does.
+  citation_kind: sibling-test
+  citation: tests/diagnostics/integer-constant-overflow.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Intentional bit-width-based rule (200 fits in 8 bits, so it is treated as an in-range bit pattern): possible, but the sibling test asserts -200 warns, and -200 also fits in 8 bits as a two's-complement pattern, so the two cases are not distinguished by bit width."
+    - "Cascading from an unrelated conversion-cost decision: the initializer and argument positions behave identically, so it is not position-specific."

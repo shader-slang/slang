@@ -1,0 +1,33 @@
+//META: generated=true
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
+//META: doc_section_digest=534618adad82acb65da181567998c07a77381ecf27996abdf7535de5b49ec7b3
+//META: purpose=`Atomic<T>::add(v)` lowers to `atomicAdd(%ptr, %val, %order)`, the IR encoding of the atomic add primitive.
+//META: intent=functional
+//META: pipeline_stage=lower
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Verifies `Atomic<int>::add(v)` lowers to the documented three-operand
+// `atomicAdd(%ptr, %val, %memoryOrder)` shape. The portable surface is
+// the `Atomic<T>::add(v)` method on a `RWStructuredBuffer` element; the
+// CHECK pins exactly one trailing operand after the value — the
+// `IRMemoryOrder` constant (`0 : Int` is relaxed) that the operand
+// column now names explicitly.
+
+//TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
+
+RWStructuredBuffer<Atomic<int>> abuf;
+uniform RWStructuredBuffer<int> rwbuf;
+
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    int idx = (int)tid.x;
+    int prev = abuf[idx].add(idx + 1);
+    rwbuf[idx] = prev;
+}
+
+// IR-LABEL: func %main
+// IR: atomicAdd(%{{[^,]+}}, %{{[^,]+}}, {{[^,)]+}})

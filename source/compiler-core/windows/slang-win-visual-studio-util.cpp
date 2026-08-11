@@ -1,11 +1,11 @@
 #include "slang-win-visual-studio-util.h"
 
-#include "../../core/slang-common.h"
-#include "../../core/slang-process-util.h"
-#include "../../core/slang-string-util.h"
-#include "../slang-json-parser.h"
-#include "../slang-json-value.h"
-#include "../slang-visual-studio-compiler-util.h"
+#include "compiler-core/slang-json-parser.h"
+#include "compiler-core/slang-json-value.h"
+#include "compiler-core/slang-visual-studio-compiler-util.h"
+#include "core/slang-common.h"
+#include "core/slang-process-util.h"
+#include "core/slang-string-util.h"
 
 #ifdef _WIN32
 #include <shlobj.h>

@@ -1,7 +1,7 @@
 // slang-ir-early-raytracing-intrinsic-simplification.cpp
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 
-#include "../core/slang-performance-profiler.h"
+#include "core/slang-performance-profiler.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"

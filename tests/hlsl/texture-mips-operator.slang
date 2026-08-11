@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -O3
 
 // CHECK: OpImageFetch %v4float {{.*}} Lod %int_1
 

@@ -25,7 +25,6 @@ from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ci_visualization import page_template, chart_section, DOWNLOAD_JS
 from ci_hosted_runner_usage import (
-    DEFAULT_HOSTED_RUNNER_CAP,
     HOSTED_LABEL_PREFIXES,
     sample_hosted_runner_usage,
 )
@@ -173,6 +172,7 @@ def fetch_gpu_quota(metrics=None):
         for region in config.get("regions", []):
             metrics_by_region.setdefault(region, set()).add(config["metric"])
 
+    errors = []
     for region in metrics_by_region:
         cmd = [
             "gcloud", "compute", "regions", "describe", region,
@@ -187,17 +187,21 @@ def fetch_gpu_quota(metrics=None):
             return None
         except subprocess.TimeoutExpired:
             print(f"Warning: timeout fetching GPU quota for {region}", file=sys.stderr)
+            errors.append(f"{region}: timeout")
             continue
         if result.returncode != 0:
+            error = result.stderr.strip() or f"gcloud exited {result.returncode}"
             print(
-                f"Warning: gcloud failed for {region}: {result.stderr.strip()}",
+                f"Warning: gcloud failed for {region}: {error}",
                 file=sys.stderr,
             )
+            errors.append(f"{region}: {error}")
             continue
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:
             print(f"Warning: invalid GPU quota JSON for {region}", file=sys.stderr)
+            errors.append(f"{region}: invalid JSON")
             continue
 
         wanted_metrics = metrics_by_region[region]
@@ -213,6 +217,7 @@ def fetch_gpu_quota(metrics=None):
                     f"Warning: invalid quota values for {metric} in {region}",
                     file=sys.stderr,
                 )
+                errors.append(f"{region}/{metric}: invalid quota values")
                 continue
             bucket = by_metric[metric]
             bucket["regions"][region] = {"usage": usage, "limit": limit}
@@ -228,6 +233,9 @@ def fetch_gpu_quota(metrics=None):
         return None
 
     result = {"by_metric": by_metric}
+    if errors:
+        result["partial"] = True
+        result["errors"] = errors
     legacy = by_metric.get(GPU_QUOTA_METRIC)
     if legacy:
         result.update({
@@ -299,20 +307,73 @@ def fetch_queue_status(repo):
         return None
 
 
+def fetch_pending_approvals(repo):
+    """Fetch workflow runs paused waiting for a deployment approval.
+
+    `status=waiting` has to be a request parameter: the default run listing
+    excludes waiting runs entirely, so filtering client-side finds nothing.
+
+    These runs are invisible in the usual CI views -- nothing has failed and
+    nothing is running, so a stalled approval looks exactly like a quiet
+    afternoon. That is why they get their own section: the cost of missing one
+    is a PR that sits until its job timeout and then reports as a test failure.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from gh_api import gh_api_list
+
+    runs, err = gh_api_list(
+        f"repos/{repo}/actions/runs?status=waiting&per_page=100",
+        "workflow_runs",
+    )
+    if err:
+        return {"pending": [], "partial": True, "errors": [err]}
+
+    now = datetime.now(timezone.utc)
+    pending = []
+    for run in runs:
+        created = run.get("created_at") or ""
+        try:
+            waited_min = int(
+                (now - datetime.fromisoformat(created.replace("Z", "+00:00"))).total_seconds() / 60
+            )
+        except ValueError:
+            waited_min = 0
+        pending.append(
+            {
+                "run_id": run.get("id"),
+                "url": run.get("html_url", ""),
+                "actor": (run.get("actor") or {}).get("login", "?"),
+                "event": run.get("event", ""),
+                "branch": run.get("head_branch", ""),
+                "title": run.get("display_title", ""),
+                "waited_min": waited_min,
+            }
+        )
+    pending.sort(key=lambda p: p["waited_min"], reverse=True)
+    return {"pending": pending, "partial": False, "errors": []}
+
+
 def fetch_recent_failures(repo):
     """Fetch recent CI workflow failures (last 3 hours)."""
     # Use gh CLI directly for a quick query
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list
 
+    now = datetime.now(timezone.utc)
+    cutoff_dt = now - timedelta(hours=3)
+    # Query a wider creation window than the displayed update window so a
+    # longer-running CI job that finishes recently is still eligible.
+    created_from = (cutoff_dt - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     runs, err = gh_api_list(
-        f"repos/{repo}/actions/runs?status=completed&per_page=20",
+        f"repos/{repo}/actions/runs?status=completed&per_page=100"
+        f"&created={created_from}..{created_to}",
         "workflow_runs",
     )
     if err:
-        return []
+        return {"failures": [], "partial": True, "errors": [err]}
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     failures = []
     for run in (runs or []):
         if run.get("name") != "CI":
@@ -330,25 +391,34 @@ def fetch_recent_failures(repo):
             "created_at": event_time,
             "actor": (run.get("actor") or {}).get("login", ""),
         })
-    return failures[:10]
+    return {"failures": failures[:10], "partial": False, "errors": []}
 
 
 def fetch_merge_queue_status(repo):
     """Fetch recent merge queue CI runs (last 24 hours).
 
-    Returns a dict with 'recent' (list of runs), 'summary' counts.
+    Returns a dict with 'recent' runs, 'summary' counts, and partial status.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     from gh_api import gh_api_list, parse_merge_queue_pr_number
 
+    now = datetime.now(timezone.utc)
+    cutoff_dt = now - timedelta(hours=24)
+    cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    created_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     runs, err = gh_api_list(
-        f"repos/{repo}/actions/runs?event=merge_group&per_page=50",
+        f"repos/{repo}/actions/runs?event=merge_group&per_page=100"
+        f"&created={cutoff}..{created_to}",
         "workflow_runs",
     )
     if err:
-        return None
+        return {
+            "recent": [],
+            "summary": {"success": 0, "failure": 0, "cancelled": 0, "in_progress": 0},
+            "partial": True,
+            "errors": [err],
+        }
 
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
     recent = []
     counts = {"success": 0, "failure": 0, "cancelled": 0, "in_progress": 0}
     for run in (runs or []):
@@ -374,7 +444,7 @@ def fetch_merge_queue_status(repo):
             "updated_at": run.get("updated_at", ""),
         })
 
-    return {"recent": recent, "summary": counts}
+    return {"recent": recent, "summary": counts, "partial": False, "errors": []}
 
 
 def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted_runner_usage=None):
@@ -386,6 +456,12 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted
     snapshot = {"timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
     if queue_data:
+        if queue_data.get("partial"):
+            snapshot["queue_partial"] = True
+            if queue_data.get("list_errors"):
+                snapshot["queue_list_errors"] = queue_data["list_errors"]
+            if queue_data.get("job_fetch_errors"):
+                snapshot["queue_job_fetch_errors"] = queue_data["job_fetch_errors"]
         # Aggregate runner counts by group
         summary = queue_data.get("summary", {})
         snapshot["jobs_queued"] = summary.get("jobs_queued", 0)
@@ -416,6 +492,10 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted
 
     # GPU quota per region
     if gpu_quota:
+        if gpu_quota.get("partial"):
+            snapshot["gpu_quota_partial"] = True
+            if gpu_quota.get("errors"):
+                snapshot["gpu_quota_errors"] = gpu_quota["errors"]
         by_metric = _normalize_gpu_quota_by_metric(gpu_quota)
         if by_metric:
             snapshot["gpu_quota_by_metric"] = by_metric
@@ -425,7 +505,12 @@ def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None, hosted
 
     # Merge queue summary
     if mq_data:
-        snapshot["merge_queue"] = mq_data.get("summary", {})
+        if mq_data.get("partial"):
+            snapshot["merge_queue_partial"] = True
+            if mq_data.get("errors"):
+                snapshot["merge_queue_errors"] = mq_data["errors"]
+        else:
+            snapshot["merge_queue"] = mq_data.get("summary", {})
 
     if hosted_runner_usage:
         snapshot["hosted_runner_usage"] = hosted_runner_usage
@@ -557,8 +642,10 @@ def _build_gpu_quota_charts(snapshots):
 
         region_series = {
             region: [
-                quota.get("regions", {}).get(region, {}).get("usage", 0)
-                for quota in metric_snapshots
+                None
+                if snapshots[i].get("gpu_quota_partial")
+                else quota.get("regions", {}).get(region, {}).get("usage", 0)
+                for i, quota in enumerate(metric_snapshots)
             ]
             for region in regions
         }
@@ -599,7 +686,10 @@ def _build_hosted_runner_chart(snapshots):
     # Collect every label observed across the window so the stacked
     # series stay consistent.
     labels_seen = set()
-    cap = DEFAULT_HOSTED_RUNNER_CAP
+    # Track the most recent known cap for the reference line. Stays None
+    # if no snapshot carried a detectable cap, in which case the chart
+    # omits the cap line rather than drawing a guessed one.
+    cap = None
     for s in snapshots:
         usage = s.get("hosted_runner_usage") or {}
         if usage.get("cap"):
@@ -715,18 +805,34 @@ def build_history_chart(snapshots):
     gcp_vm_groups = GCP_VM_GROUPS
     palette = GCP_VM_PALETTE
 
-    # Queue depth over time
-    queued_data = [s.get("jobs_queued", 0) for s in snapshots]
-    running_data = [s.get("jobs_running", 0) for s in snapshots]
+    # Queue depth over time. Partial queue samples are known undercounts,
+    # so render them as gaps rather than false-low points.
+    queued_data = [
+        None if s.get("queue_partial") else s.get("jobs_queued", 0)
+        for s in snapshots
+    ]
+    running_data = [
+        None if s.get("queue_partial") else s.get("jobs_running", 0)
+        for s in snapshots
+    ]
 
     # Active CI workflow runs over time
-    runs_in_progress = [s.get("runs_in_progress", 0) for s in snapshots]
-    runs_queued = [s.get("runs_queued", 0) for s in snapshots]
+    runs_in_progress = [
+        None if s.get("queue_partial") else s.get("runs_in_progress", 0)
+        for s in snapshots
+    ]
+    runs_queued = [
+        None if s.get("queue_partial") else s.get("runs_queued", 0)
+        for s in snapshots
+    ]
 
     # Build per-group data series
     group_series = {}
     for g in gcp_vm_groups:
-        group_series[g] = [s.get("runner_groups", {}).get(g, {}).get("total", 0) for s in snapshots]
+        group_series[g] = [
+            None if s.get("queue_partial") else s.get("runner_groups", {}).get(g, {}).get("total", 0)
+            for s in snapshots
+        ]
 
     gpu_quota_charts = _build_gpu_quota_charts(snapshots)
 
@@ -736,9 +842,29 @@ def build_history_chart(snapshots):
 
     # Merge queue cumulative success/failure from snapshots
     # Each snapshot records the running 24h totals; we just plot them over time.
-    mq_success_data = [s.get("merge_queue", {}).get("success", 0) for s in snapshots]
-    mq_failure_data = [s.get("merge_queue", {}).get("failure", 0) for s in snapshots]
+    mq_success_data = [
+        None if s.get("merge_queue_partial") else s.get("merge_queue", {}).get("success", 0)
+        for s in snapshots
+    ]
+    mq_failure_data = [
+        None if s.get("merge_queue_partial") else s.get("merge_queue", {}).get("failure", 0)
+        for s in snapshots
+    ]
     has_mq_snapshots = any(s.get("merge_queue") for s in snapshots)
+    partial_notes = []
+    if any(s.get("queue_partial") for s in snapshots):
+        partial_notes.append("queue")
+    if any(s.get("gpu_quota_partial") for s in snapshots):
+        partial_notes.append("GPU quota")
+    if any(s.get("merge_queue_partial") for s in snapshots):
+        partial_notes.append("merge queue")
+    partial_note_html = ""
+    if partial_notes:
+        partial_note_html = (
+            '<p style="color:#6c757d">Some '
+            + ", ".join(partial_notes)
+            + " samples were partial; affected chart points are rendered as gaps.</p>"
+        )
 
     charts_html = (
         chart_section("runnerHistory", "GCP Runner VMs",
@@ -763,7 +889,9 @@ def build_history_chart(snapshots):
             "hostedRunnerHistory",
             "GitHub-Hosted Runner Usage vs. Cap",
             "Hosted runners in use (stacked by label) and queued hosted-runner jobs, "
-            "sampled every 15 minutes. Dashed line shows the per-org concurrency cap.",
+            "sampled every 15 minutes. Amber/red background bands mark 80%/100% of the "
+            "per-org concurrency cap (auto-detected from the org plan); no bands are "
+            "shown when the cap can't be detected.",
         )
 
     return f"""
@@ -775,6 +903,7 @@ def build_history_chart(snapshots):
     <option value="24" selected>Last 24 hours</option>
   </select>
 </div>
+{partial_note_html}
 {charts_html}
 <script src="{CHARTJS_CDN}"></script>
 <script>
@@ -923,7 +1052,14 @@ function buildCharts(hours) {{
     }});
   }}
 
-  // Hosted-runner usage stacked by label, with the cap as a dashed line.
+  // Hosted-runner usage stacked by label. The cap is shown as faint
+  // background threshold zones (amber >=80%, red >=100%) rather than a
+  // full-height dashed line: a line at the cap forces the y-axis to
+  // auto-scale up to the cap, crushing the real usage band (typically
+  // well below cap) into an unreadable sliver at the bottom. The zone
+  // plugin draws relative to the current y-scale, so it never influences
+  // auto-scaling — the axis fits the data and the zones simply clip to
+  // whatever range is on screen.
   const hostedCanvas = document.getElementById('hostedRunnerHistory_canvas');
   if (hostedCanvas && hostedRunnerChart) {{
     const hostedDatasets = [];
@@ -949,24 +1085,63 @@ function buildCharts(hours) {{
       tension: 0.3,
       stack: 'queued',
     }});
-    hostedDatasets.push({{
-      label: 'Cap (' + hostedRunnerChart.cap + ')',
-      data: Array(labels.length).fill(hostedRunnerChart.cap),
-      borderColor: '#dc3545',
-      borderDash: [6, 3],
-      borderWidth: 2,
-      pointRadius: 0,
-      fill: false,
-    }});
+
+    // Paint amber/red threshold bands behind the data. Only active when
+    // the cap is known; a null cap (org plan not queryable) draws no
+    // bands, matching the "cap unknown" handling elsewhere.
+    const capZonesPlugin = {{
+      id: 'hostedCapZones',
+      beforeDraw(chart) {{
+        const cap = hostedRunnerChart.cap;
+        if (!cap) return;
+        const {{ ctx, chartArea, scales }} = chart;
+        const y = scales.y;
+        if (!y) return;
+        const warnStart = 0.8 * cap;   // amber threshold (80% of cap)
+        // Nothing to shade if usage never enters the warn band — this is
+        // the common case (usage well below 80%), and skipping it keeps
+        // the plot clean rather than washing it in colour.
+        if (y.max <= warnStart) return;
+        const left = chartArea.left;
+        const width = chartArea.right - left;
+        // Paint each band only across the [threshold, cap] slice that is
+        // actually on screen. Bands are drawn relative to the y-scale, so
+        // they clip to the data-driven range and never stretch the axis.
+        const px = (v) => y.getPixelForValue(Math.min(v, y.max));
+        ctx.save();
+        // Amber: 80%..100% of cap.
+        const amberTop = px(cap);
+        const amberBottom = px(warnStart);
+        ctx.fillStyle = 'rgba(253,126,20,0.10)';
+        ctx.fillRect(left, amberTop, width, amberBottom - amberTop);
+        // Red: at/above cap (only visible once usage reaches the cap).
+        if (y.max > cap) {{
+          const redTop = px(y.max);
+          const redBottom = px(cap);
+          ctx.fillStyle = 'rgba(220,53,69,0.12)';
+          ctx.fillRect(left, redTop, width, redBottom - redTop);
+        }}
+        ctx.restore();
+      }}
+    }};
+
     charts.hostedRunner = new Chart(hostedCanvas.getContext('2d'), {{
       type: 'line',
       data: {{ labels: displayLabels, datasets: hostedDatasets }},
+      plugins: [capZonesPlugin],
       options: {{
         responsive: true,
         scales: {{
           y: {{ min: 0, stacked: true, title: {{ display: true, text: 'Hosted Runners' }} }}
         }},
         plugins: {{
+          subtitle: {{
+            display: !!hostedRunnerChart.cap,
+            text: hostedRunnerChart.cap
+              ? 'Cap ' + hostedRunnerChart.cap + ' — amber ≥ 80%, red ≥ 100%'
+              : '',
+            color: '#6c757d',
+          }},
           tooltip: {{
             callbacks: {{
               afterBody: function(items) {{
@@ -975,7 +1150,9 @@ function buildCharts(hours) {{
                   hostedRunnerChart.total_series || [], n
                 )[idx];
                 if (total == null) return '';
-                return 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap;
+                return hostedRunnerChart.cap
+                  ? 'Total in use: ' + total + ' / ' + hostedRunnerChart.cap
+                  : 'Total in use: ' + total;
               }}
             }}
           }}
@@ -1015,17 +1192,89 @@ buildCharts(24);
 """
 
 
+def render_pending_approvals(data):
+    """Render runs paused on a deployment approval, oldest first.
+
+    Age is the number that matters. A run waiting a couple of minutes is the
+    approval bot about to pick it up; one waiting half an hour means nobody is
+    coming, and the job will eventually time out and report as a test failure.
+    """
+    if not data:
+        return "<p>Pending approvals unavailable.</p>"
+
+    pending = data.get("pending", [])
+    partial = data.get("partial", False)
+    oldest = max((p["waited_min"] for p in pending), default=0)
+
+    if partial:
+        fg, bg, label = "#6c757d", "#e2e3e5", "PARTIAL"
+        summary = "Could not read pending approvals"
+    elif not pending:
+        fg, bg, label = "#198754", "#d1e7dd", "OK"
+        summary = "Nothing waiting for approval"
+    elif oldest >= 30:
+        fg, bg, label = "#dc3545", "#f8d7da", "STALLED"
+        summary = f"{len(pending)} waiting, oldest {oldest} min"
+    else:
+        fg, bg, label = "#fd7e14", "#fff3cd", "WAITING"
+        summary = f"{len(pending)} waiting, oldest {oldest} min"
+
+    html = f"""
+<div style="border-left:4px solid {fg};background:{bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
+  <span style="background:{fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{label}</span>
+  <strong style="margin-left:8px">{_esc(summary)}</strong>
+</div>
+"""
+    if partial:
+        for err in data.get("errors", []):
+            html += f"<p style='color:#6c757d'>{_esc(str(err))}</p>"
+        return html
+
+    if not pending:
+        return html
+
+    html += """
+<table>
+  <tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
+"""
+    for p in pending:
+        # A merge-queue run holds up the whole queue, not just its own PR.
+        event = p["event"]
+        event_cell = (
+            f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
+        )
+        html += (
+            "  <tr>"
+            f"<td>{p['waited_min']} min</td>"
+            f"<td>{_link(p['url'], p['title'] or str(p['run_id']))}</td>"
+            f"<td>{_esc(p['actor'])}</td>"
+            f"<td>{event_cell}</td>"
+            f"<td>{_esc(p['branch'])}</td>"
+            "</tr>\n"
+        )
+    html += "</table>\n"
+    html += (
+        "<p style='color:#6c757d;font-size:0.9em'>Approve from the run page: "
+        "<em>Review deployments</em> &rarr; tick the environment &rarr; "
+        "<em>Approve and deploy</em>. Most runs are approved automatically; "
+        "anything listed here needs a person.</p>\n"
+    )
+    return html
+
+
 def render_hosted_runner_usage(hosted_runner_usage):
     """Render the GitHub-hosted runner quota section."""
     if not hosted_runner_usage:
         return "<p>Hosted-runner usage unavailable.</p>"
 
-    cap = hosted_runner_usage.get("cap", DEFAULT_HOSTED_RUNNER_CAP)
+    # `cap` is None when the org plan wasn't queryable. Treat that as
+    # "unknown" — never fall back to a guessed denominator, because a
+    # wrong cap silently mis-scales the banner and percentage.
+    cap = hosted_runner_usage.get("cap")
     in_progress = hosted_runner_usage.get("in_progress", {})
     queued = hosted_runner_usage.get("queued", {})
     in_use = in_progress.get("total", 0)
     queued_total = queued.get("total", 0)
-    pct = (in_use / cap * 100) if cap else 0
     partial = hosted_runner_usage.get("partial", False)
 
     # Severity thresholds match shader-slang/slang#11142:
@@ -1033,10 +1282,15 @@ def render_hosted_runner_usage(hosted_runner_usage):
     #   alarm at  100% of cap with queued > 0
     # A partial sample is a known undercount; show PARTIAL instead of
     # OK/HIGH/AT CAP so the dashboard doesn't reassure operators with a
-    # false-healthy banner during an Actions API failure.
+    # false-healthy banner during an Actions API failure. An unknown cap
+    # can't be scored at all, so it gets its own UNKNOWN CAP banner with
+    # no denominator or percentage.
     if partial:
         banner_fg, banner_bg = "#6c757d", "#e2e3e5"
         banner_label = "PARTIAL"
+    elif not cap:
+        banner_fg, banner_bg = "#6c757d", "#e2e3e5"
+        banner_label = "UNKNOWN CAP"
     elif in_use >= cap and queued_total > 0:
         banner_fg, banner_bg = "#dc3545", "#f8d7da"
         banner_label = "AT CAP"
@@ -1047,10 +1301,15 @@ def render_hosted_runner_usage(hosted_runner_usage):
         banner_fg, banner_bg = "#198754", "#d1e7dd"
         banner_label = "OK"
 
+    if cap:
+        usage_text = f"{in_use} / {cap} hosted runners in use ({in_use / cap * 100:.0f}%)"
+    else:
+        usage_text = f"{in_use} hosted runners in use"
+
     html = f"""
 <div style="border-left:4px solid {banner_fg};background:{banner_bg};padding:12px 18px;margin-bottom:14px;border-radius:4px">
   <span style="background:{banner_fg};color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">{banner_label}</span>
-  <strong style="margin-left:8px">{in_use} / {cap} hosted runners in use ({pct:.0f}%)</strong>
+  <strong style="margin-left:8px">{usage_text}</strong>
   &nbsp;&nbsp;<span style="color:#6c757d">queued jobs: {queued_total}</span>
 </div>
 """
@@ -1059,6 +1318,13 @@ def render_hosted_runner_usage(hosted_runner_usage):
             '<p style="color:#6c757d;margin-top:-8px">'
             "Sample is partial and may undercount usage "
             "(GitHub Actions API failure during collection)."
+            "</p>\n"
+        )
+    elif not cap:
+        html += (
+            '<p style="color:#6c757d;margin-top:-8px">'
+            "Concurrency cap could not be detected from the org plan; "
+            "showing raw usage without a cap or percentage."
             "</p>\n"
         )
 
@@ -1082,7 +1348,88 @@ def render_hosted_runner_usage(hosted_runner_usage):
     return html
 
 
-def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None):
+PENDING_APPROVALS_JS = """
+<div id="pending-approvals-section" data-repo="{repo}">
+  <p style="color:#6c757d">Loading&hellip;</p>
+</div>
+<script>
+(function () {
+  var repo = document.getElementById("pending-approvals-section").dataset.repo;
+  var url = "https://api.github.com/repos/" + repo + "/actions/runs?status=waiting&per_page=100";
+  fetch(url)
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (data) {
+      var runs = data.workflow_runs || [];
+      var now = Date.now();
+      var pending = runs.map(function (r) {
+        var waited = Math.floor((now - new Date(r.created_at).getTime()) / 60000);
+        return {
+          run_id: r.id,
+          url: r.html_url,
+          actor: (r.actor || {}).login || "?",
+          event: r.event || "",
+          branch: r.head_branch || "",
+          title: r.display_title || String(r.id),
+          waited: waited,
+        };
+      }).sort(function (a, b) { return b.waited - a.waited; });
+
+      var oldest = pending.length ? pending[0].waited : 0;
+      var fg, bg, label, summary;
+      if (!pending.length) {
+        fg = "#198754"; bg = "#d1e7dd"; label = "OK"; summary = "Nothing waiting for approval";
+      } else if (oldest >= 30) {
+        fg = "#dc3545"; bg = "#f8d7da"; label = "STALLED";
+        summary = pending.length + " waiting, oldest " + oldest + " min";
+      } else {
+        fg = "#fd7e14"; bg = "#fff3cd"; label = "WAITING";
+        summary = pending.length + " waiting, oldest " + oldest + " min";
+      }
+
+      function esc(s) {
+        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      }
+
+      var html = '<div style="border-left:4px solid ' + fg + ';background:' + bg +
+        ';padding:12px 18px;margin-bottom:14px;border-radius:4px">' +
+        '<span style="background:' + fg + ';color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">' +
+        label + '</span><strong style="margin-left:8px">' + esc(summary) + '</strong></div>';
+
+      if (pending.length) {
+        html += '<table><tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
+        pending.forEach(function (p) {
+          var event = p.event === "merge_group"
+            ? "<strong>merge_group</strong>" : esc(p.event);
+          html += '<tr>' +
+            '<td>' + p.waited + ' min</td>' +
+            '<td><a href="' + esc(p.url) + '">' + esc(p.title) + '</a></td>' +
+            '<td>' + esc(p.actor) + '</td>' +
+            '<td>' + event + '</td>' +
+            '<td>' + esc(p.branch) + '</td>' +
+            '</tr>';
+        });
+        html += '</table>';
+        html += '<p style="color:#6c757d;font-size:0.9em">Approve from the run page: ' +
+          '<em>Review deployments</em> &rarr; tick the environment &rarr; ' +
+          '<em>Approve and deploy</em>. Most runs are approved automatically; ' +
+          'anything listed here needs a person.</p>';
+      }
+
+      document.getElementById("pending-approvals-section").innerHTML = html;
+    })
+    .catch(function (err) {
+      document.getElementById("pending-approvals-section").innerHTML =
+        '<p style="color:#6c757d">Could not load pending approvals (' + esc(String(err)) + ').</p>';
+    });
+}());
+</script>
+"""
+
+
+def generate_health_html(
+    queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None,
+    pending_approvals=None, repo="shader-slang/slang",
+):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
     fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -1162,6 +1509,12 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
     queue_html = ""
     if queue_data:
         summary = queue_data.get("summary", {})
+        partial_html = ""
+        if queue_data.get("partial"):
+            partial_html = (
+                '<p style="color:#6c757d">Queue sample is partial and may undercount '
+                "running or queued jobs (GitHub Actions API failure during collection).</p>"
+            )
         queue_html = f"""
 <div>
   <div class="stat-card"><div class="value">{summary.get('jobs_queued', 0)}</div><div class="label">Jobs Queued</div></div>
@@ -1169,6 +1522,7 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
   <div class="stat-card"><div class="value">{summary.get('runs_queued', 0)}</div><div class="label">Runs Queued</div></div>
   <div class="stat-card"><div class="value">{summary.get('runs_in_progress', 0)}</div><div class="label">Runs In Progress</div></div>
 </div>
+{partial_html}
 """
         # Queue depth by group
         groups = queue_data.get("queue_by_group", [])
@@ -1220,9 +1574,19 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
     # Recent failures section
     failures_html = ""
-    if failures:
+    failures_partial = False
+    failure_entries = failures or []
+    if isinstance(failures, dict):
+        failures_partial = failures.get("partial", False)
+        failure_entries = failures.get("failures", [])
+    if failures_partial:
+        failures_html = (
+            "<p>Recent CI failure data unavailable "
+            "(GitHub Actions API failure during collection).</p>"
+        )
+    elif failure_entries:
         failures_html = '<table><tr><th>Branch</th><th>Actor</th><th>Time</th></tr>\n'
-        for f in failures:
+        for f in failure_entries:
             branch = f.get("branch", "")
             actor = f.get("actor", "")
             url = f.get("url", "")
@@ -1235,7 +1599,12 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
     # Merge queue section
     mq_html = ""
-    if mq_data:
+    if mq_data and mq_data.get("partial"):
+        mq_html = (
+            "<p>Merge queue status unavailable "
+            "(GitHub Actions API failure during collection).</p>"
+        )
+    elif mq_data:
         summary = mq_data.get("summary", {})
         fail_rate = 0
         sf_total = summary.get("success", 0) + summary.get("failure", 0)
@@ -1278,6 +1647,7 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
     history_html = build_history_chart(snapshots)
 
     hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
+    pending_approvals_live = PENDING_APPROVALS_JS.replace("{repo}", _esc(repo))
 
     body = f"""
 <h1>CI System Health</h1>
@@ -1285,6 +1655,9 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None, hosted_
 
 <h2>Queue Status</h2>
 {queue_html}
+
+<h2>Pending Approvals</h2>
+{pending_approvals_live}
 
 <h2>GitHub-Hosted Runner Quota</h2>
 {hosted_runner_html}
@@ -1317,12 +1690,21 @@ def main():
     if gpu_quota:
         for quota in _normalize_gpu_quota_by_metric(gpu_quota).values():
             print(f"  {quota.get('name', 'GPU')} GPUs: {quota['usage']}/{quota['limit']} in use")
+        if gpu_quota.get("partial"):
+            print(
+                f"  Warning: GPU quota sample is partial "
+                f"({len(gpu_quota.get('errors', []))} region errors); "
+                f"chart points will render as gaps.",
+                file=sys.stderr,
+            )
     else:
         print("  GPU quota unavailable (gcloud not configured or not accessible)")
 
     print("Fetching merge queue status...")
     mq_data = fetch_merge_queue_status(args.repo)
-    if mq_data:
+    if mq_data and mq_data.get("partial"):
+        print("  Merge queue data unavailable")
+    elif mq_data:
         s = mq_data["summary"]
         print(f"  24h: {s['success']} passed, {s['failure']} failed, {s['cancelled']} cancelled, {s['in_progress']} in progress")
     else:
@@ -1334,7 +1716,14 @@ def main():
         cap = hosted_runner_usage["cap"]
         in_use = hosted_runner_usage["in_progress"]["total"]
         queued = hosted_runner_usage["queued"]["total"]
-        print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        if cap:
+            print(f"  Hosted runners in use: {in_use}/{cap}, queued: {queued}")
+        else:
+            print(
+                f"  Hosted runners in use: {in_use} (cap unknown — org plan "
+                f"not queryable), queued: {queued}",
+                file=sys.stderr,
+            )
         if hosted_runner_usage.get("partial"):
             fetch_errs = hosted_runner_usage.get("fetch_errors", 0)
             list_errs = hosted_runner_usage.get("list_errors", [])
@@ -1367,6 +1756,7 @@ def main():
         args.output,
         mq_data=mq_data,
         hosted_runner_usage=hosted_runner_usage,
+        repo=args.repo,
     )
 
     print("Done.")

@@ -1,0 +1,39 @@
+schema_version: 1
+id: slangi-vm-swizzle-assign-bytecode-unimplemented
+bundle: conformance/types-vector-and-matrix
+suspected_kind: regression
+title: "[slangi] vector swizzle-assign aborts: VM bytecode gen unimplemented"
+observed_at: 2026-06-01T15:30:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/language-reference/types-vector-and-matrix/vector-swizzle-assign.slang
+  observed_summary: |
+    Compiling a program that performs a vector swizzle-assign
+    (`v.xz = int2(-1, -3)`) under `slangi` aborts with:
+      error[E99997]: Slang compilation aborted due to an exception
+      of N5Slang13InternalErrorE unimplemented: VM bytecode gen
+      for inst.
+    The language reference's `#element-access` example shows this
+    exact pattern as supported. The bytecode emitter has no case
+    for the swizzle-assign IR instruction.
+  exit_code: 1
+  stderr_tail: "unimplemented: VM bytecode gen for inst."
+expected:
+  claim: |
+    The language reference's example for swizzle-assign:
+    `vector<int, 4> v = { 1, 2, 3, 4 }; v.xz = vector<int, 2>(-1, -3);`
+    yields `v == { -1, 2, -3, 4 }`. The construct must compile and
+    execute under slangi just as under other backends.
+  citation_kind: doc
+  citation: docs/language-reference/types-vector-and-matrix.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: d25453d7f0b4867db4cb5eabf34fb6cd088cf596
+  doc_anchor: docs/language-reference/types-vector-and-matrix.md#element-access
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — the exact pattern appears in the doc as a working example."
+    - "Frontend bug: ruled out — the InternalError message explicitly says 'VM bytecode gen for inst', identifying the VM bytecode emitter as the missing handler."
+    - "Related to other slangi-VM findings in this campaign (#11402, #11403, and the broadcast-wrong-values finding above). All four point at slang-emit-vm.cpp / slang-vm-inst-impl.cpp as the underlying issue surface."

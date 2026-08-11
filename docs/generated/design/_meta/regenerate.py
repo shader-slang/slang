@@ -30,7 +30,8 @@ Subcommands
                                generation timestamp. Pass --commit / --model
                                to override.
     lint [<doc>...]            Run the structural linter (front-matter
-                               present, paths resolve, size cap respected)
+                               present, paths resolve, tables well-formed,
+                               size cap respected)
                                on the given documents (default: all). Also
                                lints every review and remediation report
                                under _meta/reviews/ and _meta/remediations/.
@@ -360,6 +361,31 @@ def _yaml_to_str(val) -> str:
     return str(val)
 
 
+def _parse_iso_datetime(val) -> _dt.datetime | None:
+    """Parse an ISO 8601 timestamp from YAML/JSON state into UTC."""
+    if val is None:
+        return None
+    if isinstance(val, _dt.datetime):
+        dt = val
+    else:
+        text = _yaml_to_str(val).strip()
+        if text.endswith("Z"):
+            text = text[:-1] + "+00:00"
+        try:
+            dt = _dt.datetime.fromisoformat(text)
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc)
+
+
+def _timestamp_after(lhs, rhs) -> bool:
+    lhs_dt = _parse_iso_datetime(lhs)
+    rhs_dt = _parse_iso_datetime(rhs)
+    return lhs_dt is not None and rhs_dt is not None and lhs_dt > rhs_dt
+
+
 def _is_claude_family(model: str | None) -> bool:
     """True if `model` self-identifies as part of the Claude / Anthropic family.
 
@@ -555,6 +581,9 @@ def parse_markdown_table(section_body: str) -> list[dict[str, str]] | None:
     return None
 
 
+_UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+
+
 def _is_separator_row(line: str) -> bool:
     cells = _split_md_row(line)
     if not cells:
@@ -567,12 +596,22 @@ def _is_separator_row(line: str) -> bool:
 
 
 def _split_md_row(line: str) -> list[str]:
+    """Split one Markdown table row into its cells.
+
+    Only a bare `|` separates cells: a `\\|` is a literal pipe in the
+    cell's text, which is how a table spells a gate condition such as
+    `isD3DTarget \\|\\| isSPIRV` without opening a new column. Splitting
+    on every pipe would give that row two extra cells, and
+    `parse_markdown_table` stops at the first row whose cell count
+    disagrees with the header -- so an escape-blind split silently
+    truncates a findings or Actions table at its first such row.
+    """
     s = line.strip()
     if s.startswith("|"):
         s = s[1:]
-    if s.endswith("|"):
+    if s.endswith("|") and not s.endswith("\\|"):
         s = s[:-1]
-    return [c.strip() for c in s.split("|")]
+    return [c.strip().replace("\\|", "|") for c in _UNESCAPED_PIPE_RE.split(s)]
 
 
 # --------------------------------------------------------------------------
@@ -642,6 +681,75 @@ def lint_doc(spec: DocSpec) -> list[LintIssue]:
                     spec.path, "error", f"link target does not resolve: {target}"
                 )
             )
+    issues.extend(lint_markdown_tables(spec.path, text))
+    return issues
+
+
+def lint_markdown_tables(doc: str, text: str) -> list[LintIssue]:
+    """Check that every Markdown table in `text` renders on GitHub.
+
+    These docs describe pass pipelines, so their tables are full of gate
+    conditions like `isD3DTarget || isSPIRV`. An unescaped pipe there
+    opens a new cell, and GitHub renders a row with more cells than the
+    header by dropping the extra ones -- so the row's last columns
+    silently vanish from the published doc. A delimiter row that does not
+    match its header is worse: GitHub then does not recognize the block
+    as a table at all and prints the raw pipes.
+
+    Fenced code blocks are skipped, matching the tests-tree twin. These
+    docs quote grammar productions and example tables inside ``` fences
+    -- e.g. the BNF alternatives in `syntax-reference/grammar.md`, whose
+    lines begin with `|` -- which are illustrations, not tables GitHub
+    renders. Since this lint now runs in CI, a false positive on such a
+    fenced block would fail the nightly.
+    """
+    issues: list[LintIssue] = []
+    lines = text.split("\n")
+    i = 0
+    in_fence = False
+    while i < len(lines):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        if in_fence or not lines[i].lstrip().startswith("|") or i + 1 >= len(lines):
+            i += 1
+            continue
+        if not _is_separator_row(lines[i + 1]):
+            i += 1
+            continue
+        width = len(_split_md_row(lines[i]))
+        sep_width = len(_split_md_row(lines[i + 1]))
+        if sep_width != width:
+            issues.append(
+                LintIssue(
+                    doc,
+                    "error",
+                    f"table at line {i + 1} does not render: header has"
+                    f" {width} cells but its separator row has {sep_width}",
+                )
+            )
+        i += 2
+        while i < len(lines) and lines[i].lstrip().startswith("|"):
+            cells = _split_md_row(lines[i])
+            if len(cells) != width:
+                hint = ""
+                if len(cells) > width:
+                    hint = (
+                        " (escape a literal pipe in cell text as `\\|`)"
+                        if any(c for c in cells[width:])
+                        else " (stray trailing delimiter)"
+                    )
+                issues.append(
+                    LintIssue(
+                        doc,
+                        "error",
+                        f"table row at line {i + 1} has {len(cells)} cells,"
+                        f" expected {width}{hint}",
+                    )
+                )
+            i += 1
     return issues
 
 
@@ -949,6 +1057,7 @@ def lint_remediation_report(
 
     review_ref = fm.get("review_report")
     review_fm: dict | None = None
+    remediation_matches_current_review = True
     if not isinstance(review_ref, str) or not review_ref.strip():
         issues.append(
             LintIssue(rel, "error", "review_report must be a non-empty string")
@@ -984,6 +1093,10 @@ def lint_remediation_report(
                             f" remediation target_doc {target!r}",
                         )
                     )
+                if _timestamp_after(
+                    review_fm.get("reviewed_at"), fm.get("remediated_at")
+                ):
+                    remediation_matches_current_review = False
 
     actions = fm.get("actions")
     action_sum: int | None = 0
@@ -1005,7 +1118,11 @@ def lint_remediation_report(
             elif action_sum is not None:
                 action_sum += v
 
-    if review_fm is not None and action_sum is not None:
+    if (
+        remediation_matches_current_review
+        and review_fm is not None
+        and action_sum is not None
+    ):
         review_fc = _coerce_int(review_fm.get("finding_count"))
         if review_fc is not None and review_fc != action_sum:
             issues.append(
@@ -1031,7 +1148,11 @@ def lint_remediation_report(
             )
         else:
             review_ids: set[str] = set()
-            if review_fm is not None and isinstance(review_ref, str):
+            if (
+                remediation_matches_current_review
+                and review_fm is not None
+                and isinstance(review_ref, str)
+            ):
                 # Pull finding IDs from the review's Findings table.
                 rv_body = review_text[review_text.find("\n---\n") + 5 :]
                 rv_sections = _split_sections(rv_body)
@@ -1134,38 +1255,43 @@ def cmd_list_stale(args, manifest: Manifest) -> int:
         else:
             base = f"fresh    {key}"
         if args.include_review:
-            status = _compute_review_status(key, manifest, review_docs)
+            status = _compute_review_status(key, review_docs, docs_state)
             print(f"{base}  [{status}]")
         else:
             print(base)
     return 1 if any_stale else 0
 
 
-def _doc_front_matter_digest(spec: DocSpec) -> str | None:
-    p = REPO_ROOT / spec.path
-    if not p.exists():
-        return None
-    fm = parse_front_matter(p.read_text(encoding="utf-8"))
-    if fm is None:
-        return None
-    return fm.get("watched_paths_digest") or None
-
-
 def _compute_review_status(
-    key: str, manifest: Manifest, review_docs: dict
+    key: str, review_docs: dict, freshness_docs: dict
 ) -> str:
-    """Return one of:
+    """Return the review/remediation state of one document, as one of:
 
         unreviewed
         review-stale
         reviewed-pending-remediation
         remediated
+
+    Staleness is decided against the digest recorded for `key` in
+    `freshness.json`, which `mark-fresh` writes and is therefore the
+    authoritative record of what the document was last generated from.
+
+    Do not read the digest out of the document's own YAML front-matter
+    instead. `mark-fresh` never rewrites the document, so a front-matter
+    digest is only as current as whatever the generating agent happened to
+    write there, and a document regenerated without that field being updated
+    keeps a digest that still matches its previous review. That is not a
+    hypothetical: in one cycle 11 documents were fully rewritten, kept their
+    old front-matter digests, and so reported `remediated` from a review of
+    the superseded text. The reviewer trusted the status and skipped all 11.
+    Front-matter is also unusable for the aggregator pages whose
+    `watched_paths` glob matches their own directory, because writing the
+    digest into such a page changes the page and thus the digest.
     """
     entry = review_docs.get(key)
     if not entry or "last_reviewed" not in entry:
         return "unreviewed"
-    spec = manifest.docs[key]
-    doc_digest = _doc_front_matter_digest(spec)
+    doc_digest = (freshness_docs.get(key) or {}).get("watched_paths_digest")
     last_reviewed = entry["last_reviewed"]
     if (
         doc_digest is None
@@ -1177,12 +1303,17 @@ def _compute_review_status(
         return "reviewed-pending-remediation"
     if last_remediated.get("review_report_ref") != last_reviewed.get("report_path"):
         return "reviewed-pending-remediation"
+    if _timestamp_after(
+        last_reviewed.get("reviewed_at"), last_remediated.get("remediated_at")
+    ):
+        return "reviewed-pending-remediation"
     return "remediated"
 
 
 def cmd_review_status(args, manifest: Manifest) -> int:
     review_state = load_review_state()
     review_docs = review_state.get("documents", {})
+    freshness_docs = load_freshness().get("documents", {})
     keys: list[str]
     if args.docs:
         for d in args.docs:
@@ -1193,7 +1324,7 @@ def cmd_review_status(args, manifest: Manifest) -> int:
     else:
         keys = sorted(manifest.docs)
     for key in keys:
-        status = _compute_review_status(key, manifest, review_docs)
+        status = _compute_review_status(key, review_docs, freshness_docs)
         line = f"{status:<32}{key}"
         if args.show_counts:
             entry = review_docs.get(key, {})
@@ -1256,6 +1387,42 @@ def cmd_mark_reviewed(args, manifest: Manifest) -> int:
             file=sys.stderr,
         )
         return 1
+    # Record the digest from `freshness.json`, not the copy the reviewer wrote
+    # into the report. Both should describe the same thing -- the watched-set
+    # state the reviewed text was generated from -- but only `freshness.json`
+    # is authoritative, because `mark-fresh` writes it and never rewrites the
+    # document. A reviewer that reads `watched_paths_digest` out of the target
+    # document's front-matter instead picks up whatever the generating agent
+    # last happened to type there, which is routinely out of date.
+    #
+    # Trusting the report's copy silently destroys the ledger: recording a
+    # stale digest makes `_compute_review_status` report `review-stale` the
+    # instant the review is recorded, so a completed review looks like it never
+    # happened and the remediation that follows it looks unmotivated. That is
+    # not hypothetical -- an entire 31-document review round transcribed
+    # front-matter digests and every one of them disagreed with the real value.
+    # Warn rather than fail, so that a good review is still recorded correctly.
+    review_digest = _yaml_to_str(fm["target_doc_watched_paths_digest"])
+    authoritative_digest = (
+        (load_freshness().get("documents") or {}).get(args.doc) or {}
+    ).get("watched_paths_digest")
+    if authoritative_digest is None:
+        print(
+            f"warning: {args.doc} has no freshness entry; recording the digest"
+            f" from the review report, which may be stale",
+            file=sys.stderr,
+        )
+        authoritative_digest = review_digest
+    elif review_digest != authoritative_digest:
+        print(
+            f"warning: {args.doc}: review report records watched-paths digest"
+            f" {review_digest[:12]}, but freshness.json says"
+            f" {authoritative_digest[:12]}; recording the latter."
+            f" The reviewer most likely read the digest from the target"
+            f" document's front-matter, which is not authoritative --"
+            f" use `regenerate.py digest {args.doc}` instead.",
+            file=sys.stderr,
+        )
     state = load_review_state()
     state.setdefault("schema_version", 1)
     state.setdefault("documents", {})
@@ -1264,9 +1431,7 @@ def cmd_mark_reviewed(args, manifest: Manifest) -> int:
         "reviewer_model": _yaml_to_str(fm["reviewer_model"]),
         "reviewed_at": _yaml_to_str(fm["reviewed_at"]),
         "target_doc_source_commit": _yaml_to_str(fm["target_doc_source_commit"]),
-        "target_doc_watched_paths_digest": _yaml_to_str(
-            fm["target_doc_watched_paths_digest"]
-        ),
+        "target_doc_watched_paths_digest": authoritative_digest,
         "finding_count": int(fm["finding_count"]),
         "severity_breakdown": {
             k: int(fm["severity_breakdown"][k]) for k in _REVIEW_SEVERITIES

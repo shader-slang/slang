@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-15T15:58:00+00:00
-source_commit: e75b9a3d03659cefb39882da3adecb2eb8751e0d
-watched_paths_digest: 7176a22219b18c44d0407a900615049a6a078771700ca274d01d15aeb88bc3ad
+model: claude-opus-5
+generated_at: 2026-08-03T17:45:00Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: 8033723409ecbf2551b9a4eb228a4e39356c3fa79164d7d057fb8526b4b0145a
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -75,7 +75,15 @@ explicitly.
   the unit of granularity in
   [slang-capabilities.capdef](../../../source/slang/slang-capabilities.capdef).
   Atoms are combined into capability sets that gate the use of intrinsics
-  and decide whether a function is callable on a given target.
+  and decide whether a function is callable on a given target. Atoms name
+  targets and their versions (`metallib_3_2`), stages (`node`, the
+  work-graph stage), and extensions
+  (`SPV_KHR_physical_storage_buffer`). Version atoms are special-cased in
+  set arithmetic: `isTargetVersionAtom` and `isSpirvVersionAtom` in
+  [slang-capability.cpp](../../../source/slang/slang-capability.cpp)
+  identify them, and a `*_latest` alias family (`spirv_latest`,
+  `metallib_latest`, `sm_latest`, `GLSL_latest`) tracks the newest
+  version of each.
 
   See: [cross-cutting/targets.md](cross-cutting/targets.md)
 
@@ -104,7 +112,9 @@ explicitly.
 : The built-in module written in Slang itself
   ([core.meta.slang](../../../source/slang/core.meta.slang)) that defines
   fundamental types and intrinsics available to every shader. It is
-  compiled at build time and embedded into `libslang`.
+  compiled at build time and, when `SLANG_EMBED_CORE_MODULE` is on,
+  embedded into the primary `slang-compiler` shared library; `libslang`
+  survives only as a backward-compatibility alias for that artefact.
 
   See: [cross-cutting/core-module.md](cross-cutting/core-module.md)
 
@@ -137,11 +147,31 @@ explicitly.
 
   See: [pipeline/03-semantic-check.md](pipeline/03-semantic-check.md)
 
+**DeclCheckState** `[Slang]`
+: The monotonically increasing ladder of how much semantic checking has
+  been applied to one declaration, declared as an `enum class ... :
+  uint8_t` at
+  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h)
+  line 475. In order the rungs are `Unchecked`,
+  `ReadyForParserLookup`, `ModifiersChecked`, `ScopesWired`,
+  `SignatureChecked`, `ReadyForReference`, `ReadyForLookup`,
+  `ReadyForConformances`, `TypesFullyResolved`, `AttributesChecked`,
+  `DefinitionChecked` (aliased as `DefaultConstructorReadyForUse`), and
+  `CapabilityChecked`. Checking is demand-driven rather than a fixed
+  sequence of whole-program passes: a checker that needs a declaration
+  at some rung calls `ensureDecl(decl, state)`, which drives that one
+  declaration up to the requested rung, so the ladder doubles as the
+  recursion guard against cyclic checking.
+
+  See: [pipeline/03-semantic-check.md](pipeline/03-semantic-check.md)
+
 **decoration** `[Slang]`
 : A non-essential annotation attached to another IR instruction, encoded
   as a child instruction whose opcode is in the `Decoration` family of
-  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) (every
-  opcode name ends in `Decoration`). Decorations carry information such
+  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua). The
+  C++ wrapper structs conventionally end in `Decoration`, but the
+  opcode names do not uniformly do so — `branch`, `loopControl`, and
+  `public` are all in the family. Decorations carry information such
   as the name hint preserved across passes, layout / binding indices,
   target-intrinsic spellings, loop hints, entry-point markers, and
   capability requirements. Synonym: `IRDecoration`. The full per-opcode
@@ -155,6 +185,10 @@ explicitly.
   during a compile, declared in
   [slang-diagnostic-sink.h](../../../source/compiler-core/slang-diagnostic-sink.h).
   Every compiler component takes a sink rather than printing directly.
+  The individual diagnostics a sink can carry — id, severity, and
+  message format — are declared in
+  [slang-diagnostics.lua](../../../source/slang/slang-diagnostics.lua),
+  not in a hand-written header.
 
   See: [cross-cutting/diagnostics.md](cross-cutting/diagnostics.md)
 
@@ -194,10 +228,16 @@ explicitly.
 **entry point** `[Slang]`
 : In the compile-pipeline sense, a function plus a pipeline stage
   (vertex, fragment, compute, ...) that defines a kernel to compile.
-  Modeled in the API by the `EntryPointRequest` / `EntryPointReference`
-  family in [slang-compile-request.h](../../../source/slang/slang-compile-request.h).
-  The runtime sense (a function from which a thread begins execution)
-  lives in the language-reference glossary.
+  Two distinct types model it: the front-end names one to find and
+  validate as a `FrontEndEntryPointRequest` (a translation-unit index, a
+  `Name`, and a `Profile`) at
+  [slang-compile-request.h](../../../source/slang/slang-compile-request.h)
+  line 71. Once found and checked, the compiler represents it as an
+  `EntryPoint`, a `ComponentType` that also implements the public
+  `IEntryPoint` COM interface, so an entry point can be composed and
+  specialized like any other component. The runtime sense (a function
+  from which a thread begins execution) lives in the language-reference
+  glossary.
 
   See: [pipeline/overview.md](pipeline/overview.md)
 
@@ -225,11 +265,16 @@ explicitly.
   See: [architecture/overview.md](architecture/overview.md)
 
 **fossil format** `[Slang]`
-: The memory-mappable binary serialization backend used for compiled
-  modules, declared in
+: The memory-mappable binary serialization format used for compiled
+  modules, defined in
+  [slang-fossil.h](../../../source/slang/slang-fossil.h); the
+  `ISerializerImpl` backend that writes and reads it is the separate
   [slang-serialize-fossil.h](../../../source/slang/slang-serialize-fossil.h).
-  Fossil is designed so that loading a module is a single `mmap` plus
-  pointer fix-ups; it pairs with the RIFF container format.
+  A pointer inside fossilized data is a `RelativePtr` — an offset
+  relative to the address of the pointer itself — so a fossilized object
+  graph is traversable directly once the file is mapped, with **no**
+  pointer-fixup pass at load. A finished fossil blob is what a RIFF data
+  chunk contains, so the two formats nest rather than compete.
 
   See: [cross-cutting/serialization.md](cross-cutting/serialization.md)
 
@@ -237,9 +282,11 @@ explicitly.
 : An IR instruction whose value depends only on its operands, marked
   `hoistable = true` in
   [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua). Such
-  instructions are deduplicated globally inside an `IRModule` and live
-  at the module scope rather than inside a function body — this is how
-  Slang represents types and other "value" entities in SSA form. The
+  instructions are deduplicated and hoisted as far toward the module
+  scope of an `IRModule` as their operands allow — module scope when
+  nothing constrains them, otherwise the innermost parent that defines
+  an operand. This is how Slang represents types and other "value"
+  entities in SSA form. The
   per-opcode catalog flags every hoistable opcode with `H` in its
   flags column; see for instance
   [ir-reference/types.md](ir-reference/types.md) (every Type opcode is
@@ -269,7 +316,11 @@ explicitly.
 : The API used to construct IR instructions during AST-to-IR lowering
   and during IR transformations, declared in
   [slang-ir.h](../../../source/slang/slang-ir.h). It owns an insertion
-  point and routes hoistable instructions to module scope automatically.
+  point and hoists hoistable instructions as far toward module scope as
+  operand and result-type visibility permits: `addHoistableInst` starts
+  at the module and merges in the parent of each operand and of the
+  result type, so an instruction that depends on a nested value lands
+  in that deeper parent instead.
 
   See: [pipeline/04-ast-to-ir.md](pipeline/04-ast-to-ir.md)
 
@@ -319,9 +370,12 @@ explicitly.
 **IROp** `[Slang]`
 : The integer enum tag identifying every IR instruction opcode (e.g.
   `kIROp_Add`, `kIROp_StructType`, `kIROp_NameHintDecoration`).
-  Declared in `slang-ir-insts-enum.h.fiddle` (generated by the build
-  from [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) into
-  `build/source/slang/fiddle/`). The opcode is stored in `IRInst::m_op`
+  The `enum IROp : int32_t` is declared in
+  [slang-ir-insts-enum.h](../../../source/slang/slang-ir-insts-enum.h),
+  but none of its enumerators are written by hand: the build expands
+  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) into
+  `slang-ir-insts-enum.h.fiddle` under `build/source/slang/fiddle/`,
+  which that header includes. The opcode is stored in `IRInst::m_op`
   and read via `IRInst::getOp()`; downstream casts (`as<IRFoo>()`,
   `cast<IRFoo>()`) test the opcode against a contiguous range
   determined by the Lua nesting.
@@ -358,8 +412,14 @@ explicitly.
 **linkage** `[Slang]`
 : The compile-time object that scopes loaded modules, search paths,
   target requirements, and the core module. Roughly the "compiler
-  configuration handle" exposed through `slang::ILinkage` in
-  [slang.h](../../../include/slang.h).
+  configuration handle": the internal `Linkage` class, declared at
+  [slang-session.h](../../../source/slang/slang-session.h) line 91,
+  which implements the public `slang::ISession` interface from
+  [slang.h](../../../include/slang.h) directly. The naming is a trap
+  worth memorizing: the public interface is called a *session*, but the
+  C++ class behind it is `Linkage`; the C++ class actually named
+  `Session` is the coarser global object described under **session**
+  below.
 
   See: [architecture/overview.md](architecture/overview.md)
 
@@ -410,26 +470,46 @@ explicitly.
 : The pipeline stage that walks a type-checked AST and emits Slang IR,
   driven by `generateIRForTranslationUnit` in
   [slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp).
+  It runs once per `TranslationUnitRequest` and produces the per-module
+  IR that the pre-link mandatory passes then process.
 
   See: [pipeline/04-ast-to-ir.md](pipeline/04-ast-to-ir.md)
 
+**magic type** `[Slang]`
+: A core-module type whose identity the C++ compiler knows about, marked
+  with the `__magic_type` modifier. The distinction from
+  `__intrinsic_type` is the discriminator to reach for when reading
+  `core.meta.slang`: `__magic_type` produces a `MagicTypeModifier`,
+  which carries a `SyntaxClass<NodeBase> magicNodeType` naming the
+  corresponding C++ `Type` subclass, so the front end has a dedicated
+  class for the type. `__intrinsic_type` alone produces an
+  `IntrinsicTypeModifier`, which carries only a `uint32_t irOp`, so the
+  type's identity is purely an IR opcode with no C++ subclass behind it.
+  Both modifiers are declared in
+  [slang-ast-modifier.h](../../../source/slang/slang-ast-modifier.h)
+  (lines 589 and 613); a declaration may carry both.
+
+  See: [cross-cutting/core-module.md](cross-cutting/core-module.md),
+  [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md)
+
 **mandatory optimization pass** `[Slang]`
-: An IR pass that runs unconditionally on every per-translation-unit
-  IR module inside `generateIRForTranslationUnit` (in
-  [slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp))
-  before the module is cached on `Module::m_irModule` and pulled
-  into `linkAndOptimizeIR` by `linkIR`. The set comprises Phase B
-  lowering passes (`prelinkIR`, `lowerErrorHandling`, `lowerDefer`,
-  `synthesizeBitFieldAccessors`, `lowerExpandType`,
-  `insertDebugValueStore`) and Phase C optimization passes
-  (`constructSSA`, `applySparseConditionalConstantPropagation`,
-  per-function `eliminateDeadCode`, optional `simplifyCFG` +
-  `peepholeOptimize`, optional `invertLoops`, and the
-  `performMandatoryEarlyInlining` fixed-point loop). These passes
-  serve two purposes: simplifying the IR shape that downstream
-  passes consume, and establishing dataflow invariants that the
-  Phase D validators rely on. They are target-agnostic — the same
-  sequence runs for every shader target.
+: An IR pass belonging to the target-independent pre-link
+  mandatory-processing region of `generateIRForTranslationUnit` (in
+  [slang-lower-to-ir.cpp](../../../source/slang/slang-lower-to-ir.cpp)),
+  which runs on every per-translation-unit IR module before the module
+  is cached on `Module::m_irModule` and pulled into `linkAndOptimizeIR`
+  by `linkIR`. Its unconditional core is the Phase B lowering passes
+  (`prelinkIR`, `lowerErrorHandling`, `lowerDefer`,
+  `synthesizeBitFieldAccessors`, `lowerExpandType`) plus the Phase C
+  passes `constructSSA`, `applySparseConditionalConstantPropagation`,
+  per-function `eliminateDeadCode`, and the
+  `performMandatoryEarlyInlining` fixed-point loop; `insertDebugValueStore`
+  (`debugInfoLevel >= Standard`), `simplifyCFG` + `peepholeOptimize`
+  (`!shouldPerformMinimumOptimizations()`), and `invertLoops` are
+  option-gated members of the same region. These passes simplify the IR
+  shape that downstream passes consume and establish dataflow invariants
+  that the Phase D validators rely on, and the sequence is
+  target-agnostic — the same one runs for every shader target.
 
   See: [pipeline/04b-pre-link-passes.md](pipeline/04b-pre-link-passes.md)
 
@@ -464,12 +544,37 @@ explicitly.
   [pipeline/03-semantic-check.md](pipeline/03-semantic-check.md)
   External: https://en.wikipedia.org/wiki/Name_resolution_(programming_languages)
 
+**no producer at HEAD** `[Slang]`
+: The phrase the IR-reference pages put in an opcode's AST-origin column
+  when the opcode is declared in
+  [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) —
+  sometimes with an `IRBuilder` helper, a wrapper struct, a stable name,
+  and even a consumer in a backend emitter — but nothing anywhere in the
+  tree constructs it at `source_commit`. It is a verified finding about
+  the current code, not a documentation gap; the column contract and the
+  pages that use the phrase are described in
+  [ir-reference/index.md](ir-reference/index.md). Contrast with
+  an opcode that is produced and then retired by a later pass, which has
+  a real producer. The phrase exists because the two catch-alls it
+  replaced — `(synthesized)` and a bare em-dash — could not distinguish
+  an opcode built by an IR pass from one built by nothing at all; both
+  are retired and must not appear in an AST-origin column.
+
+  See: [ir-reference/index.md](ir-reference/index.md),
+  [ir-reference/differentiation.md](ir-reference/differentiation.md)
+
 **overload resolution** `[General]`
 : Choosing one declaration from a set of candidates that share a name
   by ranking them on parameter compatibility, conversion cost, and
   generic specificity. Slang's implementation builds `OverloadCandidate`
   records and filters them through a multi-stage pipeline in
   [slang-check-overload.cpp](../../../source/slang/slang-check-overload.cpp).
+  Builtin operators on scalar, vector, and matrix operands never reach
+  that pipeline: `convertToBuiltinArithmeticOp` in
+  [slang-check-expr.cpp](../../../source/slang/slang-check-expr.cpp)
+  rewrites them to a `BuiltinOperatorExpr` carrying the resolved
+  `BuiltinOperationKind`. That fast path replaced an earlier
+  memoization cache over operator lookups, which no longer exists.
 
   See: [name-resolution/overload-resolution.md](name-resolution/overload-resolution.md)
   External: https://en.wikipedia.org/wiki/Function_overloading
@@ -509,6 +614,21 @@ explicitly.
 
   See: [name-resolution/overload-resolution.md](name-resolution/overload-resolution.md)
 
+**prelink** `[Slang]`
+: The early, target-independent link step: `prelinkIR`
+  ([slang-ir-link.cpp](../../../source/slang/slang-ir-link.cpp)), called
+  from `generateIRForTranslationUnit`, pulls exactly one category of
+  external symbol into a translation unit's IR — cross-module functions
+  carrying `[__unsafeForceInlineEarly]`, whose bodies must be present
+  before mandatory early inlining runs. Its result is the long-lived
+  module IR cached on `Module::m_irModule`, so it must stay complete;
+  that is why `IRSharedSpecContext::isFinalCodegenLink` is left false
+  here and set true only by `linkIR`, gating
+  `canPruneAutodiffLinkArtifacts()` so pruning happens only in the
+  throw-away per-target copy.
+
+  See: [pipeline/04b-pre-link-passes.md](pipeline/04b-pre-link-passes.md)
+
 **prelude** `[Slang]`
 : A target-specific snippet of source code that is prepended to the
   emitted output so that the generated code can use Slang-defined
@@ -543,11 +663,40 @@ explicitly.
   See: [pipeline/02-parse-ast.md](pipeline/02-parse-ast.md)
   External: https://en.wikipedia.org/wiki/Recursive_descent_parser
 
+**required lowering pass set** `[Slang]`
+: A struct of 34 boolean flags —
+  `RequiredLoweringPassSet`, declared in
+  [slang-code-gen.h](../../../source/slang/slang-code-gen.h) — that
+  records which kinds of IR a module actually contains. It is filled by
+  `calcRequiredLoweringPassSet`
+  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 405), and
+  then gates most of the backend pipeline: a pass is skipped outright
+  when its flag is clear. The scan runs more than once — post-link and
+  again post-specialization — and the flags accumulate rather than
+  being reset between scans, so a flag can be stale-true (a harmless
+  no-op walk) but not a false negative for IR that only the front end
+  produces. Reading a target
+  pipeline therefore means reading it as a *conditional* sequence — the
+  same pass list produces very different runs for a simple compute
+  kernel and a differentiable ray-tracing shader.
+
+  See: [target-pipelines/index.md](target-pipelines/index.md),
+  [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md)
+
 **RIFF container** `[Slang]`
-: A chunked tagged-container format used to bundle serialized AST, IR,
-  and auxiliary data into a single artifact. Implemented in
-  [slang-serialize-riff.h](../../../source/slang/slang-serialize-riff.h);
-  pairs with the fossil format to give random-access loading.
+: A chunked, tagged container format used to bundle serialized AST, IR,
+  and auxiliary data into a single artifact. The one implementation is
+  the general-purpose `RIFF` namespace in
+  [slang-riff.h](../../../source/core/slang-riff.h) /
+  [slang-riff.cpp](../../../source/core/slang-riff.cpp): `RIFF::Builder`
+  and `RIFF::BuildCursor` write chunks, `RIFF::RootChunk::getFromBlob`
+  navigates them on read. It pairs with the fossil format, which encodes
+  the *values* placed inside a RIFF data chunk, to give random-access
+  loading. A separate RIFF *serializer backend* (an `ISerializerImpl`
+  that wrote each value as its own chunk, in files named
+  `slang-serialize-riff.{h,cpp}`) once sat alongside the fossil backend,
+  but its only callers sat behind a hard-coded-off compile-time switch,
+  so it was deleted; nothing replaced it.
 
   See: [cross-cutting/serialization.md](cross-cutting/serialization.md)
 
@@ -558,15 +707,25 @@ explicitly.
   [slang-ast-base.h](../../../source/slang/slang-ast-base.h) carries a
   `containerDecl` pointer plus `parent` and `nextSibling` links; the
   parser builds the chain on the fly and stores it on the AST so the
-  checker can re-walk it.
+  checker can re-walk it. Chains that span files or modules — a
+  namespace reopened elsewhere, or one pulled in by `using` — are
+  stitched together later, at the `DeclCheckState::ScopesWired` step
+  (declared in
+  [slang-ast-support-types.h](../../../source/slang/slang-ast-support-types.h)),
+  which sits between `ModifiersChecked` and `SignatureChecked` so
+  sibling wiring is complete before any signature is checked.
 
   See: [name-resolution/scopes.md](name-resolution/scopes.md)
-  External: https://en.wikipedia.org/wiki/Scope_(computer_science)
 
 **session** `[Slang]`
 : The top-level compiler instance that owns global state shared across
   compiles — the core module, downstream compiler discovery, and the
-  built-in target descriptors. Exposed as `slang::IGlobalSession`.
+  built-in target descriptors. Exposed publicly as
+  `slang::IGlobalSession`, whose implementation is the C++ class
+  `Session` at
+  [slang-global-session.h](../../../source/slang/slang-global-session.h)
+  line 109. Do not confuse it with **linkage**, which is what the
+  public `ISession` maps to.
 
   See: [architecture/overview.md](architecture/overview.md)
 
@@ -621,12 +780,15 @@ explicitly.
   [ir-reference/generics-and-existentials.md](ir-reference/generics-and-existentials.md)
 
 **syntax-decl** `[Slang]`
-: A declaration that introduces a parser-level construct from inside
-  Slang source. Most keywords (`if`, `for`, `struct`, `__init`, ...)
-  are bound as syntax-decls in `core.meta.slang` rather than being
-  hardcoded into the lexer; the dispatch table is the
-  `SyntaxParseInfo` array in
-  [slang-parser.cpp](../../../source/slang/slang-parser.cpp).
+: A declaration that binds a keyword to a parser callback, so the
+  construct is looked up by name instead of being wired into the
+  grammar. The closed part of the grammar does not use this mechanism:
+  `if`, `for`, and `struct` are direct `LookAheadToken` tests in the
+  statement and type-specifier parsers. The extensible part does:
+  `__init` and its neighbours come from the C++ `g_parseSyntaxEntries`
+  table of `SyntaxParseInfo` in
+  [slang-parser.cpp](../../../source/slang/slang-parser.cpp), which
+  `populateBaseLanguageModule` installs into the base-language module.
 
   See: [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md)
 
@@ -638,20 +800,6 @@ explicitly.
 
   See: [cross-cutting/targets.md](cross-cutting/targets.md)
 
-**target legalization driver** `[Slang]`
-: A target-specific IR pass that runs inside `linkAndOptimizeIR` and
-  performs the bulk of the target's pre-emit transformations as a
-  single pass call. Examples are `legalizeIRForSPIRV`
-  ([slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)),
-  `legalizeIRForMetal`
-  ([slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp)),
-  and `legalizeIRForWGSL`
-  ([slang-ir-wgsl-legalize.cpp](../../../source/slang/slang-ir-wgsl-legalize.cpp)).
-  Not every target has one; HLSL and CUDA do their target-specific
-  work through individual `SLANG_PASS` calls instead.
-
-  See: [target-pipelines/index.md](target-pipelines/index.md)
-
 **target intrinsic** `[Slang]`
 : A function whose implementation is supplied as a per-target
   expression rather than as Slang body. Declared in the core module
@@ -660,23 +808,50 @@ explicitly.
   carrying the per-target spelling and applicability predicate.
   Related decorations are `IntrinsicOpDecoration` (a numeric
   intrinsic opcode for the emit backends), `RequirePreludeDecoration`
-  (forces a prelude snippet on use), and the `TargetSwitchDecoration`
-  family. The per-decoration catalog is in
+  (forces a prelude snippet on use), and `TargetDecoration` (marks a
+  definition as belonging to one target, the form the `targetSwitch`
+  terminator dispatches on). The per-decoration catalog is in
   [ir-reference/decorations.md](ir-reference/decorations.md).
 
   See: [ir-reference/decorations.md](ir-reference/decorations.md),
   [cross-cutting/targets.md](cross-cutting/targets.md)
 
+**target legalization driver** `[Slang]`
+: A target-specific IR pass that performs the bulk of one target's
+  pre-emit transformations as a single call. Exactly three exist:
+  `legalizeIRForMetal`
+  ([slang-ir-metal-legalize.cpp](../../../source/slang/slang-ir-metal-legalize.cpp)),
+  `legalizeIRForWGSL`
+  ([slang-ir-wgsl-legalize.cpp](../../../source/slang/slang-ir-wgsl-legalize.cpp)),
+  and `legalizeIRForSPIRV`
+  ([slang-ir-spirv-legalize.cpp](../../../source/slang/slang-ir-spirv-legalize.cpp)).
+  Where each one runs is a common confusion: the Metal and WGSL drivers
+  are `SLANG_PASS` calls inside `linkAndOptimizeIR`
+  ([slang-emit.cpp](../../../source/slang/slang-emit.cpp) line 970),
+  whereas the SPIR-V driver is *not* — it is called from
+  `emitSPIRVFromIR` in
+  [slang-emit-spirv.cpp](../../../source/slang/slang-emit-spirv.cpp),
+  so it belongs to the emit step that follows link-and-optimize. HLSL
+  and CUDA have no driver at all; their target-specific work is done
+  through individual `SLANG_PASS` calls.
+
+  See: [target-pipelines/index.md](target-pipelines/index.md)
+
 **terminator instruction** `[Slang]`
 : The last instruction in an `IRBlock`; it decides what runs next
   (or that nothing does). Members of the `TerminatorInst` family in
   [slang-ir-insts.lua](../../../source/slang/slang-ir-insts.lua) —
-  `Return`, `unconditionalBranch`, `conditionalBranch`, `loop`,
-  `ifElse`, `Switch`, `Unreachable`, `discard`, `Throw`,
-  `TryCall`, `defer`. Branch terminators carry per-target arguments
-  that supply the destination block's `block parameter`s. Per-opcode
-  catalog is in
-  [ir-reference/control-flow.md](ir-reference/control-flow.md).
+  `return_val`, `yield`, `unconditionalBranch`, `loop`,
+  `conditionalBranch`, `ifElse`, `throw`, `tryCall`, `switch`,
+  `targetSwitch`, `GenericAsm`, `missingReturn`, `unreachable`, and
+  `defer`. Membership is decided by opcode range, so `discard` —
+  declared one line after the family closes — is *not* a terminator
+  even though it ends pixel processing. Branch terminators carry
+  per-target arguments that supply the destination block's
+  `block parameter`s; a `yield` closes the single block inside an
+  `expand` instruction, carrying that iteration's pattern value, while a
+  `generic`'s body instead ends in `return_val`, which is what
+  `findGenericReturnVal` reads as an `IRReturn`.
 
   See: [ir-reference/control-flow.md](ir-reference/control-flow.md)
 
@@ -684,8 +859,11 @@ explicitly.
 : One logical unit of source given to the compiler — for HLSL each
   source file is its own translation unit; for Slang several files can
   belong to the same translation unit. Internally represented by
-  `TranslationUnitRequest` in
-  [slang-compile-request.h](../../../source/slang/slang-compile-request.h).
+  `TranslationUnitRequest`, declared at
+  [slang-translation-unit.h](../../../source/slang/slang-translation-unit.h)
+  line 22 (several headers carry only a forward declaration of it). One
+  `TranslationUnitRequest` is what `generateIRForTranslationUnit` runs
+  the pre-link pass pipeline over.
 
   See: [architecture/overview.md](architecture/overview.md)
 
@@ -747,6 +925,25 @@ explicitly.
   [ir-reference/structure.md](ir-reference/structure.md),
   [ir-reference/generics-and-existentials.md](ir-reference/generics-and-existentials.md)
 
+**wrapper struct** `[Slang]`
+: The C++ view of one opcode: a `struct IRFoo : IRInst` (or a more
+  specific base) that adds named accessors so callers write
+  `inst->getVal()` instead of `inst->getOperand(0)`. Every opcode gets
+  one, but only some are written by hand in
+  [slang-ir-insts.h](../../../source/slang/slang-ir-insts.h) — that file
+  spells out a struct when it needs members the generator cannot derive,
+  such as accessors that interpret an optional trailing operand. For
+  every other opcode, `getAllOtherInstStructsData()` in
+  [slang-ir.h.lua](../../../source/slang/slang-ir.h.lua) drives a FIDDLE
+  template that emits the whole struct into
+  `build/source/slang/fiddle/slang-ir-insts.h.fiddle`. Either way the
+  `FIDDLE(leafInst())` / `FIDDLE(baseInst())` expansion supplies
+  `isaImpl`, the `kOp` constant, and one accessor per named Lua operand,
+  so hand-written structs get generated accessors too.
+
+  See: [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md),
+  [ir-reference/index.md](ir-reference/index.md)
+
 ## Cross-reference index
 
 The table below maps each peer document to the glossary terms it
@@ -761,31 +958,40 @@ quick map of the vocabulary you are about to encounter.
 | [pipeline/overview.md](pipeline/overview.md) | entry point |
 | [pipeline/01-lex-preprocess.md](pipeline/01-lex-preprocess.md) | lexer, preprocessor, source-loc |
 | [pipeline/02-parse-ast.md](pipeline/02-parse-ast.md) | abstract syntax tree, ASTBuilder, parser, recursive descent, two-stage parsing |
-| [pipeline/03-semantic-check.md](pipeline/03-semantic-check.md) | decl-ref, lookup result, name resolution, type inference |
+| [pipeline/03-semantic-check.md](pipeline/03-semantic-check.md) | decl-ref, DeclCheckState, lookup result, name resolution, type inference |
 | [name-resolution/index.md](name-resolution/index.md) | name resolution |
 | [name-resolution/scopes.md](name-resolution/scopes.md) | scope |
 | [name-resolution/lookup.md](name-resolution/lookup.md) | lookup breadcrumb, lookup mask, lookup options, lookup result, shadowing, transparent member |
 | [name-resolution/visibility.md](name-resolution/visibility.md) | visibility |
 | [name-resolution/overload-resolution.md](name-resolution/overload-resolution.md) | conversion cost, overload resolution, partial generic application |
 | [pipeline/04-ast-to-ir.md](pipeline/04-ast-to-ir.md) | intermediate representation, IRBuilder, lower-to-IR |
-| [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md) | control-flow graph, dataflow analysis, dead-code elimination, dominator, inlining, monomorphization, specialization |
+| [pipeline/04b-pre-link-passes.md](pipeline/04b-pre-link-passes.md) | mandatory optimization pass, prelink |
+| [pipeline/04c-layout-ir.md](pipeline/04c-layout-ir.md) | layout IR module |
+| [pipeline/05-ir-passes.md](pipeline/05-ir-passes.md) | control-flow graph, dataflow analysis, dead-code elimination, dominator, inlining, monomorphization, required lowering pass set, specialization |
 | [pipeline/06-emit.md](pipeline/06-emit.md) | (consult cross-cutting/targets.md and pipeline/04-ast-to-ir.md) |
 | [syntax-reference/tokens.md](syntax-reference/tokens.md) | (consult pipeline/01-lex-preprocess.md) |
-| [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md) | syntax-decl |
+| [syntax-reference/keywords-and-builtins.md](syntax-reference/keywords-and-builtins.md) | magic type, syntax-decl |
 | [syntax-reference/grammar.md](syntax-reference/grammar.md) | (consult pipeline/02-parse-ast.md) |
 | [cross-cutting/diagnostics.md](cross-cutting/diagnostics.md) | DiagnosticSink |
-| [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md) | existential type, hoistable instruction, IRDecoration, IRFunc, IRInst, IRModule, IROp, single static assignment (SSA), witness table |
+| [cross-cutting/ir-instructions.md](cross-cutting/ir-instructions.md) | existential type, hoistable instruction, IRDecoration, IRFunc, IRInst, IRModule, IROp, single static assignment (SSA), witness table, wrapper struct |
 | [cross-cutting/targets.md](cross-cutting/targets.md) | capability atom, profile, target, target intrinsic |
-| [cross-cutting/core-module.md](cross-cutting/core-module.md) | core module, prelude |
+| [cross-cutting/core-module.md](cross-cutting/core-module.md) | core module, magic type, prelude |
 | [cross-cutting/serialization.md](cross-cutting/serialization.md) | fossil format, RIFF container |
-| [ir-reference/index.md](ir-reference/index.md) | IROp, IRInst, IRModule |
+| [ir-reference/index.md](ir-reference/index.md) | IROp, IRInst, IRModule, no producer at HEAD, wrapper struct |
 | [ir-reference/types.md](ir-reference/types.md) | (no glossary entries originate here; consult cross-cutting/ir-instructions.md) |
 | [ir-reference/values.md](ir-reference/values.md) | (no glossary entries originate here; consult cross-cutting/ir-instructions.md) |
 | [ir-reference/structure.md](ir-reference/structure.md) | IRFunc, IRModule, parent instruction, witness table |
 | [ir-reference/control-flow.md](ir-reference/control-flow.md) | block parameter, terminator instruction |
 | [ir-reference/generics-and-existentials.md](ir-reference/generics-and-existentials.md) | existential type, specialization, witness table |
 | [ir-reference/resources-and-atomics.md](ir-reference/resources-and-atomics.md) | (no glossary entries originate here; consult cross-cutting/ir-instructions.md) |
-| [ir-reference/differentiation.md](ir-reference/differentiation.md) | differential pair |
+| [ir-reference/differentiation.md](ir-reference/differentiation.md) | differential pair, no producer at HEAD |
 | [ir-reference/decorations.md](ir-reference/decorations.md) | decoration, IRDecoration, target intrinsic |
 | [ir-reference/metadata.md](ir-reference/metadata.md) | (no glossary entries originate here; consult cross-cutting/ir-instructions.md) |
 | [ir-reference/misc.md](ir-reference/misc.md) | (no glossary entries originate here; consult cross-cutting/ir-instructions.md) |
+| [ast-reference/index.md](ast-reference/index.md) | (no glossary entries originate here; consult pipeline/02-parse-ast.md and pipeline/03-semantic-check.md) |
+| [target-pipelines/index.md](target-pipelines/index.md) | required lowering pass set, target legalization driver |
+| [target-pipelines/hlsl.md](target-pipelines/hlsl.md) | (consult target-pipelines/index.md) |
+| [target-pipelines/spirv.md](target-pipelines/spirv.md) | (consult target-pipelines/index.md) |
+| [target-pipelines/metal.md](target-pipelines/metal.md) | (consult target-pipelines/index.md) |
+| [target-pipelines/wgsl.md](target-pipelines/wgsl.md) | (consult target-pipelines/index.md) |
+| [target-pipelines/cuda.md](target-pipelines/cuda.md) | (consult target-pipelines/index.md) |

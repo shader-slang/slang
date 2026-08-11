@@ -1,14 +1,14 @@
 // unit-test-file-system.cpp
 
-#include "../../source/core/slang-blob.h"
-#include "../../source/core/slang-castable.h"
-#include "../../source/core/slang-deflate-compression-system.h"
-#include "../../source/core/slang-file-system.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-lz4-compression-system.h"
-#include "../../source/core/slang-memory-file-system.h"
-#include "../../source/core/slang-riff-file-system.h"
-#include "../../source/core/slang-zip-file-system.h"
+#include "core/slang-blob.h"
+#include "core/slang-castable.h"
+#include "core/slang-deflate-compression-system.h"
+#include "core/slang-file-system.h"
+#include "core/slang-io.h"
+#include "core/slang-lz4-compression-system.h"
+#include "core/slang-memory-file-system.h"
+#include "core/slang-riff-file-system.h"
+#include "core/slang-zip-file-system.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <limits>
@@ -804,6 +804,43 @@ SLANG_UNIT_TEST(fileSystem)
             SLANG_CHECK(SLANG_SUCCEEDED(_testImplicitDirectory(type)));
         }
     }
+}
+
+// Loads a ZIP and then modifies it so miniz must take ownership of the Slang-owned input buffer.
+static SlangResult _testZipReadWriteTransition()
+{
+    ComPtr<ISlangMutableFileSystem> sourceFileSystem;
+    SLANG_RETURN_ON_FAIL(_createFileSystem(FileSystemType::Zip, sourceFileSystem));
+    SLANG_RETURN_ON_FAIL(sourceFileSystem->saveFile("before.txt", "before", 6));
+
+    IArchiveFileSystem* sourceArchive = as<IArchiveFileSystem>(sourceFileSystem);
+    if (!sourceArchive)
+        return SLANG_FAIL;
+
+    ComPtr<ISlangBlob> archiveBlob;
+    SLANG_RETURN_ON_FAIL(sourceArchive->storeArchive(false, archiveBlob.writeRef()));
+
+    ComPtr<ISlangFileSystemExt> loadedFileSystem;
+    SLANG_RETURN_ON_FAIL(loadArchiveFileSystem(
+        archiveBlob->getBufferPointer(),
+        archiveBlob->getBufferSize(),
+        loadedFileSystem));
+
+    ISlangMutableFileSystem* mutableFileSystem = as<ISlangMutableFileSystem>(loadedFileSystem);
+    IArchiveFileSystem* loadedArchive = as<IArchiveFileSystem>(loadedFileSystem);
+    if (!mutableFileSystem || !loadedArchive)
+        return SLANG_FAIL;
+
+    SLANG_RETURN_ON_FAIL(mutableFileSystem->saveFile("after.txt", "after", 5));
+
+    ComPtr<ISlangBlob> updatedArchiveBlob;
+    SLANG_RETURN_ON_FAIL(loadedArchive->storeArchive(false, updatedArchiveBlob.writeRef()));
+    return _checkFile(mutableFileSystem, "after.txt", "after");
+}
+
+SLANG_UNIT_TEST(zipReadWriteTransitionPreservesAllocatorOwnership)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(_testZipReadWriteTransition()));
 }
 
 SLANG_UNIT_TEST(zipRejectsOversizedUncompressedEntry)

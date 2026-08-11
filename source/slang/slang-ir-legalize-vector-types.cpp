@@ -94,7 +94,7 @@ struct VectorTypeLoweringContext
                     return getReplacement(base);
                 // 0-vectors don't have elements to get, replace with poison
                 if (has0VectorType(base))
-                    return (IRInst*)builder.emitPoison(getElement->getDataType());
+                    return (IRInst*)builder.getPoison(getElement->getDataType());
                 return nullptr;
             },
             [&](IRSwizzle* swizzle) -> IRInst*
@@ -118,7 +118,7 @@ struct VectorTypeLoweringContext
                 // Swizzling a 0-vector should produce poison (undefined)
                 if (has0VectorType(swizzled))
                 {
-                    return (IRInst*)builder.emitPoison(swizzle->getDataType());
+                    return (IRInst*)builder.getPoison(swizzle->getDataType());
                 }
                 return nullptr;
             },
@@ -129,7 +129,7 @@ struct VectorTypeLoweringContext
                     return getReplacement(base);
                 // 0-vector pointers can't be indexed, return poison
                 if (has0VectorPtrType(base))
-                    return (IRInst*)builder.emitPoison(gep->getDataType());
+                    return (IRInst*)builder.getPoison(gep->getDataType());
                 return nullptr;
             },
             [&](IRSwizzledStore* swizzledStore) -> IRInst*

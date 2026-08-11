@@ -149,6 +149,23 @@
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
       "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
     },
+    "slangi-vm-bool-false-arg-evaluates-as-true": {
+      "issue": 11402,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguaKAg",
+      "title": "[slangi] bool `false` arg evaluates as `true` in callee body",
+      "url": "https://github.com/shader-slang/slang/issues/11402"
+    },
     "slangi-vm-constants-oob-after-short-circuit-printf": {
       "issue": 11375,
       "labels": [
@@ -165,6 +182,23 @@
       "project_item_id": "PVTI_lADOAb2kZs4AcYVszguV-9k",
       "title": "[slangi] VM constants-OOB on printf after short-circuit logic-and/or",
       "url": "https://github.com/shader-slang/slang/issues/11375"
+    },
+    "slangi-vm-ternary-short-circuits-against-spec": {
+      "issue": 11403,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszguaWFA",
+      "title": "[slangi] `?:` short-circuits in VM, contra language-reference spec",
+      "url": "https://github.com/shader-slang/slang/issues/11403"
     }
   },
   "schema_version": 1
