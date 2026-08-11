@@ -858,7 +858,14 @@ void ReplayContext::releaseOrphanedPlaybackProxies()
     for (const auto& kv : m_playbackOrphanedProxies)
     {
         const uint64_t* handle = m_objectToHandle.tryGetValue(kv.first);
-        orphans.add(Orphan{handle ? *handle : 0, kv.first, kv.second});
+        // A noted orphan is a registered playback proxy: unregisterProxyImpl
+        // scrubs the note in the same step it drops the handle, so a note can
+        // only outlive a handle if that invariant is broken. Assert it rather
+        // than substituting handle 0 -- a zero would sort the orphan last and
+        // then fail the containsKey guard below, silently dropping its
+        // references (a leak) instead of surfacing the bug.
+        SLANG_RELEASE_ASSERT(handle);
+        orphans.add(Orphan{*handle, kv.first, kv.second});
     }
     m_playbackOrphanedProxies.clear();
 

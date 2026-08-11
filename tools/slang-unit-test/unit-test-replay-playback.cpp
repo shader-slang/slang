@@ -723,3 +723,41 @@ SLANG_UNIT_TEST(replayContextOrphanSweepStopsAtCascadeDestroy)
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(ownerKey) == 0);
     SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(ownedKey) == 0);
 }
+
+// The entry-point double-reference case, the reason a note is deliberately kept
+// rather than unnoted. On the playback path a RECORD_ENTRYPOINT_OUTPUT proxy
+// sits at refcount 2: the orphaned creation reference the sweep must release,
+// plus the reference m_returnedEntryPoints holds so the entry point outlives the
+// sweep and is destroyed only when its owning component proxy is torn down. The
+// retention does not balance the creation reference, so the sweep has to take
+// the proxy 2 -> 1 and leave the retained reference holding the last one.
+SLANG_UNIT_TEST(replayContextOrphanSweepKeepsEntryPointRetention)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    ctx().reset();
+    TestOwningProxy::s_owningProxyDestroyed = 0;
+
+    // Refcount 1: the orphaned creation reference the dispatcher never handed out.
+    TestOwningProxy* entryPoint = new TestOwningProxy(nullptr);
+    ISlangUnknown* key = static_cast<ISlangUnknown*>(static_cast<ITestCalculator*>(entryPoint));
+    ctx().testsOnlyRegisterProxy(entryPoint);
+    ctx().testsOnlyNoteOrphanedProxy(key);
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 1);
+
+    // Stands in for the m_returnedEntryPoints retention: a second reference held
+    // by the owning component, taking the proxy to refcount 2.
+    entryPoint->addRef();
+
+    // The sweep releases the one noted creation reference (2 -> 1). The entry
+    // point must survive on the retained reference rather than be destroyed.
+    ctx().testsOnlyReleaseOrphanedProxies();
+    SLANG_CHECK(ctx().testsOnlyGetOrphanedRefCount(key) == 0);
+    SLANG_CHECK(TestOwningProxy::s_owningProxyDestroyed == 0);
+
+    // Dropping the retained reference -- the owning component being torn down --
+    // is what finally destroys the entry point, exactly once.
+    entryPoint->release();
+    SLANG_CHECK(TestOwningProxy::s_owningProxyDestroyed == 1);
+}
