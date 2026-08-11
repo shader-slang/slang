@@ -592,11 +592,11 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
 
     /// The context that owns `_foundUnrecognizedInstructions`.
     ///
-    /// Retained so that a body decoded long after the load walk reports an
-    /// unrecognized opcode to the same place the load walk would have, rather than
-    /// accepting it silently. Outlives this decoder: it belongs to the read
-    /// serializer, which the module keeps alive for exactly this purpose.
-    IRSerialReadContext* readContext = nullptr;
+    /// Held by strong reference, not observed: a body is decoded long after the load
+    /// returns, and it reports an unrecognized opcode here. The context is owned by a
+    /// `RefPtr` local to `readSerializedModuleIR_`, so a raw pointer would dangle for
+    /// exactly the forward-compatibility case this field exists to serve.
+    RefPtr<IRSerialReadContext> readContext;
 
     /// Where each deferred body's encoding begins.
     ///
@@ -978,7 +978,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRSerialReadContext& readContext = *serializer.getContext();
     RefPtr<FlatModuleDecoder> decoder = new FlatModuleDecoder();
     decoder->module = module;
-    decoder->readContext = &readContext;
+    decoder->readContext = serializer.getContext();
     FlatInstTable& flat = decoder->flat;
     serialize(serializer, flat);
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
