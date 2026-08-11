@@ -6936,7 +6936,7 @@ struct TypeFlowSpecializationContext
             argBuilder.setInsertBefore(inst);
             ArgumentPackWorkItem packWorkItem;
             auto adaptedArg =
-                maybeUnpackArg(&argBuilder, effectiveParamType, arg, packWorkItem);
+                maybeUnpackDifferentialPairArg(&argBuilder, effectiveParamType, arg, packWorkItem);
             if (packWorkItem.concreteArg)
                 argsToPack.add(packWorkItem);
 
@@ -7257,8 +7257,7 @@ struct TypeFlowSpecializationContext
             result = builder.emitDifferentialValuePairGetPrimal(resultType, inst->getTuple());
             break;
         case 1:
-            result =
-                builder.emitDifferentialValuePairGetDifferential(resultType, inst->getTuple());
+            result = builder.emitDifferentialValuePairGetDifferential(resultType, inst->getTuple());
             break;
         default:
             return false;

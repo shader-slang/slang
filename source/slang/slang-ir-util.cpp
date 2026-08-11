@@ -1747,8 +1747,8 @@ IRType* getConcreteDifferentialType(
     auto witnessTable = as<IRWitnessTable>(differentialPairType->getWitness());
     SLANG_RELEASE_ASSERT(witnessTable);
 
-    auto requirementKey = builder->getBuiltinRequirementKey(
-        (IRIntegerValue)BuiltinRequirementKind::DifferentialType);
+    auto requirementKey =
+        builder->getBuiltinRequirementKey((IRIntegerValue)BuiltinRequirementKind::DifferentialType);
     auto differentialType = as<IRType>(findWitnessTableEntry(witnessTable, requirementKey));
     SLANG_RELEASE_ASSERT(differentialType);
     return differentialType;

@@ -23,16 +23,14 @@ static IRInst* unpackDifferentialPairArg(
     SLANG_RELEASE_ASSERT(tupleType->getOperandCount() == 2);
 
     auto primalArg = builder->emitGetTupleElement((IRType*)tupleType->getOperand(0), arg, 0);
-    auto differentialArg =
-        builder->emitGetTupleElement((IRType*)tupleType->getOperand(1), arg, 1);
+    auto differentialArg = builder->emitGetTupleElement((IRType*)tupleType->getOperand(1), arg, 1);
 
     ArgumentPackWorkItem unusedPackWork;
     auto primal = maybeUnpackArg(builder, pairType->getValueType(), primalArg, unusedPackWork);
     SLANG_RELEASE_ASSERT(!unusedPackWork.concreteArg);
 
     auto differentialType = getConcreteDifferentialType(builder, pairType);
-    auto differential =
-        maybeUnpackArg(builder, differentialType, differentialArg, unusedPackWork);
+    auto differential = maybeUnpackArg(builder, differentialType, differentialArg, unusedPackWork);
     SLANG_RELEASE_ASSERT(!unusedPackWork.concreteArg);
 
     return builder->emitMakeDifferentialPair(pairType, primal, differential);
@@ -118,6 +116,28 @@ IRInst* maybeUnpackArg(
     }
 
     return arg;
+}
+
+IRInst* maybeUnpackDifferentialPairArg(
+    IRBuilder* builder,
+    IRType* paramType,
+    IRInst* arg,
+    ArgumentPackWorkItem& packAfterCall)
+{
+    packAfterCall.dstArg = nullptr;
+    packAfterCall.concreteArg = nullptr;
+
+    IRType* paramValType = paramType;
+    IRType* argValType = arg->getDataType();
+    if (auto ptrType = as<IRPtrTypeBase>(paramValType))
+        paramValType = ptrType->getValueType();
+    if (auto ptrType = as<IRPtrTypeBase>(argValType))
+        argValType = ptrType->getValueType();
+
+    if (!as<IRDifferentialPairType>(paramValType) || !as<IRTupleType>(argValType))
+        return arg;
+
+    return maybeUnpackArg(builder, paramType, arg, packAfterCall);
 }
 
 void writeBackUnpackedArg(IRBuilder* builder, const ArgumentPackWorkItem& item)
@@ -375,9 +395,8 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             return builder->emitMakeTuple(destTupleType, upcastedElements);
         }
     }
-    else if (
-        auto argPairType = as<IRDifferentialPairType>(argInfo);
-        argPairType && as<IRTupleType>(destInfo))
+    else if (auto argPairType = as<IRDifferentialPairType>(argInfo);
+             argPairType && as<IRTupleType>(destInfo))
     {
         // A concrete witness-table implementation returns a concrete differential pair, while
         // type-flow represents the corresponding abstract result as a tuple. Marshal each

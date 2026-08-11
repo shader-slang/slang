@@ -47,6 +47,14 @@ IRInst* maybeUnpackArg(
     IRInst* arg,
     ArgumentPackWorkItem& packAfterCall);
 
+// Converts an abstract differential-pair tuple to the concrete pair required by a specialized
+// callee. Other argument representations are returned unchanged.
+IRInst* maybeUnpackDifferentialPairArg(
+    IRBuilder* builder,
+    IRType* paramType,
+    IRInst* arg,
+    ArgumentPackWorkItem& packAfterCall);
+
 // Writes a concrete out or inout temporary back to its type-flow representation.
 void writeBackUnpackedArg(IRBuilder* builder, const ArgumentPackWorkItem& item);
 
