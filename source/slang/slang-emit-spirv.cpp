@@ -2433,20 +2433,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto col = debugGlobalConst->getCol();
                 auto value = debugGlobalConst->getValue();
 
-                // Walk through same-domain casts to find the underlying literal. For example,
+                // Walk through casts to find the underlying literal. For example,
                 // `static const double cf1 = 3.0` stores the value as
                 // floatCast(FloatLit(3.0 : Float), Double) before propagateConstExpr folds it.
-                // We only peel same-domain casts (FloatCast, IntCast): cross-domain casts
-                // (CastIntToFloat, CastFloatToInt) would leave resolvedValue in the wrong
-                // domain relative to varType, producing a malformed literal when
-                // re-materialized below.
+                // Cross-domain casts (CastIntToFloat, CastFloatToInt) are also peeled: the
+                // re-materialization below handles the type mismatch by creating a new literal
+                // with the declared varType, which the IRBuilder deduplicates and the SPIRV
+                // emitter encodes correctly.
                 IRInst* resolvedValue = value;
                 while (resolvedValue)
                 {
                     if (as<IRConstant>(resolvedValue))
                         break;
                     auto op = resolvedValue->getOp() & kIROpMask_OpMask;
-                    if ((op == kIROp_FloatCast || op == kIROp_IntCast) &&
+                    if ((op == kIROp_FloatCast || op == kIROp_IntCast ||
+                         op == kIROp_CastIntToFloat || op == kIROp_CastFloatToInt) &&
                         resolvedValue->getOperandCount() >= 1)
                     {
                         resolvedValue = resolvedValue->getOperand(0);
