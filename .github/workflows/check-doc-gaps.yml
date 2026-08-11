@@ -1,0 +1,91 @@
+name: Check generated-docs gap queue (advisory)
+
+# Reports the doc gaps the agentic test suite has found in the generated
+# design docs, and hard-gates the structural lint of both trees.
+#
+# Two things happen here, with deliberately different severities:
+#
+#   * `lint` is a HARD GATE. A lint failure means a structural contract was
+#     broken -- a gap row that names no document, a malformed ledger entry, a
+#     gap-intake report whose action table disagrees with its own counts.
+#     Those are always the author's mistake and are always cheap to fix.
+#
+#   * The gap report is ADVISORY. Open gaps are a work queue, not a defect in
+#     the PR at hand: a source change can legitimately make the docs report
+#     more gaps without the PR being wrong. Blocking on the queue would
+#     pressure authors into hand-editing generated docs, which is the one
+#     thing this whole system forbids.
+#
+# No build is required -- the drivers are pure Python over markdown -- so this
+# runs on a plain ubuntu runner in seconds rather than riding along with the
+# agentic-tests nightly, which needs a full slang build and would make the
+# report hostage to a build failure.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 05:00 UTC, an hour after ci-agentic-tests-nightly's 04:00 slot, so the
+    # queue reported here reflects the suite that just ran.
+    - cron: "0 5 * * *"
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    # Only PRs that touch the generated trees or the drivers can change what
+    # this reports.
+    paths:
+      - "docs/generated/**"
+      - "docs/language-reference/**"
+      - ".github/workflows/check-doc-gaps.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  doc-gaps:
+    if: github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+
+      # Hard gate. Both drivers, both trees.
+      - name: Lint the generated design docs
+        run: python3 docs/generated/design/_meta/regenerate.py lint
+
+      - name: Lint the agentic test bundles
+        run: python3 docs/generated/tests/_meta/regenerate.py lint
+
+      - name: Self-check the test driver's lint helpers
+        run: python3 docs/generated/tests/_meta/regenerate.py selftest
+
+      # Advisory from here down. `continue-on-error` keeps a surprise in the
+      # report from failing the check.
+      - name: Report the design-doc gap queue
+        continue-on-error: true
+        run: |
+          python3 docs/generated/design/_meta/regenerate.py gap-status \
+              --only-open --format markdown >> "$GITHUB_STEP_SUMMARY"
+
+      # The language reference is written by hand, so no agent may edit it and
+      # these gaps cannot be worked by the gap-intake stage. They are a human
+      # triage queue: read the table, and file the ones worth acting on.
+      - name: Report the language-reference gap queue
+        continue-on-error: true
+        run: |
+          {
+            echo "### Gaps against the hand-written language reference"
+            echo
+            echo "No agent may edit \`docs/language-reference/\`, so these are a"
+            echo "human triage queue rather than gap-intake work."
+            echo
+            python3 docs/generated/tests/_meta/regenerate.py doc-gaps \
+                --tree language-reference
+          } >> "$GITHUB_STEP_SUMMARY"

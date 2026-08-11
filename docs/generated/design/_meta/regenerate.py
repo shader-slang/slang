@@ -85,6 +85,13 @@ FRESHNESS_PATH = META_DIR / "freshness.json"
 REVIEW_STATE_PATH = META_DIR / "review-state.json"
 REVIEWS_DIR = META_DIR / "reviews"
 REMEDIATIONS_DIR = META_DIR / "remediations"
+DOC_GAP_STATE_PATH = META_DIR / "doc-gap-state.json"
+GAP_INTAKE_DIR = META_DIR / "gap-intake"
+
+# The agentic test suite's driver. It owns the gap queue -- gaps are rows in
+# its bundle READMEs -- and this driver owns what was decided about them, so
+# the queue is read from there rather than duplicated here.
+TESTS_DRIVER = REPO_ROOT / "docs/generated/tests/_meta/regenerate.py"
 
 # Soft refusal patterns for the review / remediation model fields.
 # - The reviewer (a different model family) must NOT advertise itself as
@@ -343,6 +350,96 @@ def save_review_state(state: dict) -> None:
     REVIEW_STATE_PATH.write_text(
         json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+
+
+# --------------------------------------------------------------------------
+# Doc-gap ledger
+#
+# The agentic test suite reports, per bundle, the places where a document and
+# the compiler disagree in a way that is the document's fault -- a claim it
+# never makes, an example it never gives, behaviour it describes wrongly.
+# Those rows are the only evidence in this pipeline that came from running
+# the compiler rather than from reading it, and until this ledger existed
+# there was nothing on the consuming side to record that one had been acted
+# on, so they accumulated unread.
+#
+# The split of responsibilities: the tests driver computes the queue (it is
+# derived from bundle READMEs, and is recomputed every run, so a gap that the
+# suite stops reporting stops being work), and this file records decisions
+# against it. Nothing here writes the queue; nothing there records a decision.
+# --------------------------------------------------------------------------
+
+_GAP_STATUSES = (
+    "fixed",
+    "rejected-bogus",
+    "rejected-out-of-scope",
+    "deferred",
+    "escalated-to-finding",
+)
+
+_GAP_ID_RE = re.compile(r"^[0-9a-f]{12}$")
+
+
+def load_doc_gap_state() -> dict:
+    if not DOC_GAP_STATE_PATH.exists():
+        return {"schema_version": 1, "gaps": {}}
+    return json.loads(DOC_GAP_STATE_PATH.read_text(encoding="utf-8"))
+
+
+def save_doc_gap_state(state: dict) -> None:
+    DOC_GAP_STATE_PATH.write_text(
+        json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def load_gap_queue(source_doc: str | None = None) -> dict[str, list[dict]]:
+    """Return the open-or-not gap rows the test suite currently reports,
+    keyed by the document each is anchored to.
+
+    Shells out to the tests driver rather than importing it: the two drivers
+    are separate programs with separate manifests and separate notions of
+    what a "document" is, and a stray import would couple this file's
+    behaviour to the other's module-level state.
+    """
+    if not TESTS_DRIVER.exists():
+        raise SystemExit(
+            f"tests driver not found at {_rel_to_repo(TESTS_DRIVER)};"
+            " the doc-gap queue is computed from the test bundles"
+        )
+    cmd = [
+        sys.executable,
+        str(TESTS_DRIVER),
+        "doc-gaps",
+        "--tree",
+        "design",
+        "--format",
+        "json",
+    ]
+    if source_doc:
+        cmd += ["--source-doc", source_doc]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        # `--source-doc` with no matching rows exits non-zero, which is not
+        # an error here: a document with no reported gaps is the good case.
+        if source_doc and "no gap rows are anchored to" in proc.stderr:
+            return {}
+        raise SystemExit(
+            f"tests driver `doc-gaps` failed:\n{proc.stderr.strip()}"
+        )
+    return json.loads(proc.stdout)
+
+
+def _gap_status(gap_id: str, ledger_gaps: dict) -> str:
+    """Return the recorded status of one gap, or `open` if undecided.
+
+    Absence from the ledger is the open state rather than an explicit
+    `"status": "open"` entry, so that a newly reported gap is open by
+    construction and no writer has to seed it first.
+    """
+    entry = ledger_gaps.get(gap_id)
+    if not entry:
+        return "open"
+    return entry.get("status", "open")
 
 
 def _yaml_to_str(val) -> str:
@@ -812,7 +909,18 @@ _ACTION_BODY_TO_FM = {
 
 
 def _report_rel(path: Path) -> str:
-    return _rel_to_repo(path)
+    """Name a report file for a lint message.
+
+    `--report` takes an arbitrary path, so a report can legitimately sit
+    outside the repository (a scratch file an operator is iterating on
+    before moving it into `_meta/`). Fall back to the absolute path in
+    that case: the caller only wants something to print, and raising here
+    turned a lint run on an out-of-tree report into a traceback.
+    """
+    try:
+        return _rel_to_repo(path)
+    except ValueError:
+        return str(path)
 
 
 def _coerce_int(val) -> int | None:
@@ -1490,6 +1598,603 @@ def cmd_mark_remediated(args, manifest: Manifest) -> int:
     return 0
 
 
+def cmd_gap_status(args, manifest: Manifest) -> int:
+    """Report, per document, how many test-suite-reported doc gaps are still
+    open and what was decided about the rest.
+
+    This is the queue the doc side works from. It is a join, computed fresh
+    every run, of two things that live apart on purpose: the gaps the test
+    bundles currently report, and the decisions recorded in
+    `doc-gap-state.json`.
+    """
+    if args.docs:
+        for d in args.docs:
+            if d not in manifest.docs:
+                print(f"error: unknown doc {d!r}", file=sys.stderr)
+                return 2
+    ledger_gaps = load_doc_gap_state().get("gaps", {})
+    queue = load_gap_queue()
+
+    wanted = (
+        {manifest.docs[d].path for d in args.docs}
+        if args.docs
+        else {spec.path for spec in manifest.docs.values()}
+    )
+    # A gap can name a design page the manifest does not carry (a page that
+    # was retired, or one added to the tree but not the manifest). Reporting
+    # it under its own path beats dropping it, which would silently shrink
+    # the queue.
+    docs = sorted(wanted | {d for d in queue if not args.docs})
+
+    rows: list[dict] = []
+    for doc in docs:
+        gaps = queue.get(doc, [])
+        counts: dict[str, int] = {}
+        for g in gaps:
+            status = _gap_status(g["gap_id"], ledger_gaps)
+            counts[status] = counts.get(status, 0) + 1
+        # Decisions whose gap no longer appears in the queue. The healthy
+        # cause is a fix that landed and a bundle that was then regenerated,
+        # so the row is gone; the other cause is an id that churned when its
+        # anchored heading was renamed. Either way the decision is no longer
+        # answering anything, so it is counted apart rather than folded into
+        # the totals.
+        retired = sum(
+            1
+            for gid, e in ledger_gaps.items()
+            if e.get("target_doc") == doc
+            and not any(g["gap_id"] == gid for g in gaps)
+        )
+        rows.append(
+            {
+                "doc": doc,
+                "in_manifest": doc in wanted,
+                "counts": counts,
+                "retired": retired,
+                "gaps": [
+                    {
+                        "gap_id": g["gap_id"],
+                        "status": _gap_status(g["gap_id"], ledger_gaps),
+                        "kind": g["kind"],
+                        "anchor": g["anchor_fragment"],
+                        "reported_by": g["reported_by"],
+                    }
+                    for g in gaps
+                ],
+            }
+        )
+
+    if args.format == "json":
+        print(json.dumps(rows, indent=2, sort_keys=True))
+        return 0
+
+    if args.format == "markdown":
+        return _print_gap_status_markdown(rows, args.only_open)
+
+    total_open = 0
+    for row in rows:
+        open_n = row["counts"].get("open", 0)
+        total_open += open_n
+        decided = sum(v for k, v in row["counts"].items() if k != "open")
+        if not open_n and not decided and not row["retired"] and args.only_open:
+            continue
+        line = f"{open_n:>4} open  {decided:>4} decided"
+        if row["retired"]:
+            line += f"  {row['retired']:>3} retired"
+        else:
+            line += " " * 13
+        suffix = "" if row["in_manifest"] else "   (not in manifest)"
+        print(f"{line}  {row['doc']}{suffix}")
+        if args.show_gaps:
+            for g in row["gaps"]:
+                if args.only_open and g["status"] != "open":
+                    continue
+                print(
+                    f"        {g['gap_id']}  {g['status']:<22}"
+                    f"{g['kind']:<24}{g['anchor']}"
+                )
+    print(f"\ntotal open: {total_open}")
+    return 0
+
+
+def _print_gap_status_markdown(rows: list[dict], only_open: bool) -> int:
+    """Render the gap queue as a GitHub-flavored summary table.
+
+    Lives here rather than in the CI workflow so that what CI posts can be
+    reproduced locally with the same command, and so that changing the
+    report does not mean editing YAML.
+    """
+    total_open = sum(r["counts"].get("open", 0) for r in rows)
+    total_decided = sum(
+        v for r in rows for k, v in r["counts"].items() if k != "open"
+    )
+    shown = [
+        r
+        for r in rows
+        if not only_open
+        or r["counts"].get("open", 0)
+        or any(k != "open" for k in r["counts"])
+        or r["retired"]
+    ]
+    print("### Doc gaps reported by the agentic test suite")
+    print()
+    print(
+        f"**{total_open} open**, {total_decided} decided, across"
+        f" {len(shown)} document(s)."
+    )
+    print()
+    if not shown:
+        print("No gaps are reported against this tree.")
+        return 0
+    print("| Document | Open | Decided | Retired |")
+    print("| --- | ---: | ---: | ---: |")
+    for r in sorted(shown, key=lambda r: (-r["counts"].get("open", 0), r["doc"])):
+        decided = sum(v for k, v in r["counts"].items() if k != "open")
+        print(
+            f"| `{r['doc']}` | {r['counts'].get('open', 0)} | {decided}"
+            f" | {r['retired']} |"
+        )
+    print()
+    print(
+        "Work these with the gap-intake stage; see"
+        " `docs/generated/design/_meta/regenerate.md`"
+        " § Doc gaps from the test suite."
+    )
+    return 0
+
+
+def cmd_mark_gap(args, manifest: Manifest) -> int:
+    """Record a decision about one gap in `doc-gap-state.json`.
+
+    The gap-intake stage will write these in bulk from a report; this
+    command is the hand path, for an operator triaging a row without
+    running an agent -- most usefully to mark a gap
+    `rejected-out-of-scope` when it belongs to the language reference.
+    """
+    if not _GAP_ID_RE.match(args.gap_id):
+        print(
+            f"error: {args.gap_id!r} is not a gap id (12 hex digits);"
+            " get one from `doc-gaps`",
+            file=sys.stderr,
+        )
+        return 2
+    if args.status == "escalated-to-finding" and not args.finding:
+        print(
+            "error: --finding is required when status is escalated-to-finding,"
+            " so the compiler-side record can be found from here",
+            file=sys.stderr,
+        )
+        return 2
+
+    # Look the gap up in the live queue rather than trusting the id: a typo
+    # would otherwise be recorded as a decision about nothing and counted as
+    # retired forever after.
+    queue = load_gap_queue()
+    found = None
+    for doc, gaps in queue.items():
+        for g in gaps:
+            if g["gap_id"] == args.gap_id:
+                found = (doc, g)
+                break
+        if found:
+            break
+    if not found:
+        print(
+            f"error: no gap with id {args.gap_id} is currently reported;"
+            " run `doc-gaps` to list the queue",
+            file=sys.stderr,
+        )
+        return 2
+    doc, gap = found
+
+    state = load_doc_gap_state()
+    gaps = state.setdefault("gaps", {})
+    prev = gaps.get(args.gap_id)
+    entry = {
+        "status": args.status,
+        "target_doc": doc,
+        "kind": gap["kind"],
+        "summary": _gap_summary(gap["gap"]),
+        "decided_at": _dt.datetime.now(_dt.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z"),
+        "rationale": args.rationale,
+    }
+    if args.model:
+        entry["decided_by_model"] = args.model
+    if args.report:
+        entry["report_path"] = args.report
+    if args.finding:
+        entry["finding_id"] = args.finding
+    gaps[args.gap_id] = entry
+    save_doc_gap_state(state)
+    verb = "updated" if prev else "recorded"
+    was = f" (was {prev['status']})" if prev else ""
+    print(f"{verb} {args.gap_id} as {args.status}{was} against {doc}")
+    return 0
+
+
+_GAP_SUMMARY_CAP = 160
+
+
+def _gap_summary(prose: str) -> str:
+    """Condense a gap's prose to a line that identifies it in the ledger.
+
+    The ledger is read by humans deciding whether a decision still holds,
+    and a bare 12-hex id tells them nothing; the full prose is a paragraph
+    and would bury the file. Truncation is on a word boundary so the result
+    reads as a sentence fragment rather than a severed word.
+    """
+    prose = re.sub(r"\s+", " ", prose).strip()
+    if len(prose) <= _GAP_SUMMARY_CAP:
+        return prose
+    cut = prose[:_GAP_SUMMARY_CAP].rsplit(" ", 1)[0]
+    return cut + " ..."
+
+
+_GAP_INTAKE_REQUIRED_FM_KEYS = (
+    "gap_intake_report",
+    "intake_model",
+    "intake_at",
+    "target_doc",
+    "target_doc_source_commit_before",
+    "target_doc_source_commit_after",
+    "gap_count",
+    "actions",
+)
+
+# Body spelling of an action -> the front-matter count key. The body
+# spellings are also exactly the ledger's statuses, so a row's Action cell
+# is written into `doc-gap-state.json` verbatim.
+_GAP_ACTION_BODY_TO_FM = {
+    "fixed": "fixed",
+    "rejected-bogus": "rejected_bogus",
+    "rejected-out-of-scope": "rejected_out_of_scope",
+    "deferred": "deferred",
+    "escalated-to-finding": "escalated_to_finding",
+}
+
+
+def _default_gap_intake_report_path(doc_key: str) -> Path:
+    return GAP_INTAKE_DIR / f"{doc_key}.gap-intake.md"
+
+
+def lint_gap_intake_report(
+    path: Path, manifest: Manifest
+) -> tuple[list[LintIssue], dict | None]:
+    """Validate a gap-intake report file.
+
+    The cross-check that matters is against the *live* gap queue rather
+    than against a sibling report: unlike remediation, whose work list is
+    the review report next to it, intake's work list is recomputed from
+    the test bundles every run. So a row naming a gap the suite does not
+    report is an error (it would write a decision about nothing into the
+    ledger), while a gap the suite reports and the report does not
+    mention is a warning (the operator may be working through a document
+    in batches).
+
+    Returns (issues, front_matter_dict_or_None).
+    """
+    rel = _report_rel(path)
+    issues: list[LintIssue] = []
+    if not path.exists():
+        return [LintIssue(rel, "error", "gap-intake report does not exist")], None
+    text = path.read_text(encoding="utf-8")
+    fm = parse_yaml_front_matter(text)
+    if fm is None:
+        return [
+            LintIssue(rel, "error", "missing or malformed YAML front-matter")
+        ], None
+
+    for k in _GAP_INTAKE_REQUIRED_FM_KEYS:
+        if k not in fm:
+            issues.append(LintIssue(rel, "error", f"front-matter missing key: {k}"))
+
+    sentinel = fm.get("gap_intake_report")
+    if sentinel is not True and str(sentinel).lower() != "true":
+        issues.append(
+            LintIssue(rel, "error", "front-matter gap_intake_report must be true")
+        )
+
+    model = fm.get("intake_model")
+    if not isinstance(model, str) or not model.strip():
+        issues.append(
+            LintIssue(rel, "error", "intake_model must be a non-empty string")
+        )
+    elif not _is_claude_family(model):
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                f"intake_model {model!r} does not look like a"
+                " Claude/Anthropic model; intake edits the generated"
+                " documents and must run in the family that generated them",
+            )
+        )
+
+    target = fm.get("target_doc")
+    if not isinstance(target, str) or target not in manifest.docs:
+        issues.append(
+            LintIssue(
+                rel, "error", f"target_doc {target!r} is not a known manifest key"
+            )
+        )
+        return issues, fm
+
+    actions = fm.get("actions")
+    action_sum: int | None = 0
+    if not isinstance(actions, dict):
+        issues.append(LintIssue(rel, "error", "actions must be a mapping"))
+        action_sum = None
+    else:
+        for k in _GAP_ACTION_BODY_TO_FM.values():
+            v = _coerce_int(actions.get(k))
+            if v is None or v < 0:
+                issues.append(
+                    LintIssue(
+                        rel, "error", f"actions.{k} must be a non-negative integer"
+                    )
+                )
+                action_sum = None
+            elif action_sum is not None:
+                action_sum += v
+    gap_count = _coerce_int(fm.get("gap_count"))
+    if gap_count is None or gap_count < 0:
+        issues.append(
+            LintIssue(rel, "error", "gap_count must be a non-negative integer")
+        )
+    elif action_sum is not None and action_sum != gap_count:
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                f"actions sum to {action_sum} but gap_count is {gap_count}",
+            )
+        )
+
+    body = text[text.find("\n---\n") + 5 :] if "\n---\n" in text else ""
+    sections = _split_sections(body)
+    if "Actions" not in sections:
+        issues.append(LintIssue(rel, "error", "missing `## Actions` section"))
+        return issues, fm
+    table = parse_markdown_table(sections["Actions"])
+    if table is None:
+        issues.append(
+            LintIssue(rel, "error", "`## Actions` must contain a Markdown table")
+        )
+        return issues, fm
+
+    doc_path = manifest.docs[target].path
+    queue_ids = {
+        g["gap_id"] for g in load_gap_queue(doc_path).get(doc_path, [])
+    }
+    seen: set[str] = set()
+    for idx, row in enumerate(table, start=1):
+        gid = row.get("Gap ID", "")
+        if not gid:
+            issues.append(LintIssue(rel, "error", f"row {idx}: missing Gap ID"))
+            continue
+        if not _GAP_ID_RE.match(gid):
+            issues.append(
+                LintIssue(rel, "error", f"{gid}: not a 12-hex-digit gap id")
+            )
+        if gid in seen:
+            issues.append(LintIssue(rel, "error", f"duplicate Gap ID: {gid}"))
+        seen.add(gid)
+        action_v = row.get("Action", "").lower()
+        if action_v not in _GAP_ACTION_BODY_TO_FM:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"{gid}: Action {action_v!r} not in"
+                    f" {list(_GAP_ACTION_BODY_TO_FM)}",
+                )
+            )
+        if not row.get("Evidence", "").strip():
+            issues.append(LintIssue(rel, "error", f"{gid}: Evidence cell is empty"))
+        if action_v == "fixed" and not row.get("Fix summary", "").strip():
+            issues.append(
+                LintIssue(
+                    rel, "error", f"{gid}: Fix summary required when Action is `fixed`"
+                )
+            )
+    if gap_count is not None and len(table) != gap_count:
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                f"gap_count is {gap_count} but the Actions table has"
+                f" {len(table)} row(s)",
+            )
+        )
+    for gid in sorted(seen - queue_ids):
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                f"action row {gid} names a gap the test suite does not report"
+                f" against {target}",
+            )
+        )
+    ledger_gaps = load_doc_gap_state().get("gaps", {})
+    unaddressed = sorted(
+        gid
+        for gid in queue_ids - seen
+        if _gap_status(gid, ledger_gaps) == "open"
+    )
+    if unaddressed:
+        issues.append(
+            LintIssue(
+                rel,
+                "warning",
+                f"{len(unaddressed)} gap(s) still open against {target} are"
+                f" not in this report: {', '.join(unaddressed)}",
+            )
+        )
+    return issues, fm
+
+
+def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
+    """Write a gap-intake report's decisions into `doc-gap-state.json`.
+
+    This is the bulk writer `mark-gap` is the hand equivalent of. It
+    refuses on any lint error, so a malformed report cannot half-populate
+    the ledger.
+    """
+    _require_doc(manifest, args.doc)
+    report_path = (
+        Path(args.report).resolve()
+        if args.report
+        else _default_gap_intake_report_path(args.doc)
+    )
+    issues, fm = lint_gap_intake_report(report_path, manifest)
+    for issue in issues:
+        print(f"{issue.severity}: {issue.doc}: {issue.message}", file=sys.stderr)
+    if any(i.severity == "error" for i in issues):
+        return 1
+    if fm is None or fm.get("target_doc") != args.doc:
+        print(
+            f"error: report target_doc {fm.get('target_doc') if fm else None!r}"
+            f" does not match <doc> {args.doc!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    doc_path = manifest.docs[args.doc].path
+    queue = {g["gap_id"]: g for g in load_gap_queue(doc_path).get(doc_path, [])}
+    text = report_path.read_text(encoding="utf-8")
+    body = text[text.find("\n---\n") + 5 :]
+    table = parse_markdown_table(_split_sections(body)["Actions"]) or []
+
+    # An escalation has to name the compiler-side record, or the trail from
+    # "the docs declined to document this" to "someone is fixing it" is
+    # broken at exactly the point it matters. The report's Evidence cell is
+    # where the agent names it; a bare escalation is rejected here rather
+    # than silently recorded.
+    missing_finding = [
+        row.get("Gap ID", "")
+        for row in table
+        if row.get("Action", "").lower() == "escalated-to-finding"
+        and not _finding_ref(row.get("Evidence", ""))
+    ]
+    if missing_finding:
+        print(
+            "error: escalated-to-finding rows name no findings/<id>.yaml in"
+            f" their Evidence cell: {', '.join(missing_finding)}",
+            file=sys.stderr,
+        )
+        return 1
+
+    state = load_doc_gap_state()
+    state.setdefault("schema_version", 1)
+    gaps = state.setdefault("gaps", {})
+    intake_at = _yaml_to_str(fm["intake_at"])
+    model = _yaml_to_str(fm["intake_model"])
+    report_rel = _report_rel(report_path)
+    for row in table:
+        gid = row["Gap ID"]
+        status = row["Action"].lower()
+        entry = {
+            "status": status,
+            "target_doc": doc_path,
+            "kind": queue[gid]["kind"],
+            "summary": _gap_summary(queue[gid]["gap"]),
+            "decided_at": intake_at,
+            "decided_by_model": model,
+            "report_path": report_rel,
+            "rationale": row["Evidence"].strip(),
+        }
+        finding = _finding_ref(row.get("Evidence", ""))
+        if finding:
+            entry["finding_id"] = finding
+        gaps[gid] = entry
+    save_doc_gap_state(state)
+    print(f"marked gap intake: {args.doc} ({len(table)} gap(s))")
+    return 0
+
+
+_FINDING_REF_RE = re.compile(r"findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml")
+
+
+def _finding_ref(evidence: str) -> str | None:
+    """Return the finding id an Evidence cell cites, if any.
+
+    Escalations point at `docs/generated/tests/_meta/findings/<id>.yaml`;
+    the id is pulled out of the prose rather than given its own column
+    because it is relevant to exactly one of the five actions, and a
+    column that is an em-dash four times out of five is noise in every
+    report.
+    """
+    m = _FINDING_REF_RE.search(evidence or "")
+    return m.group(1) if m else None
+
+
+def lint_doc_gap_state() -> list[LintIssue]:
+    """Validate `doc-gap-state.json` against its schema's required shape.
+
+    Hand-rolled for the same reason the report linters are: the driver has
+    no third-party dependencies, so the schema file documents the contract
+    and this enforces it.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(DOC_GAP_STATE_PATH)
+    if not DOC_GAP_STATE_PATH.exists():
+        return issues
+    try:
+        state = json.loads(DOC_GAP_STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [LintIssue(rel, "error", f"cannot parse: {exc}")]
+    if state.get("schema_version") != 1:
+        issues.append(
+            LintIssue(rel, "error", "schema_version must be 1")
+        )
+    gaps = state.get("gaps")
+    if not isinstance(gaps, dict):
+        return issues + [LintIssue(rel, "error", "`gaps` must be an object")]
+    for gap_id, entry in sorted(gaps.items()):
+        if not _GAP_ID_RE.match(gap_id):
+            issues.append(
+                LintIssue(rel, "error", f"{gap_id}: not a 12-hex-digit gap id")
+            )
+        if not isinstance(entry, dict):
+            issues.append(LintIssue(rel, "error", f"{gap_id}: not an object"))
+            continue
+        status = entry.get("status")
+        if status not in _GAP_STATUSES:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"{gap_id}: status={status!r} not in {list(_GAP_STATUSES)}",
+                )
+            )
+        for required in ("target_doc", "decided_at", "rationale"):
+            if not entry.get(required):
+                issues.append(
+                    LintIssue(rel, "error", f"{gap_id}: missing {required}")
+                )
+        target = entry.get("target_doc")
+        if target and not (REPO_ROOT / target).exists():
+            issues.append(
+                LintIssue(
+                    rel,
+                    "warning",
+                    f"{gap_id}: target_doc {target} no longer exists",
+                )
+            )
+        if status == "escalated-to-finding" and not entry.get("finding_id"):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"{gap_id}: escalated-to-finding without a finding_id",
+                )
+            )
+    return issues
+
+
 def cmd_digest(args, manifest: Manifest) -> int:
     spec = _require_doc(manifest, args.doc)
     print(compute_digest(spec))
@@ -1574,6 +2279,27 @@ def cmd_lint(args, manifest: Manifest) -> int:
             print(f"{issue.severity}: {issue.doc}: {issue.message}")
             if issue.severity == "error":
                 any_error = True
+    gap_intake_files: list[Path] = []
+    if explicit_targets:
+        for d in args.docs:
+            gp = _default_gap_intake_report_path(d)
+            if gp.exists():
+                gap_intake_files.append(gp)
+    else:
+        gap_intake_files = _iter_report_files(GAP_INTAKE_DIR, ".gap-intake.md")
+    for gp in gap_intake_files:
+        issues, _ = lint_gap_intake_report(gp, manifest)
+        for issue in issues:
+            print(f"{issue.severity}: {issue.doc}: {issue.message}")
+            if issue.severity == "error":
+                any_error = True
+    # The doc-gap ledger is tree-wide, not per-document, so it is checked
+    # only on a full lint run.
+    if not explicit_targets:
+        for issue in lint_doc_gap_state():
+            print(f"{issue.severity}: {issue.doc}: {issue.message}")
+            if issue.severity == "error":
+                any_error = True
     return 1 if any_error else 0
 
 
@@ -1654,6 +2380,68 @@ def build_parser() -> argparse.ArgumentParser:
         " _meta/remediations/<doc>.remediation.md",
     )
 
+    p_gap = sub.add_parser(
+        "gap-status",
+        help="per-document count of open / decided doc gaps reported by the"
+        " agentic test suite",
+    )
+    p_gap.add_argument("docs", nargs="*", help="doc keys; default: all")
+    p_gap.add_argument(
+        "--show-gaps",
+        action="store_true",
+        help="list each gap's id, status, kind and anchor under its document",
+    )
+    p_gap.add_argument(
+        "--only-open",
+        action="store_true",
+        help="hide documents with nothing outstanding, and decided gaps",
+    )
+    p_gap.add_argument(
+        "--format",
+        choices=("text", "json", "markdown"),
+        default="text",
+        help="output format; `markdown` is the CI job-summary table"
+        " (default: text)",
+    )
+
+    p_mark_gap = sub.add_parser(
+        "mark-gap",
+        help="record a decision about one doc gap in doc-gap-state.json",
+    )
+    p_mark_gap.add_argument("gap_id", help="12-hex-digit id from `doc-gaps`")
+    p_mark_gap.add_argument(
+        "--status", required=True, choices=_GAP_STATUSES
+    )
+    p_mark_gap.add_argument(
+        "--rationale",
+        required=True,
+        help="why this status; recorded verbatim in the ledger",
+    )
+    p_mark_gap.add_argument(
+        "--finding",
+        default=None,
+        help="findings/<id>.yaml this was escalated to; required when"
+        " --status escalated-to-finding",
+    )
+    p_mark_gap.add_argument(
+        "--report", default=None, help="gap-intake report that decided this"
+    )
+    p_mark_gap.add_argument(
+        "--model", default=None, help="model or operator that decided this"
+    )
+
+    p_mark_intake = sub.add_parser(
+        "mark-gap-intake",
+        help="write a gap-intake report's decisions into doc-gap-state.json",
+    )
+    p_mark_intake.add_argument("doc")
+    p_mark_intake.add_argument(
+        "--report",
+        default=None,
+        help="path to the gap-intake report; default"
+        " _meta/gap-intake/<doc>.gap-intake.md",
+    )
+
     return p
 
 
@@ -1671,6 +2459,9 @@ def main(argv: list[str] | None = None) -> int:
         "review-status": cmd_review_status,
         "mark-reviewed": cmd_mark_reviewed,
         "mark-remediated": cmd_mark_remediated,
+        "gap-status": cmd_gap_status,
+        "mark-gap": cmd_mark_gap,
+        "mark-gap-intake": cmd_mark_gap_intake,
     }
     return handlers[args.cmd](args, manifest)
 

@@ -1170,9 +1170,98 @@ class GapRow:
     suggested_addition: str
     bundle: str  # bundle key that reported this row
     source_doc: str  # bundle's source_doc, for aggregation
+    # Workspace-relative path of the document the Anchor cell points at, or
+    # "" when the cell carries no resolvable link. This -- not the reporting
+    # bundle's `source_doc` -- is the document a gap is a gap *in*, and it is
+    # what `doc-gaps` groups by. See `_resolve_gap_target`.
+    anchor_target: str = ""
+    # Stable identity of this gap, for the consuming ledger. See
+    # `compute_gap_id`.
+    gap_id: str = ""
 
 
 _GAP_ANCHOR_FRAG_RE = re.compile(r"(#[A-Za-z0-9][A-Za-z0-9_-]*)")
+_GAP_ANCHOR_LINK_RE = re.compile(r"\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+
+
+def _resolve_gap_target(bundle_dir: str, anchor_cell: str) -> str:
+    """Return the workspace-relative document an Anchor cell points at.
+
+    A gap is reported by a test bundle but is a defect *in a document*, and
+    the two are not the same thing: a `coverage/` bundle has no `source_doc`
+    at all, yet every gap it reports names a design page in its Anchor cell.
+    Grouping such a row under the bundle leaves it unaddressable by the doc
+    that has to fix it, so the link target is resolved here instead.
+
+    The cell reads `[#some-heading](../../../design/pipeline/06-emit.md#some-heading)`;
+    the link is relative to the bundle directory, so it is resolved against
+    that and made repo-relative. Returns "" if the cell has no link, links
+    to a bare fragment, or points outside the repository -- all of which
+    `lint_bundle` reports, because a row that names no document cannot be
+    routed to one.
+    """
+    m = _GAP_ANCHOR_LINK_RE.search(anchor_cell)
+    if not m:
+        return ""
+    path, _, _frag = m.group("url").partition("#")
+    if not path:
+        return ""
+    try:
+        target = (REPO_ROOT / bundle_dir / unquote(path)).resolve()
+        return str(target.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except (ValueError, OSError):
+        return ""
+
+
+def _normalize_gap_prose(text: str) -> str:
+    """Reduce a gap's prose to the form its identity is computed from.
+
+    Two agents describing the same gap, or one agent re-describing it on a
+    later regeneration, will not reproduce the sentence verbatim -- they
+    reflow it, add a code span, or repunctuate. Identity has to survive
+    that, or a gap already marked fixed comes back as a new one on the next
+    bundle regeneration, which is exactly the churn the ledger exists to
+    stop. So markup is unwrapped, punctuation is dropped, whitespace is
+    collapsed, and the result is lowercased, leaving the words alone to
+    carry the identity.
+    """
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"[*_~]", "", text)
+    text = text.replace("\\|", "|")
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+_GAP_ID_LEN = 12
+
+
+def compute_gap_id(
+    anchor_target: str, anchor_fragment: str, kind: str, gap: str
+) -> str:
+    """Return the stable id a consumer tracks this gap's resolution under.
+
+    Gap rows live in bundle READMEs, which are rewritten wholesale every
+    time a bundle is regenerated, so a row has no natural key -- there is
+    nothing for a ledger to say "this one is fixed" about. The id supplies
+    one, derived from what makes a gap the gap it is: the document section
+    it is against, its kind, and its prose (normalized, see
+    `_normalize_gap_prose`).
+
+    Deriving the id rather than writing it into the README is deliberate:
+    every existing bundle gets an id without being regenerated, and a
+    generating agent cannot mint a colliding or malformed one.
+
+    The trade-off is that renaming the anchored heading, or rewriting the
+    gap prose to say something materially different, mints a new id and
+    retires the old one. That is the intended behaviour for a rewrite; for
+    a heading rename it means one stale ledger entry, which `gap-status`
+    reports as resolved-but-unseen rather than silently dropping.
+    """
+    payload = "\n".join(
+        [anchor_target, anchor_fragment, kind, _normalize_gap_prose(gap)]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:_GAP_ID_LEN]
 
 
 def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
@@ -1222,6 +1311,7 @@ def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
         anchor_cell, kind_cell, gap_cell, suggested_cell = cells[:4]
         frag_match = _GAP_ANCHOR_FRAG_RE.search(anchor_cell)
         anchor_fragment = frag_match.group(1) if frag_match else ""
+        anchor_target = _resolve_gap_target(bundle_key, anchor_cell)
         rows.append(
             GapRow(
                 anchor=anchor_cell,
@@ -1231,6 +1321,10 @@ def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
                 suggested_addition=suggested_cell,
                 bundle=bundle_key,
                 source_doc=source_doc,
+                anchor_target=anchor_target,
+                gap_id=compute_gap_id(
+                    anchor_target, anchor_fragment, kind_cell, gap_cell
+                ),
             )
         )
         i += 1
@@ -2036,6 +2130,23 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f"{spec.dir}/README.md",
                         "warning",
                         f"doc-gap row Anchor cell has no #fragment:"
+                        f" {row.anchor!r}",
+                    )
+                )
+            # An Anchor cell that names no document is the one gap defect
+            # that costs the row its whole purpose: `doc-gaps` groups by
+            # the anchored document, so a row without one is filed under
+            # the reporting bundle and never reaches a doc author. The
+            # link's *path* is checked here; `lint_markdown_links` already
+            # covers whether the path and its fragment resolve, so this
+            # does not restate that.
+            if not row.anchor_target:
+                issues.append(
+                    LintIssue(
+                        f"{spec.dir}/README.md",
+                        "error",
+                        f"doc-gap row Anchor cell has no link to a document,"
+                        f" so the gap cannot be routed to one:"
                         f" {row.anchor!r}",
                     )
                 )
@@ -3580,25 +3691,33 @@ def cmd_coverage_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
+_GAP_TREES = {
+    "design": "docs/generated/design/",
+    "language-reference": "docs/language-reference/",
+}
+
+
 def cmd_doc_gaps(args: argparse.Namespace) -> int:
-    """Aggregate ## Doc gaps observed rows across bundles, grouped by source_doc.
+    """Aggregate ## Doc gaps observed rows across bundles, grouped by the
+    document each gap is against.
 
     The output is the feedback artifact the doc-regeneration workflow
     consumes: for each docs/generated/design/<doc>.md, the list of gaps
     that bundles testing against it have reported. Rows reported by
     multiple bundles against the same Anchor + Kind are merged into
     a single row with a `Reported by` cell.
+
+    Grouping follows each row's Anchor cell, not the reporting bundle's
+    `source_doc`. The two agree for a doc-anchored bundle, but a
+    `coverage/` bundle has no `source_doc` while still reporting gaps
+    against design pages; grouping those under the bundle put them
+    somewhere `--source-doc` could not reach, so they were invisible to
+    the only workflow that can act on them.
     """
     manifest = load_manifest()
     specs = list(manifest.bundles.values())
-    if args.source_doc:
-        specs = [s for s in specs if s.source_doc == args.source_doc]
-        if not specs:
-            raise SystemExit(
-                f"no bundle has source_doc={args.source_doc!r}"
-            )
 
-    # source_doc -> list[GapRow]
+    # anchor target doc -> list[GapRow]
     by_doc: dict[str, list[GapRow]] = {}
     for spec in specs:
         bdir = REPO_ROOT / spec.dir
@@ -3606,82 +3725,93 @@ def cmd_doc_gaps(args: argparse.Namespace) -> int:
         if not readme.exists():
             continue
         text = readme.read_text(encoding="utf-8")
-        rows = parse_gap_rows(text, spec.dir, spec.gap_group)
-        if rows:
-            by_doc.setdefault(spec.gap_group, []).extend(rows)
+        for row in parse_gap_rows(text, spec.dir, spec.gap_group):
+            # A row whose Anchor names no document still has to go
+            # somewhere or it would vanish from the report entirely; it
+            # falls back to the reporting bundle, and `lint` errors on it.
+            by_doc.setdefault(row.anchor_target or spec.gap_group, []).append(row)
+
+    if args.tree != "all":
+        prefix = _GAP_TREES[args.tree]
+        by_doc = {d: rows for d, rows in by_doc.items() if d.startswith(prefix)}
+    if args.source_doc:
+        by_doc = {d: rows for d, rows in by_doc.items() if d == args.source_doc}
+        if not by_doc:
+            raise SystemExit(
+                f"no gap rows are anchored to {args.source_doc!r}"
+            )
+
+    merged_by_doc = {
+        doc: _merge_gap_rows(rows) for doc, rows in sorted(by_doc.items())
+    }
 
     if args.format == "json":
         import json
 
-        payload = {
-            doc: [
-                {
-                    "anchor": r.anchor,
-                    "anchor_fragment": r.anchor_fragment,
-                    "kind": r.kind,
-                    "gap": r.gap,
-                    "suggested_addition": r.suggested_addition,
-                    "reported_by": r.bundle,
-                }
-                for r in rows
-            ]
-            for doc, rows in sorted(by_doc.items())
-        }
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(merged_by_doc, indent=2))
         return 0
 
-    for doc in sorted(by_doc):
-        rows = by_doc[doc]
-        # Merge rows by (anchor_fragment, kind, gap-prose), tracking
-        # which bundles reported them.
-        merged: dict[tuple[str, str, str], dict] = {}
-        for r in rows:
-            key = (r.anchor_fragment, r.kind, r.gap)
-            slot = merged.setdefault(
-                key,
-                {
-                    "anchor": r.anchor,
-                    "kind": r.kind,
-                    "gap": r.gap,
-                    "suggested_addition": r.suggested_addition,
-                    "reported_by": [],
-                },
-            )
-            if r.bundle not in slot["reported_by"]:
-                slot["reported_by"].append(r.bundle)
-            # If multiple bundles offer Suggested-addition text,
-            # concatenate distinct contributions.
-            if (
-                r.suggested_addition
-                and r.suggested_addition != slot["suggested_addition"]
-                and r.suggested_addition not in slot["suggested_addition"]
-            ):
-                slot["suggested_addition"] = (
-                    slot["suggested_addition"] + " // " + r.suggested_addition
-                ).strip(" /")
-
+    for doc, merged in merged_by_doc.items():
+        reporters = sorted({b for m in merged for b in m["reported_by"]})
         print(f"# Gaps reported against {doc}")
         print()
-        print(f"Bundle reports: {', '.join(sorted({r.bundle for r in rows}))}")
+        print(f"Bundle reports: {', '.join(reporters)}")
         print()
         print(
-            "| Anchor | Kind | Gap | Suggested addition | Reported by |"
+            "| Gap id | Anchor | Kind | Gap | Suggested addition | Reported by |"
         )
-        print("| --- | --- | --- | --- | --- |")
-        # Sort by anchor fragment, then kind.
-        sorted_rows = sorted(
-            merged.values(), key=lambda m: (m["anchor"], m["kind"])
-        )
-        for m in sorted_rows:
+        print("| --- | --- | --- | --- | --- | --- |")
+        for m in merged:
             reported = ", ".join(m["reported_by"])
             print(
-                f"| {m['anchor']} | {m['kind']} | {m['gap']}"
+                f"| {m['gap_id']} | {m['anchor']} | {m['kind']} | {m['gap']}"
                 f" | {m['suggested_addition']} | {reported} |"
             )
         print()
-    if not by_doc:
+    if not merged_by_doc:
         print("# No doc-gap rows recorded across the selected bundles.")
     return 0
+
+
+def _merge_gap_rows(rows: list[GapRow]) -> list[dict]:
+    """Collapse one document's gap rows to one entry per distinct gap.
+
+    Sibling bundles routinely observe the same hole in a shared page --
+    three bundles anchored to the diagnostics doc all notice the same
+    missing subsection -- and the consumer wants one work item, not three.
+    Rows collapse on `gap_id`, so a re-wording that survives
+    `_normalize_gap_prose` merges too, which the old key (the raw prose)
+    did not. Distinct `Suggested addition` texts are kept and joined,
+    since each reporter saw the gap from its own test and the proposals
+    are usually complementary rather than redundant.
+
+    Sorted by anchor then kind, so the output reads in document order.
+    """
+    merged: dict[str, dict] = {}
+    for r in rows:
+        slot = merged.setdefault(
+            r.gap_id,
+            {
+                "gap_id": r.gap_id,
+                "anchor": r.anchor,
+                "anchor_fragment": r.anchor_fragment,
+                "kind": r.kind,
+                "gap": r.gap,
+                "suggested_addition": r.suggested_addition,
+                "reported_by": [],
+            },
+        )
+        if r.bundle not in slot["reported_by"]:
+            slot["reported_by"].append(r.bundle)
+        if (
+            r.suggested_addition
+            and r.suggested_addition != slot["suggested_addition"]
+            and r.suggested_addition not in slot["suggested_addition"]
+        ):
+            slot["suggested_addition"] = (
+                slot["suggested_addition"] + " // " + r.suggested_addition
+            ).strip(" /")
+    return sorted(merged.values(), key=lambda m: (m["anchor"], m["kind"]))
 
 
 def cmd_review_status(args: argparse.Namespace) -> int:
@@ -3845,11 +3975,22 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_dg = sub.add_parser(
         "doc-gaps",
-        help="aggregate ## Doc gaps observed rows across bundles, grouped by source_doc",
+        help="aggregate ## Doc gaps observed rows across bundles, grouped by"
+        " the document each gap is anchored to",
     )
     p_dg.add_argument(
         "--source-doc",
-        help="restrict to a single docs/generated/design/<...>.md path",
+        help="restrict to gaps anchored to a single document, by its"
+        " workspace-relative path",
+    )
+    p_dg.add_argument(
+        "--tree",
+        choices=("all", "design", "language-reference"),
+        default="all",
+        help="restrict to gaps against one doc tree. `design` is the queue"
+        " the doc-regeneration workflow can act on; `language-reference`"
+        " is the human-written spec, which no agent may edit, so those"
+        " gaps are a human triage queue (default: all)",
     )
     p_dg.add_argument(
         "--format",
@@ -4079,6 +4220,89 @@ def cmd_selftest(args: argparse.Namespace) -> int:
             "nope.md" in errors[0].message if errors else False,
             True,
         )
+
+    # Doc-gap identity. `doc-gaps` groups by the anchored document and the
+    # consuming ledger keys on `gap_id`, so both have to hold still across
+    # the rewording a bundle regeneration produces -- the corpus, being one
+    # snapshot, cannot show that a re-worded row keeps its id.
+    check(
+        "gap prose ignores markup and punctuation",
+        _normalize_gap_prose("The `Decl` node -- see [x](y.md) -- is *not* documented."),
+        "the decl node see x is not documented",
+    )
+    check(
+        "gap id survives rewording that normalizes away",
+        compute_gap_id("d.md", "#s", "missing-example", "The `foo` case, unstated."),
+        compute_gap_id("d.md", "#s", "missing-example", "The foo case unstated"),
+    )
+    check(
+        "gap id separates distinct kinds",
+        compute_gap_id("d.md", "#s", "missing-example", "x")
+        == compute_gap_id("d.md", "#s", "ambiguous-claim", "x"),
+        False,
+    )
+    check(
+        "gap id separates distinct target docs",
+        compute_gap_id("a.md", "#s", "missing-example", "x")
+        == compute_gap_id("b.md", "#s", "missing-example", "x"),
+        False,
+    )
+
+    # Anchor-cell routing: a coverage bundle has no `source_doc`, so the
+    # link in the cell is the only thing that says which document the gap
+    # is in. A cell with no link routes nowhere, which `lint_bundle` errors
+    # on -- the empty string is that signal, not an incidental default.
+    check(
+        "gap target resolves relative to the bundle dir",
+        _resolve_gap_target(
+            "docs/generated/tests/coverage/autodiff",
+            "[#x](../../../design/ir-reference/differentiation.md#x)",
+        ),
+        "docs/generated/design/ir-reference/differentiation.md",
+    )
+    check(
+        "gap target empty for a bare fragment",
+        _resolve_gap_target("docs/generated/tests/coverage/autodiff", "[#x](#x)"),
+        "",
+    )
+    check(
+        "gap target empty for an unlinked cell",
+        _resolve_gap_target("docs/generated/tests/coverage/autodiff", "#x"),
+        "",
+    )
+
+    # Sibling bundles reporting the same gap collapse to one work item,
+    # keeping both suggestions; the corpus has such pairs but nothing
+    # asserts the merge, and a regression would silently triple the queue.
+    def _mk_gap(bundle: str, prose: str, sugg: str) -> GapRow:
+        target = "docs/generated/design/d.md"
+        return GapRow(
+            anchor="[#s](../../../design/d.md#s)",
+            anchor_fragment="#s",
+            kind="missing-surface",
+            gap=prose,
+            suggested_addition=sugg,
+            bundle=bundle,
+            source_doc="",
+            anchor_target=target,
+            gap_id=compute_gap_id(target, "#s", "missing-surface", prose),
+        )
+
+    merged = _merge_gap_rows(
+        [
+            _mk_gap("b/one", "The rule is unstated.", "Add the rule."),
+            _mk_gap("b/two", "The rule is unstated", "Add an example too."),
+            _mk_gap("b/three", "A different hole entirely.", "Add that."),
+        ]
+    )
+    check("gap merge collapses re-worded duplicates", len(merged), 2)
+    dup = [m for m in merged if len(m["reported_by"]) > 1]
+    check("gap merge records both reporters", len(dup), 1)
+    check(
+        "gap merge keeps both suggestions",
+        dup[0]["suggested_addition"] if dup else "",
+        "Add the rule. // Add an example too.",
+    )
 
     # The catalog snapshot parser and the digest rule it feeds. The committed
     # corpus only shows entries that already agree, so the drift and
