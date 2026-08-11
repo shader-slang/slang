@@ -692,6 +692,64 @@ static int _dieOnRequestOrdinal()
     return int(ordinal);
 }
 
+static const char* _readStateName(HTTPPacketConnection::ReadState state)
+{
+    switch (state)
+    {
+    case HTTPPacketConnection::ReadState::Header:
+        return "Header";
+    case HTTPPacketConnection::ReadState::Content:
+        return "Content";
+    case HTTPPacketConnection::ReadState::Done:
+        return "Done";
+    case HTTPPacketConnection::ReadState::Closed:
+        return "Closed";
+    case HTTPPacketConnection::ReadState::Error:
+        return "Error";
+    default:
+        return "?";
+    }
+}
+
+/// Say why the server stopped serving, on the way out.
+///
+/// Leaving the serve loop means exiting 0 -- a clean, deliberate shutdown -- and from the
+/// client's side that is indistinguishable from a crash: the pipe closes while it is waiting.
+/// Seen in CI: a server exited with status 0 after answering 989 requests while slang-test
+/// was still waiting on the 990th. An exit status alone cannot explain that, because there
+/// is nothing wrong with the status.
+///
+/// The loop's own condition IS the explanation, so print it. `-quit` is an orderly shutdown
+/// the client asked for; a Closed or Error read state is the server deciding unilaterally
+/// that the session is over, which is the case worth catching -- the client is still there.
+///
+/// stderr, never stdout: stdout is the JSON-RPC channel, and a stray write to it would
+/// corrupt the very protocol this is trying to explain.
+static void _reportExitReason(JSONRPCConnection* connection, bool quitRequested, int servedCount)
+{
+    if (quitRequested)
+    {
+        // The client asked. Nothing to explain, and the common case -- stay quiet so the
+        // interesting lines are not buried under one of these per server per run.
+        return;
+    }
+
+    const char* stateName = "no-transport";
+    if (auto* packetConnection = connection ? connection->getUnderlyingConnection() : nullptr)
+    {
+        stateName = _readStateName(packetConnection->getReadState());
+    }
+
+    fprintf(
+        stderr,
+        "test-server: leaving the serve loop after answering %d request(s) without being asked "
+        "to quit; read state is %s. The client sees this as the server vanishing "
+        "mid-request.\n",
+        servedCount,
+        stateName);
+    fflush(stderr);
+}
+
 SlangResult TestServer::execute()
 {
     const int dieOnRequest = _dieOnRequestOrdinal();
@@ -711,10 +769,18 @@ SlangResult TestServer::execute()
         }
 
         // Failure doesn't make the execution terminate
-        [[maybe_unused]] const SlangResult res = _executeSingle();
-        servedCount++;
+        const SlangResult res = _executeSingle();
+        if (SLANG_SUCCEEDED(res))
+        {
+            // Counted on success only, so it lines up with slang-test's own request ordinal
+            // and means what it says. The iteration that discovers a dead connection has not
+            // answered anything, and counting it would report "1 request" for a server that
+            // served none -- which is exactly the confusion this number exists to resolve.
+            servedCount++;
+        }
     }
 
+    _reportExitReason(m_connection, m_quit, servedCount);
     return SLANG_OK;
 }
 
