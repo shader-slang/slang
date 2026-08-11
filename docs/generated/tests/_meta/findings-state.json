@@ -149,6 +149,15 @@
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
       "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
     },
+    "getstringhash-nonliteral-argument-sigsegv": {
+      "issue": 12440,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "title": "getStringHash on a non-literal String segfaults instead of E41023",
+      "url": "https://github.com/shader-slang/slang/issues/12440"
+    },
     "slangi-vm-bool-false-arg-evaluates-as-true": {
       "issue": 11402,
       "labels": [
