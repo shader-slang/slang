@@ -1846,8 +1846,9 @@ static SlangResult _innerMain(
     }
 
     // `session` is usually the caller's and outlives this call, so scope the prelude
-    // `_setSessionPrelude` installs below to this invocation. (A `-deferred-core-module` run gets
-    // its own session instead, where restoring is merely redundant.)
+    // `_setSessionPrelude` installs below to this invocation. (A `-load-core-module` /
+    // `-compile-core-module` run gets its own session in `innerMain` instead, where restoring is
+    // merely redundant.)
     ScopedSessionPrelude hlslPreludeRestore(session, SLANG_SOURCE_LANGUAGE_HLSL);
 
     // If can't set up a necessary prelude make not available (which will lead to the test being

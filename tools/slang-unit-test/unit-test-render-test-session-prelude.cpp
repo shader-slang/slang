@@ -16,8 +16,6 @@ using namespace Slang;
 namespace
 { // anonymous
 
-typedef SlangResult (*InnerMainFunc)(Slang::StdWriters*, SlangSession*, int, const char* const*);
-
 static String _getLanguagePrelude(slang::IGlobalSession* session, SlangSourceLanguage language)
 {
     ComPtr<ISlangBlob> blob;
@@ -99,8 +97,8 @@ static String _findRenderTestModule(const char* executableDirectory)
 // process, so this test acts as such a caller and requires its prelude back unchanged.
 SLANG_UNIT_TEST(renderTestSessionPrelude)
 {
-    // `-nvapi-extn-slot` is deliberately absent below: its absence is what selects the branch of
-    // `_setSessionPrelude` that overwrites the caller's HLSL prelude.
+    // `-nvapi-slot` is deliberately absent from the argument list below: its absence is what
+    // selects the branch of `_setSessionPrelude` that overwrites the caller's HLSL prelude.
     ComPtr<slang::IGlobalSession> session;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(slang::createGlobalSession(session.writeRef())));
 
@@ -132,7 +130,7 @@ SLANG_UNIT_TEST(renderTestSessionPrelude)
             sharedLibPath.getBuffer(),
             sharedLibrary.writeRef())));
 
-    auto innerMain = (InnerMainFunc)sharedLibrary->findFuncByName("innerMain");
+    auto innerMain = (TestToolUtil::InnerMainFunc)sharedLibrary->findFuncByName("innerMain");
     SLANG_CHECK_ABORT(innerMain != nullptr);
 
     // A `-cpu` compute run: `-compile-only` keeps it off the GPU and away from downstream compilers
@@ -163,9 +161,12 @@ SLANG_UNIT_TEST(renderTestSessionPrelude)
     SLANG_CHECK(_getLanguagePrelude(session, SLANG_SOURCE_LANGUAGE_HLSL) == sentinelHlslPrelude);
     SLANG_CHECK(_getLanguagePrelude(session, SLANG_SOURCE_LANGUAGE_CPP) == sentinelCppPrelude);
 
-    // Repeat with an empty prelude, which is the case that reaches the guard's zero-size blob path.
-    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, "");
+    // Repeat from a prelude that is short enough to reach the same one-line path but is still
+    // distinguishable from what the defect leaves behind. Asserting an *empty* prelude comes back
+    // would pass either way, since blanking also leaves it empty.
+    const char* const shortHlslPrelude = "\n";
+    session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, shortHlslPrelude);
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(innerMain(stdWriters, session, (int)args.getCount(), args.getBuffer())));
-    SLANG_CHECK(_getLanguagePrelude(session, SLANG_SOURCE_LANGUAGE_HLSL).getLength() == 0);
+    SLANG_CHECK(_getLanguagePrelude(session, SLANG_SOURCE_LANGUAGE_HLSL) == shortHlslPrelude);
 }
