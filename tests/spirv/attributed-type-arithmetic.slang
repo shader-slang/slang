@@ -54,6 +54,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     uint2 p = tid.xy;
 
+    // Each operator writes to its own slot so every result stays a live output
+    // and survives to be checked; sharing a slot would make the earlier writes
+    // redundant stores that an optimizer could drop.
+
     // The divisor is loaded rather than a literal so that the division survives
     // as one: a float division by a constant is strength-reduced to a multiply,
     // which would leave no OpFDiv to assert once the classification is correct.
