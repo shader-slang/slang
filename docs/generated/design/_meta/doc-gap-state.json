@@ -1,4 +1,85 @@
 {
-  "gaps": {},
+  "gaps": {
+    "0a69b5e6dec9": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "E30510 is real: defined at `source/slang/slang-diagnostics.lua:3376-3381` and emitted at `source/slang/slang-ir-check-differentiability.cpp:781`. Neither file is watched by this page. The watched sources corroborate only the passes' dependence on a loop bound (`slang-ir-autodiff-primal-hoist.cpp:2322`, `slang-ir-autodiff-unzip.cpp:553-556`), not the user-facing requirement or its diagnostic. Needs the manifest widened first.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "deferred",
+      "summary": "The doc covers checkpoint/rematerialization opcodes but does not state the user-surface requirement that a loop inside a differentiable function must carry ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "3a51a0977652": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "The claim itself is already in the doc and already tested; the example only had to be accurate. `ForwardDifferentiate` sits in the hoistable `TranslateBase` group at `source/slang/slang-ir-insts.lua:2835` (watched), and `docs/generated/tests/design/ir-reference/differentiation/forward-differentiate-hoisted-dedupe.slang` asserts the shape and is not in expected-failures.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "fixed",
+      "summary": "The section says identical translation requests \"dedupe to a single IR value before the translation pass ever sees them\", but shows no example, so a reader ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "56dc50d6befd": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "The premise does not hold for the anchored section. Every row of the Forward-mode table already names its user surface: `ForwardDifferentiate` gives `__fwd_diff(...)`, `TrivialForwardDifferentiate` gives `[TreatAsDifferentiable]` / `[HasTrivialForwardDerivative]`, and `ForwardDifferentiatePropagate` correctly states it has no AST origin.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "rejected-bogus",
+      "summary": "The `AST origin` column names internal checking entry points (`checkDifferentiableCallableCommon`, `trySynthesizeDiffFuncRequirementWitness`, ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "5ba741954afb": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Behaviour confirmed \u2014 `convertHigherOrderExprToLookup` (`source/slang/slang-check-expr.cpp:3965-3979`) rewrites `bwd_diff(fn)` into a lookup of the `fn.bwd_diff` member \u2014 but that file is not in this page's `watched_paths`. The gap's suggested answer (a `LegacyBackwardDifferentiate` value) is also narrower than the source: the lookup resolves to whichever synthesized member the callable has. Needs the manifest widened first.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "deferred",
+      "summary": "The Reverse-mode table gives `BackwardDifferentiate` the AST origin \"`BackwardDifferentiateVal` via `visitBackwardDifferentiateVal`\", but the section body then ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "5f9684f655d5": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Confirmed in watched `source/slang/slang-check-decl.cpp:16258-16264`. Note the source is broader than the gap claimed: the gate is on `visitFuncExtensionDecl`, so it covers every `__func_extension` form rather than `__apply` alone, and it exempts core-module source via `isFromCoreModule`. Documented what the source says, not the suggestion.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "fixed",
+      "summary": "`IdentityRemat`'s AST origin is given as \"`SynthesizedFuncDecl` `remat` from `_funcExtensionApply`\" with no hint that the `__func_extension __apply` surface ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "6da449d93530": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Confirmed in watched sources: `slang-ir-autodiff-rev.cpp:405,726` generate the `s_bwdProp_` prefix, `:314,727` the `s_bwdCallableCtx_` prefix, and `slang-ir-autodiff-fwd.cpp:2271` builds `s_fwd_<orig>`.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "fixed",
+      "summary": "The doc describes the `BackwardDifferentiate` / `BackwardDifferentiatePropagate` opcodes but never names the user-visible emitted artefacts the transpose pass ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "cf11c291dff6": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-example",
+      "rationale": "Could not confirm the proposed rule. The gap asserts a `DiffPair_*` struct survives into target text only when a differentiated call passes the pair across a function boundary, and that a purely local pair is \"scalarized away before emit\"; the pass that would do that scalarization is in neither the watched paths nor `slang-ir-autodiff-pairs.cpp`, and no test in the reporting bundle pins the negative case. Documenting it would mean asserting an unverified rule about emitted output.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "deferred",
+      "summary": "The section says `processPairTypes` \"rewrites it into a `makeStruct` over the auto-generated pair struct\", but a reader inspecting generated HLSL/Metal/WGSL ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    },
+    "f4b0906929c8": {
+      "decided_at": "2026-08-11T15:10:00+00:00",
+      "decided_by_model": "claude-opus-5[1m]",
+      "kind": "missing-surface",
+      "rationale": "Confirmed in watched `source/slang/slang-check-decl.cpp`: lines 6736-6751 move a `NoDiffModifierVal` off a parameter's type onto the `ParamDecl` as a `NoDiffModifier`, lines 2872-2878 do the same for var decls, and `doesTypeHaveNoDiffModifier` (5333, 5338) reads it from either place. No `detachDerivative` inst is involved on that path.",
+      "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/differentiation.md.gap-intake.md",
+      "status": "fixed",
+      "summary": "The section lists two source spellings, \"the core-module `detach<T>(T x)` intrinsic, and `no_diff` / `[TreatAsDifferentiable]` applied to an expression\", but ...",
+      "target_doc": "docs/generated/design/ir-reference/differentiation.md"
+    }
+  },
   "schema_version": 1
 }
