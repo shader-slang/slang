@@ -957,9 +957,7 @@ void TestReporter::endSuite()
 
 TestResult TestReporter::adjustResult(UnownedStringSlice testName, TestResult result)
 {
-    // Reads the list directly rather than through isExpectedFailure(): this runs for every result,
-    // and the accessor takes a String, so routing through it would construct one per call.
-    if (result == TestResult::Fail && m_expectedFailureList.contains(testName))
+    if (result == TestResult::Fail && isExpectedFailure(testName))
         result = TestResult::ExpectedFail;
     return result;
 }

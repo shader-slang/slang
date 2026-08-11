@@ -5738,6 +5738,13 @@ static SlangResult runUnitTestModule(
                 // failed unit tests so that we can retry.
                 // Note the expected-failure list is keyed by the command (the same string
                 // `TestReporter::adjustResult` looks up), not by the bare test name.
+                //
+                // Passing `test.command` here is load-bearing and unguarded by the suite:
+                // `slangTestReporterExpectedFailureKeysOnCommand` pins what the accessor means,
+                // not what this call site hands it. Reverting to `test.testName` would leave every
+                // test green -- the second failure is still downgraded to ExpectedFail, so the only
+                // symptom is the pointless retry this line exists to avoid. A real two-pass CI run
+                // is the only thing that would show it.
                 if (isFailed && !context->isRetry && !context->options.disableRetries &&
                     !context->getTestReporter()->isExpectedFailure(test.command))
                 {
@@ -6212,6 +6219,11 @@ SlangResult innerMain(int argc, char** argv)
 
         // Every retry pass has now run, so any test whose result is still deferred is never going
         // to get one. Turn those into failures before they reach the summary.
+        //
+        // The position matters and no unit test can hold it: the reporter tests call
+        // reconcilePendingRetries() directly, so moving this above the retry loop -- where it would
+        // count deferrals the retry was about to redeem -- or dropping it entirely would not fail
+        // any of them. It has to run after the last retry and before outputSummary().
         reporter.reconcilePendingRetries();
 
         reporter.outputSummary();

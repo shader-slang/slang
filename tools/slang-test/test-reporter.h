@@ -171,10 +171,17 @@ public:
     /// name is exactly the mismatch this fix corrects.
     Slang::HashSet<Slang::String> m_pendingRetryTests;
 
-    /// Names of *every* test that reached a final (non-deferred) result -- one entry per test in
-    /// the run, not just the ones that redeemed a deferral. Reconciliation needs only the
-    /// intersection with `m_pendingRetryTests`, which is a handful; recording unconditionally is
-    /// what makes it order-independent across sub-reporters.
+    /// Names of every test that reached a *redeeming verdict* -- Pass, Fail or ExpectedFail.
+    ///
+    /// `Ignored` is excluded even though it is also a final, non-deferred result. A test is
+    /// deferred because it ran and failed, and a retry that skips it produces no verdict and so
+    /// refutes nothing; letting an ignore redeem the deferral is how a real failure went missing
+    /// (see the recording site in `_addResult`).
+    ///
+    /// Every other result lands here, so this holds roughly one entry per test in the run rather
+    /// than just the handful that redeem something. Reconciliation reads only the intersection with
+    /// `m_pendingRetryTests`; recording unconditionally is what makes that order-independent across
+    /// sub-reporters.
     ///
     /// This is what redeems an entry in `m_pendingRetryTests`, and it is tracked separately rather
     /// than read back out of `m_testInfos` for two reasons: a test can be deferred by one
