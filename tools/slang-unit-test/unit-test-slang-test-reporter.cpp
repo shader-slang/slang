@@ -352,9 +352,9 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure)
     reporter.m_suppressConsoleOutput = true;
     const String command("gfx-unit-test-tool/probeDispatchFailure.internal");
 
-    reporter.noteDispatchFailure(command);                // the call never reached the test
-    reporter.addTest(command, TestResult::PendingRetry);  // deferred
-    reporter.addTest(command, TestResult::Ignored);       // retry reached it; not applicable here
+    reporter.noteDispatchFailure(command);               // the call never reached the test
+    reporter.addTest(command, TestResult::PendingRetry); // deferred
+    reporter.addTest(command, TestResult::Ignored);      // retry reached it; not applicable here
 
     SLANG_CHECK(reporter.m_finalResultTests.contains(command));
 
