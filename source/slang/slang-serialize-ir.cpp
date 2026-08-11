@@ -5,6 +5,7 @@
 #include "core/slang-common.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
 #include "core/slang-riff.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
@@ -521,6 +522,30 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 }
 
 //
+/// True if `SLANG_ONDEMAND_LAZY_IR` selects deferred loading of builtin-module
+/// instruction bodies.
+///
+/// Read once: a global session is shared across threads, and the underlying
+/// environment lookup is not safe against a concurrent write. Uses
+/// `PlatformUtil::getEnvironmentVariable` rather than `getenv`, which MSVC
+/// deprecates and this build treats as an error.
+static bool isLazyIRLoadEnabled()
+{
+    static const bool enabled = []
+    {
+        StringBuilder value;
+        if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice("SLANG_ONDEMAND_LAZY_IR"),
+                value)))
+        {
+            return false;
+        }
+        const String text = value.produceString();
+        return text.getLength() != 0 && text[0] != '0';
+    }();
+    return enabled;
+}
+
 // Decoding state for a module's flat instruction table.
 //
 // The same walk serves two purposes, which is why it lives in an object rather
@@ -529,19 +554,6 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 // table and the instruction array keeps the second use possible -- a body's
 // operands are indices into that array, and may name any module-scope global.
 //
-/// True if `SLANG_ONDEMAND_LAZY_IR` selects deferred loading of builtin-module
-/// instruction bodies. Read once, since a global session is shared across threads
-/// and `getenv` is not safe against a concurrent `setenv`.
-static bool isLazyIRLoadEnabled()
-{
-    static const bool enabled = []
-    {
-        const char* value = ::getenv("SLANG_ONDEMAND_LAZY_IR");
-        return value && value[0] != '\0' && value[0] != '0';
-    }();
-    return enabled;
-}
-
 struct FlatModuleDecoder : IRDeferredBodyLoader
 {
     FlatInstTable flat;
