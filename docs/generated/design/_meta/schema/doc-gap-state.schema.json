@@ -70,12 +70,17 @@
         },
         "finding_id": {
           "type": "string",
-          "description": "Required when status is escalated-to-finding: the `docs/generated/tests/_meta/findings/<id>.yaml` the behaviour was filed under."
+          "description": "Required when status is escalated-to-finding. Always the bare id -- the `<id>` of `docs/generated/tests/_meta/findings/<id>.yaml` -- never a path. Both writers canonicalize to this form and both verify the file exists before recording it.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
         },
         "rationale": {
           "type": "string",
-          "description": "Why this status. Required for every status including `fixed`, where it names the edit that closed the gap, so that a later reader can tell a real fix from a row that was waved through.",
+          "description": "Why this status, required for every status. The two writers supply different-but-comparable text: `mark-gap` stores the operator's free-text `--rationale`, while `mark-gap-intake` stores the report row's `Evidence` cell -- for a `fixed` row that is the source citation confirming what was written. See `fix_summary` for the edit itself.",
           "minLength": 1
+        },
+        "fix_summary": {
+          "type": "string",
+          "description": "What the edit actually was, carried from a gap-intake report row's `Fix summary` cell. Present only for entries recorded by `mark-gap-intake` whose action was `fixed`; a hand decision made with `mark-gap` has none."
         }
       }
     }

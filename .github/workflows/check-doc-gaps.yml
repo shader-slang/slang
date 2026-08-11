@@ -30,8 +30,11 @@ on:
   pull_request:
     branches: [master]
     types: [opened, synchronize, reopened, ready_for_review]
-    # Only PRs that touch the generated trees or the drivers can change what
-    # this reports.
+    # `docs/generated/**` and this workflow are what can change the reported
+    # numbers. `docs/language-reference/**` cannot -- the language-reference
+    # queue is derived from the test bundles' own tables, not from the spec
+    # source -- and is listed on purpose anyway, so that a spec editor sees
+    # the standing human-triage queue against the pages they are editing.
     paths:
       - "docs/generated/**"
       - "docs/language-reference/**"
@@ -65,6 +68,9 @@ jobs:
 
       - name: Self-check the test driver's lint helpers
         run: python3 docs/generated/tests/_meta/regenerate.py selftest
+
+      - name: Self-check the design driver's ledger helpers
+        run: python3 docs/generated/design/_meta/regenerate.py selftest
 
       # Advisory from here down. `continue-on-error` keeps a surprise in the
       # report from failing the check.

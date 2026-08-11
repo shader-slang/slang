@@ -1228,7 +1228,11 @@ def _normalize_gap_prose(text: str) -> str:
     text = re.sub(r"`([^`]*)`", r"\1", text)
     text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
     text = re.sub(r"[*_~]", "", text)
-    text = text.replace("\\|", "|")
+    # No un-escaping of `\|` here: the punctuation strip below maps both the
+    # backslash and the pipe to spaces and the final collapse erases the
+    # difference, so doing it first changes nothing. This is the identity
+    # function for `gap_id`, so it is worth keeping free of steps that only
+    # look like they matter.
     text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
     return re.sub(r"\s+", " ", text).strip().lower()
 
@@ -3691,6 +3695,11 @@ def cmd_coverage_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
+# The design driver's `load_gap_queue` matches on this text to tell "no gaps
+# for this document" (benign) from a real failure. Named on both sides and
+# pinned by `selftest` so a reword cannot silently break that.
+_NO_GAPS_FOR_DOC = "no gap rows are anchored to {doc!r}"
+
 _GAP_TREES = {
     "design": "docs/generated/design/",
     "language-reference": "docs/language-reference/",
@@ -3737,9 +3746,7 @@ def cmd_doc_gaps(args: argparse.Namespace) -> int:
     if args.source_doc:
         by_doc = {d: rows for d, rows in by_doc.items() if d == args.source_doc}
         if not by_doc:
-            raise SystemExit(
-                f"no gap rows are anchored to {args.source_doc!r}"
-            )
+            raise SystemExit(_NO_GAPS_FOR_DOC.format(doc=args.source_doc))
 
     merged_by_doc = {
         doc: _merge_gap_rows(rows) for doc, rows in sorted(by_doc.items())
@@ -3785,7 +3792,10 @@ def _merge_gap_rows(rows: list[GapRow]) -> list[dict]:
     since each reporter saw the gap from its own test and the proposals
     are usually complementary rather than redundant.
 
-    Sorted by anchor then kind, so the output reads in document order.
+    Sorted by the raw Anchor-cell text then kind. That is *not* document
+    order -- the cell is a markdown link, so this is lexicographic on the
+    link text -- but it is stable and groups rows sharing an anchor, which
+    is what a reader working through one document's gaps wants.
     """
     merged: dict[str, dict] = {}
     for r in rows:
@@ -4302,6 +4312,47 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         "gap merge keeps both suggestions",
         dup[0]["suggested_addition"] if dup else "",
         "Add the rule. // Add an example too.",
+    )
+
+    # `--tree` routing: two production callers depend on this prefix split
+    # (the workflow passes `language-reference`, the design driver always
+    # passes `design`), and a mis-partition would silently send a page's
+    # gaps to the wrong queue.
+    check(
+        "tree prefixes are the two doc trees",
+        sorted(_GAP_TREES),
+        ["design", "language-reference"],
+    )
+    check(
+        "design tree prefix",
+        _GAP_TREES["design"],
+        "docs/generated/design/",
+    )
+    check(
+        "language-reference tree prefix",
+        _GAP_TREES["language-reference"],
+        "docs/language-reference/",
+    )
+    _rows = {
+        "docs/generated/design/a.md": [1],
+        "docs/language-reference/b.md": [1],
+        "coverage/orphan (no source doc)": [1],
+    }
+    for tree, want in (("design", 1), ("language-reference", 1)):
+        pref = _GAP_TREES[tree]
+        check(
+            f"--tree {tree} partitions by prefix",
+            len({d: r for d, r in _rows.items() if d.startswith(pref)}),
+            want,
+        )
+
+    # The design driver recognizes "this document has no gaps" by matching
+    # this exact substring on our stderr. Pin it here so a reword fails
+    # loudly rather than making every gap-status run raise.
+    check(
+        "cross-driver no-gaps message is stable",
+        "no gap rows are anchored to" in _NO_GAPS_FOR_DOC,
+        True,
     )
 
     # The catalog snapshot parser and the digest rule it feeds. The committed
