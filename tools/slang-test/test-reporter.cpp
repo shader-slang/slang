@@ -165,7 +165,7 @@ void TestReporter::addResult(TestResult result)
     SLANG_ASSERT(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    if (result == TestResult::Fail && m_expectedFailureList.contains(m_currentInfo.name))
+    if (result == TestResult::Fail && isExpectedFailure(m_currentInfo.name))
         result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
@@ -719,11 +719,13 @@ void TestReporter::reconcilePendingRetries()
 
         if (!m_suppressConsoleOutput)
         {
+            // Same name formatting as the "failed(pending retry)" notice this one answers, so
+            // the pair reads as a pair.
             printf(
-                "error: test '%s' was marked pending retry but was never re-run, so its failure "
+                "error: test '%S' was marked pending retry but was never re-run, so its failure "
                 "was about to go unreported; reporting it now (as a failure, or an expected "
                 "failure if it is on the expected-failure list)\n",
-                name.getBuffer());
+                name.toWString().begin());
             fflush(stdout);
         }
 
@@ -795,7 +797,7 @@ void TestReporter::outputSummary()
                 {
                     if (testInfo.testResult == TestResult::Pass)
                     {
-                        if (m_expectedFailureList.contains(testInfo.name))
+                        if (isExpectedFailure(testInfo.name))
                         {
                             printf("%s\n", testInfo.name.getBuffer());
                         }
@@ -955,6 +957,8 @@ void TestReporter::endSuite()
 
 TestResult TestReporter::adjustResult(UnownedStringSlice testName, TestResult result)
 {
+    // Reads the list directly rather than through isExpectedFailure(): this runs for every result,
+    // and the accessor takes a String, so routing through it would construct one per call.
     if (result == TestResult::Fail && m_expectedFailureList.contains(testName))
         result = TestResult::ExpectedFail;
     return result;

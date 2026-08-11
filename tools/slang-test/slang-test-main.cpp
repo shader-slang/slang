@@ -5282,7 +5282,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
                 if (testResult == TestResult::Fail && !context->options.disableRetries &&
-                    !context->getTestReporter()->m_expectedFailureList.contains(testName))
+                    !context->getTestReporter()->isExpectedFailure(testName))
                 {
                     RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
                     fileTestInfo->filePath = filePath;
@@ -5822,6 +5822,14 @@ static SlangResult runUnitTestModule(
     // process lifetime and is filled in once, by the module's load-time static constructors, so
     // this function must leave it intact for the retry pass to enumerate. (The test server, which
     // holds the same kind of module, releases its own copy from its destructor at shutdown.)
+    //
+    // No unit test guards this: the cross-pass dlopen / static-constructor path it turns on cannot
+    // be driven from an in-process SLANG_UNIT_TEST, so a real two-pass run under CI is the only
+    // positive check. What does exist is a backstop -- reinstating the call would leave every
+    // unit-test deferral unredeemed, and `TestReporter::reconcilePendingRetries()` would then count
+    // them as failures. So the regression surfaces as red CI rather than as the silent green it
+    // used to be, but only because that safety net is there. Do not "tidy up" the missing
+    // destroy() on the assumption the unit tests cover it.
     return SLANG_OK;
 }
 
