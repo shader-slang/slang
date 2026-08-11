@@ -23,10 +23,19 @@ void writeSerializedModuleIR(
     IRModule* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
+/// Reads an IR module out of `chunk`.
+///
+/// `blobHoldingSerializedData` is the blob those bytes live in, or null if the caller
+/// read them from storage it owns itself. It matters because instruction bodies can be
+/// left encoded and decoded on demand, out of spans that point into these bytes rather
+/// than copies of them: when a blob is supplied it is retained for as long as bodies can
+/// still be decoded, and when it is not, bodies are loaded eagerly instead. Passing null
+/// is therefore always safe, and never wrong -- only slower.
 [[nodiscard]] Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
+    ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule);
 
 [[nodiscard]] Result readSerializedModuleInfo(

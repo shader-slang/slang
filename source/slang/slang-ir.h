@@ -48,7 +48,13 @@ struct IRDeferredBodyLoader : RefObject
     virtual ~IRDeferredBodyLoader() = default;
 
     /// Decodes the children of `inst`, a global value whose body was deferred, and
-    /// links them after its decorations. Called at most once per instruction.
+    /// links them after its decorations.
+    ///
+    /// May be *called* more than once for the same instruction: two threads can both
+    /// observe the deferred flag before either has finished, since the flag is cleared
+    /// by this implementation after linking rather than by the caller beforehand. An
+    /// implementation therefore owes the deduplication — decode a given instruction
+    /// once, and make later calls for it no-ops — rather than assuming one call.
     virtual void materializeDeferredBody(IRInst* inst) = 0;
 };
 

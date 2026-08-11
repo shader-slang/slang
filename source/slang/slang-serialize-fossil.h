@@ -910,21 +910,6 @@ public:
     /// count, so this is known before any element is decoded.
     Count getRemainingElementCount();
 
-    /// Reads `count` scalar elements of type `T` into `dest`, in bulk, returning
-    /// false if that is not possible for the current state.
-    ///
-    /// The fossil format stores container elements contiguously at a known
-    /// stride, so when that stride equals `sizeof(T)` the elements are already
-    /// laid out exactly as the destination array wants them and the whole run can
-    /// be copied at once instead of decoded one value at a time. For the IR's flat
-    /// instruction table that is several megabytes of `Int64` indices, which
-    /// dominates deserialization time.
-    ///
-    /// The first element is read through the ordinary path so that its layout is
-    /// validated as usual; only the remainder is copied directly. Returns false
-    /// (having read nothing) when the state is not a container, when the stride
-    /// does not match, or when fewer than `count` elements remain, leaving the
-    /// caller to fall back to the per-element path.
     /// Points `outData` at `count` scalar elements of type `T` in the serialized
     /// data itself, returning false if that is not possible for the current state.
     ///
@@ -962,6 +947,21 @@ public:
         return true;
     }
 
+    /// Reads `count` scalar elements of type `T` into `dest`, in bulk, returning
+    /// false if that is not possible for the current state.
+    ///
+    /// The fossil format stores container elements contiguously at a known
+    /// stride, so when that stride equals `sizeof(T)` the elements are already
+    /// laid out exactly as the destination array wants them and the whole run can
+    /// be copied at once instead of decoded one value at a time. For the IR's flat
+    /// instruction table that is several megabytes of `Int64` indices, which
+    /// dominates deserialization time.
+    ///
+    /// The first element is read through the ordinary path so that its layout is
+    /// validated as usual; only the remainder is copied directly. Returns false
+    /// (having read nothing) when the state is not a container, when the stride
+    /// does not match, or when fewer than `count` elements remain, leaving the
+    /// caller to fall back to the per-element path.
     template<typename T>
     bool tryReadContiguousScalars(T* dest, Count count)
     {
@@ -1094,7 +1094,13 @@ SLANG_FORCE_INLINE bool SerialReader::hasElements()
 
 SLANG_FORCE_INLINE Count SerialReader::getRemainingElementCount()
 {
-    return Count(getState().remainingValueCount);
+    // `remainingValueCount` only means "elements left" while a container or record is
+    // being read; in other states it holds whatever the last one left behind. Callers
+    // size storage and drive bulk reads off this, so a stale value would be read as a
+    // real count.
+    const auto& state = getState();
+    SLANG_ASSERT(state.type == State::Type::Container || state.type == State::Type::Record);
+    return Count(state.remainingValueCount);
 }
 
 SLANG_FORCE_INLINE void SerialReader::endStruct(Scope& scope)

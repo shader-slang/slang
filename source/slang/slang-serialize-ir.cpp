@@ -283,10 +283,25 @@ struct IRSerialWriteContext : SourceLocSerialContext
 
 struct IRSerialReadContext : SourceLocSerialContext, RefObject
 {
-    IRSerialReadContext(Session* session, SerialSourceLocReader* sourceLocReader)
-        : _session(session), _sourceLocReader(sourceLocReader)
+    /// `blobHoldingSerializedData` may be null, and is retained when it is not.
+    ///
+    /// Deferred instruction bodies are decoded long after this read returns, out of
+    /// spans that point into the serialized bytes rather than copies of them. Whoever
+    /// owns those bytes therefore has to outlive the `IRModule`. Retaining the blob
+    /// here makes that ownership explicit and local; when the caller has no blob to
+    /// give (the bytes are a caller-local buffer), bodies are not deferred at all.
+    IRSerialReadContext(
+        Session* session,
+        SerialSourceLocReader* sourceLocReader,
+        ISlangBlob* blobHoldingSerializedData)
+        : _session(session)
+        , _sourceLocReader(sourceLocReader)
+        , _blobHoldingSerializedData(blobHoldingSerializedData)
     {
     }
+
+    ISlangBlob* getBlobHoldingSerializedData() const { return _blobHoldingSerializedData; }
+    ComPtr<ISlangBlob> _blobHoldingSerializedData;
     virtual void handleIRModule(IRReadSerializer const& serializer, IRModule*& value);
     virtual void handleName(IRReadSerializer const& serializer, Name*& value);
     virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
@@ -560,6 +575,13 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     List<IRInst*> instsList; ///< index -1 is the null slot, hence `insts()`
     IRModule* module = nullptr;
 
+    /// Keeps the serialized bytes alive for as long as bodies can still be decoded.
+    ///
+    /// The flat table holds spans into this blob rather than copies, so it must not be
+    /// released while this decoder can still be asked for a body. Only set when the
+    /// caller supplied a blob; deferral is disabled otherwise.
+    ComPtr<ISlangBlob> blobHoldingSerializedData;
+
     /// The context that owns `_foundUnrecognizedInstructions`.
     ///
     /// Retained so that a body decoded long after the load walk reports an
@@ -604,7 +626,16 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     Int64 stringLengthIndex = 0;
     Int64 stringDataIndex = 0;
 
-    IRInst** insts() { return &instsList[1]; }
+    /// The instruction array, indexed from -1 so that a serialized -1 reads as null.
+    ///
+    /// Asserted rather than assumed: the load path sizes `instsList` before the first
+    /// call, but deferred materialization reaches this from paths that do not, and
+    /// `&instsList[1]` on an empty list is out of bounds without saying so.
+    IRInst** insts()
+    {
+        SLANG_RELEASE_ASSERT(instsList.getCount() >= 1);
+        return &instsList[1];
+    }
     Int64 getInstCount() const { return flat.instAllocInfo.getCount(); }
 
     IRInst* readInstRef()
@@ -784,7 +815,14 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
     // payload entries still have to be consumed so the cursors stay aligned for
     // the instructions that were kept.
     const auto& allocInfo = flat.instAllocInfo[thisInstIndex];
-    const Int64 thisOperandCount = inst ? Int64(inst->operandCount) : Int64(allocInfo.operandCount);
+
+    // The table is the single source for how many operands to consume. When the
+    // instruction exists it was allocated with this same count, so the two agree by
+    // construction -- but if they ever stopped agreeing, reading the instruction's
+    // count would desynchronize the operand cursor for every instruction after this
+    // one, and the damage would surface nowhere near here.
+    const Int64 thisOperandCount = Int64(allocInfo.operandCount);
+    SLANG_ASSERT(!inst || Int64(inst->operandCount) == thisOperandCount);
 
     // operands and sourcelocs
     if (inst)
@@ -878,6 +916,9 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
         // entries and keep the cursors aligned.
         if (deferBodies && depth == 1 && inst && !inst->m_hasDeferredBody)
         {
+            // Looked at before the recursive call validates it, so bound it here; a
+            // corrupt `childCounts` is what would put this out of range.
+            SLANG_RELEASE_ASSERT(instIndex < getInstCount());
             const IROp nextOp = flat.instAllocInfo[instIndex].op;
             const bool nextIsDecoration =
                 nextOp >= kIROp_FirstDecoration && nextOp <= kIROp_LastDecoration;
@@ -964,7 +1005,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // instruction on its own is that operands, literals and strings are consumed by
     // running cursors in preorder; those cursor positions are recovered here by a
     // scan over `childCounts` that allocates nothing.
-    const bool lazyIRLoad = isLazyIRLoadEnabled();
+    // Deferral is only sound when something keeps the serialized bytes alive: the flat
+    // table spans point into them, and a body is decoded long after this returns. A
+    // caller that reads out of its own buffer supplies no blob, and gets an eager load.
+    decoder->blobHoldingSerializedData = readContext.getBlobHoldingSerializedData();
+    const bool lazyIRLoad = isLazyIRLoadEnabled() && decoder->blobHoldingSerializedData;
     List<uint8_t> materializeInst;
     if (lazyIRLoad)
     {
@@ -1129,6 +1174,7 @@ Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
+    ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule)
 {
     auto dataChunk = as<RIFF::DataChunk>(chunk);
@@ -1152,7 +1198,8 @@ Result readSerializedModuleInfo(
         return SLANG_FAIL;
 
     IRModuleInfo info;
-    auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
+    auto sharedDecodingContext =
+        RefPtr(new IRSerialReadContext(session, sourceLocReader, blobHoldingSerializedData));
     {
         Fossil::ReadContext readContext;
         Fossil::SerialReader reader(
@@ -1175,11 +1222,17 @@ Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
+    ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule)
 {
     SLANG_PROFILE;
 
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(
+        chunk,
+        session,
+        sourceLocReader,
+        blobHoldingSerializedData,
+        outIRModule));
 
     //
     // Module is finally valid (or at least as much as it was going it) and
