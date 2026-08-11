@@ -119,6 +119,15 @@ public:
     /// pointless retry.
     bool isExpectedFailure(const Slang::String& testKey) const;
 
+    /// Records that the harness never reached `testKey` -- the call failed in transport, so no
+    /// verdict exists for it.
+    ///
+    /// This is not a test result. A dispatch failure says the connection died, and carries no
+    /// information about the test that happened to be in flight: on a run configured for one API,
+    /// the test in question is often one that would have skipped itself anyway. What it does change
+    /// is what may redeem the retry -- see `m_dispatchFailures`.
+    void noteDispatchFailure(const Slang::String& testKey);
+
     /// Counts every test whose result is still deferred as a failure, and reports it.
     ///
     /// Reporting `TestResult::PendingRetry` for a test defers its result: it is left out of the
@@ -189,6 +198,20 @@ public:
     /// first pass), so the two sets have to survive `consolidateWith` independently; and a final
     /// `Ignored` result under `-hide-ignored` never reaches `m_testInfos` at all.
     Slang::HashSet<Slang::String> m_finalResultTests;
+
+    /// Names deferred after the harness failed to reach the test at all, rather than after the test
+    /// ran and failed.
+    ///
+    /// The distinction decides what may redeem the deferral. A test that ran and failed is not
+    /// answered by a retry that skips it, so `Ignored` must not redeem it. A test that was never
+    /// reached has no failure to refute, and a retry reporting it skipped *is* the answer -- that
+    /// is what a run configured for one API says about a test for another. Treating those alike
+    /// blames a dead connection on whichever test was next in the queue.
+    Slang::HashSet<Slang::String> m_dispatchFailures;
+
+    /// How many dispatch failures were seen, including ones a retry went on to resolve. Reported in
+    /// the summary so a connection dying is never merely a line in the middle of the log.
+    int m_dispatchFailureCount = 0;
 
     Slang::List<Slang::String> m_suiteStack;
 

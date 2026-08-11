@@ -261,6 +261,9 @@ void TestReporter::consolidateWith(TestReporter* other)
         m_pendingRetryTests.add(name);
     for (const auto& name : other->m_finalResultTests)
         m_finalResultTests.add(name);
+    for (const auto& name : other->m_dispatchFailures)
+        m_dispatchFailures.add(name);
+    m_dispatchFailureCount += other->m_dispatchFailureCount;
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -390,7 +393,9 @@ void TestReporter::_addResult(TestInfo info)
     //
     // Recorded before the hidden-ignored return below, because being hidden from the output does
     // not make a verdict any less final.
-    if (info.testResult != TestResult::Ignored)
+    // Ignored redeems a deferral only when the first attempt never reached the test. See
+    // m_dispatchFailures for why the two cases differ.
+    if (info.testResult != TestResult::Ignored || m_dispatchFailures.contains(info.name))
         m_finalResultTests.add(info.name);
 
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
@@ -745,6 +750,12 @@ void TestReporter::reconcilePendingRetries()
     m_finalResultTests.clear();
 }
 
+void TestReporter::noteDispatchFailure(const String& testKey)
+{
+    m_dispatchFailures.add(testKey);
+    m_dispatchFailureCount++;
+}
+
 bool TestReporter::isExpectedFailure(const String& testKey) const
 {
     return m_expectedFailureList.contains(testKey);
@@ -785,6 +796,15 @@ void TestReporter::outputSummary()
             }
 
             printf("\n===\n%d%% of tests passed (%d/%d)", percentPassed, passCount, runTotal);
+            if (m_dispatchFailureCount)
+            {
+                // Reported even when a retry went on to resolve every one of them: a connection
+                // dying is a fault worth seeing, and it is not attributable to whichever test was
+                // in flight when it happened.
+                printf(
+                    ", %d test-server dispatch failure(s) -- a connection died mid-run",
+                    m_dispatchFailureCount);
+            }
             if (ignoredCount)
             {
                 printf(", %d tests ignored", ignoredCount);

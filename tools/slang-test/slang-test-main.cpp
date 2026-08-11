@@ -5715,8 +5715,12 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    // The call never reached the test, so this is not a verdict about it. Tell the
+                    // reporter, which needs to know a retry that skips the test is a real answer
+                    // here rather than a skipped failure.
                     testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
+                    reporter->noteDispatchFailure(options.command);
                 }
 
                 // Check for VVL errors in unit tests

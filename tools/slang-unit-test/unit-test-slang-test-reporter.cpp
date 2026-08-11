@@ -340,3 +340,65 @@ SLANG_UNIT_TEST(slangTestReporterSuppressesSummary)
     SLANG_CHECK(reporter.m_totalTestCount == 3);
     SLANG_CHECK(reporter.didAllSucceed());
 }
+
+// A deferral whose first attempt never reached the test is answered by a retry that skips it. The
+// two live instances of this were both `JSON RPC failure: sendCall()` on a test for an API the run
+// had not enabled -- the connection died, the retry reached the test, and the test skipped itself
+// because it was never applicable. Counting that as a test failure blames a dead connection on
+// whichever test was next in the queue.
+SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    const String command("gfx-unit-test-tool/probeDispatchFailure.internal");
+
+    reporter.noteDispatchFailure(command);                // the call never reached the test
+    reporter.addTest(command, TestResult::PendingRetry);  // deferred
+    reporter.addTest(command, TestResult::Ignored);       // retry reached it; not applicable here
+
+    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+
+    reporter.reconcilePendingRetries();
+
+    // No failure invented for a test that was never applicable...
+    SLANG_CHECK(reporter.m_failedTestCount == 0);
+    SLANG_CHECK(reporter.didAllSucceed());
+    // ...but the connection dying is still on the record.
+    SLANG_CHECK(reporter.m_dispatchFailureCount == 1);
+}
+
+// The same shape without a dispatch failure is still a failure: there the test ran and failed, so a
+// retry that skips it refutes nothing.
+SLANG_UNIT_TEST(slangTestReporterIgnoredDoesNotRedeemRealFailure)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    const String command("gfx-unit-test-tool/probeRanAndFailed.internal");
+
+    reporter.addTest(command, TestResult::PendingRetry);
+    reporter.addTest(command, TestResult::Ignored);
+
+    SLANG_CHECK(!reporter.m_finalResultTests.contains(command));
+
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(!reporter.didAllSucceed());
+}
+
+// A dispatch failure that no retry ever resolves is still a failure -- the run must not go green
+// having never obtained a result, which is the sibling bug #11751.
+SLANG_UNIT_TEST(slangTestReporterUnresolvedDispatchFailureStillFails)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    const String command("gfx-unit-test-tool/probeDispatchNeverResolved.internal");
+
+    reporter.noteDispatchFailure(command);
+    reporter.addTest(command, TestResult::PendingRetry);
+
+    reporter.reconcilePendingRetries();
+
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(!reporter.didAllSucceed());
+}
