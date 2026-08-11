@@ -19,22 +19,22 @@
       "watched_paths_digest": "f3185a46468c53d1e66be2d3d1f2a5e85be39f2a41be1987449571f18613956d"
     },
     "ast-reference/base.md": {
-      "generated_at": "2026-08-11T16:42:08+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "1c805fd57c8f6a9ac9e03e53c2b3763c613f1f33dcbfc2ea8231f4ce9568568b"
+      "generated_at": "2026-08-04T09:10:04+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "ee1fb3c40342ae89da97ad9ebe3c1853ce01e7825a3528db059959204e5a2fc6"
     },
     "ast-reference/declarations.md": {
-      "generated_at": "2026-08-11T16:44:43+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "cab948190b7fbdb9a1cd90d3b8f910c4623841609eb38d039104ef0e757f58c0"
+      "generated_at": "2026-08-04T09:10:04+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "40846d6323a4545ce1013f919b025bb0a96aea7d0df6f90a941d573b1467ac6d"
     },
     "ast-reference/expressions.md": {
-      "generated_at": "2026-08-11T16:41:32+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "4759fd07490fc89b9fe26f4904cfd4437d449f03b17ead1c86573eeb16a01df2"
+      "generated_at": "2026-08-04T09:07:32+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "8e2a1a1b289d2a99a65d0dbd1eee944a77ca8b0eb9415e18a3e6fc23cb52c0bf"
     },
     "ast-reference/index.md": {
       "generated_at": "2026-08-04T14:20:35+00:00",
@@ -43,58 +43,58 @@
       "watched_paths_digest": "de7b9184921fa81822d9918fafd0bc645a26b014ff5bd5969a169b334f1f5e80"
     },
     "ast-reference/modifiers.md": {
-      "generated_at": "2026-08-11T16:15:21+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "40fec14220a2627136248158e1504fbc865cb690d4772ecc5d0beac1d34c8198"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "3390b4894a127a22ac54d3fd216aa54aa11f8c940d5c28b9bed1c58dcd6a4e5b"
     },
     "ast-reference/statements.md": {
-      "generated_at": "2026-08-11T16:42:53+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "4f1e133994e63bb91b6e311ec44fd909691d56d4846d984327447f03f55ff796"
+      "generated_at": "2026-08-04T09:10:04+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "070b3ccec0f278478300fb9f59f4c0f312a12c4abadffcc0764197842e97ad2b"
     },
     "ast-reference/types.md": {
-      "generated_at": "2026-08-11T16:46:13+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "a9c76231c9b81f5947d88817afde8632a0fbc875218ac115c61218f90e87e7ff"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "f2d375e20b7e118e0455c1e85ad9b98372056265673d41c23fbc2dca235cce5f"
     },
     "ast-reference/values.md": {
-      "generated_at": "2026-08-11T16:44:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "aef5635e1ef9fa4b343b87770319419d9f040cafb6cb8890ba570b414d4ab9fd"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "55dc87d11089661c283c3c2eb95d5e23ea098ea531bcd68490959a34000adae3"
     },
     "cross-cutting/core-module.md": {
-      "generated_at": "2026-08-11T16:42:52+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "88de7dd1df49a4aeb297e957597aa68615678a797617a5f1df4caf2f2aec4629"
+      "generated_at": "2026-08-04T09:19:34+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "758f3793c6cde62bb10f3ecad0e65bcabd0d3115b5629165afe8408e4fab2f78"
     },
     "cross-cutting/diagnostics.md": {
-      "generated_at": "2026-08-11T16:18:22+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "74923a087d0c80ce9877adb20d844e61fdc17cb034eec1a841d4d6c18ab63019"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "a8646b00e05ca4d2c3465decf22eb25717edc20b334890d58ff467e4f0135378"
     },
     "cross-cutting/ir-instructions.md": {
-      "generated_at": "2026-08-11T16:42:44+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "878b8b66143ae85cceebe33f78bbb7ef1da40aec889c81a3b4c02276ee3a4698"
+      "generated_at": "2026-08-04T09:19:34+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "32a6f83c708fb280660629cff147cc6b41bd0816fc7f889340630eb73cb6b9f1"
     },
     "cross-cutting/serialization.md": {
-      "generated_at": "2026-08-11T16:45:27+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "81f373bc40c932135a7e678f9e498cc38a0d7731d61df59f229a928745c9048b"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "ec2dbba845c65be8a0b4a6e9917fe98983520d876c47130c349d660c048c7927"
     },
     "cross-cutting/targets.md": {
-      "generated_at": "2026-08-11T16:23:07+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "38550acb4c3fc872a534b2ef7a47a16ccd180afc9dca05a84a36e6f57504c085"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "d756802fb6fb08540ebd1d938ec80f71c3eeab8c917c8e946c13bf7f55367713"
     },
     "glossary.md": {
       "generated_at": "2026-08-04T14:20:35+00:00",
@@ -103,28 +103,28 @@
       "watched_paths_digest": "0555823f0c58906b7b77fb6b6d3efdb85115cfc831499dc40118083862f74bd1"
     },
     "ir-reference/control-flow.md": {
-      "generated_at": "2026-08-11T16:27:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "2846d8a4c3310f669ffe2b40747fed53f1704996ffd7d5f1f57b2de940cf1bb3"
+      "generated_at": "2026-08-04T09:05:12+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc"
     },
     "ir-reference/decorations.md": {
-      "generated_at": "2026-08-11T16:27:14+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "337c9db48af043378ae2ba0f0aaee21a40d3c0150ea6c179fd44e125dca5340e"
+      "generated_at": "2026-08-04T09:14:29+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "6ca22e11b1ae848bc68390906f1d20589efa4eb3e3366532aa60f8ccaecd4b6c"
     },
     "ir-reference/differentiation.md": {
-      "generated_at": "2026-08-11T14:09:21+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e",
-      "watched_paths_digest": "8745a4790865406bbd154994aa56c83569315766a559f0b244b25d971ee61599"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "c87b55d453408ef578c56f83aae6d62d40673c4909a3a8879fedfc11d5f0289a"
     },
     "ir-reference/generics-and-existentials.md": {
-      "generated_at": "2026-08-11T16:31:47+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "5494872911b6eb8c9026b322f8a22c6c603abdbb278ebedbee2b949cec5b2816"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "81b8df45231be4f8f5631a0f32c2367f7195c78bf075b130543b70b9bdbc0e21"
     },
     "ir-reference/index.md": {
       "generated_at": "2026-08-04T14:20:35+00:00",
@@ -133,40 +133,40 @@
       "watched_paths_digest": "216b1339fd7d43a4648049d9f19c6398f2f493d802dc2aa55394abc05f5e9a14"
     },
     "ir-reference/metadata.md": {
-      "generated_at": "2026-08-11T16:20:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "48c3cf7c1c7a57109886f98d7b43aaec1a0d488fc5e63839dd67af06d9facac7"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "7a1dbed10b699c1119504013fe3801828e2a4d937052719ed584f2844323d380"
     },
     "ir-reference/misc.md": {
-      "generated_at": "2026-08-11T16:46:43+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "5bf9f2c51dd2d7708b814bef32a55279444bcd56d1aef7bbcf0421f5c304c7ab"
+      "generated_at": "2026-08-04T14:20:35+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "4949982a8b85d952032d9efbb3832024faa6d0b6ec41f9079186b0156ef3ea93"
     },
     "ir-reference/resources-and-atomics.md": {
-      "generated_at": "2026-08-11T15:47:19+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "b593a414a99467f7117d34f4b5a8e34b48903c7f",
-      "watched_paths_digest": "3372cb546abad5179a8089004fdb5b82bc7a91a3a687f3cf916613d1e0c853b0"
+      "generated_at": "2026-08-04T10:14:50+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc"
     },
     "ir-reference/structure.md": {
-      "generated_at": "2026-08-11T15:31:29+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "effe094e04be4887dd61e09d08f5e1aa8706164d",
-      "watched_paths_digest": "222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa"
+      "generated_at": "2026-08-04T09:05:12+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc"
     },
     "ir-reference/types.md": {
-      "generated_at": "2026-08-11T16:21:06+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "3372cb546abad5179a8089004fdb5b82bc7a91a3a687f3cf916613d1e0c853b0"
+      "generated_at": "2026-08-04T10:14:51+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc"
     },
     "ir-reference/values.md": {
-      "generated_at": "2026-08-11T16:20:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "2846d8a4c3310f669ffe2b40747fed53f1704996ffd7d5f1f57b2de940cf1bb3"
+      "generated_at": "2026-08-04T10:14:51+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc"
     },
     "name-resolution/index.md": {
       "generated_at": "2026-08-04T14:20:36+00:00",
@@ -175,112 +175,112 @@
       "watched_paths_digest": "e736dc0c2c5eb74024ed81d4eebe26b2caecea88993780180d46c0314fb8f61e"
     },
     "name-resolution/lookup.md": {
-      "generated_at": "2026-08-11T16:49:42+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "9508a44da4dca77d0e4ee15d92bdecf5f4245e933a11bc6301db78416a00e15a"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "4824386ae8ea099d1c1c5fce3ad1de39a629e6fdc82526541b91ba7a41ee5cea"
     },
     "name-resolution/overload-resolution.md": {
-      "generated_at": "2026-08-11T16:44:24+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "7570564d89d6ad14432d9191d7b9f4a82f4b0ae8198622a9dcde27f3ebdc52d6"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "0ab883e31bbc02157f6b83da570aee19cce84a8a9f672ceaee5e9b54cde07233"
     },
     "name-resolution/scopes.md": {
-      "generated_at": "2026-08-11T16:42:28+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "5d62807c9645166aa0d46faacc5809a67a020c5b437a689dac16c099e5889498"
+      "generated_at": "2026-08-04T09:15:53+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "2d1b0424ee67205473f3a56c4db750bce6b7847387448b1952bed261cc3cca46"
     },
     "name-resolution/visibility.md": {
-      "generated_at": "2026-08-11T16:41:40+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "027c3c7de7f7173841853c2772fda781e500b122e7cd8dd8a625e475f718c698"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "fe1f0eae9856c5c4257b9873ae52d368c3539de41332272791d7b7a6d9ba3462"
     },
     "pipeline/01-lex-preprocess.md": {
-      "generated_at": "2026-08-11T16:31:47+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "72fb89f25c7e58ae29283095f80908a245352c618902bdc1bd3cec34adcfa06b"
+      "generated_at": "2026-08-04T09:03:10+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "1ec94893dbf01f578c85e79607171f593c06c00e297add42831695b6d50bc8d0"
     },
     "pipeline/02-parse-ast.md": {
-      "generated_at": "2026-08-11T16:20:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "86a85bb0f6e6d15df99db7e13104e84ad8b96d4394489f91dc6c4ab158ae63b5"
+      "generated_at": "2026-08-04T09:03:10+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "0199faf4e426ba466aba526a350e702abad4289ecdf404224cde287299d5da24"
     },
     "pipeline/03-semantic-check.md": {
-      "generated_at": "2026-08-11T16:31:46+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "e24f47f9ed6e4f63ac9e7084ebe639c8ede56fc11ecff29043ad085525d31114"
+      "generated_at": "2026-08-04T09:03:10+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "a244dfa19ecf6d79ea826d9b14c775491f6a2445e1ddbc0c633a710605a2aec3"
     },
     "pipeline/04-ast-to-ir.md": {
-      "generated_at": "2026-08-11T16:46:58+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "843f6ad861c7688679b7557f9e8279480b5feba937d936b29fff7a28a415430d"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "b5b087832fec0e249e88a0d170e419896ef6e42e51a41f7730860c109aee1cd2"
     },
     "pipeline/04b-pre-link-passes.md": {
-      "generated_at": "2026-08-11T16:48:31+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "8f8401862c7c92375e6e40dd7a8368e8503f352c28197b2b3f6b504371addc36"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "2f1be6c8a7930d3cd062388ebea44fcca2e2daa97546d2d674ce22b28637e232"
     },
     "pipeline/04c-layout-ir.md": {
-      "generated_at": "2026-08-11T16:15:22+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "92a97c700278a235f6afb26097034d58bc7c43c907cee31e59929c3be4c6777a"
+      "generated_at": "2026-08-03T17:25:13+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "209732500305bcb18fcda63902d7342536b82874be03cfaadcb631d2b21216ed"
     },
     "pipeline/05-ir-passes.md": {
-      "generated_at": "2026-08-11T16:21:54+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "d051ea2ebc935f1b3d40abd03872434bb3f5dee7eab3f97c897cb167e4b08b11"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "561ce9270f07ba9a17746131175ab0e86f22aa51ef019c1089e119a53b258e20"
     },
     "pipeline/06-emit.md": {
-      "generated_at": "2026-08-11T16:42:45+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "417b6e4ef13546ce6b508a15b19455d2b788336a667109e8c8ffb241cc28479a"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "d41c93eaac05bae9ae158e44147f1873e1923b6c15a3d4d962ed724c292eb0ac"
     },
     "pipeline/overview.md": {
-      "generated_at": "2026-08-11T16:40:13+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "42e4f3e7a1f5b6ebea608e04b9f8115b11aba5d70f56d7edc60803b6bdd44dc5"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "519fade0f73ddc2f1adb7802668653730b5be442d1722cb8f2c593b47d26d7bb"
     },
     "syntax-reference/grammar.md": {
-      "generated_at": "2026-08-11T16:45:19+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "77f49a14cc2919ac7b3e772b8808298944ccedd69bc8c6bf5a05eafef11f4272"
+      "generated_at": "2026-08-04T09:17:49+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "da0d1f10369218c4e091cd72414d8d541941c541ee85497b27e089007588104f"
     },
     "syntax-reference/keywords-and-builtins.md": {
-      "generated_at": "2026-08-11T16:33:49+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "618f8023f3d5522ee053792395975dd6af290d7c13c53401bd6c1f427bf0c49f"
+      "generated_at": "2026-08-04T09:17:49+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "16f77d4f6aaedcbfaa66fc7d04979d22e0ea47e46b6259a533f617fa9ec29f68"
     },
     "syntax-reference/tokens.md": {
-      "generated_at": "2026-08-11T16:40:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "a4d6820dd5b254561eca89f47fe77109c2cdf4ed699621fedbcd2d852c71f477"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "6e0a427eba39e35678e64610833cfef0257a86ba98ba6a3bac59ba622cdb8b39"
     },
     "target-pipelines/cuda.md": {
-      "generated_at": "2026-08-11T16:31:46+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "9adea8a74f33324c54e1995bd954a0ccad37a867848141521e7e6f7b1d5f8d25"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "41963975f71fa0a3e8c21463b8abdb4002447689d7cbbe864826d90be72ec2c8"
     },
     "target-pipelines/hlsl.md": {
-      "generated_at": "2026-08-11T16:19:35+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "26d041d3c6147dedffc376a761e9ab05f932976c88c38b7ba34042d8546be44b"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "c3d8d1ac4151be00fcecb1562ddf4e92997b2ed7da3d9c925548557cb9dc8eb8"
     },
     "target-pipelines/index.md": {
       "generated_at": "2026-08-04T14:20:36+00:00",
@@ -289,22 +289,22 @@
       "watched_paths_digest": "326e2823727ab1920e1a64bc912543d54e402a681b78b9fb463f21bd6bf989e8"
     },
     "target-pipelines/metal.md": {
-      "generated_at": "2026-08-11T16:25:51+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "936d5dd95fa502bd756edf279d83e921490d60182a34c5156bfdcce207d523ae"
+      "generated_at": "2026-08-04T14:20:36+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "d31da5d7aabb635e9628f7c6e3881fa7226fbf920c0e2b0ae04c62ba0a8ad5bc"
     },
     "target-pipelines/spirv.md": {
-      "generated_at": "2026-08-11T16:28:23+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "007f731e2e98464d0b77d765a34374cd151cf7276769b11fbd349d2bc87e42d8"
+      "generated_at": "2026-08-04T14:20:37+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "c154f30ebdb1c52e61aa3c72238ddff3778fc5edc6f1e4f6efc79646bf783d11"
     },
     "target-pipelines/wgsl.md": {
-      "generated_at": "2026-08-11T16:29:23+00:00",
-      "model": "claude-opus-5[1m]",
-      "source_commit": "c64470bcd3013990310ba15148c633f64d50896c",
-      "watched_paths_digest": "01f66030276f47ef5d683c27d8359701dd05f9c78ff163c04bcf3a2980614a29"
+      "generated_at": "2026-08-04T14:20:37+00:00",
+      "model": "claude-opus-5",
+      "source_commit": "53b76e6d3009b8e6434d41573524c7ce5c499d23",
+      "watched_paths_digest": "72b014f7d10d7c7b623ee719e5a9b0b7ba310ea23a2aabfd214d87a853ef837d"
     }
   },
   "schema_version": 1
