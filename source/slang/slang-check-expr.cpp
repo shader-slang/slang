@@ -5584,44 +5584,19 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    // Construct the forward function one parameter at a time, splitting resolved packs before
-    // preserving each element's direction. Directions are wrappers on individual parameter types;
-    // the function-type machinery cannot distribute such a wrapper over a retained pack.
-    //
-    // For example, if a two-element pair pack must preserve `inout`, the forward function needs two
-    // `inout DifferentialPair<float>` parameters. Retaining the pair pack would instead create
-    // one `inout ConcreteTypePack<...>` parameter, which `FuncType` cannot expose as two parameters
-    // with their own directions.
     auto addForwardDiffParameterElements = [&](Type* primalType, ParamPassingMode mode)
     {
-        auto pairOrPrimalType = primalType;
+        Type* pairType = nullptr;
         if (mode != ParamPassingMode::Ref)
-            if (auto pairType = tryGetDifferentialPairType(primalType))
-                pairOrPrimalType = pairType;
+            pairType = tryGetDifferentialPairType(primalType);
 
-        appendMappedElementTypes(
+        appendDifferentiatedParameterTypes(
             m_astBuilder,
             paramTypes,
-            pairOrPrimalType,
-            [&](Type* elementType) -> Type*
-            {
-                switch (mode)
-                {
-                case ParamPassingMode::In:
-                    return elementType;
-                case ParamPassingMode::Out:
-                    return m_astBuilder->getOutParamType(elementType);
-                case ParamPassingMode::BorrowInOut:
-                    return m_astBuilder->getBorrowInOutParamType(elementType);
-                case ParamPassingMode::BorrowIn:
-                    return m_astBuilder->getConstRefParamType(elementType);
-                case ParamPassingMode::Ref:
-                    // Ref parameters keep their primal element type.
-                    return m_astBuilder->getRefParamType(elementType);
-                default:
-                    SLANG_UNEXPECTED("Unhandled param passing mode");
-                }
-            });
+            pairType ? pairType : primalType,
+            mode,
+            DifferentiatedParameterDirectionPolicy::Preserve,
+            mode != ParamPassingMode::Ref && !pairType);
     };
 
     if (thisQualType.type)
@@ -5659,85 +5634,33 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
-    // Construct the backward function one parameter at a time, splitting resolved packs before
-    // applying each element's new direction. Directions are wrappers on individual parameter
-    // types; the function-type machinery cannot distribute such a wrapper over a retained pack.
-    //
-    // Consider `expand each TArgs args` specialized with `TArgs = <float, float>`. Backward mode
-    // needs two separate `inout DifferentialPair<float>` parameters. Retaining the pair pack would
-    // instead create one `inout ConcreteTypePack<...>` parameter, whose direction and elements
-    // `FuncType` cannot split into the required parameter list.
     auto addBackwardDiffParameterElements = [&](Type* primalType, ParamPassingMode mode)
     {
-        auto pairOrPrimalType = primalType;
-        if (auto pairType = tryGetDifferentialPairType(primalType))
-            pairOrPrimalType = pairType;
+        auto pairType = tryGetDifferentialPairType(primalType);
 
-        appendMappedElementTypes(
+        appendDifferentiatedParameterTypes(
             m_astBuilder,
             paramTypes,
-            pairOrPrimalType,
-            [&](Type* elementType) -> Type*
-            {
-                auto valuePairType = as<DifferentialPairType>(elementType);
-                auto pointerPairType = as<DifferentialPtrPairType>(elementType);
-                auto parameterValueType =
-                    valuePairType || pointerPairType || doesTypeHaveNoDiffModifier(elementType)
-                        ? elementType
-                        : m_astBuilder->getModifiedType(
-                              elementType,
-                              {m_astBuilder->getNoDiffModifierVal()});
-
-                switch (mode)
-                {
-                case ParamPassingMode::In:
-                    // The backward function accumulates into value-pair differentials. Pointer
-                    // pairs already identify mutable differential storage.
-                    if (valuePairType)
-                        return m_astBuilder->getBorrowInOutParamType(elementType);
-                    if (pointerPairType)
-                        return elementType;
-                    return parameterValueType;
-                case ParamPassingMode::BorrowInOut:
-                    if (valuePairType || pointerPairType)
-                        return m_astBuilder->getBorrowInOutParamType(elementType);
-                    return parameterValueType;
-                case ParamPassingMode::BorrowIn:
-                    return m_astBuilder->getConstRefParamType(parameterValueType);
-                default:
-                    SLANG_UNEXPECTED("unsupported parameter mode for backward differential pair");
-                }
-            });
+            pairType ? pairType : primalType,
+            mode,
+            DifferentiatedParameterDirectionPolicy::Backward,
+            !pairType);
     };
 
     // Handle implicit `this` parameter for non-static member methods.
     if (thisQualType.type)
     {
-        auto pairOrPrimalThisType = thisQualType.type;
-        if (auto pairType = tryGetDifferentialPairType(thisQualType.type))
-            pairOrPrimalThisType = pairType;
+        auto pairType = tryGetDifferentialPairType(thisQualType.type);
 
         // The explicit object argument keeps the base expression's value category. Unlike an
-        // ordinary `in` parameter, an r-value object argument is not made mutable. Split a
-        // resolved pack before applying that direction because `FuncType` cannot distribute a
-        // direction wrapper over a retained pack.
-        appendMappedElementTypes(
+        // ordinary backward `in` parameter, an r-value object argument is not made mutable.
+        appendDifferentiatedParameterTypes(
             m_astBuilder,
             paramTypes,
-            pairOrPrimalThisType,
-            [&](Type* elementType) -> Type*
-            {
-                auto parameterValueType = as<DifferentialPairType>(elementType) ||
-                                                  as<DifferentialPtrPairType>(elementType) ||
-                                                  doesTypeHaveNoDiffModifier(elementType)
-                                              ? elementType
-                                              : m_astBuilder->getModifiedType(
-                                                    elementType,
-                                                    {m_astBuilder->getNoDiffModifierVal()});
-                return thisQualType.isLeftValue
-                           ? m_astBuilder->getBorrowInOutParamType(parameterValueType)
-                           : parameterValueType;
-            });
+            pairType ? pairType : thisQualType.type,
+            thisQualType.isLeftValue ? ParamPassingMode::BorrowInOut : ParamPassingMode::In,
+            DifferentiatedParameterDirectionPolicy::Preserve,
+            !pairType);
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)

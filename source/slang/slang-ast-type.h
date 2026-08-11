@@ -967,6 +967,39 @@ ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
     Type* paramType);
 
+/// Selects how a differentiated function parameter derives its passing mode.
+enum class DifferentiatedParameterDirectionPolicy
+{
+    /// Preserve the primal parameter's passing mode after selecting its pair or primal type.
+    /// Forward-mode parameters and expression-checked explicit `this` parameters use this policy.
+    Preserve,
+
+    /// Apply reverse-mode accumulation rules to the selected pair or primal type.
+    Backward,
+};
+
+/// Appends the differentiated parameter types represented by `pairOrPrimalType`.
+///
+/// Concrete packs are split into individual parameters, while abstract expansions remain
+/// expansions. `directionPolicy` is the single source of truth for applying `primalMode` to each
+/// resulting element. When `markNoDiff` is true, each element is idempotently marked `no_diff`
+/// before its direction is applied; callers use this for non-differentiable primal types, but not
+/// for differential-pair or `ref` parameters.
+///
+/// `Preserve` retains the primal direction. This is used for forward-mode parameters and when
+/// expression checking already knows an explicit `this` argument's l-value or r-value category.
+/// `Backward` applies reverse-mode accumulation: an `in` value pair becomes `inout`, a pointer pair
+/// already identifies mutable storage, and a non-differentiable primal remains an ordinary
+/// `no_diff` input. A resolved backward-function signature also uses `Backward` for a
+/// differentiable `this` because the reverse translator accumulates through that pair's storage.
+void appendDifferentiatedParameterTypes(
+    ASTBuilder* astBuilder,
+    List<Type*>& outTypes,
+    Type* pairOrPrimalType,
+    ParamPassingMode primalMode,
+    DifferentiatedParameterDirectionPolicy directionPolicy,
+    bool markNoDiff);
+
 // A function type is defined by its parameter types
 // and its result type.
 FIDDLE()
