@@ -429,6 +429,80 @@ def load_gap_queue(source_doc: str | None = None) -> dict[str, list[dict]]:
     return json.loads(proc.stdout)
 
 
+TESTS_FRESHNESS_PATH = REPO_ROOT / "docs/generated/tests/_meta/freshness.json"
+
+
+def load_bundle_source_doc_digests() -> dict[str, str | None]:
+    """Return each test bundle's recorded `source_doc_digest`.
+
+    Read straight out of the tests tree's freshness ledger rather than by
+    asking its driver, because this is a lookup of recorded state rather
+    than a computation, and because the `None` a `coverage/` bundle
+    records is itself the answer to a question asked below.
+    """
+    if not TESTS_FRESHNESS_PATH.exists():
+        return {}
+    try:
+        state = json.loads(TESTS_FRESHNESS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {
+        key: entry.get("source_doc_digest")
+        for key, entry in (state.get("bundles") or {}).items()
+    }
+
+
+def _verify_fixed_gap(
+    doc: str, reported_by: list[str], bundle_digests: dict[str, str | None]
+) -> str:
+    """Say whether a gap the ledger calls `fixed` has actually been retested.
+
+    Fixing a gap edits the document, which changes the reporting bundle's
+    `source_doc_digest` and marks it stale; regenerating the bundle
+    re-tests the claim against the improved text, and the row should then
+    be gone. So a `fixed` gap that is *still* in the queue means one of
+    three different things, and reporting them as one would make the
+    ledger lie in both directions:
+
+    - `reopened` — every doc-anchored bundle that reported it has since
+      been regenerated against the current text of the document, and
+      still reports it. The fix did not take.
+    - `awaiting-regen` — at least one reporting bundle has not been
+      regenerated yet, so the claim has not been retested and its
+      continued presence means nothing.
+    - `unverifiable` — no reporting bundle is doc-anchored. A
+      `coverage/` bundle records no `source_doc_digest` and is never
+      invalidated by a document edit, so this route cannot ever confirm
+      the fix; it needs a human, or a bundle regenerated for its own
+      reasons.
+
+    The check is deliberately limited to `fixed`. The other four statuses
+    make no claim about what the suite should observe next -- a
+    `deferred` gap is *expected* to keep being reported.
+    """
+    doc_path = REPO_ROOT / doc
+    if not doc_path.exists():
+        return "unverifiable"
+    current = hashlib.sha256(doc_path.read_bytes()).hexdigest()
+    anchored = [b for b in reported_by if bundle_digests.get(_bundle_key(b))]
+    if not anchored:
+        return "unverifiable"
+    for bundle in anchored:
+        if bundle_digests.get(_bundle_key(bundle)) != current:
+            return "awaiting-regen"
+    return "reopened"
+
+
+def _bundle_key(bundle_dir: str) -> str:
+    """Map a bundle's workspace-relative directory to its manifest key.
+
+    `doc-gaps` reports a bundle as `docs/generated/tests/design/x`, while
+    both freshness ledgers key on `design/x`.
+    """
+    prefix = "docs/generated/tests/"
+    return bundle_dir[len(prefix) :] if bundle_dir.startswith(prefix) else bundle_dir
+
+
 def _gap_status(gap_id: str, ledger_gaps: dict) -> str:
     """Return the recorded status of one gap, or `open` if undecided.
 
@@ -1614,6 +1688,7 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
                 return 2
     ledger_gaps = load_doc_gap_state().get("gaps", {})
     queue = load_gap_queue()
+    bundle_digests = load_bundle_source_doc_digests()
 
     wanted = (
         {manifest.docs[d].path for d in args.docs}
@@ -1630,9 +1705,20 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
     for doc in docs:
         gaps = queue.get(doc, [])
         counts: dict[str, int] = {}
+        verification: dict[str, str] = {}
         for g in gaps:
             status = _gap_status(g["gap_id"], ledger_gaps)
             counts[status] = counts.get(status, 0) + 1
+            # A `fixed` gap that is still in the queue has not necessarily
+            # failed; whether it has is the question `_verify_fixed_gap`
+            # answers. A gap that has left the queue is counted as
+            # `retired` below and needs no verification -- its absence is
+            # the confirmation.
+            if status == "fixed":
+                verification[g["gap_id"]] = _verify_fixed_gap(
+                    doc, g["reported_by"], bundle_digests
+                )
+        reopened = sum(1 for v in verification.values() if v == "reopened")
         # Decisions whose gap no longer appears in the queue. The healthy
         # cause is a fix that landed and a bundle that was then regenerated,
         # so the row is gone; the other cause is an id that churned when its
@@ -1651,10 +1737,12 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
                 "in_manifest": doc in wanted,
                 "counts": counts,
                 "retired": retired,
+                "reopened": reopened,
                 "gaps": [
                     {
                         "gap_id": g["gap_id"],
                         "status": _gap_status(g["gap_id"], ledger_gaps),
+                        "verification": verification.get(g["gap_id"]),
                         "kind": g["kind"],
                         "anchor": g["anchor_fragment"],
                         "reported_by": g["reported_by"],
@@ -1672,9 +1760,11 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
         return _print_gap_status_markdown(rows, args.only_open)
 
     total_open = 0
+    total_reopened = 0
     for row in rows:
         open_n = row["counts"].get("open", 0)
         total_open += open_n
+        total_reopened += row["reopened"]
         decided = sum(v for k, v in row["counts"].items() if k != "open")
         if not open_n and not decided and not row["retired"] and args.only_open:
             continue
@@ -1683,17 +1773,26 @@ def cmd_gap_status(args, manifest: Manifest) -> int:
             line += f"  {row['retired']:>3} retired"
         else:
             line += " " * 13
+        if row["reopened"]:
+            line += f"  {row['reopened']:>3} REOPENED"
         suffix = "" if row["in_manifest"] else "   (not in manifest)"
         print(f"{line}  {row['doc']}{suffix}")
         if args.show_gaps:
             for g in row["gaps"]:
                 if args.only_open and g["status"] != "open":
                     continue
+                verdict = f"  [{g['verification']}]" if g["verification"] else ""
                 print(
                     f"        {g['gap_id']}  {g['status']:<22}"
-                    f"{g['kind']:<24}{g['anchor']}"
+                    f"{g['kind']:<24}{g['anchor']}{verdict}"
                 )
     print(f"\ntotal open: {total_open}")
+    if total_reopened:
+        print(
+            f"REOPENED: {total_reopened} gap(s) recorded as fixed are still"
+            " reported by a bundle that has since been regenerated -- the fix"
+            " did not take. Re-run gap intake for those documents."
+        )
     return 0
 
 
@@ -1716,6 +1815,7 @@ def _print_gap_status_markdown(rows: list[dict], only_open: bool) -> int:
         or any(k != "open" for k in r["counts"])
         or r["retired"]
     ]
+    total_reopened = sum(r["reopened"] for r in rows)
     print("### Doc gaps reported by the agentic test suite")
     print()
     print(
@@ -1723,16 +1823,32 @@ def _print_gap_status_markdown(rows: list[dict], only_open: bool) -> int:
         f" {len(shown)} document(s)."
     )
     print()
+    if total_reopened:
+        # Loud, because this is the one state in the report that means
+        # something is wrong rather than merely outstanding: a fix was
+        # recorded, the bundle was regenerated against it, and the suite
+        # still reports the gap.
+        print(
+            f"> **{total_reopened} gap(s) reopened.** These were recorded as"
+            " fixed, but a bundle regenerated against the current text still"
+            " reports them, so the fix did not take. Re-run gap intake for the"
+            " documents marked below."
+        )
+        print()
     if not shown:
         print("No gaps are reported against this tree.")
         return 0
-    print("| Document | Open | Decided | Retired |")
-    print("| --- | ---: | ---: | ---: |")
-    for r in sorted(shown, key=lambda r: (-r["counts"].get("open", 0), r["doc"])):
+    print("| Document | Open | Decided | Retired | Reopened |")
+    print("| --- | ---: | ---: | ---: | ---: |")
+    # Reopened first: a failed fix outranks a large queue for attention.
+    for r in sorted(
+        shown, key=lambda r: (-r["reopened"], -r["counts"].get("open", 0), r["doc"])
+    ):
         decided = sum(v for k, v in r["counts"].items() if k != "open")
+        reopened = f"**{r['reopened']}**" if r["reopened"] else "0"
         print(
             f"| `{r['doc']}` | {r['counts'].get('open', 0)} | {decided}"
-            f" | {r['retired']} |"
+            f" | {r['retired']} | {reopened} |"
         )
     print()
     print(

@@ -228,6 +228,29 @@ picks it up, and regenerating the bundle re-tests against the improved
 text. That is the loop closing: the gap row should be gone from the
 regenerated README, and `gap-status` counts the decision as `retired`.
 
+### When a fix does not take
+
+If the row is still there after the bundle has been regenerated, the fix
+did not work, and `gap-status` says so. A `fixed` gap still in the queue
+is classified three ways, because "still reported" on its own means
+nothing:
+
+| Verdict          | Meaning                                                                                                                                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `awaiting-regen` | A reporting bundle has not been regenerated yet, so the claim has not been retested. Expected right after intake.                                        |
+| `reopened`       | Every doc-anchored reporting bundle has been regenerated against the current text and still reports it. **The fix did not take** — re-run intake.        |
+| `unverifiable`   | No reporting bundle is doc-anchored. A `coverage/` bundle records no `source_doc_digest` and is never invalidated by a doc edit, so this route is blind. |
+
+The comparison is the bundle's recorded `source_doc_digest` in
+`docs/generated/tests/_meta/freshness.json` against the current sha256
+of the document. Only `fixed` is checked: the other four statuses make
+no claim about what the suite should observe next — a `deferred` gap is
+_expected_ to keep being reported.
+
+`unverifiable` is worth watching. It is not an error, but it means that
+particular fix can only ever be confirmed by hand, or by the coverage
+bundle happening to be regenerated for its own reasons.
+
 Editing a document here does _not_ invalidate its review: review
 freshness is computed from the `watched_paths` digest, which is over
 compiler source, not over the document's own prose. Gap intake and the
