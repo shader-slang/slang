@@ -19,7 +19,7 @@
 
 uniform RWStructuredBuffer<int> buf;
 
-[__unsafe_force_inline_early]
+[__unsafeForceInlineEarly]
 int earlyInlined(int x) { return x + 1; }
 
 [numthreads(1, 1, 1)]

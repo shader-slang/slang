@@ -324,7 +324,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: debug
-      server-count: 4
+      server-count: 8
 
   test-linux-debug-gcc-x86_64-rhi:
     needs: [filter, build-linux-debug-gcc-x86_64]
@@ -339,7 +339,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
-      server-count: 4
+      server-count: 8
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -359,7 +359,7 @@ jobs:
       config: release
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
-      server-count: 4
+      server-count: 8
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
   # Runs the test suite filtered to CPU and LLVM backends via
@@ -378,9 +378,7 @@ jobs:
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
       cpu-only: true
-      # Keep the CPU-only tier off the persistent test-server while we
-      # investigate intermittent JSON RPC failures on GitHub-hosted runners.
-      server-count: 1
+      server-count: 4
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -456,8 +454,13 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
 
-  # Windows GPU tests (self-hosted)
-  test-windows-debug-cl-x86_64-gpu:
+  # Windows GPU tests (self-hosted).
+  # Each config is split into three parallel jobs to reduce wall-clock time:
+  #   -gpu-dx:   dx11+dx12+wgpu
+  #   -gpu-vk:   vk+cpu+llvm + no-API tests
+  #   -gpu-cuda: cuda
+  # The three jobs run concurrently on separate runners.
+  test-windows-debug-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -468,6 +471,35 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+
+  test-windows-debug-cl-x86_64-gpu-vk:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cpu+llvm
+      gpu-tier: t4
+
+  test-windows-debug-cl-x86_64-gpu-cuda:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: cuda
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-gpu-rhi:
@@ -481,7 +513,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu:
+  test-windows-release-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -492,6 +524,35 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+
+  test-windows-release-cl-x86_64-gpu-vk:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cpu+llvm
+      gpu-tier: t4
+
+  test-windows-release-cl-x86_64-gpu-cuda:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: cuda
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
@@ -654,9 +715,13 @@ jobs:
         build-macos-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
-        test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-dx,
+        test-windows-release-cl-x86_64-gpu-vk,
+        test-windows-release-cl-x86_64-gpu-cuda,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu-dx,
+        test-windows-debug-cl-x86_64-gpu-vk,
+        test-windows-debug-cl-x86_64-gpu-cuda,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,

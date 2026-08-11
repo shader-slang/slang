@@ -178,7 +178,9 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
       autoRequestedReviewer: "jkwak-work",
       autoRequestedHasSignal: true,
     }),
-    "**PR board sync:** auto-assigned @jkwak-work as shepherd for this Bot PR.",
+    "<!-- pr-board-sync-assignment -->\n" +
+      "**Automated notice** (PR board sync) — do not reply to this comment.\n\n" +
+      "Auto-assigned @jkwak-work as shepherd for this Bot PR.",
   );
   const withRequested = formatAssignmentComment({
     source: "Community",
@@ -187,14 +189,17 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     autoRequestedReviewer: "alice",
     autoRequestedHasSignal: true,
   });
+  assert.match(withRequested, /Automated notice.*do not reply to this comment/s);
   assert.match(
     withRequested,
-    /^\*\*PR board sync:\*\* auto-assigned @alice as shepherd for this Community PR\./,
+    /Auto-assigned @alice as shepherd for this Community PR\./,
   );
   assert.match(
     withRequested,
     /higher for skallweitNV than for the auto-requested reviewer \(alice\)/,
   );
+  assert.match(withRequested, /a human may optionally add them as a reviewer/);
+  assert.doesNotMatch(withRequested, /consider requesting/);
   assert.doesNotMatch(withRequested, /@skallweitNV/);
 
   const withoutRequested = formatAssignmentComment({
@@ -208,6 +213,7 @@ test("formatAssignmentComment always notes assignee; suggestion has no @", () =>
     withoutRequested,
     /highest for dev1 among collaborators other than the assignee/,
   );
+  assert.match(withoutRequested, /a human may optionally add them as a reviewer/);
   assert.doesNotMatch(withoutRequested, /@dev1/);
 
   // Auto-requested maintainer with no measured signal: do not claim they have
