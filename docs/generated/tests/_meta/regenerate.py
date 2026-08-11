@@ -80,8 +80,10 @@ Exit codes
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as _dt
 import hashlib
+import io
 import json
 import os
 import re
@@ -1486,7 +1488,26 @@ def lint_catalog_entry_digests(
     snapshot = snapshot or CATALOG_SNAPSHOT_PATH
     catalog = parse_catalog_snapshot(snapshot)
     if not catalog:
-        return []
+        # An absent or empty snapshot must not read as "nothing to report". Every
+        # digest is checked by looking its code up in here, so returning silently
+        # would leave the whole bundle unverified while lint claims success --
+        # the same unnoticed-unverified state #11410 was filed about, reached by
+        # deleting a file instead of by skipping a code path. The unknown-code
+        # warning below cannot cover this: with no rows there are no lookups, so
+        # it never fires.
+        unchecked = [spec for spec in specs if spec.is_diagnostics_catalog]
+        if not unchecked:
+            return []
+        count = sum(len(list((root / spec.dir).glob("*.slang"))) for spec in unchecked)
+        return [
+            LintIssue(
+                _rel_to_repo(snapshot),
+                "warning",
+                f"catalog snapshot is missing or empty, so the doc_section_digest"
+                f" of {count} catalog test(s) went unchecked. Re-extract it:"
+                f" without it this lint passes whatever those tests record",
+            )
+        ]
     issues: list[LintIssue] = []
     unknown: list[tuple[str, str]] = []
     for spec in specs:
@@ -3930,16 +3951,21 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def cmd_catalog_digest(args: argparse.Namespace) -> int:
+def cmd_catalog_digest(args: argparse.Namespace, snapshot: Path | None = None) -> int:
     """Print the `doc_section_digest` a diagnostics-catalog test should carry.
 
     Exists so that the generation prompt can name one command instead of
     describing a hashing rule an agent then re-implements by hand -- which is
     how the corpus ended up with values nothing could reproduce (#11410).
+
+    `snapshot` defaults to the real one and is a parameter only so that
+    `selftest` can drive the missing-snapshot and success paths against a
+    fixture; the argparse entry point never passes it.
     """
-    catalog = parse_catalog_snapshot()
+    snapshot = snapshot or CATALOG_SNAPSHOT_PATH
+    catalog = parse_catalog_snapshot(snapshot)
     if not catalog:
-        print(f"error: no catalog snapshot at {_rel_to_repo(CATALOG_SNAPSHOT_PATH)}")
+        print(f"error: no catalog snapshot at {_rel_to_repo(snapshot)}")
         return 1
     entry = catalog.get(args.code)
     if entry is None:
@@ -4113,25 +4139,98 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         _write("agree.slang", "1", good)
         _write("drifted.slang", "1", "cd" * 32)
         _write("gone.slang", "9999", "ef" * 32)
+        # A test mid-generation that has a code but no digest yet is skipped
+        # rather than counted, which is what keeps the count below at two.
+        (bundle / "partial.slang").write_text("//META: catalog_code=1\n", encoding="utf-8")
+
+        # The non-catalog bundle gets a populated directory holding a test that
+        # *would* be flagged, so "skips non-catalog bundles" fails when the
+        # guard is dropped instead of passing on an empty glob.
+        sibling = root / "docs/generated/tests/design/cross-cutting/diagnostics"
+        sibling.mkdir(parents=True)
+        (sibling / "drifted.slang").write_text(
+            "//META: catalog_code=1\n//META: doc_section_digest=" + "cd" * 32 + "\n",
+            encoding="utf-8",
+        )
 
         spec = BundleSpec(
             key="design/cross-cutting/diagnostics-catalog",
             source_doc=None,
             watched_paths=[],
         )
+        other = BundleSpec(
+            key="design/cross-cutting/diagnostics",
+            source_doc=None,
+            watched_paths=[],
+        )
         snap = snap_dir / "catalog.txt"
         found = lint_catalog_entry_digests([spec], root=root, snapshot=snap)
 
-        # Two warnings -- the drifted test and the unknown code -- and the
-        # agreeing test contributes neither.
+        # Two warnings -- the drifted test and the unknown code -- and neither
+        # the agreeing test nor the digest-less one contributes.
         check("catalog lint reports two issues", len(found), 2)
         check(
             "catalog lint is warn-only",
             {i.severity for i in found},
             {"warning"},
         )
+        drift = [i for i in found if i.where.endswith("drifted.slang")]
+        check("catalog lint flags the drifted test", len(drift), 1)
         unknown = [i for i in found if "9999" in i.message]
         check("catalog lint groups the unknown code", len(unknown), 1)
+        check(
+            "catalog lint skips non-catalog bundles",
+            lint_catalog_entry_digests([other], root=root, snapshot=snap),
+            [],
+        )
+
+        # An absent snapshot must be reported, not silently treated as "nothing
+        # to check" -- that would leave the bundle unverified while lint passes.
+        missing = snap_dir / "does-not-exist.txt"
+        absent = lint_catalog_entry_digests([spec], root=root, snapshot=missing)
+        check("missing snapshot warns", len(absent), 1)
+        check(
+            "missing snapshot names the count",
+            "4 catalog test(s) went unchecked" in absent[0].message if absent else False,
+            True,
+        )
+        check(
+            "missing snapshot is silent without a catalog bundle",
+            lint_catalog_entry_digests([other], root=root, snapshot=missing),
+            [],
+        )
+
+        # The catalog-digest subcommand is what the prompt and README tell an
+        # agent to run, so its exit status and output are part of the contract.
+        def _run_catalog_digest(code: str, snapshot_path: Path):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_catalog_digest(argparse.Namespace(code=code), snapshot=snapshot_path)
+            return rc, buf.getvalue().strip()
+
+        rc, out = _run_catalog_digest("1", snap)
+        check("catalog-digest succeeds for a known code", rc, 0)
+        check("catalog-digest prints the digest", out, good)
+        rc, out = _run_catalog_digest("999999", snap)
+        check("catalog-digest fails for an unknown code", rc, 1)
+        check("catalog-digest names the unknown code", "999999" in out, True)
+        rc, out = _run_catalog_digest("1", missing)
+        check("catalog-digest fails without a snapshot", rc, 1)
+        check("catalog-digest names the missing snapshot", "no catalog snapshot" in out, True)
+
+    # The catalog bundle is matched by exact manifest key, so a bundle whose path
+    # merely contains "diagnostics-catalog" does not inherit catalog-only rules.
+    def _is_catalog(key: str) -> bool:
+        return BundleSpec(key=key, source_doc=None, watched_paths=[]).is_diagnostics_catalog
+
+    check("catalog matched by exact key", _is_catalog("design/cross-cutting/diagnostics-catalog"), True)
+    check("lookalike suffix is not the catalog", _is_catalog("design/cross-cutting/diagnostics-catalog-extra"), False)
+    check("prefix is not the catalog", _is_catalog("design/cross-cutting/diagnostics"), False)
+
+    # _code_sort_key exists to order codes numerically; plain string sort would
+    # put "100" before "99".
+    check("code sort key orders numerically", sorted(["100", "99", "3001"], key=_code_sort_key), ["99", "100", "3001"])
+    check("code sort key puts non-numeric last", sorted(["W123", "42"], key=_code_sort_key), ["42", "W123"])
 
     for f in failures:
         print(f"FAIL {f}")
