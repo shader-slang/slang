@@ -1647,7 +1647,7 @@ def generate_health_html(
     history_html = build_history_chart(snapshots)
 
     hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
-    pending_approvals_live = PENDING_APPROVALS_JS.replace("{repo}", repo)
+    pending_approvals_live = PENDING_APPROVALS_JS.replace("{repo}", _esc(repo))
 
     body = f"""
 <h1>CI System Health</h1>
