@@ -18,20 +18,28 @@ RWTexture2D<unorm float> u1;
 RWTexture2D<snorm float> s1;
 RWStructuredBuffer<float> outBuf;
 
-// One classifier feeds every opcode below, so all six operators are covered.
+// One classifier feeds every opcode below, so all eleven operators are covered.
 // CHECK-SPIRV-DAG: OpFAdd %float
 // CHECK-SPIRV-DAG: OpFSub %float
 // CHECK-SPIRV-DAG: OpFMul %float
 // CHECK-SPIRV-DAG: OpFDiv %float
-// CHECK-SPIRV-DAG: OpFOrdLessThan %bool
 // CHECK-SPIRV-DAG: OpFNegate %float
+// CHECK-SPIRV-DAG: OpFOrdLessThan %bool
+// CHECK-SPIRV-DAG: OpFOrdLessThanEqual %bool
+// CHECK-SPIRV-DAG: OpFOrdEqual %bool
+// CHECK-SPIRV-DAG: OpFUnordNotEqual %bool
+// CHECK-SPIRV-DAG: OpFOrdGreaterThanEqual %bool
+// CHECK-SPIRV-DAG: OpFOrdGreaterThan %bool
 
 // CHECK-SPIRV-NOT: OpIAdd
 // CHECK-SPIRV-NOT: OpISub
 // CHECK-SPIRV-NOT: OpIMul
 // CHECK-SPIRV-NOT: OpUDiv
-// CHECK-SPIRV-NOT: OpULessThan
 // CHECK-SPIRV-NOT: OpSNegate
+// CHECK-SPIRV-NOT: OpULessThan
+// CHECK-SPIRV-NOT: OpIEqual
+// CHECK-SPIRV-NOT: OpINotEqual
+// CHECK-SPIRV-NOT: OpUGreaterThan
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -48,6 +56,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outBuf[1] = u1[p] - 0.25;
     outBuf[2] = u1[p] * 0.5;
     outBuf[3] = u1[p] / divisor;
-    outBuf[4] = s1[p] < 0.5 ? 1.0 : 0.0;
-    outBuf[5] = -s1[p];
+    outBuf[4] = -s1[p];
+
+    outBuf[5] = s1[p] < 0.5 ? 1.0 : 0.0;
+    outBuf[6] = u1[p] <= divisor ? 1.0 : 0.0;
+    outBuf[7] = u1[p] == divisor ? 1.0 : 0.0;
+    outBuf[8] = u1[p] != divisor ? 1.0 : 0.0;
+    outBuf[10] = u1[p] >= divisor ? 1.0 : 0.0;
+    outBuf[11] = u1[p] > divisor ? 1.0 : 0.0;
 }
