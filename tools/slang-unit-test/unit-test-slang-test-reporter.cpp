@@ -265,3 +265,52 @@ SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
     SLANG_CHECK(reporter.m_failedTestCount == 1);
     SLANG_CHECK(reporter.m_totalTestCount == 1);
 }
+
+// The flag has to cover every write the reporter makes, not just the result lines: a test that
+// opens a suite scope or asks for a summary is on the same JSON-RPC channel.
+//
+// Two tests because the two writes live in different output modes: TeamCity is what makes
+// startSuite/endSuite emit their markers, and it is the Default summary that prints a pass count.
+// Each uses a string the surrounding slang-test run cannot itself produce, so a leak is
+// attributable to this reporter rather than to the harness reporting on the test.
+
+SLANG_UNIT_TEST(slangTestReporterSuppressesSuiteMarkers)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    reporter.m_outputMode = TestOutputMode::TeamCity;
+
+    {
+        // "probeSuiteName" appears in no other output, so `##teamcity[...probeSuiteName...]`
+        // on stdout would be this reporter's marker escaping.
+        TestReporter::SuiteScope suite(&reporter, "probeSuiteName");
+        SLANG_CHECK(reporter.m_suiteStack.getCount() == 1);
+        reporter.addTest(String("slang-unit-test-tool/probeSuite.internal"), TestResult::Pass);
+    }
+
+    // Suppressing the markers must not stop the stack unwinding.
+    SLANG_CHECK(reporter.m_suiteStack.getCount() == 0);
+    SLANG_CHECK(reporter.m_passedTestCount == 1);
+}
+
+SLANG_UNIT_TEST(slangTestReporterSuppressesSummary)
+{
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+
+    // Three passes, so the summary this reporter would print reads "(3/3)". The slang-test run
+    // hosting this test reports its own counts and never produces that, which is what makes a
+    // leak distinguishable from the harness's own summary.
+    for (int i = 0; i < 3; ++i)
+    {
+        StringBuilder name;
+        name << "slang-unit-test-tool/probeSummary" << i << ".internal";
+        reporter.addTest(name.produceString(), TestResult::Pass);
+    }
+    SLANG_CHECK(reporter.m_passedTestCount == 3);
+
+    reporter.outputSummary();
+
+    SLANG_CHECK(reporter.m_totalTestCount == 3);
+    SLANG_CHECK(reporter.didAllSucceed());
+}

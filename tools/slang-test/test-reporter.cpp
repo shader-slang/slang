@@ -749,6 +749,10 @@ bool TestReporter::didAllSucceed() const
 
 void TestReporter::outputSummary()
 {
+    // Nothing here but reporting, so a suppressed reporter has nothing to do.
+    if (m_suppressConsoleOutput)
+        return;
+
     auto passCount = m_passedTestCount;
     auto rawTotal = m_totalTestCount;
     auto ignoredCount = m_ignoredTestCount;
@@ -894,6 +898,9 @@ void TestReporter::startSuite(const String& name)
 {
     m_suiteStack.add(name);
 
+    if (m_suppressConsoleOutput)
+        return;
+
     switch (m_outputMode)
     {
     case TestOutputMode::TeamCity:
@@ -914,6 +921,13 @@ void TestReporter::startSuite(const String& name)
 void TestReporter::endSuite()
 {
     SLANG_ASSERT(m_suiteStack.getCount());
+
+    // Gate only the reporting: the stack still has to unwind below.
+    if (m_suppressConsoleOutput)
+    {
+        m_suiteStack.removeLast();
+        return;
+    }
 
     switch (m_outputMode)
     {

@@ -182,8 +182,9 @@ public:
     TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;
     VerbosityLevel m_verbosity;
-    /// Suppresses the reporter's own writes to stdout, leaving the accounting -- counters,
-    /// m_testInfos, the pending/final sets -- untouched.
+    /// Suppresses every write this reporter makes to stdout -- result lines, the pending-retry
+    /// notice, the TeamCity suite markers, and the summary -- leaving the accounting (counters,
+    /// m_testInfos, the suite stack, the pending/final sets) untouched.
     ///
     /// Set by a unit test that drives a TestReporter directly. Those run inside test-server, which
     /// answers the harness over a JSON-RPC channel carried on its stdout, so a stray
