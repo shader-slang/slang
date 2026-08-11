@@ -22,8 +22,12 @@ declines to reproduce lives in the structured catalogs the doc points at
 (`source/slang/slang-diagnostics.lua` plus the `*-diagnostic-defs.h` files under
 `source/compiler-core/`). Each test therefore anchors `doc_ref` at the catalog file
 that declares its code, and `doc_section_digest` is the SHA-256 of that code's catalog
-entry rendered as `code<TAB>kind<TAB>name<TAB>message`, so a rename or a message edit
-invalidates exactly the tests for that code.
+entry rendered as `code<TAB>severity<TAB>name<TAB>message`, read from the committed
+snapshot `_meta/diagnostics-catalog/catalog.txt`, so a rename or a message edit
+invalidates exactly the tests for that code. Print it with
+`_meta/regenerate.py catalog-digest <code>` instead of hashing by hand;
+`_meta/regenerate.py lint` recomputes every entry and warns about the ones that have
+drifted.
 
 Every test drives the compiler from a minimum-reproduction input and asserts the
 target code appears in the diagnostic stream. This regeneration re-derived the whole
