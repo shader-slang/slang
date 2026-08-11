@@ -2279,5 +2279,48 @@ class TestHostedRunnerRender(unittest.TestCase):
         self.assertEqual(snapshot["hosted_runner_usage"], usage)
 
 
+class TestPendingApprovalsLive(unittest.TestCase):
+    """The pending approvals section is now rendered by client-side JS that
+    fetches the GitHub API on page load, so the generated HTML contains a
+    placeholder div and a script tag rather than static content."""
+
+    def _health_html(self, repo="shader-slang/slang"):
+        queue_data = {
+            "summary": {
+                "jobs_queued": 0, "jobs_running": 0,
+                "runs_queued": 0, "runs_in_progress": 0,
+            },
+            "partial": False,
+            "list_errors": [],
+            "self_hosted_runners": [],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp, repo=repo)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                return f.read()
+
+    def test_pending_approvals_section_uses_js_placeholder(self):
+        html = self._health_html()
+        self.assertIn('id="pending-approvals-section"', html)
+        self.assertIn("fetch(url)", html)
+
+    def test_pending_approvals_placeholder_embeds_repo(self):
+        html = self._health_html(repo="shader-slang/slang")
+        self.assertIn('data-repo="shader-slang/slang"', html)
+
+    def test_pending_approvals_section_shows_loading_placeholder(self):
+        # The placeholder div shows a loading message before JS runs.
+        # Server-side rendering is gone; all content arrives via fetch().
+        html = self._health_html()
+        self.assertIn("Loading", html)
+        # No server-rendered approval rows exist as real HTML elements —
+        # the Python render_pending_approvals function is no longer called.
+        # The fetch_pending_approvals call was removed from main(), so the
+        # pending_approvals kwarg is never passed to generate_health_html.
+        self.assertNotIn("render_pending_approvals", html)
+
+
 if __name__ == "__main__":
     unittest.main()

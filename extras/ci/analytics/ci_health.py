@@ -1348,9 +1348,87 @@ def render_hosted_runner_usage(hosted_runner_usage):
     return html
 
 
+PENDING_APPROVALS_JS = """
+<div id="pending-approvals-section" data-repo="{repo}">
+  <p style="color:#6c757d">Loading&hellip;</p>
+</div>
+<script>
+(function () {
+  var repo = document.getElementById("pending-approvals-section").dataset.repo;
+  var url = "https://api.github.com/repos/" + repo + "/actions/runs?status=waiting&per_page=100";
+  fetch(url)
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (data) {
+      var runs = data.workflow_runs || [];
+      var now = Date.now();
+      var pending = runs.map(function (r) {
+        var waited = Math.floor((now - new Date(r.created_at).getTime()) / 60000);
+        return {
+          run_id: r.id,
+          url: r.html_url,
+          actor: (r.actor || {}).login || "?",
+          event: r.event || "",
+          branch: r.head_branch || "",
+          title: r.display_title || String(r.id),
+          waited: waited,
+        };
+      }).sort(function (a, b) { return b.waited - a.waited; });
+
+      var oldest = pending.length ? pending[0].waited : 0;
+      var fg, bg, label, summary;
+      if (!pending.length) {
+        fg = "#198754"; bg = "#d1e7dd"; label = "OK"; summary = "Nothing waiting for approval";
+      } else if (oldest >= 30) {
+        fg = "#dc3545"; bg = "#f8d7da"; label = "STALLED";
+        summary = pending.length + " waiting, oldest " + oldest + " min";
+      } else {
+        fg = "#fd7e14"; bg = "#fff3cd"; label = "WAITING";
+        summary = pending.length + " waiting, oldest " + oldest + " min";
+      }
+
+      function esc(s) {
+        return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      }
+
+      var html = '<div style="border-left:4px solid ' + fg + ';background:' + bg +
+        ';padding:12px 18px;margin-bottom:14px;border-radius:4px">' +
+        '<span style="background:' + fg + ';color:white;padding:2px 8px;border-radius:3px;font-size:0.8em">' +
+        label + '</span><strong style="margin-left:8px">' + esc(summary) + '</strong></div>';
+
+      if (pending.length) {
+        html += '<table><tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
+        pending.forEach(function (p) {
+          var event = p.event === "merge_group"
+            ? "<strong>merge_group</strong>" : esc(p.event);
+          html += '<tr>' +
+            '<td>' + p.waited + ' min</td>' +
+            '<td><a href="' + esc(p.url) + '">' + esc(p.title) + '</a></td>' +
+            '<td>' + esc(p.actor) + '</td>' +
+            '<td>' + event + '</td>' +
+            '<td>' + esc(p.branch) + '</td>' +
+            '</tr>';
+        });
+        html += '</table>';
+        html += '<p style="color:#6c757d;font-size:0.9em">Approve from the run page: ' +
+          '<em>Review deployments</em> &rarr; tick the environment &rarr; ' +
+          '<em>Approve and deploy</em>. Most runs are approved automatically; ' +
+          'anything listed here needs a person.</p>';
+      }
+
+      document.getElementById("pending-approvals-section").innerHTML = html;
+    })
+    .catch(function (err) {
+      document.getElementById("pending-approvals-section").innerHTML =
+        '<p style="color:#6c757d">Could not load pending approvals (' + esc(String(err)) + ').</p>';
+    });
+}());
+</script>
+"""
+
+
 def generate_health_html(
     queue_data, failures, output_dir, mq_data=None, hosted_runner_usage=None,
-    pending_approvals=None,
+    pending_approvals=None, repo="shader-slang/slang",
 ):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
@@ -1569,7 +1647,7 @@ def generate_health_html(
     history_html = build_history_chart(snapshots)
 
     hosted_runner_html = render_hosted_runner_usage(hosted_runner_usage)
-    pending_approvals_html = render_pending_approvals(pending_approvals)
+    pending_approvals_live = PENDING_APPROVALS_JS.replace("{repo}", repo)
 
     body = f"""
 <h1>CI System Health</h1>
@@ -1579,7 +1657,7 @@ def generate_health_html(
 {queue_html}
 
 <h2>Pending Approvals</h2>
-{pending_approvals_html}
+{pending_approvals_live}
 
 <h2>GitHub-Hosted Runner Quota</h2>
 {hosted_runner_html}
@@ -1671,9 +1749,6 @@ def main():
     print("Fetching recent CI failures...")
     failures = fetch_recent_failures(args.repo)
 
-    print("Fetching pending approvals...")
-    pending_approvals = fetch_pending_approvals(args.repo)
-
     print(f"Generating health.html in {args.output}/...")
     generate_health_html(
         queue_data,
@@ -1682,6 +1757,7 @@ def main():
         mq_data=mq_data,
         hosted_runner_usage=hosted_runner_usage,
         pending_approvals=pending_approvals,
+        repo=args.repo,
     )
 
     print("Done.")
