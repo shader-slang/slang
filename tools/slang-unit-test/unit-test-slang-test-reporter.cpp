@@ -2,86 +2,7 @@
 #include "slang-test/test-reporter.h"
 #include "unit-test/slang-unit-test.h"
 
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#else
-#include <fcntl.h>
-#include <unistd.h>
-#endif
-
-#include <stdio.h>
-
 using namespace Slang;
-
-/// Sends anything written to stdout to the null device for as long as it is in
-/// scope, restoring the descriptor afterwards.
-///
-/// `TestReporter` reports results by writing them to stdout, which is what it
-/// should do inside slang-test but not here: a unit test runs inside
-/// test-server, and that process answers the harness over a JSON-RPC channel
-/// carried on its stdout. Driving the reporter without this guard puts
-/// "failed(pending retry) ..." straight into that stream, and the run dies with
-/// "JSON RPC failure: waitForResult()" instead of reporting a test result. The
-/// test's own result is unaffected: test-server buffers it and replies once the
-/// test function has returned, by which point this guard has restored stdout.
-///
-/// Mirrors `ScopedWriteOnlyStdin` in unit-test-stdin-compile.cpp.
-struct ScopedSuppressStdout
-{
-    ScopedSuppressStdout()
-    {
-        // Flush first so anything already buffered goes to the real stdout
-        // rather than to the null device.
-        fflush(stdout);
-#ifdef _WIN32
-        const int stdoutFd = _fileno(stdout);
-        m_savedStdoutFd = _dup(stdoutFd);
-        if (m_savedStdoutFd == -1)
-            return;
-        const int nullFd = _open("NUL", _O_WRONLY);
-        if (nullFd == -1)
-            return;
-        m_isActive = _dup2(nullFd, stdoutFd) != -1;
-        _close(nullFd);
-#else
-        const int stdoutFd = fileno(stdout);
-        m_savedStdoutFd = dup(stdoutFd);
-        if (m_savedStdoutFd == -1)
-            return;
-        const int nullFd = open("/dev/null", O_WRONLY);
-        if (nullFd == -1)
-            return;
-        m_isActive = dup2(nullFd, stdoutFd) != -1;
-        close(nullFd);
-#endif
-    }
-
-    ~ScopedSuppressStdout()
-    {
-        // Flush while the descriptor still points at the null device, so the
-        // suppressed output is discarded instead of reaching the restored one.
-        fflush(stdout);
-        if (m_savedStdoutFd == -1)
-            return;
-#ifdef _WIN32
-        _dup2(m_savedStdoutFd, _fileno(stdout));
-        _close(m_savedStdoutFd);
-#else
-        dup2(m_savedStdoutFd, fileno(stdout));
-        close(m_savedStdoutFd);
-#endif
-    }
-
-    /// True when stdout is actually redirected. A test asserts this rather than
-    /// running on regardless, because carrying on would corrupt the RPC stream
-    /// and fail the whole run rather than this one test.
-    bool isActive() const { return m_isActive; }
-
-private:
-    int m_savedStdoutFd = -1;
-    bool m_isActive = false;
-};
 
 // A sub-reporter (the per-worker reporter used by parallel runs) must receive the same
 // Options-derived display configuration as the main reporter, so that verbosity, dump-on-failure,
@@ -124,11 +45,9 @@ SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
 // This is the exact bug: the deferred failure must not vanish.
 SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     const String command("slang-unit-test-tool/probeAlwaysFails.internal");
 
     // First pass defers the failure, which is what test-server mode does before a retry.
@@ -152,11 +71,9 @@ SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
 // every retried test as failed.
 SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     const String command("slang-unit-test-tool/probeFlaky.internal");
 
     reporter.addTest(command, TestResult::PendingRetry); // first pass: deferred
@@ -179,11 +96,9 @@ SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
 // still applies to a reconciled deferral.
 SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     const String command("slang-unit-test-tool/probeExpectedFail.internal");
     reporter.m_expectedFailureList.add(command);
 
@@ -201,19 +116,20 @@ SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
 // pending/final sets are tracked separately and reconciled only after consolidation.
 SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     const String command("slang-unit-test-tool/probeCrossThread.internal");
 
+    // Each reporter here reports a result, so each keeps its writes off
+    // test-server's JSON-RPC channel.
     TestReporter firstPass;
+    firstPass.m_suppressConsoleOutput = true;
     firstPass.addTest(command, TestResult::PendingRetry); // deferred on one worker
 
     TestReporter retryPass;
+    retryPass.m_suppressConsoleOutput = true;
     retryPass.addTest(command, TestResult::Pass); // redeemed on another worker
 
     TestReporter main;
+    main.m_suppressConsoleOutput = true;
     main.consolidateWith(&firstPass);
     main.consolidateWith(&retryPass);
 
@@ -232,11 +148,9 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
 // failure for the same test. This is the ordinary "flaky test stays broken" path.
 SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     const String command("slang-unit-test-tool/probeRetriedStillFails.internal");
 
     reporter.addTest(command, TestResult::PendingRetry); // first pass: deferred
@@ -257,16 +171,16 @@ SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
 // no worker ever redeems must, after `consolidateWith()`, still be reconciled into a failure.
 SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     const String command("slang-unit-test-tool/probeCrossThreadUnredeemed.internal");
 
+    // Each reporter here reports a result, so each keeps its writes off
+    // test-server's JSON-RPC channel.
     TestReporter firstPass;
+    firstPass.m_suppressConsoleOutput = true;
     firstPass.addTest(command, TestResult::PendingRetry); // deferred on one worker, never redeemed
 
     TestReporter main;
+    main.m_suppressConsoleOutput = true;
     main.consolidateWith(&firstPass);
 
     SLANG_CHECK(main.m_pendingRetryTests.contains(command));
@@ -284,11 +198,9 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
 // spurious failure by reconciliation.
 SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     reporter.m_hideIgnored = true;
     const String command("slang-unit-test-tool/probeHiddenIgnored.internal");
 
@@ -313,6 +225,8 @@ SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
 SLANG_UNIT_TEST(slangTestReporterShouldDeferForRetryKeysOnCommand)
 {
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     const String command("slang-unit-test-tool/probeExpectedFail.internal");
     const String bareName("probeExpectedFail");
     reporter.m_expectedFailureList.add(command);
@@ -333,11 +247,9 @@ SLANG_UNIT_TEST(slangTestReporterShouldDeferForRetryKeysOnCommand)
 // reconciliation would carry stale redeemers.
 SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
 {
-    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
-    ScopedSuppressStdout quiet;
-    SLANG_CHECK(quiet.isActive());
-
     TestReporter reporter;
+    // Keeps the reporter's writes off test-server's JSON-RPC channel.
+    reporter.m_suppressConsoleOutput = true;
     const String command("slang-unit-test-tool/probeUnredeemed.internal");
 
     reporter.addTest(command, TestResult::PendingRetry);

@@ -182,6 +182,16 @@ public:
     TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;
     VerbosityLevel m_verbosity;
+    /// Suppresses the reporter's own writes to stdout, leaving the accounting -- counters,
+    /// m_testInfos, the pending/final sets -- untouched.
+    ///
+    /// Set by a unit test that drives a TestReporter directly. Those run inside test-server, which
+    /// answers the harness over a JSON-RPC channel carried on its stdout, so a stray
+    /// "failed(pending retry) ..." lands in the middle of a JSON message and kills the connection.
+    /// Redirecting the file descriptor instead was tried and is not portable: it worked on Linux
+    /// and macOS and silently did not on Windows, where the tests then wrote to the live channel.
+    bool m_suppressConsoleOutput = false;
+
     bool m_hideIgnored = false;
     bool m_isSubReporter = false;
     Slang::HashSet<Slang::String> m_expectedFailureList;

@@ -373,8 +373,11 @@ void TestReporter::_addResult(TestInfo info)
     if (info.testResult == TestResult::PendingRetry)
     {
         m_pendingRetryTests.add(info.name);
-        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
-        fflush(stdout);
+        if (!m_suppressConsoleOutput)
+        {
+            printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
+            fflush(stdout);
+        }
         return;
     }
 
@@ -459,6 +462,11 @@ void TestReporter::_addResult(TestInfo info)
             buffer.getBuffer());
         fflush(stdout);
     };
+
+    // Everything above this point is accounting -- counters and m_testInfos --
+    // and still happens. Only the reporting below is skipped.
+    if (m_suppressConsoleOutput)
+        return;
 
     switch (m_outputMode)
     {
@@ -702,12 +710,15 @@ void TestReporter::reconcilePendingRetries()
         if (m_finalResultTests.contains(name))
             continue;
 
-        printf(
-            "error: test '%s' was marked pending retry but was never re-run, so its failure was "
-            "about to go unreported; reporting it now (as a failure, or an expected failure if it "
-            "is on the expected-failure list)\n",
-            name.getBuffer());
-        fflush(stdout);
+        if (!m_suppressConsoleOutput)
+        {
+            printf(
+                "error: test '%s' was marked pending retry but was never re-run, so its failure "
+                "was about to go unreported; reporting it now (as a failure, or an expected "
+                "failure if it is on the expected-failure list)\n",
+                name.getBuffer());
+            fflush(stdout);
+        }
 
         // Report it as an ordinary failure so that it lands in the summary and, like any other
         // failure, is still downgraded if it is on the expected-failure list.
