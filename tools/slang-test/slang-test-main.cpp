@@ -1162,7 +1162,8 @@ Result spawnAndWaitProxy(
 enum class RPCAttemptOutcome
 {
     Ok,            ///< A result came back (whatever the test's own verdict is).
-    Lost,          ///< The connection closed or errored: the server is gone.
+    Lost,          ///< The connection closed or errored: a running server went away.
+    StartFailed,   ///< No server could be spawned, so nothing ever ran.
     TimedOut,      ///< The server is alive but did not answer in connectionTimeOutInMs.
     ProtocolError, ///< A reply arrived but was not the expected result message.
     SendFailed     ///< The request could not even be written.
@@ -1223,18 +1224,38 @@ static void _reportServerLoss(
         break;
     }
 
-    // The exit status separates the leading explanations at a glance: a signal means the
-    // server was killed (137 = SIGKILL, typically the OOM killer; 139 = SIGSEGV, a crash),
-    // whereas a small non-zero code means it chose to exit.
+    // How the server ended separates the leading explanations at a glance: killed by SIGKILL
+    // is the OOM killer, SIGSEGV is a crash, and an ordinary exit status means it chose to
+    // stop. Reported as a signal rather than as a shell-style 137/139 because that is what
+    // the OS actually told us -- Unix exit statuses are narrowed to int8_t to round-trip
+    // negative return codes, so 137 would surface as -119 and a signal death would surface
+    // as nothing at all.
     if (auto* process = rpcConnection->getProcess())
     {
-        if (process->isTerminated())
+        if (!process->isTerminated())
         {
-            detail << ", server exited with status " << process->getReturnValue();
+            detail << ", server process still running";
+        }
+        else if (const int32_t signalNumber = process->getTerminationSignal())
+        {
+            detail << ", server killed by signal " << signalNumber;
+#if SLANG_UNIX_FAMILY
+            // Named only where the constants exist: signal.h is Unix-guarded above, and the
+            // MSVC CRT has no SIGKILL at all. The number is always printed, so a Windows
+            // build loses nothing but the gloss -- and cannot report a signal anyway.
+            if (signalNumber == SIGKILL)
+            {
+                detail << " (SIGKILL -- typically the OOM killer)";
+            }
+            else if (signalNumber == SIGSEGV)
+            {
+                detail << " (SIGSEGV -- a crash)";
+            }
+#endif
         }
         else
         {
-            detail << ", server process still running";
+            detail << ", server exited with status " << process->getReturnValue();
         }
     }
 
@@ -1272,10 +1293,15 @@ static RPCAttemptOutcome _executeRPCOnce(
     JSONRPCConnection* rpcConnection = context->getOrCreateJSONRPCConnection();
     if (!rpcConnection)
     {
+        // NOT Lost. Nothing was spawned, so no server closed a connection and no request
+        // was ever sent -- attributing this to the test would let a missing test-server
+        // binary or a fork failure be reported as "this test killed a freshly spawned test
+        // server twice", which names an innocent input for a broken machine.
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
-            "JSON RPC failure: getOrCreateJSONRPCConnection()");
-        return RPCAttemptOutcome::Lost;
+            "JSON RPC failure: getOrCreateJSONRPCConnection() -- no test server could be "
+            "spawned, so this test never ran");
+        return RPCAttemptOutcome::StartFailed;
     }
 
     const int requestOrdinal = context->nextRPCRequestOrdinal();
@@ -1383,14 +1409,20 @@ static Result _executeRPC(
         return SLANG_OK;
     }
 
-    // Only a LOST server earns a second attempt, and deliberately so:
+    // A lost server earns a second attempt; a failed SPAWN earns one too, since a transient
+    // resource shortage is worth one more try. They are kept distinct because only the first
+    // can be attributed to the test: nothing ran on a server that never started.
+    //
+    // The rest do not retry, deliberately:
     //
     // - A timeout is re-paid in full (another connectionTimeOutInMs) and a fresh server has
     //   to recompile the core module first, so retrying a slow request is the one way to
     //   turn a two-minute problem into a five-minute one.
     // - A protocol or send failure means the two sides disagree about the wire format, which
     //   a new process will disagree about identically.
-    if (first != RPCAttemptOutcome::Lost)
+    const bool isRetryable =
+        first == RPCAttemptOutcome::Lost || first == RPCAttemptOutcome::StartFailed;
+    if (!isRetryable)
     {
         return SLANG_FAIL;
     }
@@ -1414,14 +1446,16 @@ static Result _executeRPC(
 
     if (second == RPCAttemptOutcome::Ok)
     {
-        // The test is fine; the server was not. Record the loss so it stays countable --
+        // The RPC is fine; the server was not. Record the loss so it stays countable --
         // silently absorbing these is how a rate that climbs from 14 a night to 140 stays
         // invisible -- but do not charge it to the test.
         context->getTestReporter()->recordTestServerLoss();
         return SLANG_OK;
     }
 
-    if (second == RPCAttemptOutcome::Lost)
+    // Only a genuine second LOSS implicates the input. A spawn failure repeating means the
+    // machine still cannot start a server, which says nothing about the test.
+    if (second == RPCAttemptOutcome::Lost && first == RPCAttemptOutcome::Lost)
     {
         context->getTestReporter()->messageFormat(
             TestMessageType::TestFailure,

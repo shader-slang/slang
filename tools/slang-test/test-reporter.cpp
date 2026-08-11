@@ -769,10 +769,15 @@ void TestReporter::outputSummary()
             // that lost fifteen servers is typographically identical to one that lost none.
             if (m_testServerLossCount)
             {
+                // "recovered", not "passed": the retry only proves an RPC came back from a
+                // fresh server. The test's own verdict is decided afterwards and can still
+                // be a failure, so a name here may legitimately appear in the failing list
+                // above too -- what this block asserts is that the server death was not the
+                // reason.
                 printf(
-                    "\nwarning: %d test server loss(es); each test below passed when re-run "
-                    "on a freshly spawned server, so the failure was the server's and not the "
-                    "test's:\n",
+                    "\nwarning: %d test server loss(es); the server died under each test below "
+                    "and the request succeeded on a freshly spawned one, so the loss was the "
+                    "server's doing and not the test's:\n",
                     m_testServerLossCount);
                 printf("---\n");
                 for (const auto& name : m_testServerLossTests)

@@ -208,6 +208,13 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
     }
     SLANG_CHECK(res.resultCode != 0);
 
+    // Non-zero alone is satisfied by either half of the abort fix on its own, so it does not
+    // guard them independently: the `!aborted` term reds the run even with the deferred
+    // tests dropped, and recording them reds it even without the term. Requiring the
+    // deferred tests to have REACHED the totals separates the two -- with the recording
+    // removed the summary degrades to "(0/0)" and names nothing, which this rejects.
     const String output = _allOutput(res);
     SLANG_CHECK(!_contains(output, "100% of tests passed"));
+    SLANG_CHECK(!_contains(output, "(0/0)"));
+    SLANG_CHECK(_contains(output, "failing tests:"));
 }
