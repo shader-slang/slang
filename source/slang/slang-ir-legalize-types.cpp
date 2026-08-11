@@ -3498,8 +3498,8 @@ static LegalVal declareVars(
             {
                 // The recorded link is the chain root: `legalizeGlobalParam` seeds it from an empty
                 // parent, so it has no parent link. Assert that, so a future change that records a
-                // non-root/inner link (whose `next` is non-null) is caught here rather than dropping
-                // the wrong link and silently mis-binding the split-out resources.
+                // non-root/inner link (whose `next` is non-null) is caught here rather than
+                // dropping the wrong link and silently mis-binding the split-out resources.
                 SLANG_ASSERT(varChain.primaryChain->next == nullptr);
                 specialVarChain.primaryChain = varChain.primaryChain->next;
             }
