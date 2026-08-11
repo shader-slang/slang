@@ -2231,7 +2231,10 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
     return 0
 
 
+FINDINGS_DIR = REPO_ROOT / "docs/generated/tests/_meta/findings"
+
 _FINDING_REF_RE = re.compile(r"findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml")
+_FINDING_ID_RE = re.compile(r"`([a-z0-9][a-z0-9-]{4,})`")
 
 
 def _finding_ref(evidence: str) -> str | None:
@@ -2242,9 +2245,27 @@ def _finding_ref(evidence: str) -> str | None:
     because it is relevant to exactly one of the five actions, and a
     column that is an em-dash four times out of five is noise in every
     report.
+
+    An agent that names the finding by its bare id rather than its path
+    has still named it, so the bare form is accepted too -- but only when
+    it resolves to a file that actually exists under `findings/`. That
+    keeps the check precise rather than merely lenient: the point of
+    requiring a reference at all is that someone can follow it, and a
+    filesystem hit proves they can. The first cycle to escalate anything
+    was rejected over exactly this spelling difference, with the finding
+    sitting in the directory the whole time.
     """
     m = _FINDING_REF_RE.search(evidence or "")
-    return m.group(1) if m else None
+    if m:
+        return m.group(1)
+    for candidate in _FINDING_ID_RE.findall(evidence or ""):
+        for path in (
+            FINDINGS_DIR / f"{candidate}.yaml",
+            FINDINGS_DIR / "filed" / f"{candidate}.yaml",
+        ):
+            if path.exists():
+                return candidate
+    return None
 
 
 def lint_doc_gap_state() -> list[LintIssue]:
