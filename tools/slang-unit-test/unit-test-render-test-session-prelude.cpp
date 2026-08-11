@@ -72,6 +72,11 @@ static String _findRenderTestModule(const char* executableDirectory)
 
     List<String> candidates;
     String dllDirectory;
+    // "slang-test" is a stand-in executable name, not a required file. `getDllDirectoryPath` takes
+    // an executable *path* and derives the module directory from it (the executable's own directory
+    // on Windows, the sibling `lib` elsewhere, per the note above); when the named file does not
+    // exist it falls back to the running executable's own path, so no `slang-test` binary need be
+    // present here.
     if (SLANG_SUCCEEDED(TestToolUtil::getDllDirectoryPath(
             Path::combine(executableDirectory, "slang-test").getBuffer(),
             dllDirectory)))
@@ -161,9 +166,11 @@ SLANG_UNIT_TEST(renderTestSessionPrelude)
     SLANG_CHECK(_getLanguagePrelude(session, SLANG_SOURCE_LANGUAGE_HLSL) == sentinelHlslPrelude);
     SLANG_CHECK(_getLanguagePrelude(session, SLANG_SOURCE_LANGUAGE_CPP) == sentinelCppPrelude);
 
-    // Repeat from a prelude that is short enough to reach the same one-line path but is still
-    // distinguishable from what the defect leaves behind. Asserting an *empty* prelude comes back
-    // would pass either way, since blanking also leaves it empty.
+    // Run again from a minimal, non-empty prelude to check round-trip fidelity at the boundary: the
+    // guard must return exactly what was set, not a normalized or empty form. The sentinel above is
+    // a comfortably-sized string; `"\n"` is a shortest non-empty prelude, still distinguishable
+    // from the empty prelude the defect produces, so it exercises the small-input end of the same
+    // restore.
     const char* const shortHlslPrelude = "\n";
     session->setLanguagePrelude(SLANG_SOURCE_LANGUAGE_HLSL, shortHlslPrelude);
     SLANG_CHECK_ABORT(
