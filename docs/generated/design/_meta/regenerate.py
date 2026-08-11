@@ -2279,11 +2279,16 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
 
 FINDINGS_DIR = REPO_ROOT / "docs/generated/tests/_meta/findings"
 
-# `(?<![\w/])` keeps the path form from matching inside a longer token -- a
-# URL such as `https://…/findings/filed/test.yaml/comments` would otherwise
-# yield `test`. `(?![\w.])` does the same on the right.
+# `(?<!\w)` stops `myfindings/x.yaml` from matching, but deliberately allows a
+# leading `/`: the documented spelling is the full workspace path
+# `docs/generated/tests/_meta/findings/<id>.yaml`, so excluding `/` here would
+# reject the very form the contract asks agents to write.
+#
+# The real guard against a spurious match -- including the URL case,
+# `https://…/findings/filed/test.yaml/comments` -- is `_finding_exists`: an id
+# that names no file is not a reference, however it was spelled.
 _FINDING_REF_RE = re.compile(
-    r"(?<![\w/])findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml(?![\w.])"
+    r"(?<!\w)findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml"
 )
 _FINDING_ID_RE = re.compile(r"`([a-z0-9][a-z0-9-]{4,})`")
 
@@ -2531,10 +2536,33 @@ def cmd_selftest(args, manifest: Manifest) -> int:
         real = cand.stem
     if real:
         check("finding path form", _finding_ref(f"see findings/{real}.yaml"), real)
-        check("finding bare id", _finding_ref(f"covered by `{real}`"), real)
+        # The documented spelling is the full workspace path. An earlier
+        # anchoring attempt rejected exactly this, breaking three real
+        # reports, so it is pinned here.
         check(
-            "finding embedded in URL is not a match",
+            "finding full workspace path",
+            _finding_ref(f"Existing finding: `docs/generated/tests/_meta/findings/{real}.yaml`."),
+            real,
+        )
+        check(
+            "finding path inside prose",
+            _finding_ref(f"tracked in docs/generated/tests/_meta/findings/{real}.yaml today"),
+            real,
+        )
+        check("finding bare id", _finding_ref(f"covered by `{real}`"), real)
+        # A URL that happens to name a real finding still names it, and the
+        # ledger only needs an id someone can follow. What must not resolve
+        # is a spelling that names no file -- checked just below. Pinning the
+        # URL case as a *match* records that this is the intended reading
+        # rather than an oversight.
+        check(
+            "finding named inside a URL still resolves, since the file exists",
             _finding_ref(f"https://x/findings/{real}.yaml/comments"),
+            real,
+        )
+        check(
+            "URL naming a nonexistent finding does not resolve",
+            _finding_ref("https://x/findings/not-a-real-finding.yaml/comments"),
             None,
         )
     check("finding missing path rejected", _finding_ref("see findings/nope.yaml"), None)
