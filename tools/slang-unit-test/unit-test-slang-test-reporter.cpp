@@ -80,7 +80,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
     reporter.addTest(command, TestResult::Pass);         // retry pass: redeemed as a pass
 
     SLANG_CHECK(reporter.m_passedTestCount == 1);
-    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(reporter.m_redeemingResultTests.contains(command));
 
     // The deferral is already redeemed, so reconciliation must leave the pass untouched.
     reporter.reconcilePendingRetries();
@@ -134,7 +134,7 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
     main.consolidateWith(&retryPass);
 
     SLANG_CHECK(main.m_pendingRetryTests.contains(command));
-    SLANG_CHECK(main.m_finalResultTests.contains(command));
+    SLANG_CHECK(main.m_redeemingResultTests.contains(command));
 
     main.reconcilePendingRetries();
 
@@ -157,7 +157,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
     reporter.addTest(command, TestResult::Fail);         // retry pass: ran and failed again
 
     SLANG_CHECK(reporter.m_failedTestCount == 1);
-    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(reporter.m_redeemingResultTests.contains(command));
 
     // Already redeemed by the final Fail, so reconciliation must not count it a second time.
     reporter.reconcilePendingRetries();
@@ -184,7 +184,7 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
     main.consolidateWith(&firstPass);
 
     SLANG_CHECK(main.m_pendingRetryTests.contains(command));
-    SLANG_CHECK(!main.m_finalResultTests.contains(command));
+    SLANG_CHECK(!main.m_redeemingResultTests.contains(command));
 
     main.reconcilePendingRetries();
 
@@ -212,7 +212,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredRetryDoesNotRedeemDeferral)
 
     // The ignore is still reported as an ignore, but it does not redeem anything.
     SLANG_CHECK(reporter.m_ignoredTestCount == 1);
-    SLANG_CHECK(!reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(!reporter.m_redeemingResultTests.contains(command));
     SLANG_CHECK(reporter.m_pendingRetryTests.contains(command));
 
     reporter.reconcilePendingRetries();
@@ -235,7 +235,7 @@ SLANG_UNIT_TEST(slangTestReporterHiddenIgnoredRetryStillLeavesAFailure)
     reporter.addTest(command, TestResult::Ignored);
 
     SLANG_CHECK(reporter.m_ignoredTestCount == 0); // hidden, so not counted
-    SLANG_CHECK(!reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(!reporter.m_redeemingResultTests.contains(command));
 
     reporter.reconcilePendingRetries();
 
@@ -285,7 +285,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
 
     // Both sets are empty afterwards, so the reporter no longer claims a deferral or a redeemer.
     SLANG_CHECK(reporter.m_pendingRetryTests.getCount() == 0);
-    SLANG_CHECK(reporter.m_finalResultTests.getCount() == 0);
+    SLANG_CHECK(reporter.m_redeemingResultTests.getCount() == 0);
 
     reporter.reconcilePendingRetries();
     SLANG_CHECK(reporter.m_failedTestCount == 1);
@@ -356,7 +356,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredRedeemsDispatchFailure)
     reporter.addTest(command, TestResult::PendingRetry); // deferred
     reporter.addTest(command, TestResult::Ignored);      // retry reached it; not applicable here
 
-    SLANG_CHECK(reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(reporter.m_redeemingResultTests.contains(command));
 
     reporter.reconcilePendingRetries();
 
@@ -378,7 +378,7 @@ SLANG_UNIT_TEST(slangTestReporterIgnoredDoesNotRedeemRealFailure)
     reporter.addTest(command, TestResult::PendingRetry);
     reporter.addTest(command, TestResult::Ignored);
 
-    SLANG_CHECK(!reporter.m_finalResultTests.contains(command));
+    SLANG_CHECK(!reporter.m_redeemingResultTests.contains(command));
 
     reporter.reconcilePendingRetries();
 
@@ -401,4 +401,25 @@ SLANG_UNIT_TEST(slangTestReporterUnresolvedDispatchFailureStillFails)
 
     SLANG_CHECK(reporter.m_failedTestCount == 1);
     SLANG_CHECK(!reporter.didAllSucceed());
+}
+
+// The retry-eligibility gate looks the test up by its reporter key, and the expected-failure files
+// are written in that form. Building the key in one place is what stops the bare test name being
+// used by mistake -- a mistake with no visible symptom, since the lookup simply never matches and
+// the only cost is a retry that cannot change the outcome.
+SLANG_UNIT_TEST(slangTestReporterUnitTestKeyIsTheExpectedFailureKey)
+{
+    const String key = makeUnitTestKey(
+        UnownedStringSlice("slang-unit-test-tool"),
+        UnownedStringSlice("replayRecord_triangle"));
+    SLANG_CHECK(key == String("slang-unit-test-tool/replayRecord_triangle.internal"));
+
+    // An expected-failure file holds exactly that string, so the key matches and the bare name
+    // does not.
+    TestReporter reporter;
+    reporter.m_suppressConsoleOutput = true;
+    reporter.m_expectedFailureList.add(key);
+
+    SLANG_CHECK(reporter.isExpectedFailure(key));
+    SLANG_CHECK(!reporter.isExpectedFailure(String("replayRecord_triangle")));
 }

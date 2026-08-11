@@ -25,6 +25,17 @@ enum class TestOutputMode
     TeamCity, ///< Output suitable for teamcity
 };
 
+/// Returns the reporter key for a unit test: `<moduleName>/<testName>.internal`.
+///
+/// This is the identity a unit test is reported, retried and looked up under -- the same string the
+/// expected-failure files are written in and that `TestReporter::adjustResult()` matches against.
+/// It lives here, rather than being spelled out where it happens to be needed, because keying off
+/// the bare test name instead is a mistake that produces no visible symptom: the expected-failure
+/// lookup silently never matches.
+Slang::String makeUnitTestKey(
+    const Slang::UnownedStringSlice& moduleName,
+    const Slang::UnownedStringSlice& testName);
+
 class TestReporter : public ITestReporter
 {
 public:
@@ -180,7 +191,8 @@ public:
     /// name is exactly the mismatch this fix corrects.
     Slang::HashSet<Slang::String> m_pendingRetryTests;
 
-    /// Names of every test that reached a *redeeming verdict* -- Pass, Fail or ExpectedFail.
+    /// Names of every test whose result redeems a deferral -- a verdict (Pass, Fail or
+    /// ExpectedFail), or an `Ignored` for a test the harness never reached.
     ///
     /// `Ignored` is excluded even though it is also a final, non-deferred result. A test is
     /// deferred because it ran and failed, and a retry that skips it produces no verdict and so
@@ -197,7 +209,7 @@ public:
     /// sub-reporter and resolved by another (the retry pass runs on different threads than the
     /// first pass), so the two sets have to survive `consolidateWith` independently; and a final
     /// `Ignored` result under `-hide-ignored` never reaches `m_testInfos` at all.
-    Slang::HashSet<Slang::String> m_finalResultTests;
+    Slang::HashSet<Slang::String> m_redeemingResultTests;
 
     /// Names deferred after the harness failed to reach the test at all, rather than after the test
     /// ran and failed.

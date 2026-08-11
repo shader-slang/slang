@@ -5661,9 +5661,8 @@ static SlangResult runUnitTestModule(
         auto testFunc = testModule->getTestFunc(i);
         auto testName = testModule->getTestName(i);
 
-        StringBuilder filePath;
-        filePath << moduleName << "/" << testName << ".internal";
-        auto command = filePath.produceString();
+        auto command =
+            makeUnitTestKey(UnownedStringSlice(moduleName), UnownedStringSlice(testName));
 
         if (shouldRunTest(context, command))
         {
@@ -5740,17 +5739,14 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
-                // Note the expected-failure list is keyed by the command (the same string
-                // `TestReporter::adjustResult` looks up), not by the bare test name.
-                //
-                // Passing `test.command` here is load-bearing and unguarded by the suite:
-                // `slangTestReporterExpectedFailureKeysOnCommand` pins what the accessor means,
-                // not what this call site hands it. Reverting to `test.testName` would leave every
-                // test green -- the second failure is still downgraded to ExpectedFail, so the only
-                // symptom is the pointless retry this line exists to avoid. A real two-pass CI run
-                // is the only thing that would show it.
+                // The expected-failure list is keyed by the reporter key, not the bare test
+                // name, so the key is built by makeUnitTestKey() rather than chosen here. That
+                // matters because choosing wrong has no visible symptom -- the lookup just never
+                // matches, and the only cost is the pointless retry this gate exists to avoid.
                 if (isFailed && !context->isRetry && !context->options.disableRetries &&
-                    !context->getTestReporter()->isExpectedFailure(test.command))
+                    !context->getTestReporter()->isExpectedFailure(makeUnitTestKey(
+                        UnownedStringSlice(moduleName),
+                        test.testName.getUnownedSlice())))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);

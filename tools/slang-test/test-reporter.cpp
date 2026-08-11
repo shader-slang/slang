@@ -13,6 +13,13 @@ using namespace Slang;
 
 /* static */ TestReporter* TestReporter::s_reporter = nullptr;
 
+String makeUnitTestKey(const UnownedStringSlice& moduleName, const UnownedStringSlice& testName)
+{
+    StringBuilder key;
+    key << moduleName << "/" << testName << ".internal";
+    return key.produceString();
+}
+
 static void appendXmlEncode(char c, StringBuilder& out)
 {
     switch (c)
@@ -259,8 +266,8 @@ void TestReporter::consolidateWith(TestReporter* other)
     // let reconcilePendingRetries() match them up once everything has been consolidated.
     for (const auto& name : other->m_pendingRetryTests)
         m_pendingRetryTests.add(name);
-    for (const auto& name : other->m_finalResultTests)
-        m_finalResultTests.add(name);
+    for (const auto& name : other->m_redeemingResultTests)
+        m_redeemingResultTests.add(name);
     for (const auto& name : other->m_dispatchFailures)
         m_dispatchFailures.add(name);
     m_dispatchFailureCount += other->m_dispatchFailureCount;
@@ -396,7 +403,7 @@ void TestReporter::_addResult(TestInfo info)
     // Ignored redeems a deferral only when the first attempt never reached the test. See
     // m_dispatchFailures for why the two cases differ.
     if (info.testResult != TestResult::Ignored || m_dispatchFailures.contains(info.name))
-        m_finalResultTests.add(info.name);
+        m_redeemingResultTests.add(info.name);
 
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
@@ -719,7 +726,7 @@ void TestReporter::reconcilePendingRetries()
 {
     for (const auto& name : m_pendingRetryTests)
     {
-        if (m_finalResultTests.contains(name))
+        if (m_redeemingResultTests.contains(name))
             continue;
 
         if (!m_suppressConsoleOutput)
@@ -747,7 +754,7 @@ void TestReporter::reconcilePendingRetries()
     // false-green this function exists to prevent. Clearing both also makes a second call a
     // genuine no-op rather than one that only happens to find nothing pending.
     m_pendingRetryTests.clear();
-    m_finalResultTests.clear();
+    m_redeemingResultTests.clear();
 }
 
 void TestReporter::noteDispatchFailure(const String& testKey)
