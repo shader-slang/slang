@@ -590,13 +590,19 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// caller supplied a blob; deferral is disabled otherwise.
     ComPtr<ISlangBlob> blobHoldingSerializedData;
 
-    /// The context that owns `_foundUnrecognizedInstructions`.
+    /// Set when an unrecognized opcode is seen, by either the load walk or a body
+    /// decoded later.
     ///
-    /// Held by strong reference, not observed: a body is decoded long after the load
-    /// returns, and it reports an unrecognized opcode here. The context is owned by a
-    /// `RefPtr` local to `readSerializedModuleIR_`, so a raw pointer would dangle for
-    /// exactly the forward-compatibility case this field exists to serve.
-    RefPtr<IRSerialReadContext> readContext;
+    /// Recorded here rather than on the `IRSerialReadContext`, which this must not
+    /// reference: the context holds a `RefPtr` to the `IRModule`, the module holds
+    /// this decoder, and a strong reference from here would close that loop and leak
+    /// the module, this decoder's flat table and instruction array, and the retained
+    /// blob -- for every module loaded, for the life of the process. A raw pointer
+    /// would instead dangle, since the context is owned by a `RefPtr` local to the
+    /// load. The load propagates this into the context while that context is still
+    /// alive; a deferred decode has no reader for it, and records it here so the
+    /// information is at least not written into freed memory.
+    bool foundUnrecognizedInstructions = false;
 
     /// Where each deferred body's encoding begins.
     ///
@@ -820,7 +826,7 @@ IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringL
         // materialized module would silently accept an opcode that an eager load
         // reports, and the end-state checks keyed on this flag would not relax.
         op = kIROp_Unrecognized;
-        readContext->_foundUnrecognizedInstructions = true;
+        foundUnrecognizedInstructions = true;
     }
 
     const size_t minSizeInBytes = _calcInstMinSizeInBytes(op, flat, stringLengthCursor);
@@ -995,7 +1001,6 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRSerialReadContext& readContext = *serializer.getContext();
     RefPtr<FlatModuleDecoder> decoder = new FlatModuleDecoder();
     decoder->module = module;
-    decoder->readContext = serializer.getContext();
     FlatInstTable& flat = decoder->flat;
     serialize(serializer, flat);
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
@@ -1113,6 +1118,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     SLANG_RELEASE_ASSERT(decoder->operandIndex == operandIndicesCount);
     // Unknown future opcodes intentionally become a recoverable read failure later.
     // This reader cannot know whether those opcodes consume literal or string payloads.
+    // Propagate what the decode walk saw, while the context is still alive.
+    readContext._foundUnrecognizedInstructions |= decoder->foundUnrecognizedInstructions;
+
     if (!readContext._foundUnrecognizedInstructions)
     {
         SLANG_RELEASE_ASSERT(decoder->literalIndex == flat.literals.getCount());
