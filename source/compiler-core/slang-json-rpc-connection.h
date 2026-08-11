@@ -220,6 +220,14 @@ public:
 
     HTTPPacketConnection* getUnderlyingConnection() { return m_connection.Ptr(); }
 
+    /// The backing process, or null if this connection is not process-backed.
+    ///
+    /// Exposed so a caller that loses the connection can ask the OS why. Without it a
+    /// server that dies mid-request is indistinguishable from one that is merely slow,
+    /// and an OOM kill is indistinguishable from a crash: all the caller sees is a read
+    /// that stopped returning data.
+    Process* getProcess() const { return m_process.Ptr(); }
+
     /// Dtor
     ~JSONRPCConnection() { disconnect(); }
 

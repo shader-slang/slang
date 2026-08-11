@@ -1152,7 +1152,96 @@ Result spawnAndWaitProxy(
     return res;
 }
 
-static Result _executeRPC(
+/// Why an RPC attempt did not produce a result.
+///
+/// The distinction that matters is Lost vs TimedOut. A lost connection says nothing at all
+/// about the test that was in flight -- the request never completed, so there is no verdict
+/// to report -- whereas a timeout is a statement about this test: it ran and did not finish.
+/// Collapsing the two, as this code used to, means a server that dies for its own reasons is
+/// recorded as "this test failed", which is simply false.
+enum class RPCAttemptOutcome
+{
+    Ok,        ///< A result came back (whatever the test's own verdict is).
+    Lost,      ///< The connection closed or errored: the server is gone.
+    TimedOut,  ///< The server is alive but did not answer in connectionTimeOutInMs.
+    Protocol,  ///< A reply arrived but was not the expected result message.
+    SendFailed ///< The request could not even be written.
+};
+
+/// Describe the death of a test server as precisely as the OS will let us.
+///
+/// Everything here was previously discarded. The transport already distinguishes a closed
+/// pipe from a read error from a timeout (HTTPPacketConnection::getReadState), and the
+/// process object already knows the exit status -- but the only thing that reached the log
+/// was the name of the function that failed, which is the one detail that cannot tell an
+/// OOM kill from a segfault from a clean exit.
+static void _reportServerLoss(
+    TestContext* context,
+    JSONRPCConnection* rpcConnection,
+    RPCAttemptOutcome outcome,
+    int requestOrdinal,
+    const char* phase)
+{
+    StringBuilder detail;
+
+    auto* connection = rpcConnection ? rpcConnection->getUnderlyingConnection() : nullptr;
+
+    switch (outcome)
+    {
+    case RPCAttemptOutcome::SendFailed:
+        detail << "the request could not be written, though the server is still running";
+        break;
+    case RPCAttemptOutcome::TimedOut:
+        detail << "no reply within the timeout";
+        break;
+    default:
+        if (!connection)
+        {
+            detail << "no transport";
+        }
+        else if (connection->getReadState() == HTTPPacketConnection::ReadState::Closed)
+        {
+            detail << "the server closed the connection";
+        }
+        else if (connection->getReadState() == HTTPPacketConnection::ReadState::Error)
+        {
+            detail << "the connection errored";
+        }
+        else
+        {
+            // Nothing had been read on this connection yet, so the transport has no opinion:
+            // this is a server that died BETWEEN requests rather than during one.
+            detail << "the server is gone";
+        }
+        break;
+    }
+
+    // The exit status separates the leading explanations at a glance: a signal means the
+    // server was killed (137 = SIGKILL, typically the OOM killer; 139 = SIGSEGV, a crash),
+    // whereas a small non-zero code means it chose to exit.
+    if (auto* process = rpcConnection ? rpcConnection->getProcess() : nullptr)
+    {
+        if (process->isTerminated())
+        {
+            detail << ", server exited with status " << process->getReturnValue();
+        }
+        else
+        {
+            detail << ", server process still running";
+        }
+    }
+
+    context->getTestReporter()->messageFormat(
+        TestMessageType::RunError,
+        "test server lost in %s after serving %d request(s) on this connection: %s",
+        phase,
+        requestOrdinal,
+        detail.produceString().getBuffer());
+}
+
+/// One RPC attempt. Reports nothing about the test itself; the caller decides what a
+/// non-Ok outcome means.
+static RPCAttemptOutcome _executeRPCOnce(
     TestContext* context,
     SpawnType spawnType,
     const UnownedStringSlice& method,
@@ -1173,37 +1262,52 @@ static Result _executeRPC(
         context->getTestReporter()->messageFormat(
             TestMessageType::RunError,
             "JSON RPC failure: getOrCreateJSONRPCConnection()");
-        return SLANG_FAIL;
+        return RPCAttemptOutcome::Lost;
     }
+
+    const int requestOrdinal = context->nextRPCRequestOrdinal();
 
     // Execute
     if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
     {
-        context->getTestReporter()->messageFormat(
-            TestMessageType::RunError,
-            "JSON RPC failure: sendCall()");
+        // A write that fails because the peer is GONE is a lost server, not a bad request.
+        // A server that dies between requests leaves the next test writing into a closed
+        // pipe, and that test has not run at all yet -- blaming it would be the same false
+        // verdict this function exists to stop, just moved one step earlier. Asked of the
+        // process rather than the transport because nothing has been read on this connection,
+        // so the read state has no opinion to give.
+        const bool serverGone = !rpcConnection->isActive();
+        const RPCAttemptOutcome outcome =
+            serverGone ? RPCAttemptOutcome::Lost : RPCAttemptOutcome::SendFailed;
+
+        _reportServerLoss(context, rpcConnection, outcome, requestOrdinal, "sendCall");
 
         context->destroyRPCConnection();
-        return SLANG_FAIL;
+        return outcome;
     }
 
     // Wait for the result
-    if (SLANG_FAILED(rpcConnection->waitForResult(context->connectionTimeOutInMs)))
-    {
-        context->getTestReporter()->messageFormat(
-            TestMessageType::RunError,
-            "JSON RPC failure: waitForResult()");
-    }
+    const bool waitFailed =
+        SLANG_FAILED(rpcConnection->waitForResult(context->connectionTimeOutInMs));
 
-    if (!rpcConnection->hasMessage())
+    if (waitFailed || !rpcConnection->hasMessage())
     {
-        context->getTestReporter()->messageFormat(
-            TestMessageType::RunError,
-            "JSON RPC failure: hasMessage()");
+        // waitForResult folds three causes into one failure code, so ask the transport which
+        // it was: a live-but-slow server is a timeout (this test's problem), while a closed
+        // or errored pipe is a lost server (not this test's problem).
+        auto* connection = rpcConnection->getUnderlyingConnection();
+        const bool serverGone =
+            connection && (connection->getReadState() == HTTPPacketConnection::ReadState::Closed ||
+                           connection->getReadState() == HTTPPacketConnection::ReadState::Error);
+        const RPCAttemptOutcome outcome =
+            serverGone ? RPCAttemptOutcome::Lost : RPCAttemptOutcome::TimedOut;
 
-        // We can assume somethings gone wrong. So lets kill the connection and fail.
+        _reportServerLoss(context, rpcConnection, outcome, requestOrdinal, "waitForResult");
+
+        // Either way the connection is unusable now: a timed-out request may still land later
+        // and would then be read as the answer to the NEXT request.
         context->destroyRPCConnection();
-        return SLANG_FAIL;
+        return outcome;
     }
 
     if (rpcConnection->getMessageType() != JSONRPCMessageType::Result)
@@ -1213,7 +1317,7 @@ static Result _executeRPC(
             "JSON RPC failure: getMessageType() != JSONRPCMessageType::Result");
 
         context->destroyRPCConnection();
-        return SLANG_FAIL;
+        return RPCAttemptOutcome::Protocol;
     }
 
     // Get the result
@@ -1225,7 +1329,7 @@ static Result _executeRPC(
             "JSON RPC failure: getMessage()");
 
         context->destroyRPCConnection();
-        return SLANG_FAIL;
+        return RPCAttemptOutcome::Protocol;
     }
 
     outRes.resultCode = exeRes.returnCode;
@@ -1233,7 +1337,72 @@ static Result _executeRPC(
     outRes.standardOutput = exeRes.stdOut;
     outRes.debugLayer = exeRes.debugLayer;
 
-    return SLANG_OK;
+    return RPCAttemptOutcome::Ok;
+}
+
+static Result _executeRPC(
+    TestContext* context,
+    SpawnType spawnType,
+    const UnownedStringSlice& method,
+    const RttiInfo* rttiInfo,
+    const void* args,
+    ExecuteResult& outRes)
+{
+    const RPCAttemptOutcome first =
+        _executeRPCOnce(context, spawnType, method, rttiInfo, args, outRes);
+
+    if (first == RPCAttemptOutcome::Ok)
+    {
+        return SLANG_OK;
+    }
+
+    // Only a LOST server earns a second attempt, and deliberately so:
+    //
+    // - A timeout is re-paid in full (another connectionTimeOutInMs) and a fresh server has
+    //   to recompile the core module first, so retrying a slow request is the one way to
+    //   turn a two-minute problem into a five-minute one.
+    // - A protocol or send failure means the two sides disagree about the wire format, which
+    //   a new process will disagree about identically.
+    if (first != RPCAttemptOutcome::Lost)
+    {
+        return SLANG_FAIL;
+    }
+
+    // _executeRPCOnce already tore the connection down, so this attempt gets a server that
+    // has served nothing else. That is what makes the retry a DISCRIMINATOR rather than a
+    // mask: an ambient death (whatever the server had accumulated, or whatever the machine
+    // was doing) does not reproduce on a virgin process, while an input that genuinely kills
+    // the compiler kills this one too -- and then the failure is reported against the test,
+    // where it belongs, instead of being retried until it looks green.
+    context->getTestReporter()->message(
+        TestMessageType::RunError,
+        "retrying once on a freshly spawned test server; a second loss will be reported "
+        "against this test");
+
+    // Straight into outRes, as the first attempt does: _executeRPCOnce writes it only on
+    // success, so a second loss leaves the caller's own init() value intact rather than a
+    // half-populated copy.
+    const RPCAttemptOutcome second =
+        _executeRPCOnce(context, spawnType, method, rttiInfo, args, outRes);
+
+    if (second == RPCAttemptOutcome::Ok)
+    {
+        // The test is fine; the server was not. Record the loss so it stays countable --
+        // silently absorbing these is how a rate that climbs from 14 a night to 140 stays
+        // invisible -- but do not charge it to the test.
+        context->getTestReporter()->reportTestServerLoss();
+        return SLANG_OK;
+    }
+
+    if (second == RPCAttemptOutcome::Lost)
+    {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::TestFailure,
+            "this test killed a freshly spawned test server twice in a row; treating it as a "
+            "crash caused by this input rather than as an unrelated server loss");
+    }
+
+    return SLANG_FAIL;
 }
 
 template<typename T>
@@ -6150,6 +6319,24 @@ SlangResult innerMain(int argc, char** argv)
                 "*** Skipping retries for %d failed tests.\n\n",
                 (int)context.failedFileTests.getCount());
             fflush(stderr);
+
+            // Skipping the retries is right; dropping the results is not. A test deferred for
+            // retry has only been recorded as "pending retry", which is a placeholder rather
+            // than a verdict, and the retry loop below is what normally turns it into one. On
+            // this branch that loop never runs, so before this the tests vanished:
+            // m_failedTestCount stayed 0, didAllSucceed() returned true, and slang-test exited
+            // 0 announcing "0% of tests passed (0/0)".
+            //
+            // That made the systemic collapse this branch exists to shout about the one
+            // outcome CI could not see -- a green run. Recorded the same way the
+            // too-many-failures branch below records its own skipped retries.
+            for (auto& test : context.failedFileTests)
+            {
+                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                reporter.addResult(TestResult::Fail);
+            }
         }
 
         if (!context.options.disableRetries && !context.stopSchedulingTests.load())
@@ -6200,7 +6387,14 @@ SlangResult innerMain(int argc, char** argv)
         reporter.outputSummary();
 
         cleanupRenderTestDeviceCache(context);
-        return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
+
+        // An abort is a failure in its own right, whatever ended up recorded. The loop above
+        // converts the deferred FILE tests, but the threshold can equally be tripped by unit
+        // tests, and in any case a run that stopped scheduling work has not verified what it
+        // was asked to verify. Reporting success because the remaining tests never ran is
+        // exactly backwards.
+        const bool aborted = context.stopSchedulingTests.load();
+        return (reporter.didAllSucceed() && !aborted) ? SLANG_OK : SLANG_FAIL;
     }
 }
 

@@ -665,12 +665,54 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     return m_connection->sendResult(&result, id);
 }
 
+/// Hidden integration-test hook, in the same spirit as -parent-monitor-ready-event above.
+///
+/// SLANG_TEST_SERVER_DIE_ON_REQUEST=N makes the server vanish when the Nth request arrives,
+/// leaving that request unanswered. That is the exact shape of the failure slang-test's
+/// lost-server handling exists for -- a client blocked on a pipe that will never deliver --
+/// and it is otherwise reproducible only by waiting for a server to die on its own, which is
+/// the one thing nobody can schedule.
+///
+/// Returns 0 (disabled) for anything unset or unparseable, so a typo in the variable name
+/// leaves the server behaving normally rather than dying on request one.
+static int _dieOnRequestOrdinal()
+{
+    StringBuilder value;
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice::fromLiteral("SLANG_TEST_SERVER_DIE_ON_REQUEST"),
+            value)))
+    {
+        return 0;
+    }
+    Int64 ordinal = 0;
+    if (SLANG_FAILED(StringUtil::parseInt64(value.getUnownedSlice(), ordinal)) || ordinal <= 0)
+    {
+        return 0;
+    }
+    return int(ordinal);
+}
+
 SlangResult TestServer::execute()
 {
+    const int dieOnRequest = _dieOnRequestOrdinal();
+    int servedCount = 0;
+
     while (m_connection->isActive() && !m_quit)
     {
+        // Before _executeSingle, so the request is left unread and unanswered. The client has
+        // already written it, so it sees EOF on a call it is waiting for -- a mid-request
+        // loss, not a tidy shutdown.
+        //
+        // _Exit, not exit or return: running atexit handlers or unwinding would close the
+        // connection in an orderly way, which is the case that is NOT interesting here.
+        if (dieOnRequest && servedCount == dieOnRequest - 1)
+        {
+            _Exit(1);
+        }
+
         // Failure doesn't make the execution terminate
         [[maybe_unused]] const SlangResult res = _executeSingle();
+        servedCount++;
     }
 
     return SLANG_OK;

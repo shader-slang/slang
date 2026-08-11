@@ -253,6 +253,22 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_passedTestCount += other->m_passedTestCount;
     m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
+    m_testServerLossCount += other->m_testServerLossCount;
+    m_testServerLossTests.addRange(other->m_testServerLossTests);
+}
+
+void TestReporter::reportTestServerLoss()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
+    m_testServerLossCount++;
+    // Name it. A single loss is noise, but the same test appearing night after night is the
+    // shortlist for whatever is killing the servers -- and that pattern is only visible if
+    // the victim is recorded even when it went on to pass.
+    if (m_inTest && m_currentInfo.name.getLength())
+    {
+        m_testServerLossTests.add(m_currentInfo.name);
+    }
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -744,6 +760,24 @@ void TestReporter::outputSummary()
                     {
                         printf("%s\n", testInfo.name.getBuffer());
                     }
+                }
+                printf("---\n");
+            }
+
+            // Reported unconditionally when non-zero, INCLUDING on an otherwise clean run.
+            // These tests passed, so nothing above mentions them; without this block a run
+            // that lost fifteen servers is typographically identical to one that lost none.
+            if (m_testServerLossCount)
+            {
+                printf(
+                    "\nwarning: %d test server loss(es); each test below passed when re-run "
+                    "on a freshly spawned server, so the failure was the server's and not the "
+                    "test's:\n",
+                    m_testServerLossCount);
+                printf("---\n");
+                for (const auto& name : m_testServerLossTests)
+                {
+                    printf("%s\n", name.getBuffer());
                 }
                 printf("---\n");
             }
