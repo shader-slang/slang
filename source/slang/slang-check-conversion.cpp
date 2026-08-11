@@ -2175,6 +2175,12 @@ bool SemanticsVisitor::_coerce(
     // A enum type can be converted into its underlying tag type.
     if (auto enumDecl = isEnumType(fromType))
     {
+        // `tagType` is only assigned once the `EnumDecl` reaches `ReadyForLookup`, and a
+        // conversion can be checked before that (e.g. an array bound in the signature of a
+        // declaration that precedes any other use of the enum). Without this, `tagType` is null
+        // and the comparison below silently declines to offer the conversion.
+        ensureDecl(enumDecl, DeclCheckState::ReadyForLookup);
+
         Type* tagType = enumDecl->tagType;
         if (tagType == toType)
         {
@@ -2201,6 +2207,10 @@ bool SemanticsVisitor::_coerce(
     {
         if (auto toEnumDeclRef = isDeclRefTypeOf<EnumDecl>(toType))
         {
+            // As above: the enum may not have reached the state that assigns `tagType` yet, and
+            // here a null is reported as an outright coercion failure.
+            ensureDecl(toEnumDeclRef, DeclCheckState::ReadyForLookup);
+
             auto tagType = getTagType(m_astBuilder, toEnumDeclRef);
             if (!tagType)
                 return false;
