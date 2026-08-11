@@ -105,14 +105,19 @@ public:
     /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
-    /// Returns whether a failing test should be deferred for a retry pass rather than counted now.
+    /// Returns whether `testKey` is on the expected-failure list.
+    ///
+    /// Named for the single proposition it computes rather than for its caller's decision: the
+    /// retry-eligibility gate in `runUnitTestModule` also weighs whether the test actually failed,
+    /// whether this is already the retry pass, and whether retries are disabled, and those stay at
+    /// the call site.
     ///
     /// `testKey` is the reporter's test key -- for the unit-test path the full command string
     /// (`moduleName/testName.internal`), the same key `adjustResult()` looks up. Passing the bare
-    /// test name here silently answers true for every expected failure, because the
-    /// expected-failure files are written in command form; that mismatch is what sent known-failing
-    /// unit tests round a pointless retry.
-    bool shouldDeferForRetry(const Slang::String& testKey) const;
+    /// test name here answers false for every expected failure, because the expected-failure files
+    /// are written in command form; that mismatch is what sent known-failing unit tests round a
+    /// pointless retry.
+    bool isExpectedFailure(const Slang::String& testKey) const;
 
     /// Counts every test whose result is still deferred as a failure, and reports it.
     ///
@@ -153,14 +158,23 @@ public:
 
     /// Names of tests whose result was deferred by a `TestResult::PendingRetry` report.
     ///
-    /// The key is the test's `info.name`. For the unit-test path that is the full command string
-    /// (`moduleName/testName.internal`), the same key `adjustResult()`'s expected-failure gate uses
-    /// -- not the bare test name. `reconcilePendingRetries()` and the retry-eligibility check in
-    /// `runUnitTestModule` must look these tests up by that same command key; keying off the bare
-    /// test name instead is exactly the mismatch this fix corrects.
+    /// The key is whatever `info.name` the deferring `addResult()` observed, and the two retry
+    /// paths spell that differently: a unit test defers under its full command
+    /// (`moduleName/testName.internal`), a file test under its `testName`. So these sets hold keys
+    /// from both namespaces at once.
+    ///
+    /// That is fine, and the invariant the whole mechanism rests on is why: deferral and
+    /// redemption use the identical name *within* a path, so an entry can only ever be matched by
+    /// the retry that corresponds to it. What must not happen is a lookup in one namespace against
+    /// a key written in the other -- the retry-eligibility gate in `runUnitTestModule` reads the
+    /// expected-failure list, which is written in command form, and keying that off the bare test
+    /// name is exactly the mismatch this fix corrects.
     Slang::HashSet<Slang::String> m_pendingRetryTests;
 
-    /// Names of tests that reached a final (non-deferred) result.
+    /// Names of *every* test that reached a final (non-deferred) result -- one entry per test in
+    /// the run, not just the ones that redeemed a deferral. Reconciliation needs only the
+    /// intersection with `m_pendingRetryTests`, which is a handful; recording unconditionally is
+    /// what makes it order-independent across sub-reporters.
     ///
     /// This is what redeems an entry in `m_pendingRetryTests`, and it is tracked separately rather
     /// than read back out of `m_testInfos` for two reasons: a test can be deferred by one

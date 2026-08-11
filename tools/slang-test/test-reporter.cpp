@@ -725,21 +725,18 @@ void TestReporter::reconcilePendingRetries()
         addTest(name, TestResult::Fail);
     }
 
-    // Clear both halves, not just the pending one. The two sets are only
-    // meaningful as a pair -- one records deferrals, the other what redeemed
-    // them -- so leaving the redeemers behind would put the reporter in a state
-    // that no longer describes anything. Clearing both also makes a second call
-    // a genuine no-op rather than one that only happens to find nothing pending.
+    // Clear both halves, not just the pending one. If the redeemers survived while the
+    // deferrals were dropped, a deferral reported after this point would be matched against a
+    // stale redeemer, counted as already resolved, and vanish from the failure count -- the exact
+    // false-green this function exists to prevent. Clearing both also makes a second call a
+    // genuine no-op rather than one that only happens to find nothing pending.
     m_pendingRetryTests.clear();
     m_finalResultTests.clear();
 }
 
-bool TestReporter::shouldDeferForRetry(const String& testKey) const
+bool TestReporter::isExpectedFailure(const String& testKey) const
 {
-    // A test already known to fail has nothing to learn from a retry: adjustResult()
-    // downgrades its failure to ExpectedFail either way, so deferring it only spends
-    // a second run to reach the same result.
-    return !m_expectedFailureList.contains(testKey);
+    return m_expectedFailureList.contains(testKey);
 }
 
 bool TestReporter::didAllSucceed() const

@@ -222,7 +222,7 @@ SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
 // `adjustResult()` looks up. Keying off the bare test name instead never matches, so every
 // known-failing unit test gets pushed through a retry that can only reach the same result. This
 // pins the key so that regression cannot come back silently.
-SLANG_UNIT_TEST(slangTestReporterShouldDeferForRetryKeysOnCommand)
+SLANG_UNIT_TEST(slangTestReporterExpectedFailureKeysOnCommand)
 {
     TestReporter reporter;
     // Keeps the reporter's writes off test-server's JSON-RPC channel.
@@ -232,14 +232,14 @@ SLANG_UNIT_TEST(slangTestReporterShouldDeferForRetryKeysOnCommand)
     reporter.m_expectedFailureList.add(command);
 
     // An expected failure is recognised by its command and must not be deferred.
-    SLANG_CHECK(!reporter.shouldDeferForRetry(command));
+    SLANG_CHECK(reporter.isExpectedFailure(command));
 
     // The bare name is not the key: looking up by it would answer "defer" for a test that is
     // already known to fail, which is the bug.
-    SLANG_CHECK(reporter.shouldDeferForRetry(bareName));
+    SLANG_CHECK(!reporter.isExpectedFailure(bareName));
 
     // Anything not on the list is still eligible.
-    SLANG_CHECK(reporter.shouldDeferForRetry(String("slang-unit-test-tool/other.internal")));
+    SLANG_CHECK(!reporter.isExpectedFailure(String("slang-unit-test-tool/other.internal")));
 }
 
 // Reconciliation is terminal: it clears both halves of the pending/redeemed pair, so calling it a

@@ -5739,7 +5739,7 @@ static SlangResult runUnitTestModule(
                 // Note the expected-failure list is keyed by the command (the same string
                 // `TestReporter::adjustResult` looks up), not by the bare test name.
                 if (isFailed && !context->isRetry && !context->options.disableRetries &&
-                    context->getTestReporter()->shouldDeferForRetry(test.command))
+                    !context->getTestReporter()->isExpectedFailure(test.command))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
