@@ -722,9 +722,11 @@ void TestReporter::reconcilePendingRetries()
             // Same name formatting as the "failed(pending retry)" notice this one answers, so
             // the pair reads as a pair.
             printf(
-                "error: test '%S' was marked pending retry but was never re-run, so its failure "
-                "was about to go unreported; reporting it now (as a failure, or an expected "
-                "failure if it is on the expected-failure list)\n",
+                "error: test '%S' failed and its retry never produced a verdict, so the failure "
+                "was about to go unreported; counting it now (as a failure, or an expected "
+                "failure if it is on the expected-failure list). Either the retry did not run the "
+                "test, or it ran and reported it ignored -- the retry's own line above says "
+                "which\n",
                 name.toWString().begin());
             fflush(stdout);
         }
