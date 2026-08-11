@@ -12,7 +12,12 @@
 // survives a copy into a local, but not a result already computed from one, so
 // folding the operands together would emit float opcodes either way.
 
+// The NEG prefix is a second pass whose directives are all CHECK-NOT, so it scans the whole
+// module. Trailing CHECK-NOTs in the positive pass would only cover the span after the last
+// CHECK-DAG match.
+
 //TEST:SIMPLE(filecheck=CHECK-SPIRV):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=NEG):-target spirv -entry computeMain -stage compute
 
 RWTexture2D<unorm float> u1;
 RWTexture2D<snorm float> s1;
@@ -31,15 +36,17 @@ RWStructuredBuffer<float> outBuf;
 // CHECK-SPIRV-DAG: OpFOrdGreaterThanEqual %bool
 // CHECK-SPIRV-DAG: OpFOrdGreaterThan %bool
 
-// CHECK-SPIRV-NOT: OpIAdd
-// CHECK-SPIRV-NOT: OpISub
-// CHECK-SPIRV-NOT: OpIMul
-// CHECK-SPIRV-NOT: OpUDiv
-// CHECK-SPIRV-NOT: OpSNegate
-// CHECK-SPIRV-NOT: OpULessThan
-// CHECK-SPIRV-NOT: OpIEqual
-// CHECK-SPIRV-NOT: OpINotEqual
-// CHECK-SPIRV-NOT: OpUGreaterThan
+// NEG-NOT: OpIAdd %float
+// NEG-NOT: OpISub %float
+// NEG-NOT: OpIMul %float
+// NEG-NOT: OpUDiv %float
+// NEG-NOT: OpSNegate %float
+// NEG-NOT: OpULessThan %bool
+// NEG-NOT: OpULessThanEqual %bool
+// NEG-NOT: OpIEqual %bool
+// NEG-NOT: OpINotEqual %bool
+// NEG-NOT: OpUGreaterThanEqual %bool
+// NEG-NOT: OpUGreaterThan %bool
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
