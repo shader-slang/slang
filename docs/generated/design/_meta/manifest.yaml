@@ -598,6 +598,8 @@ documents:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/core.meta.slang
+      - source/slang/hlsl.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -612,6 +614,7 @@ documents:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/core.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -630,6 +633,7 @@ documents:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/core.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -644,6 +648,7 @@ documents:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/core.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -687,6 +692,8 @@ documents:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/core.meta.slang
+      - source/slang/hlsl.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -711,6 +718,10 @@ documents:
       - source/slang/slang-ir-dce.cpp
       - source/slang/slang-check-decl.cpp
       - source/slang/slang-emit-c-like.cpp
+      - source/slang/core.meta.slang
+      - source/slang/diff.meta.slang
+      - source/slang/slang-check-expr.cpp
+      - source/slang/slang-ir-check-differentiability.cpp
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md
@@ -727,6 +738,8 @@ documents:
       - source/slang/slang-ir.h
       - source/slang/slang-ir.cpp
       - source/slang/slang-lower-to-ir.cpp
+      - source/slang/core.meta.slang
+      - source/slang/hlsl.meta.slang
     depends_on:
       - cross-cutting/ir-instructions.md
       - pipeline/04-ast-to-ir.md

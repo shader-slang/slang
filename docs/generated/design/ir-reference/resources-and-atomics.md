@@ -223,6 +223,19 @@ flowchart TD
 | `getRegisterIndex` | **`IRGetRegisterIndex`** | `[resource]` | | `__intrinsic_op` on `__getRegisterIndex`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26386-26387 | Register index the resource is bound to. Child of the `BindingQuery` group. |
 | `getRegisterSpace` | **`IRGetRegisterSpace`** | `[resource]` | | `__intrinsic_op` on `__getRegisterSpace`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 26383-26384 | Register space the resource is bound to. Child of the `BindingQuery` group. |
 
+Five of these rows have **no public wrapper**: the underscore-prefixed
+declarations `__getEquivalentStructuredBuffer`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+10213-10219), `__getStructuredBufferPtr`, `__getUntypedBufferPtr`, and
+`__getRegisterIndex` / `__getRegisterSpace` (lines 26389-26393) are the
+whole surface. Unlike `InterlockedAdd` or `WaveGetActiveMask`, no
+ordinary Slang function calls them on the user's behalf, so reaching
+these opcodes from source means calling the underscore intrinsic
+directly and accepting that it is not a stable public API. That also
+means they *do* appear at the lowering snapshot, with no inlining step
+in between — the opposite of the wrapper cases collected under
+[`Interlocked*` is a wrapper, not an opcode](#interlocked-is-a-wrapper-not-an-opcode).
+
 ### Shader IO
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -268,6 +281,14 @@ enum IRMemoryOrder
     kIRMemoryOrder_SeqCst = 4,
 };
 ```
+
+The Slang-level spelling a user writes is the `MemoryOrder` enum in
+[core.meta.slang](../../../../source/slang/core.meta.slang) (lines
+4052-4063), whose enumerators are `Relaxed`, `Acquire`, `Release`,
+`AcquireRelease` and `SeqCst` — so `MemoryOrder.AcquireRelease` is what
+produces `kIRMemoryOrder_AcquireRelease = 3`. The two cannot drift: each
+Slang enumerator is defined by a `$(kIRMemoryOrder_*)` splice of the C++
+constant above.
 
 There is no memory-*scope* operand. The SPIR-V backend hard-codes
 `SpvScopeDevice` in every atomic case
@@ -332,6 +353,19 @@ instrumentation pass runs:
 | `GroupMemoryBarrierWithGroupSync` | `IRGroupMemoryBarrierWithGroupSync` | — | | (no producer at HEAD) | See [`ControlBarrier` vs `GroupMemoryBarrierWithGroupSync`](#controlbarrier-vs-groupmemorybarrierwithgroupsync). |
 | `BeginFragmentShaderInterlock` | `IRBeginFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3537 | Opens a rasterizer-ordered critical section. |
 | `EndFragmentShaderInterlock` | `IREndFragmentShaderInterlock` | — | | `__intrinsic_op`, [core.meta.slang](../../../../source/slang/core.meta.slang) line 3542 | Closes the section opened above. |
+
+The Slang a user writes to reach these: the two interlock opcodes are
+`beginInvocationInterlock()` and `endInvocationInterlock()`
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines
+3538 and 3543), and they require a `fragment` entry point — the
+rasterizer ordering they request has no meaning in another stage.
+`ControlBarrier` has no direct spelling at all; it is synthesized by
+GLSL legalization. The HLSL barrier family a user does call —
+`AllMemoryBarrier`, `GroupMemoryBarrier`, `DeviceMemoryBarrier`, each
+also in a `WithGroupSync` form, plus the `WithWaveMaskSync` variants
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+7797, 9943, 11835, 15678, 15713) — does not lower to these opcodes; see
+[`ControlBarrier` vs `GroupMemoryBarrierWithGroupSync`](#controlbarrier-vs-groupmemorybarrierwithgroupsync).
 
 The general-purpose `Barrier(memoryType, semantics)` intrinsic is not on
 this page: its flag arguments are carried by the
@@ -557,6 +591,26 @@ straight to the opcode, use `Atomic<T>` — `counter.add(1)` becomes an
 Note also that one `atomicAdd` in the IR corresponds to one *statement*,
 not one thread. Contention across a dispatch is implicit in the launch;
 the IR carries no fan-out.
+
+#### The same pattern, elsewhere on this page
+
+`Interlocked*` is the clearest case but not the only one. Whenever the
+`__intrinsic_op` sits on an underscore-prefixed declaration and the
+public name is an ordinary Slang function that calls it, the opcode is
+absent from the lowering snapshot and appears only after inlining. A
+reader searching `func %main` in a fresh `-dump-ir` for any of these
+will not find them:
+
+| Opcode | Public surface | Where the `__intrinsic_op` actually sits |
+| --- | --- | --- |
+| `waveGetActiveMask` | `WaveGetActiveMask()` | `__WaveGetActiveMask()`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines 15532-15533, called from the wrapper at 15538-15556 |
+| `imageSubscript` | `rwtex[coord]` | the core-module `__ref` subscript accessor, so the subscript is still a call until that accessor is inlined |
+| `StructuredBufferGetDimensions` | `sBuf.GetDimensions(count, stride)` | inside the core-module `GetDimensions` body, never at the call site |
+| `atomicAdd` and friends, from `atomic_reduce` | the `[ForceInline]` `__target_switch` body | the switch body is still a call immediately after lowering; the unused-result `atomicAdd` the section describes appears once inlining has run |
+
+The general rule is worth carrying to the rest of this page: an
+`AST origin` cell naming an `__intrinsic_op` line tells you where the
+opcode is *declared*, not the earliest IR in which you can observe it.
 
 ### `getNaturalStride` and `getNaturalAlignment`
 
