@@ -537,8 +537,14 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 }
 
 //
-/// True if `SLANG_ONDEMAND_LAZY_IR` selects deferred loading of builtin-module
-/// instruction bodies.
+/// True if builtin-module instruction bodies should be left encoded until something
+/// reads them. **On by default**; `SLANG_ONDEMAND_LAZY_IR=0` forces the eager load.
+///
+/// The override exists because the two paths must produce identical results, and the
+/// cheapest way to investigate a suspected difference is to run the same binary both
+/// ways. It is deliberately an override rather than an opt-in: shipping this off by
+/// default would mean nobody gets the reduction without knowing to ask, and the
+/// deferred path would go untested in ordinary runs.
 ///
 /// Read once: a global session is shared across threads, and the underlying
 /// environment lookup is not safe against a concurrent write. Uses
@@ -553,10 +559,12 @@ static bool isLazyIRLoadEnabled()
                 UnownedStringSlice("SLANG_ONDEMAND_LAZY_IR"),
                 value)))
         {
-            return false;
+            return true;
         }
+        // Set-but-empty reads as "not specified", so that clearing the variable in a
+        // shell behaves the same as never having set it.
         const String text = value.produceString();
-        return text.getLength() != 0 && text[0] != '0';
+        return text.getLength() == 0 || text[0] != '0';
     }();
     return enabled;
 }
