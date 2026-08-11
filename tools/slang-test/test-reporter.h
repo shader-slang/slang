@@ -105,6 +105,15 @@ public:
     /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
+    /// Returns whether a failing test should be deferred for a retry pass rather than counted now.
+    ///
+    /// `testKey` is the reporter's test key -- for the unit-test path the full command string
+    /// (`moduleName/testName.internal`), the same key `adjustResult()` looks up. Passing the bare
+    /// test name here silently answers true for every expected failure, because the
+    /// expected-failure files are written in command form; that mismatch is what sent known-failing
+    /// unit tests round a pointless retry.
+    bool shouldDeferForRetry(const Slang::String& testKey) const;
+
     /// Counts every test whose result is still deferred as a failure, and reports it.
     ///
     /// Reporting `TestResult::PendingRetry` for a test defers its result: it is left out of the

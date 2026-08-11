@@ -2,7 +2,86 @@
 #include "slang-test/test-reporter.h"
 #include "unit-test/slang-unit-test.h"
 
+#ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
+#include <stdio.h>
+
 using namespace Slang;
+
+/// Sends anything written to stdout to the null device for as long as it is in
+/// scope, restoring the descriptor afterwards.
+///
+/// `TestReporter` reports results by writing them to stdout, which is what it
+/// should do inside slang-test but not here: a unit test runs inside
+/// test-server, and that process answers the harness over a JSON-RPC channel
+/// carried on its stdout. Driving the reporter without this guard puts
+/// "failed(pending retry) ..." straight into that stream, and the run dies with
+/// "JSON RPC failure: waitForResult()" instead of reporting a test result. The
+/// test's own result is unaffected: test-server buffers it and replies once the
+/// test function has returned, by which point this guard has restored stdout.
+///
+/// Mirrors `ScopedWriteOnlyStdin` in unit-test-stdin-compile.cpp.
+struct ScopedSuppressStdout
+{
+    ScopedSuppressStdout()
+    {
+        // Flush first so anything already buffered goes to the real stdout
+        // rather than to the null device.
+        fflush(stdout);
+#ifdef _WIN32
+        const int stdoutFd = _fileno(stdout);
+        m_savedStdoutFd = _dup(stdoutFd);
+        if (m_savedStdoutFd == -1)
+            return;
+        const int nullFd = _open("NUL", _O_WRONLY);
+        if (nullFd == -1)
+            return;
+        m_isActive = _dup2(nullFd, stdoutFd) != -1;
+        _close(nullFd);
+#else
+        const int stdoutFd = fileno(stdout);
+        m_savedStdoutFd = dup(stdoutFd);
+        if (m_savedStdoutFd == -1)
+            return;
+        const int nullFd = open("/dev/null", O_WRONLY);
+        if (nullFd == -1)
+            return;
+        m_isActive = dup2(nullFd, stdoutFd) != -1;
+        close(nullFd);
+#endif
+    }
+
+    ~ScopedSuppressStdout()
+    {
+        // Flush while the descriptor still points at the null device, so the
+        // suppressed output is discarded instead of reaching the restored one.
+        fflush(stdout);
+        if (m_savedStdoutFd == -1)
+            return;
+#ifdef _WIN32
+        _dup2(m_savedStdoutFd, _fileno(stdout));
+        _close(m_savedStdoutFd);
+#else
+        dup2(m_savedStdoutFd, fileno(stdout));
+        close(m_savedStdoutFd);
+#endif
+    }
+
+    /// True when stdout is actually redirected. A test asserts this rather than
+    /// running on regardless, because carrying on would corrupt the RPC stream
+    /// and fail the whole run rather than this one test.
+    bool isActive() const { return m_isActive; }
+
+private:
+    int m_savedStdoutFd = -1;
+    bool m_isActive = false;
+};
 
 // A sub-reporter (the per-worker reporter used by parallel runs) must receive the same
 // Options-derived display configuration as the main reporter, so that verbosity, dump-on-failure,
@@ -45,6 +124,10 @@ SLANG_UNIT_TEST(slangTestReporterInitFromOptions)
 // This is the exact bug: the deferred failure must not vanish.
 SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     TestReporter reporter;
     const String command("slang-unit-test-tool/probeAlwaysFails.internal");
 
@@ -69,6 +152,10 @@ SLANG_UNIT_TEST(slangTestReporterReconcileFailsUnredeemedRetry)
 // every retried test as failed.
 SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     TestReporter reporter;
     const String command("slang-unit-test-tool/probeFlaky.internal");
 
@@ -92,6 +179,10 @@ SLANG_UNIT_TEST(slangTestReporterReconcileKeepsRedeemedRetry)
 // still applies to a reconciled deferral.
 SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     TestReporter reporter;
     const String command("slang-unit-test-tool/probeExpectedFail.internal");
     reporter.m_expectedFailureList.add(command);
@@ -110,6 +201,10 @@ SLANG_UNIT_TEST(slangTestReporterReconcileHonorsExpectedFailure)
 // pending/final sets are tracked separately and reconciled only after consolidation.
 SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     const String command("slang-unit-test-tool/probeCrossThread.internal");
 
     TestReporter firstPass;
@@ -137,6 +232,10 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateThenReconcile)
 // failure for the same test. This is the ordinary "flaky test stays broken" path.
 SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     TestReporter reporter;
     const String command("slang-unit-test-tool/probeRetriedStillFails.internal");
 
@@ -158,6 +257,10 @@ SLANG_UNIT_TEST(slangTestReporterReconcileCountsRetriedFailureOnce)
 // no worker ever redeems must, after `consolidateWith()`, still be reconciled into a failure.
 SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     const String command("slang-unit-test-tool/probeCrossThreadUnredeemed.internal");
 
     TestReporter firstPass;
@@ -181,6 +284,10 @@ SLANG_UNIT_TEST(slangTestReporterConsolidateUnredeemedReconcilesToFailure)
 // spurious failure by reconciliation.
 SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
 {
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
     TestReporter reporter;
     reporter.m_hideIgnored = true;
     const String command("slang-unit-test-tool/probeHiddenIgnored.internal");
@@ -196,4 +303,53 @@ SLANG_UNIT_TEST(slangTestReporterReconcileRedeemedByHiddenIgnored)
 
     SLANG_CHECK(reporter.m_failedTestCount == 0);
     SLANG_CHECK(reporter.didAllSucceed());
+}
+
+// The retry-eligibility gate in `runUnitTestModule` keys off the reporter's test key -- the full
+// command -- because that is what the expected-failure files are written in and what
+// `adjustResult()` looks up. Keying off the bare test name instead never matches, so every
+// known-failing unit test gets pushed through a retry that can only reach the same result. This
+// pins the key so that regression cannot come back silently.
+SLANG_UNIT_TEST(slangTestReporterShouldDeferForRetryKeysOnCommand)
+{
+    TestReporter reporter;
+    const String command("slang-unit-test-tool/probeExpectedFail.internal");
+    const String bareName("probeExpectedFail");
+    reporter.m_expectedFailureList.add(command);
+
+    // An expected failure is recognised by its command and must not be deferred.
+    SLANG_CHECK(!reporter.shouldDeferForRetry(command));
+
+    // The bare name is not the key: looking up by it would answer "defer" for a test that is
+    // already known to fail, which is the bug.
+    SLANG_CHECK(reporter.shouldDeferForRetry(bareName));
+
+    // Anything not on the list is still eligible.
+    SLANG_CHECK(reporter.shouldDeferForRetry(String("slang-unit-test-tool/other.internal")));
+}
+
+// Reconciliation is terminal: it clears both halves of the pending/redeemed pair, so calling it a
+// second time cannot synthesize the same failure twice. Without that, a reporter reused after
+// reconciliation would carry stale redeemers.
+SLANG_UNIT_TEST(slangTestReporterReconcileIsIdempotent)
+{
+    // Reporting a deferral prints to stdout; see ScopedSuppressStdout.
+    ScopedSuppressStdout quiet;
+    SLANG_CHECK(quiet.isActive());
+
+    TestReporter reporter;
+    const String command("slang-unit-test-tool/probeUnredeemed.internal");
+
+    reporter.addTest(command, TestResult::PendingRetry);
+    reporter.reconcilePendingRetries();
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_totalTestCount == 1);
+
+    // Both sets are empty afterwards, so the reporter no longer claims a deferral or a redeemer.
+    SLANG_CHECK(reporter.m_pendingRetryTests.getCount() == 0);
+    SLANG_CHECK(reporter.m_finalResultTests.getCount() == 0);
+
+    reporter.reconcilePendingRetries();
+    SLANG_CHECK(reporter.m_failedTestCount == 1);
+    SLANG_CHECK(reporter.m_totalTestCount == 1);
 }
