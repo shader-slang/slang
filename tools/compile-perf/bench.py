@@ -2,8 +2,8 @@
 """Slang compile-time perf-suite runner.
 
 Drives a given slangc over the workloads in manifest.py, parses the per-phase
-timers emitted by -report-perf-benchmark, and writes tidy per-run JSON
-(median/min/mean/stdev per timer; merge-on-write).
+timers emitted by -report-perf-benchmark, and writes per-run JSON: a summary
+(median/min/max/mean/stdev/n) AND the raw samples per timer; merge-on-write.
 
 Stdlib only (no prettytable / numpy) so it runs unchanged against any release's
 slangc.
@@ -88,15 +88,38 @@ def parse_timers(text):
 
 
 def stats(values):
+    """Summarize repeated measurements, keeping the raw samples alongside.
+
+    The samples are retained, not only the summary, because any summary is
+    lossy in a way that cannot be undone: a bimodal five-sample run and a
+    tight one can share a median and a stdev, and only the samples tell them
+    apart. results.json is the archive, so a question that needs them later
+    cannot be answered by re-deriving them. They also let a consumer compute
+    statistics under its own definition instead of trusting ours — the
+    BenchView submission format, for one, computes its own summary from
+    samples and treats that as authoritative.
+
+    `max` is reported for symmetry with `min`: without it the spread cannot
+    be bounded from the summary alone, and consumers that accept a summary in
+    place of samples generally require both extrema.
+    """
     values = [v for v in values if v is not None]
     if not values:
         return None
     return {
         "median": round(statistics.median(values), 4),
         "min": round(min(values), 4),
+        "max": round(max(values), 4),
         "mean": round(statistics.mean(values), 4),
         "stdev": round(statistics.stdev(values), 4) if len(values) > 1 else 0.0,
         "n": len(values),
+        # NOT rounded, unlike the summary fields above. Rounding the samples
+        # would defeat their purpose twice over: a consumer recomputing
+        # statistics would be working from altered measurements, and where a
+        # consumer checks our summary against its own (BenchView does, within
+        # 1e-9) a summary derived from RAW values will not match one derived
+        # from rounded samples — measured at ~80% of five-sample sets.
+        "samples": list(values),
     }
 
 
@@ -719,7 +742,7 @@ def main():
     with analyze.open_output(jpath) as fh:
         json.dump(records, fh, indent=2)
 
-    # results.json is the single source of truth (all of median/min/mean/stdev per
+    # results.json is the single source of truth (summary AND raw samples per
     # timer); the analysis/report tools read it directly. No CSV is emitted.
     if not args.gen_dir:
         shutil.rmtree(gen_root, ignore_errors=True)
@@ -729,6 +752,33 @@ def main():
     print(f"wrote {jpath}")
     if n_ok != len(this_run):
         sys.exit(1)
+
+
+# Import-time self-checks (the directory idiom), run by check-python-core.yml
+# on every PR touching these files. The samples are stored RAW deliberately,
+# and nothing else in the suite reads them yet, so a future edit rounding them
+# would import cleanly, merge, and surface only as silently altered
+# measurements — and as a rejected BenchView submission, since a summary
+# computed from raw values does not match one recomputed from rounded samples.
+# Both extrema carry a 5th decimal so that dropping their round() is
+# observable. A value that is already exact at 4 places (3.0, say) asserts
+# nothing about rounding: it compares equal either way, so the check would
+# pass through the very edit it exists to catch.
+_s = stats([1.23456, 2.0, 3.98769])
+assert _s["samples"] == [1.23456, 2.0, 3.98769], \
+    "samples must be stored RAW; rounding them alters what a consumer recomputes"
+assert _s["min"] == 1.2346 and _s["max"] == 3.9877, \
+    "summary fields ARE rounded, and max is reported alongside min"
+assert _s["n"] == 3
+assert stats([]) is None, "no measurements yields no stats, not an empty summary"
+assert stats([5.0])["stdev"] == 0.0, "a single sample has zero deviation, not None"
+# Pins the sample list, not just n: both are built from the same filtered
+# list today, so n alone would still hold if a later edit archived the
+# unfiltered argument, letting a None reach a consumer that cannot take one.
+assert stats([1.0, None, 2.0])["samples"] == [1.0, 2.0], \
+    "None samples are dropped from the archive, not merely uncounted"
+assert stats([1.0, None, 2.0])["n"] == 2
+del _s
 
 
 # Import-time self-check pinning the [MEM] line contract to api-driver.cpp's
