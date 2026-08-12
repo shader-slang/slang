@@ -28,11 +28,11 @@ static ComPtr<slang::ISession> makeSession(slang::IGlobalSession* gs)
 struct CapturedDiagnostic
 {
     SlangSeverity severity;
-    int64_t       code;
-    String        message;
-    String        filename;
-    uint32_t      startLine;
-    uint32_t      startCol;
+    int64_t code;
+    String message;
+    String filename;
+    uint32_t startLine;
+    uint32_t startCol;
 };
 
 // Callback that appends each diagnostic to a caller-supplied list.
@@ -40,12 +40,12 @@ static bool collectCallback(const SlangStructuredDiagnostic* d, void* userData)
 {
     auto* list = static_cast<List<CapturedDiagnostic>*>(userData);
     CapturedDiagnostic c;
-    c.severity  = d->severity;
-    c.code      = d->code;
-    c.message   = d->message ? d->message : "";
-    c.filename  = d->primarySpan.filename ? d->primarySpan.filename : "";
+    c.severity = d->severity;
+    c.code = d->code;
+    c.message = d->message ? d->message : "";
+    c.filename = d->primarySpan.filename ? d->primarySpan.filename : "";
     c.startLine = d->primarySpan.startLine;
-    c.startCol  = d->primarySpan.startCol;
+    c.startCol = d->primarySpan.startCol;
     list->add(c);
     return true;
 }
