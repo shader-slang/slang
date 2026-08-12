@@ -1820,12 +1820,6 @@ class PreferRecomputeAttribute : public Attribute
 {
     FIDDLE(...)
 
-    enum SideEffectBehavior
-    {
-        Warn = 0,
-        Allow = 1
-    };
-
     FIDDLE() SideEffectBehavior sideEffectBehavior;
 };
 
