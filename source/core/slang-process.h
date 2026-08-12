@@ -20,8 +20,14 @@ public:
     {
         enum Enum : Flags
         {
-            // Ignored on non-Windows platforms
+            /// Ignored on non-Windows platforms.
             AttachDebugger = 0x01,
+
+            /// Leave the child's stderr alone, so it inherits this process's.
+            ///
+            /// Honoured on Windows AND Unix. It was Windows-only, which made it a silent
+            /// no-op on Linux: the child's stderr went to a pipe regardless, and a caller
+            /// that did not drain that pipe discarded everything written to it.
             DisableStdErrRedirection = 0x02
         };
     };

@@ -270,6 +270,11 @@ SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
 
     // The run itself still recovers: a signal death is a lost server like any other.
     SLANG_CHECK(res.resultCode == 0);
+#else
+    // Ignored, not silently passed. Without this the whole body compiles out on Windows and
+    // the case reports success having run zero checks -- the vacuous pass this suite exists
+    // to make impossible, in the test guarding its headline diagnostic.
+    SLANG_IGNORE_TEST
 #endif
 }
 
