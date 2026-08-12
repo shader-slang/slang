@@ -183,7 +183,14 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
 
     // Recovered, but NOT hidden. Absorbing losses into the pass is how a rate climbs from
     // 14 a night to 140 without anyone noticing, so the count has to survive the recovery.
-    SLANG_CHECK(_contains(output, "test server loss"));
+    //
+    // Pinned past the block header, which on its own matches while every load-bearing part
+    // of the diagnostic is broken. The full sentence catches a reworded summary; the ordinal
+    // catches the accounting -- the server was rigged to die on its 3rd request having
+    // answered 2, so those exact numbers are the whole off-by-one contract, and a reset that
+    // stopped happening per connection would drift them run to run.
+    SLANG_CHECK(_contains(output, "test server loss(es); the server died under each test below"));
+    SLANG_CHECK(_contains(output, "on request #3 of this connection (it had answered 2)"));
 }
 
 /// A server that dies on every request, so no retry can ever succeed.

@@ -1212,8 +1212,11 @@ static void _reportServerLoss(
         }
         else
         {
-            // Nothing had been read on this connection yet, so the transport has no opinion:
-            // this is a server that died BETWEEN requests rather than during one.
+            // Header, Content or Done: the transport saw no failure, so the loss was
+            // established by the process being gone rather than by the pipe. Header does
+            // mean nothing was read on this connection, but Content and Done reach here too
+            // (via the sendCall path, where an earlier packet was read), so this says only
+            // what is certain -- not that the death fell between requests.
             detail << "the server is gone";
         }
         break;
@@ -1260,6 +1263,24 @@ static void _reportServerLoss(
         }
     }
 
+    // The lead phrase follows the OUTCOME. Hardcoding "lost" made a timeout claim the server
+    // was gone when it is alive-but-slow, and made a send failure emit "test server lost ...
+    // the request could not be written, though the server is still running" -- one line
+    // asserting both halves of a contradiction, in a change whose whole point is that these
+    // logs stop lying about what happened.
+    const char* lead = "test server lost";
+    switch (outcome)
+    {
+    case RPCAttemptOutcome::TimedOut:
+        lead = "test server did not answer";
+        break;
+    case RPCAttemptOutcome::SendFailed:
+        lead = "test server could not be sent to";
+        break;
+    default:
+        break;
+    }
+
     // "died ON request N", not "after serving N": advanceRPCRequestOrdinal() numbers the request
     // being sent, so the server had answered N-1 of them. Stated as the ordinal it died on
     // because that is the number worth comparing across runs -- if deaths cluster near a fixed
@@ -1267,15 +1288,20 @@ static void _reportServerLoss(
     // instrument would misplace exactly that clustering.
     context->getTestReporter()->messageFormat(
         TestMessageType::RunError,
-        "test server lost in %s on request #%d of this connection (it had answered %d): %s",
+        "%s in %s on request #%d of this connection (it had answered %d): %s",
+        lead,
         phase,
         requestOrdinal,
         requestOrdinal - 1,
         detail.produceString().getBuffer());
 }
 
-/// One RPC attempt. Reports nothing about the test itself; the caller decides what a
-/// non-Ok outcome means.
+/// One RPC attempt.
+///
+/// Records no pass/fail VERDICT for the test -- the caller decides what a non-Ok outcome
+/// means. Server-loss diagnostics are still emitted from here, which is the distinction the
+/// old wording blurred. outRes is written only on Ok, so a failed attempt leaves whatever the
+/// caller initialised it with rather than a half-populated result.
 static RPCAttemptOutcome _executeRPCOnce(
     TestContext* context,
     SpawnType spawnType,
