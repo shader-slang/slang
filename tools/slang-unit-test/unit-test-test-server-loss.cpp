@@ -49,7 +49,18 @@ static const char* kInnerTestPrefix = "tests/preprocessor/";
 /// not, since that is an environment they cannot conclude anything from.
 static const char* kInnerTestDir = "tests/preprocessor";
 
-/// Set while a child spawned by these tests is running. A nested invocation would be a
+/// Set while a child spawned by these tests is running.
+///
+/// ScopedEnvVar mutates THIS process's environment, not the child's, so it is only safe
+/// because unit tests never run concurrently within one process: slang-test parallelises by
+/// dispatching to one test-server process per thread (m_jsonRpcConnections is indexed by
+/// thread), and each server serves its requests from a single loop. Verified under
+/// -server-count 4, where all cases here still pass.
+///
+/// If unit tests are ever run concurrently inside one process, this breaks in two ways at
+/// once: a sibling would inherit the death variables and lose servers for no reason, and a
+/// sibling reading the sentinel below would ignore itself silently -- a vacuous pass. Prefer
+/// a per-child environment block if that day comes. A nested invocation would be a
 /// recursion, so the tests skip rather than fork-bomb if the name filter above ever stops
 /// excluding them.
 static const char* kNestedGuardEnvVar = "SLANG_TEST_SERVER_LOSS_SELFTEST";
