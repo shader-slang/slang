@@ -393,6 +393,11 @@
       "title": "slangc never terminates on -target spirv for a function returning Optional<T*>",
       "url": "https://github.com/shader-slang/slang/issues/12498"
     },
+    "switch-case-decl-used-in-later-case-invalid-cpp-emit": {
+      "dup_of": 12461,
+      "note": "nv-slang-bot filed the same defect independently on 2026-08-10; its report is stronger, showing -validate-ir reports 'def must dominate use' at every -g level, so the malformed IR predates emit and -g2 only lets it survive",
+      "title": "[cpp -g2] cross-case switch var emits undeclared identifier"
+    },
     "torch-autobind-unmappable-param-sigsegv": {
       "issue": 12483,
       "labels": [
