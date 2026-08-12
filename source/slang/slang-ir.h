@@ -75,6 +75,23 @@ SLANG_FORCE_INLINE IRInst* irLoadDecorationLink(IRInst* const& slot)
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
 }
 
+//
+// Live-`IRModule` accounting, for tests that a module is actually released.
+//
+// A retain cycle through an `IRModule` is invisible to LeakSanitizer in the shapes CI
+// runs: the module stays reachable from a live global session until the process exits,
+// so there is nothing unreachable to report. It shows up only as growth in a process
+// that creates and destroys sessions, which is what a test can assert directly.
+//
+void _noteIRModuleCreated();
+void _noteIRModuleDestroyed();
+
+/// Number of `IRModule`s currently alive in this process.
+///
+/// Exported so a separately linked unit-test tool can observe it; deliberately absent
+/// from the public `slang.h` API.
+SLANG_API Index getLiveIRModuleCount();
+
 struct IRDeferredBodyLoader : RefObject
 {
     virtual ~IRDeferredBodyLoader() = default;
@@ -2412,8 +2429,13 @@ private:
     IRModule(Session* session)
         : m_session(session), m_memoryArena(kMemoryArenaBlockSize), m_deduplicationContext(this)
     {
+        _noteIRModuleCreated();
     }
 
+public:
+    ~IRModule() { _noteIRModuleDestroyed(); }
+
+private:
     // The compilation session in use.
     Session* m_session = nullptr;
 

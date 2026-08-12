@@ -8847,6 +8847,26 @@ void findAllInstsBreadthFirst(IRInst* inst, List<IRInst*>& outInsts)
     }
 }
 
+namespace
+{
+std::atomic<Index> g_liveIRModuleCount{0};
+}
+
+void _noteIRModuleCreated()
+{
+    g_liveIRModuleCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void _noteIRModuleDestroyed()
+{
+    g_liveIRModuleCount.fetch_sub(1, std::memory_order_relaxed);
+}
+
+Index getLiveIRModuleCount()
+{
+    return g_liveIRModuleCount.load(std::memory_order_relaxed);
+}
+
 IRDecoration* IRInst::getFirstDecoration()
 {
     // Decoration lookup runs on every instruction of every module, so it does not
