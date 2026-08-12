@@ -200,30 +200,18 @@ public:
     // `[__readNone]`, and at this phase (before `propagateFuncProperties`)
     // they are not yet readNone-marked.
     //
-    // The two stay hand-synced rather than sharing one walker: factoring the
-    // traversal would mean threading a leaf predicate through
-    // `isReadNoneCallee`, which has three other callers in unrelated passes.
-    // `no-diff-carry-readnone-derivative-generic.slang` covers the
-    // specialize-of-generic arm — a `dot` call reaches this through
-    // `IRSpecialize` of the generic `__d_dot` — so dropping that arm turns the
-    // built-in case from "pure" into "carries" and fails that test rather than
-    // going unnoticed.
+    // The arms must be kept in step with `isReadNoneCallee` by hand;
+    // `no-diff-carry-readnone-derivative-generic.slang` fails if one is dropped.
     //
     // `[PreferRecompute]` is only honored for built-in derivatives, gated on
-    // `[__target_intrinsic]`. That decoration is a reliable built-in signal here
-    // for a non-obvious reason worth recording, because reading
-    // `diff.meta.slang` alone suggests the opposite: the file contains no
-    // `__target_intrinsic` at all, and every `[PreferRecompute]` derivative
-    // there has a Slang body, which would seem to fall foul of the
-    // `if (decl->body) return;` early-out in
-    // `addCatchAllIntrinsicDecorationIfNeeded`. What closes the gap is that
-    // `FunctionDeclBase::body` carries no `FIDDLE()` marker, so it is not a
-    // serialized field. The core module reaches this compilation through
-    // `readSerializedModuleAST`, and its `FuncDecl`s therefore arrive with
-    // `body == nullptr`; the catch-all fires and every core-module derivative
-    // does carry `IRTargetIntrinsicDecoration` by the time this runs. Verified
-    // by instrumenting the leaf: a `dot` call reaches it with
-    // `targetIntrinsic=1` on `__d_dot`.
+    // `[__target_intrinsic]`. Core-module derivatives carry that decoration even
+    // though `diff.meta.slang` never spells it and they all have bodies, which
+    // would otherwise hit the `if (decl->body) return;` early-out in
+    // `addCatchAllIntrinsicDecorationIfNeeded`: `FunctionDeclBase::body` has no
+    // `FIDDLE()` marker, so it is not serialized, and the core module arrives
+    // via `readSerializedModuleAST` with null bodies. Were `body` ever to become
+    // a serialized field, this predicate would silently begin reporting every
+    // built-in derivative as impure.
     //
     // A user-authored derivative can carry plain `[PreferRecompute]`
     // yet still have side effects — that form only requests recomputation and
@@ -294,12 +282,8 @@ public:
             // Only trust `[PreferRecompute]` for built-in derivatives.
             if (!func->findDecoration<IRTargetIntrinsicDecoration>())
                 return false;
-            // Operand 0 is the `SideEffectBehavior`. Lowering always builds it
-            // as an integer literal (`slang-lower-to-ir.cpp`, the
-            // `PreferRecomputeAttribute` case), so a non-literal here is
-            // out-of-contract rather than a shape to tolerate — treating it as
-            // pure would silently suppress the diagnostic this gate exists to
-            // produce. Only the default `Warn` form is side-effect free;
+            // Operand 0 is the `SideEffectBehavior`, always an integer literal
+            // from lowering. Only the default `Warn` form is side-effect free;
             // `Allow` opts out of that guarantee.
             auto behavior = as<IRIntLit>(preferRecompute->getOperand(0));
             SLANG_RELEASE_ASSERT(behavior);
@@ -324,13 +308,10 @@ public:
         //    `slang-ir-autodiff-fwd.cpp`). There is no body to be impure.
         //  - `BackwardDerivativeContextRemat` associates a remat callee, but a
         //    remat only reconstructs the context it is handed; it never runs the
-        //    user's derivative body. For the legacy shape that is a
-        //    `kIROp_Backward*Remat*` translate op, which `isReadNoneCallee`
-        //    reports readNone unconditionally. A `__apply` extension instead
-        //    synthesizes `kIROp_IdentityRemat` (`slang-check-decl.cpp`,
-        //    `_funcExtensionApply`), which `isReadNoneCallee` does *not*
-        //    recognize; it is pure because its translation returns the minimal
-        //    context it was given, not because of the op-code.
+        //    user's derivative body. Note this holds semantically, not by
+        //    op-code: the legacy `kIROp_Backward*Remat*` ops are unconditionally
+        //    readNone in `isReadNoneCallee`, but a `__apply` extension
+        //    synthesizes `kIROp_IdentityRemat`, which is not among them.
         //  - The remaining kinds describe differential types/witnesses
         //    (`DifferentialPairType`, `DifferentialZero`, ...) or the fwd-diff
         //    witness tables, none of which are callees.
@@ -342,14 +323,11 @@ public:
             int(AnnotationKind::CountOf) == 16,
             "AnnotationKind changed: does the new kind associate a derivative "
             "callee that can have side effects? If so, add it here.");
-        // `BackwardDerivativeApply` is listed even though the legacy shape makes
-        // it redundant: there `apply_bwd` is
-        // `BackwardPrimalFromLegacyBwdDiffFunc(primary, bwd_diff)`, unwrapped to
-        // operand 0, so it re-derives the already-checked primary. A `__apply`
-        // extension instead synthesizes `FunctionCopy(userApplyFunc)`
-        // (`slang-check-decl.cpp`, `_funcExtensionApply`), which unwraps to the
-        // user's apply function — impure independently of the primary. That
-        // shape is why the kind belongs here.
+        // `BackwardDerivativeApply` matters only for a custom `__apply`, whose
+        // `apply_bwd` is `FunctionCopy(userApplyFunc)` and so can be impure
+        // independently of the primary. The legacy shape,
+        // `BackwardPrimalFromLegacyBwdDiffFunc(primary, bwd_diff)`, unwraps to
+        // the already-checked primary and adds nothing.
         static const AnnotationKind kDerivativeKinds[] = {
             AnnotationKind::ForwardDerivative,
             AnnotationKind::BackwardDerivativeApply,
