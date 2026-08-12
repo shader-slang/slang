@@ -5565,6 +5565,13 @@ err(
 )
 
 err(
+    "torch-entry-point-requires-body",
+    55103,
+    "'[TorchEntryPoint]' function requires a body",
+    span { loc = "location", message = "a '[TorchEntryPoint]' function must have a body; a forward declaration cannot be compiled for the torch target." }
+)
+
+err(
     "unsupported-builtin-type",
     55200,
     "unsupported builtin type",

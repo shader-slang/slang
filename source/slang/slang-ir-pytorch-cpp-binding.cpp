@@ -371,6 +371,15 @@ static IRInst* makeValueFromTargetTuple(IRBuilder& builder, IRType* type, IRInst
 
 static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
 {
+    // A bodyless '[TorchEntryPoint]' (a forward declaration) has no first block, so the code below
+    // that inserts the generated binding into the function body would dereference a null block.
+    // Diagnose it as a user error and bail before any IR is generated.
+    if (!func->getFirstBlock())
+    {
+        sink->diagnose(Diagnostics::TorchEntryPointRequiresBody{.location = func->sourceLoc});
+        return;
+    }
+
     IRBuilder builder(func);
 
     builder.setInsertBefore(func);
