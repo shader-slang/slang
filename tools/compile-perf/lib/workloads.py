@@ -49,8 +49,8 @@ def gen_minimal(n):
 
     This is the cleanest detector for "the standard library got heavier"
     regressions: when the core module grows, every compile pays here regardless
-    of which language features it uses (the class of regression introduced by the
-    auto-diff overhaul in PR #9808, where an empty shader's linkIR rose ~27x)."""
+    of which language features it uses (the class of regression seen in the
+    v2026.7 release, where an empty shader's linkIR rose ~27x)."""
     s = [_HEADER, _buf()]
     s.append('[shader("compute")]\n[numthreads(1,1,1)]\n')
     s.append("void computeMain(uint3 tid : SV_DispatchThreadID) { outBuf[tid.x] = float(tid.x); }\n")
@@ -60,7 +60,8 @@ def gen_minimal(n):
 def gen_ir_builder(n):
     """One enormous straight-line function: `n` trivial integer SSA ops, almost
     no semantic work. Stresses IR instruction construction / dedup / hash-cons
-    and the SSA simplifier (the shared IRBuilder layer PR #9808 touched).
+    and the SSA simplifier (the shared IRBuilder layer the v2026.7 release
+    regressed).
 
     Scaling null: n scales straight-line op count; ideal cost is O(n) with amortized-constant hash-consing, so super-linear sweep growth means IR dedup/use-list structures scale worse than the code.
     """
