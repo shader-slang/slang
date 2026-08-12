@@ -137,7 +137,7 @@ public:
     /// ordinal is accumulating something across requests, while ordinals scattered uniformly
     /// point outward at the machine. Neither is visible from the request that happened to be
     /// in flight.
-    int nextRPCRequestOrdinal();
+    int advanceRPCRequestOrdinal();
 
     /// Given a spawn type, return the final spawn type.
     /// In particular we want 'Default' spawn type to vary by the environment (for example running

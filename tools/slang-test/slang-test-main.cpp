@@ -1260,7 +1260,7 @@ static void _reportServerLoss(
         }
     }
 
-    // "died ON request N", not "after serving N": nextRPCRequestOrdinal() numbers the request
+    // "died ON request N", not "after serving N": advanceRPCRequestOrdinal() numbers the request
     // being sent, so the server had answered N-1 of them. Stated as the ordinal it died on
     // because that is the number worth comparing across runs -- if deaths cluster near a fixed
     // ordinal the server is accumulating something per request, and an off-by-one in the
@@ -1305,7 +1305,7 @@ static RPCAttemptOutcome _executeRPCOnce(
         return RPCAttemptOutcome::StartFailed;
     }
 
-    const int requestOrdinal = context->nextRPCRequestOrdinal();
+    const int requestOrdinal = context->advanceRPCRequestOrdinal();
 
     // Execute
     if (SLANG_FAILED(rpcConnection->sendCall(method, rttiInfo, args)))
@@ -1434,10 +1434,16 @@ static Result _executeRPC(
     // was doing) does not reproduce on a virgin process, while an input that genuinely kills
     // the compiler kills this one too -- and then the failure is reported against the test,
     // where it belongs, instead of being retried until it looks green.
+    // Worded to cover both causes it is reached for. A repeated StartFailed is NOT charged
+    // to the test -- that needs `second == Lost && first == Lost` below -- so promising that
+    // "a second loss will be reported against this test" would be false on the spawn path.
     context->getTestReporter()->message(
         TestMessageType::RunError,
-        "retrying once on a freshly spawned test server; a second loss will be reported "
-        "against this test");
+        first == RPCAttemptOutcome::StartFailed
+            ? "no test server could be spawned; retrying once, and a second failure to spawn "
+              "will fail this test without blaming its input"
+            : "retrying once on a freshly spawned test server; a second loss will be reported "
+              "against this test");
 
     // Straight into outRes, as the first attempt does: _executeRPCOnce writes it only on
     // success, so a second loss leaves the caller's own init() value intact rather than a
@@ -6440,11 +6446,15 @@ SlangResult innerMain(int argc, char** argv)
 
         cleanupRenderTestDeviceCache(context);
 
-        // An abort is a failure in its own right, whatever ended up recorded. The loop above
-        // converts the deferred FILE tests, but the threshold can equally be tripped by unit
-        // tests, and in any case a run that stopped scheduling work has not verified what it
-        // was asked to verify. Reporting success because the remaining tests never ran is
-        // exactly backwards.
+        // An abort is a failure in its own right, whatever ended up recorded.
+        //
+        // Deliberately belt-and-braces, and not independently testable: reconcilePendingRetries()
+        // converts every deferral, so any abort reachable today also leaves recorded failures and
+        // would exit non-zero without this term. It is kept because the two facts are independent
+        // -- one is "some tests failed", the other is "we stopped running tests" -- and only the
+        // second is true of a run that abandoned its work. A future change that downgrades or
+        // redeems those failures (an expected-failure list covering them, say) would restore the
+        // exit-0 hole this PR exists to close, and this term is what would still catch it.
         const bool aborted = context.stopSchedulingTests.load();
         return (reporter.didAllSucceed() && !aborted) ? SLANG_OK : SLANG_FAIL;
     }

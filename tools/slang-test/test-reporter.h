@@ -252,6 +252,12 @@ public:
     /// Separate from the pass/fail counts on purpose: these tests DID pass, so folding the
     /// losses into m_failedTestCount would re-introduce the false verdict this exists to
     /// remove, while folding them into m_passedTestCount alone would erase the signal.
+    /// The COUNT is authoritative: every loss increments it, including one that happens
+    /// outside a test scope and therefore contributes no name. The NAME LIST is best-effort
+    /// and frequency-weighted -- deliberately a List rather than a set, because a test that
+    /// loses several servers is the signal worth seeing, and consolidateWith concatenates
+    /// rather than unions for the same reason. So the two can legitimately disagree: more
+    /// losses than names, and a name repeated. Neither is a bug.
     int m_testServerLossCount = 0;
     Slang::List<Slang::String> m_testServerLossTests;
 

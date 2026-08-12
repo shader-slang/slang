@@ -674,13 +674,12 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 /// the one thing nobody can schedule.
 ///
 /// Returns 0 (disabled) for anything unset or unparseable, so a typo in the variable name
-/// leaves the server behaving normally rather than dying on request one.
-static int _dieOnRequestOrdinal()
+/// leaves the server behaving normally rather than dying on request one. Shared by the
+/// exit-on-request and kill-on-request hooks.
+static int _requestOrdinalFromEnv(const char* name)
 {
     StringBuilder value;
-    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
-            UnownedStringSlice::fromLiteral("SLANG_TEST_SERVER_DIE_ON_REQUEST"),
-            value)))
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice(name), value)))
     {
         return 0;
     }
@@ -752,7 +751,15 @@ static void _reportExitReason(JSONRPCConnection* connection, bool quitRequested,
 
 SlangResult TestServer::execute()
 {
-    const int dieOnRequest = _dieOnRequestOrdinal();
+    const int dieOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_DIE_ON_REQUEST");
+
+    // Companion to the above that dies by SIGNAL rather than by exiting. The two are not
+    // interchangeable: an exit is reported through getReturnValue(), a signal through
+    // getTerminationSignal(), and those are separate paths on the client side -- the one
+    // that turns "the server vanished" into "the OOM killer took it" is reachable ONLY this
+    // way. Without it the headline diagnostic of this change has no test driving it, and a
+    // regression in the WTERMSIG recording would pass CI in silence.
+    const int killOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_KILL_ON_REQUEST");
     int servedCount = 0;
 
     while (m_connection->isActive() && !m_quit)
@@ -766,6 +773,22 @@ SlangResult TestServer::execute()
         if (dieOnRequest && servedCount == dieOnRequest - 1)
         {
             _Exit(1);
+        }
+
+        // SIGKILL specifically: uncatchable, so no handler can soften it, and it is what the
+        // OOM killer actually sends -- the case the client-side gloss names.
+        //
+        // Unix only, and that costs nothing: Windows has no signal deaths for the client to
+        // report, since WinProcess reports every termination as an exit code. The variable is
+        // simply inert there rather than conditionally compiled away at its read, so a
+        // Windows run of the same test still exercises the ordinary exit path.
+        if (killOnRequest && servedCount == killOnRequest - 1)
+        {
+#if SLANG_UNIX_FAMILY
+            ::raise(SIGKILL);
+#else
+            _Exit(1);
+#endif
         }
 
         // Failure doesn't make the execution terminate

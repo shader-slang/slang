@@ -19,6 +19,7 @@
 // these deterministic; the alternative is waiting for a server to die on its own, which is
 // exactly the thing that cannot be scheduled.
 
+#include "../slang-test/test-reporter.h"
 #include "core/slang-io.h"
 #include "core/slang-platform.h"
 #include "core/slang-process-util.h"
@@ -78,7 +79,8 @@ static bool _cannotRunHere()
 static SlangResult _runSlangTestWithDyingServer(
     UnitTestContext* context,
     int dieOnRequest,
-    ExecuteResult& outResult)
+    ExecuteResult& outResult,
+    bool killBySignal = false)
 {
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slang-test"));
@@ -97,7 +99,9 @@ static SlangResult _runSlangTestWithDyingServer(
         return ProcessUtil::execute(cmdLine, outResult);
     }
 
-    ScopedEnvVar dieAfter("SLANG_TEST_SERVER_DIE_ON_REQUEST", String(dieOnRequest).getBuffer());
+    ScopedEnvVar dieAfter(
+        killBySignal ? "SLANG_TEST_SERVER_KILL_ON_REQUEST" : "SLANG_TEST_SERVER_DIE_ON_REQUEST",
+        String(dieOnRequest).getBuffer());
     return ProcessUtil::execute(cmdLine, outResult);
 }
 
@@ -217,4 +221,71 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
     SLANG_CHECK(!_contains(output, "100% of tests passed"));
     SLANG_CHECK(!_contains(output, "(0/0)"));
     SLANG_CHECK(_contains(output, "failing tests:"));
+}
+
+/// The signal-death path, which is the one the whole diagnostic exists for.
+///
+/// Every other case here kills the server with _Exit, so they all take the ordinary
+/// exit-status branch and none of them touches getTerminationSignal(), the WIFSIGNALED
+/// recording behind it, or the SIGKILL gloss. That left the headline claim of this change --
+/// telling an OOM kill apart from a crash apart from a clean stop -- as the one behaviour
+/// with no test driving it.
+///
+/// Unix only. Windows reports every termination as an exit code, so there is no signal for
+/// the client to report and nothing here to assert.
+SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
+{
+    if (_cannotRunHere())
+    {
+        SLANG_IGNORE_TEST
+    }
+
+#if SLANG_UNIX_FAMILY
+    ExecuteResult res;
+    SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithDyingServer(unitTestContext, 3, res, true)));
+
+    const String output = _allOutput(res);
+    if (!_contains(output, "killed by signal"))
+    {
+        _dumpChildRun("signal", 3, res);
+    }
+
+    // The number, and the name that makes it actionable. Before this path existed the same
+    // death reported "server exited with status -1", because a Unix exit status is only
+    // recorded for WIFEXITED -- so SIGKILL and SIGSEGV were indistinguishable from each other
+    // and from a reader that never ran.
+    SLANG_CHECK(_contains(output, "killed by signal"));
+    SLANG_CHECK(_contains(output, "SIGKILL"));
+
+    // And it must NOT fall back to the exit-status wording, which is what a regression in
+    // getTerminationSignal() returning 0 would produce.
+    SLANG_CHECK(!_contains(output, "server exited with status"));
+
+    // The run itself still recovers: a signal death is a lost server like any other.
+    SLANG_CHECK(res.resultCode == 0);
+#endif
+}
+
+/// consolidateWith merges the loss accounting across per-thread sub-reporters.
+///
+/// Nothing else here reaches it: every child run above uses -server-count 1, so all the
+/// losses land in one reporter and the merge is never exercised. Production CI runs
+/// -server-count 4. Deleting the two merge lines leaves every other case in this file green.
+SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters)
+{
+    TestReporter parent;
+    TestReporter worker;
+
+    parent.m_testServerLossCount = 1;
+    parent.m_testServerLossTests.add("main/a.slang");
+
+    worker.m_testServerLossCount = 2;
+    worker.m_testServerLossTests.add("worker/b.slang");
+    worker.m_testServerLossTests.add("worker/b.slang"); // same test, two servers lost
+
+    parent.consolidateWith(&worker);
+
+    SLANG_CHECK(parent.m_testServerLossCount == 3);
+    // Concatenated, not unioned: a repeat is the frequency signal, so the duplicate survives.
+    SLANG_CHECK(parent.m_testServerLossTests.getCount() == 3);
 }

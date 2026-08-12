@@ -309,7 +309,7 @@ void TestContext::destroyRPCConnection()
     m_rpcRequestOrdinals[slangTestThreadIndex] = 0;
 }
 
-int TestContext::nextRPCRequestOrdinal()
+int TestContext::advanceRPCRequestOrdinal()
 {
     return ++m_rpcRequestOrdinals[slangTestThreadIndex];
 }
