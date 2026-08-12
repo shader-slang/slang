@@ -33,6 +33,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Emitted when the shader has no entry point of the requested name. Means this script's
+# command line did not fit the shader, not that the compiler found anything wrong.
+ENTRY_POINT_MISMATCH = b"E38000"
+
 
 def compile_once(slangc, source, env_var, value, target, extra_args):
     env = dict(os.environ)
@@ -93,7 +97,15 @@ def main():
     if args.compare == "ir":
         # -dump-ir writes the IR to stdout and needs -o to keep target code from mixing in.
         extra += ["-dump-ir", "-o", os.devnull]
-    diverged, both_failed, agreed = [], 0, 0
+    # A shared failure is not one thing. A shader the compiler parsed, checked and then
+    # diagnosed is a real negative-test comparison: the two modes produced byte-identical
+    # diagnostics. A shader rejected only because this script guessed the wrong entry
+    # point never got that far -- it exercised session creation, builtin-module load and
+    # entry-point lookup, and nothing else. Counting them together overstates the depth
+    # of the coverage.
+    diverged, agreed = [], 0
+    negative_agreed = 0   # failed identically, having actually diagnosed something
+    entry_mismatch = 0    # failed identically, but only because -entry did not match
 
     for i, src in enumerate(sources, 1):
         on = compile_once(slangc, src, args.var, args.on, args.target, extra)
@@ -101,8 +113,10 @@ def main():
         if on == off:
             if on[0] == 0:
                 agreed += 1
+            elif ENTRY_POINT_MISMATCH in on[2]:
+                entry_mismatch += 1
             else:
-                both_failed += 1
+                negative_agreed += 1
         else:
             diverged.append((src, on, off))
             print(f"DIVERGED: {src}")
@@ -113,11 +127,16 @@ def main():
             if on[2] != off[2]:
                 print("  stderr differs")
         if not args.quiet and i % 100 == 0:
-            print(f"... {i}/{len(sources)}  agreed={agreed} both-failed={both_failed} "
-                  f"diverged={len(diverged)}", file=sys.stderr)
+            print(f"... {i}/{len(sources)}  agreed={agreed} negative={negative_agreed} "
+                  f"entry-mismatch={entry_mismatch} diverged={len(diverged)}",
+                  file=sys.stderr)
 
-    print(f"\n{len(sources)} shaders: {agreed} agreed, {both_failed} failed the same way "
-          f"under both, {len(diverged)} diverged")
+    print(f"\n{len(sources)} shaders")
+    print(f"  {agreed:5d}  compiled, generated output identical")
+    print(f"  {negative_agreed:5d}  diagnosed, diagnostics identical (negative-test coverage)")
+    print(f"  {entry_mismatch:5d}  skipped: no '{args.entry}' entry point, so only the load "
+          f"path was compared")
+    print(f"  {len(diverged):5d}  DIVERGED")
     if sources and agreed == 0:
         # Every shader was rejected, so the comparison only ever saw the error path.
         # Technically "no divergence", but it establishes nothing about generated code.
