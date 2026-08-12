@@ -311,10 +311,8 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None,
     # generated here, or already prepared by an earlier step / another machine
     # (bench.py --corpus). Either way what follows measures a directory.
     if prepared:
-        files = corpus.existing(gen_dir)
+        files = corpus.prepared_files(gen_dir)
     else:
-        if os.path.exists(gen_dir):
-            shutil.rmtree(gen_dir)
         files = corpus.materialize(spec, size, gen_dir)
 
     # An api workload without a driver+libslang must fail loudly (not silently
@@ -417,8 +415,11 @@ def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument("--slangc", required=True, help="path to slangc to benchmark")
-    ap.add_argument("--label", required=True, help="version/run label, e.g. v2026.9")
+    # Required to MEASURE, but not to PREPARE — see the --prepare check below.
+    ap.add_argument("--slangc", default=None,
+                    help="path to slangc to benchmark (required unless --prepare)")
+    ap.add_argument("--label", default=None,
+                    help="version/run label, e.g. v2026.9 (required unless --prepare)")
     ap.add_argument("--out", default="results", help="output directory")
     ap.add_argument("--samples", type=int, default=5)
     ap.add_argument("--warmup", type=int, default=1)
@@ -438,7 +439,9 @@ def main():
     # the default path is unchanged — prepare-then-bench in one process.
     ap.add_argument("--prepare", metavar="DIR", default=None,
                     help="write the selected workloads' .slang sources to DIR "
-                         "and exit without benchmarking")
+                         "as one <workload>_n<size>/ directory per run, then "
+                         "exit without benchmarking. Needs no --slangc/--label: "
+                         "pass the same DIR to --corpus on the measuring machine")
     ap.add_argument("--corpus", metavar="DIR", default=None,
                     help="bench sources already prepared in DIR (skips "
                          "generation entirely; DIR must contain one "
@@ -457,9 +460,18 @@ def main():
                          "resynced with them (see DESIGN.md 'API-path workloads').")
     args = ap.parse_args()
 
-    slangc = os.path.abspath(args.slangc)
-    if not os.path.exists(slangc):
-        sys.exit(f"slangc not found: {slangc}")
+    # --slangc and --label are checked HERE rather than declared required=True,
+    # and validated only after the --prepare return below. Preparing a corpus
+    # invokes no compiler and writes no results directory, so a machine that has
+    # the tree but no slangc must be able to run it — which is the entire point
+    # of splitting the two steps. argparse cannot express "required unless
+    # --prepare", so the condition is spelled out.
+    if not args.prepare:
+        absent = [flag for flag, val in (("--slangc", args.slangc),
+                                         ("--label", args.label)) if not val]
+        if absent:
+            sys.exit(f"{', '.join(absent)} required for a benchmark run "
+                     f"(only --prepare runs without them)")
 
     specs = manifest.WORKLOADS
     if not args.api and not args.only:
@@ -482,8 +494,6 @@ def main():
         if missing:
             sys.exit(f"unknown workloads: {sorted(missing)}")
 
-    root = os.path.join(os.path.abspath(args.out), args.label)
-    os.makedirs(root, exist_ok=True)
     # Generated sources + compiled outputs are large, transient build scratch; keep
     # them OUT of the results dir so it stores only results.json. Default to a
     # tempdir that is removed at the end (overridable with --gen-dir to keep them).
@@ -510,6 +520,17 @@ def main():
                 print(f"[prep] {spec.name:24s} n={size:<6} {len(names):4d} file(s)")
         print(f"\nwrote {total} file(s) to {gen_root}")
         return
+
+    # Everything below MEASURES, so slangc and the results directory are
+    # required from here on — and not one line earlier: validating slangc above
+    # would fail a --prepare run on a machine that has no compiler, and creating
+    # the results directory above would leave an empty one behind that --prepare
+    # never writes into.
+    slangc = os.path.abspath(args.slangc)
+    if not os.path.exists(slangc):
+        sys.exit(f"slangc not found: {slangc}")
+    root = os.path.join(os.path.abspath(args.out), args.label)
+    os.makedirs(root, exist_ok=True)
     os.makedirs(gen_root, exist_ok=True)
 
     # Resolve the api-driver + libslang once when any api workload is selected.

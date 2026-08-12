@@ -18,6 +18,8 @@ generator that read files off disk, a default_size of 0 documented as
 from the determinism guard. Three accommodations for one idea.
 """
 import os
+import shutil
+import tempfile
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CORPUS_ROOT = os.path.join(HERE, "corpus")
@@ -66,7 +68,21 @@ def dir_name(spec, size):
 
 
 def materialize(spec, size, dest):
-    """Write a workload's sources into `dest` and return their filenames.
+    """Replace `dest` with a workload's sources and return their filenames, sorted.
+
+    `dest` is REPLACED, not written over. Writing over it would leave behind any
+    file the generator no longer emits, and prepared_files() cannot tell an
+    orphan from a source — so a later `bench.py --corpus` run would compile a
+    file that no version of the generator produces. Clearing lives here rather
+    than in the two callers because both need it and only one used to do it.
+
+    The return is sorted for the same reason prepared_files() sorts: those two
+    are the only ways a caller learns a corpus's file list, and build_commands
+    picks the entry point positionally (`list(files)[0]`) when a workload names
+    no main file. If the two disagreed, preparing in-process and preparing on
+    another machine could measure DIFFERENT files from identical bytes on disk
+    — silently, and only for multi-file workloads. Sorting both makes them
+    identical by construction; the round-trip is pinned at import below.
 
     Generated sources must be pure ASCII: a typographic character would make
     the corpus bytes platform-dependent, and the series compares bytes across
@@ -74,25 +90,37 @@ def materialize(spec, size, dest):
     python -O. Static corpora are exempt by construction — they are input, not
     something our generators promise about.
     """
+    if os.path.isdir(dest):
+        shutil.rmtree(dest)
     os.makedirs(dest, exist_ok=True)
     files = sources(spec, size)
     for fn, src in files.items():
+        # Flat by contract. materialize() could write a nested path, but
+        # read_corpus() and prepared_files() both list one directory level, so
+        # a nested source would be written and then never read back — the file
+        # would silently vanish from the measurement. Rejecting the shape is
+        # honest where supporting it halfway is not; no generator emits one,
+        # and adding nested support means teaching all three functions at once.
+        if "/" in fn or os.sep in fn:
+            raise ValueError(
+                f"source filename {fn!r} is nested; corpus directories are flat "
+                f"because read_corpus/prepared_files list a single level")
         if not spec.source_dir and not src.isascii():
             raise ValueError(
                 f"generated source {fn} contains non-ASCII; generators must "
                 f"emit ASCII only so the corpus is byte-identical everywhere")
-        path = os.path.join(dest, fn)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        with open(os.path.join(dest, fn), "w", encoding="utf-8", newline="\n") as fh:
             fh.write(src)
-    return list(files)
+    return sorted(files)
 
 
-def existing(dest):
-    """Filenames of an already-prepared corpus directory.
+def prepared_files(dest):
+    """Sorted filenames of an already-prepared corpus directory.
 
     Used by `bench.py --corpus`, where the sources were produced elsewhere
-    (another job, another machine) and this run only measures them.
+    (another job, another machine) and this run only measures them. Named for
+    what it returns rather than what it tests — it reads a list, not a
+    predicate — and sorted to match materialize()'s order exactly.
     """
     if not os.path.isdir(dest):
         raise FileNotFoundError(f"no prepared corpus at {dest}")
@@ -115,3 +143,59 @@ for _s in manifest.WORKLOADS:
 del _s
 
 assert dir_name(manifest.BY_NAME["minimal"], 0) == "minimal_n0"
+
+# The prepare -> bench round-trip, over a throwaway tmpdir. This is the
+# invariant the whole split rests on: --prepare writes a corpus and --corpus
+# measures it, possibly on another machine, and the two must agree on WHICH
+# files are in it and in WHAT order. Order matters because build_commands
+# selects the entry point positionally for workloads that name no main file,
+# so a disagreement would silently measure a different file rather than fail.
+#
+# Driven by a stub spec, not a real workload: the manifest's multi-file
+# generators are large, and the property under test is materialize's, not any
+# workload's. The filenames deliberately expose BOTH ways insertion order
+# diverges from sorted order — "m10" sorts before "m2", and "link_main" sorts
+# before every "m*" while generators emit it last.
+class _StubSpec:
+    name = "_selfcheck"
+    source_dir = None
+
+    @staticmethod
+    def gen(n):
+        return {"m2.slang": "// a\n", "m10.slang": "// b\n", "link_main.slang": "// c\n"}
+
+
+_tmp = tempfile.mkdtemp(prefix="corpus_selfcheck_")
+try:
+    _dest = os.path.join(_tmp, dir_name(_StubSpec, 1))
+    _written = materialize(_StubSpec, 1, _dest)
+    assert _written == prepared_files(_dest), \
+        (f"materialize and prepared_files must agree on the file list AND its "
+         f"order; got {_written} vs {prepared_files(_dest)}")
+    assert _written == ["link_main.slang", "m10.slang", "m2.slang"], \
+        "both sides must be sorted, not in generator emission order"
+
+    # Re-preparing must REPLACE, not accumulate: an orphan left by an earlier
+    # run is indistinguishable from a source once it is on disk.
+    with open(os.path.join(_dest, "orphan.slang"), "w", encoding="utf-8") as _fh:
+        _fh.write("// stale\n")
+    assert "orphan.slang" in prepared_files(_dest), "self-check setup failed"
+    assert "orphan.slang" not in materialize(_StubSpec, 1, _dest), \
+        "materialize must clear dest; a stale file would be compiled by --corpus"
+    assert "orphan.slang" not in prepared_files(_dest), \
+        "the orphan must be gone from disk, not merely absent from the return"
+
+    # Nested filenames are rejected rather than half-supported (see materialize).
+    class _NestedSpec(_StubSpec):
+        @staticmethod
+        def gen(n):
+            return {"sub/a.slang": "// x\n"}
+
+    try:
+        materialize(_NestedSpec, 1, os.path.join(_tmp, "nested"))
+        raise AssertionError("materialize must reject a nested source filename")
+    except ValueError as _e:
+        assert "nested" in str(_e), f"the rejection must name the shape; got {str(_e)!r}"
+finally:
+    shutil.rmtree(_tmp, ignore_errors=True)
+del _StubSpec, _NestedSpec, _tmp, _dest, _written, _fh
