@@ -571,6 +571,15 @@ _REQUIRED_FINDING_KEYS = (
     "provenance",
 )
 _REQUIRED_EVIDENCE_KEYS = ("command", "source_slang", "observed_summary")
+
+# A path in `evidence.command` that will not exist after the session ends. A
+# finding whose command names one of these cannot be re-run later, so it cannot
+# be confirmed still-reproducing before filing -- which is the one thing triage
+# has to do. Seventeen sigsegv findings were triaged in one pass and seven were
+# untestable for exactly this reason; two of those produced convincing false
+# "already fixed" results, because substituting the committed `source_slang`
+# silently fed slangc a different program.
+_SCRATCH_PATH_RE = re.compile(r"(?:^|[\s=])(?:/tmp/|/var/folders/)\S*|<file>|<tmp>")
 _REQUIRED_EXPECTED_KEYS = ("claim", "citation_kind", "citation")
 _REQUIRED_PROVENANCE_KEYS = ("agent_model", "source_commit", "doc_anchor")
 _SUSPECTED_KINDS = {
@@ -621,6 +630,58 @@ def load_finding(path: Path) -> dict:
     return _load_yaml(path.read_text(encoding="utf-8")) or {}
 
 
+def _lint_finding_reproducibility(where: str, ev: dict) -> list[LintIssue]:
+    """Check that a finding can still be re-run after the session that filed it.
+
+    Triage has exactly one job before filing: confirm the failure still
+    happens. That is impossible if the recorded `command` points at a
+    scratch path -- `/tmp/foo.slang`, `<file>` -- because the input is
+    gone. Substituting `evidence.source_slang` is not a fix: when the
+    failing input was a *variant* of the committed test, the substitution
+    silently compiles a different program. In one triage pass that turned
+    two live bugs into apparent "already fixed" results, which is worse
+    than having no result at all.
+
+    So: name a scratch path in the command, and the real input must be
+    inlined in `evidence.repro_source`. This is a warning rather than an
+    error because 28 of the 82 findings committed before the rule predate
+    it; the fix is a sweep, not a gate.
+    """
+    issues: list[LintIssue] = []
+    cmd = str(ev.get("command") or "")
+    scratch = _SCRATCH_PATH_RE.search(cmd)
+    has_inline = bool(str(ev.get("repro_source") or "").strip()) or bool(
+        str(ev.get("minimized_repro") or "").strip()
+    )
+    if scratch and not has_inline:
+        issues.append(
+            LintIssue(
+                where,
+                "warning",
+                f"evidence.command names a scratch path ({scratch.group(0).strip()!r})"
+                " that will not exist later, and no evidence.repro_source is"
+                " given, so this finding cannot be re-run to confirm it still"
+                " reproduces before filing",
+            )
+        )
+    src = str(ev.get("source_slang") or "")
+    if (
+        src.endswith(".slang")
+        and not src.startswith(("/tmp", "<"))
+        and not (REPO_ROOT / src).exists()
+        and not has_inline
+    ):
+        issues.append(
+            LintIssue(
+                where,
+                "warning",
+                f"evidence.source_slang {src!r} does not exist and no"
+                " evidence.repro_source is given; the finding has no runnable input",
+            )
+        )
+    return issues
+
+
 def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
     """Structural validation. Mirrors finding.schema.json required fields."""
     issues: list[LintIssue] = []
@@ -660,6 +721,8 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
             LintIssue(where, "error", f"title exceeds 80 chars ({len(title)})")
         )
     ev = finding.get("evidence")
+    if isinstance(ev, dict):
+        issues.extend(_lint_finding_reproducibility(where, ev))
     if isinstance(ev, dict):
         for k in _REQUIRED_EVIDENCE_KEYS:
             if k not in ev:
@@ -4312,6 +4375,46 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         "gap merge keeps both suggestions",
         dup[0]["suggested_addition"] if dup else "",
         "Add the rule. // Add an example too.",
+    )
+
+    # Finding reproducibility. A finding whose command names a scratch path
+    # cannot be re-run at triage time; the committed corpus has both shapes,
+    # but only the negative cases prove the check fires.
+    def repro_warns(ev):
+        return [i.message for i in _lint_finding_reproducibility("f", ev)]
+
+    check(
+        "scratch command without inline repro warns",
+        len(repro_warns({"command": "slangc /tmp/x.slang -target hlsl"})),
+        1,
+    )
+    check(
+        "placeholder command without inline repro warns",
+        len(repro_warns({"command": "slangc <file> -target hlsl"})),
+        1,
+    )
+    check(
+        "scratch command with inline repro is accepted",
+        repro_warns({"command": "slangc /tmp/x.slang", "repro_source": "void main(){}"}),
+        [],
+    )
+    check(
+        "operator-minimized repro also satisfies it",
+        repro_warns({"command": "slangc <file>", "minimized_repro": "void main(){}"}),
+        [],
+    )
+    check(
+        "committed input with a clean command is silent",
+        repro_warns({
+            "command": "slangc docs/generated/tests/x.slang -target hlsl",
+            "source_slang": "docs/generated/tests/_meta/regenerate.py",
+        }),
+        [],
+    )
+    check(
+        "missing source_slang with no inline repro warns",
+        len(repro_warns({"command": "slangc a.slang", "source_slang": "docs/nope.slang"})),
+        1,
     )
 
     # `--tree` routing: two production callers depend on this prefix split
