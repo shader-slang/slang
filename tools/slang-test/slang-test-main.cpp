@@ -5255,7 +5255,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
                 if (testResult == TestResult::Fail && !context->options.disableRetries &&
-                    !context->getTestReporter()->m_expectedFailureList.contains(testName))
+                    !context->getTestReporter()->isExpectedFailure(testName))
                 {
                     RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
                     fileTestInfo->filePath = filePath;
@@ -5634,9 +5634,8 @@ static SlangResult runUnitTestModule(
         auto testFunc = testModule->getTestFunc(i);
         auto testName = testModule->getTestName(i);
 
-        StringBuilder filePath;
-        filePath << moduleName << "/" << testName << ".internal";
-        auto command = filePath.produceString();
+        auto command =
+            makeUnitTestKey(UnownedStringSlice(moduleName), UnownedStringSlice(testName));
 
         if (shouldRunTest(context, command))
         {
@@ -5688,8 +5687,12 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    // The call never reached the test, so this is not a verdict about it. Tell the
+                    // reporter, which needs to know a retry that skips the test is a real answer
+                    // here rather than a skipped failure.
                     testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
+                    reporter->noteDispatchFailure(options.command);
                 }
 
                 // Check for VVL errors in unit tests
@@ -5709,8 +5712,14 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
+                // The expected-failure list is keyed by the reporter key, not the bare test
+                // name, so the key is built by makeUnitTestKey() rather than chosen here. That
+                // matters because choosing wrong has no visible symptom -- the lookup just never
+                // matches, and the only cost is the pointless retry this gate exists to avoid.
                 if (isFailed && !context->isRetry && !context->options.disableRetries &&
-                    !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
+                    !context->getTestReporter()->isExpectedFailure(makeUnitTestKey(
+                        UnownedStringSlice(moduleName),
+                        test.testName.getUnownedSlice())))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
@@ -5789,7 +5798,18 @@ static SlangResult runUnitTestModule(
             runUnitTest(t);
     }
 
-    testModule->destroy();
+    // Note `testModule->destroy()` is deliberately not called here. The registry it would empty has
+    // process lifetime and is filled in once, by the module's load-time static constructors, so
+    // this function must leave it intact for the retry pass to enumerate. (The test server, which
+    // holds the same kind of module, releases its own copy from its destructor at shutdown.)
+    //
+    // No unit test guards this: the cross-pass dlopen / static-constructor path it turns on cannot
+    // be driven from an in-process SLANG_UNIT_TEST, so a real two-pass run under CI is the only
+    // positive check. What does exist is a backstop -- reinstating the call would leave every
+    // unit-test deferral unredeemed, and `TestReporter::reconcilePendingRetries()` would then count
+    // them as failures. So the regression surfaces as red CI rather than as the silent green it
+    // used to be, but only because that safety net is there. Do not "tidy up" the missing
+    // destroy() on the assumption the unit tests cover it.
     return SLANG_OK;
 }
 
@@ -6169,6 +6189,15 @@ SlangResult innerMain(int argc, char** argv)
                 }
             }
         }
+
+        // Every retry pass has now run, so any test whose result is still deferred is never going
+        // to get one. Turn those into failures before they reach the summary.
+        //
+        // The position matters and no unit test can hold it: the reporter tests call
+        // reconcilePendingRetries() directly, so moving this above the retry loop -- where it would
+        // count deferrals the retry was about to redeem -- or dropping it entirely would not fail
+        // any of them. It has to run after the last retry and before outputSummary().
+        reporter.reconcilePendingRetries();
 
         reporter.outputSummary();
 

@@ -13,6 +13,13 @@ using namespace Slang;
 
 /* static */ TestReporter* TestReporter::s_reporter = nullptr;
 
+String makeUnitTestKey(const UnownedStringSlice& moduleName, const UnownedStringSlice& testName)
+{
+    StringBuilder key;
+    key << moduleName << "/" << testName << ".internal";
+    return key.produceString();
+}
+
 static void appendXmlEncode(char c, StringBuilder& out)
 {
     switch (c)
@@ -165,7 +172,7 @@ void TestReporter::addResult(TestResult result)
     SLANG_ASSERT(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
-    if (result == TestResult::Fail && m_expectedFailureList.contains(m_currentInfo.name))
+    if (result == TestResult::Fail && isExpectedFailure(m_currentInfo.name))
         result = TestResult::ExpectedFail;
     m_currentInfo.testResult = combine(m_currentInfo.testResult, result);
     m_numCurrentResults++;
@@ -253,6 +260,19 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_passedTestCount += other->m_passedTestCount;
     m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
+
+    // A deferral and the final result that redeems it can be recorded by two different
+    // sub-reporters, because the retry pass is run by a fresh set of threads. Merge both sets and
+    // let reconcilePendingRetries() match them up once everything has been consolidated.
+    for (const auto& name : other->m_pendingRetryTests)
+        m_pendingRetryTests.add(name);
+    for (const auto& name : other->m_redeemingResultTests)
+        m_redeemingResultTests.add(name);
+    for (const auto& name : other->m_ignoredTests)
+        m_ignoredTests.add(name);
+    for (const auto& name : other->m_dispatchFailures)
+        m_dispatchFailures.add(name);
+    m_dispatchFailureCount += other->m_dispatchFailureCount;
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -359,17 +379,40 @@ void TestReporter::_addResult(TestInfo info)
         return;
     }
 
-    if (info.testResult == TestResult::Ignored && m_hideIgnored)
+    // If test is pending retry, don't count it in any statistics yet.
+    // The test will be re-run and reported again with a final result; remember the deferral so
+    // reconcilePendingRetries() can fail the test if that never happens.
+    if (info.testResult == TestResult::PendingRetry)
     {
+        m_pendingRetryTests.add(info.name);
+        if (!m_suppressConsoleOutput)
+        {
+            printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
+            fflush(stdout);
+        }
         return;
     }
 
-    // If test is pending retry, don't count it in any statistics yet
-    // The test will be re-run and reported again with a final result
-    if (info.testResult == TestResult::PendingRetry)
+    // A verdict -- Pass, Fail, ExpectedFail -- redeems an earlier deferral of the same test.
+    // Ignored does not. A test is deferred because it *ran and failed*; a retry that skips it
+    // produces no verdict and so refutes nothing, leaving the first-pass failure standing for
+    // reconcilePendingRetries() to count. Treating Ignored as final is how a real failure
+    // disappeared from a run: deferred on the first pass, ignored on the retry, and under
+    // -hide-ignored not even counted as ignored, so it left no trace in the totals at all.
+    //
+    // Recorded before the hidden-ignored return below, because being hidden from the output does
+    // not make a verdict any less final.
+    // Record what this result *is*; whether it redeems a deferral is decided by
+    // reconcilePendingRetries(), after consolidation. It cannot be decided here: the deferral and
+    // the retry are reported by different sub-reporters, so this one does not know whether the
+    // first attempt ever reached the test.
+    if (info.testResult == TestResult::Ignored)
+        m_ignoredTests.add(info.name);
+    else
+        m_redeemingResultTests.add(info.name);
+
+    if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
-        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
-        fflush(stdout);
         return;
     }
 
@@ -444,6 +487,11 @@ void TestReporter::_addResult(TestInfo info)
             buffer.getBuffer());
         fflush(stdout);
     };
+
+    // Everything above this point is accounting -- counters and m_testInfos --
+    // and still happens. Only the reporting below is skipped.
+    if (m_suppressConsoleOutput)
+        return;
 
     switch (m_outputMode)
     {
@@ -680,6 +728,67 @@ void TestReporter::message(TestMessageType type, const char* messageContent)
 }
 
 
+String TestReporter::describeUnredeemedRetry(const String& testKey)
+{
+    // Built rather than printed so a test can read it: this is the diagnostic a maintainer sees
+    // when a run goes red for this reason, and it is otherwise never produced under test, since
+    // every reporter test suppresses console output.
+    StringBuilder message;
+    message << "error: test '" << testKey
+            << "' failed and its retry never produced a verdict, so the failure was about to go "
+               "unreported; counting it now (as a failure, or an expected failure if it is on the "
+               "expected-failure list). Either the retry did not run the test, or it ran and "
+               "reported it ignored -- the retry's own line above says which";
+    return message.produceString();
+}
+
+void TestReporter::reconcilePendingRetries()
+{
+    for (const auto& name : m_pendingRetryTests)
+    {
+        // A verdict always redeems. An ignore redeems only a deferral whose first attempt never
+        // reached the test -- there is no failure for the skip to refute. Both halves are read
+        // here, after consolidation, because the two facts are recorded by different
+        // sub-reporters.
+        const bool redeemed = m_redeemingResultTests.contains(name) ||
+                              (m_ignoredTests.contains(name) && m_dispatchFailures.contains(name));
+        if (redeemed)
+            continue;
+
+        if (!m_suppressConsoleOutput)
+        {
+            printf("%s\n", describeUnredeemedRetry(name).getBuffer());
+            fflush(stdout);
+        }
+
+        // Report it as an ordinary failure so that it lands in the summary and, like any other
+        // failure, is still downgraded if it is on the expected-failure list.
+        addTest(name, TestResult::Fail);
+    }
+
+    m_pendingRetryTests.clear();
+    m_redeemingResultTests.clear();
+    m_ignoredTests.clear();
+
+    // The dispatch-failure *names* are only read above, to decide redemption, so they are cleared
+    // with everything else: leaving them would let a stale key redeem an unrelated later ignore if
+    // the reporter were ever reused. The *count* deliberately survives -- outputSummary() runs
+    // after this and reports it, and it is a tally of everything that happened in the run rather
+    // than state to be reconciled.
+    m_dispatchFailures.clear();
+}
+
+void TestReporter::noteDispatchFailure(const String& testKey)
+{
+    m_dispatchFailures.add(testKey);
+    m_dispatchFailureCount++;
+}
+
+bool TestReporter::isExpectedFailure(const String& testKey) const
+{
+    return m_expectedFailureList.contains(testKey);
+}
+
 bool TestReporter::didAllSucceed() const
 {
     return m_failedTestCount == 0;
@@ -687,6 +796,10 @@ bool TestReporter::didAllSucceed() const
 
 void TestReporter::outputSummary()
 {
+    // Nothing here but reporting, so a suppressed reporter has nothing to do.
+    if (m_suppressConsoleOutput)
+        return;
+
     auto passCount = m_passedTestCount;
     auto rawTotal = m_totalTestCount;
     auto ignoredCount = m_ignoredTestCount;
@@ -711,6 +824,15 @@ void TestReporter::outputSummary()
             }
 
             printf("\n===\n%d%% of tests passed (%d/%d)", percentPassed, passCount, runTotal);
+            if (m_dispatchFailureCount)
+            {
+                // Reported even when a retry went on to resolve every one of them: a connection
+                // dying is a fault worth seeing, and it is not attributable to whichever test was
+                // in flight when it happened.
+                printf(
+                    ", %d test-server dispatch failure(s) -- a connection died mid-run",
+                    m_dispatchFailureCount);
+            }
             if (ignoredCount)
             {
                 printf(", %d tests ignored", ignoredCount);
@@ -725,7 +847,7 @@ void TestReporter::outputSummary()
                 {
                     if (testInfo.testResult == TestResult::Pass)
                     {
-                        if (m_expectedFailureList.contains(testInfo.name))
+                        if (isExpectedFailure(testInfo.name))
                         {
                             printf("%s\n", testInfo.name.getBuffer());
                         }
@@ -832,6 +954,9 @@ void TestReporter::startSuite(const String& name)
 {
     m_suiteStack.add(name);
 
+    if (m_suppressConsoleOutput)
+        return;
+
     switch (m_outputMode)
     {
     case TestOutputMode::TeamCity:
@@ -852,6 +977,13 @@ void TestReporter::startSuite(const String& name)
 void TestReporter::endSuite()
 {
     SLANG_ASSERT(m_suiteStack.getCount());
+
+    // Gate only the reporting: the stack still has to unwind below.
+    if (m_suppressConsoleOutput)
+    {
+        m_suiteStack.removeLast();
+        return;
+    }
 
     switch (m_outputMode)
     {
@@ -875,7 +1007,7 @@ void TestReporter::endSuite()
 
 TestResult TestReporter::adjustResult(UnownedStringSlice testName, TestResult result)
 {
-    if (result == TestResult::Fail && m_expectedFailureList.contains(testName))
+    if (result == TestResult::Fail && isExpectedFailure(testName))
         result = TestResult::ExpectedFail;
     return result;
 }
