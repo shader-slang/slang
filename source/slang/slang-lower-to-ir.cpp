@@ -8866,6 +8866,32 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 return;
             }
 
+            if (as<RefAccessorDecl>(context->funcDecl))
+            {
+                // A `ref` accessor's IR function is declared to return a *pointer*
+                // to the referenced storage (its result type is set to `Ptr(T)` in
+                // `_lowerInfoFromFuncParameters`), so `return _v;` must return the
+                // *address* of the l-value. The ordinary path below would instead
+                // `getSimpleVal` it, emitting a load and returning the value `T`,
+                // which contradicts the `Ptr(T)` result type.
+                auto lvalue = lowerLValueExpr(context, expr);
+                if (IRInst* addr = getAddress(context, lvalue, expr->loc))
+                {
+                    getBuilder()->emitReturn(addr);
+                }
+                else
+                {
+                    // The body is not an l-value (e.g. `ref { return _v + 1; }`);
+                    // `getAddress` has already diagnosed it, so compilation will
+                    // fail before this reaches a backend. Emit a placeholder null
+                    // pointer purely to keep the block terminated, mirroring the
+                    // `ref`-parameter recovery path (see the `ParamPassingMode::Ref`
+                    // case in `addArg`).
+                    getBuilder()->emitReturn(getBuilder()->getNullVoidPtrValue());
+                }
+                return;
+            }
+
             // If the AST `return` statement had an expression, then we
             // need to lower it to the IR at this point, both to
             // compute its value and (in case we are returning a
