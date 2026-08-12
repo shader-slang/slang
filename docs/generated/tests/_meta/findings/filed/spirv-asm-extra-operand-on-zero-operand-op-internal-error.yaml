@@ -7,6 +7,9 @@ observed_at: "2026-08-05T00:00:00+00:00"
 scope: spirv
 evidence:
   command: "build/RelWithDebInfo/bin/slangc -target spirv -entry test -stage compute <file> -o /tmp/o.spv"
+  repro_source: |
+    [numthreads(1,1,1)]
+    void test() { spirv_asm { OpNop %x; }; }
   source_slang: docs/generated/tests/coverage/check-expr/spirv-asm-not-enough-operands-diag.slang
   observed_summary: |
     Writing an operand after a SPIR-V opcode that takes no operands emits the expected

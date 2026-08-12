@@ -206,6 +206,23 @@
       "title": "[expressions] `new T(args)` with a user __init aborts: internal error",
       "url": "https://github.com/shader-slang/slang/issues/12485"
     },
+    "pack-query-first-last-compiler-crash": {
+      "issue": 12494,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2Oloc",
+      "title": "[generics] `__first(P)` and `__last(P)` pack-query ops crash slangc (exit 139)",
+      "url": "https://github.com/shader-slang/slang/issues/12494"
+    },
     "parser-magic-type-modifier-on-user-struct-sigsegv": {
       "issue": 12484,
       "labels": [
@@ -222,6 +239,40 @@
       "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXWI",
       "title": "`__magic_type(Name)` on a user struct crashes slangc with SIGSEGV",
       "url": "https://github.com/shader-slang/slang/issues/12484"
+    },
+    "slangi-as-operator-struct-upcast-segfault": {
+      "issue": 12495,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2OlyE",
+      "title": "slangi segfaults on `derived as Base` struct upcast through the as operator",
+      "url": "https://github.com/shader-slang/slang/issues/12495"
+    },
+    "slangi-bwd-diff-working-set-oob": {
+      "issue": 12496,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2Ol98",
+      "title": "slangi VM aborts with working-set out-of-bounds on any __bwd_diff call",
+      "url": "https://github.com/shader-slang/slang/issues/12496"
     },
     "slangi-vm-bool-false-arg-evaluates-as-true": {
       "issue": 11402,
@@ -290,6 +341,40 @@
       "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXmQ",
       "title": "Interface defaults-init + dynamic dispatch aborts in spirv-emit (E99997)",
       "url": "https://github.com/shader-slang/slang/issues/12486"
+    },
+    "spirv-asm-extra-operand-on-zero-operand-op-internal-error": {
+      "issue": 12497,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2OmKI",
+      "title": "spirv_asm: extra operand on a zero-operand opcode aborts with InternalError",
+      "url": "https://github.com/shader-slang/slang/issues/12497"
+    },
+    "spirv-optional-pointer-return-hangs": {
+      "issue": 12498,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2OmRE",
+      "title": "slangc never terminates on -target spirv for a function returning Optional<T*>",
+      "url": "https://github.com/shader-slang/slang/issues/12498"
     },
     "torch-autobind-unmappable-param-sigsegv": {
       "issue": 12483,
