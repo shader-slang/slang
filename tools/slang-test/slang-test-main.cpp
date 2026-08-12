@@ -14,6 +14,7 @@
 #include "core/slang-std-writers.h"
 #include "core/slang-string-escape-util.h"
 #include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -4983,28 +4984,6 @@ static String insertSubtestIndex(const String& testName, int index)
 
 // Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
 // Returns the subtest index if found, or -1 if not a subtest prefix.
-static int getSubtestIndex(const String& prefix, const String& filePath)
-{
-    if (prefix.getLength() <= filePath.getLength() || !prefix.startsWith(filePath))
-        return -1;
-
-    auto suffix = prefix.getUnownedSlice().tail(filePath.getLength());
-    if (suffix.getLength() < 2 || suffix[0] != '.')
-        return -1;
-
-    // Check all remaining chars are digits
-    int index = 0;
-    for (Index i = 1; i < suffix.getLength(); i++)
-    {
-        char c = suffix[i];
-        if (c < '0' || c > '9')
-            return -1;
-        index = index * 10 + (c - '0');
-    }
-
-    return index;
-}
-
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 {
     // Gather a list of tests to run
@@ -5105,20 +5084,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             for (Index i = 0; i < prefixes.getCount(); i++)
             {
                 // Check if prefix matches this specific subtest
-                int prefixSubtest = getSubtestIndex(prefixes[i], filePath);
-                if (prefixSubtest >= 0)
-                {
-                    // Prefix specifies a subtest - check for exact match
-                    if (prefixSubtest == 0 && testIdx == 0)
-                        return i;
-                    if (outputStem == prefixes[i])
-                        return i;
-                }
-                else if (filePath.startsWith(prefixes[i]))
-                {
-                    // Non-specific prefix - matches all subtests in file
+                if (TestToolUtil::entryMatchesSubtest(prefixes[i], filePath, outputStem, testIdx))
                     return i;
-                }
             }
             return prefixes.getCount();
         };
@@ -5204,6 +5171,29 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             testName << ")";
         }
 
+        // Per-subtest exclusion, and it has to happen HERE rather than in
+        // shouldRunTest(): that runs before subtests are expanded, so it can
+        // only see the source path. A synthesized variant such as
+        // `tests/compute/parameter-block.slang.6 syn (llvm)` can crash the
+        // worker outright, which also rules out -expected-failure-list —
+        // that reclassifies a result only after the test returns, and this
+        // one never does. The skip must be pre-dispatch, so it is.
+        if (TestToolUtil::isSubtestExcluded(
+                context->options.excludePrefixes,
+                context->options.skipList,
+                filePath,
+                outputStem,
+                subTestIndex))
+        {
+            if (context->options.verbosity >= VerbosityLevel::Info)
+            {
+                StringBuilder msg;
+                msg << "skipping excluded subtest: " << testName;
+                context->getTestReporter()->message(TestMessageType::Info, msg.produceString());
+            }
+            continue;
+        }
+
         // Check if any prefix is more specific than the file path (has subtest index).
         // If so, filter to only run tests whose outputStem matches the prefix.
         if (context->options.testPrefixes.getCount() > 0)
@@ -5213,32 +5203,15 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
             for (auto& p : context->options.testPrefixes)
             {
-                int prefixSubtestIndex = getSubtestIndex(p, filePath);
-                if (prefixSubtestIndex >= 0)
+                // Two separate questions, and only the second is the shared
+                // matching rule: whether the entry NAMES a subtest at all
+                // (which arms the filter), and whether it matches THIS one.
+                if (TestToolUtil::getSubtestIndex(p, filePath) >= 0)
                 {
                     hasSpecificPrefix = true;
-                    // Handle .0 specially - it refers to the first test (no suffix in outputStem)
-                    if (prefixSubtestIndex == 0)
-                    {
-                        if (outputStem == filePath)
-                        {
-                            matchesSpecificPrefix = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        // outputStem must match exactly (e.g., .10 shouldn't match .100)
-                        if (outputStem == p)
-                        {
-                            matchesSpecificPrefix = true;
-                            break;
-                        }
-                    }
                 }
-                else if (filePath.startsWith(p))
+                if (TestToolUtil::entryMatchesSubtest(p, filePath, outputStem, subTestIndex))
                 {
-                    // Non-specific prefix that matches the file - always run
                     matchesSpecificPrefix = true;
                     break;
                 }
@@ -5383,7 +5356,7 @@ static bool shouldRunTest(TestContext* context, String filePath)
         }
         // Also match if the prefix specifies a subtest index
         // (e.g., prefix "foo.slang.1" should include file "foo.slang")
-        if (getSubtestIndex(p, filePath) >= 0)
+        if (TestToolUtil::getSubtestIndex(p, filePath) >= 0)
         {
             return true;
         }
@@ -5507,7 +5480,7 @@ void runTestsInDirectory(TestContext* context)
                     return i;
                 }
                 // Also match subtest prefixes (e.g., "foo.slang.1" matches file "foo.slang")
-                if (getSubtestIndex(prefixes[i], filePath) >= 0)
+                if (TestToolUtil::getSubtestIndex(prefixes[i], filePath) >= 0)
                 {
                     return i;
                 }
