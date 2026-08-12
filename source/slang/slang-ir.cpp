@@ -222,7 +222,7 @@ void IRInstListBase::Iterator::operator++()
 {
     if (inst)
     {
-        inst = inst->next;
+        inst = irLoadInstLink(inst->next);
     }
 }
 
@@ -232,7 +232,7 @@ IRInstListBase::Iterator IRInstListBase::begin()
 }
 IRInstListBase::Iterator IRInstListBase::end()
 {
-    return Iterator(last ? last->next : nullptr);
+    return Iterator(last ? irLoadInstLink(last->next) : nullptr);
 }
 
 //
@@ -8873,7 +8873,7 @@ IRDecoration* IRInst::getFirstDecoration()
     // materialize: decorations precede children, and `as<IRDecoration>` stops this
     // walk at the first non-decoration. The load is acquire because a deferred body
     // attaches here on a global that has no decorations.
-    return as<IRDecoration>(irLoadDecorationLink(m_decorationsAndChildren.first));
+    return as<IRDecoration>(irLoadInstLink(m_decorationsAndChildren.first));
 }
 
 IRDecoration* IRInst::getLastDecoration()

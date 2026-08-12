@@ -41,7 +41,7 @@ struct IRDecoration : IRInst
         // The last decoration's `next` is the link a deferred body attaches to, so
         // this step can race a concurrent materialization; acquire pairs with the
         // release store that publishes the chain.
-        return as<IRDecoration>(irLoadDecorationLink(next));
+        return as<IRDecoration>(irLoadInstLink(next));
     }
 };
 

@@ -64,13 +64,20 @@ class TargetRequest;
 //
 
 /// Release-store `value` into `slot`, publishing everything written before it.
-SLANG_FORCE_INLINE void irPublishDecorationLink(IRInst*& slot, IRInst* value)
+///
+/// Paired with `irLoadInstLink`, which every traversal of an instruction list uses.
+SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
 {
     std::atomic_ref<IRInst*>(slot).store(value, std::memory_order_release);
 }
 
-/// Acquire-load a link that a deferred body may be attaching to.
-SLANG_FORCE_INLINE IRInst* irLoadDecorationLink(IRInst* const& slot)
+/// Acquire-load a `next`/`first` link of an instruction list.
+///
+/// Applied to all list traversal, not only the decoration walk: `findDecoration`
+/// iterates through `IRInstListBase::Iterator`, whose `operator++` and `end()` read
+/// these links directly, so putting the barrier only on the named decoration
+/// accessors left the path that actually walks the list unsynchronized.
+SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 {
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
 }

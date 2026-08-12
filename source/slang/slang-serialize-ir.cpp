@@ -747,9 +747,9 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
         // The publishing store. Release so that a reader which observes the link also
         // observes every field of every instruction in the chain behind it.
         if (lastDecoration)
-            irPublishDecorationLink(lastDecoration->next, bodyFirst);
+            irPublishInstLink(lastDecoration->next, bodyFirst);
         else
-            irPublishDecorationLink(inst->m_decorationsAndChildren.first, bodyFirst);
+            irPublishInstLink(inst->m_decorationsAndChildren.first, bodyFirst);
     }
 
     deferBodies = savedDefer;
