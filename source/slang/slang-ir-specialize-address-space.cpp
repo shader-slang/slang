@@ -265,6 +265,20 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                 {
                                     specializedCallee = specializeFunc(key);
                                     workList.add(specializedCallee);
+
+                                    // The callee's result address space must be settled before it
+                                    // is read below: specializeFunc concretizes only parameters,
+                                    // and the result is concretized lazily in Return handling, so
+                                    // an unsettled callee would record a stale result address space
+                                    // that the mapInstToAddrSpace cache then makes permanent. The
+                                    // workList.add above still stands: the later visit is
+                                    // idempotent because processFunction skips insts already in
+                                    // mapInstToAddrSpace. Terminates because the call graph is
+                                    // acyclic: E55201 rejects recursive cycles (direct and mutual)
+                                    // before this pass runs, so a recursive callee is reachable
+                                    // here only under -disable-non-essential-validations, which
+                                    // voids that acyclic-call-graph precondition.
+                                    processFunction(specializedCallee);
                                 }
                                 IRBuilder builder(callInst);
                                 builder.setInsertBefore(callInst);
@@ -372,9 +386,12 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             }
         }
 
-        HashSet<IRFunc*> newWorkList;
         while (workList.getCount())
         {
+            // Requeue only the callers discovered this round; the set must reset
+            // each iteration or the worklist refills from the whole accumulated
+            // set forever and the fixpoint never terminates (#12498).
+            HashSet<IRFunc*> newWorkList;
             for (Index i = 0; i < workList.getCount(); i++)
             {
                 auto func = workList[i];

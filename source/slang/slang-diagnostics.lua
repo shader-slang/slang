@@ -5854,6 +5854,18 @@ err(
     span { loc = "location", message = "'~inst:IRInst': use of pointer with inconsistent address space." }
 )
 
+-- SPIR-V address-space legalization (58004-)
+
+err(
+    "cannot-return-pointer-in-this-storage-class",
+    58004,
+    "cannot return a pointer in this storage class when targeting SPIR-V",
+    span {
+        loc = "location",
+        message = "SPIR-V's Logical addressing model only permits a function to return a pointer in the PhysicalStorageBuffer, StorageBuffer, or Workgroup storage class; a pointer in any other class — such as a function-local ('Function') or a 'static' global ('Private') — cannot be returned. Return a pointer in one of the permitted storage classes, or mark the function '[ForceInline]' so no such pointer crosses a call boundary.",
+    }
+)
+
 -- Autodiff checkpoint reporting notes (-1)
 
 standalone_note(
