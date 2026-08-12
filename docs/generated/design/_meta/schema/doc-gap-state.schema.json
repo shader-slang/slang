@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://shader-slang.github.io/generated/design/doc-gap-state.schema.json",
+  "title": "Doc-gap resolution ledger",
+  "description": "Records what was decided about each doc gap reported by the agentic test suite. A gap is one row of a `## Doc gaps observed` table in a test bundle README, aggregated by `docs/generated/tests/_meta/regenerate.py doc-gaps` and keyed by the `gap_id` that command derives. Gaps absent from this file are open: the ledger records decisions, never the queue itself, which is recomputed from the bundle READMEs on every run so that a gap the suite stops reporting stops being work.",
+  "type": "object",
+  "required": ["schema_version", "gaps"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "gaps": {
+      "type": "object",
+      "description": "Keyed by gap_id, the 12-hex-digit identity `doc-gaps` derives from the anchored document, its heading fragment, the gap kind, and the normalized gap prose.",
+      "propertyNames": {
+        "pattern": "^[0-9a-f]{12}$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "target_doc", "decided_at", "rationale"],
+      "properties": {
+        "status": {
+          "description": "fixed — the document was edited so the gap no longer applies. rejected-bogus — the gap misreads the document or the compiler. rejected-out-of-scope — real, but belongs to another document (commonly the human-written language reference, which no agent may edit). deferred — real and in scope, but not now. escalated-to-finding — the disagreement is a compiler defect, not a documentation defect, so it belongs in the tests tree's findings channel; `finding_id` names it.",
+          "enum": [
+            "fixed",
+            "rejected-bogus",
+            "rejected-out-of-scope",
+            "deferred",
+            "escalated-to-finding"
+          ]
+        },
+        "target_doc": {
+          "type": "string",
+          "description": "Workspace-relative path of the document the gap is anchored to. Recorded so the ledger stays readable on its own, and so a decision survives the gap dropping out of the aggregation.",
+          "pattern": "^docs/"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "missing-example",
+            "missing-surface",
+            "undocumented-behavior",
+            "cascading-only-mention",
+            "ambiguous-claim",
+            "drift-from-source"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "description": "Short human-readable restatement of the gap, so a reader of this file need not re-run the aggregator to know what a gap_id refers to."
+        },
+        "decided_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "decided_by_model": {
+          "type": "string",
+          "description": "Model identifier that made the call, or the operator's name for a hand decision."
+        },
+        "report_path": {
+          "type": "string",
+          "description": "Path to the gap-intake report that recorded this action, when one exists. A hand decision made with `mark-gap` has none."
+        },
+        "finding_id": {
+          "type": "string",
+          "description": "Required when status is escalated-to-finding. Always the bare id -- the `<id>` of `docs/generated/tests/_meta/findings/<id>.yaml` -- never a path. Both writers canonicalize to this form and both verify the file exists before recording it.",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this status, required for every status. The two writers supply different-but-comparable text: `mark-gap` stores the operator's free-text `--rationale`, while `mark-gap-intake` stores the report row's `Evidence` cell -- for a `fixed` row that is the source citation confirming what was written. See `fix_summary` for the edit itself.",
+          "minLength": 1
+        },
+        "fix_summary": {
+          "type": "string",
+          "description": "What the edit actually was, carried from a gap-intake report row's `Fix summary` cell. Present only for entries recorded by `mark-gap-intake` whose action was `fixed`; a hand decision made with `mark-gap` has none."
+        }
+      }
+    }
+  }
+}
