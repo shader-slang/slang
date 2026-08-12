@@ -167,6 +167,24 @@
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
       "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
     },
+    "getlegalizedspirvglobalparamaddr-reaches-emit-ice": {
+      "issue": 12493,
+      "labels": [
+        "Test Agent Finding",
+        "bug",
+        "Diagnostics"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2NowE",
+      "title": "__getLegalizedSPIRVGlobalParamAddr is user-callable and aborts every backend",
+      "url": "https://github.com/shader-slang/slang/issues/12493"
+    },
     "getstringhash-nonliteral-argument-sigsegv": {
       "dup_of": 12440,
       "title": "getStringHash on a non-literal String segfaults instead of E41023"

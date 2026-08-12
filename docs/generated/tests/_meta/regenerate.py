@@ -782,8 +782,29 @@ def lint_findings() -> list[LintIssue]:
     Filed findings (under findings/filed/) are immutable history and are
     not re-validated — their citations or referenced paths may have
     rotted since filing, and that is acceptable for a historical record.
+
+    They are still checked for *parseability*, though, which is a
+    different thing from rot. A filed finding that no longer loads is not
+    stale history, it is unreadable history: every tool that walks the
+    whole corpus trips over it, and the record it was meant to preserve
+    is effectively gone. One shipped that way in the bootstrap commit —
+    an unquoted `observed_summary` containing `spirv-emit: castToVoid`,
+    where the colon-space turned the scalar into a mapping — and went
+    unnoticed because this function skipped the directory entirely.
     """
     issues: list[LintIssue] = []
+    pending = list_finding_paths(include_filed=False)
+    for p in set(list_finding_paths(include_filed=True)) - set(pending):
+        try:
+            load_finding(p)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    str(p.relative_to(REPO_ROOT)),
+                    "error",
+                    f"filed finding no longer parses as YAML: {exc}",
+                )
+            )
     seen_bundles_in_manifest = set(load_manifest().bundles.keys())
     for p in list_finding_paths(include_filed=False):
         try:
@@ -986,12 +1007,23 @@ def compute_finding_labels(finding: dict, state: dict) -> list[str]:
 def _repro_body(finding: dict) -> str:
     """Return the .slang source block for the issue body.
 
-    Prefers evidence.minimized_repro when present; otherwise reads
-    evidence.source_slang from disk.
+    Prefers the operator's `minimized_repro`, then the agent's inlined
+    `repro_source`, and only then reads `source_slang` from disk.
+
+    The `repro_source` step is not optional politeness: the reproducibility
+    rule tells an agent whose failing input was a scratch file to inline it
+    there, precisely because `source_slang` then names a *different*
+    program -- the committed test the scratch input was derived from.
+    Falling through to disk in that case pairs the recorded command with a
+    shader that does not reproduce the bug, which is the exact confusion
+    the rule exists to prevent. This function honoured `minimized_repro`
+    but not `repro_source`, so until now it did just that.
     """
     ev = finding.get("evidence") or {}
     if ev.get("minimized_repro"):
         return str(ev["minimized_repro"]).rstrip() + "\n"
+    if ev.get("repro_source"):
+        return str(ev["repro_source"]).rstrip() + "\n"
     src = ev.get("source_slang")
     if not src:
         return "(no source_slang on finding)\n"
@@ -4415,6 +4447,36 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         "missing source_slang with no inline repro warns",
         len(repro_warns({"command": "slangc a.slang", "source_slang": "docs/nope.slang"})),
         1,
+    )
+
+    # The lint rule and the issue renderer have to agree on what counts as
+    # the repro, or the rule accepts a finding that then files an issue
+    # showing a different program. `_repro_body` honoured `minimized_repro`
+    # but not `repro_source`, so a finding that satisfied the rule the
+    # intended way still rendered `source_slang` from disk.
+    # `source_slang` here points at a real committed file so the fallback
+    # path is exercised; the comparisons are truncated so that a
+    # regression -- which returns that whole file -- reports a short
+    # prefix instead of dumping it into the selftest output.
+    inline_only = {
+        "command": "slangc /tmp/x.slang -target hlsl",
+        "source_slang": "docs/generated/tests/_meta/schema/finding.schema.json",
+        "repro_source": "void main() { /* the scratch variant */ }",
+    }
+    check(
+        "issue body prefers the inlined repro over source_slang on disk",
+        _repro_body({"evidence": inline_only}).strip()[:41],
+        "void main() { /* the scratch variant */ }",
+    )
+    check(
+        "operator minimization still outranks the agent's inline repro",
+        _repro_body({"evidence": dict(inline_only, minimized_repro="void main() {}")}).strip()[:14],
+        "void main() {}",
+    )
+    check(
+        "committed source_slang is still read when nothing is inlined",
+        _repro_body({"evidence": {k: v for k, v in inline_only.items() if k != "repro_source"}})[:1],
+        "{",
     )
 
     # `--tree` routing: two production callers depend on this prefix split
