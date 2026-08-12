@@ -110,6 +110,24 @@
       "title": "A bootstrap sweep against the diagnostic catalog identified ~16 codes declared\u2026",
       "url": "https://github.com/shader-slang/slang/issues/11320"
     },
+    "declarations-refaccessor-metal-unknown-addressspace-abort": {
+      "issue": 12487,
+      "labels": [
+        "Test Agent Finding",
+        "bug",
+        "Metal"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXt0",
+      "title": "[declarations] property `ref` accessor aborts Metal emit: Unknown addressspace",
+      "url": "https://github.com/shader-slang/slang/issues/12487"
+    },
     "diag-code-29104-double-defined": {
       "issue": 11318,
       "labels": [
@@ -148,6 +166,44 @@
       "dup_of": 10241,
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
       "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
+    },
+    "getstringhash-nonliteral-argument-sigsegv": {
+      "dup_of": 12440,
+      "title": "getStringHash on a non-literal String segfaults instead of E41023"
+    },
+    "new-expr-with-constructor-args-internal-error": {
+      "issue": 12485,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXdw",
+      "title": "[expressions] `new T(args)` with a user __init aborts: internal error",
+      "url": "https://github.com/shader-slang/slang/issues/12485"
+    },
+    "parser-magic-type-modifier-on-user-struct-sigsegv": {
+      "issue": 12484,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXWI",
+      "title": "`__magic_type(Name)` on a user struct crashes slangc with SIGSEGV",
+      "url": "https://github.com/shader-slang/slang/issues/12484"
     },
     "slangi-vm-bool-false-arg-evaluates-as-true": {
       "issue": 11402,
@@ -199,6 +255,41 @@
       "project_item_id": "PVTI_lADOAb2kZs4AcYVszguaWFA",
       "title": "[slangi] `?:` short-circuits in VM, contra language-reference spec",
       "url": "https://github.com/shader-slang/slang/issues/11403"
+    },
+    "specialize-interface-defaults-init-spirv-emit-ice": {
+      "issue": 12486,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXmQ",
+      "title": "Interface defaults-init + dynamic dispatch aborts in spirv-emit (E99997)",
+      "url": "https://github.com/shader-slang/slang/issues/12486"
+    },
+    "torch-autobind-unmappable-param-sigsegv": {
+      "issue": 12483,
+      "labels": [
+        "Test Agent Finding",
+        "bug",
+        "cuda"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2KXOQ",
+      "title": "[AutoPyBindCUDA] kernel with unmappable param crashes after diagnosing E56001",
+      "url": "https://github.com/shader-slang/slang/issues/12483"
     }
   },
   "schema_version": 1
