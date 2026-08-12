@@ -201,6 +201,31 @@ omit the heading. Bundle-specific sections (e.g. `## Sibling-bundle
 overlap`, `## Catalog coverage`, `## Codes dropped`) may appear after
 the four canonical sections but never between them.
 
+**Never write a raw `{{` or `{%` anywhere in the README body — not even
+inside a code span or fence.** The README carries YAML front-matter, so
+the GitHub Pages Jekyll build treats it as a page and runs Liquid over
+the whole body before Markdown; `{{`/`{%` open Liquid tags. A `{{` that
+Liquid cannot close aborts the entire site build — in
+`float2x2 m = {{1,2},{3,4}}` the scan for `}}` stops at the first single
+`}`, so the tag is never terminated. A `{{...}}` that _is_ terminated
+(e.g. a FileCheck `{{.*}}` wildcard) instead gets evaluated as a template
+expression (usually rendering empty), so the literal text does not
+survive on the page. The README is also read on github.com, where Liquid is not
+processed, so a `{% raw %}` wrapper or an HTML entity inside a backtick
+span is wrong too — both show up literally there. Two spellings are safe
+on both surfaces:
+
+- Where whitespace does not matter, space the braces: write
+  `float2x2 m = { {1,2},{3,4} }`, not `{{1,2},{3,4}}`.
+- Where the exact token matters (a FileCheck `{{...}}` pattern), show it
+  in a raw `<code>` element with numeric brace entities:
+  `<code>&#123;&#123;.*&#125;&#125;</code>` renders as `{{.*}}` on both
+  github.com and Pages. (`_meta/` prose files have no front-matter, so
+  Jekyll copies them verbatim and they may use `{{...}}` freely — this
+  rule is only for the front-matter-bearing bundle READMEs.)
+
+`regenerate.py lint` enforces this and fails the build on any raw opener.
+
 ```markdown
 # Tests for <bundle-key>
 
@@ -292,14 +317,14 @@ to add.
   multiple sections, pick the most specific anchor and mention the
   others in the Gap cell.
 - **Kind** is one value from the controlled vocabulary:
-  | Kind | When to use |
-  | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-  | `missing-example` | Doc names a claim but does not include a minimal example shader that exercises it. |
-  | `missing-surface` | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it. |
-  | `undocumented-behavior` | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).|
-  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass. |
-  | `ambiguous-claim` | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess. |
-  | `drift-from-source` | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
+  | Kind                     | When to use                                                                                                                 |
+  | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+  | `missing-example`        | Doc names a claim but does not include a minimal example shader that exercises it.                                          |
+  | `missing-surface`        | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it.             |
+  | `undocumented-behavior`  | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).          |
+  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass.                |
+  | `ambiguous-claim`        | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess.                    |
+  | `drift-from-source`      | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
 - **Gap** is one to three sentences naming what the doc lacks, in the
   voice of a reader of the doc. Quote the doc literally when the gap
   is about its exact wording. Do **not** describe internal compiler
