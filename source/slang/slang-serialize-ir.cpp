@@ -577,6 +577,15 @@ static bool isOnDemandIRLoadEnabled()
 // table and the instruction array keeps the second use possible -- a body's
 // operands are indices into that array, and may name any module-scope global.
 //
+// Depths in the module's preorder walk. The module inst is the root, its globals sit
+// directly under it, and a global's decorations and body children sit under those. Three
+// separate pieces of logic depend on this model agreeing -- the deferral test in
+// `decodeInst`, the eager-skeleton scan, and the depth a replayed body is decoded at --
+// so the numbers are named rather than written out at each site.
+static const Int64 kModuleInstDepth = 0;
+static const Int64 kGlobalValueDepth = 1;
+static const Int64 kBodyChildDepth = 2;
+
 struct FlatModuleDecoder : IRDeferredBodyLoader
 {
     FlatInstTable flat;
@@ -652,12 +661,25 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     }
     Int64 getInstCount() const { return flat.instAllocInfo.getCount(); }
 
-    IRInst* readInstRef()
+    /// Reads one operand index and resolves it to an instruction.
+    ///
+    /// `mustResolve` says whether the result is about to be wired into a live
+    /// instruction. The walk also consumes operands for instructions it skipped, to keep
+    /// the cursors aligned, and those may refer to other skipped instructions -- so a
+    /// null result is expected there and only a violation here.
+    IRInst* readInstRef(bool mustResolve)
     {
         SLANG_RELEASE_ASSERT(operandIndex < flat.operandIndices.getCount());
         const auto index = flat.operandIndices[operandIndex++];
         SLANG_RELEASE_ASSERT(index >= -1 && index < getInstCount());
-        return insts()[index];
+        IRInst* const result = insts()[index];
+        // -1 encodes a null operand. Anything else must resolve to an instruction that
+        // exists, which is the invariant the whole scheme rests on: nothing outside a
+        // deferred body refers into one, so no eagerly decoded operand can land on a
+        // slot the skeleton left empty. Measured as holding across every operand in the
+        // builtin modules; assert it rather than return the null and fail later.
+        SLANG_RELEASE_ASSERT(!mustResolve || index == -1 || result);
+        return result;
     }
 
     /// Decodes the instruction at the cursor and, recursively, its children.
@@ -727,7 +749,7 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
     IRInst* bodyLast = nullptr;
     for (Int64 i = 0; i < body.childCount; ++i)
     {
-        auto child = decodeInst(inst, 2);
+        auto child = decodeInst(inst, kBodyChildDepth);
         if (!child)
             continue;
         child->prev = bodyLast;
@@ -859,15 +881,15 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
     if (inst)
     {
         inst->sourceLoc = flat.sourceLocs[thisInstIndex];
-        inst->typeUse.init(inst, readInstRef());
+        inst->typeUse.init(inst, readInstRef(true));
         for (Int64 o = 0; o < thisOperandCount; ++o)
-            inst->getOperands()[o].init(inst, readInstRef());
+            inst->getOperands()[o].init(inst, readInstRef(true));
     }
     else
     {
-        readInstRef(); // type use
+        readInstRef(false); // type use
         for (Int64 o = 0; o < thisOperandCount; ++o)
-            readInstRef();
+            readInstRef(false);
     }
 
     // Handle special instructions
@@ -945,7 +967,7 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
         // let the remaining children be walked without being materialized --
         // the walk still has to run, to consume their operand and payload
         // entries and keep the cursors aligned.
-        if (deferBodies && depth == 1 && inst && !inst->m_hasDeferredBody)
+        if (deferBodies && depth == kGlobalValueDepth && inst && !inst->m_hasDeferredBody)
         {
             // Looked at before the recursive call validates it, so bound it here; a
             // corrupt `childCounts` is what would put this out of range.
@@ -989,8 +1011,14 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
     // it spans, so materializing it later can pre-allocate them all.
     if (inst && inst->m_hasDeferredBody)
     {
-        if (auto recorded = deferredBodies.tryGetValue(inst))
-            recorded->instCount = instIndex - recorded->firstChildInstIndex;
+        // The entry was added on the deferral branch above and `m_hasDeferredBody` is
+        // the guard, so this lookup cannot miss. Assert rather than skip: leaving
+        // `instCount` at 0 would make materialization pre-allocate nothing while the
+        // decode still walks every child, so forward references would resolve against
+        // null slots and fail somewhere far away.
+        auto recorded = deferredBodies.tryGetValue(inst);
+        SLANG_RELEASE_ASSERT(recorded);
+        recorded->instCount = instIndex - recorded->firstChildInstIndex;
     }
 
     return inst;
@@ -1049,6 +1077,17 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // Preorder scan tracking depth, allocating nothing. `childCounts` is in the
         // same preorder as the instructions, so a stack of remaining-child counts
         // is enough to recover each instruction's depth.
+        //
+        // This decides the same cut that `decodeInst` decides again while walking:
+        // what is eager skeleton and what is a deferrable body. The two must agree
+        // exactly -- an instruction this scan leaves unallocated but the decoder does
+        // not defer would be wired against an empty slot, and the reverse would defer
+        // a body whose slots were never filled. They agree because both derive from
+        // one rule, that a global's decorations are eager and everything after them is
+        // body, but they express it differently and there is no single predicate
+        // enforcing it. Sharing one is the obvious follow-up; `readInstRef` asserting
+        // that no live operand resolves to an empty slot is what would catch a
+        // disagreement today.
         List<Int64> remainingChildren;
         Int64 depth = 0;
         // True while the scan is inside a global's decoration, including anything
@@ -1064,11 +1103,11 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             const bool isDecoration = op >= kIROp_FirstDecoration && op <= kIROp_LastDecoration;
             // Depth 0 is the module inst and depth 1 its globals; a global's
             // decorations sit at depth 2 and carry the linkage names.
-            if (depth <= 2)
+            if (depth <= kBodyChildDepth)
                 inDecorationSubtree = false;
-            if (depth == 2 && isDecoration)
+            if (depth == kBodyChildDepth && isDecoration)
                 inDecorationSubtree = true;
-            materializeInst[i] = uint8_t(depth <= 1 || inDecorationSubtree);
+            materializeInst[i] = uint8_t(depth <= kGlobalValueDepth || inDecorationSubtree);
 
             remainingChildren.add(flat.childCounts[i]);
             depth++;
