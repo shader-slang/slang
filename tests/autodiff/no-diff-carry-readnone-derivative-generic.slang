@@ -1,23 +1,15 @@
 // Companion to no-diff-carry-readnone-derivative.slang for issue
-// shader-slang/slang#11374.
-//
-// Covers the built-in path, which the other four cases in this family do not:
-// they all use user-authored functions, so none of them reaches the
-// `IRSpecialize` / `IRGeneric` arms of `isDerivativeAssumedReadNone`, and none
-// of them exercises a *built-in* derivative.
+// shader-slang/slang#11374, covering the built-in derivative path.
 //
 // `dot` is `[__readNone]` (hlsl.meta.slang) and its derivatives `__d_dot` are
 // generic and marked `[PreferRecompute]` (diff.meta.slang) rather than
-// `[__readNone]`, so a call to it reaches the gate as a specialize-of-generic
-// wrapping a `[PreferRecompute]` function. `__d_dot` is genuinely pure — it
-// only reads its `DifferentialPair` arguments — so the derivatives-aware gate
-// added for #11374 must still treat `dot(x, x)` as not carrying a derivative
-// when its arguments are `no_diff`.
+// `[__readNone]`, so the call reaches the carry-set gate as a
+// specialize-of-generic wrapping a `[PreferRecompute]` function. `__d_dot` only
+// reads its `DifferentialPair` arguments, so the gate must still treat
+// `dot(x, x)` as not carrying a derivative when its arguments are `no_diff`.
 //
-// If the gate fails to recognize a pure built-in derivative, this fires a
-// spurious E41031 — which is exactly the #11285 false positive that #11286
-// fixed, re-opened from the other direction. That makes this the negative
-// case that guards the new gate's built-in-purity signal.
+// A gate that fails to recognize a pure built-in derivative reports a spurious
+// E41031 here.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 

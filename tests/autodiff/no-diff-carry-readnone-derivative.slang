@@ -8,9 +8,9 @@
 // writes to memory, and that variant is what runs after the autodiff
 // transform. If the gate skips the call based only on the primary's
 // readNone-ness, the missing-no_diff diagnostic that #11374 expects to
-// fire here is silently suppressed. (#11285 pulled the other way: it was
-// a false-positive report — E41031 firing where no derivative flowed in —
-// and #11286 fixed it by making the diagnostic stop firing there.)
+// fire here is silently suppressed. (#11285 pulled the opposite way — it
+// reported E41031 firing where no derivative flowed in — so the companion
+// -clean.slang case must keep compiling clean.)
 //
 // This file exercises a custom backward-derivative variant with side
 // effects. With the fix in slang-ir-check-differentiability.cpp, the gate

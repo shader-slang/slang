@@ -201,7 +201,8 @@ public:
     // they are not yet readNone-marked.
     //
     // The arms must be kept in step with `isReadNoneCallee` by hand;
-    // `no-diff-carry-readnone-derivative-generic.slang` fails if one is dropped.
+    // `no-diff-carry-readnone-derivative-generic.slang` covers the
+    // specialize-of-generic arm, the one a built-in derivative arrives through.
     //
     // `[PreferRecompute]` is only honored for built-in derivatives, gated on
     // `[__target_intrinsic]`. Core-module derivatives carry that decoration even
