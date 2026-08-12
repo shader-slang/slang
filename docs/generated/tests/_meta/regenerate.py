@@ -627,7 +627,28 @@ def list_finding_paths(include_filed: bool = False) -> list[Path]:
 
 
 def load_finding(path: Path) -> dict:
-    return _load_yaml(path.read_text(encoding="utf-8")) or {}
+    """Load a finding, normalizing `observed_at` to the ISO string the
+    schema declares.
+
+    An unquoted ISO timestamp is a *date* in YAML, not a string, so
+    `observed_at: 2026-08-04T00:00:00+00:00` loads as a `datetime` while
+    the quoted spelling next to it loads as `str`. Both are the same
+    instant and both look identical in the file, so the difference is
+    invisible until something does string work on the value -- which is
+    how `findings list` came to abort partway through the queue with
+    `'datetime.datetime' object is not subscriptable`. 21 of the 83
+    committed findings use the unquoted spelling.
+
+    Normalizing here rather than at the call site keeps one in-memory
+    contract for every consumer, and matches what the schema already
+    says the field is. The files are left alone: 10 of the 21 are under
+    findings/filed/, which is immutable history.
+    """
+    finding = _load_yaml(path.read_text(encoding="utf-8")) or {}
+    observed = finding.get("observed_at")
+    if isinstance(observed, (_dt.datetime, _dt.date)):
+        finding["observed_at"] = observed.isoformat()
+    return finding
 
 
 def _lint_finding_reproducibility(where: str, ev: dict) -> list[LintIssue]:
@@ -4478,6 +4499,29 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         _repro_body({"evidence": {k: v for k, v in inline_only.items() if k != "repro_source"}})[:1],
         "{",
     )
+
+    # An unquoted ISO timestamp is a YAML date, not a string, and the two
+    # spellings are indistinguishable in the file. `findings list` used to
+    # abort partway through the queue on the unquoted ones; `load_finding`
+    # now normalizes, so consumers see one type regardless of spelling.
+    with tempfile.TemporaryDirectory() as td:
+        both = Path(td) / "f.yaml"
+        for spelling in ("2026-08-04T00:00:00+00:00", '"2026-08-04T00:00:00+00:00"'):
+            both.write_text(f"id: x\nobserved_at: {spelling}\n", encoding="utf-8")
+            loaded = load_finding(both)["observed_at"]
+            # Compare the type before slicing: a regression here returns a
+            # datetime, and slicing that raises rather than reporting,
+            # which would abort the rest of the selftest.
+            check(
+                f"observed_at loads as str for spelling {spelling}",
+                type(loaded).__name__,
+                "str",
+            )
+            check(
+                f"observed_at keeps its date for spelling {spelling}",
+                str(loaded)[:10],
+                "2026-08-04",
+            )
 
     # `--tree` routing: two production callers depend on this prefix split
     # (the workflow passes `language-reference`, the design driver always
