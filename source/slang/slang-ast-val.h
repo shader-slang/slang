@@ -1376,6 +1376,14 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
+    else if (auto firstWitness = as<FirstSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(firstWitness->getPatternTypeWitness());
+    }
+    else if (auto lastWitness = as<LastSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(lastWitness->getPatternTypeWitness());
+    }
     else if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(witness))
     {
         return isTypeEqualityWitness(trimFirstWitness->getPatternTypeWitness());

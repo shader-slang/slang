@@ -7247,6 +7247,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 return nullptr;
             }
         }
+        else if (auto firstSubtypeWitness = as<FirstSubtypeWitness>(subTypeWitness))
+        {
+            // `__first`/`__last` select a single element of a value pack before this cast runs
+            // (the element is materialized by `kIROp_ExtractFirstFromPack`/`ExtractLastFromPack`),
+            // so the projection to a concrete `superType` is governed by the pattern witness that
+            // relates that element type to `superType`.
+            return emitCastToConcreteSuperTypeRec(
+                value,
+                superType,
+                firstSubtypeWitness->getPatternTypeWitness());
+        }
+        else if (auto lastSubtypeWitness = as<LastSubtypeWitness>(subTypeWitness))
+        {
+            return emitCastToConcreteSuperTypeRec(
+                value,
+                superType,
+                lastSubtypeWitness->getPatternTypeWitness());
+        }
         else
         {
             SLANG_ASSERT(!"unhandled");
