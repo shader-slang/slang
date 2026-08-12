@@ -180,6 +180,24 @@ def build_api_driver(out_dir):
     return out
 
 
+def api_driver_supports_out_dir(driver):
+    """Return whether `driver` understands --out-dir, by reading its own usage.
+
+    Only an externally supplied --api-driver can be too old for the flag; the
+    one bench.py builds comes from native/api-driver.cpp in this checkout. The
+    usage banner is the capability signal precisely because it lives in that
+    same file: a binary old enough to lack --out-dir prints a banner old enough
+    to lack the line, so the two cannot drift apart. Run with no arguments the
+    driver prints usage and exits 2, which is what this reads.
+    """
+    try:
+        r = subprocess.run([driver], stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return b"--out-dir" in r.stdout
+
+
 def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
     """Return (commands, primary_outfile_for_parsing_index).
 
@@ -336,6 +354,16 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
     # (bench.py --corpus). Either way what follows measures a directory.
     if prepared:
         files = corpus.prepared_files(src_dir)
+        # An empty prepared directory is legitimate for an api workload — the
+        # driver takes --dir and reads it itself, and session-create needs no
+        # sources at all — but every other mode picks an entry point out of
+        # this list, so empty there means the corpus was prepared incompletely
+        # or --corpus points a level too high. Named here rather than left to
+        # build_commands, whose IndexError would say nothing about which
+        # directory to go and look at.
+        if not files and spec.mode != "api":
+            raise FileNotFoundError(
+                f"no .slang files in prepared corpus {src_dir}")
     else:
         files = corpus.materialize(spec, size, src_dir)
     os.makedirs(out_dir, exist_ok=True)
@@ -569,7 +597,12 @@ def main():
         sys.exit(f"slangc not found: {slangc}")
     root = os.path.join(os.path.abspath(args.out), args.label)
     os.makedirs(root, exist_ok=True)
-    os.makedirs(src_root, exist_ok=True)
+    # Only when WE produce the sources. A --corpus tree is an input the caller
+    # prepared, so creating a missing one would turn "you pointed --corpus at
+    # the wrong path" into a silently-created empty directory plus a confusing
+    # per-workload failure further down.
+    if not args.corpus:
+        os.makedirs(src_root, exist_ok=True)
 
     # Compiler artifacts go to their OWN root when the sources came from
     # --corpus. That tree is the caller's input — prepared by another job or
@@ -590,6 +623,19 @@ def main():
     if any(s.mode == "api" for s in specs):
         libslang = os.path.abspath(args.libslang) if args.libslang else find_libslang(slangc)
         driver = os.path.abspath(args.api_driver) if args.api_driver else build_api_driver(out_root)
+        # A driver too old to know --out-dir does not reject it — argValue()
+        # scans for the flags it knows and ignores the rest — so module-graph-bin
+        # would serialize .slang-module binaries beside the sources it read,
+        # which under --corpus is the caller's prepared tree. Checked rather
+        # than warned about, because the failure mode is writing into somebody
+        # else's directory and then reporting success. Only --corpus splits the
+        # two roots; everywhere else --out-dir equals --dir and an old driver
+        # ignoring it lands in the same place anyway.
+        if driver and args.corpus and not api_driver_supports_out_dir(driver):
+            sys.exit(f"--api-driver {driver} predates --out-dir, so a corpus run "
+                     f"would write .slang-module files into {src_root}; rebuild "
+                     f"it from this checkout, or drop --api-driver and let "
+                     f"bench.py build it")
         if libslang and driver:
             api = {"driver": driver, "libslang": libslang}
         else:
@@ -685,6 +731,39 @@ assert stats([1.0, None, 2.0])["samples"] == [1.0, 2.0], \
     "None samples are dropped from the archive, not merely uncounted"
 assert stats([1.0, None, 2.0])["n"] == 2
 del _s
+
+
+# build_commands is pure, and two of its properties fail SILENTLY — as a wrong
+# or incomparable number rather than an error — so both are pinned here.
+def _check_build_commands():
+    """Check the include paths build_commands emits for a link workload."""
+    class LinkSpec:
+        mode = "link"
+        extra_flags = []
+
+    files = ["link_main.slang", "m0.slang"]
+    same = build_commands("slangc", LinkSpec, "/src", files, "/src")["timed"]
+    assert same.count("-I") == 1, \
+        ("on the default path sources and artifacts share a directory, and the "
+         "single -I emitted there is part of the cmd string recorded in "
+         "results.json; a second one makes new results incomparable with every "
+         f"point already in the series: {same}")
+
+    split = build_commands("slangc", LinkSpec, "/src", files, "/out")
+    timed = split["timed"]
+    assert timed.count("-I") == 2 and timed.index("/out") < timed.index("/src"), \
+        ("split roots must put out_dir on the include path FIRST: the "
+         "precompiled .slang-module lives there while its .slang source lives "
+         "in src_dir, so the reverse order resolves the import to the source "
+         "and measures a recompile — succeeding all the while, which is the "
+         f"whole danger: {timed}")
+    assert timed[-1].startswith("/out"), "the -o output must land under out_dir"
+    assert all(c[-1].startswith("/out") for c in split["setup"]), \
+        "precompiled modules must land under out_dir, never in a --corpus tree"
+
+
+_check_build_commands()
+del _check_build_commands
 
 
 if __name__ == "__main__":

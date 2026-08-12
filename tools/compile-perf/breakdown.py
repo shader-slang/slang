@@ -985,7 +985,7 @@ _SPEC = manifest.BY_NAME["reflection_layout"]
 _n, _files = _workload_source(_SPEC)
 _gen = corpus.sources(_SPEC, _n)
 assert [fn for fn, _ in _files] == list(_gen), \
-    "_workload_source must list every generated file, in generator order"
+    "_workload_source must list every file, in the order corpus.sources returns them"
 for _fn, _src in _files:
     assert _src == _gen[_fn], \
         f"_workload_source must return {_fn} verbatim — no windowing, no elision"

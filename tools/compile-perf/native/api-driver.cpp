@@ -602,8 +602,12 @@ static int runModuleGraph(
     return 0;
 }
 
-// module-graph-bin: like module-graph, but the timed load resolves the DAG
-// from serialized .slang-module binaries instead of source — the import path
+// Serializes every module of the graph rooted at `root` into `outDir`, then
+// measures how long a fresh session takes to load that graph back from the
+// serialized binaries.
+//
+// It is like module-graph, but the timed load resolves the DAG from
+// .slang-module binaries instead of source — the import path
 // where the 2026-07-03 module-loading regression (#11952) lives, which
 // source-based loads do not exercise. Setup runs before the apiTotal scope
 // opens, so it does not count toward apiTotal, but its phases are still timed

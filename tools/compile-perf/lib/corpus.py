@@ -101,7 +101,13 @@ def materialize(spec, size, dest):
         # would silently vanish from the measurement. Rejecting the shape is
         # honest where supporting it halfway is not; no generator emits one,
         # and adding nested support means teaching all three functions at once.
-        if "/" in fn or os.sep in fn:
+        # Both separators literally, not os.sep: a corpus is prepared on one
+        # machine and measured on another, so the question is not "is this
+        # nested HERE" but "is this nested on any machine that will read it".
+        # On POSIX os.sep is "/", which would let "sub\\a.slang" through as one
+        # flat filename — a name Windows cannot represent, where the same
+        # prepare step would create a subdirectory instead.
+        if "/" in fn or "\\" in fn:
             raise ValueError(
                 f"source filename {fn!r} is nested; corpus directories are flat "
                 f"because read_corpus/prepared_files list a single level")
@@ -121,13 +127,21 @@ def prepared_files(dest):
     (another job, another machine) and this run only measures them. Named for
     what it returns rather than what it tests — it reads a list, not a
     predicate — and sorted to match materialize()'s order exactly.
+
+    An empty but PRESENT directory returns [], because materialize() does: a
+    workload may legitimately have no sources, as api_session_create's
+    generator returns {} for a driver that only creates and destroys sessions.
+    These two functions are the two halves of one round-trip, so a
+    disagreement about empty means `--corpus` fails a workload the default
+    path runs fine. A MISSING directory still raises — that is `--corpus`
+    pointed somewhere wrong, a caller error rather than a property of any
+    workload. (read_corpus keeps its non-empty requirement: a static corpus is
+    only ever named by a workload that HAS sources, so empty there means the
+    files were never copied.)
     """
     if not os.path.isdir(dest):
         raise FileNotFoundError(f"no prepared corpus at {dest}")
-    files = sorted(f for f in os.listdir(dest) if f.endswith(".slang"))
-    if not files:
-        raise FileNotFoundError(f"no .slang files in prepared corpus {dest}")
-    return files
+    return sorted(f for f in os.listdir(dest) if f.endswith(".slang"))
 
 
 # Import-time self-checks (the directory idiom).
@@ -151,51 +165,135 @@ assert dir_name(manifest.BY_NAME["minimal"], 0) == "minimal_n0"
 # selects the entry point positionally for workloads that name no main file,
 # so a disagreement would silently measure a different file rather than fail.
 #
-# Driven by a stub spec, not a real workload: the manifest's multi-file
-# generators are large, and the property under test is materialize's, not any
-# workload's. The filenames deliberately expose BOTH ways insertion order
-# diverges from sorted order — "m10" sorts before "m2", and "link_main" sorts
-# before every "m*" while generators emit it last.
-class _StubSpec:
-    name = "_selfcheck"
-    source_dir = None
+# Written as a function rather than the bare module-level asserts used above:
+# it needs several stub specs and a temporary CORPUS_ROOT, and local scope
+# retires all of that on return instead of leaving a hand-maintained `del`
+# list that must be kept in step with every name the block introduces.
+def _selfcheck():
+    """Check the prepare -> bench round-trip and materialize's two raises."""
+    # Driven by stub specs, not real workloads: the manifest's multi-file
+    # generators are large, and the properties under test are materialize's,
+    # not any workload's. These filenames deliberately expose BOTH ways
+    # insertion order diverges from sorted order — "m10" sorts before "m2",
+    # and "link_main" sorts before every "m*" while generators emit it last.
+    class StubSpec:
+        name = "_selfcheck"
+        source_dir = None
 
-    @staticmethod
-    def gen(n):
-        return {"m2.slang": "// a\n", "m10.slang": "// b\n", "link_main.slang": "// c\n"}
-
-
-_tmp = tempfile.mkdtemp(prefix="corpus_selfcheck_")
-try:
-    _dest = os.path.join(_tmp, dir_name(_StubSpec, 1))
-    _written = materialize(_StubSpec, 1, _dest)
-    assert _written == prepared_files(_dest), \
-        (f"materialize and prepared_files must agree on the file list AND its "
-         f"order; got {_written} vs {prepared_files(_dest)}")
-    assert _written == ["link_main.slang", "m10.slang", "m2.slang"], \
-        "both sides must be sorted, not in generator emission order"
-
-    # Re-preparing must REPLACE, not accumulate: an orphan left by an earlier
-    # run is indistinguishable from a source once it is on disk.
-    with open(os.path.join(_dest, "orphan.slang"), "w", encoding="utf-8") as _fh:
-        _fh.write("// stale\n")
-    assert "orphan.slang" in prepared_files(_dest), "self-check setup failed"
-    assert "orphan.slang" not in materialize(_StubSpec, 1, _dest), \
-        "materialize must clear dest; a stale file would be compiled by --corpus"
-    assert "orphan.slang" not in prepared_files(_dest), \
-        "the orphan must be gone from disk, not merely absent from the return"
-
-    # Nested filenames are rejected rather than half-supported (see materialize).
-    class _NestedSpec(_StubSpec):
         @staticmethod
         def gen(n):
-            return {"sub/a.slang": "// x\n"}
+            return {"m2.slang": "// a\n", "m10.slang": "// b\n",
+                    "link_main.slang": "// c\n"}
 
+    tmp = tempfile.mkdtemp(prefix="corpus_selfcheck_")
     try:
-        materialize(_NestedSpec, 1, os.path.join(_tmp, "nested"))
-        raise AssertionError("materialize must reject a nested source filename")
-    except ValueError as _e:
-        assert "nested" in str(_e), f"the rejection must name the shape; got {str(_e)!r}"
-finally:
-    shutil.rmtree(_tmp, ignore_errors=True)
-del _StubSpec, _NestedSpec, _tmp, _dest, _written, _fh
+        dest = os.path.join(tmp, dir_name(StubSpec, 1))
+        written = materialize(StubSpec, 1, dest)
+        assert written == prepared_files(dest), \
+            (f"materialize and prepared_files must agree on the file list AND "
+             f"its order; got {written} vs {prepared_files(dest)}")
+        assert written == ["link_main.slang", "m10.slang", "m2.slang"], \
+            "both sides must be sorted, not in generator emission order"
+
+        # Re-preparing must REPLACE, not accumulate: an orphan left by an
+        # earlier run is indistinguishable from a source once it is on disk.
+        with open(os.path.join(dest, "orphan.slang"), "w", encoding="utf-8") as fh:
+            fh.write("// stale\n")
+        assert "orphan.slang" in prepared_files(dest), "self-check setup failed"
+        assert "orphan.slang" not in materialize(StubSpec, 1, dest), \
+            "materialize must clear dest; a stale file would be compiled by --corpus"
+        assert "orphan.slang" not in prepared_files(dest), \
+            "the orphan must be gone from disk, not merely absent from the return"
+
+        # A workload with NO sources round-trips too. api_session_create's
+        # generator returns {} because that driver only creates and destroys
+        # sessions, so --prepare writes an empty directory and --corpus must
+        # read it back as zero files. The two must agree about empty for the
+        # same reason they must agree about order: --corpus is supposed to be
+        # the default path minus generation, and a workload that runs fine
+        # in-process should not fail merely because it was prepared first.
+        def emitting(files):
+            """A generated stub spec whose gen() returns exactly `files`."""
+            class Spec(StubSpec):
+                gen = staticmethod(lambda n: files)
+            return Spec
+
+        empty = os.path.join(tmp, "empty")
+        assert materialize(emitting({}), 1, empty) == [], \
+            "a sourceless workload prepares as [], not as an error"
+        assert prepared_files(empty) == [], \
+            "prepared_files must agree with materialize on empty; raising here " \
+            "fails a sourceless workload under --corpus that runs fine by default"
+
+        # Nested filenames are rejected rather than half-supported (see
+        # materialize). Both separators, since a corpus crosses machines.
+        for bad in ("sub/a.slang", "sub\\a.slang"):
+            try:
+                materialize(emitting({bad: "// x\n"}), 1, os.path.join(tmp, "nested"))
+                raise AssertionError(f"materialize must reject nested name {bad!r}")
+            except ValueError as e:
+                assert "nested" in str(e), \
+                    f"the rejection must name the shape; got {str(e)!r}"
+
+        # The ASCII byte-determinism guard, and its source_dir exemption. Both
+        # halves are checked because inverting the `not spec.source_dir` test
+        # would silently drop the guard for exactly the sources it constrains,
+        # and nothing downstream would notice until two machines produced
+        # different bytes for the "same" corpus.
+        try:
+            materialize(emitting({"a.slang": "// — em dash\n"}), 1,
+                        os.path.join(tmp, "nonascii"))
+            raise AssertionError("materialize must reject a non-ASCII generated source")
+        except ValueError as e:
+            assert "non-ASCII" in str(e), \
+                f"the rejection must name the shape; got {str(e)!r}"
+
+        # The source_dir half of the split, over a throwaway CORPUS_ROOT.
+        # mdl_dxr is the only real source_dir workload and its corpus/mdl tree
+        # is not in the repo, so without this stub read_corpus runs only on a
+        # machine that has that corpus — a wrong sort, a decode change, or a
+        # lost .slang filter would import cleanly here and surface as a bad
+        # number on the nightly. Non-ASCII is expected to be ACCEPTED here:
+        # third-party sources carry license headers and author names, and the
+        # determinism guard is a promise about our generators, not about input.
+        static = os.path.join(tmp, "static_root", "stat")
+        os.makedirs(static)
+        for fn, src in (("m2.slang", "// a\n"), ("m10.slang", "// b\n"),
+                        ("notes.txt", "not a source\n"), ("uni.slang", "// é\n")):
+            with open(os.path.join(static, fn), "w", encoding="utf-8") as fh:
+                fh.write(src)
+
+        class StaticSpec:
+            name = "_selfcheck_static"
+            gen = None
+            source_dir = "stat"
+
+        global CORPUS_ROOT
+        saved_root = CORPUS_ROOT
+        CORPUS_ROOT = os.path.join(tmp, "static_root")
+        try:
+            sdest = os.path.join(tmp, dir_name(StaticSpec, 0))
+            expected = ["m10.slang", "m2.slang", "uni.slang"]
+            assert materialize(StaticSpec, 0, sdest) == expected, \
+                ("a source_dir workload must round-trip sorted, .slang only, "
+                 "with non-ASCII accepted")
+            assert prepared_files(sdest) == expected, \
+                "the source_dir round-trip must match materialize exactly"
+            # sources() is asserted separately from the round-trip above, which
+            # cannot see this: materialize sorts its own return, so it would
+            # absorb a read_corpus that stopped sorting. breakdown.py renders a
+            # workload page straight from sources(), in this order.
+            assert list(sources(StaticSpec, 0)) == expected, \
+                "sources() must return a static corpus sorted, for breakdown.py"
+            assert sources(StaticSpec, 0)["uni.slang"] == "// é\n", \
+                ("read_corpus must decode third-party bytes tolerantly and "
+                 "return them verbatim; a stricter codec would mangle the "
+                 "license headers and author names real corpora carry")
+        finally:
+            CORPUS_ROOT = saved_root
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+_selfcheck()
+del _selfcheck
