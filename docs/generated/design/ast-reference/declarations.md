@@ -103,7 +103,7 @@ though nothing constructs it directly. Concrete leaves below.
 | `LetDecl` | `VarDecl` | (inherits) | [variable declaration](../syntax-reference/grammar.md#declarations) | `let` variable; immutable. |
 | `ParamDecl` | `VarDeclBase` | (inherits) | [parameter](../syntax-reference/grammar.md#function-style-declarations) | Function / initializer / subscript parameter. |
 | `ModernParamDecl` | `ParamDecl` | (inherits) | [parameter](../syntax-reference/grammar.md#function-style-declarations) | Modern-syntax (name-first) parameter; immutable unless `out`/`inout`. |
-| `GlobalGenericValueParamDecl` | `VarDeclBase` | (inherits) | [`__generic_value_param`](../syntax-reference/grammar.md#declarations) | Module-level existential value parameter (not a type parameter). |
+| `GlobalGenericValueParamDecl` | `VarDeclBase` | (inherits) | [`__generic_value_param`](../syntax-reference/grammar.md#declarations) | Module-level existential value parameter (not a type parameter); bound by an external specialization argument — see `## Notable nodes`. |
 | `GenericValueParamDecl` | `VarDeclBase` | `parameterIndex: int` | [generic-value param](../syntax-reference/grammar.md#generics-and-where-clauses) | A value parameter of a `GenericDecl`. |
 | `GenericValuePackParamDecl` | `VarDeclBase` | `parameterIndex: int` | [generic-value-pack param](../syntax-reference/grammar.md#generics-and-where-clauses) | A value-pack parameter of a `GenericDecl` (`let each N`). |
 | `ExtensionDecl` | `AggTypeDeclBase` | `targetType: TypeExp` | [extension](../syntax-reference/grammar.md#type-defining-declarations) | `extension T { ... }`; attaches new members to an existing type. |
@@ -120,7 +120,7 @@ though nothing constructs it directly. Concrete leaves below.
 | `TypeDefDecl` | `SimpleTypeDecl` | `type: TypeExp` | [typedef](../syntax-reference/grammar.md#type-defining-declarations) | `typedef X Y;`. |
 | `TypeAliasDecl` | `TypeDefDecl` | (inherits) | [typealias](../syntax-reference/grammar.md#type-defining-declarations) | `typealias Y = X;` (modern alias syntax). |
 | `AssocTypeDecl` | `AggTypeDecl` | (inherits) | [associatedtype](../syntax-reference/grammar.md#type-defining-declarations) | `associatedtype T` inside an interface. |
-| `GlobalGenericParamDecl` | `AggTypeDecl` | (inherits) | [`type_param`](../syntax-reference/grammar.md#declarations) | Module-level type parameter (`type_param`). |
+| `GlobalGenericParamDecl` | `AggTypeDecl` | (inherits) | [`type_param`](../syntax-reference/grammar.md#declarations) | Module-level type parameter (`type_param`); bound by an external specialization argument — see `## Notable nodes`. |
 | `ScopeDecl` | `ContainerDecl` | (inherits) | [block scope](../syntax-reference/grammar.md#statements) | Anonymous scope created by the parser for block statements, loop headers, and lambda parameter lists. |
 | `FuncAliasDecl` | `CallableDecl` | `targetDeclRef: DeclRef<CallableDecl>` | (none) | Alias member naming an existing callable; synthesized during checking (e.g. the `fwd_diff` member of a derivative extension), not parsed. |
 | `ConstructorDecl` | `FunctionDeclBase` | `m_flavor: int` (UserDefined / SynthesizedDefault / SynthesizedMemberInit) | [constructor](../syntax-reference/grammar.md#function-style-declarations) | `__init` / synthesized constructor. |
@@ -443,6 +443,33 @@ through the same sibling subtype-constraint representation already used
 for associated-type constraints. For when and why the front end creates
 these nodes, see
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md).
+
+### GlobalGenericParamDecl and GlobalGenericValueParamDecl
+
+`type_param T;` and `__generic_value_param N : int;` are module-scope
+declarations, not members of a `GenericDecl`:
+`parseGlobalGenericTypeParamDecl` reads a name plus optional generic
+constraints (`type_param T : IFoo;`), and
+`parseGlobalGenericValueParamDecl` a name plus an optional `: <type>`
+and `= <init>`. Neither takes an argument where it is written. Each
+instead becomes a specialization parameter of the enclosing module —
+flavor `GenericType` for the type form, `GenericValue` for the value
+form — in `Module::_collectShaderParams`
+([slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)),
+and the binding arrives from outside, validated against those
+parameters by `Module::_validateSpecializationArgsImpl` in the same
+file.
+
+Because the binding is external, compiling the module on its own
+succeeds even when the parameter is used, and so does a target compile
+of a file that declares one and never uses it. What needs the binding
+is generating target code from a *use*: without one the compiler
+reports `error[E38207]: global generic parameter used in code without a
+concrete binding`, located at the declaration. The command-line
+`-specialize` option does not supply it — that option feeds the last
+entry point rather than the module — so using it for a module-level
+parameter reports `error[E38025]: wrong number of specialization
+arguments`.
 
 ### GLSLInterfaceBlockDecl
 

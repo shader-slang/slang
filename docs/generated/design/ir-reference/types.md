@@ -105,15 +105,15 @@ AST-side classes these come from are catalogued in
 [../ast-reference/types.md](../ast-reference/types.md).
 
 The core-module sources that carry those `__intrinsic_type(...)`
-attributes are not in this page's manifest `watched_paths`, so a change
-there cannot mark this page stale. That gap is real and it bit this
-page: the ten `WorkGraphRecordTypeBase` opcodes are declared in
-[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang),
-which **no** document in the manifest watches. The manifest should add
-`source/standard-modules/experimental/workgraph.slang`,
+attributes are in this page's manifest `watched_paths`:
 `source/slang/core.meta.slang`, `source/slang/hlsl.meta.slang` and
-`source/slang/slang-ir.h.lua` (which owns the `kIROp_*` naming rule and
-the flag map) to this page's watched paths.
+[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
+(which declares the ten `WorkGraphRecordTypeBase` opcodes) all
+resolve, so a change to any of them marks this page stale. The one
+remaining omission is `source/slang/slang-ir.h.lua`, which owns both
+the `kIROp_*` naming rule cited above (`instEnums`, line 276) and the
+`flagMap` behind this page's Flags column (lines 228-234); the
+manifest should add it.
 
 ## Family hierarchy
 
@@ -328,6 +328,41 @@ The context-channel types are keyed by the function they belong to;
 `BackwardDiffIntermediateContextType` is the one excluded from the
 generated builders and has a hand-written
 `IRBuilder::getBackwardDiffIntermediateContextType`.
+
+Which of the three context-channel *families* a function gets is
+decided at semantic-checking time, by the differentiation attribute on
+the primal function. Each arm of the checker's
+`IBackwardDifferentiable` extension synthesis sets the `irOp` of the
+two structs it synthesizes — `BwdCallable` and `MinimalContext` —
+directly
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 15142-15183, 15227-15268 and 19210-19277):
+
+| Attribute on the primal function | `BwdCallable` opcode | `MinimalContext` opcode |
+| --- | --- | --- |
+| `[Differentiable]`, `[BackwardDifferentiable]` | `BackwardDiffIntermediateContextType` | `BackwardDiffMinimalContextType` |
+| `[TreatAsDifferentiable]` | `TrivialBackwardDiffIntermediateContextType` | `TrivialBackwardDiffMinimalContextType` |
+| `[BackwardDerivative(fn)]`, `[BackwardDerivativeOf(fn)]` | `BackwardContextFromLegacyBwdDiffFunc` | `BackwardMinimalContextFromLegacyBwdDiffFunc` |
+
+The two columns are *not* alternatives: both structs are synthesized
+for every differentiable function, and the function's
+`IBackwardDifferentiable` witness table names both. For
+`[Differentiable] float f(float x) { return x * x; }`, a `-dump-ir`
+of a shader that calls `bwd_diff(f)` prints
+`witness_table_entry(%30,BackwardDiffIntermediateContextType(%f))`
+and `witness_table_entry(%29,BackwardDiffMinimalContextType(%f))` in
+the same `witness_table`. Re-marking `f` `[TreatAsDifferentiable]`
+replaces both with the `Trivial*` pair; moving the derivative into a
+user-written `[BackwardDerivative(f_bwd)]` replaces them with the
+`FromLegacy*` pair, which carries the user function as its second
+operand (`BackwardContextFromLegacyBwdDiffFunc(%f, %f_bwd_diff)`).
+
+The pair divides by role, not by state size. `apply_bwd` returns the
+minimal context beside the primal result
+(`Func(tuple_type(Float, BackwardDiffMinimalContextType(%f)), Float)`),
+`remat` expands that into the full one
+(`Func(BackwardDiffIntermediateContextType(%f), BackwardDiffMinimalContextType(%f), Float)`),
+and the propagate function takes the full one.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -835,10 +870,15 @@ the comment will swap the two sets.
 The reverse-mode autodiff pipeline threads recorded primal-side
 state through the call graph via *context channels*. Each
 function's context-channel type is one of the `*Context*` types
-above, keyed by the function value. The choice between the
-`Minimal`, ordinary, and `Trivial` variants is set by the
-specialization pass based on whether the propagation strategy
-needs full state, minimal state, or nothing.
+above, keyed by the function value. Which family the pair comes from
+is fixed by the attribute on the primal function, as tabulated under
+[Differentiation types](#differentiation-types); a later pass decides
+only the *contents*. `MinimalContext` "will hold the same data as
+`BwdCallable`" when the checker synthesizes it, and "the backward
+diff translation pass will later determine exactly what goes in the
+minimal context"
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 3727-3728).
 
 ## See also
 

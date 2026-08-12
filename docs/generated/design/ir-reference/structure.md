@@ -172,11 +172,46 @@ expressed by the wrapper's accessors, such as
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `global_var` | `IRGlobalVar` | — | G | a module-scope `VarDecl` that is neither a shader parameter nor `static const`, via `lowerGlobalVarDecl`, and a mutable function-`static` local, via `lowerFunctionStaticVarDecl` | Module-scope mutable variable; its type is a `PtrType` and an initializer lives in child blocks. |
+| `global_var` | `IRGlobalVar` | — | G | a module-scope `VarDecl` that is neither a shader parameter nor `static const`, via `lowerGlobalVarDecl`, and a mutable function-`static` local, via `lowerFunctionStaticVarDecl` | Module-scope mutable variable; its type is a `PtrType`, and a module-scope initializer lives in child blocks (a function-`static` initializer does not — see below). |
 | `global_param` | `IRGlobalParam` | — | G | a module-scope shader-parameter `VarDecl`, via `lowerGlobalShaderParam` | Module-scope uniform parameter; unlike `global_var` it *is* the value, not its address. |
 | `globalConstant` | `IRGlobalConstant` | `value` (optional; unnamed in Lua, read by `getValue()`) | G | a `static const` module-scope `VarDecl`, via `lowerGlobalConstantDecl`, and a function-`static` `const`, via `lowerFunctionStaticConstVarDecl` | Module-scope constant; with no operand it is an `extern` constant defined in another module. |
 | `global_generic_param` | `IRGlobalGenericParam` | — | G | `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl`, written `type_param T : IFoo;` at module scope | Declares a generic parameter at module level; bound by `bind_global_generic_param`. Note the producer is *not* `GenericTypeParamDecl` — `GlobalGenericParamDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 10878) derives from `AggTypeDecl` while `GlobalGenericValueParamDecl` (line 10885) derives from `VarDeclBase`, and constraint decls parented by one also lower here. [generics-and-existentials.md](generics-and-existentials.md) owns the declaration/binding pair in full. |
 | `global_hashed_string_literals` | `IRGlobalHashedStringLiterals` | (variadic) | | (synthesized) | Container for the module's hashed-string-literal pool; a module holds at most one. |
+
+The two AST origins of `global_var` print differently. A module-scope
+`static int g = 3;` keeps its initializer in a child block that
+returns the value:
+
+```
+global_var %g : Ptr(Int)
+{
+block %2:
+    return_val(3 : Int)
+}
+```
+
+A function-`static` does not. `lowerFunctionStaticVarDecl`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+lines 11885-11924) leaves the variable's own `global_var` bodyless and
+creates a *second*, unnamed `global_var` typed `Ptr(Bool)` whose block
+returns `false`. That second global is a run-once guard: the
+initializer is lowered into the enclosing function, under an `ifElse`
+on the guard, instead of into a block on the variable. So one `static`
+local with an initializer yields two module-scope insts:
+
+```
+global_var %c : Ptr(Int);
+
+global_var %3 : Ptr(Bool)
+{
+block %4:
+    return_val(false)
+}
+```
+
+The guard is emitted whenever the declaration has an initializer at
+all: the lowering tests only for the presence of `initExpr` (line
+11885), not for whether that initializer is a compile-time constant.
 
 A constrained `type_param` lowers to **two** module-scope insts, not
 one: the parameter itself, typed `Type`, and a second
@@ -376,6 +411,40 @@ autodiff) can find the requirement by role rather than by entry
 order. Because either key kind can appear, the `lookupKey` operand
 of `lookupWitness`-style dispatch is typed `IRInst`, not
 `IRStructKey`.
+
+A dump prints the key and its decoration on consecutive lines, with
+the `BuiltinRequirementKind` appearing twice — once as the inst's
+operand and once inside the decoration:
+
+```
+[BuiltinRequirementDecoration(1 : Int)]
+let %201 : _ = builtinRequirementKey(1 : Int)
+```
+
+Kind `1` is `DifferentialType`, the `IDifferentiable.Differential`
+requirement. A `StructKey` for an ordinary requirement prints in the
+same shape but under a name (its `[export("key_...")]` line, elided
+here, sits between the two — the mangled tail varies with the module
+name):
+
+```
+[nameHint("IComputable.compute")]
+let %IComputablex5Fcompute : _ = key
+```
+
+The printed identifier is the name hint put through `scrubName`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines
+7688-7717), which rewrites `.` to `_` and then escapes the `_` as
+`x5F`. `getInterfaceRequirementKey` calls `addNameHint` only on that
+`StructKey` path
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 1826); a `BuiltinRequirementKey` never gets a name hint, so a
+dump numbers it like any other unnamed value. The `_` type clause the
+two share is how a null result type prints:
+`IRBuilder::getBuiltinRequirementKey` passes `nullptr` for the type
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
+3609), and `dumpType` writes `_` when the type is null
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7889).
 
 ### `witness_table`
 

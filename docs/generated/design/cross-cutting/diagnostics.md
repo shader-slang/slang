@@ -426,6 +426,32 @@ dozen entries, `no-applicable-overload-for-name-with-args` and
 header carries the id and the message but never the name, so for a
 multi-bound code the message text is the only discriminator.
 
+A catalog entry is a diagnostic the compiler *can* emit; it is not a
+promise that some input reaches it, and its summary line does not
+identify the construct that triggers it.
+`expected-array-expression` (`30020`) is raised only by
+`SemanticsExprVisitor::visitGetArrayLengthExpr` in
+[slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
+and the `GetArrayLengthExpr` node it inspects has no parser
+production — its only producer is
+`ASTSynthesizer::emitGetArrayLengthExpr`, called while synthesizing a
+member-wise assignment over a field that is already an array — so no
+source text provokes it. The user-facing spelling,
+`Array::getCount` in
+[core.meta.slang](../../../../source/slang/core.meta.slang), is an
+ordinary method backed by `__intrinsic_op($(kIROp_GetArrayLength))`,
+so on a non-array it reports `no-member-of-name-in-type` (`30027`)
+instead.
+Conversely `cannot-convert-array-of-smaller-to-larger-size` (`30024`)
+reads like an assignment error but is emitted from GLSL varying
+legalization, for a system-value array declared larger than the
+target's — `float inside[4] : SV_InsideTessFactor` in a
+`[domain("quad")]` shader, for instance — whereas a plain
+`float b[4] = a;` with `a` of type `float[2]` reports `type-mismatch`
+(`30019`). Guessing an input from an entry's name is therefore
+unreliable; the regression tests are the record of which entries have
+a demonstrated reproduction.
+
 Tools suppress or promote diagnostics through `overrideDiagnostic` /
 `overrideDiagnostics`, declared in
 [slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h) and

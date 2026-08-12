@@ -1,7 +1,7 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:28:05Z
+intake_at: 2026-08-12T06:52:00Z
 target_doc: target-pipelines/cuda.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
@@ -18,12 +18,35 @@ actions:
 
 ## Summary
 
-Ten gaps, all from `docs/generated/tests/design/target-pipelines/cuda`.
-Nothing was escalated: no gap turned out to be a compiler defect. Nine are
-fixed and one is deferred — the PTX fingerprint, which no Slang source
-produces (nvrtc writes that text) and which this host cannot settle by
-running the compiler. The page grew from 79,761 to 84,439 bytes against its
+This is a **re-run** of one gap, `805da7fc5a61` (the PTX fingerprint),
+which the first pass deferred on the belief that no `slangc` was
+available. A native macOS-arm64 `slangc` was built since, so the gap was
+re-checked by running it; the verdict stays `deferred` but the reason is
+now an observed failure rather than an assumption — `-target ptx` aborts
+with `error[E00100]: failed to load downstream compiler 'nvrtc'` on this
+host, while the same file compiles to CUDA C++ under `-target cuda`. No
+other gap was revisited and the target document was not edited in this
+run, so the nine `fixed` verdicts, their Evidence, and
+`target_doc_source_commit_after` are carried forward verbatim from the
+first pass. The counts are unchanged: nine fixed, one deferred, nothing
+escalated, nothing rejected. The page is 84,439 bytes against its
 98,304-byte cap.
+
+A side check requested with the re-run **refutes** a claim the first pass
+made outside its queue and wrote into the document: the CUDA emitter's
+`<<<...>>>` arm is *not* unreachable on the `CUDASource` arm. A
+hand-written `__dispatch_kernel` in an ordinary `[shader("compute")]`
+entry point survives to CUDA text — `slangc -target cuda -entry main
+-stage compute` on such a file emits
+`myKernel<<<make_uint3 (32U, 1U, 1U), make_uint3 (1U, 1U, 1U)>>>(t_0);`
+inside `extern "C" __global__ void main_0()`. Only the `[TorchEntryPoint]`
+host-function case is deleted by `removeTorchKernels`, and only the
+PyTorch arm rewrites the opcode into `kIROp_CudaKernelLaunch` (confirmed:
+`-target torch` on `tests/autodiff/cuda-kernel-export.slang` emits
+`cudaLaunchKernel(...)`, no `<<<`). The last sentence of the
+`#adjacent-targets` OptiX bullet in the document therefore overstates the
+`CUDASource` case; correcting it is outside this run's one-gap scope and
+is left for the operator to queue.
 
 The one `drift-from-source` gap (`7057bdb1d195`) resolved as a documentation
 gap, not a compiler bug: `handleAutoBindNames` does write `__kernel__<name>`
@@ -46,7 +69,11 @@ and `source/slang/slang-diagnostics.lua` (`E45105` / `E45114`). Each is a
 declarative table read directly and cited by line, matching the precedent set
 in the `target-pipelines/hlsl.md` intake, but the manifest should gain those
 paths so the claims stay tracked. See rows `c47f6376ff53`, `23fe34a4ec1e`,
-`7d9a27123dfe`, `b0910e127d33` and `2a6f07fe3e9a`.
+`7d9a27123dfe`, `b0910e127d33` and `2a6f07fe3e9a`. As of this re-run the
+manifest has gained them: `regenerate.py show target-pipelines/cuda.md`
+resolves `slang-type-text-util.cpp`, `slang-options.cpp`, `slang-parser.cpp`,
+`slang-lower-to-ir.cpp` and `slang-diagnostics.lua`, so the "outside
+`watched_paths`" warnings kept verbatim in those Evidence cells are stale.
 
 ## Actions
 
@@ -54,7 +81,7 @@ paths so the claims stay tracked. See rows `c47f6376ff53`, `23fe34a4ec1e`,
 | --- | --- | --- | --- |
 | 2a6f07fe3e9a | fixed | The opcode's CUDA-side producer is watched `source/slang/slang-ir-pytorch-cpp-binding.cpp:1064` (`generateCUDAWrapperForFunc`, line 1009, called only from `generateHostFunctionsForAutoBindCuda` at `:1237-1255`), and the same file rewrites every `IRDispatchKernel` into `kIROp_CudaKernelLaunch` at `:438-462` (`generateCppBindingForFunc`, PyTorch arm) — so the `<<<...>>>` emitter arm at watched `source/slang/slang-emit-cuda.cpp:1388-1404` is not reached on either ordinary arm, which is why no test could pin it. The surface keyword is `source/slang/slang-parser.cpp:3217-3231` (`__dispatch_kernel`, registered at `:10871`), lowered at `source/slang/slang-lower-to-ir.cpp:5978-5992`; used in `tests/autodiff/cuda-kernel-export.slang:44`. **`slang-parser.cpp` and `slang-lower-to-ir.cpp` are outside `watched_paths`.** | named both producers of `kIROp_DispatchKernel` (the `__dispatch_kernel` keyword, cross-linked to the AST page, and the generated `[AutoPyBindCUDA]` host wrapper) and stated why neither normally reaches CUDA text; the requested `-target cuda` example was not added because the source shows the arm is not reachable that way |
 | c47f6376ff53 | fixed | `{SLANG_CUDA_SOURCE, "cu", "cuda,cu", ...}`, `{SLANG_CUDA_HEADER, "cuh", "cuh", ...}`, `{SLANG_PTX, "ptx", "ptx", ...}` at `source/core/slang-type-text-util.cpp:82-84`. Corroborated by the bundle's own verified directives: 85 tests use `-target cuda` and `coopvec-lowered-on-cuda-header.slang` uses `-target cuh`. **`slang-type-text-util.cpp` is outside `watched_paths`.** | added the three `-target` spellings (`cuda`/`cu`, `cuh`, `ptx`) to the intro sentence that enumerates the `CodeGenTarget` values |
-| 805da7fc5a61 | deferred | `.version` / `.target` / `.visible .entry` are nvrtc's output format, not Slang's: nothing under `watched_paths` writes PTX text (the CUDA pipeline stops at CUDA C++, per watched `source/slang/slang-emit.cpp:2972-2973`). The only test, `ptx-downstream-nvrtc-emit.slang`, carries `//META: requires-tool=nvrtc` and the bundle README (line 63-66) records it as ignored on a runner without the CUDA toolchain, so its CHECK lines are unverified. Settling it needs a `slangc -target ptx` run with nvrtc present — impossible here (the tree's build is Linux x86-64, this host is arm64). Follow-up: run the bundle test on a CUDA-toolchain runner, then document the fingerprint from the verified output. | — |
+| 805da7fc5a61 | deferred | **Re-checked by running the compiler** (native macOS-arm64 `build-arm64/Debug/bin/slangc` at HEAD `67149d1e03eb`, `SLANG_ASSERT=release-assert-only`), which the first pass could not do. PTX is unreachable on this host: `slangc -target ptx -entry main -stage compute docs/generated/tests/design/target-pipelines/cuda/ptx-downstream-nvrtc-emit.slang` exits 255 printing `error[E00100]: failed to load downstream compiler 'nvrtc'`, `note[E99996]: failed to load dynamic library 'nvrtc'`, `error[E52002]: pass-through compiler not found`, and writes no artifact even with `-o`. There is no nvrtc here to load (no `/usr/local/cuda`, no `*nvrtc*` under `/usr/local`, `/opt`, `/Library` or `external/`) and NVIDIA ships no macOS-arm64 nvrtc. The block is nvrtc alone, not the CUDA pipeline: the same file compiles to CUDA C++ under `-target cuda`. Nor can the fingerprint be confirmed from source, because Slang never writes PTX text — watched `source/slang/slang-code-gen.cpp:268` maps `PTX` to `CodeGenTarget::CUDASource` and `:1194` routes `PTX` to `emitWithDownstreamForEntryPoints`, so `.version` / `.target` / `.visible .entry` are the downstream compiler's output. Follow-up unchanged: run `ptx-downstream-nvrtc-emit.slang` (`//META: requires-tool=nvrtc`, still recorded ignored in the bundle README) on a CUDA-toolchain runner, then document the fingerprint from the verified output. | — |
 | 0c3f169de800 | fixed | Watched `source/slang/slang-ir-legalize-varying-params.cpp:1912-1916` says so in the source comment: "A recursive terminate-reaching call chain cannot be flattened by inlining ... In practice such recursion is already rejected upstream (E55201, 'recursion not allowed'), so this guard primarily guarantees the pass itself always terminates." Cycle check at `:1917`, residual-call diagnostic at `:1983-1996`. E55201 is the verified CHECK of `stress-recursive-function-rejected.slang:24-25`. | noted that the recursive arm is shadowed by `checkForRecursiveFunctions` / `E55201` and that the cycle check exists for termination, leaving "a call `inlineCall` declines to flatten" as the reachable shape |
 | 7057bdb1d195 | fixed | Watched `source/slang/slang-ir-pytorch-cpp-binding.cpp:1332-1355`: the rename is applied to the `IRExternCppDecoration` and only when one is present (`:1342`). Watched `source/slang/slang-emit-c-like.cpp:1219-1248` returns `generateEntryPointNameImpl(...)` for any inst with an `IREntryPointDecoration`, before the `IRExternCppDecoration` branch at `:1251-1255`; watched `source/slang/slang-emit-cuda.cpp:435-440` prefixes such a function `extern "C" __global__`. So the observed unprefixed name is what the source prescribes — a doc gap, not a compiler bug. The wrapper takes the original name at `:1090-1093`. | added a paragraph stating the rewrite touches only the `ExternCpp` linkage name, that an entry point's symbol name wins over it (so `-target cuda` emits `extern "C" __global__ void myKernel(...)` unprefixed), and that the prefixed name matters on the `PyTorchCppBinding` arm |
 | 7b1f9994557e | fixed | Watched `source/slang/slang-ir-cuda-immutable-load.cpp`: `createLoadFuncForType` handles only the scalar ops at `:85-98`, `kIROp_VectorType` `:101`, `kIROp_MatrixType` `:148`, `kIROp_ArrayType` `:215`, `kIROp_StructType` `:242`, and returns an empty `LoadMethod` off the end of the switch at `:269`; the array and struct arms discard the half-built function and return empty when a leaf fails (`:231-235`, `:257-261`); `processInst` leaves the original load in place when `emitImmutableLoad` yields null (`:292-330`). | replaced the unillustrated "no leaf is `__ldg`-able" sentence with the recognized type-op set and the two bail-out paths, so the surviving load shape is derivable (an opaque leaf — resource handle or pointer — not a composite of the five recognized ops) |

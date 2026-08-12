@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: "claude-opus-5[1m]"
-intake_at: 2026-08-11T16:42:09Z
+intake_at: 2026-08-12T07:05:00Z
 target_doc: ast-reference/declarations.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 7
 actions:
-  fixed: 6
+  fixed: 7
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,52 +18,45 @@ actions:
 
 ## Summary
 
-Nothing was escalated. Six of the seven gaps were fixed by editing six
-sections — two `## Nodes` rows (`GLSLInterfaceBlockDecl`,
-`AttributeDecl`), `### SyntaxDecl and the syntax-as-declaration model`,
-`### NamespaceDecl, ModuleDecl, FileDecl`,
-`### EnumDecl and EnumCaseDecl`, `### AccessorDecl family` — plus two
-new callouts, `### SemanticDecl` and `### GLSLInterfaceBlockDecl`. One
-gap was deferred: the claim that `type_param` /
-`__generic_value_param` are bound by external specialization arguments
-cannot be confirmed from this page's `watched_paths`. Nothing was
-rejected.
+This is a re-run of the gap-intake stage covering one gap,
+`ca655cf14cfe`, which the previous cycle deferred on the grounds that
+the binding path lay outside `watched_paths` and that `slangc` could
+not be run on this host. Both grounds have since dissolved:
+`regenerate.py show` now resolves `source/slang/slang-check-shader.cpp`
+and `source/slang/slang-diagnostics.lua` as watched paths for this
+page, and a native arm64 `slangc` at `build-arm64/Debug/bin/slangc`
+runs here. Running it settled the gap, so `ca655cf14cfe` moves from
+`deferred` to `fixed` and the tally is now seven `fixed`, nothing
+rejected, deferred, or escalated. The other six verdicts and their
+Evidence are carried forward unchanged from the previous cycle.
 
-Two hypotheses did not survive confirmation and were replaced by what
-the source actually says. `91fe0f7f6aa5` asked for a
-`GLSLInterfaceBlockDecl` example "accepted in GLSL-compatibility
-mode"; in fact `Parser::ParseGLSLInterfaceBlock`
-(`source/slang/slang-parser.cpp:6457`) has no caller anywhere under
-`source/`, and the GLSL `uniform` / `buffer` / `in` / `out` block
-spellings desugar to a `StructDecl` + `VarDecl` pair instead — so the
-node has no reachable spelling to exemplify, and its `Grammar` cell is
-now `(none)`. `2fede3d30d6e` assumed the "empty body" the document
-mentions is `{ }`; the parser's own comment sits on the *semicolon*
-branch of `parseStorageDeclBody`, and the two forms coincide only
-because neither records an accessor member.
+Running the compiler also refuted the gap's own `Suggested addition`,
+which asked for a note that "a stand-alone compile of the module is
+expected to fail". It does not fail. `slangc /tmp/gapca/tp.slang -o
+tp.slang-module` on a file that both declares `type_param T;` and uses
+`T` in an entry point exits 0 and writes a 9107-byte module; a target
+compile of a file that declares a `type_param` and never uses it also
+exits 0. What fails is generating target code from a *use*: `slangc
+tp.slang -target hlsl -entry computeMain -stage compute` reports
+`error[E38207]: global generic parameter used in code without a
+concrete binding` pointed at the `type_param` token. The same error
+appears for `__generic_value_param N : int;` read as a value, though
+reading one as an array extent fails earlier and differently
+(`error[E39999]: expression does not evaluate to a compile-time
+constant`). The new callout states the fact the gap was reaching for
+without absorbing the hypothesis's incorrect version of it.
 
-The `attribute_syntax` gap (`ec5f9a6f1ce7`) is `drift-from-source`
-where the source backs the observation, so the document was the thing
-that was wrong: `parseAttributeSyntaxDecl` resolves the `: <class>`
-clause through `ASTBuilder::findSyntaxClass`, which can only find a
-class the compiler was built with. The internal error the reporting
-bundle saw for an unknown class is a separate compiler defect already
-recorded as
-`docs/generated/tests/_meta/findings/declarations-attribute-syntax-unknown-class-ice.yaml`;
-the new prose states the requirement without blessing the ICE as
-documented behaviour.
-
-Operator follow-up: `ca655cf14cfe` needs either a `watched_paths`
-expansion to `source/slang/slang-check-shader.cpp` (which turns a
-`GlobalGenericParamDecl` into a specialization parameter, `:2798-2806`)
-and `source/slang/slang-diagnostics.lua` (which defines E38207,
-`:4620-4625`), or a CLI harness. The same shape of blocker applies to
-the checker-side halves of `ba8f19c2205d` (which base is the tag type,
-what the choice affects) and `2fede3d30d6e` (implicit-getter
-materialization) — those live in `source/slang/slang-check-decl.cpp`,
-so the edits state the parse-shape facts and leave the checking rules
-to `pipeline/03-semantic-check.md`, as the generation prompt's
-forbidden-content clause requires.
+One further hypothesis in the gap row — that the arguments may be
+"supplied through the compilation API or command line" — is only half
+right, and the document now says which half. `slangc -specialize float`
+on the same file reports `error[E38025]: wrong number of specialization
+arguments`, because `-specialize` accumulates onto
+`rawEntryPoint.specializationArgs` and is handed to `addEntryPointEx`
+(`source/slang/slang-options.cpp:3407`, `:4287-4296`), binding entry-
+point parameters rather than the module's. The module-level path is the
+API one: `Module::_collectShaderParams` makes the specialization
+parameter and `Module::_validateSpecializationArgsImpl` consumes the
+argument.
 
 ## Actions
 
@@ -75,4 +68,4 @@ forbidden-content clause requires.
 | 91fe0f7f6aa5 | fixed | `source/slang/slang-parser.cpp:214` and `:6457-6472` — `Parser::ParseGLSLInterfaceBlock` is the only site that constructs a `GLSLInterfaceBlockDecl`, and a tree-wide grep finds no call to it, so the node is unreachable at this commit. The GLSL block forms go elsewhere: `:5866` (`buffer` -> `parseGLSLShaderStorageBufferDecl`), `:5881` (`uniform` -> `parseHLSLCBufferDeclWithLayout`), `:5891` (`in`/`out` -> `ParseBufferBlockDecl` with an empty wrapper name), all of which build a `StructDecl` + `VarDecl` pair at `:4010-4110` and add a `TransparentModifier` at `:4159` when no instance name is written. `:3530-3541` confirms the `options.allowGLSLInput` gate | set the row's `Grammar` to `(none)`, noted the node is unreached, and added a `### GLSLInterfaceBlockDecl` callout naming the three desugarings instead of inventing an example |
 | d03e7f78dc55 | fixed | `source/slang/slang-parser.cpp:4979-4992` — `parseSemanticDecl` reads `semantic <name>` then `parseSemanticDeclBody`, which at `:4957-4977` requires a braced body; `:4917-4954` — `parseSemanticAccessorDecl` accepts only `get : <type>;` and `set : <type>;`, producing `SemanticGetterDecl` / `SemanticSetterDecl`. The two-line surface is the verified form in `docs/generated/tests/design/ast-reference/declarations/semanticdecl-typed-getter.slang` | added a `### SemanticDecl` callout with the `semantic MySem { get : int; }` / `struct S { int v : MySem; }` example |
 | ba8f19c2205d | fixed | `source/slang/slang-parser.cpp:6490-6559` — `parseEnumDecl` parses the `: T` part with the same `parseOptionalInheritanceClause` a struct uses, so the tag type and any conformances become sibling `InheritanceDecl` children; no assignment to `tagType` appears anywhere in `slang-parser.cpp`, and `source/slang/slang-ast-decl.h:448` declares the field on `EnumDecl`. Which base becomes the tag type, and the default when none is written, are decided in `source/slang/slang-check-decl.cpp:12185-12299` — outside `watched_paths` and forbidden content per `_meta/prompts/ast-reference-declarations.md:63-64`, so they are left to `pipeline/03-semantic-check.md` | added the `enum E : uint8_t { A, B }` spelling and the base-list parse shape to `### EnumDecl and EnumCaseDecl`, and said the parser never sets `tagType` |
-| ca655cf14cfe | deferred | Both halves of the claim are outside `watched_paths`. `source/slang/slang-parser.cpp:4384-4412` (`parseGlobalGenericTypeParamDecl`, `parseGlobalGenericValueParamDecl`) only shows that `type_param` / `__generic_value_param` parse into `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl`, and `source/slang/slang-ast-decl.h:572-583` only calls them "generic entry-point" / "existential value" parameters. The binding path is `source/slang/slang-check-shader.cpp:2798-2806` (the decl becomes a `SpecializationParam`) and the diagnostic is E38207 in `source/slang/slang-diagnostics.lua:4620-4625`; neither file is watched here, and `slangc` cannot be run on this host (Linux x86-64 build, arm64 host) to reproduce. Follow-up: expand `watched_paths` with those two files, or add a CLI-driving harness on the tests side | — |
+| ca655cf14cfe | fixed | Both halves are now in `watched_paths` (confirmed by `regenerate.py show ast-reference/declarations.md`). `source/slang/slang-check-shader.cpp:2798-2818`, inside `Module::_collectShaderParams` (`:2726`), turns a `GlobalGenericParamDecl` into a `SpecializationParam` of flavor `GenericType` and a `GlobalGenericValueParamDecl` into one of flavor `GenericValue`, appending both to `m_specializationParams`; `Module::_validateSpecializationArgsImpl` (`:3199-3212`) validates supplied `SpecializationArg`s against `getSpecializationParamCount()` and diagnoses `MismatchSpecializationArguments` when too few arrive. `source/slang/slang-diagnostics.lua:4619-4625` defines E38207 `unspecialized-global-generic-param-with-uses` with exactly the observed message; `:4402-4407` defines E38025. Surface confirmed at `source/slang/slang-parser.cpp:4384-4415`. Compiler runs with `build-arm64/Debug/bin/slangc` and `SLANG_ASSERT=release-assert-only`, on a file declaring `type_param T;` plus a `computeMain` that uses `T`: `slangc tp.slang -target hlsl -entry computeMain -stage compute -o /dev/null` gives `error[E38207]: global generic parameter used in code without a concrete binding` at `tp.slang:1:12` (exit 255); `slangc tp.slang -o tp.slang-module` exits 0 and writes the module; the same target compile of a file whose `type_param` is unused exits 0; and adding `-specialize float` gives `error[E38025]: wrong number of specialization arguments`, since `source/slang/slang-options.cpp:3407` and `:4287-4296` route `-specialize` to `addEntryPointEx` | added a `### GlobalGenericParamDecl and GlobalGenericValueParamDecl` callout giving the two spellings, the module-specialization-parameter role, and the E38207 / E38025 outcomes, and pointed both `## Nodes` rows at it |

@@ -520,6 +520,22 @@ special type leaks out of a parameter group, are suppressed when it is
 present. Type legalization propagates it when it rebuilds the struct, so
 the marker survives the legalization rewrite.
 
+Both producers are reachable from a few lines of ordinary code: an
+entry point declared
+`void computeMain(uniform float scale, uint3 tid : SV_DispatchThreadID)`
+and compiled with `-target hlsl -entry computeMain` carries the marker
+on its synthesized `EntryPointParams` struct, and moving `scale` to
+file scope as a global `uniform float scale` moves it to
+`GlobalParams` — but only because that global is *ordinary* data,
+since global collection is skipped when the global scope holds nothing
+but resources
+([slang-ir-collect-global-uniforms.cpp](../../../../source/slang/slang-ir-collect-global-uniforms.cpp)
+lines 120-122). Both passes run during target lowering rather than AST
+lowering, so neither struct is in the `LOWER-TO-IR` snapshot of a
+`-dump-ir` trace; the decoration first appears under
+`AFTER collectEntryPointUniformParams` or
+`AFTER collectGlobalUniformParameters`.
+
 ### `interpolationMode`
 
 The `modeOperand` is a plain integer `IRInterpolationMode` value, not

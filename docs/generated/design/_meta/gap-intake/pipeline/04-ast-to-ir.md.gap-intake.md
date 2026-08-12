@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:44:19Z
+intake_at: 2026-08-12T06:25:16Z
 target_doc: pipeline/04-ast-to-ir.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
 gap_count: 10
 actions:
-  fixed: 8
+  fixed: 10
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 2
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,46 +18,45 @@ actions:
 
 ## Summary
 
-Ten gaps, all from `design/pipeline/04-ast-to-ir`. Eight were confirmed in
-the watched paths and fixed; two are deferred. Nothing was escalated — the
-one `drift-from-source` gap turned out to be a documentation error, not a
-compiler defect: the checker really does stamp
-`kIROp_SynthesizedForwardDerivativeWitnessTable` on the synthesized
-differentiability conformance, so the doc's parenthetical naming
-`kIROp_ForwardDifferentiate` was simply wrong. The largest correction is
-the one the operator flagged in advance: the `LOWER-TO-IR` dump is *not*
-the raw output of the lowering walk, because `prelinkIR` and the whole
-mandatory pass block run before it — that is now stated once, in
-`Inputs and outputs`, and it is the answer to the prelinking gap rather
-than a pointer at a later stage. The two deferred gaps both ask for
-material that cannot be produced without running the compiler, which this
-host cannot do (Linux x86-64 build, arm64 host). The page is now 32,729
-bytes against a 32,768-byte cap; that budget is the reason every fix is
-terse, and it is the main obstacle to any further work on this page.
+This is a **re-run** of the intake for this page with the first pass's two
+constraints lifted: the size cap moved from 32,768 to 49,152 bytes, and a
+working native `slangc` (`build-arm64/Debug/bin/slangc`, `2026.14.1-80-g6122d03def`)
+turned out to be available. All ten gaps are now `fixed`; nothing is
+deferred, rejected or escalated, and no compiler defect was found. The two
+gaps the first pass deferred — `8fa595c02daf` and `eb9ddcf6e85a` — were
+both settled by building a candidate input and compiling it, so the verdict
+change is entirely "compiler run", not "more space". Four of the eight
+previously-fixed gaps were expanded where the first pass had written to
+budget and the source (or a dump) supported more — `8abfb42eaf38`,
+`080381fc3fa2`, `ec22217dbfdc`, `f84a0d200976` — and the other four
+(`02d54d396116`, `ed8892764aff`, `e8b7f6b842fe`, `a797d351abfe`) were
+re-verified, three of them by running the compiler, and left unchanged
+because the existing text already says everything the source and the
+dump support. The page went from 32,729 to 36,225 bytes, well under the
+49,152 cap.
 
-Two fixes go slightly beyond the gap text, in both cases because the
-gap's `Suggested addition` was wrong on the source. The `constexpr*`
-example the gap proposed (`N / 2` reaching `visitBuiltinOperationIntVal`)
-was replaced with the one that has a verified dump line, `int b[N + 1]`
-→ `constexprAdd(1 : Int, %N)`, together with the correction that `+`,
-`-`, `*` and unary `-` never form a `BuiltinOperationIntVal` at all
-(`slang-ast-val.h:243-247` asserts it) and reach the same opcodes through
-`visitPolynomialIntVal`. The `LoweredValInfo` flavor table also records
-that `Subscript` has no construction site anywhere in
-`slang-lower-to-ir.cpp`, which is why no Slang surface could be paired
-with it.
+Two substantive corrections came out of running the compiler rather than
+reading alone. First, the `MaximumTypeNestingLevelExceeded` guard in
+`visitInvokeExprImpl` is not constructor-specific: an `lldb` backtrace
+taken at the diagnostic shows the recursion is `visitInvokeExprImpl` →
+`addDirectCallArgs` → `lowerRValueExpr` → `visitInvokeExprImpl`, so a
+chain of 128 ordinary calls trips it. Second, the gap's own hypothesis for
+`8abfb42eaf38` (`N / 2` reaching `visitBuiltinOperationIntVal`) was right
+after all — the first pass could not confirm it and substituted a
+`PolynomialIntVal` example instead; the page now carries both, which is
+what makes the split between the two `Val` paths legible.
 
 ## Actions
 
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
-| 02d54d396116 | fixed | `source/slang/slang-check-decl.cpp:9490` and `:15113` pass `kIROp_SynthesizedForwardDerivativeWitnessTable` as the `synthesisOp` that becomes `SynthesizedModifier::op`; `source/slang/slang-lower-to-ir.cpp:11390-11394` emits `(IROp)synModifier->op`; the opcode is declared at `source/slang/slang-ir-insts.lua:2847`. Corroborated by `differentiable-conformance-is-intrinsic-witness-value.slang` (`= SynthesizedForwardDerivativeWitnessTable([[FWD]])`). Source agrees with the observation, so the doc was wrong. | corrected the conformance parenthetical to `kIROp_SynthesizedForwardDerivativeWitnessTable` and moved `kIROp_ForwardDifferentiate` onto the `SynthesizedFuncDecl` bullet |
-| ed8892764aff | fixed | `source/slang/slang-lower-to-ir.cpp:15572` calls `prelinkIR`, `:15664` runs `performMandatoryEarlyInlining`, `:15770` runs DCE — all before `dumpIR(..., "LOWER-TO-IR", ...)` at `:15797`. `04b-pre-link-passes/phase-c-mandatory-early-inlining-pulls-in-core-helper.slang` pins the inlined `add(%a, %b)` under `### LOWER-TO-IR:`. | added a sentence to `Inputs and outputs` stating the prelinked body is already in the `LOWER-TO-IR` dump, normally inlined, and that the dump is not raw lowering output |
-| 8abfb42eaf38 | fixed | `source/slang/slang-lower-to-ir.cpp:2009-2029` (`visitPolynomialIntVal` emits `constexprMul`/`constexprAdd`, constant term first); `source/slang/slang-ast-val.h:243-247` asserts `Add`/`Sub`/`Mul`/`Neg` never form a `BuiltinOperationIntVal` and that an all-constant fold is a `ConstantIntVal`; `source/slang/slang-ir-insts.lua:3408-3437` declares the hoistable `constexpr*` family. Verified dump line from `cross-cutting/ir-instructions/value-constexpr-add-ir.slang:49`. | added the `int b[N + 1]` / `constexprAdd(1 : Int, %N)` example and the `PolynomialIntVal` split |
-| 080381fc3fa2 | fixed | `source/slang/slang-lower-to-ir.cpp:1124` (`BoundStorage` when the accessor set is more than a lone `get`, per `:1090-1116`), `:6394` (`BoundMember` for a callable member-expr), `:7739` (`ExtractedExistential` in l-value context), `:7768` (`ImplicitCastedLValue` from `LValueImplicitCastExpr`/`OutImplicitCastExpr`), `:7795` (matrix swizzle), `:7880` (vector swizzle); `LoweredValInfo::subscript` (`:405`) has no call site. Use-site insts from `bound-storage-property-read-emits-accessor-call.slang` and `swizzled-lvalue-assign-lowers-to-swizzled-store.slang`. | replaced the inline flavor list with a flavor → Slang-surface table and a note that `Subscript` is never constructed |
-| e8b7f6b842fe | fixed | `source/slang/slang-lower-to-ir.cpp:6355-6364` and `:7481,7560-7567` (`IndexExpr` → `emitElementExtract`/`emitElementAddress`, mnemonics `getElement`/`getElementPtr` at `slang-ir-insts.lua:1273-1274`), `:5580-5595` (`__subscript` reaches lowering as an `InvokeExpr` routed to `lowerStorageReference`), `:7645-7654` (`AssignExpr` → `assignExpr`), `:7191-7195` with `source/slang/slang-ir.cpp:4377,4431-4440` (`emitCast` style table), `:9065-9098` with `source/slang/slang-ir.cpp:6447-6455` (`emitBreak`/`emitContinue` are `emitBranch`). Composite type spellings from `lower-optional-int.slang`, `lower-tuple-heterogeneous.slang`, `lower-parameter-block-narrow-struct.slang`. | added five mapping-table rows (`IndexExpr`, `AssignExpr`, `BuiltinCastExpr`, `BreakStmt`/`ContinueStmt`, composite generics) and pointed the element-type spellings at `ir-reference/types.md` instead of duplicating them |
-| a797d351abfe | fixed | The only `addLayoutDecoration` calls in `source/slang/slang-lower-to-ir.cpp` are at `:16444`, `:16478`, `:16526`, all inside `TargetProgram::createIRModuleForLayout` (`:16353`); nothing on the `generateIRForTranslationUnit` path attaches one. | rewrote the bullet to say layout intent is not materialized at lowering and to point at `04c-layout-ir.md` |
-| ec22217dbfdc | fixed | `source/standard-modules/experimental/workgraph.slang:10,17-39` declares `[ExperimentalModule] module workgraph` and the `attribute_syntax` for `NodeLaunch` / `NodeMaxDispatchGrid` / `NodeDispatchGrid` / `MaxRecords` / `NodeID`; `source/slang/slang-session.cpp:1768-1776` diagnoses `NeedToEnableExperimentFeature` unless `CompilerOptionName::ExperimentalFeature` is set (`-experimental-feature`, `source/slang/slang-options.cpp:1222`); `source/slang/slang-lower-to-ir.cpp:14485-14525` is the attribute → decoration mapping. Compile options corroborated by `entry-point-node-launch-attribute-lowers-to-string-decoration.slang`. | added the required `import experimental.workgraph` plus `-experimental-feature` / `-stage node` / `lib_6_8` to the work-graph paragraph |
-| f84a0d200976 | fixed | `source/slang/slang-parser.cpp:1966-1976` parses `where countof(Pack) == <expr>` into a `GenericVariadicPackCountConstraintDecl`; the spelling is exercised by `tests/language-feature/generics/diagnose-variadic-pack-count-constraint.slang:3`. | added the surface spelling `void f<let N : int, each T>(T x) where countof(T) == N` to the section's opening sentence |
-| 8fa595c02daf | deferred | The `assign` switch (`source/slang/slang-lower-to-ir.cpp:10249-10619`) handles `Ptr`, `SwizzledLValue`, `SwizzledMatrixLValue`, `BoundStorage`, `BoundMember`, `ExtractedExistential`, `ImplicitCastedLValue`; only `None` / `Simple` / `Subscript` reach the `UnsupportedAssignmentTarget` arm at `:10614`, and semantic checking rejects an r-value assignment target before lowering, so no user-reachable left-hand side is nameable from the source alone. `MaximumTypeNestingLevelExceeded` needs a type that recurses past `kMaxIRInvokeLoweringRecursionDepth` (128) in `visitInvokeExprImpl`, which is trial-and-error without a compiler. Both need a `slangc` run (unavailable: Linux x86-64 build, arm64 host) to produce a reproducer and its `E####` code; the codes themselves live in `source/slang/slang-diagnostic-defs.h`, outside this page's `watched_paths`. | — |
-| eb9ddcf6e85a | deferred | `source/slang/slang-lower-to-ir.cpp:11107-11115` confirms the specialization itself, and `:10916-10938` shows `getWitnessTableBaseDeclRef` returns null only when the conformance's base type is not a `DeclRefType` — which no ordinary source-level `struct S : IFoo` produces, so the gap's "without the base specialization" half may not be reachable from Slang at all. No test in this bundle or in `ir-reference/*` pins a `witness_table_entry` line for a conformance to a generic interface, and the difference cannot be asserted without running the compiler. Needs a bundle test that dumps a generic-interface conformance before the entry's value operand can be described. | — |
+| 02d54d396116 | fixed | Fix from the first pass re-verified by running the compiler, not just reading it: `build-arm64/Debug/bin/slangc -target spirv-asm -dump-ir -entry main diff.slang -o /dev/null` on a `[Differentiable] float sq(float)` prints, in `LOWER-TO-IR`, `= SynthesizedForwardDerivativeWitnessTable(%sq_fwd_diff)` on the conformance and `= ForwardDifferentiate(%sq)` on the member — matching `source/slang/slang-check-decl.cpp:9490,15113` (the `synthesisOp`), `source/slang/slang-lower-to-ir.cpp:11390-11394` (`(IROp)synModifier->op`) and `source/slang/slang-ir-insts.lua:2847`. | unchanged from the first pass; the parenthetical already names `kIROp_SynthesizedForwardDerivativeWitnessTable` |
+| ed8892764aff | fixed | Re-verified by running the bundle's own reproducer: `slangc -target spirv-asm -dump-ir -o /dev/null -entry main -stage compute phase-c-mandatory-early-inlining-pulls-in-core-helper.slang` prints `let %4 : Int = add(%a, %b)` inside `### LOWER-TO-IR:` with no `call`, i.e. the prelinked core operator is already imported *and* inlined by the time the first dump is printed. Source: `source/slang/slang-lower-to-ir.cpp:15572` (`prelinkIR`), `:15664` (`performMandatoryEarlyInlining`), `:15797` (`dumpIR(..., "LOWER-TO-IR", ...)`). | unchanged; the `Inputs and outputs` sentence already names the stage and warns the dump is not raw lowering output |
+| 8abfb42eaf38 | fixed | `source/slang/slang-lower-to-ir.cpp:1901` (`visitBuiltinOperationIntVal`) and `:2009` (`visitPolynomialIntVal`, constant term first); `source/slang/slang-ast-val.h:243-247` asserts `Add`/`Sub`/`Mul`/`Neg` never form a `BuiltinOperationIntVal`; `source/slang/slang-ir-insts.lua:3408-3437` declares the hoistable `constexpr*` family. Confirmed by running `slangc -target spirv-asm -dump-ir -entry main constexpr.slang -o /dev/null` on `int f<let N : int>() { int a[N / 2]; int b[N + 1]; ... }`, whose `LOWER-TO-IR` block contains `constexprAdd(1 : Int, %N1)` and `constexprDiv(%N1, 2 : Int)`. | expanded the example to both extents, so the `BuiltinOperationIntVal` path the section is about finally has its own dump line, and stated why `constexprAdd`'s operand order is reversed |
+| 080381fc3fa2 | fixed | Read side `source/slang/slang-lower-to-ir.cpp:1184` (`materialize`) — `:1265` `extractField`, `:1288` `emitSwizzle`, nested `emitElementExtract` + `emitMakeVector` for the matrix case, `:1342` `getSimpleVal`. Write side `:10249` (`assign`) — `:10327` `emitSwizzleSet`, `:10370` `swizzledStore`, `:10404` `emitMatrixSwizzleStore`, `:10583` `emitMakeExistential`, `:10597` `emitCast`. Mnemonics from `source/slang/slang-ir-insts.lua:1267-1274,1397,1413,1431,1445,2708`. Dump spellings corroborated by `memberexpr-lvalue-lowers-to-get-field-addr.slang` and `swizzled-lvalue-assign-lowers-to-swizzled-store.slang`. | added the third "Use site emits" column the gap asked for, replacing the two-example sentence that followed the table |
+| e8b7f6b842fe | fixed | `source/slang/slang-lower-to-ir.cpp:6355-6364`, `:7481`, `:7560-7567` (`IndexExpr`), `:5580-5595` (`__subscript` as `InvokeExpr`), `:7645-7654` (`AssignExpr`), `:7191-7195` with `source/slang/slang-ir.cpp:4377,4431-4440` (`emitCast` style table), `:9065-9098` with `source/slang/slang-ir.cpp:6447-6455` (`emitBreak`/`emitContinue`). The gap's "element types and storage shapes" half is owned by `docs/generated/design/ir-reference/types.md`, which catalogues the scalar spellings at `:204-227` and `Mat(elementType, rowCount, columnCount, layout)` at `:589`; duplicating it here would violate the contract's no-duplication rule. | unchanged; the five added rows plus the `ir-reference/types.md` cross-reference already cover every family the gap named |
+| a797d351abfe | fixed | Re-verified by running the compiler: in the `LOWER-TO-IR` block of `slangc -target spirv-asm -dump-ir -entry main diff.slang -o /dev/null`, `%outBuf` and `%g` carry only `[nameHint(...)]` and `[export(...)]` and no layout decoration. The only `addLayoutDecoration` calls in `source/slang/slang-lower-to-ir.cpp` are at `:16444`, `:16478`, `:16526`, all inside `TargetProgram::createIRModuleForLayout` (`:16353`). | unchanged; the bullet already states layout intent is not materialized at lowering and points at `04c-layout-ir.md` |
+| ec22217dbfdc | fixed | Attribute spellings from `source/standard-modules/experimental/workgraph.slang:17-43`; the attribute → decoration mapping is `source/slang/slang-lower-to-ir.cpp:14485-14525`; decoration mnemonics from `source/slang/slang-ir-insts.lua:1996-2029`. Ran `slangc -I build-arm64/Debug/lib/slang-standard-module-2026.14.1 -target hlsl -dump-ir -o /dev/null -stage node -entry main -profile lib_6_8 -experimental-feature wg.slang`, whose `LOWER-TO-IR` block prints `[nodeIsProgramEntry]`, `[nodeID("myNode", 0 : Int)]`, `[nodeDispatchGrid(1 : Int, 1 : Int, 1 : Int)]`, `[nodeLaunch("broadcasting")]` on `func %main`; deleting the `import` line turns each into `warning[E31000]: unknown attribute 'NodeLaunch'`. | replaced the C++ attribute-class list with a source-spelling → decoration table, keeping the existing import / compile-option paragraph |
+| f84a0d200976 | fixed | `source/slang/slang-parser.cpp:1966-1976` parses the `where countof(Pack) == <expr>` spelling. Ran `slangc -target spirv-asm -dump-ir -entry main packcount.slang -o /dev/null` on `int sum<let N : int, each T>(T values) where countof(T) == N` called as `sum<2>(1, 2)`; the `LOWER-TO-IR` block shows `param %5 : witness_table_t(Void)` as the generic's last parameter, `witness_table %10 : witness_table_t(Void)(Void);` at module scope, and `call specialize(%6, 2 : Int, TypePack(Int, Int), %10)(%1)` at the use site. | added the dump-line paragraph the gap asked for, alongside the surface spelling the first pass added |
+| 8fa595c02daf | fixed | Both halves settled by running the compiler; verdict changed from `deferred`. (a) `UnsupportedAssignmentTarget` (`source/slang/slang-lower-to-ir.cpp:10602`, the `default:` arm of `assign`) is reachable: `subscriptValue` (`:7481`) calls `materialize` on a `BoundStorage` base, which collapses it to a `Simple` via a getter `call` (`:1196-1220`), and indexing that temporary yields a `Simple` l-value. `slangc -target spirv -entry main propassign.slang -o /dev/null` on an array-valued `property` with `get`+`set` prints `error[E40017]: assignment target is not supported`; `tests/diagnostics/indexed-property-assign.slang` is the existing regression test. (b) `MaximumTypeNestingLevelExceeded` (`:5513-5521`) fires at exactly 128 nested calls — `f(f(...f(x)...))` — printing `fatal error[E39997]: maximum type nesting level exceeded`. An `lldb` breakpoint on `Slang::Diagnostics::MaximumTypeNestingLevelExceeded::toGenericDiagnostic` proves the *lowering* site is the one that fires (frame #1 is `ExprLoweringContext<RValueExprLoweringVisitor>::visitInvokeExprImpl`, recursing through `addDirectCallArgs` at `:5153`), not any of the seven type-nesting guards in `slang-check-*.cpp` / `slang-type-layout.cpp` that share the diagnostic. | added the `property`-index reproducer with its `E40017` line, and corrected the recursion bullet to say the counter is per nested `InvokeExpr` rather than per constructor, with the 128-call reproducer and its `E39997` line |
+| eb9ddcf6e85a | fixed | Settled by running the compiler; verdict changed from `deferred`. `source/slang/slang-lower-to-ir.cpp:11099-11115` applies `SubstitutionSet(witnessTableBaseDeclRef)` to each requirement witness; `:10916-10925` shows the decl-ref is null only when the conformance's base type is not a `DeclRefType`, which no ordinary `struct S : IFoo<...>` produces — so the "without the base specialization" half of the gap is unreachable from Slang and the observable difference is per-entry instead. `slangc -target spirv-asm -dump-ir -entry main geniface.slang -o /dev/null` on `interface IFoo<T> { T zero(); T twice() { return zero(); } }` + `struct S : IFoo<int>` prints `witness_table %26 : witness_table_t(specialize(%1, Int))(%S)` with `witness_table_entry(%IFoo_zero,%S_zero)` and `witness_table_entry(%IFoo_twice,specialize(specialize(%15, Int), %S, %26))`; the inner `specialize(%15, Int)` is exactly the base specialization. | added the two contrasting `witness_table_entry` lines and the note that the base decl-ref is null only for a non-`DeclRefType` base |

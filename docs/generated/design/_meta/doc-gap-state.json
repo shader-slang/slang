@@ -23,21 +23,22 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "028643968b5f": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "named the surface shape and added a `### nonuniform` callout on the key-only, never-dumped attribute; corrected `## Manifest coverage`",
       "kind": "missing-surface",
-      "rationale": "The only producer is `source/slang/slang-ir-specialize-function-call.cpp:618`, which is not in `watched_paths`. Watched sources give only the negative: `core.meta.slang` declares no `__intrinsic_op` for `kIROp_NonUniformAttr` and `slang-lower-to-ir.cpp` never creates one, so no user syntax lowers to it. The gap's further claim that it is \"never present in a dumped module\" is not safe to write either: line 621 wraps it in a real `IRBuilder::getAttributedType` inst that is interned into the module, so whether it survives into a dump needs a compiler run, which this host cannot do (Linux x86-64 build, arm64 host). Needs the specialization file added to `watched_paths`.",
+      "rationale": "`slang-ir-specialize-function-call.cpp` is now watched. Confirmed there: 618 creates the attr, 678 (`findNonuniformIndexInst`) is the trigger, 621 wraps it in an `Attributed` type, 622 adds that type to `ioInfo.key.vals`; the key is used only at 335/384/402 as a `Dictionary<Key, IRFunc*>` lookup, and `grep -rn NonUniformAttr source/ include/` finds no reader at all. Settled by compiling `ConstantBuffer<Params> gCB[64]` with `f(gCB[NonUniformResourceIndex(i)]) + f(gCB[i])`: `slangc -target spirv -dump-ir` gives 81 pass dumps with 0 occurrences of `nonuniform` and 0 of `Attributed` (114 of `nonUniformResourceIndex`), and `-dump-ir-after specializeResourceUsage` shows `func %f` and `func %f1`, both `Func(Vec(Float, 4 : Int), UInt)`.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/metadata.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The `nonuniform` row names an IR pass as its origin but no user-level syntax. Writing `NonUniformResourceIndex(i)` over a bindless texture array \u2014 the obvious ...",
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "02d54d396116": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "corrected the conformance parenthetical to `kIROp_SynthesizedForwardDerivativeWitnessTable` and moved `kIROp_ForwardDifferentiate` onto the `SynthesizedFuncDecl` bullet",
+      "fix_summary": "unchanged from the first pass; the parenthetical already names `kIROp_SynthesizedForwardDerivativeWitnessTable`",
       "kind": "drift-from-source",
-      "rationale": "`source/slang/slang-check-decl.cpp:9490` and `:15113` pass `kIROp_SynthesizedForwardDerivativeWitnessTable` as the `synthesisOp` that becomes `SynthesizedModifier::op`; `source/slang/slang-lower-to-ir.cpp:11390-11394` emits `(IROp)synModifier->op`; the opcode is declared at `source/slang/slang-ir-insts.lua:2847`. Corroborated by `differentiable-conformance-is-intrinsic-witness-value.slang` (`= SynthesizedForwardDerivativeWitnessTable([[FWD]])`). Source agrees with the observation, so the doc was wrong.",
+      "rationale": "Fix from the first pass re-verified by running the compiler, not just reading it: `build-arm64/Debug/bin/slangc -target spirv-asm -dump-ir -entry main diff.slang -o /dev/null` on a `[Differentiable] float sq(float)` prints, in `LOWER-TO-IR`, `= SynthesizedForwardDerivativeWitnessTable(%sq_fwd_diff)` on the conformance and `= ForwardDifferentiate(%sq)` on the member \u2014 matching `source/slang/slang-check-decl.cpp:9490,15113` (the `synthesisOp`), `source/slang/slang-lower-to-ir.cpp:11390-11394` (`(IROp)synModifier->op`) and `source/slang/slang-ir-insts.lua:2847`.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The doc says the `SynthesizedModifier` conformance \"emits one intrinsic inst whose opcode is the modifier's `op` (for the forward case ...",
@@ -54,7 +55,7 @@
       "target_doc": "docs/generated/design/name-resolution/scopes.md"
     },
     "03a328b5c0e3": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the two signatures and the call-argument restriction to the Variable struct-wrapping legalization preamble, and named the real intrinsic on the ray-payload row's AST-origin cell",
       "kind": "missing-example",
@@ -87,7 +88,7 @@
       "target_doc": "docs/generated/design/cross-cutting/core-module.md"
     },
     "056b53499498": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a three-bullet list giving the emitted form per operand shape (scalar infix, vector `and()` / `or()` behind two profile predicates, lowered matrix per-row inside an array construction)",
       "kind": "undocumented-behavior",
@@ -120,11 +121,11 @@
       "target_doc": "docs/generated/design/name-resolution/lookup.md"
     },
     "080381fc3fa2": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "replaced the inline flavor list with a flavor \u2192 Slang-surface table and a note that `Subscript` is never constructed",
+      "fix_summary": "added the third \"Use site emits\" column the gap asked for, replacing the two-example sentence that followed the table",
       "kind": "missing-example",
-      "rationale": "`source/slang/slang-lower-to-ir.cpp:1124` (`BoundStorage` when the accessor set is more than a lone `get`, per `:1090-1116`), `:6394` (`BoundMember` for a callable member-expr), `:7739` (`ExtractedExistential` in l-value context), `:7768` (`ImplicitCastedLValue` from `LValueImplicitCastExpr`/`OutImplicitCastExpr`), `:7795` (matrix swizzle), `:7880` (vector swizzle); `LoweredValInfo::subscript` (`:405`) has no call site. Use-site insts from `bound-storage-property-read-emits-accessor-call.slang` and `swizzled-lvalue-assign-lowers-to-swizzled-store.slang`.",
+      "rationale": "Read side `source/slang/slang-lower-to-ir.cpp:1184` (`materialize`) \u2014 `:1265` `extractField`, `:1288` `emitSwizzle`, nested `emitElementExtract` + `emitMakeVector` for the matrix case, `:1342` `getSimpleVal`. Write side `:10249` (`assign`) \u2014 `:10327` `emitSwizzleSet`, `:10370` `swizzledStore`, `:10404` `emitMatrixSwizzleStore`, `:10583` `emitMakeExistential`, `:10597` `emitCast`. Mnemonics from `source/slang/slang-ir-insts.lua:1267-1274,1397,1413,1431,1445,2708`. Dump spellings corroborated by `memberexpr-lvalue-lowers-to-get-field-addr.slang` and `swizzled-lvalue-assign-lowers-to-swizzled-store.slang`.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The flavor list (`BoundMember`, `Subscript`, `BoundStorage`, `SwizzledLValue`, `SwizzledMatrixLValue`, `ExtractedExistential`, `ImplicitCastedLValue`) names ...",
@@ -163,7 +164,7 @@
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "0a34a3865c53": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added `-fspv-reflect` and the statement that the decoration leaves nothing in emitted HLSL to the `VulkanEmitReflection` row",
       "kind": "missing-surface",
@@ -174,12 +175,13 @@
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "0a4d2ff77760": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "replaced the section's entry-condition paragraph with the unreachability finding (`legalizeMatrixTypes`, Phase B row 63, splits the matrix `And` / `Or` per row first) plus a three-line `bool2x2 && bool2x2` example and its per-row `select` output",
       "kind": "missing-surface",
-      "rationale": "Could not confirm a Slang-level construct that reaches the arm: `source/slang/slang-ir-legalize-binary-operator.cpp:200-210` casts only `IRVectorType` operands and `:246-263` then asserts both operands are already `array<vector<bool,N>>`, so only a boolean matrix qualifies \u2014 but `source/slang/core.meta.slang:3724-3730` constrains `operator&&` to `T : ILogical` and the file declares no `matrix` conformance to `ILogical`, so a plain `bool2x2 && bool2x2` may not type-check at all. The emitted per-element shape has no bundle test and cannot be settled without running `slangc`, which is unavailable on this host (Linux x86-64 build, arm64 host). Follow-up: run the compiler on a boolean-matrix `&&`, or confirm the arm is unreachable and file it as dead code. A source-confirmed narrowing of the entry condition was added to the section in the meantime, but the two things the gap asks for remain unwritten.",
+      "rationale": "Settled by running `build-arm64/Debug/bin/slangc` (2026.14.1-80-g6122d03def) at this commit. Ordering is in a watched path: `source/slang/slang-emit.cpp:1934` calls `legalizeMatrixTypes`, `:2280` calls `legalizeLogicalAndOr`. `slangc -target wgsl -dump-ir-before legalizeLogicalAndOr` on a `bool2x2 && bool2x2` shader shows the operation already split into two `logicalAnd` insts on `Vec(Bool, 2 : Int)` before the pass runs, so the `IRArrayType` arm at `source/slang/slang-ir-legalize-binary-operator.cpp:246-292` never sees an array-typed `And`. An lldb breakpoint on that arm's entry (`legalizeLogicalAndOr(IRInst*, TargetProgram*)+664`, the instruction after the `as<IRArrayType>(dataType)` test) was hit zero times over eleven shader shapes (`bool2x2`, `bool3x4`, `bool1x4`, `bool4x4` in a loop, `int2x2`, `uint4x4`, `float2x2`, matrix-in-struct, matrix-valued function, matrix array indexed by thread id, matrix `&&` scalar-splat) crossed with `-target wgsl` / `spirv` / `metal` and with and without `-O0`; the same probe placed on the vector arm (`+608`) is hit on the first shape, so the probe is sound. Emitted form from `slangc -target wgsl`: one `select(vec2<bool>(false), <rhs row>, <lhs row>)` per matrix row. `operator&&` constrained to `T : ILogical` at `source/slang/core.meta.slang:3724-3730`; the `E30081` operand-conversion warning for `int` and `float` matrix operands is from the same compiler runs.",
       "report_path": "docs/generated/design/_meta/gap-intake/target-pipelines/wgsl.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The section says the pass \"for array-lowered matrices loops over the array elements emitting a per-element `And` / `Or` and reassembling the array\", but names ...",
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
@@ -216,7 +218,7 @@
       "target_doc": "docs/generated/design/target-pipelines/metal.md"
     },
     "0c3f169de800": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "noted that the recursive arm is shadowed by `checkForRecursiveFunctions` / `E55201` and that the cycle check exists for termination, leaving \"a call `inlineCall` declines to flatten\" as the reachable shape",
       "kind": "cascading-only-mention",
@@ -260,7 +262,7 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "0d94aa42f381": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a `### Emitted spellings` subsection under Phase D with a Slang-to-WGSL spelling table and a two-line worked example",
       "kind": "missing-example",
@@ -271,7 +273,7 @@
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
     "0e8404b8657f": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "corrected the free-form-extension spelling in comparator step 3 to `extension<T : IFoo> T` and defined it as an extension whose target type is a generic type parameter",
       "kind": "missing-surface",
@@ -282,7 +284,7 @@
       "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
     },
     "0ee661b40073": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "covered by the generalized wrapper section",
       "kind": "missing-surface",
@@ -304,7 +306,7 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "1079d955aaa9": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "noted the whole-file operand in the `DebugSource` row and added a `### DebugSource` callout on the echoed input",
       "kind": "undocumented-behavior",
@@ -315,12 +317,13 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "108e85e927a2": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a paragraph and a one-line `hlsl` block stating the split load is observable, giving the emitted per-field initializer form, the never-fold reason it cannot be folded away, and the non-struct-element exception",
       "kind": "undocumented-behavior",
-      "rationale": "The pass body (`source/slang/slang-ir-legalize-uniform-buffer-load.cpp:29-49`) confirms the IR rewrite but says nothing about emit, and the file is outside this page's `watched_paths`. Whether the `makeStruct` survives to text depends on the later `simplifyForEmit` / DCE, so answering \"is it observable\" requires running `slangc` on a whole-object `ConstantBuffer<S>` read \u2014 impossible here (the tree's build is Linux x86-64, the host is arm64). No bundle test anchors `#legalizeuniformbufferload`. Needs a test written against that shape first.",
+      "rationale": "Settled by compiling, reversing the previous cycle's deferral. `SLANG_ASSERT=release-assert-only build-arm64/Debug/bin/slangc -target hlsl -profile sm_6_6 -stage compute -entry main <tmp>.slang` on `struct S { float4 a; int2 b; float c; }` + `ConstantBuffer<S> gCB;` + `S local = gCB;` emits `S_0 _S1 = { gCB_0.a_0, gCB_0.b_0, gCB_0.c_0 };` \u2014 one member read per field, in field order. A second run adding `ConstantBuffer<float4> gVec;` shows the non-struct element type is skipped (its use emits `gVec_0.y` directly), matching the `as<IRStructType>` continue at watched `source/slang/slang-ir-legalize-uniform-buffer-load.cpp:34-36`. Why it survives to text: `kIROp_MakeStruct` is on the never-fold list at watched `source/slang/slang-emit-c-like.cpp:1535-1541` (\"we currently lower them to initializer lists\"), so it must materialise as a declaration, and the brace-list is written at `:2934-2951`; the `_S<N>` name is the no-name-hint fallback at `:1290-1292`. `slang-ir-legalize-uniform-buffer-load.cpp` is now inside `watched_paths` per `regenerate.py show target-pipelines/hlsl.md`.",
       "report_path": "docs/generated/design/_meta/gap-intake/target-pipelines/hlsl.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The section describes an IR-level rewrite (whole-object load to per-field loads recombined by `makeStruct`) but does not say whether the rewrite is visible in ...",
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
@@ -346,7 +349,7 @@
       "target_doc": "docs/generated/design/syntax-reference/grammar.md"
     },
     "11b06b8f801a": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph under Anatomy stating one note record per supplied item, with the `ambiguous-overload-for-name-with-args` `variadic_note` as the worked example",
       "kind": "missing-example",
@@ -368,7 +371,7 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "1444b2f734a0": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "annotated the `GenericConstraintNotSatisfied` row with which constraint kinds reach it and which are captured as `InterfaceConformanceNotSatisfied` instead",
       "kind": "cascading-only-mention",
@@ -390,7 +393,7 @@
       "target_doc": "docs/generated/design/ast-reference/values.md"
     },
     "151da0a0a8be": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added both CLI spellings and the E45113 (bits, CLI) / E45114 (bytes, API) split to the `instrumentCoverage` row",
       "kind": "missing-surface",
@@ -422,7 +425,7 @@
       "target_doc": "docs/generated/design/pipeline/06-emit.md"
     },
     "173c31f83602": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph showing `StructuredBuffer<float, Std140DataLayout>` landing in the data-layout operand, plus the `[require(spirv)]` gate on two of the six",
       "kind": "missing-example",
@@ -443,12 +446,13 @@
       "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "187da073e7f8": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added the minimal two-`__init` tie under Conversion costs, with the explicit-vs-implicit site rule that makes it the smallest possible one",
       "kind": "missing-example",
-      "rationale": "Blocked on execution, not on source. `_coerce`'s ambiguity arm fires when `AddTypeOverloadCandidates(toType, ...)` leaves more than one entry in `overloadContext.bestCandidates` (`source/slang/slang-check-conversion.cpp:2632-2699`), i.e. when two initializers tie under the *whole* `CompareOverloadCandidates` chain, not just on argument cost \u2014 which is why the reporting agent's two `__implicit_conversion` initializers never tied. The only verified E30080 reproduction in the tree is `tests/bugs/gh-7856.slang`, which is far from minimal and whose tied pair I cannot identify without running the compiler (no runnable `slangc`: Linux x86-64 build, arm64 host). Follow-up: minimize that test on a machine with a build, then land the confirmed shape as the example.",
+      "rationale": "Confirmed by running the compiler and in the watched paths. `SLANG_ASSERT=release-assert-only ./build-arm64/Debug/bin/slangc -target hlsl x.slang` on the two-line file `struct T { __init(int v) {} __init(uint v) {} }` / `void f(float x) { T t = T(x); }` prints `error[E30080]: ambiguous conversion ... more than one conversion exists from 'float' to 'T'` followed by a `see declaration of 'T.init'` note for each `__init`. This is `tests/bugs/gh-7856.slang` reduced: the same run on that file names its `__init(int64_t)` / `__init(uint64_t)` pair. Why it needs an explicit site: `source/slang/slang-check-conversion.cpp:2579` sets `disallowNestedConversions = (site != CoercionSite::ExplicitCoercion)`, and `source/slang/slang-check-overload.cpp:898-906` turns that flag into an exact-type requirement, so no two distinct parameter types can both apply implicitly; a single-argument call on a type name reaches `_coerce` with `ExplicitCoercion` at `source/slang/slang-check-overload.cpp:3443`. Checked against the compiler: `void f(int x) { T t = T(x); }` compiles clean (exact match costs 0), `void f(double x)` is ambiguous, and `T t = x;` reports `error[E30019]: type mismatch in expression` rather than an ambiguity. The shared cost level is `kConversionCost_GeneralConversion` (`source/slang/slang-ast-support-types.h:162`): `float` and the integer types differ in `conversionKind`, so both pairs fall through every special case in `getBaseTypeConversionCost` to its final `else` (`source/slang-core-module/slang-embedded-core-module-source.cpp:258`, outside watched paths, which is why the doc names only the constant).",
       "report_path": "docs/generated/design/_meta/gap-intake/name-resolution/overload-resolution.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The `AmbiguousConversion` paragraph says an ambiguous conversion is \"deliberately reported as _possible_ while probing\" and only fails when the coerced ...",
       "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
     },
@@ -475,7 +479,7 @@
       "target_doc": "docs/generated/design/cross-cutting/serialization.md"
     },
     "1a7efc520b52": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced the \"found as an ordinary member\" / implicit-`this` claim with the scope-lookup rule plus the two operators that really are member-resolved",
       "kind": "drift-from-source",
@@ -486,7 +490,7 @@
       "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
     },
     "1b0d1d14d61c": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named `DescriptorHandle<T>` and the `_sm_6_6` disjunct in the `descriptor_handle` row of the capability-gates table",
       "kind": "missing-surface",
@@ -562,7 +566,7 @@
       "target_doc": "docs/generated/design/ast-reference/statements.md"
     },
     "20f31c85247b": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "undocumented-behavior",
       "rationale": "The line numbers the gap wants dropped are required by the contract this page was generated from: the Target-pipeline page contract in `docs/generated/design/_meta/prompts/_common.md:299-305` says `## Source` must \"Cite the line numbers of the relevant entry points (`linkAndOptimizeIR`, the per-target `emit*ForEntryPoints*`, the per-target `legalize*`)\". Staleness of those numbers is handled by the `watched_paths_digest` / `mark-fresh` regeneration cycle, not by softening the page.",
@@ -583,7 +587,7 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "21a2e979a3f1": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "rewrote the `addDenormalModeDecorations` Notes cell to record the early return and that the decorations leave no marker in emitted HLSL",
       "kind": "undocumented-behavior",
@@ -627,7 +631,7 @@
       "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
     },
     "23fe34a4ec1e": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `slangc` spelling inline to the five option rows and the `E45114` (API bytes) / `E45113` (CLI bits) split to the `TraceCoverageCounterByteWidth` row, rather than widening the table with a sixth column",
       "kind": "missing-surface",
@@ -671,7 +675,7 @@
       "target_doc": "docs/generated/design/ast-reference/expressions.md"
     },
     "27bdc3599a05": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the spelling to the `global_generic_param` row and a paragraph on the two insts",
       "kind": "missing-surface",
@@ -693,7 +697,7 @@
       "target_doc": "docs/generated/design/name-resolution/scopes.md"
     },
     "287d78f2e773": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "narrowed the `Each` row's summary and added a paragraph to the `Expand` / `Each` callout naming the three `Val`-level producers and the `getTupleElement` form a dump of an expansion body actually shows",
       "kind": "drift-from-source",
@@ -737,7 +741,7 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "2a6f07fe3e9a": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named both producers of `kIROp_DispatchKernel` (the `__dispatch_kernel` keyword, cross-linked to the AST page, and the generated `[AutoPyBindCUDA]` host wrapper) and stated why neither normally reaches CUDA text; the requested `-target cuda` example was not added because the source shows the arm is not reachable that way",
       "kind": "missing-surface",
@@ -748,7 +752,7 @@
       "target_doc": "docs/generated/design/target-pipelines/cuda.md"
     },
     "2c0bc580a959": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "stated that only five of the six rendered names ever print, that `ignored` names a state not an output, and that fatal/internal abort the compile",
       "kind": "missing-example",
@@ -781,7 +785,7 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "2dfdf40e0637": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced the `Result` row's AST origin with the real producer (the `throws` clause plus the error-handling pass) and gave the resulting `Func(Result(Int, Enum(...)), Int)` shape",
       "kind": "missing-surface",
@@ -824,7 +828,7 @@
       "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "2fede3d30d6e": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "rewrote the `### AccessorDecl family` sentence to separate a statement body (a parse error) from the two no-accessor forms `{ }` and `;` that share the implicit-getter case",
       "kind": "ambiguous-claim",
@@ -835,7 +839,7 @@
       "target_doc": "docs/generated/design/ast-reference/declarations.md"
     },
     "32069964919e": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph after the Layout table giving the minimal Slang declaration for each row",
       "kind": "missing-surface",
@@ -846,7 +850,7 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "320bf7714a3d": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "extended the `entryPoint` callout to say the tag is a `Profile::RawVal` (`ProfileVersion` high 16 bits, `Stage` low 16), not a bare stage code",
       "kind": "missing-surface",
@@ -879,7 +883,7 @@
       "target_doc": "docs/generated/design/ir-reference/control-flow.md"
     },
     "33fbeb8b7617": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced the false `require(...)` AST origin with the layout-IR producer and the inferred-capability-set route, and noted that only SPIR-V-version and Metal-library atoms are recorded",
       "kind": "missing-example",
@@ -890,7 +894,7 @@
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
     "34b5fafdf292": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a note that the `-capability` handler reuses the unknown-profile diagnostic",
       "kind": "undocumented-behavior",
@@ -912,17 +916,18 @@
       "target_doc": "docs/generated/design/cross-cutting/serialization.md"
     },
     "352bf73e9bfd": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "replaced the \"no constructor expression\" summary with the operand the call site actually passes and added a paragraph under Tensor and runtime helpers explaining why the inst never reaches a dump",
       "kind": "missing-example",
-      "rationale": "The row's AST origin is correct \u2014 `RayQuery::__init()` (`source/slang/hlsl.meta.slang:21207-21209`) and `HitObject::__init()` (`22768-22769`) both carry `__intrinsic_op($(kIROp_AllocateOpaqueHandle))` \u2014 so nothing in the document is wrong; what the gap asks for is a shader whose dump contains the inst. Which surface form reaches the `__init` is decided in the unwatched checker, and confirming a candidate requires running `slangc`, which this host cannot do (the tree's build is Linux x86-64, the host is arm64). Needs a run on a Linux builder, or a `watched_paths` expansion covering the checker's default-construct path.",
+      "rationale": "Re-run with `build-arm64/Debug/bin/slangc` (2026.14.1-80-g6122d03def). The inst is emitted and then deleted, so no example can exist. Emission: an lldb breakpoint on `Slang::IRBuilder::emitIntrinsicInst` conditioned on `$x2 == 429` (`kIROp_AllocateOpaqueHandle`) fires for both `RayQuery<0> q;` and `RayQuery<0> q = RayQuery<0>();`, twice per `RayQuery` local, never for a shader with none, with the stack `visitVarDecl` -> `assignExpr` -> `DestinationDrivenRValueExprLoweringVisitor::visitInvokeExpr` -> `visitInvokeExprImpl` -> `emitCallToDeclRef` -> `emitIntrinsicInst`, and `argCount == 1`. Deletion: following that inst pointer to `Slang::IRInst::removeAndDeallocate` gives the stack `eliminateDeadCode` -> `DeadCodeEliminationContext::processInst` -> `eliminateDeadInstsRec`, called from `generateIRForTranslationUnit`. The watched-path mechanism behind both: `source/slang/slang-lower-to-ir.cpp:4238-4251` and `4781-4785` give the non-copyable `__init` a return-destination parameter, `5714-5741` retypes the result `void` and passes the destination as the sole operand, `source/slang/slang-ir.cpp:9670` puts `kIROp_AllocateOpaqueHandle` on the no-side-effects list, and `source/slang/slang-lower-to-ir.cpp:15621-15625` runs DCE over every function ahead of the `LOWER-TO-IR` dump at `15797`. Corroborated by `slangc -dump-ir -target hlsl -stage compute -entry main`: `grep -c allocateOpaqueHandle` is 0 across all 77 dumped passes for both spellings.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/misc.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The `allocateOpaqueHandle` row names `RayQuery::__init` / `HitObject::__init` as its AST origin, but neither a default-initialized `RayQuery<0> q;` nor an ...",
       "target_doc": "docs/generated/design/ir-reference/misc.md"
     },
     "35bd0499af6c": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph under Size, alignment, count naming `ScalarDataLayout` as the default operand and listing the six layout spellings with their dumped opcode names",
       "kind": "missing-surface",
@@ -953,7 +958,7 @@
       "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
     },
     "37d42be463f4": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "rewrote the token-paste sentence to attribute the note loop to the legacy `diagnoseImpl` path and to say the rich path has no such loop",
       "kind": "drift-from-source",
@@ -964,7 +969,7 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "3889ad2105cd": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a minimal `if`/`else` example under `eliminatePhis with default options` showing the `var v_0 : i32;` declaration and the per-arm assignments",
       "kind": "missing-example",
@@ -975,7 +980,7 @@
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
     "396a1bd6a8bf": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "clarified on row 33 that `(always)` names the call site rather than a guaranteed IR change, generalized to every `(always)` row",
       "kind": "ambiguous-claim",
@@ -997,7 +1002,7 @@
       "target_doc": "docs/generated/design/ir-reference/differentiation.md"
     },
     "3a7efc985e8b": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the options that consume a diagnostic name, so the alias keeps `-warnings-disable overlappingBindings` working",
       "kind": "missing-surface",
@@ -1008,7 +1013,7 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "3b04183a771b": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the intrinsic-to-WGSL-builtin table and the array-layer coordinate-split explanation to the same new Phase D subsection",
       "kind": "missing-surface",
@@ -1030,7 +1035,7 @@
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
     },
     "3beeb23ba3da": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "documented the `getGLSLSystemValueInfo` resolution step, two representative mappings, and the 49999 diagnostic; the full per-stage enumeration was deliberately not copied in \u2014 `source/slang/slang-emit-spirv.cpp:7663-7695` shows SPIR-V re-derives a `BuiltIn` decoration from the semantic name rather than using the `gl_*` name, so a `gl_*` table is catalog material for `pipeline/05-ir-passes.md`, not the observable form on this page (consolidated with 82b3ea5ed6b8)",
       "kind": "missing-surface",
@@ -1051,7 +1056,7 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "3de1c2fff064": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph on the synthetic command-line source and advised pinning CLI-parse diagnostics by error code",
       "kind": "undocumented-behavior",
@@ -1073,7 +1078,7 @@
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
     "3fda9351de83": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added `E56005`, its message text, and the \"once per `precise`-qualified value (plain `diagnose`, not `diagnoseOnce`)\" note to the `precise` paragraph",
       "kind": "missing-surface",
@@ -1128,7 +1133,7 @@
       "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "456356a76d90": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added `-embed-downstream-ir` and the statement that the pass narrows the embedded-IR export set without changing emitted HLSL text",
       "kind": "missing-surface",
@@ -1150,7 +1155,7 @@
       "target_doc": "docs/generated/design/name-resolution/scopes.md"
     },
     "46e0da77c461": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the `Function`-storage `OpVariable` + per-edge `OpStore` shape that replaces the merge `OpPhi`, under `eliminatePhis with SPIR-V-specific options`",
       "kind": "missing-surface",
@@ -1182,7 +1187,7 @@
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
     "4a3bac7372ce": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "rewrote \u00a7`Enum` and its table row: cases are neither operands nor children, `P` only means the opcode may hold children, and the type prints as `Enum(Int)`",
       "kind": "missing-example",
@@ -1204,7 +1209,7 @@
       "target_doc": "docs/generated/design/syntax-reference/tokens.md"
     },
     "4ca278c8d71b": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the `abort` builtin and its call form in the `[Compound]` paragraph",
       "kind": "missing-surface",
@@ -1226,12 +1231,13 @@
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
     "4d492e51b04e": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "replaced the `getBoolOption(PreserveParameters)` row's bare claim with what is actually observable: the decorated `OpVariable` is emitted but left out of the `OpEntryPoint` interface, so only `-O0` (the level at which `needsOptimization` is false) keeps it",
       "kind": "drift-from-source",
-      "rationale": "Downgraded from `escalated-to-finding` by the operator: a finding YAML requires `command` / `source_slang` / `observed_summary`, i.e. a reproduction, and none exists \u2014 the reporting bundle shipped no test (\"not reproducible from the CLI\") and this host cannot run `slangc` (Linux x86-64 build, arm64 host). The source trace below stands and should be re-escalated once someone can produce a repro. See `## Escalated gaps`. Watched source agrees with the document at `source/slang/slang-emit.cpp:1353-1354` and `source/slang/slang-emit-spirv.cpp:12212-12218`; the compiler does not. No finding id exists yet.",
+      "rationale": "Re-run with a working `slangc`; the previous cycle's escalation is retracted. Two compiles of a shader with an unreferenced `RWStructuredBuffer unused`: `slangc -target spirv -O0 -preserve-params -o pp.spv pp.slang` yields `%unused = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer` plus `OpDecorate %unused Binding 1` / `DescriptorSet 0`, so `source/slang/slang-emit-spirv.cpp:12212-12218` behaves exactly as documented. The same command without `-O0` yields no `unused` token at all. The difference is the downstream optimizer, not the emitter: `%unused` is absent from `OpEntryPoint GLCompute %main \"main\" %used %gl_GlobalInvocationID`, `source/slang/slang-emit.cpp:3390-3397` loads `spirv-opt` for every optimization level except `None`, and `spirv-opt --eliminate-dead-code-aggressive` on the `-O0` module removes `%unused` \u2014 the pass the Default preset registers at `source/slang-glslang/slang-glslang.cpp:366`. An explicit `[[vk::binding(3, 0)]]` changes nothing, matching the gap's report.",
       "report_path": "docs/generated/design/_meta/gap-intake/target-pipelines/spirv.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The doc says `getBoolOption(PreserveParameters)` makes Phase D \"emit unreferenced `IRGlobalParam`s into the SPIR-V module\". Compiling a shader whose second ...",
       "target_doc": "docs/generated/design/target-pipelines/spirv.md"
     },
@@ -1247,7 +1253,7 @@
       "target_doc": "docs/generated/design/syntax-reference/tokens.md"
     },
     "4eca2b39600e": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "finding_id": "countof-on-array-returns-element-size",
       "kind": "drift-from-source",
@@ -1302,7 +1308,7 @@
       "target_doc": "docs/generated/design/name-resolution/lookup.md"
     },
     "52d3221d1b09": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a note to \u00a7`module` that the container is observable only through its children",
       "kind": "undocumented-behavior",
@@ -1335,17 +1341,18 @@
       "target_doc": "docs/generated/design/ir-reference/control-flow.md"
     },
     "53a781a689ef": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a paragraph to Error code namespace stating that a catalog entry is not a promise of reachability nor a description of the triggering construct, with `30020` (no parser production) and `30024` (GLSL varying legalization, not assignment) as the two worked cases",
       "kind": "cascading-only-mention",
-      "rationale": "The claimed pre-emption (E30013 before E30020, E30019 before E30024) is decided in `source/slang/slang-check-*.cpp`, outside `watched_paths`; nothing in the watched files states which catalog entries are reachable. Confirming it needs a `slangc` run, impossible here (Linux x86-64 build, arm64 host).",
+      "rationale": "Re-run with `build-arm64/Debug/bin/slangc` (`SLANG_ASSERT=release-assert-only`). `x[0]` on a `float` gives `error[E30013] ... no subscript declarations found for type 'float'` and `float b[4] = a;` with `a` of type `float[2]` gives `error[E30019] ... expected an expression of type 'float[4]', got 'float[2]'` \u2014 both correct, not pre-emption. `30020` is emitted only at `source/slang/slang-check-expr.cpp:6283-6286`, whose `GetArrayLengthExpr` has one producer, `source/slang/slang-ast-synthesis.cpp:112-118` (sole caller `source/slang/slang-check-decl.cpp:8905`, array-typed fields only); `x.getCount()`/`x.getLength()`/`x.length` on a `float` all give `E30027` (`no-member-of-name-in-type`, `source/slang/slang-diagnostics.lua:1309-1313`) because `Array::getCount` is an ordinary intrinsic-backed method (`source/slang/core.meta.slang:2265-2267`). `30024` is emitted only at `source/slang/slang-ir-glsl-legalize.cpp:1976-1980` and was reproduced with `float inside[4] : SV_InsideTessFactor` under `[domain(\"quad\")]` (`slangc ds.slang -target glsl -stage domain -entry main` \u2192 `error[E30024]: array size mismatch prevents conversion`), against the `float[2]` required type at `:838-846`.",
       "report_path": "docs/generated/design/_meta/gap-intake/cross-cutting/diagnostics.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The catalog is presented as the contract of codes the compiler offers, with no indication that some entries are shadowed in practice. Building minimum ...",
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "53d93b30593a": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the observation point to \u00a7`UntypedResourceHandle` and `UntypedSamplerHandle` \u2014 visible on the heap-subscript value in a lowering-stage `-dump-ir`, gone by emit",
       "kind": "undocumented-behavior",
@@ -1367,7 +1374,7 @@
       "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "55797498c6d9": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a before/after payload example showing `read(caller)` preserved and the `write(...)` side filled with the full stage list, plus the SM 6.6 no-qualifier contrast",
       "kind": "missing-example",
@@ -1410,7 +1417,7 @@
       "target_doc": "docs/generated/design/syntax-reference/grammar.md"
     },
     "57da50efca74": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph to \u00a7The work-graph record types listing the four requirements: `import experimental.workgraph;`, `-experimental-feature`, a `[shader(\"node\")]` entry point at `-stage node`, and `-profile lib_6_8`",
       "kind": "missing-surface",
@@ -1486,7 +1493,7 @@
       "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "5c7ca9a187c9": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the `&` spelling in the `Conjunction` AST-origin cell and recorded the constraint decomposition that hides the opcode",
       "kind": "missing-surface",
@@ -1508,7 +1515,7 @@
       "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "5da5b747b6e5": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `functype(T, T) -> T` parameter spelling and the `FuncType` precondition to the `Flavor::Expr` bullet",
       "kind": "missing-surface",
@@ -1574,7 +1581,7 @@
       "target_doc": "docs/generated/design/target-pipelines/metal.md"
     },
     "5fbf90b33fd2": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a printed-form paragraph and a two-instruction dump excerpt to \u00a7SPIR-V inline asm",
       "kind": "missing-example",
@@ -1585,7 +1592,7 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "60366ad2b2ce": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `intptr_t` / `uintptr_t` spellings to both AST-origin cells and the `size_t` / `ssize_t` aliases to their summaries",
       "kind": "missing-surface",
@@ -1629,7 +1636,7 @@
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
     },
     "6527e8b0b50a": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "finding_id": "as-dynamic-uniform-reaches-emit-ice",
       "kind": "undocumented-behavior",
@@ -1672,7 +1679,7 @@
       "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
     },
     "69f3396b03eb": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "drift-from-source",
       "rationale": "These are two distinct opcodes, not two spellings of one. `source/slang/slang-ir-insts.lua:2081-2084` declares the decoration `streamOutputTypeDecoration`; `source/slang/slang-ir-insts.lua:2888` declares `streamOutputTypeLayout` under `TypeLayout`, wrapped by `IRStreamOutputTypeLayout : IRTypeLayout` at `source/slang/slang-ir-insts.h:1406-1424`. What `stream-output-type-decoration.slang` matched is the type-layout inst. The decoration itself is produced only by `source/slang/slang-ir-glsl-legalize.cpp:4076`, so an `-target hlsl` dump cannot contain it.",
@@ -1682,7 +1689,7 @@
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
     "6a2d82fd6cfa": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "stated that for a multi-bound code the rendered id does not identify the entry and the message text is the only discriminator (consolidated with 8ad5729b0ea8)",
       "kind": "undocumented-behavior",
@@ -1748,7 +1755,7 @@
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "700f09296336": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "extended Phase C row 21's Notes with the `<Name>_std430` / `<Name>_std140` and `_MatrixStorage_<elem><R>x<C>_ColMajor<rule>` wrapper names, the `data` field shape, and the `@align(N)` field attributes",
       "kind": "missing-surface",
@@ -1781,7 +1788,7 @@
       "target_doc": "docs/generated/design/ast-reference/statements.md"
     },
     "7057bdb1d195": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph stating the rewrite touches only the `ExternCpp` linkage name, that an entry point's symbol name wins over it (so `-target cuda` emits `extern \"C\" __global__ void myKernel(...)` unprefixed), and that the prefixed name matters on the `PyTorchCppBinding` arm",
       "kind": "drift-from-source",
@@ -1803,10 +1810,10 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "70c758b923f2": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-surface",
-      "rationale": "The `-target` spellings are owned by `docs/command-line-slangc-reference.md` (the `target` list at its `#target-1` anchor, which the document already names as the owner of user-facing target documentation). The authoritative table is `s_compileTargetInfos` in `source/core/slang-type-text-util.cpp:47-108`, outside `watched_paths`.",
+      "rationale": "The `-target` spellings are owned by `docs/command-line-slangc-reference.md` (the `target` list at its `#target-1` anchor, which the document already names as the owner of user-facing target documentation). The authoritative table is `s_compileTargetInfos` in `source/core/slang-type-text-util.cpp:47-108`.",
       "report_path": "docs/generated/design/_meta/gap-intake/cross-cutting/targets.md.gap-intake.md",
       "status": "rejected-out-of-scope",
       "summary": "The table names public `SlangCompileTarget` enumerators but never the `-target` spellings that select them, and the two namespaces do not line up: ...",
@@ -1867,7 +1874,7 @@
       "target_doc": "docs/generated/design/ast-reference/base.md"
     },
     "74ef1e3a36aa": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "stated the `-1` / `-2` raw spellings in \u00a7`size` and `offset` (one edit with 75a053a8073a)",
       "kind": "ambiguous-claim",
@@ -1900,7 +1907,7 @@
       "target_doc": "docs/generated/design/ir-reference/control-flow.md"
     },
     "75a053a8073a": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the practical kind enumerators and a worked byte-vs-slot reading to \u00a7`size` and `offset`",
       "kind": "missing-example",
@@ -1944,7 +1951,7 @@
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
     },
     "777a56bb41c0": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph stating the capability requirement, the `E36107` type-check rejection, and that the emit-time wrapper drop applies only to insts reaching WGSL by another route (`nonuniform(DescriptorHandle<T>)`, `hlsl.meta.slang:27817-27818`)",
       "kind": "drift-from-source",
@@ -1966,7 +1973,7 @@
       "target_doc": "docs/generated/design/syntax-reference/grammar.md"
     },
     "77f10c369661": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the generalized printing rule to the `## Opcodes` preamble and a note under \u00a7Existentials and interfaces with the `interface_req_entry(%key, Func(Float, this_type(%IShape)))` form; same edit serves 4a3bac7372ce and 173c31f83602",
       "kind": "missing-example",
@@ -1977,7 +1984,7 @@
       "target_doc": "docs/generated/design/ir-reference/types.md"
     },
     "78544eaa1263": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-example",
       "rationale": "`docs/diagnostics.md` lines 105-165 own the `DIAGNOSTIC_TEST` directive and annotation grammar; the parser is `tools/slang-test/diagnostic-annotation-util.cpp`, outside this page's `watched_paths`. Step 8 already routes the reader there via `CLAUDE.md`.",
@@ -1987,7 +1994,7 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "78ba541779f9": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the command-line spelling next to the flag and the record layout",
       "kind": "missing-surface",
@@ -2008,7 +2015,7 @@
       "target_doc": "docs/generated/design/pipeline/overview.md"
     },
     "794da7170ab0": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a Slang-type-to-WGSL-type table (texture family, sampler, storage-texture format inference and access mode) in the new `### Texture, sampler, and texture-intrinsic spellings` subsection",
       "kind": "missing-surface",
@@ -2030,7 +2037,7 @@
       "target_doc": "docs/generated/design/ast-reference/types.md"
     },
     "7b1666501f66": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the warning severity, the `E56005` code and the drop-and-continue behaviour to the `precise` bullet in Phase D",
       "kind": "missing-surface",
@@ -2041,7 +2048,7 @@
       "target_doc": "docs/generated/design/target-pipelines/cuda.md"
     },
     "7b1f9994557e": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced the unillustrated \"no leaf is `__ldg`-able\" sentence with the recognized type-op set and the two bail-out paths, so the surviving load shape is derivable (an opaque leaf \u2014 resource handle or pointer \u2014 not a composite of the five recognized ops)",
       "kind": "missing-example",
@@ -2052,7 +2059,7 @@
       "target_doc": "docs/generated/design/target-pipelines/cuda.md"
     },
     "7bb8913f2a18": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-surface",
       "rationale": "`source/slang/core.meta.slang:4418-4419` declares `attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute`, so `vk_location` is the attribute's real name and is writable; `source/slang/slang-parser.cpp:963-978` (`parseAttributeName`) rewrites each `::` in a scoped attribute name to `_`, which is how `[vk::location(7)]` in `glsl-location-decoration.slang` reaches the same attribute. The gap's premise \u2014 that `[vk_location(...)]` is unwritable \u2014 is false. The row was still reworded to lead with the spelling users write.",
@@ -2073,7 +2080,7 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "7d9a27123dfe": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added `E45105`, the three coverage options and their `slangc` spellings, and the opcode that actually sets `reqSet.coverageTracing`, to Phase A row 13",
       "kind": "missing-surface",
@@ -2106,17 +2113,18 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "7ef0acfec3ad": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a surface paragraph after the Shader IO table naming `GetAttributeAtVertex`, the target split, and the `E36107` stage check",
       "kind": "missing-surface",
-      "rationale": "Could not confirm which attribute produces a per-vertex input array. The gap proposes `nointerpolation`; the two opcodes' `__intrinsic_op` lines do not state a required attribute or stage, and I found nothing in the newly watched core-module files that ties them to one.",
+      "rationale": "Re-run, was `deferred`. `source/slang/hlsl.meta.slang:11733-11743` shows `GetAttributeAtVertex` is the public surface, with a `__target_switch` whose `hlsl` case uses `__ResolveVaryingInputRef` alone and whose `glsl`/`spirv` case wraps it in `__GetPerVertexInputArray` (intrinsics at 11703 and 11706). Compiling a `fragment` entry point that calls `GetAttributeAtVertex` on a `nointerpolation` input with `-dump-ir -target spirv -O0` yields both opcodes; the same shader on `-target hlsl` yields only `ResolveVaryingInputRef` and emits a `GetAttributeAtVertex` call. The stage requirement is real: `-stage vertex` fails with `error[E36107]: unavailable features in entry point`, citing `GetAttributeAtVertex`.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/resources-and-atomics.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "`GetPerVertexInputArray` and `ResolveVaryingInputRef` are new to this table and give only an `__intrinsic_op` line number. Neither the Slang attribute that ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "7f177d41fca4": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "undocumented-behavior",
       "rationale": "The document already states the consequence the gap's suggested addition asks for. `## Loops in the pipeline` reads: \"There is also no HLSL legalization driver function to host such a loop; HLSL relies on the downstream DXC / fxc compiler for further optimization. DXC and fxc have their own optimization loops, but those are out of scope.\" The remaining half of the suggestion (\"the emitted text is deliberately un-simplified relative to SPIR-V\") is a comparative claim with no support in the watched paths, and the `## Loops in the pipeline` section is mandated as pipeline-structure material by `docs/generated/design/_meta/prompts/_common.md:345-348`.",
@@ -2126,7 +2134,7 @@
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "7f255374e795": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-example",
       "rationale": "The bullet's own lead already reads \"**`NoContraction` under `-fp-mode precise`.**\" and the bullet already says integer, bitwise, logical and floating-point-comparison operations \"emit opcodes on which `NoContraction` is invalid\" \u2014 both halves of the suggested addition are present. `source/slang/slang-emit-spirv.cpp:10415-10445` confirms the text: the comment names `-fp-mode precise` and the `switch` decorates only `OpFAdd` / `OpFSub` / `OpFMul` / `OpFDiv` / `OpFRem` / `OpFNegate` / `OpVectorTimesScalar`.",
@@ -2158,10 +2166,10 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "805da7fc5a61": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-surface",
-      "rationale": "`.version` / `.target` / `.visible .entry` are nvrtc's output format, not Slang's: nothing under `watched_paths` writes PTX text (the CUDA pipeline stops at CUDA C++, per watched `source/slang/slang-emit.cpp:2972-2973`). The only test, `ptx-downstream-nvrtc-emit.slang`, carries `//META: requires-tool=nvrtc` and the bundle README (line 63-66) records it as ignored on a runner without the CUDA toolchain, so its CHECK lines are unverified. Settling it needs a `slangc -target ptx` run with nvrtc present \u2014 impossible here (the tree's build is Linux x86-64, this host is arm64). Follow-up: run the bundle test on a CUDA-toolchain runner, then document the fingerprint from the verified output.",
+      "rationale": "**Re-checked by running the compiler** (native macOS-arm64 `build-arm64/Debug/bin/slangc` at HEAD `67149d1e03eb`, `SLANG_ASSERT=release-assert-only`), which the first pass could not do. PTX is unreachable on this host: `slangc -target ptx -entry main -stage compute docs/generated/tests/design/target-pipelines/cuda/ptx-downstream-nvrtc-emit.slang` exits 255 printing `error[E00100]: failed to load downstream compiler 'nvrtc'`, `note[E99996]: failed to load dynamic library 'nvrtc'`, `error[E52002]: pass-through compiler not found`, and writes no artifact even with `-o`. There is no nvrtc here to load (no `/usr/local/cuda`, no `*nvrtc*` under `/usr/local`, `/opt`, `/Library` or `external/`) and NVIDIA ships no macOS-arm64 nvrtc. The block is nvrtc alone, not the CUDA pipeline: the same file compiles to CUDA C++ under `-target cuda`. Nor can the fingerprint be confirmed from source, because Slang never writes PTX text \u2014 watched `source/slang/slang-code-gen.cpp:268` maps `PTX` to `CodeGenTarget::CUDASource` and `:1194` routes `PTX` to `emitWithDownstreamForEntryPoints`, so `.version` / `.target` / `.visible .entry` are the downstream compiler's output. Follow-up unchanged: run `ptx-downstream-nvrtc-emit.slang` (`//META: requires-tool=nvrtc`, still recorded ignored in the bundle README) on a CUDA-toolchain runner, then document the fingerprint from the verified output.",
       "report_path": "docs/generated/design/_meta/gap-intake/target-pipelines/cuda.md.gap-intake.md",
       "status": "deferred",
       "summary": "The section says PTX generation is delegated to nvrtc and that \"Slang does not check for nvrtc-specific syntax errors\", but names nothing in the PTX text a ...",
@@ -2179,7 +2187,7 @@
       "target_doc": "docs/generated/design/pipeline/01-lex-preprocess.md"
     },
     "80a7f7a3b324": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a `getMatrixLayoutMode()` row to Option-set toggles stating that the emitted member decoration is the transpose of the source layout",
       "kind": "undocumented-behavior",
@@ -2222,7 +2230,7 @@
       "target_doc": "docs/generated/design/ast-reference/statements.md"
     },
     "82b3ea5ed6b8": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `SV_VertexID` / `SV_InstanceID` rebasing note (with the `OpISub` + `DrawParameters` consequence and the un-rebased `SV_Vulkan*ID` contrast) as one consolidated edit with 3beeb23ba3da",
       "kind": "undocumented-behavior",
@@ -2255,7 +2263,7 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "863b0c0f87dc": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "corrected the `ForceUnroll` row to the builder-appended `count: IRIntLit` idiom the `vulkanRayPayload` rows already use, and recorded the `LoopStmt`-only attribute target and the `0` default",
       "kind": "drift-from-source",
@@ -2331,18 +2339,18 @@
       "target_doc": "docs/generated/design/name-resolution/visibility.md"
     },
     "8abfb42eaf38": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added the `int b[N + 1]` / `constexprAdd(1 : Int, %N)` example and the `PolynomialIntVal` split",
+      "fix_summary": "expanded the example to both extents, so the `BuiltinOperationIntVal` path the section is about finally has its own dump line, and stated why `constexprAdd`'s operand order is reversed",
       "kind": "missing-example",
-      "rationale": "`source/slang/slang-lower-to-ir.cpp:2009-2029` (`visitPolynomialIntVal` emits `constexprMul`/`constexprAdd`, constant term first); `source/slang/slang-ast-val.h:243-247` asserts `Add`/`Sub`/`Mul`/`Neg` never form a `BuiltinOperationIntVal` and that an all-constant fold is a `ConstantIntVal`; `source/slang/slang-ir-insts.lua:3408-3437` declares the hoistable `constexpr*` family. Verified dump line from `cross-cutting/ir-instructions/value-constexpr-add-ir.slang:49`.",
+      "rationale": "`source/slang/slang-lower-to-ir.cpp:1901` (`visitBuiltinOperationIntVal`) and `:2009` (`visitPolynomialIntVal`, constant term first); `source/slang/slang-ast-val.h:243-247` asserts `Add`/`Sub`/`Mul`/`Neg` never form a `BuiltinOperationIntVal`; `source/slang/slang-ir-insts.lua:3408-3437` declares the hoistable `constexpr*` family. Confirmed by running `slangc -target spirv-asm -dump-ir -entry main constexpr.slang -o /dev/null` on `int f<let N : int>() { int a[N / 2]; int b[N + 1]; ... }`, whose `LOWER-TO-IR` block contains `constexprAdd(1 : Int, %N1)` and `constexprDiv(%N1, 2 : Int)`.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The compile-time paragraph says a `BuiltinOperationIntVal` lowers to a hoistable `constexpr*` opcode, but gives no shader whose dump surfaces one; ordinary ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
     "8ad5729b0ea8": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named both 39999 entries in the Error code namespace section (one consolidated edit with 6a2d82fd6cfa)",
       "kind": "missing-example",
@@ -2364,7 +2372,7 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "8b396dac437f": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added `parentScope?` to the `DebugFunction` row and a `### DebugFunction` callout covering both absence cases",
       "kind": "drift-from-source",
@@ -2419,18 +2427,18 @@
       "target_doc": "docs/generated/design/ast-reference/statements.md"
     },
     "8db3a13d2d01": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added the `_S<N>` fallback-naming rule and a before/after `RWStructuredBuffer<float4x4>` shape to `wrapStructuredBuffersOfMatrices`, noting the rule is general to anonymous synthesized structs",
+      "fix_summary": "previously added the `_S<N>` fallback rule and the `RWStructuredBuffer<float4x4>` before/after; this cycle added the `_MatrixStorage_` paragraph with the confirmed shape, its correct owning pass, and both compiled spellings",
       "kind": "undocumented-behavior",
-      "rationale": "`_S<instID>` is the emitter's fallback name for an instruction with no name hint, at watched `source/slang/slang-emit-c-like.cpp:1290-1292` (with the `startsWith(\"_S\")` collision guard at `:1003`); the emitted shape is the verified CHECK of `wrap-structured-buffer-of-matrix.slang:31-33`. The `_MatrixStorage_*` half was deliberately **not** written here: that name is built by `lowerBufferElementTypeToStorageType` (`source/slang/slang-ir-lower-buffer-element-type.cpp:2778-2790`, Phase C row 21, outside `watched_paths`), it is not produced by this pass, and its real shape is `_MatrixStorage_<elem><R>x<C>[_ColMajor][_logical]<layoutRule>`, not the `<spelling>natural_<N>` the gap states.",
+      "rationale": "`_S<instID>` is the emitter's fallback name at watched `source/slang/slang-emit-c-like.cpp:1290-1292`; compiling `RWStructuredBuffer<float4x4> outBuf;` with `build-arm64/Debug/bin/slangc -target hlsl -profile sm_6_6 -stage compute -entry main` emits `struct _S1 { float4x4 _S2; };` and `RWStructuredBuffer<_S1 > outBuf_0 : register(u0);`, confirming the shape already written. The `_MatrixStorage_` half is a *different* pass and the gap's `<spelling>natural_<N>` was misattributed; the name is built at watched `source/slang/slang-ir-lower-buffer-element-type.cpp:2781-2789` as `_MatrixStorage_<elem><R>x<C>[_ColMajor][_logical]<layoutRule>`, with `natural` from `getLayoutName` at `:446` and the wrap gated on a non-default layout at `:2607-2617`. Compiling `struct M { row_major float3x4 m; float4 pad; }` in a `ConstantBuffer` emits `struct _MatrixStorage_float3x4natural_0 { float4 data_0[int(3)]; };`; the same field spelled `column_major` under `-matrix-layout-row-major` emits `_MatrixStorage_float3x4_ColMajornatural_0`.",
       "report_path": "docs/generated/design/_meta/gap-intake/target-pipelines/hlsl.md.gap-intake.md",
       "status": "fixed",
       "summary": "The section describes wrapping the matrix element of a `StructuredBuffer` but not the emit-time naming convention, so a reader cannot predict what to look for: ...",
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "8dd64f408ea2": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named `-separate-debug-info` in the `DebugBuildIdentifier` row and corrected its line citation to 1031",
       "kind": "missing-surface",
@@ -2452,7 +2460,7 @@
       "target_doc": "docs/generated/design/name-resolution/lookup.md"
     },
     "8eab4b5f6ea9": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a four-line dump excerpt and a sentence on the `Void`-typed, never-folded layout insts to \u00a7`Layout`",
       "kind": "missing-example",
@@ -2463,7 +2471,7 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "8f065a228462": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph stating that `-diagnostic-color` selects the frame glyph set as well as colour, and that `auto` resolves via the writer's console check",
       "kind": "undocumented-behavior",
@@ -2474,22 +2482,24 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "8fa595c02daf": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added the `property`-index reproducer with its `E40017` line, and corrected the recursion bullet to say the counter is per nested `InvokeExpr` rather than per constructor, with the 128-call reproducer and its `E39997` line",
       "kind": "missing-example",
-      "rationale": "The `assign` switch (`source/slang/slang-lower-to-ir.cpp:10249-10619`) handles `Ptr`, `SwizzledLValue`, `SwizzledMatrixLValue`, `BoundStorage`, `BoundMember`, `ExtractedExistential`, `ImplicitCastedLValue`; only `None` / `Simple` / `Subscript` reach the `UnsupportedAssignmentTarget` arm at `:10614`, and semantic checking rejects an r-value assignment target before lowering, so no user-reachable left-hand side is nameable from the source alone. `MaximumTypeNestingLevelExceeded` needs a type that recurses past `kMaxIRInvokeLoweringRecursionDepth` (128) in `visitInvokeExprImpl`, which is trial-and-error without a compiler. Both need a `slangc` run (unavailable: Linux x86-64 build, arm64 host) to produce a reproducer and its `E####` code; the codes themselves live in `source/slang/slang-diagnostic-defs.h`, outside this page's `watched_paths`.",
+      "rationale": "Both halves settled by running the compiler; verdict changed from `deferred`. (a) `UnsupportedAssignmentTarget` (`source/slang/slang-lower-to-ir.cpp:10602`, the `default:` arm of `assign`) is reachable: `subscriptValue` (`:7481`) calls `materialize` on a `BoundStorage` base, which collapses it to a `Simple` via a getter `call` (`:1196-1220`), and indexing that temporary yields a `Simple` l-value. `slangc -target spirv -entry main propassign.slang -o /dev/null` on an array-valued `property` with `get`+`set` prints `error[E40017]: assignment target is not supported`; `tests/diagnostics/indexed-property-assign.slang` is the existing regression test. (b) `MaximumTypeNestingLevelExceeded` (`:5513-5521`) fires at exactly 128 nested calls \u2014 `f(f(...f(x)...))` \u2014 printing `fatal error[E39997]: maximum type nesting level exceeded`. An `lldb` breakpoint on `Slang::Diagnostics::MaximumTypeNestingLevelExceeded::toGenericDiagnostic` proves the *lowering* site is the one that fires (frame #1 is `ExprLoweringContext<RValueExprLoweringVisitor>::visitInvokeExprImpl`, recursing through `addDirectCallArgs` at `:5153`), not any of the seven type-nesting guards in `slang-check-*.cpp` / `slang-type-layout.cpp` that share the diagnostic.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "Two of the three diagnostics in this section have no reproducer: `UnsupportedAssignmentTarget` names neither a left-hand side that reaches the assignment ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
     "901ca639c751": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a second paragraph to the `synthesizedParameterGroup` callout giving the reachable entry-point and global spellings with their target and options, the ordinary-data precondition on global collection, and the note that both structs are absent from the `LOWER-TO-IR` snapshot",
       "kind": "missing-example",
-      "rationale": "Both producers are outside `watched_paths` \u2014 `source/slang/slang-ir-entry-point-uniforms.cpp:550` and `source/slang/slang-ir-collect-global-uniforms.cpp:157` \u2014 and the gap asks for a program plus target/options that demonstrably *reaches* one of them. Deciding which entry-point-`uniform` or global-`uniform` shape actually triggers collection requires running `slangc -dump-ir`, which this host cannot do (the tree's build is Linux x86-64, host is arm64). Follow-up: add both files to `watched_paths` and settle the reachable case on a machine that can run the compiler.",
+      "rationale": "Re-run: settled by running the compiler, which the first pass wrongly believed impossible. `build-arm64/Debug/bin/slangc` (`-version` `2026.14.1-80-g6122d03def`; `git diff --stat 6122d03def HEAD -- source/ include/` is empty, so its compiler source is `HEAD`'s). With `SLANG_ASSERT=release-assert-only`, `slangc -dump-ir -target hlsl -entry computeMain -o out.hlsl x.slang` on a `[shader(\"compute\")] [numthreads(1,1,1)] void computeMain(uniform float scale, uint3 tid : SV_DispatchThreadID)` writing `outBuf[tid.x] = scale` prints `[synthesizedParameterGroup]` on `struct %EntryPointParams` in the `AFTER collectEntryPointUniformParams` snapshot and in all later ones; moving `scale` to a file-scope `uniform float scale` prints it on `struct %GlobalParams` from `AFTER collectGlobalUniformParameters` onward. Both agree with the watched producers `source/slang/slang-ir-entry-point-uniforms.cpp:550` (`ensureCollectedParamAndTypeHaveBeenCreated`) and `source/slang/slang-ir-collect-global-uniforms.cpp:157`. Neither appears in the `LOWER-TO-IR` snapshot, because `slang-emit.cpp:1231` and `1275` run both passes during target lowering. The ordinary-data precondition is `source/slang/slang-ir-collect-global-uniforms.cpp:120-122`, confirmed by a control program whose only globals are `RWStructuredBuffer` and `Texture2D`: zero matches in the whole dump. Same counts on glsl, spirv, metal and wgsl.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/decorations.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The section says the marker is attached \"for example the struct produced when entry-point `uniform` parameters are collected ... or when global uniforms are ...",
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
@@ -2516,7 +2526,7 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "91fe0f7f6aa5": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "set the row's `Grammar` to `(none)`, noted the node is unreached, and added a `### GLSLInterfaceBlockDecl` callout naming the three desugarings instead of inventing an example",
       "kind": "missing-example",
@@ -2527,17 +2537,18 @@
       "target_doc": "docs/generated/design/ast-reference/declarations.md"
     },
     "925a5389cc94": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "named the `DescriptorHandle<T>` + `-capability spvDescriptorHeapEXT` surface after the table, and corrected which producer comes first",
       "kind": "missing-surface",
-      "rationale": "`DescriptorHandle` appears in `hlsl.meta.slang`, so the surface exists, but I could not establish which shader construct plus compile option actually drives SPIR-V legalization to emit the implicit heap arrays \u2014 the legalization pass is not in this page's watched set even after widening, and naming a surface I have not traced would be a guess.",
+      "rationale": "Re-run, was `deferred`. The switch is a capability, confirmed at `source/slang/hlsl.meta.slang:27797-27803` (`case spvDescriptorHeapEXT:` inside `defaultGetDescriptorFromHandle`, 27708-27807) returning `__spirvLoadDescriptorFromHeap(__spirvResourceHeap()/__spirvSamplerHeap(), i)`; those two are `__intrinsic_op` declarations at 27685/27688. Ran `slangc -dump-ir -target spirv -O0 -capability spvDescriptorHeapEXT -stage compute -entry main` on a shader with `DescriptorHandle<SamplerState>` / `<Texture2D<float4>>`: IR holds `SPIRVLoadDescriptorFromHeap(%34, \u2026)` with `%34 = SPIRVResourceHeap`, `%35 = SPIRVSamplerHeap`; `strings` on the `.spv` gives `SPV_EXT_descriptor_heap`, `slang_resourceHeap`, `slang_samplerHeap`. Dropping the capability gives `GetDynamicResourceHeap` and `__slang_resource_heap` instead. `legalizeIRForSPIRV` is called from `source/slang/slang-emit-spirv.cpp:12131`, after the last `-dump-ir` point, so its two products are not observable there.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/resources-and-atomics.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "`SPIRVResourceHeap`, `SPIRVSamplerHeap`, and `SPIRVLoadTexelPointerFromHeap` are described only through their `IRBuilder` helper names, so a reader has no ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "93335aeba9c7": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced the retired `(variadic, min=1)` cell with `(1 unnamed: an `IRBoolLit`, read by `getSynthesizedStatus()`)` and said `true` marks the compiler-synthesized default rather than a user-written `__init`",
       "kind": "missing-surface",
@@ -2570,7 +2581,7 @@
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "972e44de2c38": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "covered by the generalized wrapper section, with the line numbers",
       "kind": "missing-surface",
@@ -2581,7 +2592,7 @@
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "97e3c6404b08": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "stated that the floor raises what a node entry point promises, which is why a below-`sm_6_8` node entry point is not diagnosed",
       "kind": "ambiguous-claim",
@@ -2658,7 +2669,7 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "9b5730e82911": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added `E41400` / `E41401` / `E41402` to row 72's Notes and `E30029` to row 24's Notes",
       "kind": "missing-surface",
@@ -2669,7 +2680,7 @@
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
     "9b9e225bc5b0": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a bulleted printed-form mapping to \u00a7`SPIRVAsmOperand`, stating which kinds a dump cannot tell apart",
       "kind": "ambiguous-claim",
@@ -2691,7 +2702,7 @@
       "target_doc": "docs/generated/design/cross-cutting/ir-instructions.md"
     },
     "9ef7b8187353": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "listed what `emitFrontMatter` actually emits on Phase D row 15, and named where the other tokens in the suggested list really come from",
       "kind": "missing-surface",
@@ -2734,7 +2745,7 @@
       "target_doc": "docs/generated/design/name-resolution/visibility.md"
     },
     "a08fdce0f5ce": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named `#pragma warning(push)` / `(pop)` / `(<specifier> : <id-list>)` as the tracker's user surface and noted that `slang-preprocessor.cpp` is unwatched",
       "kind": "missing-surface",
@@ -2756,7 +2767,7 @@
       "target_doc": "docs/generated/design/pipeline/06-emit.md"
     },
     "a13d8a468a77": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "undocumented-behavior",
       "rationale": "`docs/generated/design/_meta/prompts/ir-reference-decorations.md` lines 75-81, `## Forbidden content`: \"Backend-specific consumption of decorations \u2014 see [../pipeline/06-emit.md]\". A per-target table of what `[unroll]` / `[branch]` become in hlsl / glsl / spirv / metal / wgsl is exactly that material, and the callout already links `06-emit.md`.",
@@ -2766,7 +2777,7 @@
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
     "a178c913175f": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "undocumented-behavior",
       "rationale": "The binding-shift behaviour is real but lives in `source/slang/slang-parameter-binding.cpp` (`_maybeApplyHLSLToVulkanShifts`, lines 4325-4378; the shift-enabled test at lines 1379-1393), which is a `watched_paths` entry of `pipeline/04c-layout-ir.md`, not of this document. This page's Option-set toggles table has no binding-shift row and makes no claim about shifts, so there is nothing here to correct.",
@@ -2776,7 +2787,7 @@
       "target_doc": "docs/generated/design/target-pipelines/spirv.md"
     },
     "a2ab094d2c29": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `-target spirv-asm -capability SPV_KHR_cooperative_matrix` worked example to the version-floor paragraph",
       "kind": "missing-example",
@@ -2809,11 +2820,11 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "a36b7c8757cc": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "distinguished \"no `-profile`\" from \"cross-family `-profile`\" and gave the emitted `; Version:` line for each",
       "kind": "ambiguous-claim",
-      "rationale": "`source/slang/slang-profile.cpp:25-37` maps a profile version to `CapabilityName::<TAG>`; `source/slang/slang-capabilities.capdef:1792-1799` shows `alias sm_6_0_version` carrying `spirv_1_3` (reached from `sm_6_0` at `:1803` and from `DX_6_0` at `:2025`), and `:2185-2195` shows `alias GLSL_450` listing `spirv_1_3` directly, so a cross-family profile does supply a SPIR-V version atom. The no-profile case is the verified `SPIRV: Version: 1.5` line of `docs/generated/tests/design/cross-cutting/targets/spirv-direct-path-defaults-to-spirv-1-5.slang`.",
+      "rationale": "`source/slang/slang-profile.cpp:25-37` maps a profile version to `CapabilityName::<TAG>`; `source/slang/slang-capabilities.capdef:1792-1799` shows `alias sm_6_0_version` carrying `spirv_1_3` (reached from `sm_6_0` at `:1803` and from `DX_6_0` at `:2025`), and `:2185-2195` shows `alias GLSL_450` listing `spirv_1_3` directly, so a cross-family profile does supply a SPIR-V version atom. The no-profile case is the verified `SPIRV: Version: 1.5` line of `docs/generated/tests/design/cross-cutting/targets/spirv-direct-path-defaults-to-spirv-1-5.slang`. Re-confirmed against the compiler on this pass: `slangc -O0 -target spirv -entry main -stage compute t.slang -o t.spv` writes header version 1.5 with no `-profile`, and 1.3 under each of `-profile glsl_450`, `-profile sm_6_0`, `-profile spirv_1_3`.",
       "report_path": "docs/generated/design/_meta/gap-intake/cross-cutting/targets.md.gap-intake.md",
       "status": "fixed",
       "summary": "\"Falls back to `spirv_1_5` when the profile supplies none\" does not say what supplying none means or where the fallback shows up. With no `-profile` at all the ...",
@@ -2842,7 +2853,7 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "a43e4751357e": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the `Stage` enumeration in the `stage` row and gave `stage(6 : Int)` as the compute value",
       "kind": "undocumented-behavior",
@@ -2853,7 +2864,7 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "a58af9003740": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a `### Shape of the emitted file` subsection under Phase D giving the front-matter/prelude order, the conditional NVAPI defines, and the `#ifdef`-guarded include",
       "kind": "undocumented-behavior",
@@ -2864,7 +2875,7 @@
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "a5bba1b768e1": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the missing condition in \u00a7`SPIRVUntypedPtr` \u2014 the capability arm that emits the heap load \u2014 and stated that a plain `-target spirv` heap fetch emits no untyped pointer",
       "kind": "drift-from-source",
@@ -2885,7 +2896,7 @@
       "target_doc": "docs/generated/design/cross-cutting/serialization.md"
     },
     "a6197cfe99b6": {
-      "decided_at": "2026-08-11T16:44:02+00:00",
+      "decided_at": "2026-08-12T06:47:15+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "finding_id": "getstringhash-nonliteral-argument-sigsegv",
       "kind": "drift-from-source",
@@ -2906,11 +2917,11 @@
       "target_doc": "docs/generated/design/ast-reference/types.md"
     },
     "a797d351abfe": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "rewrote the bullet to say layout intent is not materialized at lowering and to point at `04c-layout-ir.md`",
+      "fix_summary": "unchanged; the bullet already states layout intent is not materialized at lowering and points at `04c-layout-ir.md`",
       "kind": "undocumented-behavior",
-      "rationale": "The only `addLayoutDecoration` calls in `source/slang/slang-lower-to-ir.cpp` are at `:16444`, `:16478`, `:16526`, all inside `TargetProgram::createIRModuleForLayout` (`:16353`); nothing on the `generateIRForTranslationUnit` path attaches one.",
+      "rationale": "Re-verified by running the compiler: in the `LOWER-TO-IR` block of `slangc -target spirv-asm -dump-ir -entry main diff.slang -o /dev/null`, `%outBuf` and `%g` carry only `[nameHint(...)]` and `[export(...)]` and no layout decoration. The only `addLayoutDecoration` calls in `source/slang/slang-lower-to-ir.cpp` are at `:16444`, `:16478`, `:16526`, all inside `TargetProgram::createIRModuleForLayout` (`:16353`).",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "\"Layout intent on global parameters is likewise recorded in the module\" does not say what that record looks like at lowering time. Global parameters in the ...",
@@ -2928,7 +2939,7 @@
       "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
     },
     "a88cfc08a133": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph after the table stating no public wrapper exists, and that these therefore appear without an inlining step",
       "kind": "missing-surface",
@@ -2939,7 +2950,7 @@
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "a9afaeff7d54": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph mapping each helper to the kind of condition it describes, stating that `internal` entries mean a compiler defect rather than a reproducible input",
       "kind": "missing-surface",
@@ -2950,7 +2961,7 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "a9fa50665328": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-surface",
       "rationale": "The document's `## What is not in this document` bullet assigns \"how a particular construct is spelled in the emitted language\" to `docs/generated/design/target-pipelines/`, adding \"even when the reason is a capability\". A per-family statement of where a version word appears in emitted SPIR-V / GLSL / HLSL / MSL is that form.",
@@ -2993,7 +3004,7 @@
       "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "ab792853eacb": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "extended row 54's Notes with the two generated storage buffers and the `atomicAdd`-then-store rewrite, and stated that `AppendStructuredBuffer<T>` is not front-end-rejected on WGSL",
       "kind": "drift-from-source",
@@ -3082,7 +3093,7 @@
       "target_doc": "docs/generated/design/pipeline/05-ir-passes.md"
     },
     "b0910e127d33": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "one generalized note on Phase B row 33a naming the option, its `slangc` spelling and the read path, and pointing at every other arm the same flag selects (rows 49/49a/49b, 57a/57b, Phase C row 26)",
       "kind": "missing-surface",
@@ -3126,7 +3137,7 @@
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "b33105c1d0d7": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "covered by the generalized wrapper section",
       "kind": "missing-surface",
@@ -3180,7 +3191,7 @@
       "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "b81d8b1c1c82": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "corrected step 3: named `TooManyArguments` for the too-long case and stated the condition under which `GenericArgumentListArityMismatch` actually fires",
       "kind": "drift-from-source",
@@ -3202,7 +3213,7 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "b9e17ab8c4e8": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the printed `Func(Int, Int, Int)` form, the operand order, and the trailing-attr caveat to \u00a7`func`",
       "kind": "missing-example",
@@ -3213,17 +3224,18 @@
       "target_doc": "docs/generated/design/ir-reference/structure.md"
     },
     "ba43401fe07f": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added the diagnosed `-profile spirv_1_3` + `SPV_KHR_cooperative_matrix` command line with its verbatim `E00046` text, plus the cross-family counter-example, attributing its silence to the call site's family gate rather than to the folding function's early return",
       "kind": "missing-example",
-      "rationale": "Blocked twice over: the positive triple's diagnostic text can only be settled by running `slangc`, which this host cannot do (the tree's build is Linux x86-64, the host is arm64); and the bundle README records that the compiler binary the tests ran against predates `conflicting-explicit-capability-and-profile`, so `capability-added-to-cross-family-profile-not-diagnosed.slang` passing is not evidence for the carve-out branch either. The call site is `source/slang/slang-options.cpp:4508-4538`, outside `watched_paths`. Follow-up: re-run once a host-native build exists.",
+      "rationale": "Settled by running the compiler; verdict changed from `deferred` (the previous cycle's \"no host `slangc`\" blocker is gone, and `source/slang/slang-options.cpp` is now watched). Diagnosed triple: `build-arm64/Debug/bin/slangc -O0 -target spirv -profile spirv_1_3 -capability SPV_KHR_cooperative_matrix -entry main -stage compute t.slang -o t.spv` exits 1 printing `error[E00046]: a requested '-capability' requires a higher target version than the explicitly requested profile 'spirv_1_3'; specify a higher '-profile' or remove the conflicting '-capability'` \u2014 the message of `source/slang/slang-diagnostics.lua:342-346`, raised at `source/slang/slang-options.cpp:4530-4537`, with the `_spirv_1_6` floor at `source/slang/slang-capabilities.capdef:683`. The same line at `-profile spirv_1_6`, and with no `-profile`, exits 0 and writes a module whose header version word is 1.6. Counter-example: swapping in `-profile glsl_450` or `-profile sm_6_0` also exits 0 and emits 1.6, while each of those profiles alone emits 1.3 \u2014 so the suppression is *not* the function's `selectedVersion == CapabilityAtom::Invalid` early return (`source/slang/slang-capability.cpp:217-220`) but the call site's family gate (`source/slang/slang-options.cpp:4486-4508`), whose comment at `:4480-4483` names `-profile glsl_450` plus `-capability spirv_1_4` as the false positive it exists to avoid.",
       "report_path": "docs/generated/design/_meta/gap-intake/cross-cutting/targets.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The section names the `conflicting-explicit-capability-and-profile` diagnostic and the folding rule but gives no command line that triggers it, and no ...",
       "target_doc": "docs/generated/design/cross-cutting/targets.md"
     },
     "ba8f19c2205d": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `enum E : uint8_t { A, B }` spelling and the base-list parse shape to `### EnumDecl and EnumCaseDecl`, and said the parser never sets `tagType`",
       "kind": "missing-surface",
@@ -3267,7 +3279,7 @@
       "target_doc": "docs/generated/design/pipeline/02-parse-ast.md"
     },
     "bb807f37d4bb": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph with the `struct S { BFloat16 b; FloatE4M3 e; FloatE5M2 f; }` example, the `float(...)` conversion requirement, and the capability gates",
       "kind": "missing-example",
@@ -3311,7 +3323,7 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "bd7183d2d708": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "narrowed the row from \"Core-module lowering\" / \"an inst\" to the `[builtin]` attribute on an `interface`, and named `IBufferDataLayout` as the case ordinary code links in",
       "kind": "missing-example",
@@ -3355,7 +3367,7 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "bfb77d573b0f": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced the `__*_attr` citations with the public wrappers, added a capability paragraph, and corrected the `emitLoad`/`emitStore` line numbers",
       "kind": "missing-surface",
@@ -3366,7 +3378,7 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "c0d54084a05b": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph under `### Runtime representation` naming both flags and the diagnostic each selects",
       "kind": "undocumented-behavior",
@@ -3377,7 +3389,7 @@
       "target_doc": "docs/generated/design/cross-cutting/targets.md"
     },
     "c15c7c4c2e96": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "listed the ten gated `RayQuery` methods and the NVAPI requirement, in the same `[Compound]` edit as 4ca278c8d71b",
       "kind": "missing-surface",
@@ -3410,7 +3422,7 @@
       "target_doc": "docs/generated/design/name-resolution/lookup.md"
     },
     "c402197b09a5": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a minimal `__target_switch` example and the no-matching-arm rule under **Specialization passes**",
       "kind": "missing-surface",
@@ -3432,7 +3444,7 @@
       "target_doc": "docs/generated/design/ir-reference/values.md"
     },
     "c47f6376ff53": {
-      "decided_at": "2026-08-11T16:28:05+00:00",
+      "decided_at": "2026-08-12T06:52:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the three `-target` spellings (`cuda`/`cu`, `cuh`, `ptx`) to the intro sentence that enumerates the `CodeGenTarget` values",
       "kind": "missing-surface",
@@ -3497,7 +3509,7 @@
       "target_doc": "docs/generated/design/pipeline/overview.md"
     },
     "c797e6b42b45": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a user-surface paragraph after the barrier table, including the fragment-stage requirement",
       "kind": "missing-surface",
@@ -3519,7 +3531,7 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "c8cbcc3a5ffd": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "replaced `__prefer` with `[OverloadRank(N)]` in comparator step 8 and noted its `@internal` core-module role and default rank",
       "kind": "missing-surface",
@@ -3540,12 +3552,13 @@
       "target_doc": "docs/generated/design/pipeline/04c-layout-ir.md"
     },
     "ca655cf14cfe": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a `### GlobalGenericParamDecl and GlobalGenericValueParamDecl` callout giving the two spellings, the module-specialization-parameter role, and the E38207 / E38025 outcomes, and pointed both `## Nodes` rows at it",
       "kind": "missing-surface",
-      "rationale": "Both halves of the claim are outside `watched_paths`. `source/slang/slang-parser.cpp:4384-4412` (`parseGlobalGenericTypeParamDecl`, `parseGlobalGenericValueParamDecl`) only shows that `type_param` / `__generic_value_param` parse into `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl`, and `source/slang/slang-ast-decl.h:572-583` only calls them \"generic entry-point\" / \"existential value\" parameters. The binding path is `source/slang/slang-check-shader.cpp:2798-2806` (the decl becomes a `SpecializationParam`) and the diagnostic is E38207 in `source/slang/slang-diagnostics.lua:4620-4625`; neither file is watched here, and `slangc` cannot be run on this host (Linux x86-64 build, arm64 host) to reproduce. Follow-up: expand `watched_paths` with those two files, or add a CLI-driving harness on the tests side",
+      "rationale": "Both halves are now in `watched_paths` (confirmed by `regenerate.py show ast-reference/declarations.md`). `source/slang/slang-check-shader.cpp:2798-2818`, inside `Module::_collectShaderParams` (`:2726`), turns a `GlobalGenericParamDecl` into a `SpecializationParam` of flavor `GenericType` and a `GlobalGenericValueParamDecl` into one of flavor `GenericValue`, appending both to `m_specializationParams`; `Module::_validateSpecializationArgsImpl` (`:3199-3212`) validates supplied `SpecializationArg`s against `getSpecializationParamCount()` and diagnoses `MismatchSpecializationArguments` when too few arrive. `source/slang/slang-diagnostics.lua:4619-4625` defines E38207 `unspecialized-global-generic-param-with-uses` with exactly the observed message; `:4402-4407` defines E38025. Surface confirmed at `source/slang/slang-parser.cpp:4384-4415`. Compiler runs with `build-arm64/Debug/bin/slangc` and `SLANG_ASSERT=release-assert-only`, on a file declaring `type_param T;` plus a `computeMain` that uses `T`: `slangc tp.slang -target hlsl -entry computeMain -stage compute -o /dev/null` gives `error[E38207]: global generic parameter used in code without a concrete binding` at `tp.slang:1:12` (exit 255); `slangc tp.slang -o tp.slang-module` exits 0 and writes the module; the same target compile of a file whose `type_param` is unused exits 0; and adding `-specialize float` gives `error[E38025]: wrong number of specialization arguments`, since `source/slang/slang-options.cpp:3407` and `:4287-4296` route `-specialize` to `addEntryPointEx`",
       "report_path": "docs/generated/design/_meta/gap-intake/ast-reference/declarations.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The `GlobalGenericParamDecl` and `GlobalGenericValueParamDecl` rows name the `type_param` / `__generic_value_param` spellings but do not say that a module ...",
       "target_doc": "docs/generated/design/ast-reference/declarations.md"
     },
@@ -3560,7 +3573,7 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "cacdc30cbae7": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "reworded the requirement-list paragraph and anchored it to the counting loop",
       "kind": "ambiguous-claim",
@@ -3582,7 +3595,7 @@
       "target_doc": "docs/generated/design/name-resolution/scopes.md"
     },
     "cb92e1d6601c": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a dump excerpt and a sentence to \u00a7`SymbolAlias`",
       "kind": "missing-example",
@@ -3615,7 +3628,7 @@
       "target_doc": "docs/generated/design/cross-cutting/core-module.md"
     },
     "ce8aaa00510a": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "gave the three `SlangMatrixLayoutMode` values and their meanings in \u00a7`Vec` and `Mat`, plus who sets `0` and what later resolves it",
       "kind": "ambiguous-claim",
@@ -3636,7 +3649,7 @@
       "target_doc": "docs/generated/design/ir-reference/differentiation.md"
     },
     "d03e7f78dc55": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a `### SemanticDecl` callout with the `semantic MySem { get : int; }` / `struct S { int v : MySem; }` example",
       "kind": "missing-example",
@@ -3668,17 +3681,17 @@
       "target_doc": "docs/generated/design/ast-reference/types.md"
     },
     "d25f710d2ffa": {
-      "decided_at": "2026-08-11T16:20:02+00:00",
+      "decided_at": "2026-08-12T06:38:51+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "kind": "missing-example",
-      "rationale": "The document's `## What is not in this document` already delegates \"the detailed profile-version table\" to `source/slang/slang-profile-defs.h`, and the accepted `-profile` spellings are listed in `docs/command-line-slangc-reference.md` under `-profile`. The macro table itself is outside `watched_paths`.",
+      "rationale": "The document's `## What is not in this document` already delegates \"the detailed profile-version table\" to `source/slang/slang-profile-defs.h`, and the accepted `-profile` spellings are listed in `docs/command-line-slangc-reference.md` under `-profile`.",
       "report_path": "docs/generated/design/_meta/gap-intake/cross-cutting/targets.md.gap-intake.md",
       "status": "rejected-out-of-scope",
       "summary": "The section explains what a profile carries but never lists the names one can pass to `-profile`; the version-edge tests had to recover the accepted spellings ...",
       "target_doc": "docs/generated/design/cross-cutting/targets.md"
     },
     "d27a9f53454e": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a before/after example to the `legalizeSwitch` bullet showing a `default:`-less Slang switch emitting `case i32(0):`, `case i32(1):` and a `default :` arm",
       "kind": "missing-example",
@@ -3689,7 +3702,7 @@
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
     "d326f38b2c3a": {
-      "decided_at": "2026-08-11T16:42:04+00:00",
+      "decided_at": "2026-08-12T06:38:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "stated the current status of the two initializer forms: still declared, deprecation warning under the default language version, error under 2026+",
       "kind": "missing-surface",
@@ -3700,7 +3713,7 @@
       "target_doc": "docs/generated/design/name-resolution/overload-resolution.md"
     },
     "d47ad3aa8c64": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "documented the native-spelling composition rule, the register-class mapping, and intrinsic-method pass-through in the same new Phase D subsection",
       "kind": "undocumented-behavior",
@@ -3711,7 +3724,7 @@
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "d4aeafd64cde": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "corrected `-W<name>` to `-W<id>` and stated that the operand may be an id or a diagnostic name",
       "kind": "missing-surface",
@@ -3766,12 +3779,13 @@
       "target_doc": "docs/generated/design/pipeline/04b-pre-link-passes.md"
     },
     "d75271bc7d3f": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added the printed key/decoration pair, the named `StructKey` contrast, and the `_`-type note to \u00a7`builtinRequirementKey`",
       "kind": "missing-example",
-      "rationale": "Cannot confirm the printed form. The gap asks for a dump excerpt of a `builtinRequirementKey` definition together with its decoration; no watched source states the rendering, and the bundle's tests pin only the fragment `= builtinRequirementKey(`. Observing it needs a runnable compiler, and the tree's build is Linux x86-64 on an arm64 host.",
+      "rationale": "Re-run; previously deferred. Observed by running `SLANG_ASSERT=release-assert-only build-arm64/Debug/bin/slangc -target spirv-asm -dump-ir -o /dev/null -entry main -stage compute` on the bundle's `builtin-requirement-key-in-witness-table.slang`; the `LOWER-TO-IR` dump prints `[BuiltinRequirementDecoration(1 : Int)]` immediately above `let %201 : _ = builtinRequirementKey(1 : Int)`. The `_` is a null result type \u2014 watched `slang-ir-insts.h:3609` passes `nullptr` to `emitIntrinsicInst`, and watched `slang-ir.cpp:7889` prints `_` for a null type. The absent name hint is watched `slang-lower-to-ir.cpp:1826`: `addNameHint` is on the `StructKey` branch only. Kind `1` is `DifferentialType`: the same dump has `interface_req_entry(%201, associated_type)` and `witness_table_entry(%201, %Grad)`, and `builtinRequirementKey(27 : Int)` next to it keys `witness_table_t(%IDifferentiable)`, matching `BuiltinRequirementKind` order in `source/slang/slang-ast-support-types.h:1822`. Contrast form from the same command on `interface-with-requirement.slang`; escaping is watched `slang-ir.cpp:7688-7717`.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/structure.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The section says the key's identity is \"its single `kindOperand` (an `IRIntLit` holding a `BuiltinRequirementKind` value)\" and that ...",
       "target_doc": "docs/generated/design/ir-reference/structure.md"
     },
@@ -3787,17 +3801,18 @@
       "target_doc": "docs/generated/design/ast-reference/expressions.md"
     },
     "d984deecc3c7": {
-      "decided_at": "2026-08-11T16:20:00+00:00",
+      "decided_at": "2026-08-12T06:41:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added both printed shapes to \u00a7Global state and qualified the `global_var` row's initializer claim",
       "kind": "missing-example",
-      "rationale": "Cannot confirm either half. No watched source shows a `Ptr(Bool)` run-once guard global for a function-`static` with a runtime initializer, and the bundle's `global-var-function-static.slang` shows only a bare `global_var %c : Ptr(Int);` with no initializer block and no guard \u2014 which neither confirms nor refutes the gap, since that test uses a constant initializer. Documenting either shape would assert an unverified claim about emitted IR.",
+      "rationale": "Re-run; previously deferred. Both halves observed with the same `slangc -dump-ir` command on a two-case file (`static int g = 3;` at module scope plus `static int c = u;` inside a function). The `LOWER-TO-IR` dump shows `global_var %g : Ptr(Int) { block %2: return_val(3 : Int) }` \u2014 SCCP does not fold it away \u2014 and, for the function-`static`, a bodyless `global_var %c : Ptr(Int);` beside an unnamed `global_var %3 : Ptr(Bool) { block %4: return_val(false) }`, with the function body doing `load(%3)` / `ifElse` / `store(%c, %u)` / `store(%3, true)`. Confirmed in watched `slang-lower-to-ir.cpp:11817-11826` (module-scope initializer block) and `11885-11924` (guard global plus in-function `ifElse`). Line 11885 tests only `decl->initExpr`, so the guard is not conditional on a runtime initializer; re-running the command on the bundle's own `global-var-function-static.slang` (`static int c = 0;`) emits the guard too.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/structure.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The `global_var` row says \"an initializer lives in child blocks\" without showing the shape, and does not mention that a `static` local with an initializer ...",
       "target_doc": "docs/generated/design/ir-reference/structure.md"
     },
     "da19e305367a": {
-      "decided_at": "2026-08-11T16:27:12+00:00",
+      "decided_at": "2026-08-12T06:45:28+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the emitted `select(...)` forms for `And` and `Or` under `legalizeLogicalAndOr`, with the already-boolean and cast-from-integer operand cases",
       "kind": "missing-example",
@@ -3808,7 +3823,7 @@
       "target_doc": "docs/generated/design/target-pipelines/wgsl.md"
     },
     "db73d48479a1": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the two verbatim `Barrier(...)` call forms as a fenced block in the barrier bullet, so the per-argument parenthesisation is documented",
       "kind": "missing-example",
@@ -3819,7 +3834,7 @@
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "dbe97ebb7283": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "showed the quoted argument in the `format` row and said the operand is the integer `ImageFormat` value the string resolves to",
       "kind": "ambiguous-claim",
@@ -3830,12 +3845,13 @@
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
     "dcbf50926593": {
-      "decided_at": "2026-08-11T16:17:50+00:00",
+      "decided_at": "2026-08-12T00:00:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "replaced the \u00a7Differentiation types preamble's missing surface with an attribute-to-opcode table for the three families, the both-are-synthesized correction with its witness-table dump lines, and the `apply_bwd` / `remat` / propagate role split; rewrote the contradicting sentence in \u00a7`BackwardDiffIntermediateContextType` to match",
       "kind": "missing-surface",
-      "rationale": "Blocked on `watched_paths`. Which of the `Minimal` / ordinary / `Trivial` context types is used is decided in `source/slang/slang-check-decl.cpp` (~3730, 15165-15270, 19526), `source/slang/slang-ir-translate.cpp:167-232` and `source/slang/slang-ir-autodiff-fwd.cpp:3704,3755` \u2014 none of which this page watches, and none of which is reachable from what it does watch (`slang-ir.cpp:3115` only builds the type). A first read also suggests the gap's premise is off: the checker synthesizes the full (`BwdCallable`) and `MinimalContext` structs together for every differentiable function rather than one per user construct, so writing the requested per-variant surface examples would need both a `watched_paths` expansion and a compiler run to verify. I cannot run `slangc` (Linux x86-64 build, arm64 host).",
+      "rationale": "Re-run of a previously `deferred` gap; both stated blockers were false. All three deciding files are now watched (`regenerate.py show ir-reference/types.md` resolves `source/slang/slang-check-decl.cpp`, `source/slang/slang-ir-translate.cpp`, `source/slang/slang-ir-autodiff-fwd.cpp`), and `build-arm64/Debug/bin/slangc` runs natively. Confirmed in watched `slang-check-decl.cpp`: the `BackwardDifferentiableAttribute` arm at `:15142` sets `kIROp_BackwardDiffIntermediateContextType` (`:15169`) and `kIROp_BackwardDiffMinimalContextType` (`:15179`); the `TreatAsDifferentiableAttribute` arm at `:15227` sets the `Trivial*` pair (`:15254,15264`); `translateBwdDerivativeAttributeToAD2` at `:19210` sets the `FromLegacy*` pair (`:19261,19272`). Surface spellings are watched `core.meta.slang:470` (`attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute`), `:451` (`[BackwardDifferentiable]`) and `:131` (`[TreatAsDifferentiable]`). Verified by running `SLANG_ASSERT=release-assert-only build-arm64/Debug/bin/slangc -dump-ir -target hlsl -entry computeMain ctx.slang -o ctx.hlsl` on a shader with `[Differentiable] float f` and `[TreatAsDifferentiable] float g` both called through `bwd_diff`: the dump shows `witness_table_entry(%30,BackwardDiffIntermediateContextType(%f))` and `witness_table_entry(%29,BackwardDiffMinimalContextType(%f))` in one witness table and the `Trivial*` pair in `g`'s, plus `Func(tuple_type(Float, BackwardDiffMinimalContextType(%f)), Float) = BackwardDifferentiatePrimal(%f)` and `Func(BackwardDiffIntermediateContextType(%f), BackwardDiffMinimalContextType(%f), Float) = BackwardRemat(%f)`. The same command on `[BackwardDerivative(h_bwd)]` and on `[BackwardDerivativeOf(k)]` shaders produced `BackwardContextFromLegacyBwdDiffFunc(%h, %h_bwd_diff)` / `BackwardMinimalContextFromLegacyBwdDiffFunc(...)`. The document's \"specialization pass chooses\" claim is a documentation defect, not a compiler one: `slang-check-decl.cpp:3727-3728` says only the *contents* are decided later.",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/types.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The catalog rows do not name the user-level construct that triggers each context-type variant (`Minimal` versus ordinary versus `Trivial`); the prose only says ...",
       "target_doc": "docs/generated/design/ir-reference/types.md"
     },
@@ -3851,7 +3867,7 @@
       "target_doc": "docs/generated/design/syntax-reference/grammar.md"
     },
     "dd6630d4d2c0": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a paragraph stating the repairs surface as a declaration lifted to the top of the function body, with no dedicated marker, and that the clone repair leaves no declaration at all",
       "kind": "undocumented-behavior",
@@ -3862,7 +3878,7 @@
       "target_doc": "docs/generated/design/target-pipelines/hlsl.md"
     },
     "dd82a7558698": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named E31117 / E31116 in the `validateBarrierFlagsForHLSL` section and quoted the message shape listing the spellable bits with hex values",
       "kind": "missing-surface",
@@ -3916,7 +3932,7 @@
       "target_doc": "docs/generated/design/target-pipelines/metal.md"
     },
     "e19c29a6b653": {
-      "decided_at": "2026-08-11T16:23:56+00:00",
+      "decided_at": "2026-08-12T06:38:42+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added an `interpolationMode` callout with the full six-value mapping (the gap's list omitted `PerVertex` 5) and pointed the table row at it",
       "kind": "missing-surface",
@@ -3927,7 +3943,7 @@
       "target_doc": "docs/generated/design/ir-reference/decorations.md"
     },
     "e1a31870fa3e": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a debug-level paragraph to `### Debug info family` mapping each level to the records it produces (also covers 8dd64f408ea2, 1079d955aaa9)",
       "kind": "missing-surface",
@@ -4012,7 +4028,7 @@
       "target_doc": "docs/generated/design/ast-reference/types.md"
     },
     "e8a0eb0eafa7": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `MemoryOrder.*` spellings under the `IRMemoryOrder` block, noting the splice",
       "kind": "missing-surface",
@@ -4023,18 +4039,18 @@
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
     "e8b7f6b842fe": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added five mapping-table rows (`IndexExpr`, `AssignExpr`, `BuiltinCastExpr`, `BreakStmt`/`ContinueStmt`, composite generics) and pointed the element-type spellings at `ir-reference/types.md` instead of duplicating them",
+      "fix_summary": "unchanged; the five added rows plus the `ir-reference/types.md` cross-reference already cover every family the gap named",
       "kind": "undocumented-behavior",
-      "rationale": "`source/slang/slang-lower-to-ir.cpp:6355-6364` and `:7481,7560-7567` (`IndexExpr` \u2192 `emitElementExtract`/`emitElementAddress`, mnemonics `getElement`/`getElementPtr` at `slang-ir-insts.lua:1273-1274`), `:5580-5595` (`__subscript` reaches lowering as an `InvokeExpr` routed to `lowerStorageReference`), `:7645-7654` (`AssignExpr` \u2192 `assignExpr`), `:7191-7195` with `source/slang/slang-ir.cpp:4377,4431-4440` (`emitCast` style table), `:9065-9098` with `source/slang/slang-ir.cpp:6447-6455` (`emitBreak`/`emitContinue` are `emitBranch`). Composite type spellings from `lower-optional-int.slang`, `lower-tuple-heterogeneous.slang`, `lower-parameter-block-narrow-struct.slang`.",
+      "rationale": "`source/slang/slang-lower-to-ir.cpp:6355-6364`, `:7481`, `:7560-7567` (`IndexExpr`), `:5580-5595` (`__subscript` as `InvokeExpr`), `:7645-7654` (`AssignExpr`), `:7191-7195` with `source/slang/slang-ir.cpp:4377,4431-4440` (`emitCast` style table), `:9065-9098` with `source/slang/slang-ir.cpp:6447-6455` (`emitBreak`/`emitContinue`). The gap's \"element types and storage shapes\" half is owned by `docs/generated/design/ir-reference/types.md`, which catalogues the scalar spellings at `:204-227` and `Mat(elementType, rowCount, columnCount, layout)` at `:589`; duplicating it here would violate the contract's no-duplication rule.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The table is explicitly \"illustrative, not exhaustive\", and several everyday AST families are absent: `IndexExpr` (resource subscript / array element access), ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
     "e974ee53af16": {
-      "decided_at": "2026-08-11T16:17:17+00:00",
+      "decided_at": "2026-08-12T06:40:40+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "gave `1`/`2` in the `matrixTypeLayout` row and named the two options in the surface paragraph",
       "kind": "undocumented-behavior",
@@ -4045,7 +4061,7 @@
       "target_doc": "docs/generated/design/ir-reference/metadata.md"
     },
     "ea3331936f79": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added a note to the third profile-predicate row that the `node` disjunct is defensive, since the `node` atom conjoins `_sm_6_8`",
       "kind": "cascading-only-mention",
@@ -4067,21 +4083,22 @@
       "target_doc": "docs/generated/design/pipeline/03-semantic-check.md"
     },
     "eb9ddcf6e85a": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added the two contrasting `witness_table_entry` lines and the note that the base decl-ref is null only for a non-`DeclRefType` base",
       "kind": "missing-surface",
-      "rationale": "`source/slang/slang-lower-to-ir.cpp:11107-11115` confirms the specialization itself, and `:10916-10938` shows `getWitnessTableBaseDeclRef` returns null only when the conformance's base type is not a `DeclRefType` \u2014 which no ordinary source-level `struct S : IFoo` produces, so the gap's \"without the base specialization\" half may not be reachable from Slang at all. No test in this bundle or in `ir-reference/*` pins a `witness_table_entry` line for a conformance to a generic interface, and the difference cannot be asserted without running the compiler. Needs a bundle test that dumps a generic-interface conformance before the entry's value operand can be described.",
+      "rationale": "Settled by running the compiler; verdict changed from `deferred`. `source/slang/slang-lower-to-ir.cpp:11099-11115` applies `SubstitutionSet(witnessTableBaseDeclRef)` to each requirement witness; `:10916-10925` shows the decl-ref is null only when the conformance's base type is not a `DeclRefType`, which no ordinary `struct S : IFoo<...>` produces \u2014 so the \"without the base specialization\" half of the gap is unreachable from Slang and the observable difference is per-entry instead. `slangc -target spirv-asm -dump-ir -entry main geniface.slang -o /dev/null` on `interface IFoo<T> { T zero(); T twice() { return zero(); } }` + `struct S : IFoo<int>` prints `witness_table %26 : witness_table_t(specialize(%1, Int))(%S)` with `witness_table_entry(%IFoo_zero,%S_zero)` and `witness_table_entry(%IFoo_twice,specialize(specialize(%15, Int), %S, %26))`; the inner `specialize(%15, Int)` is exactly the base specialization.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "The section says a requirement witness is `specialize`d through `getWitnessTableBaseDeclRef` \"when it is non-null\", but does not say what a reader would see in ...",
       "target_doc": "docs/generated/design/pipeline/04-ast-to-ir.md"
     },
     "ec22217dbfdc": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added the required `import experimental.workgraph` plus `-experimental-feature` / `-stage node` / `lib_6_8` to the work-graph paragraph",
+      "fix_summary": "replaced the C++ attribute-class list with a source-spelling \u2192 decoration table, keeping the existing import / compile-option paragraph",
       "kind": "missing-surface",
-      "rationale": "`source/standard-modules/experimental/workgraph.slang:10,17-39` declares `[ExperimentalModule] module workgraph` and the `attribute_syntax` for `NodeLaunch` / `NodeMaxDispatchGrid` / `NodeDispatchGrid` / `MaxRecords` / `NodeID`; `source/slang/slang-session.cpp:1768-1776` diagnoses `NeedToEnableExperimentFeature` unless `CompilerOptionName::ExperimentalFeature` is set (`-experimental-feature`, `source/slang/slang-options.cpp:1222`); `source/slang/slang-lower-to-ir.cpp:14485-14525` is the attribute \u2192 decoration mapping. Compile options corroborated by `entry-point-node-launch-attribute-lowers-to-string-decoration.slang`.",
+      "rationale": "Attribute spellings from `source/standard-modules/experimental/workgraph.slang:17-43`; the attribute \u2192 decoration mapping is `source/slang/slang-lower-to-ir.cpp:14485-14525`; decoration mnemonics from `source/slang/slang-ir-insts.lua:1996-2029`. Ran `slangc -I build-arm64/Debug/lib/slang-standard-module-2026.14.1 -target hlsl -dump-ir -o /dev/null -stage node -entry main -profile lib_6_8 -experimental-feature wg.slang`, whose `LOWER-TO-IR` block prints `[nodeIsProgramEntry]`, `[nodeID(\"myNode\", 0 : Int)]`, `[nodeDispatchGrid(1 : Int, 1 : Int, 1 : Int)]`, `[nodeLaunch(\"broadcasting\")]` on `func %main`; deleting the `import` line turns each into `warning[E31000]: unknown attribute 'NodeLaunch'`.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The work-graph paragraph lists `NodeLaunchAttribute`, `NodeIDAttribute`, `MaxRecordsAttribute` and friends as if they were ordinary attributes, but they are ...",
@@ -4099,8 +4116,9 @@
       "target_doc": "docs/generated/design/pipeline/overview.md"
     },
     "ec5f9a6f1ce7": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "finding_id": "declarations-attribute-syntax-unknown-class-ice",
       "fix_summary": "reworded the `AttributeDecl` row to \"binds the spelling ... to an AST attribute class the compiler already knows\" and added an `attribute_syntax` paragraph to the `SyntaxDecl` callout",
       "kind": "drift-from-source",
       "rationale": "`source/slang/slang-parser.cpp:5543-5589` \u2014 `parseAttributeSyntaxDecl` resolves the `: <class>` clause with `parser->astBuilder->findSyntaxClass(classNameAndLoc.name)` (`:5587`) followed by `SLANG_ASSERT(syntaxClass)` (`:5589`), so only a class the compiler was built with can be named; `:5534-5541` \u2014 the comment says attribute-specific code is not invoked during parsing and \"all specialized behavior takes place during semantic checking\", which is why placement rules come from the C++ class. All 110 uses are in `source/slang/core.meta.slang` (108, e.g. `:4381`) and `source/slang/hlsl.meta.slang` (2). The unknown-class internal error is already covered by `docs/generated/tests/_meta/findings/declarations-attribute-syntax-unknown-class-ice.yaml` and is deliberately not documented",
@@ -4110,7 +4128,7 @@
       "target_doc": "docs/generated/design/ast-reference/declarations.md"
     },
     "ecac3ca82a5b": {
-      "decided_at": "2026-08-11T16:42:09+00:00",
+      "decided_at": "2026-08-12T07:05:00+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added three sentences to `### NamespaceDecl, ModuleDecl, FileDecl` saying transparency belongs to the checker-built file scopes, not to a hand-written `__file_decl` block",
       "kind": "ambiguous-claim",
@@ -4121,11 +4139,11 @@
       "target_doc": "docs/generated/design/ast-reference/declarations.md"
     },
     "ed8892764aff": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added a sentence to `Inputs and outputs` stating the prelinked body is already in the `LOWER-TO-IR` dump, normally inlined, and that the dump is not raw lowering output",
+      "fix_summary": "unchanged; the `Inputs and outputs` sentence already names the stage and warns the dump is not raw lowering output",
       "kind": "missing-example",
-      "rationale": "`source/slang/slang-lower-to-ir.cpp:15572` calls `prelinkIR`, `:15664` runs `performMandatoryEarlyInlining`, `:15770` runs DCE \u2014 all before `dumpIR(..., \"LOWER-TO-IR\", ...)` at `:15797`. `04b-pre-link-passes/phase-c-mandatory-early-inlining-pulls-in-core-helper.slang` pins the inlined `add(%a, %b)` under `### LOWER-TO-IR:`.",
+      "rationale": "Re-verified by running the bundle's own reproducer: `slangc -target spirv-asm -dump-ir -o /dev/null -entry main -stage compute phase-c-mandatory-early-inlining-pulls-in-core-helper.slang` prints `let %4 : Int = add(%a, %b)` inside `### LOWER-TO-IR:` with no `call`, i.e. the prelinked core operator is already imported *and* inlined by the time the first dump is printed. Source: `source/slang/slang-lower-to-ir.cpp:15572` (`prelinkIR`), `:15664` (`performMandatoryEarlyInlining`), `:15797` (`dumpIR(..., \"LOWER-TO-IR\", ...)`).",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The targeted-prelinking paragraph says imported `[unsafeForceInlineEarly]` functions are cloned into the module \"before it is returned\", but does not say ...",
@@ -4264,12 +4282,13 @@
       "target_doc": "docs/generated/design/ir-reference/generics-and-existentials.md"
     },
     "f3b2b47f3963": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a Notes cell to Phase B row 21 naming the earlier IR-generation call that shadows this one for source input, and the serialized-module shape that still reaches it",
       "kind": "cascading-only-mention",
-      "rationale": "Both halves need sources outside this document's `watched_paths`: the shadowing front-end check (error 41001, `source/slang/slang-diagnostics.lua:4911`) is raised from `source/slang/slang-check-*.cpp`, and the surviving-input-shape question is answered by `source/slang/slang-ir-check-recursion.cpp`. Neither is watched here, and the claim cannot be settled by running the compiler on this host (Linux x86-64 build, arm64 host). Follow-up: either extend `watched_paths` with `slang-ir-check-recursion.cpp`, or re-file the note against `pipeline/05-ir-passes.md`, which owns the pass catalog.",
+      "rationale": "Re-run with a working `slangc` and `lldb`; the previous cycle's \"sources lie outside `watched_paths`\" reason was wrong on both counts \u2014 `source/slang/slang-ir-check-recursion.cpp` is watched, and error 41001 is not a front-end check but this very pass, declared as `recursive-type` under the \"41000 - IR-level validation issues\" banner at `source/slang/slang-diagnostics.lua:4909-4914`. `checkForRecursiveTypes` has two call sites: `source/slang/slang-lower-to-ir.cpp:15691` (inside `generateIRForTranslationUnit`, followed by an early return on error at lines 15693-15694) and the Phase B one at `source/slang/slang-emit.cpp:1548`. An `lldb` breakpoint on `Slang::checkForRecursiveTypes` during `slangc -target spirv -O0 rec1.slang` (a `struct S { S s; float f; }`) is hit exactly once, from `generateIRForTranslationUnit`; the Phase B site never runs. The residual reach is confirmed the same way: building the same source as a module with `-disable-non-essential-validations` and then running `slangc -target spirv -O0 -o recmod2.spv recmod2.slang-module` hits the breakpoint from `linkAndOptimizeIR` and reports 41001 there.",
       "report_path": "docs/generated/design/_meta/gap-intake/target-pipelines/spirv.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "Row 21 lists `checkForRecursiveTypes` as a Phase B validator, but a struct that contains itself is rejected by the front end with E41001 before ...",
       "target_doc": "docs/generated/design/target-pipelines/spirv.md"
     },
@@ -4307,7 +4326,7 @@
       "target_doc": "docs/generated/design/pipeline/overview.md"
     },
     "f5bfc8605d11": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the rejection (`unknown-diagnostic-name` 31111 with the requested identifier) and noted it is enforced at the option layer, not in `getEffectiveMessageSeverity`",
       "kind": "undocumented-behavior",
@@ -4318,7 +4337,7 @@
       "target_doc": "docs/generated/design/cross-cutting/diagnostics.md"
     },
     "f5d27f386fc6": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "covered by the generalized wrapper section; the \"after inlining\" qualifier the gap asked for is now the rule the section states",
       "kind": "missing-example",
@@ -4351,12 +4370,13 @@
       "target_doc": "docs/generated/design/ast-reference/values.md"
     },
     "f742df1cbf5e": {
-      "decided_at": "2026-08-11T17:05:00+00:00",
+      "decided_at": "2026-08-12T06:44:10+00:00",
       "decided_by_model": "claude-opus-5[1m]",
+      "fix_summary": "added a minimal `closesthit` example under Raytracing payload plus the two shapes that do not produce the opcode",
       "kind": "missing-example",
-      "rationale": "Asks for a minimal OptiX example whose entry-point uniform is shaped so as to force the SBT lookup rather than fold. That is a question about emitted code, answerable by running the compiler; the tree's build is Linux x86-64 and the host is arm64, so I could not observe the fold boundary.",
+      "rationale": "Re-run, was `deferred`. The gap's \"a single scalar uniform folds\" premise is disproved: `slangc -dump-ir -target cuda -stage closesthit -entry ch` on a `closesthit` function with `uniform float scale` shows `let %32 : ConstantBuffer(%ShaderRecordParams, DefaultLayout) = getOptiXSbtDataPointer` in the first dump after `collectOptiXEntryPointUniformParams`, and emits `((ShaderRecordParams_0*)optixGetSbtDataPointer())->scale_0`. The real discriminator is declaration site and stage: the bundle test's module-scope `uniform ShaderRecord sbtRecord` compiles to `globalParams_0->sbtRecord_0` with no SBT access, and a `compute` entry point with a `uniform` parameter emits `__global__ void cs(float scale_0)` \u2014 matching the `case Stage::Compute: return;` guard in `source/slang/slang-ir-optix-entry-point-uniforms.cpp` (`processEntryPointImpl`).",
       "report_path": "docs/generated/design/_meta/gap-intake/ir-reference/resources-and-atomics.md.gap-intake.md",
-      "status": "deferred",
+      "status": "fixed",
       "summary": "`getOptiXSbtDataPointer` is described as the pointer to the SBT record holding entry-point uniforms, but nothing says what makes an entry-point uniform ...",
       "target_doc": "docs/generated/design/ir-reference/resources-and-atomics.md"
     },
@@ -4372,11 +4392,11 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "f84a0d200976": {
-      "decided_at": "2026-08-11T16:44:19+00:00",
+      "decided_at": "2026-08-12T06:25:16+00:00",
       "decided_by_model": "claude-opus-5[1m]",
-      "fix_summary": "added the surface spelling `void f<let N : int, each T>(T x) where countof(T) == N` to the section's opening sentence",
+      "fix_summary": "added the dump-line paragraph the gap asked for, alongside the surface spelling the first pass added",
       "kind": "missing-example",
-      "rationale": "`source/slang/slang-parser.cpp:1966-1976` parses `where countof(Pack) == <expr>` into a `GenericVariadicPackCountConstraintDecl`; the spelling is exercised by `tests/language-feature/generics/diagnose-variadic-pack-count-constraint.slang:3`.",
+      "rationale": "`source/slang/slang-parser.cpp:1966-1976` parses the `where countof(Pack) == <expr>` spelling. Ran `slangc -target spirv-asm -dump-ir -entry main packcount.slang -o /dev/null` on `int sum<let N : int, each T>(T values) where countof(T) == N` called as `sum<2>(1, 2)`; the `LOWER-TO-IR` block shows `param %5 : witness_table_t(Void)` as the generic's last parameter, `witness_table %10 : witness_table_t(Void)(Void);` at module scope, and `call specialize(%6, 2 : Int, TypePack(Int, Int), %10)(%1)` at the use site.",
       "report_path": "docs/generated/design/_meta/gap-intake/pipeline/04-ast-to-ir.md.gap-intake.md",
       "status": "fixed",
       "summary": "The section describes the lowering of a `GenericVariadicPackCountConstraintDecl` in full but shows no Slang source for a variadic generic carrying a ...",
@@ -4415,7 +4435,7 @@
       "target_doc": "docs/generated/design/syntax-reference/keywords-and-builtins.md"
     },
     "fc1bc2f64511": {
-      "decided_at": "2026-08-11T16:25:31+00:00",
+      "decided_at": "2026-08-12T06:41:18+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "named the emitted `DepthGreater` / `DepthLess` / `DepthReplacing` execution modes and the layout-attribute source the emitter derives them from",
       "kind": "missing-example",
@@ -4448,7 +4468,7 @@
       "target_doc": "docs/generated/design/ast-reference/modifiers.md"
     },
     "fd38d79db386": {
-      "decided_at": "2026-08-11T16:14:06+00:00",
+      "decided_at": "2026-08-12T06:39:25+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the `textures[NonUniformResourceIndex(idx)].Sample(samp, uv)` spelling to the Phase C row and stated that no stage gate applies",
       "kind": "undocumented-behavior",
@@ -4480,7 +4500,7 @@
       "target_doc": "docs/generated/design/pipeline/06-emit.md"
     },
     "fdd5599154eb": {
-      "decided_at": "2026-08-11T16:15:16+00:00",
+      "decided_at": "2026-08-12T06:39:03+00:00",
       "decided_by_model": "claude-opus-5[1m]",
       "fix_summary": "added the header form, the always-`E` prefix rule, the negative-code case, and a two-line rendered example",
       "kind": "missing-surface",

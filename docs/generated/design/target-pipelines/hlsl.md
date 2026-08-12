@@ -1020,6 +1020,25 @@ lines 1290-1292). That is what a reader should look for:
 fallback naming rule applies to every anonymous struct the backend
 synthesizes, not just this pass.
 
+The other synthesized name a reader meets near matrices belongs to
+a different pass. A matrix reached through a *buffer* element type
+is rewritten by `lowerBufferElementTypeToStorageType` (Phase C row
+21) into a storage struct with a single `data` field, whose name is
+built at
+[slang-ir-lower-buffer-element-type.cpp](../../../../source/slang/slang-ir-lower-buffer-element-type.cpp)
+lines 2781-2789 as
+`_MatrixStorage_<element><R>x<C>[_ColMajor][_logical]<layoutRule>`,
+carrying the emitter's uniquing suffix like any other name hint. On
+HLSL the layout rule spells `natural` (line 446), and the rewrite
+happens only when the matrix layout differs from the compile's
+default (lines 2607-2617): a `row_major float3x4` in a
+`ConstantBuffer` emits as
+`struct _MatrixStorage_float3x4natural_0 { float4 data_0[int(3)]; };`
+under the default column-major layout, and the same field declared
+`column_major` emits as `_MatrixStorage_float3x4_ColMajornatural_0`
+under `-matrix-layout-row-major`. A matrix that already matches the
+default layout is not wrapped at all.
+
 ### `legalizeUniformBufferLoad`
 
 Line 2456, inside the `isKhronosTarget || target == HLSL` gate at
@@ -1030,6 +1049,26 @@ sequence recombined by `makeStruct`. Loads of a constant buffer
 whose element type is not a struct are left alone. Splitting the
 load here keeps the emitter from having to spell a whole-buffer
 load, which HLSL has no direct syntax for.
+
+The rewrite *is* visible in the emitted text. `kIROp_MakeStruct` is
+on the emitter's never-fold list
+([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+lines 1535-1541), so the recombined struct cannot be folded into its
+use; it materialises as a local declaration whose initializer is the
+brace-list written at lines 2934-2951, named by the same `_S<N>`
+fallback rule as the wrapper struct above. Reading a whole
+`ConstantBuffer<S>` for `struct S { float4 a; int2 b; float c; }`
+therefore reaches the HLSL text as
+
+```hlsl
+S_0 _S1 = { gCB_0.a_0, gCB_0.b_0, gCB_0.c_0 };
+```
+
+— one member read per field, in field order — never as a
+whole-object copy of the `cbuffer` variable, since the pass has
+already replaced that load. A constant buffer whose element type is
+not a struct, such as `ConstantBuffer<float4>`, keeps its
+whole-object load and its uses read the `cbuffer` variable directly.
 
 ### `legalizeByteAddressBufferOps` for HLSL
 

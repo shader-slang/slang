@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:17:50Z
+intake_at: 2026-08-12T00:00:00Z
 target_doc: ir-reference/types.md
-target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_before: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
 target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
 gap_count: 12
 actions:
-  fixed: 11
+  fixed: 12
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,42 +18,48 @@ actions:
 
 ## Summary
 
-Twelve gaps, all reported by `design/ir-reference/types`. Eleven were confirmed
-in source and fixed; one is deferred. Nothing was escalated — none of the twelve
-turned out to be a compiler defect, and in the one `drift-from-source` case
-(`SPIRVUntypedPtr`) the source agreed with the observation, not with the
-document: the retyping is gated behind the `spvDescriptorHeapEXT` capability
-arm of `defaultGetDescriptorFromHandle`, so a plain `-target spirv` compile
-correctly produces no untyped pointer.
+This is a **re-run** of the gap-intake stage, revisiting the single gap the
+first pass left `deferred`. That gap, `dcbf50926593`, is now `fixed`, so the
+queue of twelve is twelve `fixed` and nothing else — no rejections, no
+deferrals, no escalations. The eleven gaps the first pass already settled were
+not revisited; their verdicts and `Evidence` are carried forward verbatim
+below.
 
-Five of the gaps asked, in different sections, "what does this print in
-`-dump-ir`?". They are answered once, by a new paragraph in the `## Opcodes`
-preamble that states the rule from `shouldFoldInstIntoUses`: every type is
-folded into its use sites and printed as `Mnemonic(operand, ...)`, except the
-four nominal opcodes `struct`, `class`, `GLSLShaderStorageBuffer` and
-`interface`, which get their own line; and only the first three of those are
-also printed with children in braces. Per-section notes then say only what is
-specific to the section.
+Both of the first pass's stated blockers on `dcbf50926593` turned out to be
+false. It said the deciding source — `slang-check-decl.cpp`,
+`slang-ir-translate.cpp`, `slang-ir-autodiff-fwd.cpp` — was outside
+`watched_paths`; `regenerate.py show ir-reference/types.md` now resolves all
+three. It also said `slangc` could not be run on this host; a native
+macOS-arm64 build at `build-arm64/Debug/bin/slangc` (`2026.14.1-80-g6122d03def`)
+compiles and dumps IR fine. Both the source read and three `-dump-ir` runs went
+into the fix.
 
-Two fixes correct claims the document had wrong rather than merely missing.
-`Enum` did **not** encode its cases as child instructions — `createEnumType`
-builds the inst with the tag-type operand alone and `visitEnumCaseDecl` lowers a
-case to an ordinary constant typed by the `Enum`, so there is nothing to walk.
-And `Result` has no AST class and no source spelling at all; it is created by
-the error-handling pass out of a `throws` clause. Both were found by confirming
-the gap's premise against the watched source before writing anything.
+The gap's own premise was the part that held up: the document could not say
+what user-level construct selects a context-type variant. What the compiler
+showed is that the question was mis-framed by the document, not by the gap.
+`Minimal` and ordinary are not competing variants at all — the checker
+synthesizes a `MinimalContext` **and** a `BwdCallable` struct for every
+differentiable function, and both appear as entries of the same
+`IBackwardDifferentiable` witness table. What the surface actually selects is
+the *family* prefix, at semantic-checking time: `[Differentiable]` /
+`[BackwardDifferentiable]` gives the plain pair, `[TreatAsDifferentiable]` the
+`Trivial*` pair, and `[BackwardDerivative(fn)]` / `[BackwardDerivativeOf(fn)]`
+the `FromLegacy*` pair. The document's claim that "the specialization pass"
+chooses "based on whether the propagation strategy needs full state, minimal
+state, or nothing" was therefore wrong on both counts, and is replaced.
 
-Two operator notes. The deferred gap and several confirmations needed source
-outside this page's `watched_paths` (named per row below); and the `## Source`
-paragraph's standing recommendation to add `core.meta.slang` and
-`hlsl.meta.slang` to `watched_paths` is now stale — both are already watched.
+One item outside the gap queue was also corrected, as the operator asked: the
+`## Source` section still recommended adding `core.meta.slang`,
+`hlsl.meta.slang` and `workgraph.slang` to `watched_paths`, which
+`regenerate.py show` resolves as already watched. That paragraph now records
+`source/slang/slang-ir.h.lua` as the one genuinely missing path.
 
 ## Actions
 
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
 | 60366ad2b2ce | fixed | Confirmed in watched `source/slang/core.meta.slang`: `extension intptr_t` / `extension uintptr_t` at lines 1682 and 1692 (under `//@public:` from line 1642), and the typedefs `size_t` / `usize_t` / `ssize_t` at lines 20-24. The names come from the base-type table in `source/slang-core-module/slang-embedded-core-module-source.cpp:107,150`. Both types are shader-reachable; "host-side only" would have been wrong. | added the `intptr_t` / `uintptr_t` spellings to both AST-origin cells and the `size_t` / `ssize_t` aliases to their summaries |
-| dcbf50926593 | deferred | Blocked on `watched_paths`. Which of the `Minimal` / ordinary / `Trivial` context types is used is decided in `source/slang/slang-check-decl.cpp` (~3730, 15165-15270, 19526), `source/slang/slang-ir-translate.cpp:167-232` and `source/slang/slang-ir-autodiff-fwd.cpp:3704,3755` — none of which this page watches, and none of which is reachable from what it does watch (`slang-ir.cpp:3115` only builds the type). A first read also suggests the gap's premise is off: the checker synthesizes the full (`BwdCallable`) and `MinimalContext` structs together for every differentiable function rather than one per user construct, so writing the requested per-variant surface examples would need both a `watched_paths` expansion and a compiler run to verify. I cannot run `slangc` (Linux x86-64 build, arm64 host). | — |
+| dcbf50926593 | fixed | Re-run of a previously `deferred` gap; both stated blockers were false. All three deciding files are now watched (`regenerate.py show ir-reference/types.md` resolves `source/slang/slang-check-decl.cpp`, `source/slang/slang-ir-translate.cpp`, `source/slang/slang-ir-autodiff-fwd.cpp`), and `build-arm64/Debug/bin/slangc` runs natively. Confirmed in watched `slang-check-decl.cpp`: the `BackwardDifferentiableAttribute` arm at `:15142` sets `kIROp_BackwardDiffIntermediateContextType` (`:15169`) and `kIROp_BackwardDiffMinimalContextType` (`:15179`); the `TreatAsDifferentiableAttribute` arm at `:15227` sets the `Trivial*` pair (`:15254,15264`); `translateBwdDerivativeAttributeToAD2` at `:19210` sets the `FromLegacy*` pair (`:19261,19272`). Surface spellings are watched `core.meta.slang:470` (`attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute`), `:451` (`[BackwardDifferentiable]`) and `:131` (`[TreatAsDifferentiable]`). Verified by running `SLANG_ASSERT=release-assert-only build-arm64/Debug/bin/slangc -dump-ir -target hlsl -entry computeMain ctx.slang -o ctx.hlsl` on a shader with `[Differentiable] float f` and `[TreatAsDifferentiable] float g` both called through `bwd_diff`: the dump shows `witness_table_entry(%30,BackwardDiffIntermediateContextType(%f))` and `witness_table_entry(%29,BackwardDiffMinimalContextType(%f))` in one witness table and the `Trivial*` pair in `g`'s, plus `Func(tuple_type(Float, BackwardDiffMinimalContextType(%f)), Float) = BackwardDifferentiatePrimal(%f)` and `Func(BackwardDiffIntermediateContextType(%f), BackwardDiffMinimalContextType(%f), Float) = BackwardRemat(%f)`. The same command on `[BackwardDerivative(h_bwd)]` and on `[BackwardDerivativeOf(k)]` shaders produced `BackwardContextFromLegacyBwdDiffFunc(%h, %h_bwd_diff)` / `BackwardMinimalContextFromLegacyBwdDiffFunc(...)`. The document's "specialization pass chooses" claim is a documentation defect, not a compiler one: `slang-check-decl.cpp:3727-3728` says only the *contents* are decided later. | replaced the §Differentiation types preamble's missing surface with an attribute-to-opcode table for the three families, the both-are-synthesized correction with its witness-table dump lines, and the `apply_bwd` / `remat` / propagate role split; rewrote the contradicting sentence in §`BackwardDiffIntermediateContextType` to match |
 | 4a3bac7372ce | fixed | The gap's premise is false and the document was wrong. Confirmed in watched `slang-lower-to-ir.cpp:12352-12378` (`visitEnumDecl` creates the type from the tag type and adds nothing else), `:12334-12350` (`visitEnumCaseDecl` lowers a case to the value of its tag expression) and `slang-ir.cpp:5337-5342` (`createEnumType` passes only `tagType`). Nothing in `source/` gives an `Enum` inst children; `slang-ir-lower-enum-type.cpp:124-126` confirms a case is an `IRIntLit` *typed by* the enum. The printed form `Enum(Int)` follows from `slang-ir.cpp:7852` (types fold) and is pinned by the bundle test `enum-tag-type.slang`. | rewrote §`Enum` and its table row: cases are neither operands nor children, `P` only means the opcode may hold children, and the type prints as `Enum(Int)` |
 | 77f10c369661 | fixed | Confirmed in watched `slang-ir.cpp:7840-7850` (`InterfaceType` is one of four opcodes excluded from folding) and `:8296-8311` (`dumpInstBody`'s parent-inst special case covers `WitnessTable` / `StructType` / `ClassType` / `GLSLShaderStorageBufferType` / `SPIRVAsm` but **not** `InterfaceType`, so `interface` takes the ordinary `let %I : Type = interface(...)` path), plus `slang-lower-to-ir.cpp:12124-12130` (`createInterfaceType(operandCount, nullptr)` then `setInsertBefore(irInterface)` for the entries). The entry's printed shape is pinned by the bundle test `interface-and-this-type.slang`. | added the generalized printing rule to the `## Opcodes` preamble and a note under §Existentials and interfaces with the `interface_req_entry(%key, Func(Float, this_type(%IShape)))` form; same edit serves 4a3bac7372ce and 173c31f83602 |
 | 173c31f83602 | fixed | Confirmed in watched `source/slang/hlsl.meta.slang`: the six markers are `IBufferDataLayout` implementations at lines 23-71, and `L` is the second generic parameter of `StructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout>` at line 5970, so `lowerSimpleIntrinsicType` (`slang-lower-to-ir.cpp:2885-2908`) puts the marker in operand 1. The printed forms `StructuredBuffer(Float, Std140Layout, ...)` and `RWStructuredBuffer(Float, DefaultLayout, ...)` are pinned by the bundle test `buffer-layout-marker-operands.slang`. | added a paragraph showing `StructuredBuffer<float, Std140DataLayout>` landing in the data-layout operand, plus the `[require(spirv)]` gate on two of the six |

@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:14:06Z
+intake_at: 2026-08-12T06:39:25Z
 target_doc: target-pipelines/hlsl.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 18
 actions:
-  fixed: 15
+  fixed: 16
   rejected_bogus: 1
   rejected_out_of_scope: 1
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,35 +18,33 @@ actions:
 
 ## Summary
 
-Eighteen gaps, all from `docs/generated/tests/design/target-pipelines/hlsl`.
-Nothing was escalated: no gap turned out to be a compiler defect, and every
-observation that was confirmable agreed with the source. Fifteen are fixed,
-one is rejected as bogus (the loops section already states the consequence the
-gap asks for), one is out of scope (the `## Source` line numbers the gap wants
-dropped are mandated by the target-pipeline contract), and one is deferred
-because settling it needs a compiler run this host cannot do. The page now
-stands at 82,772 bytes against its 98,304-byte cap, so the edits had room to
-be explicit.
+This is a **re-run** of the intake for this page, covering the one gap the
+previous cycle left `deferred`. Nothing was escalated. The queue is unchanged
+at eighteen gaps, all from `docs/generated/tests/design/target-pipelines/hlsl`;
+the breakdown is now sixteen fixed, one rejected as bogus, one out of scope,
+and none deferred. Every verdict other than `108e85e927a2` is carried forward
+from the previous report, with its Evidence cell verbatim.
 
-Two gaps anchored on `#phase-d-hlsl-emit-and-downstream-tools` were applied as
-one consolidated edit, a new `### Shape of the emitted file` subsection, since
-both ask what the emitted artifact actually contains. Several fixes say more
-than the gap asked because the source says more: the `and(a, b)` / `or(a, b)`
-answer for `legalizeLogicalAndOr` turns out to be selected by operand shape
-*and* two profile predicates, not by the pass at all; the coverage row now
-distinguishes the CLI bit-width path (`E45113`) from the API byte-width path
-(`E45114`), which the gap conflated; and the `descriptor_handle` row records
-that `_sm_6_6` is the only disjunct of that alias an HLSL target can satisfy.
-One fix says less: gap `8db3a13d2d01` asked for two generated-name shapes, and
-only `_S<N>` belongs to `wrapStructuredBuffersOfMatrices`.
+What changed. `108e85e927a2` moves `deferred` -> `fixed`. Its previous
+deferral rested on two claims that are both false at this HEAD: that no
+`slangc` could be run (a native macOS-arm64 build exists at
+`build-arm64/Debug/bin/slangc`, and `-target hlsl` emits text without a GPU),
+and that `source/slang/slang-ir-legalize-uniform-buffer-load.cpp` is outside
+`watched_paths` (`regenerate.py show target-pipelines/hlsl.md` lists it, along
+with `slang-options.cpp`, `slang-diagnostics.lua`,
+`slang-capabilities.capdef`, `slang-ir-lower-buffer-element-type.cpp` and
+`slang-ir-user-type-hint.cpp` — the manifest expansion the previous report
+asked for has landed, so the "outside `watched_paths`" notes carried forward
+below are historical and no longer blocking). Compiling a whole-object
+`ConstantBuffer<S>` read settles the question: the split load *is* observable
+in the emitted HLSL.
 
-Three fixes rest on files outside this page's `watched_paths` —
-`slang-options.cpp` (CLI spellings), `slang-diagnostics.lua` (diagnostic
-codes), and `slang-capabilities.capdef` (capability aliases). Each is a
-declarative table read directly and cited by line, but the manifest should
-gain those paths so the claims stay tracked. See the Actions rows for
-`0a34a3865c53`, `456356a76d90`, `151da0a0a8be`, `dd82a7558698`, `ea3331936f79`
-and `1b0d1d14d61c`.
+`8db3a13d2d01` stays `fixed`; the previous cycle deliberately wrote only half
+of it because the `_MatrixStorage_` name belongs to a different pass and the
+gap's stated shape was wrong. The real shape is now confirmed by compiling
+one, so the missing half was written into the same section with the correct
+spelling and an explicit attribution to `lowerBufferElementTypeToStorageType`.
+The page stands at 84,752 bytes against its 98,304-byte cap.
 
 ## Actions
 
@@ -57,7 +55,7 @@ and `1b0d1d14d61c`.
 | db73d48479a1 | fixed | `emitNamedMemoryTypeFlagSet` / `emitNamedSemanticFlagSet` in watched `source/slang/slang-emit-hlsl-prelude.cpp:553-580` and `:582-609` each emit `"("` before and `")"` after the flag spelling, independently of the shorthand-vs-joined branch; the call arms are at watched `source/slang/slang-emit-hlsl.cpp:1177-1195`. Both forms are the verified CHECK lines of `barrier-flags-named-constants-emit.slang:41,44`. | added the two verbatim `Barrier(...)` call forms as a fenced block in the barrier bullet, so the per-argument parenthesisation is documented |
 | 056b53499498 | fixed | The form is chosen at emit, not by the pass: watched `source/slang/slang-emit-hlsl.cpp:1262-1288` returns `false` for `as<IRBasicType>` results (falling through to the infix `&&` / `\|\|` at watched `source/slang/slang-emit-c-like.cpp:2605-2616`) and otherwise writes `and(` / `or(`, but only when `m_effectiveProfile.getVersion() >= DX_6_0` and `isTargetHLSL2018`. Matrix case reaches emit as the `MakeArray` built at watched `source/slang/slang-ir-legalize-binary-operator.cpp:246-291`. | added a three-bullet list giving the emitted form per operand shape (scalar infix, vector `and()` / `or()` behind two profile predicates, lowered matrix per-row inside an array construction) |
 | 55797498c6d9 | fixed | `addDefaultPayloadAccessQualifiersToField` in watched `source/slang/slang-ir-hlsl-legalize.cpp:91-122`: returns early when both sides are present, and fills only the missing side with the literal stage list `caller, anyhit, closesthit, miss` built at `:99-104`. Matches the CHECK67-DAG lines of `raypayload-access-qualifiers-sm67.slang:40,42` and its CHECK66-NOT contrast. | added a before/after payload example showing `read(caller)` preserved and the `write(...)` side filled with the full stage list, plus the SM 6.6 no-qualifier contrast |
-| 108e85e927a2 | deferred | The pass body (`source/slang/slang-ir-legalize-uniform-buffer-load.cpp:29-49`) confirms the IR rewrite but says nothing about emit, and the file is outside this page's `watched_paths`. Whether the `makeStruct` survives to text depends on the later `simplifyForEmit` / DCE, so answering "is it observable" requires running `slangc` on a whole-object `ConstantBuffer<S>` read — impossible here (the tree's build is Linux x86-64, the host is arm64). No bundle test anchors `#legalizeuniformbufferload`. Needs a test written against that shape first. | — |
+| 108e85e927a2 | fixed | Settled by compiling, reversing the previous cycle's deferral. `SLANG_ASSERT=release-assert-only build-arm64/Debug/bin/slangc -target hlsl -profile sm_6_6 -stage compute -entry main <tmp>.slang` on `struct S { float4 a; int2 b; float c; }` + `ConstantBuffer<S> gCB;` + `S local = gCB;` emits `S_0 _S1 = { gCB_0.a_0, gCB_0.b_0, gCB_0.c_0 };` — one member read per field, in field order. A second run adding `ConstantBuffer<float4> gVec;` shows the non-struct element type is skipped (its use emits `gVec_0.y` directly), matching the `as<IRStructType>` continue at watched `source/slang/slang-ir-legalize-uniform-buffer-load.cpp:34-36`. Why it survives to text: `kIROp_MakeStruct` is on the never-fold list at watched `source/slang/slang-emit-c-like.cpp:1535-1541` ("we currently lower them to initializer lists"), so it must materialise as a declaration, and the brace-list is written at `:2934-2951`; the `_S<N>` name is the no-name-hint fallback at `:1290-1292`. `slang-ir-legalize-uniform-buffer-load.cpp` is now inside `watched_paths` per `regenerate.py show target-pipelines/hlsl.md`. | added a paragraph and a one-line `hlsl` block stating the split load is observable, giving the emitted per-field initializer form, the never-fold reason it cannot be folded away, and the non-struct-element exception |
 | 7f177d41fca4 | rejected-bogus | The document already states the consequence the gap's suggested addition asks for. `## Loops in the pipeline` reads: "There is also no HLSL legalization driver function to host such a loop; HLSL relies on the downstream DXC / fxc compiler for further optimization. DXC and fxc have their own optimization loops, but those are out of scope." The remaining half of the suggestion ("the emitted text is deliberately un-simplified relative to SPIR-V") is a comparative claim with no support in the watched paths, and the `## Loops in the pipeline` section is mandated as pipeline-structure material by `docs/generated/design/_meta/prompts/_common.md:345-348`. | — |
 | 0a34a3865c53 | fixed | CLI spelling `-fspv-reflect` at `source/slang/slang-options.cpp:898-901`. The "no HLSL artifact" half is confirmed in watched paths by absence: `IRUserTypeNameDecoration` (added at `source/slang/slang-ir-user-type-hint.cpp:30`) has no handler anywhere in watched `source/slang/slang-emit-hlsl.cpp` or `slang-emit-c-like.cpp`; its only emit consumer is `source/slang/slang-emit-spirv.cpp:6843-6853`. **`slang-options.cpp` is outside `watched_paths`.** | added `-fspv-reflect` and the statement that the decoration leaves nothing in emitted HLSL to the `VulkanEmitReflection` row |
 | 456356a76d90 | fixed | CLI spelling `-embed-downstream-ir` at `source/slang/slang-options.cpp:1218-1221`. The artifact question is answered in watched `source/slang/slang-emit.cpp:707-752`: the pass only removes `IRPublicDecoration` / `IRDownstreamModuleExportDecoration` from functions whose signature mentions `kIROp_HLSLStructuredBufferType` or `kIROp_MatrixType`; neither decoration has an HLSL spelling. **`slang-options.cpp` is outside `watched_paths`.** | added `-embed-downstream-ir` and the statement that the pass narrows the embedded-IR export set without changing emitted HLSL text |
@@ -69,4 +67,4 @@ and `1b0d1d14d61c`.
 | ea3331936f79 | fixed | `alias node = _node + _sm_6_8;` at `source/slang/slang-capabilities.capdef:1532`, whose own doc comment reads "requires SM 6.8 or later". The predicate is at watched `source/slang/slang-emit-hlsl.cpp:437`. So in a capability-checked compile the version test is already satisfied and the `node` disjunct cannot decide. **`slang-capabilities.capdef` is outside `watched_paths`.** Existing line number 438 left untouched to avoid an inconsistency with the other reference to the same site. | added a note to the third profile-predicate row that the `node` disjunct is defensive, since the `node` atom conjoins `_sm_6_8` |
 | 20f31c85247b | rejected-out-of-scope | The line numbers the gap wants dropped are required by the contract this page was generated from: the Target-pipeline page contract in `docs/generated/design/_meta/prompts/_common.md:299-305` says `## Source` must "Cite the line numbers of the relevant entry points (`linkAndOptimizeIR`, the per-target `emit*ForEntryPoints*`, the per-target `legalize*`)". Staleness of those numbers is handled by the `watched_paths_digest` / `mark-fresh` regeneration cycle, not by softening the page. | — |
 | dd82a7558698 | fixed | `invalid-barrier-semantic-flags-value` = id `31116` and `invalid-barrier-memory-type-flags-value` = id `31117` at `source/slang/slang-diagnostics.lua:2657-2670`, with the hex-value message text on `:2662` and `:2669`. The memory-type message is the verified CHECK of `barrier-flags-invalid-memory-type-diag.slang:33`, and the reporting agent observed the same two codes. Emitter side confirmed in watched `source/slang/slang-ir-hlsl-legalize.cpp:69-89`. **`slang-diagnostics.lua` is outside `watched_paths`.** | named E31117 / E31116 in the `validateBarrierFlagsForHLSL` section and quoted the message shape listing the spellable bits with hex values |
-| 8db3a13d2d01 | fixed | `_S<instID>` is the emitter's fallback name for an instruction with no name hint, at watched `source/slang/slang-emit-c-like.cpp:1290-1292` (with the `startsWith("_S")` collision guard at `:1003`); the emitted shape is the verified CHECK of `wrap-structured-buffer-of-matrix.slang:31-33`. The `_MatrixStorage_*` half was deliberately **not** written here: that name is built by `lowerBufferElementTypeToStorageType` (`source/slang/slang-ir-lower-buffer-element-type.cpp:2778-2790`, Phase C row 21, outside `watched_paths`), it is not produced by this pass, and its real shape is `_MatrixStorage_<elem><R>x<C>[_ColMajor][_logical]<layoutRule>`, not the `<spelling>natural_<N>` the gap states. | added the `_S<N>` fallback-naming rule and a before/after `RWStructuredBuffer<float4x4>` shape to `wrapStructuredBuffersOfMatrices`, noting the rule is general to anonymous synthesized structs |
+| 8db3a13d2d01 | fixed | `_S<instID>` is the emitter's fallback name at watched `source/slang/slang-emit-c-like.cpp:1290-1292`; compiling `RWStructuredBuffer<float4x4> outBuf;` with `build-arm64/Debug/bin/slangc -target hlsl -profile sm_6_6 -stage compute -entry main` emits `struct _S1 { float4x4 _S2; };` and `RWStructuredBuffer<_S1 > outBuf_0 : register(u0);`, confirming the shape already written. The `_MatrixStorage_` half is a *different* pass and the gap's `<spelling>natural_<N>` was misattributed; the name is built at watched `source/slang/slang-ir-lower-buffer-element-type.cpp:2781-2789` as `_MatrixStorage_<elem><R>x<C>[_ColMajor][_logical]<layoutRule>`, with `natural` from `getLayoutName` at `:446` and the wrap gated on a non-default layout at `:2607-2617`. Compiling `struct M { row_major float3x4 m; float4 pad; }` in a `ConstantBuffer` emits `struct _MatrixStorage_float3x4natural_0 { float4 data_0[int(3)]; };`; the same field spelled `column_major` under `-matrix-layout-row-major` emits `_MatrixStorage_float3x4_ColMajornatural_0`. | previously added the `_S<N>` fallback rule and the `RWStructuredBuffer<float4x4>` before/after; this cycle added the `_MatrixStorage_` paragraph with the confirmed shape, its correct owning pass, and both compiled spellings |

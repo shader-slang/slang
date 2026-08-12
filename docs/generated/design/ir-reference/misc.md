@@ -171,7 +171,24 @@ comes from lowering a call to a core-module declaration carrying
 | `allocTorchTensor` | `IRAllocateTorchTensor` | (variadic) | | core-module `TorchTensor<T>::alloc` / `emptyLike` | Allocates a Torch tensor host-side; operands are the extents (or the tensor to imitate). |
 | `TorchGetCudaStream` | `IRTorchGetCudaStream` | — | | `generateCppBindingForFunc` in the PyTorch binding pass ([slang-ir-pytorch-cpp-binding.cpp](../../../../source/slang/slang-ir-pytorch-cpp-binding.cpp) line 465) | Returns the current Torch CUDA stream, typed `Ptr<void>`. |
 | `TorchTensorGetView` | `IRTorchTensorGetView`‡ | (variadic) | | core-module `TorchTensor<T>::getView`, `TensorView<T>` converting `__init` | Produces a `TensorView` over the Torch tensor in its single operand. |
-| `allocateOpaqueHandle` | `IRAllocateOpaqueHandle` | — | | core-module `RayQuery::__init` / `HitObject::__init` | Materializes a fresh opaque handle for a type with no constructor expression. |
+| `allocateOpaqueHandle` | `IRAllocateOpaqueHandle` | — | | core-module `RayQuery::__init` / `HitObject::__init` | Materializes a fresh opaque handle; the Lua entry names no operand, and the call site passes exactly one, the destination the handle is materialized into. |
+
+`allocateOpaqueHandle` is emitted by lowering but never reaches a
+`-dump-ir` snapshot. Because `RayQuery` and `HitObject` are
+`[__NonCopyableType]`, `maybeAddReturnDestinationParam`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+lines 4238-4251) gives their `__init` a trailing return-destination
+parameter, which sets `returnViaLastRefParam` (line 4784); the call
+site then passes that destination as the inst's single operand and
+retypes the result `void` (lines 5714-5741). A `void` result can have
+no users, and `kIROp_AllocateOpaqueHandle` is on the no-side-effects
+list in `IRInst::mightHaveSideEffects`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 9670), so
+the mandatory `eliminateDeadCode` that `generateIRForTranslationUnit`
+runs over every function (lines 15621-15625) — ahead of the
+`LOWER-TO-IR` dump at line 15797 — always deletes it. Both
+`RayQuery<0> q;` and `RayQuery<0> q = RayQuery<0>();` build the inst
+during lowering, and neither shows it in any dumped pass.
 
 ### Pack and expansion
 

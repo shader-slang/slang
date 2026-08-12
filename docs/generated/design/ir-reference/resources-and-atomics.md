@@ -246,6 +246,18 @@ in between — the opposite of the wrapper cases collected under
 | `GetPerVertexInputArray` | `IRGetPerVertexInputArray` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11700 | Array view of a `nointerpolation` input across the primitive's vertices. |
 | `ResolveVaryingInputRef` | `IRResolveVaryingInputRef` | `[attribute]` | H | `__intrinsic_op`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11697 | Placeholder reference to a varying input, rewritten to the real parameter by varying-param legalization. |
 
+The last two rows share one user surface:
+`GetAttributeAtVertex(attribute, vertexIndex)`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 11733),
+called from a `fragment` entry point on an input declared
+`nointerpolation`. Which of the two opcodes you get is a target
+decision, not a source one: the function's `__target_switch` produces
+`ResolveVaryingInputRef` on its own for `hlsl` (which has its own
+`GetAttributeAtVertex` to emit), and wraps that reference in
+`GetPerVertexInputArray` before subscripting it for `glsl` / `spirv`.
+The `fragment` requirement is enforced by capability checking — the
+same call in a `vertex` entry point is rejected with `E36107`.
+
 ### Mesh-shader outputs
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -405,6 +417,32 @@ stay as core-module calls until backend emit.
 | `setOptiXPayloadRegister` | `IRSetOptiXPayloadRegister` | `[registerIndex]`, `[value]` | | [slang-ir-legalize-varying-params.cpp](../../../../source/slang/slang-ir-legalize-varying-params.cpp) lines 1547-1624 | Writes one 32-bit OptiX payload register. |
 | `GetVulkanRayTracingPayloadLocation` | `IRGetVulkanRayTracingPayloadLocation` | `[payload]` | | `__intrinsic_op` on `__callablePayloadLocation`, [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 19599 | Location index assigned to a Vulkan raytracing / callable payload. |
 
+What produces `getOptiXSbtDataPointer` is *where* a uniform is
+declared, not how large it is. Only an entry-point `uniform`
+**parameter**, on a stage other than compute, is collected into the SBT
+record; one scalar is enough:
+
+```slang
+struct Payload { float3 color; };
+
+[shader("closesthit")]
+void ch(inout Payload p, uniform float scale)
+{
+    p.color = float3(scale, scale, scale);
+}
+```
+
+With `-target cuda -stage closesthit -entry ch`, the opcode first
+appears in the dump after `collectOptiXEntryPointUniformParams`, as
+`getOptiXSbtDataPointer` typed
+`ConstantBuffer(%ShaderRecordParams, DefaultLayout)`, and the emitted
+CUDA reads
+`((ShaderRecordParams_0*)optixGetSbtDataPointer())->scale_0`. Two
+nearby shapes do *not* produce it: a module-scope `uniform` global
+becomes an ordinary `global_param` read out of the CUDA global
+parameter block, and a `compute` entry point is skipped by the pass —
+its `uniform` parameter becomes a kernel launch argument.
+
 ### Descriptor heaps
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
@@ -415,6 +453,32 @@ stay as core-module calls until backend emit.
 | `SPIRVLoadTexelPointerFromHeap` | `IRSPIRVLoadTexelPointerFromHeap` | `heap, index, textureType, coord, sampleIndex` | | `IRBuilder::emitSPIRVLoadTexelPointerFromHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1482 | Forms a texel pointer directly from a heap descriptor so an atomic can target a bindless image. |
 | `SPIRVResourceHeap` | `IRSPIRVResourceHeap` | — | H | `IRBuilder::emitSPIRVResourceDescriptorHeap` from [slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 1854 | The implicit SPIR-V resource-descriptor array. Note the builder helper is named `emitSPIRVResourceDescriptorHeap`, not `emitSPIRVResourceHeap`. |
 | `SPIRVSamplerHeap` | `IRSPIRVSamplerHeap` | — | H | `IRBuilder::emitSPIRVSamplerDescriptorHeap` from the same site, line 1858 | The implicit SPIR-V sampler-descriptor array. |
+
+The surface behind every row here is `DescriptorHandle<T>`: each
+dereference of one goes through `defaultGetDescriptorFromHandle`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+27708-27807), whose `__target_switch` chooses the heap form. On SPIR-V
+the choice is made by a capability, not by the shader text. Compiled
+with `-capability spvDescriptorHeapEXT`, the `spvDescriptorHeapEXT`
+case (line 27797) returns
+`__spirvLoadDescriptorFromHeap(__spirvResourceHeap(), i)`, or
+`__spirvSamplerHeap()` for `DescriptorKind.Sampler` — so the two heap
+opcodes are *core-module* intrinsics (lines 27685 and 27688) that are
+in the IR from linking onward, not things SPIR-V legalization invents.
+Without that capability the same shader falls to the plain `spirv`
+case and uses `GetDynamicResourceHeap` instead; the emitted binary
+names `slang_resourceHeap` / `slang_samplerHeap` and requests
+`SPV_EXT_descriptor_heap` in the first case, and `__slang_resource_heap`
+in the second.
+
+SPIR-V legalization is the second producer, reached only from the
+combined-texture-sampler arm of that same branch:
+`processMakeCombinedTextureSamplerFromHandle` expands
+`MakeCombinedTextureSamplerFromHandle` into one load from each of the
+two heaps. `SPIRVLoadTexelPointerFromHeap` has no other producer at
+all. Neither is visible under `-dump-ir`: `legalizeIRForSPIRV` runs
+from [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)
+line 12131, inside emit, after the last dump point.
 
 The conversions between descriptor handles and integers
 (`CastUInt2ToDescriptorHandle`, `CastDescriptorHandleToUInt64`,

@@ -511,8 +511,35 @@ requiring it can still be ranked; it only fails when the checker asks
 for the coerced expression, at which point
 `Diagnostics::AmbiguousConversion` plus one `SeeDeclarationOf` note per
 tied initializer is emitted ([slang-check-conversion.cpp lines
-2677-2699](../../../../source/slang/slang-check-conversion.cpp)). The
-full enum, in source-declaration order:
+2677-2699](../../../../source/slang/slang-check-conversion.cpp)).
+
+Two initializers with *different* parameter types can only tie at an
+explicit coercion site. `_coerce` sets `disallowNestedConversions` for
+every site other than `CoercionSite::ExplicitCoercion`
+([slang-check-conversion.cpp line
+2579](../../../../source/slang/slang-check-conversion.cpp)), and that
+flag makes argument matching demand an exact parameter/argument type
+([slang-check-overload.cpp line
+898](../../../../source/slang/slang-check-overload.cpp)), so at an
+implicit site at most one initializer can apply. A cast, or a
+single-argument call written on the type name, routes to `_coerce`
+with `ExplicitCoercion` instead ([slang-check-overload.cpp line
+3443](../../../../source/slang/slang-check-overload.cpp)), and it is
+the nested conversions that then become legal which can tie:
+
+```slang
+struct T { __init(int v) {} __init(uint v) {} }
+void f(float x) { T t = T(x); } // ambiguous conversion from 'float' to 'T'
+```
+
+`float` -> `int` and `float` -> `uint` are both
+`kConversionCost_GeneralConversion`, and two `__init` declarations in
+one `struct` are indistinguishable to the comparator below, so neither
+candidate is dropped and both are named in the diagnostic. Making the
+argument an `int` removes the ambiguity (the exact match costs 0);
+writing `T t = x;` instead is an implicit site, where neither
+initializer matches `float` exactly and the failure is an ordinary
+type mismatch. The full enum, in source-declaration order:
 
 | Constant | Numeric | Meaning |
 | --- | --- | --- |

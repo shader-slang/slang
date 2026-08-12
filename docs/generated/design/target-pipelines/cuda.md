@@ -705,13 +705,28 @@ their own emit arms and are **out of scope** for this page:
   (see [../ast-reference/expressions.md](../ast-reference/expressions.md))
   — and `generateCUDAWrapperForFunc` (line 1009), which emits one
   into the host wrapper it generates for each `[AutoPyBindCUDA]`
-  kernel (line 1064). Neither normally survives to CUDA text: on
-  the PyTorch arm `generateCppBindingForFunc` rewrites every
-  `IRDispatchKernel` into `kIROp_CudaKernelLaunch` before emit
-  (lines 438-462), and on the `CUDASource` / `CUDAHeader` arm no
-  wrapper is generated at all while `removeTorchKernels` deletes
-  the `[TorchEntryPoint]` host functions a hand-written dispatch
-  would live in.
+  kernel (line 1064). On the PyTorch arm neither survives to text:
+  `generateCppBindingForFunc` rewrites every `IRDispatchKernel`
+  into `kIROp_CudaKernelLaunch` before emit (lines 438-462), so
+  `-target torch` emits `AT_CUDA_CHECK(cudaLaunchKernel(...))` and
+  no `<<<`.
+
+  On the `CUDASource` / `CUDAHeader` arm it does survive. A
+  hand-written `__dispatch_kernel` in an ordinary
+  `[shader("compute")]` entry point is not a `[TorchEntryPoint]`,
+  so `removeTorchKernels` never sees it, and `-target cuda` emits
+  the launch verbatim:
+
+  ```
+  myKernel_0<<<make_uint3 (1U, 1U, 1U), make_uint3 (32U, 1U, 1U)>>>()
+  ```
+
+  Note the operand order inverts. The surface is
+  `__dispatch_kernel(fn, dispatchSize, threadGroupSize)`
+  ([slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
+  lines 3225-3227), while `<<<...>>>` takes CUDA's grid-then-block
+  pair — so the call above was written with `dispatchSize` of
+  `uint3(32,1,1)` and `threadGroupSize` of `uint3(1,1,1)`.
 - **OptiX** — OptiX never has its own `CodeGenTarget` value: it
   runs through `CUDASource` / `CUDAHeader` / `PTX` and is selected
   by *stage*, not by a target switch. The `raytracing` capability

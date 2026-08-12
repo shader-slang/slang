@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:23:56Z
+intake_at: 2026-08-12T06:38:42Z
 target_doc: ir-reference/decorations.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 11
 actions:
-  fixed: 7
+  fixed: 8
   rejected_bogus: 2
   rejected_out_of_scope: 1
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,43 +18,42 @@ actions:
 
 ## Summary
 
-Eleven gaps, all reported by `design/ir-reference/decorations`. Seven were
-confirmed in the watched paths and fixed: the `ForceUnroll` operand and
-loop-statement-only placement, the `requireCapabilityAtom` producer, the
-`entryPoint` profile-tag encoding, the `interpolationMode` value mapping, the
-quoted-string `format` argument, the `constructor` boolean operand, and the
-real origin of `BuiltinDecoration`. Two were rejected as bogus after reading
-the source: `streamOutputTypeLayout` is a separate `TypeLayout` opcode rather
-than a second spelling of `streamOutputTypeDecoration`, and `[vk_location(N)]`
-*is* a writable spelling (the parser folds `vk::location` onto it) — though
-that row was still improved to lead with the spelling users actually write.
-One is out of scope (per-target emit behaviour is forbidden content for this
-page) and one is deferred because it can only be settled by running the
-compiler. No gap turned out to be a compiler defect, so nothing was escalated.
+This is a re-run of the intake for this page, revisiting the single gap
+the first pass deferred; the ten other verdicts and their Evidence are
+carried forward unchanged. `901ca639c751` was deferred on the premise
+that only a `-dump-ir` run could settle it and that this host could not
+run the compiler. That premise was wrong: a native macOS-arm64 `slangc`
+built from the same compiler source as `HEAD` is present, and it shows
+the decoration plainly, so the gap moves from `deferred` to `fixed` and
+the deferred count drops to zero. The action breakdown is now eight
+fixed, two rejected as bogus, one rejected as out of scope, none
+deferred, and none escalated.
 
-Two `Suggested addition` hypotheses were wrong in a way that mattered and were
-not written as proposed. `320bf7714a3d` proposed a stage-to-tag table; the tag
-is a `Profile::RawVal` whose low 16 bits happen to be the stage, so a
-stage-only table would have been a documented half-truth. `bd7183d2d708`
-asserted `BuiltinDecoration` sits on "nearly every core-module declaration";
-the sole producer attaches it only to `interface` declarations carrying
-`[builtin]`, of which there are 18 across the two `.meta.slang` files.
+The dump contradicted the gap's own report as well as the deferral. The
+gap said neither an entry-point `uniform` nor a global `uniform`
+produced the decoration in any snapshot; both do, on every text target
+tried. What the earlier observation most likely hit is the
+`LOWER-TO-IR` snapshot, which cannot contain the struct because both
+producing passes run during target lowering — that timing is now stated
+in the page so the next reader does not repeat the search.
 
-## Manifest follow-up for the operator
+Two `Suggested addition` hypotheses from the first pass were wrong in a
+way that mattered and were not written as proposed; those verdicts are
+unchanged. `320bf7714a3d` proposed a stage-to-tag table; the tag is a
+`Profile::RawVal` whose low 16 bits happen to be the stage, so a
+stage-only table would have been a documented half-truth.
+`bd7183d2d708` asserted `BuiltinDecoration` sits on "nearly every
+core-module declaration"; the sole producer attaches it only to
+`interface` declarations carrying `[builtin]`, of which there are 18
+across the two `.meta.slang` files.
 
-Two claims this page now makes, and one it should make, rest on files outside
-`watched_paths`:
-
-- `source/slang/slang-profile.h` — owns the `Profile::RawVal` layout
-  (`(ProfileVersion << 16) | Stage`) that the new `entryPoint` callout cites.
-  The page cannot detect drift in that encoding today.
-- `source/slang/slang-ir-glsl-legalize.cpp` — is the *second* producer of
-  `requireCapabilityAtom` (line 5077, on the module inst) and the *only*
-  producer of `streamOutputTypeDecoration` (line 4076). The page already cites
-  this file in four rows without watching it. Adding it would let the
-  `streamOutputTypeDecoration` row name its real producer instead of the
-  current "Geometry shader output declaration", which is the underlying reason
-  a reader searching an HLSL dump finds nothing.
+The first pass also flagged `source/slang/slang-profile.h`,
+`source/slang/slang-ir-glsl-legalize.cpp`,
+`source/slang/slang-ir-entry-point-uniforms.cpp` and
+`source/slang/slang-ir-collect-global-uniforms.cpp` as cited but
+unwatched. All four are in `watched_paths` at `HEAD`
+(`regenerate.py show ir-reference/decorations.md`), so that follow-up is
+closed and the new `901ca639c751` text cites a watched path.
 
 ## Actions
 
@@ -70,4 +69,4 @@ Two claims this page now makes, and one it should make, rest on files outside
 | 69f3396b03eb | rejected-bogus | These are two distinct opcodes, not two spellings of one. `source/slang/slang-ir-insts.lua:2081-2084` declares the decoration `streamOutputTypeDecoration`; `source/slang/slang-ir-insts.lua:2888` declares `streamOutputTypeLayout` under `TypeLayout`, wrapped by `IRStreamOutputTypeLayout : IRTypeLayout` at `source/slang/slang-ir-insts.h:1406-1424`. What `stream-output-type-decoration.slang` matched is the type-layout inst. The decoration itself is produced only by `source/slang/slang-ir-glsl-legalize.cpp:4076`, so an `-target hlsl` dump cannot contain it. | — |
 | bd7183d2d708 | fixed | `source/slang/slang-ir-insts.h:5341` is the only definition of `addBuiltinDecoration` and `source/slang/slang-lower-to-ir.cpp:12322-12325` its only caller, inside `visitInterfaceDecl` (line 12073) under `decl->findModifier<BuiltinAttribute>()`. `[builtin]` is declared at `source/slang/core.meta.slang:4874-4875`; all 12 uses in `core.meta.slang` and all 6 in `hlsl.meta.slang` are on `interface` declarations, including `IBufferDataLayout` at `source/slang/hlsl.meta.slang:22-24`, which is the default layout constraint of `RWStructuredBuffer` (`hlsl.meta.slang:74`). | narrowed the row from "Core-module lowering" / "an inst" to the `[builtin]` attribute on an `interface`, and named `IBufferDataLayout` as the case ordinary code links in |
 | 93335aeba9c7 | fixed | `source/slang/slang-ir-insts.h:895-901` — `IRConstructorDecoration::getSynthesizedStatus()` reads `cast<IRBoolLit>(getOperand(0))`; `source/slang/slang-ir-insts.h:4884-4887` — `addConstructorDecoration(IRInst*, bool synthesizedConstructor)`; sole caller `source/slang/slang-lower-to-ir.cpp:14302-14305` passes `constructorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault)`. | replaced the retired `(variadic, min=1)` cell with `(1 unnamed: an `IRBoolLit`, read by `getSynthesizedStatus()`)` and said `true` marks the compiler-synthesized default rather than a user-written `__init` |
-| 901ca639c751 | deferred | Both producers are outside `watched_paths` — `source/slang/slang-ir-entry-point-uniforms.cpp:550` and `source/slang/slang-ir-collect-global-uniforms.cpp:157` — and the gap asks for a program plus target/options that demonstrably *reaches* one of them. Deciding which entry-point-`uniform` or global-`uniform` shape actually triggers collection requires running `slangc -dump-ir`, which this host cannot do (the tree's build is Linux x86-64, host is arm64). Follow-up: add both files to `watched_paths` and settle the reachable case on a machine that can run the compiler. | — |
+| 901ca639c751 | fixed | Re-run: settled by running the compiler, which the first pass wrongly believed impossible. `build-arm64/Debug/bin/slangc` (`-version` `2026.14.1-80-g6122d03def`; `git diff --stat 6122d03def HEAD -- source/ include/` is empty, so its compiler source is `HEAD`'s). With `SLANG_ASSERT=release-assert-only`, `slangc -dump-ir -target hlsl -entry computeMain -o out.hlsl x.slang` on a `[shader("compute")] [numthreads(1,1,1)] void computeMain(uniform float scale, uint3 tid : SV_DispatchThreadID)` writing `outBuf[tid.x] = scale` prints `[synthesizedParameterGroup]` on `struct %EntryPointParams` in the `AFTER collectEntryPointUniformParams` snapshot and in all later ones; moving `scale` to a file-scope `uniform float scale` prints it on `struct %GlobalParams` from `AFTER collectGlobalUniformParameters` onward. Both agree with the watched producers `source/slang/slang-ir-entry-point-uniforms.cpp:550` (`ensureCollectedParamAndTypeHaveBeenCreated`) and `source/slang/slang-ir-collect-global-uniforms.cpp:157`. Neither appears in the `LOWER-TO-IR` snapshot, because `slang-emit.cpp:1231` and `1275` run both passes during target lowering. The ordinary-data precondition is `source/slang/slang-ir-collect-global-uniforms.cpp:120-122`, confirmed by a control program whose only globals are `RWStructuredBuffer` and `Texture2D`: zero matches in the whole dump. Same counts on glsl, spirv, metal and wgsl. | added a second paragraph to the `synthesizedParameterGroup` callout giving the reachable entry-point and global spellings with their target and options, the ordinary-data precondition on global collection, and the note that both structs are absent from the `LOWER-TO-IR` snapshot |

@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:17:17Z
+intake_at: 2026-08-12T06:40:40Z
 target_doc: ir-reference/metadata.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 14
 actions:
-  fixed: 13
+  fixed: 14
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,35 +18,39 @@ actions:
 
 ## Summary
 
-Fourteen gaps, all reported by `design/ir-reference/metadata`. Thirteen were
-confirmed in the watched paths and fixed; one is deferred because the only
-source that can settle it sits outside this document's `watched_paths`.
-Nothing was escalated: no gap turned out to be a compiler defect. The one
-`drift-from-source` gap (`DebugFunction`'s operand count) resolved in the
-observation's favour — `slang-ir-insts.h` and `IRBuilder::emitDebugFunction`
-both describe the optional sixth operand, so the document was simply stale.
+This is a re-run of the gap-intake stage covering the single gap the
+previous cycle deferred, `028643968b5f` (the `nonuniform` attribute); the
+other thirteen verdicts and their evidence are carried forward unchanged.
+That gap is now `fixed`, so the breakdown is fourteen `fixed` and nothing
+deferred, rejected or escalated. Two things had changed since the previous
+cycle: `slang-ir-specialize-function-call.cpp` has been added to this
+document's `watched_paths`, and a native `slangc` was in fact available, so
+the question the previous cycle could not answer — whether the attribute
+survives into a dumped module — was settled by compiling a shader that
+reaches the producing code.
 
-Two fixes are generalized rather than local, as the gaps were repeats of one
-observation. The three debug-info gaps that each asked about one record's
-availability are answered once, by a paragraph in `### Debug info family`
-stating the whole `DebugInfoLevel` → records mapping; the individual rows only
-carry the one-clause consequence. Likewise the two SPIR-V-asm gaps and the two
-`size` / `offset` encoding gaps are each one edit. Several fixes say more than
-the gap asked because the source did: the `DebugFunction` parent scope is also
-absent for `#include`d sources, not only at `-g1`; `MemoryScope` reaches loads
-as well as stores; and the `LayoutSize` encoding has a second sentinel (`-2`,
-invalid) beside the `-1` the gap named.
+The compiler run answered it in the gap's favour but for a reason the gap's
+suggested wording did not state, so the wording written into the document is
+not the suggested one. The attribute is created (line 618) and immediately
+wrapped in a real interned `Attributed` type (line 621), but that type only
+ever becomes an entry in an `IRSimpleSpecializationKey`, which is a plain
+`List<IRInst*>` used as a `Dictionary<Key, IRFunc*>` lookup — never an
+operand of an emitted instruction. `nonuniform` is therefore a write-only
+value: it has one producer and, at HEAD, no reader anywhere in the tree. Its
+only observable effect is that two call sites differing only in a
+`NonUniformResourceIndex` specialize into two distinct functions with
+identical signatures, which is what the new callout shows.
 
-The document's `## Manifest coverage` section was refreshed as part of these
-edits: `core.meta.slang` and `slang-compiler-tu.cpp` have since been added to
-`watched_paths` and no longer belong on its unwatched list, while the new
-enumerator-value and option-spelling citations do.
+The `## Manifest coverage` section was corrected in the same edit: it still
+listed `slang-ir-specialize-function-call.cpp` as unwatched and said the page
+"cannot say what a reader is expected to write to obtain a `nonuniform`
+attribute", both of which are now false.
 
 ## Actions
 
 | Gap ID       | Action   | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                | Fix summary                                                                                                                       |
 | ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| 028643968b5f | deferred | The only producer is `source/slang/slang-ir-specialize-function-call.cpp:618`, which is not in `watched_paths`. Watched sources give only the negative: `core.meta.slang` declares no `__intrinsic_op` for `kIROp_NonUniformAttr` and `slang-lower-to-ir.cpp` never creates one, so no user syntax lowers to it. The gap's further claim that it is "never present in a dumped module" is not safe to write either: line 621 wraps it in a real `IRBuilder::getAttributedType` inst that is interned into the module, so whether it survives into a dump needs a compiler run, which this host cannot do (Linux x86-64 build, arm64 host). Needs the specialization file added to `watched_paths`. | —                                                                                                                                 |
+| 028643968b5f | fixed    | `slang-ir-specialize-function-call.cpp` is now watched. Confirmed there: 618 creates the attr, 678 (`findNonuniformIndexInst`) is the trigger, 621 wraps it in an `Attributed` type, 622 adds that type to `ioInfo.key.vals`; the key is used only at 335/384/402 as a `Dictionary<Key, IRFunc*>` lookup, and `grep -rn NonUniformAttr source/ include/` finds no reader at all. Settled by compiling `ConstantBuffer<Params> gCB[64]` with `f(gCB[NonUniformResourceIndex(i)]) + f(gCB[i])`: `slangc -target spirv -dump-ir` gives 81 pass dumps with 0 occurrences of `nonuniform` and 0 of `Attributed` (114 of `nonUniformResourceIndex`), and `-dump-ir-after specializeResourceUsage` shows `func %f` and `func %f1`, both `Func(Vec(Float, 4 : Int), UInt)`. | named the surface shape and added a `### nonuniform` callout on the key-only, never-dumped attribute; corrected `## Manifest coverage` |
 | bfb77d573b0f | fixed    | Confirmed in watched `source/slang/core.meta.slang`: `__align_attr` (1516) and `__memoryscope_attr` (1557) are `internal` and under `//@hidden:`; the public wrappers are `loadAligned` (1536), `storeAligned` (1550), `storeCoherent` (1573) and `loadCoherent` (1586), the coherent pair carrying `[require(SPV_KHR_vulkan_memory_model)]` at 1570 and 1582. Watched `slang-emit-spirv.cpp:8793` asserts the Vulkan memory model when a `MemoryScope` reaches emit. | replaced the `__*_attr` citations with the public wrappers, added a capability paragraph, and corrected the `emitLoad`/`emitStore` line numbers |
 | a43e4751357e | fixed    | Confirmed in watched `source/slang/slang-ir-insts.h:1645` — `IRStageAttr::getStage()` returns `Stage(getIntVal(getStageOperand()))`, so the literal is a `Slang::Stage` enumerator. The value comes from `include/slang.h:913` (`SLANG_STAGE_COMPUTE = 6`), which `slang-profile.h:52` re-exports as `Stage`; recorded in `## Manifest coverage` as an unwatched anchor.                                                                              | named the `Stage` enumeration in the `stage` row and gave `stage(6 : Int)` as the compute value                                    |
 | 8b396dac437f | fixed    | Source agrees with the observation, so the document was wrong, not the compiler. Watched `slang-ir-insts.h:2827` declares `getParentScope()` reading operand 5 when `getOperandCount() > 5`; watched `slang-ir.cpp:3655-3671` emits the 6- or 5-operand form rather than a null; watched `slang-lower-to-ir.cpp:14700-14719` passes the source file's `DebugCompilationUnit`, which is null at Minimal *and* for an included / `#line`-remapped source. | added `parentScope?` to the `DebugFunction` row and a `### DebugFunction` callout covering both absence cases                      |

@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:27:12Z
+intake_at: 2026-08-12T06:45:28Z
 target_doc: target-pipelines/wgsl.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 12
 actions:
-  fixed: 11
+  fixed: 12
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,17 +18,20 @@ actions:
 
 ## Summary
 
-Eleven of the twelve gaps were fixed by editing the document; one was
-deferred. No gap was escalated: in every `drift-from-source` case the
-watched source agreed with the observation, so the document was
-incomplete rather than the compiler wrong. The bulk of the work is two
-new Phase D subsections (`### Emitted spellings` and
-`### Texture, sampler, and texture-intrinsic spellings`) that pin the
-literal, vector, matrix, array, texture and sampler spellings the
-`WGSLSourceEmitter` produces and the `case wgsl:` intrinsic templates
-in `hlsl.meta.slang`; the rest are targeted additions to four
-`## Notable passes` sections and four pass-table Notes cells. Nothing
-was rejected as bogus or out of scope.
+This is a re-run of the gap-intake stage for a single gap,
+`0a4d2ff77760`, which the previous cycle deferred on the false
+premise that no `slangc` was available. A native macOS-arm64
+`slangc` built from this commit was used to settle it, so its
+verdict changes from `deferred` to `fixed` and the queue is now
+twelve `fixed`, nothing rejected, deferred, or escalated. The
+compiler showed that the array-lowered-matrix arm of
+`legalizeLogicalAndOr` is not reached by any matrix `&&` / `||`
+written in Slang: `legalizeMatrixTypes` runs much earlier and has
+already split the matrix operation into one vector `And` / `Or` per
+row. The section's previous paragraph, which claimed a boolean
+matrix could reach the arm, was replaced with that finding plus the
+emitted per-row `select` shape. The other eleven verdicts and their
+Evidence are carried forward unchanged from the first cycle.
 
 ## Actions
 
@@ -38,7 +41,7 @@ was rejected as bogus or out of scope.
 | 777a56bb41c0 | fixed | `source/slang/hlsl.meta.slang:13946-13949` declares `NonUniformResourceIndex` with `[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]`; that alias is `cpp \| cuda \| glsl \| hlsl \| spirv` (`source/slang/slang-capabilities.capdef:330`), excluding `wgsl`. `E36107` text confirmed by `non-uniform-resource-index-rejected.slang`. The existing emit-time claim is still correct (`source/slang/slang-emit-c-like.cpp:2753-2756`). | added a paragraph stating the capability requirement, the `E36107` type-check rejection, and that the emit-time wrapper drop applies only to insts reaching WGSL by another route (`nonuniform(DescriptorHandle<T>)`, `hlsl.meta.slang:27817-27818`) |
 | d27a9f53454e | fixed | `source/slang/slang-emit-wgsl.cpp:74-101` (`emitSwitchCaseSelectorsImpl`) writes `case ` + selectors, or the bare keyword `default `, then `:`. Printed form confirmed by `switch-without-default-gets-synthesized-default.slang` (`CHECK: case i32(0)` / `CHECK: default`). | added a before/after example to the `legalizeSwitch` bullet showing a `default:`-less Slang switch emitting `case i32(0):`, `case i32(1):` and a `default :` arm |
 | da19e305367a | fixed | `source/slang/slang-emit-wgsl.cpp:1494-1525` emits `And` as `select(vecN<bool>(false), rhs, lhs)` and `Or` as `select(rhs, vecN<bool>(true), lhs)`. Printed forms confirmed by `vector-logical-and-becomes-select.slang` and `int-vector-logical-and-casts-operands-to-bool.slang`. | added the emitted `select(...)` forms for `And` and `Or` under `legalizeLogicalAndOr`, with the already-boolean and cast-from-integer operand cases |
-| 0a4d2ff77760 | deferred | Could not confirm a Slang-level construct that reaches the arm: `source/slang/slang-ir-legalize-binary-operator.cpp:200-210` casts only `IRVectorType` operands and `:246-263` then asserts both operands are already `array<vector<bool,N>>`, so only a boolean matrix qualifies — but `source/slang/core.meta.slang:3724-3730` constrains `operator&&` to `T : ILogical` and the file declares no `matrix` conformance to `ILogical`, so a plain `bool2x2 && bool2x2` may not type-check at all. The emitted per-element shape has no bundle test and cannot be settled without running `slangc`, which is unavailable on this host (Linux x86-64 build, arm64 host). Follow-up: run the compiler on a boolean-matrix `&&`, or confirm the arm is unreachable and file it as dead code. A source-confirmed narrowing of the entry condition was added to the section in the meantime, but the two things the gap asks for remain unwritten. | — |
+| 0a4d2ff77760 | fixed | Settled by running `build-arm64/Debug/bin/slangc` (2026.14.1-80-g6122d03def) at this commit. Ordering is in a watched path: `source/slang/slang-emit.cpp:1934` calls `legalizeMatrixTypes`, `:2280` calls `legalizeLogicalAndOr`. `slangc -target wgsl -dump-ir-before legalizeLogicalAndOr` on a `bool2x2 && bool2x2` shader shows the operation already split into two `logicalAnd` insts on `Vec(Bool, 2 : Int)` before the pass runs, so the `IRArrayType` arm at `source/slang/slang-ir-legalize-binary-operator.cpp:246-292` never sees an array-typed `And`. An lldb breakpoint on that arm's entry (`legalizeLogicalAndOr(IRInst*, TargetProgram*)+664`, the instruction after the `as<IRArrayType>(dataType)` test) was hit zero times over eleven shader shapes (`bool2x2`, `bool3x4`, `bool1x4`, `bool4x4` in a loop, `int2x2`, `uint4x4`, `float2x2`, matrix-in-struct, matrix-valued function, matrix array indexed by thread id, matrix `&&` scalar-splat) crossed with `-target wgsl` / `spirv` / `metal` and with and without `-O0`; the same probe placed on the vector arm (`+608`) is hit on the first shape, so the probe is sound. Emitted form from `slangc -target wgsl`: one `select(vec2<bool>(false), <rhs row>, <lhs row>)` per matrix row. `operator&&` constrained to `T : ILogical` at `source/slang/core.meta.slang:3724-3730`; the `E30081` operand-conversion warning for `int` and `float` matrix operands is from the same compiler runs. | replaced the section's entry-condition paragraph with the unreachability finding (`legalizeMatrixTypes`, Phase B row 63, splits the matrix `And` / `Or` per row first) plus a three-line `bool2x2 && bool2x2` example and its per-row `select` output |
 | ab792853eacb | fixed | `source/slang/slang-ir-lower-append-consume-structured-buffer.cpp:29-50` name-hints the two generated fields `elements` and `counter`; `:122-138` rewrites `Append` as `AtomicInc` on `counter[0]` (relaxed) then a store into `elements[oldCounter]`. Emitted spellings confirmed by `append-structured-buffer-lowers-to-counter-and-elements.slang` (`array<atomic<i32>>`, `array<u32>`, `atomicAdd`). | extended row 54's Notes with the two generated storage buffers and the `atomicAdd`-then-store rewrite, and stated that `AppendStructuredBuffer<T>` is not front-end-rejected on WGSL |
 | 9b5730e82911 | fixed | `source/slang/slang-emit.cpp:654-690` shows `checkStaticAssert` raising `StaticAssertionFailure` / `StaticAssertionFailureWithoutMessage` / `StaticAssertionConditionNotConstant`; ids 41400 / 41401 / 41402 at `source/slang/slang-diagnostics.lua:5322-5341`, and `array-index-out-of-bounds` = 30029 at `:1295-1300`. `E30029` also confirmed by `array-index-out-of-bounds-rejected.slang`. | added `E41400` / `E41401` / `E41402` to row 72's Notes and `E30029` to row 24's Notes |
 | 700f09296336 | fixed | `source/slang/slang-emit-wgsl.cpp:304-341` (`emitStructFieldAttributes`) writes `@align(N)` per field as GCD(field offset, struct alignment); wrapper naming and the `data : array<vector<T,R>, C>` field at `source/slang/slang-ir-lower-buffer-element-type.cpp:2778-2820` and `:437-450` (`getLayoutName`). Emitted names confirmed by `structured-buffer-of-matrix-wraps-storage.slang`, `constant-buffer-matrix-std140-wrapper.slang`, `matrix-storage-square-2x2.slang`, `vec3-padding-trailing-field.slang`, `constant-buffer-uniform-std140.slang`. | extended Phase C row 21's Notes with the `<Name>_std430` / `<Name>_std140` and `_MatrixStorage_<elem><R>x<C>_ColMajor<rule>` wrapper names, the `data` field shape, and the `@align(N)` field attributes |

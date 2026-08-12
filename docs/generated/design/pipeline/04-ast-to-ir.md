@@ -73,19 +73,19 @@ returns a `LoweredValInfo` (line 120). Its `Flavor` enum distinguishes
 lowering must keep symbolic until a use site decides how to read or
 write them:
 
-| Compound flavor | Slang surface that produces it |
-| --- | --- |
-| `BoundMember` | `obj.method` as a value before the call (line 6394), or a field whose base is itself deferred |
-| `BoundStorage` | a `property` / `__subscript` access whose accessor set is more than a lone `get` (line 1124) — `c.doubled`, `buf[i]` |
-| `SwizzledLValue` | a vector swizzle in l-value position — `v.xy = ...` (line 7880) |
-| `SwizzledMatrixLValue` | a matrix swizzle in l-value position — `m._m00_m11 = ...` (line 7795) |
-| `ExtractedExistential` | an interface-typed value opened in l-value position (line 7739) |
-| `ImplicitCastedLValue` | an implicit conversion on an `out` / `inout` argument (line 7768) |
+| Compound flavor | Slang surface that produces it | Use site emits |
+| --- | --- | --- |
+| `BoundMember` | `obj.method` as a value before the call (line 6394), or a field whose base is itself deferred | `get_field` / `get_field_addr` for a field (line 1265); the resolved function value for a method |
+| `BoundStorage` | a `property` / `__subscript` access whose accessor set is more than a lone `get` (line 1124) — `c.doubled`, `buf[i]` | a `call` to the `get` accessor on a read and to `set` on a write; a `ref` accessor instead collapses the value to a `Ptr` |
+| `SwizzledLValue` | a vector swizzle in l-value position — `v.xy = ...` (line 7880) | `swizzle` on a read (line 1288); on a write, `swizzledStore` when the base is a `Ptr` (line 10370) and otherwise `swizzleSet` plus a store back (line 10327) |
+| `SwizzledMatrixLValue` | a matrix swizzle in l-value position — `m._m00_m11 = ...` (line 7795) | on a read, two nested `getElement`s per component plus a `makeVector` when more than one is selected; `matrixSwizzleStore` on a write (line 10404) |
+| `ExtractedExistential` | an interface-typed value opened in l-value position (line 7739) | the extracted value as it stands; a write re-wraps the source with `makeExistential` first (line 10583) |
+| `ImplicitCastedLValue` | an implicit conversion on an `out` / `inout` argument (line 7768) | whichever conversion inst `emitCast` picks, on a read; on a write, that cast applied to the source followed by a store into the base (line 10597) |
 
-`Subscript` is declared but has no construction site. `getSimpleVal`
-forces any flavor down to a single `IRInst*`: a `BoundStorage` read
-becomes a `call` to the getter, a `SwizzledLValue` write one
-`swizzledStore`.
+`Subscript` is declared but has no construction site. The right-hand
+column is what `materialize` (line 1184) and `getSimpleVal` (line 1342)
+produce when a flavor is forced down to a single `IRInst*`, and what
+the `assign` switch (line 10249) produces on the write side.
 
 Per-environment caches sit on `IRGenEnv`: `mapDeclToValue` for decls
 and `mapValToValue` (line 472) for `Val`s. `lowerVal` and `lowerType`
@@ -207,13 +207,22 @@ that matched the operator's source name string; the `constexpr*` ops are
 hoistable so equal compile-time expressions deduplicate to one inst.
 
 The surface that reaches these opcodes is arithmetic on a *generic value
-parameter*, whose result is needed as a type-level value: the extent in
-`int b[N + 1]` inside `f<let N : int>` lowers to
-`constexprAdd(1 : Int, %N)`. A literal-only expression instead folds to
-a `ConstantIntVal` during checking and arrives as a plain `IRIntLit`.
-`+`, `-`, `*` and unary `-` never form a `BuiltinOperationIntVal` at
-all; they arrive as a `PolynomialIntVal`, which `visitPolynomialIntVal`
-(line 2009) lowers to those same opcodes.
+parameter*, whose result is needed as a type-level value. Inside
+`int f<let N : int>()`, the two array extents
+
+```slang
+int a[N / 2];
+int b[N + 1];
+```
+
+lower to `constexprDiv(%N, 2 : Int)` and `constexprAdd(1 : Int, %N)`.
+Only the first is a `BuiltinOperationIntVal`: `+`, `-`, `*` and unary
+`-` never form one at all. They arrive as a `PolynomialIntVal`, which
+`visitPolynomialIntVal` (line 2009) lowers to the same opcode family,
+emitting the constant term first — which is why the operand order of
+`constexprAdd` above does not follow the source. A literal-only
+expression instead folds to a `ConstantIntVal` during checking and
+arrives as a plain `IRIntLit`.
 
 ## Generics and existentials
 
@@ -248,13 +257,37 @@ conformance, obtained from `getWitnessTableBaseDeclRef` (lines 10904 and
 AST requirement dictionary is `specialize`d through it before being
 lowered, so an entry copied from a generic interface carries the
 conforming type's substitutions rather than the interface's own
-parameters. Per-entry
-lowering is factored into `lowerWitnessEntryValue` (line 10933), which
-switches on the `RequirementWitness::Flavor`: a `declRef` witness lowers
-through `emitDeclRef`, a `val` witness through `lowerSimpleVal`, and a
-`witnessTable` witness recursively materializes a nested
-`IRWitnessTable` (with its own conformance mangled name and, for an
-exported type, `HLSLExport` / `KeepAlive` decorations). The
+parameters. It is null only when the conformance's base type is not a
+`DeclRefType`, which an ordinary `struct S : IFoo<...>` never produces.
+
+In a dump the substitution is an extra `specialize` layer on the entry's
+value. Given
+
+```slang
+interface IFoo<T> { T zero(); T twice() { return zero(); } }
+struct S : IFoo<int> { int zero() { return 0; } }
+```
+
+`S`'s table is `witness_table_t(specialize(%IFoo, Int))(%S)`, and its two
+entries do not have the same shape:
+
+```
+witness_table_entry(%IFoo_zero,  %S_zero)
+witness_table_entry(%IFoo_twice, specialize(specialize(%twiceImpl, Int), %S, %table))
+```
+
+`zero` is satisfied by a member of `S`, mentions no interface parameter,
+and stays flat. `twice` is inherited from the interface's own default
+implementation, and the inner `specialize(..., Int)` is the base
+specialization: it binds the interface's `T` before the outer
+`specialize` supplies the conforming type and its witness table.
+
+Per-entry lowering is factored into `lowerWitnessEntryValue`
+(line 10933), which switches on the `RequirementWitness::Flavor`: a
+`declRef` witness lowers through `emitDeclRef`, a `val` witness through
+`lowerSimpleVal`, and a `witnessTable` witness recursively materializes
+a nested `IRWitnessTable` (with its own conformance mangled name and,
+for an exported type, `HLSLExport` / `KeepAlive` decorations). The
 already-materialized nested tables are memoized in
 `IRGenContext::mapASTWitnessTableToIRWitnessTable` (line 676), a
 *non-owning* pointer: the dictionary is owned by the lowering scope, so
@@ -430,6 +463,13 @@ witness-table representation as other data-free generic witnesses:
   asserts up front that a pack-count constraint is never an interface
   requirement.
 
+All three pieces show up together in the `LOWER-TO-IR` dump of
+`int sum<let N : int, each T>(T values) where countof(T) == N`, called as
+`sum<2>(1, 2)`: the generic's parameter list ends with
+`param %w : witness_table_t(Void)`, the module holds one
+`witness_table %t : witness_table_t(Void)(Void);`, and the call site
+reads `call specialize(%sum, 2 : Int, TypePack(Int, Int), %t)(...)`.
+
 The point of using a witness-table-shaped value (instead of a runtime
 `countof`) is that the count is a compile-time fact: the witness only
 needs a concrete `IRInst` for the generic param / call argument slot.
@@ -445,9 +485,24 @@ the assignment-lowering switch in
 reaches an assignment whose left-hand side it cannot encode, it emits
 `Diagnostics::UnsupportedAssignmentTarget` (line 10602), recovering the
 nearest non-zero source location from the builder's source-loc info,
-rather than aborting via `SLANG_UNIMPLEMENTED_X`. Lowering
-errors flow through the same `DiagnosticSink` used by the rest of the
-front-end (see
+rather than aborting via `SLANG_UNIMPLEMENTED_X`. The left-hand sides
+that get there are the ones the flavor table above has already collapsed
+to an r-value. Indexing an array-valued `property` is the reachable
+case, because `s.v` materializes to a `call` to the getter and `[0]`
+then extracts an element of that temporary:
+
+```slang
+struct S
+{
+    float _v[2];
+    property float v[2] { get { return _v; } set { _v = newValue; } }
+}
+// ... s.v[0] = 1.0;
+// error[E40017]: assignment target is not supported
+```
+
+Lowering errors flow through the same `DiagnosticSink` used by the rest
+of the front-end (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).
 
 Two other lowering-time reports are worth knowing about because they
@@ -463,10 +518,15 @@ depend on facts only the lowering walk has:
   Previously these statements were silently dropped.
 - **Runaway constructor-call lowering.** `visitInvokeExprImpl` counts its
   own recursion depth in `IRGenContext::invokeLoweringRecursionDepth` and,
-  past `kMaxIRInvokeLoweringRecursionDepth` (128), diagnoses
+  past `kMaxIRInvokeLoweringRecursionDepth` (128, line 5513), diagnoses
   `Diagnostics::MaximumTypeNestingLevelExceeded` and yields
   `getPoison(type)` rather than overflowing the native stack on an
   infinitely nesting type that keeps synthesizing constructor calls.
+  Nothing in the counter is specific to constructors, though: it advances
+  once per nested `InvokeExpr`, because a call's arguments are lowered
+  from inside `addDirectCallArgs` (line 5153). A chain of 128 ordinary
+  calls — `f(f(...f(x)...))` — is already enough to reach the limit and
+  report `fatal error[E39997]: maximum type nesting level exceeded`.
 
 ## Module-level outputs
 
@@ -513,12 +573,21 @@ AND-across-alternatives and therefore too strict as a presence test). The
 requirement is lifted here rather than left on the attributed callee
 because the corresponding SPIR-V execution mode is entry-point scoped.
 Work-graph node attributes take the same route in the general function
-path: `NodeLaunchAttribute`, `NodeIDAttribute`,
-`NodeMaxDispatchGridAttribute`, `NodeDispatchGridAttribute`,
-`MaxRecordsAttribute` and `NodeIsProgramEntryAttribute` each lower to
-their matching decoration, with the launch mode kept as an
-`IRStringLit` rather than an integer so HLSL emit can re-emit the source
-name. Those attributes are not core-language syntax: their
+path (line 14485), each source spelling lowering to its matching
+decoration:
+
+| Source attribute | Decoration |
+| --- | --- |
+| `[NodeLaunch(mode)]` | `nodeLaunch` |
+| `[NodeID(name, arrayIndex)]` | `nodeID` |
+| `[NodeMaxDispatchGrid(x, y, z)]` | `nodeMaxDispatchGrid` |
+| `[NodeDispatchGrid(x, y, z)]` | `nodeDispatchGrid` |
+| `[MaxRecords(count)]` | `maxRecords` |
+| `[NodeIsProgramEntry]` | `nodeIsProgramEntry` |
+
+The launch mode is kept as an `IRStringLit` rather than an integer, so
+the dump reads `[nodeLaunch("broadcasting")]` and HLSL emit can re-emit
+the source name. Those attributes are not core-language syntax: their
 `attribute_syntax` declarations live in the `experimental.workgraph`
 standard module, so the shader must `import experimental.workgraph` and
 the compile must pass `-experimental-feature` (alongside `-stage node`

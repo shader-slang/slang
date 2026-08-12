@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:42:04Z
+intake_at: 2026-08-12T06:38:25Z
 target_doc: name-resolution/overload-resolution.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 8
 actions:
-  fixed: 7
+  fixed: 8
   rejected_bogus: 0
   rejected_out_of_scope: 0
-  deferred: 1
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,29 +18,21 @@ actions:
 
 ## Summary
 
-Nothing was escalated: both `drift-from-source` gaps turned out to be
-documentation defects that the watched sources confirm, not compiler
-bugs. Seven gaps are `fixed` and one is `deferred`. The two most
-substantive fixes correct claims that were simply wrong about the
-surface language: the general-path section said a member `operator+`
-on a `struct` is "found as an ordinary member", when `visitInvokeExpr`
-resolves an operator callee with plain `CheckTerm` scope lookup
-(`source/slang/slang-check-expr.cpp:5124`) and only `operator()` and
-`__subscript` are found by member lookup; and comparator step 8 named
-a `__prefer` modifier that does not exist anywhere in `source/` — the
-real spelling is `[OverloadRank(N)]`. The generic-arity drift is also
-a doc defect: the arity step forces `required = 0` but keeps `allowed`
-for a `Flavor::Generic` candidate, so an over-long explicit generic
-argument list is rejected by `TooManyArguments` long before
-`GenericArgumentListArityMismatch` can fire. The one deferral is the
-`AmbiguousConversion` example, which needs a compiler run to construct
-and verify.
+This is a re-run of the intake for this page, revisiting the single gap
+the first pass left `deferred` (`187da073e7f8`, the missing
+`AmbiguousConversion` example). The first pass was told no `slangc` was
+available and could not construct a verified tie; a native
+`build-arm64/Debug/bin/slangc` at the current `HEAD` was used this
+time, and `tests/bugs/gh-7856.slang` was minimized against it down to
+two lines. That gap moves `deferred` -> `fixed`; the seven other
+verdicts are carried forward unchanged from the previous report. Final
+breakdown: eight `fixed`, nothing rejected, deferred, or escalated.
 
 ## Actions
 
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
-| 187da073e7f8 | deferred | Blocked on execution, not on source. `_coerce`'s ambiguity arm fires when `AddTypeOverloadCandidates(toType, ...)` leaves more than one entry in `overloadContext.bestCandidates` (`source/slang/slang-check-conversion.cpp:2632-2699`), i.e. when two initializers tie under the *whole* `CompareOverloadCandidates` chain, not just on argument cost — which is why the reporting agent's two `__implicit_conversion` initializers never tied. The only verified E30080 reproduction in the tree is `tests/bugs/gh-7856.slang`, which is far from minimal and whose tied pair I cannot identify without running the compiler (no runnable `slangc`: Linux x86-64 build, arm64 host). Follow-up: minimize that test on a machine with a build, then land the confirmed shape as the example. | — |
+| 187da073e7f8 | fixed | Confirmed by running the compiler and in the watched paths. `SLANG_ASSERT=release-assert-only ./build-arm64/Debug/bin/slangc -target hlsl x.slang` on the two-line file `struct T { __init(int v) {} __init(uint v) {} }` / `void f(float x) { T t = T(x); }` prints `error[E30080]: ambiguous conversion ... more than one conversion exists from 'float' to 'T'` followed by a `see declaration of 'T.init'` note for each `__init`. This is `tests/bugs/gh-7856.slang` reduced: the same run on that file names its `__init(int64_t)` / `__init(uint64_t)` pair. Why it needs an explicit site: `source/slang/slang-check-conversion.cpp:2579` sets `disallowNestedConversions = (site != CoercionSite::ExplicitCoercion)`, and `source/slang/slang-check-overload.cpp:898-906` turns that flag into an exact-type requirement, so no two distinct parameter types can both apply implicitly; a single-argument call on a type name reaches `_coerce` with `ExplicitCoercion` at `source/slang/slang-check-overload.cpp:3443`. Checked against the compiler: `void f(int x) { T t = T(x); }` compiles clean (exact match costs 0), `void f(double x)` is ambiguous, and `T t = x;` reports `error[E30019]: type mismatch in expression` rather than an ambiguity. The shared cost level is `kConversionCost_GeneralConversion` (`source/slang/slang-ast-support-types.h:162`): `float` and the integer types differ in `conversionKind`, so both pairs fall through every special case in `getBaseTypeConversionCost` to its final `else` (`source/slang-core-module/slang-embedded-core-module-source.cpp:258`, outside watched paths, which is why the doc names only the constant). | added the minimal two-`__init` tie under Conversion costs, with the explicit-vs-implicit site rule that makes it the smallest possible one |
 | d326f38b2c3a | fixed | `source/slang/core.meta.slang:2806-2826` — both `(vector<T,2>, T)` and `(T, vector<T,2>)` `__init`s are still declared at `source_commit`, carrying `[deprecated]` and `[RemovedSince(2026, ...)]`; `source/slang/core.meta.slang:4907-4930` documents `[RemovedSince]` as an error at that language version or higher, with the `[deprecated]` message ignored once it fires. Default language version is `SLANG_LANGUAGE_VERSION_LEGACY` (`include/slang.h:5772`, outside watched paths, so the doc says "earlier than 2026" rather than citing it). | stated the current status of the two initializer forms: still declared, deprecation warning under the default language version, error under 2026+ |
 | 1444b2f734a0 | fixed | `source/slang/slang-check-impl.h:270-283` — the `GenericConstraintNotSatisfied` payload comment states it is "the general fallback for every constraint kind handled by the witness solver other than conformance (today: equality `where T == X`, type coercion `where U(T)`, non-empty pack `where nonempty(P)`, ...)". Confirmed at the recording sites in `source/slang/slang-check-constraint.cpp:1709-1717` and `:2999-3007`. The gap's premise (unreachable) is wrong; it is unreachable only for conformance constraints. | annotated the `GenericConstraintNotSatisfied` row with which constraint kinds reach it and which are captured as `InterfaceConformanceNotSatisfied` instead |
 | b81d8b1c1c82 | fixed | Source agrees with the observation, so the doc was wrong. `source/slang/slang-check-overload.cpp:1430-1438` runs arity before types; `:158-166` gives a `Flavor::Generic` candidate `allowed` = declared parameter count but forces `required = 0`; `:199` emits `Diagnostics::TooManyArguments`. `TryCheckGenericOverloadCandidateTypes` is reached only through `TryCheckOverloadCandidateTypes` (`:835-837`), so its `providedCount > expectedCount` branch (`:406-425`) is dead for over-long lists; the under-filled branch survives step 1 and fires when `allowPartialGenericApp` is false (`:316-320`). | corrected step 3: named `TooManyArguments` for the too-long case and stated the condition under which `GenericArgumentListArityMismatch` actually fires |

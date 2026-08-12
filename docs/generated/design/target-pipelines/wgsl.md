@@ -1067,9 +1067,10 @@ Runs at line 2277. WGSL is in the
 `isD3DTarget || isKhronosTarget || isWGPUTarget || isMetalTarget`
 arm. The pass legalizes the operand and result types of vector and
 array logical `And` / `Or`: it casts non-boolean vector operands and
-results to `vector<bool,N>` and rebuilds the `And` / `Or`, and for
-array-lowered matrices loops over the array elements emitting a
-per-element `And` / `Or` and reassembling the array.
+results to `vector<bool,N>` and rebuilds the `And` / `Or`, and it
+carries a second arm for array-lowered matrices that loops over the
+array elements emitting a per-element `And` / `Or` and reassembling
+the array.
 
 WGSL has no vector `&&` / `||`, so the legalized inst is emitted
 with `select`, whose WGSL signature is `select(f, t, cond)`
@@ -1086,13 +1087,37 @@ and for two `int3` values the operand casts the pass inserted show
 up inline in the same `select`, as
 `select(vec3<bool>(false), vec3<bool>(vec3<i32>(...)), vec3<bool>(vec3<i32>(...)))`.
 
-The array-lowered-matrix arm has a narrower entry condition than the
-vector arm: the operand-cast loop above it only casts operands of
-`IRVectorType`, and the array arm then asserts that both operands
-are already `array<vector<bool,N>>`
-(`slang-ir-legalize-binary-operator.cpp:200-210` and `246-263`), so
-only an operand pair that was *already* boolean before
-`legalizeMatrixTypes` lowered it to an array can reach it.
+No Slang-level matrix `&&` / `||` reaches the array-lowered-matrix
+arm. `legalizeMatrixTypes` (Phase B row 63, called at line 1934 of
+`slang-emit.cpp`) runs long before line 2277 and has already
+rewritten a matrix `And` / `Or` into one vector `And` / `Or` per
+matrix row, so what arrives here is a `vector<bool,C>` operation
+that the vector arm above handles. The `IRArrayType` arm
+(`slang-ir-legalize-binary-operator.cpp:246-292`), including its
+assertion that both operands are already `array<vector<bool,N>>`,
+is left unexercised. The element type does not change this:
+`operator&&` is declared `__generic<T : ILogical>`
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines
+3724-3730), so an `int` or `float` matrix operand is converted to
+`matrix<bool,R,C>` at the call site (warning `E30081`) and then
+takes the same route.
+
+What a reader sees is therefore one `select` per matrix row. For
+
+```slang
+bool2x2 a = bool2x2(inBuf[0] > 0.0f, inBuf[1] > 0.0f);
+bool2x2 b = bool2x2(inBuf[2] > 0.0f, inBuf[3] > 0.0f);
+bool2x2 c = a && b;
+```
+
+row 0 of `c` is emitted as
+
+```wgsl
+select(vec2<bool>(false), inBuf_0[i32(2)] > _S1, inBuf_0[i32(0)] > _S1)
+```
+
+and row 1 as the same call over `inBuf_0[i32(1)]` and
+`inBuf_0[i32(3)]`.
 
 ### `floatNonUniformResourceIndex`
 

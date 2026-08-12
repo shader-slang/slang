@@ -1,16 +1,16 @@
 ---
 gap_intake_report: true
 intake_model: claude-opus-5[1m]
-intake_at: 2026-08-11T16:25:31Z
+intake_at: 2026-08-12T06:41:18Z
 target_doc: target-pipelines/spirv.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
-target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
 gap_count: 11
 actions:
-  fixed: 7
+  fixed: 9
   rejected_bogus: 1
   rejected_out_of_scope: 1
-  deferred: 2
+  deferred: 0
   escalated_to_finding: 0
 ---
 
@@ -18,60 +18,20 @@ actions:
 
 ## Summary
 
-One gap was escalated: `4d492e51b04e` reports that `-preserve-params`
-does not emit an unreferenced `IRGlobalParam`, but every watched-path
-site agrees with the document, so this is a suspected compiler defect
-rather than a documentation defect. Of the remaining ten, seven were
-fixed with source-confirmed edits (front matter actually emitted by
-`emitFrontMatter`, the register-allocation phi shape, the
-`SV_*` system-value resolution plus the 49999 diagnostic, the
-`SV_VertexID` / `SV_InstanceID` rebasing, the conservative-depth
-execution modes, the transposed matrix-layout decoration, and the
-meaning of `(always)` on row 33 of Phase C), one was rejected as bogus
-(the `NoContraction` bullet already names `-fp-mode precise` and
-already states that integer / bitwise / comparison opcodes are
-skipped), one was rejected as out of scope (`-fvk-<class>-shift`
-auto-allocation belongs to `pipeline/04c-layout-ir.md`, which watches
-`slang-parameter-binding.cpp`), and one was deferred because the
-sources that would settle it lie outside this document's
-`watched_paths`. Two gaps against the same anchor
-(`#legalizeentrypointsforglsl-despite-the-name`) were resolved as one
-consolidated edit. Three suggested additions were written down
-narrower than proposed, because the source says less than the
-hypothesis did.
-
-## Escalated gaps
-
-- **`4d492e51b04e`** — `-preserve-params` and unreferenced global
-  parameters. The document says the option makes Phase D emit
-  unreferenced `IRGlobalParam`s, and the watched source says the same
-  thing in three independent places:
-  `source/slang/slang-emit.cpp:1353-1354` sets
-  `deadCodeEliminationOptions.keepGlobalParamsAlive` from the option
-  and every `eliminateDeadCode` inside `linkAndOptimizeIR` uses either
-  that record or `fastIRSimplificationOptions.deadCodeElimOptions`,
-  which is built from the same option
-  (`source/slang/slang-ir-ssa-simplification.cpp:30-31, 44-45`); and
-  `source/slang/slang-emit-spirv.cpp:12212-12218` walks the global
-  insts and calls `ensureInst` on *every* `IRGlobalParam` when
-  `shouldPreserveParams` holds, with no reachability or layout test.
-  Outside the watched set the same picture holds:
-  `source/slang/slang-ir-link.cpp:2340-2370` clones every global param
-  and adds a `KeepAliveDecoration` when the option is set, and
-  `source/slang/slang-options.cpp:4845` makes the target option set
-  inherit the linkage option the CLI writes at
-  `slang-options.cpp:2818-2821`, so the emit-time read of
-  `targetProgram->getOptionSet()` should see it. The reported
-  behaviour — no `OpVariable` for an unreferenced
-  `RWStructuredBuffer` global under `-preserve-params`, with or
-  without an explicit `[[vk::binding(3, 0)]]` — contradicts all of
-  that. No existing finding in
-  `docs/generated/tests/_meta/findings/` covers it; the operator will
-  need one opened before `mark-gap-intake`. The reporting bundle
-  shipped no test for this row (it is recorded as "not reproducible
-  from the CLI"), and the tree's build is Linux x86-64 against an
-  arm64 host, so intake could not re-run the compiler to narrow it
-  further.
+This is a re-run of the intake for this page, revisiting the two gaps
+the previous cycle deferred on the (mistaken) grounds that no `slangc`
+could be run here. A native macOS-arm64 `slangc` built from HEAD
+settled both, and both verdicts changed from `deferred` to `fixed`:
+`4d492e51b04e` (`-preserve-params`) and `f3b2b47f3963`
+(`checkForRecursiveTypes`). Neither turned out to be a compiler defect,
+so nothing is escalated and the previous cycle's suspicion that
+`-preserve-params` was broken is retracted — the emitter does exactly
+what the document said, and the downstream `spirv-opt` step removes the
+result again. The other nine verdicts are carried forward unchanged
+from the previous cycle: seven `fixed`, one `rejected-bogus`, one
+`rejected-out-of-scope`. The totals are therefore nine `fixed`, one
+`rejected-bogus`, one `rejected-out-of-scope`, no `deferred` and no
+`escalated-to-finding`.
 
 ## Actions
 
@@ -82,9 +42,9 @@ hypothesis did.
 | 3beeb23ba3da | fixed | `source/slang/slang-ir-glsl-legalize.cpp:51` (`getGLSLSystemValueInfo`), with `sv_dispatchthreadid` → `gl_GlobalInvocationID` at line 614 and `sv_isfrontface` → `gl_FrontFacing` at line 687; the unrecognized-semantic fall-through raises `Diagnostics::UnknownSystemValueSemantic` at line 1012, defined as error 49999 in `source/slang/slang-diagnostics.lua:4844-4849`. `docs/generated/tests/coverage/legalize/unknown-system-value-semantic.slang` pins it firing under `-target spirv`. | documented the `getGLSLSystemValueInfo` resolution step, two representative mappings, and the 49999 diagnostic; the full per-stage enumeration was deliberately not copied in — `source/slang/slang-emit-spirv.cpp:7663-7695` shows SPIR-V re-derives a `BuiltIn` decoration from the semantic name rather than using the `gl_*` name, so a `gl_*` table is catalog material for `pipeline/05-ir-passes.md`, not the observable form on this page (consolidated with 82b3ea5ed6b8) |
 | 82b3ea5ed6b8 | fixed | `source/slang/slang-ir-glsl-legalize.cpp:4726` (`legalizeTargetBuiltinVar`) rewrites `HlslVertexID` loads to `SpvVertexIndex - SpvBaseVertex` (lines 4785-4814) and `HlslInstanceID` to `SpvInstanceIndex - SpvBaseInstance` (lines 4752-4783); it is called at line 5037, at the end of `legalizeEntryPointForGLSL`. `source/slang/slang-emit-spirv.cpp:7673-7680` maps those builtin names to `SpvBuiltInBaseVertex` / `SpvBuiltInBaseInstance` and requires `SpvCapabilityDrawParameters`. `docs/generated/tests/coverage/legalize/vertex-id-base-offset-glsl.slang` pins both subtractions. | added the `SV_VertexID` / `SV_InstanceID` rebasing note (with the `OpISub` + `DrawParameters` consequence and the un-rebased `SV_Vulkan*ID` contrast) as one consolidated edit with 3beeb23ba3da |
 | fc1bc2f64511 | fixed | `source/slang/slang-emit-spirv.cpp:6066-6110` (`getDepthOutputExecutionMode`) maps `sv_depthgreaterequal` → `SpvExecutionModeDepthGreater` (line 6103) and `sv_depthlessequal` → `SpvExecutionModeDepthLess` (line 6109) off the var layout's `IRSystemValueSemanticAttr`, not off the decoration; `maybeEmitEntryPointDepthReplacingExecutionMode` (line 6138) requires `DepthReplacing` unconditionally at lines 6167-6170 and collapses a mixed entry point to it at lines 6154-6160. | named the emitted `DepthGreater` / `DepthLess` / `DepthReplacing` execution modes and the layout-attribute source the emitter derives them from |
-| 4d492e51b04e | deferred | Downgraded from `escalated-to-finding` by the operator: a finding YAML requires `command` / `source_slang` / `observed_summary`, i.e. a reproduction, and none exists — the reporting bundle shipped no test ("not reproducible from the CLI") and this host cannot run `slangc` (Linux x86-64 build, arm64 host). The source trace below stands and should be re-escalated once someone can produce a repro. See `## Escalated gaps`. Watched source agrees with the document at `source/slang/slang-emit.cpp:1353-1354` and `source/slang/slang-emit-spirv.cpp:12212-12218`; the compiler does not. No finding id exists yet. | — |
+| 4d492e51b04e | fixed | Re-run with a working `slangc`; the previous cycle's escalation is retracted. Two compiles of a shader with an unreferenced `RWStructuredBuffer unused`: `slangc -target spirv -O0 -preserve-params -o pp.spv pp.slang` yields `%unused = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer` plus `OpDecorate %unused Binding 1` / `DescriptorSet 0`, so `source/slang/slang-emit-spirv.cpp:12212-12218` behaves exactly as documented. The same command without `-O0` yields no `unused` token at all. The difference is the downstream optimizer, not the emitter: `%unused` is absent from `OpEntryPoint GLCompute %main "main" %used %gl_GlobalInvocationID`, `source/slang/slang-emit.cpp:3390-3397` loads `spirv-opt` for every optimization level except `None`, and `spirv-opt --eliminate-dead-code-aggressive` on the `-O0` module removes `%unused` — the pass the Default preset registers at `source/slang-glslang/slang-glslang.cpp:366`. An explicit `[[vk::binding(3, 0)]]` changes nothing, matching the gap's report. | replaced the `getBoolOption(PreserveParameters)` row's bare claim with what is actually observable: the decorated `OpVariable` is emitted but left out of the `OpEntryPoint` interface, so only `-O0` (the level at which `needsOptimization` is false) keeps it |
 | 80a7f7a3b324 | fixed | `source/slang/slang-emit-spirv.cpp:7045-7068` carries the inversion as a source comment ("the meaning of row/column major layout in our semantics is the *opposite* of what GLSL/SPIRV calls them") and emits `SpvDecorationRowMajor` for `SLANG_MATRIX_LAYOUT_COLUMN_MAJOR` and `SpvDecorationColMajor` otherwise. The accessor is `getMatrixLayoutMode()` at `source/slang/slang-compiler-options.h:316`. `docs/generated/tests/coverage/cli-options/matrix-layout-spirv-decoration.slang` CHECKs `ROW: OpMemberDecorate {{.*}} 0 ColMajor` and `COL: ... RowMajor`. | added a `getMatrixLayoutMode()` row to Option-set toggles stating that the emitted member decoration is the transpose of the source layout |
 | a178c913175f | rejected-out-of-scope | The binding-shift behaviour is real but lives in `source/slang/slang-parameter-binding.cpp` (`_maybeApplyHLSLToVulkanShifts`, lines 4325-4378; the shift-enabled test at lines 1379-1393), which is a `watched_paths` entry of `pipeline/04c-layout-ir.md`, not of this document. This page's Option-set toggles table has no binding-shift row and makes no claim about shifts, so there is nothing here to correct. | — |
-| f3b2b47f3963 | deferred | Both halves need sources outside this document's `watched_paths`: the shadowing front-end check (error 41001, `source/slang/slang-diagnostics.lua:4911`) is raised from `source/slang/slang-check-*.cpp`, and the surviving-input-shape question is answered by `source/slang/slang-ir-check-recursion.cpp`. Neither is watched here, and the claim cannot be settled by running the compiler on this host (Linux x86-64 build, arm64 host). Follow-up: either extend `watched_paths` with `slang-ir-check-recursion.cpp`, or re-file the note against `pipeline/05-ir-passes.md`, which owns the pass catalog. | — |
+| f3b2b47f3963 | fixed | Re-run with a working `slangc` and `lldb`; the previous cycle's "sources lie outside `watched_paths`" reason was wrong on both counts — `source/slang/slang-ir-check-recursion.cpp` is watched, and error 41001 is not a front-end check but this very pass, declared as `recursive-type` under the "41000 - IR-level validation issues" banner at `source/slang/slang-diagnostics.lua:4909-4914`. `checkForRecursiveTypes` has two call sites: `source/slang/slang-lower-to-ir.cpp:15691` (inside `generateIRForTranslationUnit`, followed by an early return on error at lines 15693-15694) and the Phase B one at `source/slang/slang-emit.cpp:1548`. An `lldb` breakpoint on `Slang::checkForRecursiveTypes` during `slangc -target spirv -O0 rec1.slang` (a `struct S { S s; float f; }`) is hit exactly once, from `generateIRForTranslationUnit`; the Phase B site never runs. The residual reach is confirmed the same way: building the same source as a module with `-disable-non-essential-validations` and then running `slangc -target spirv -O0 -o recmod2.spv recmod2.slang-module` hits the breakpoint from `linkAndOptimizeIR` and reports 41001 there. | added a Notes cell to Phase B row 21 naming the earlier IR-generation call that shadows this one for source input, and the serialized-module shape that still reaches it |
 | 396a1bd6a8bf | fixed | `source/slang/slang-emit.cpp:2527` is an unconditional `SLANG_PASS(eliminateMultiLevelBreak, targetProgram)`, so `(always)` is a statement about the call site; row 34's `simplifyIR` (line 2530) and Phase D's simplification loop both run afterwards. The proposed "emits a `Function`-storage `bool` flag" wording was not written: `source/slang/slang-ir-eliminate-multilevel-break.cpp` is outside `watched_paths` and contains no boolean-variable construction, so attributing the `OpVariable %_ptr_Function_bool` seen in `multi-level-break-nested-loops.slang` to this pass would be an unconfirmed claim. | clarified on row 33 that `(always)` names the call site rather than a guaranteed IR change, generalized to every `(always)` row |
 | 9ef7b8187353 | fixed | `source/slang/slang-emit-spirv.cpp:1657-1687` — `emitFrontMatter` emits only `OpCapability Shader` and `OpMemoryModel` (addressing model default `SpvAddressingModelLogical`, line 504). The rest of the proposed list is not front matter: `OpSource` comes from `emitSource` (line 2167, called at line 12246), and `SPV_KHR_storage_buffer_storage_class` is requested on demand at line 2527 for a `StorageBuffer`-storage-class pointer. The `; SPIR-V` / `; Version:` lines are the disassembler's rendering of the header words `emitPhysicalLayout` writes at lines 529-553. `docs/generated/tests/design/target-pipelines/spirv/memory-model-logical-glsl450.slang` pins `OpMemoryModel Logical GLSL450`. | listed what `emitFrontMatter` actually emits on Phase D row 15, and named where the other tokens in the suggested list really come from |

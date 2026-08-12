@@ -199,7 +199,7 @@ the Vulkan memory model selected.
 | `unorm` | `IRUNormAttr` | — | H | `UNormModifierVal` (line 3017) | Marks a type as the UNORM-normalized form. |
 | `snorm` | `IRSNormAttr` | — | H | `SNormModifierVal` (line 3023) | Marks a type as the SNORM-normalized form. |
 | `no_diff` | `IRNoDiffAttr` | — | H | `NoDiffModifierVal` (line 3029) | Marks a type as not contributing to derivative computation. |
-| `nonuniform` | `IRNonUniformAttr` | — | H | Call specialization (`slang-ir-specialize-function-call.cpp`, line 618) | Marks a resource index as non-uniform. |
+| `nonuniform` | `IRNonUniformAttr` | — | H | Call specialization (`slang-ir-specialize-function-call.cpp`, line 618) | Marks a resource index as non-uniform; a specialization-key-only value that never reaches a dump, see the callout below. |
 | `Aligned` | `IRAlignedAttr`‡ | `alignment` | H | Core-module `loadAligned` / `storeAligned` (`core.meta.slang` lines 1536, 1550), via the internal `__align_attr` (`__intrinsic_op`, line 1516); also `IRBuilder::emitLoad` / `emitStore` (`slang-ir.cpp` lines 5564, 5627) | Access alignment of a `load` / `store`, not of a type layout. |
 | `MemoryScope` | `IRMemoryScopeAttr`‡ | `memoryScope` | H | Core-module `loadCoherent` / `storeCoherent` (`core.meta.slang` lines 1586, 1573), via the internal `__memoryscope_attr` (`__intrinsic_op`, line 1557); also `IRBuilder::emitStore` (`slang-ir.cpp` line 5641) | Memory scope of a coherent `load` / `store`; read by `getMemoryScope()`. |
 | `userSemantic` | `IRUserSemanticAttr`‡ | `name: IRStringLit, index: IRIntLit` | H | `VarLayout::semanticName` | User-defined HLSL semantic on a parameter or field. |
@@ -466,6 +466,36 @@ choose between user-defined naming and built-in slot assignment
 without parsing the string at emit time. `IRVarLayout` exposes a
 direct `findSystemValueSemanticAttr()` for the common query.
 
+### `nonuniform`
+
+`nonuniform` is the one attribute on this page that never reaches a
+dump. It has a single producer and no consumer: `getCallInfoForArg`
+([slang-ir-specialize-function-call.cpp](../../../../source/slang/slang-ir-specialize-function-call.cpp)
+line 618) creates it when an argument of a call being specialized is
+an element access whose index traces back — through `intCast`s — to a
+`nonUniformResourceIndex` (`findNonuniformIndexInst`, line 678). Line
+621 wraps it in an `Attributed` type over the index's own data type,
+and line 622 adds that type to the call's specialization key, which is
+only ever a `Dictionary<Key, IRFunc*>` lookup (lines 335, 384 and
+402). That key holds plain `IRInst*` list entries, so neither the
+attribute nor its wrapper becomes an operand of an emitted
+instruction, and nothing in the tree reads the attribute back.
+
+Its only visible effect is on how many specialized functions a call
+site produces. In
+
+```
+ConstantBuffer<Params> gCB[64];
+float4 f(ConstantBuffer<Params> cb) { return cb.v; }
+...
+gOut[0] = f(gCB[NonUniformResourceIndex(i)]) + f(gCB[i]);
+```
+
+`specializeResourceUsage` splits `f` into two specialized functions
+with the identical signature `Func(Vec(Float, 4 : Int), UInt)` —
+their keys differ only by this attribute — while no pass dump of that
+compile contains either `nonuniform` or an `Attributed` type.
+
 ### `DebugSource`
 
 `DebugSource` is not just a path record: operand 1 holds the *entire
@@ -616,14 +646,11 @@ is related but different: it is a pseudo-opcode, and
 
 Several claims on this page are anchored outside the manifest's
 `watched_paths` for it, so changes there will not mark this page
-stale. Four producers are still unwatched: the IR passes behind most
+stale. Three producers are still unwatched: the IR passes behind most
 `Debug*` opcodes (`slang-ir-inline.cpp`,
 `slang-ir-insert-debug-value-store.cpp`,
-`slang-ir-legalize-types.cpp`) and the `nonuniform` producer
-(`slang-ir-specialize-function-call.cpp`, line 618). Those four paths
-should be added to this document's `watched_paths`; without the last
-of them the page cannot say what, if anything, a reader is expected to
-write to obtain a `nonuniform` attribute.
+`slang-ir-legalize-types.cpp`). Those three paths should be added to
+this document's `watched_paths`.
 
 The enumerator values quoted for `stage`, `matrixTypeLayout` and the
 `size` / `offset` resource kinds come from the public `SLANG_STAGE_*`,
@@ -634,8 +661,10 @@ and the `LayoutSize` sentinels in `slang-type-layout.h`; the `-g`,
 `slang-options.cpp`; and the SPIR-V opcode numbers in the inline-asm
 excerpt come from `external/spirv-headers`. `core.meta.slang`,
 `slang-compiler-tu.cpp`, the `DebugBuildIdentifier` producer in
-`slang-emit.cpp` and the inline-asm type-function evaluation in
-`slang-emit-spirv.cpp` are all already watched.
+`slang-emit.cpp`, the `nonuniform` producer in
+`slang-ir-specialize-function-call.cpp` and the inline-asm
+type-function evaluation in `slang-emit-spirv.cpp` are all already
+watched.
 
 ## See also
 

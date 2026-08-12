@@ -349,6 +349,33 @@ reports `conflicting-explicit-capability-and-profile`, defined in
 When the profile pins no version of that family, the function
 returns false and nothing is diagnosed.
 
+Reaching the diagnostic needs the profile and the target to be in
+the same family. `SPV_KHR_cooperative_matrix` inherits `_spirv_1_6`,
+so a compile of any kernel under
+`-target spirv -profile spirv_1_3 -capability SPV_KHR_cooperative_matrix`
+stops with
+
+```
+error[E00046]: a requested '-capability' requires a higher target version than the explicitly requested profile 'spirv_1_3'; specify a higher '-profile' or remove the conflicting '-capability'
+```
+
+while the same line at `-profile spirv_1_6`, or with no `-profile`
+at all, compiles and emits a 1.6 module.
+
+The counter-example is that line with a cross-family profile:
+`-profile glsl_450` or `-profile sm_6_0` also compiles and emits
+1.6, silently. What suppresses the check is not the function's early
+return — both profiles do supply a SPIR-V version atom, and on their
+own both emit `; Version: 1.3` — but a gate ahead of it. The call
+site picks a version family only when `profile.getFamily()` agrees
+with the target format (`ProfileFamily::SPIRV` with `isSPIRV`, `DX`
+with `isD3DTarget`, `GLSL` with the GLSL text target, `METAL` with
+`isMetalTarget`), and otherwise never calls the folding function at
+all. Without that gate the version atoms a cross-family profile
+carries would read as a pin, and adding `-capability spirv_1_4` to
+`-profile glsl_450` would be rejected as a conflict the user never
+expressed.
+
 The two options do not have separate diagnostic name spaces. An
 unrecognised `-capability` atom is rejected by `findCapabilityName`
 but reported as `unknown profile '<name>'` — the same diagnostic an
