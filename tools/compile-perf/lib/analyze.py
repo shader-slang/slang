@@ -169,11 +169,14 @@ def canonical_runs(runs):
     The returned records' `timers` dict is a MIXED-UNIT counter map: ms phase
     timers plus, for manifest track_memory workloads, the kb memory counters
     (peakRssKb and the api-driver deltas). The units are distinguished by
-    unit_of()'s Kb-suffix convention — asserted where counters are
+    unit_of()'s Kb-suffix convention — enforced below, where counters are
     synthesized — which is what lets every consumer (tracking, trend,
     pages) handle one uniform {counter: stats} shape without a second
     channel, at the cost that display code must format through fmt_qty
     rather than assuming milliseconds.
+
+    Raises ValueError if a promoted counter's name does not end in Kb, since
+    unit_of would then classify it as milliseconds.
     """
     from . import manifest
     best = {}
@@ -202,9 +205,16 @@ def canonical_runs(runs):
             for name, st in (r.get("memory") or {}).items():
                 extra[name] = st
         if extra:
+            # A `raise`, not an `assert`: this is the promotion point where a
+            # memory counter enters the mixed-unit map, and it runs on the perf
+            # runner and in report rendering rather than under
+            # check-python-core, so `python -O` would erase an assert and let a
+            # kb value through to be charted and gated as milliseconds. Same
+            # contract, and same reasoning, as bench.parse_mem's guard.
             for name in extra:
-                assert name.endswith("Kb"), \
-                    f"memory counter '{name}' must end in Kb (unit_of contract)"
+                if not name.endswith("Kb"):
+                    raise ValueError(f"memory counter '{name}' must end in Kb "
+                                     "(unit_of contract)")
             r = dict(r, timers=dict(r.get("timers") or {}, **extra))
         out.append(r)
     return out
@@ -365,7 +375,20 @@ assert _mr[0]["rss_kb"] == {"median": 5.0}, "source fields not consumed"
 _mu = canonical_runs([dict(_rec, workload="conformance")])
 assert "peakRssKb" not in _mu[0]["timers"], \
     "memory promotion must be curated: only track_memory workloads"
-del _rec, _mr, _mu
+
+# The rejection branch, which the promotions above never reach. Pinned for the
+# same reason as its twin in bench.py: the guard must be a `raise` rather than
+# an `assert` so `python -O` cannot erase it on the perf runner, and catching
+# ValueError specifically is what makes a later revert to `assert` fail here.
+_bad = dict(_rec, workload="rt_renderer",
+            memory={"apiCreateGlobalSessionRssDelta": {"median": 7.0}})
+try:
+    canonical_runs([_bad])
+    raise AssertionError("canonical_runs must reject a counter name without Kb")
+except ValueError as _e:
+    assert "unit_of contract" in str(_e), \
+        f"the rejection must cite the unit_of contract; got {str(_e)!r}"
+del _rec, _mr, _mu, _bad
 
 
 # Import-time self-check for daily_labels, over a throwaway tmpdir (the same

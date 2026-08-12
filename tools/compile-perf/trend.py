@@ -3,11 +3,15 @@
 
 Reads the tracking series (track.py's tracking/tracking.json) and compares the
 latest point — tonight's tip-of-tree (ToT) sweep — against the trailing median of
-the previous N points, per (workload, primary-timer). A metric that rises beyond
-both a relative and an absolute threshold is flagged: printed, emitted as a
-GitHub Actions ::error:: annotation + step-summary row, and (unless --no-fail)
-the process exits non-zero so the nightly job goes red. This catches the gradual
-drift a per-PR step gate structurally misses.
+the previous N points, per (workload, counter). "Counter" rather than "timer"
+throughout: the series is mixed-unit, carrying kb memory counters alongside the
+ms phase timers, and which one a value is decides both its formatting and its
+absolute floor.
+
+A metric that rises beyond both a relative and an absolute threshold is flagged:
+printed, emitted as a GitHub Actions ::error:: annotation + step-summary row,
+and (unless --no-fail) the process exits non-zero so the nightly job goes red.
+This catches the gradual drift a per-PR step gate structurally misses.
 
 Absolute compile times are runner-specific, so comparisons are restricted to
 points sharing the current point's runner fingerprint. If the latest point ran on
@@ -31,8 +35,12 @@ from lib import analyze, manifest
 
 
 def timers_for(workload):
-    """The counters worth alerting on for a workload: its manifest primary
-    timers, always including compileInner (the holistic signal)."""
+    """The ms timers worth alerting on for a workload: its manifest primary
+    timers, always including compileInner (the holistic signal).
+
+    Deliberately timers only, despite the mixed-unit series — memory counters
+    are declared nowhere per workload, so judged() is the single place the two
+    kinds are unioned."""
     spec = manifest.BY_NAME.get(workload)
     timers = set(spec.primary_timers) if spec else set()
     timers.add("compileInner")
@@ -231,8 +239,8 @@ def main():
     regressions = []
     warnings = []
     for key, cur in sorted(current.get("metrics", {}).items()):
-        wl, _, timer = key.partition("|")
-        if not judged(wl, timer):
+        wl, _, counter = key.partition("|")
+        if not judged(wl, counter):
             continue
         baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
         if len(baseline) < args.min_baseline:
@@ -249,18 +257,24 @@ def main():
         # is what keeps the two-tier gate and the unit-aware floor composable
         # rather than one overwriting the other.
         verdict = classify_metric(ratio, delta, args.rel, args.warn_rel,
-                                  abs_floor_for(timer, args.abs))
+                                  abs_floor_for(counter, args.abs))
         if verdict == "error":
-            regressions.append((wl, timer, med, cur, ratio, delta))
+            regressions.append((wl, counter, med, cur, ratio, delta))
         elif verdict == "warning":
-            warnings.append((wl, timer, med, cur, ratio, delta))
+            warnings.append((wl, counter, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
 
+    # The absolute floor is quoted per unit, and read back out of
+    # abs_floor_for rather than restated: the memory floor is not --abs, so a
+    # single "{args.abs} ms" would misreport the gate every memory counter is
+    # actually judged against.
+    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", args.abs))
     print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
           f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
-          f">= {args.warn_rel}, both gated on >= {args.abs} ms\n")
+          f">= {args.warn_rel}, both gated on an absolute delta of "
+          f">= {args.abs} ms for timers / {mem_floor} for memory counters\n")
 
     # `warnings` is the ONLY key the workflow reads, and the only one it
     # needs: the Slack step distinguishes a warnings-only night from a clean
@@ -294,27 +308,27 @@ def main():
     # "ms" formatting the two-tier tables originally used would print a
     # 200 MB peak as "204800.0 ms". The column headers say "median"/"Δ"
     # without a unit for the same reason — fmt_qty puts the unit on each value.
-    print(f"{'workload':20s}{'timer':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
+    print(f"{'workload':20s}{'counter':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
     rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
 
     def table(items, kind, gha):
         rows.append(f"\n**{kind}** ({len(items)}):\n")
-        rows.append("| workload | timer | median | current | ratio | Δ |")
+        rows.append("| workload | counter | median | current | ratio | Δ |")
         rows.append("|---|---|--:|--:|--:|--:|")
-        for wl, timer, med, cur, ratio, delta in items:
-            print(f"{wl:20s}{timer:26s}{analyze.fmt_qty(timer, med):>12s}"
-                  f"{analyze.fmt_qty(timer, cur):>12s}{ratio:7.2f}x"
-                  f"{analyze.fmt_qty(timer, delta, signed=True):>12s}")
+        for wl, counter, med, cur, ratio, delta in items:
+            print(f"{wl:20s}{counter:26s}{analyze.fmt_qty(counter, med):>12s}"
+                  f"{analyze.fmt_qty(counter, cur):>12s}{ratio:7.2f}x"
+                  f"{analyze.fmt_qty(counter, delta, signed=True):>12s}")
             emit_gha_command(
-                f"::{gha} title=Perf {kind.lower()} {wl}/{timer}::"
-                f"{ratio:.2f}x ({analyze.fmt_qty(timer, med)} -> "
-                f"{analyze.fmt_qty(timer, cur)}, "
-                f"{analyze.fmt_qty(timer, delta, signed=True)}) vs trailing median")
-            rows.append(f"| {wl} | {timer} | {analyze.fmt_qty(timer, med)} | "
-                        f"{analyze.fmt_qty(timer, cur)} | {ratio:.2f}× | "
-                        f"{analyze.fmt_qty(timer, delta, signed=True)} |")
+                f"::{gha} title=Perf {kind.lower()} {wl}/{counter}::"
+                f"{ratio:.2f}x ({analyze.fmt_qty(counter, med)} -> "
+                f"{analyze.fmt_qty(counter, cur)}, "
+                f"{analyze.fmt_qty(counter, delta, signed=True)}) vs trailing median")
+            rows.append(f"| {wl} | {counter} | {analyze.fmt_qty(counter, med)} | "
+                        f"{analyze.fmt_qty(counter, cur)} | {ratio:.2f}× | "
+                        f"{analyze.fmt_qty(counter, delta, signed=True)} |")
 
     if regressions:
         table(regressions, "Regressions", "error")

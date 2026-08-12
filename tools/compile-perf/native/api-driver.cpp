@@ -77,14 +77,22 @@
 
 using Clock = std::chrono::steady_clock;
 
-// Accumulates total milliseconds and an op count per phase, and prints the
-// slangc-compatible "[*] name count total" report at the end of a run.
+// Accumulates a running total and an op count per name, and prints the
+// slangc-compatible "[*] name count total" timer report at the end of a run.
+//
+// `total` is deliberately unit-less: the UNIT belongs to the caller, not to
+// the accumulator. Timing (Scope, and report() below) feeds it milliseconds
+// and prints an "ms" suffix; g_memDeltas feeds it kilobytes and prints a "kb"
+// suffix from reportMemDeltas(). Naming the field totalMs would be a comment
+// that only one of its two callers can honour — and the wrong one would be
+// silently wrong about units, which is the failure this suite works hardest
+// to prevent. Each printf spells out the unit it is publishing instead.
 struct Timers
 {
     struct Entry
     {
         std::string name;
-        double totalMs = 0.0;
+        double total = 0.0;
         long count = 0;
     };
     std::vector<Entry> entries;
@@ -98,17 +106,19 @@ struct Timers
         return entries.back();
     }
 
-    void add(const char* name, double ms)
+    void add(const char* name, double value)
     {
         auto& e = get(name);
-        e.totalMs += ms;
+        e.total += value;
         e.count += 1;
     }
 
+    // The milliseconds consumer: every caller reaching report() is a timing
+    // caller, so the "ms" suffix is this function's to assert.
     void report() const
     {
         for (const auto& e : entries)
-            printf("[*] %s\t%ld\t%.4fms\n", e.name.c_str(), e.count, e.totalMs);
+            printf("[*] %s\t%ld\t%.4fms\n", e.name.c_str(), e.count, e.total);
     }
 };
 
@@ -256,8 +266,10 @@ static int runSelfCheckMem()
 // Memory deltas recorded around selected phases, reported next to the timers
 // as "[MEM] name\tNNNkb" lines that bench.py parses into the record's
 // `memory` dict. The RSS growth across createGlobalSession is the metric of
-// shader-slang/slang#9817. Reuses Timers as the accumulator (totalMs holds
-// KB); reportMemDeltas() runs wherever timers.report() does.
+// shader-slang/slang#9817. Reuses Timers purely as a named (total, count)
+// accumulator — the KILOBYTES unit is this file's to state, and it is stated
+// at the publish printf in reportMemDeltas(), which runs wherever
+// timers.report() does.
 // Each g_memDeltas counter is written AT MOST ONCE per process; entries are
 // only inserted after both RSS readings succeed, so a failed reading yields
 // no data point rather than a real-looking 0kb sample.
@@ -311,7 +323,7 @@ static void reportMemDeltas()
     for (const auto& e : g_memDeltas.entries)
     {
         // Enforce the "written AT MOST ONCE per process" contract at the point
-        // the number is published. Timers::add ACCUMULATES (totalMs += ms), so
+        // the number is published. Timers::add ACCUMULATES (total += value), so
         // a regressed g_sessionRssRecorded guard would not produce a duplicate
         // line that a reader could notice — it would produce one line holding
         // the SUM of every session's delta, which for api_session_create
@@ -337,7 +349,9 @@ static void reportMemDeltas()
                 e.count);
             continue;
         }
-        printf("[MEM] %s\t%.0fkb\n", e.name.c_str(), e.totalMs);
+        // The unit is asserted here, where it is known: e.total holds the
+        // kilobyte delta recordSessionCreateRss() put in it.
+        printf("[MEM] %s\t%.0fkb\n", e.name.c_str(), e.total);
     }
 }
 

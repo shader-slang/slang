@@ -51,12 +51,26 @@ def parse_mem(text):
         # print format), while the counter NAME must end in capitalized
         # "Kb" (analyze.unit_of's display-classification convention).
         if len(toks) == 2 and toks[1].endswith("kb"):
+            # A `raise`, not an `assert`, and ahead of the value parse — both
+            # deliberately. This runs on the perf runner rather than under
+            # check-python-core, so an assert would be erased by `python -O`,
+            # taking with it the guard against the failure the asymmetry below
+            # describes; and placing it before the try keeps it structurally
+            # impossible for the value path's `except ValueError` to swallow
+            # it, rather than merely adjacent to it.
+            #
+            # Loud rather than skipped, deliberately, and the asymmetry with
+            # the value path is the point: a bad VALUE loses one sample, while
+            # a name that does not end in Kb is classified as milliseconds by
+            # unit_of, so ~200,000 kb charts as 200,000 ms and trend gates it
+            # on a 2 ms floor. Wrong units are worse than no units.
+            if not toks[0].endswith("Kb"):
+                raise ValueError(f"memory counter '{toks[0]}' must end in Kb "
+                                 "(analyze.unit_of contract)")
             try:
                 val = float(toks[1][:-2])
             except ValueError:
                 continue
-            assert toks[0].endswith("Kb"), \
-                f"memory counter '{toks[0]}' must end in Kb (analyze.unit_of contract)"
             out[toks[0]] = val
     return out
 
@@ -791,18 +805,17 @@ assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed line
 
 # The Kb-suffix branch, which the two checks above never reach: "malformed" is
 # rejected on token COUNT, so nothing so far drives a line that is structurally
-# fine but whose counter NAME breaks the analyze.unit_of contract. Note the
-# value token parses cleanly, so the `except ValueError: continue` above does
-# not shadow the assertion — this really does reach it.
+# fine but whose counter NAME breaks the analyze.unit_of contract.
 #
-# Loud rather than skipped, deliberately, and the asymmetry with the value path
-# is the point: a bad VALUE loses one sample, while a name that does not end in
-# Kb is classified as milliseconds by unit_of, so ~200,000 kb charts as 200,000
-# ms and trend gates it on a 2 ms floor. Wrong units are worse than no units.
+# ValueError, not AssertionError, is what this must catch — and catching the
+# specific type is the point of the check, not incidental to it. The guard has
+# to survive `python -O` on the perf runner (see parse_mem), which an assert
+# would not, so a future edit "simplifying" the raise back to an assert has to
+# fail here rather than pass quietly and disarm the guard in production.
 _rejected = None
 try:
     parse_mem("[MEM] badname\t100kb")
-except AssertionError as _e:
+except ValueError as _e:
     _rejected = str(_e)
 assert _rejected and "unit_of contract" in _rejected, \
     ("parse_mem must REJECT a counter name not ending in Kb, citing the "
