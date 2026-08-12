@@ -467,7 +467,38 @@ struct IRKnownBuiltinDecoration : IRDecoration
 };
 
 FIDDLE()
+struct IRBuiltinRequirementDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+
+    // The `BuiltinRequirementKind`, as its integer value (kept as a raw integer
+    // here so this IR header need not depend on the AST enum).
+    IRIntegerValue getKind() { return getIntVal(getKindOperand()); }
+};
+
+// A requirement key for a recognized built-in interface requirement (e.g. an
+// `IDifferentiable` requirement identified by `BuiltinRequirementKind`). It is a
+// hoistable inst, so it is deduplicated by construction from its `kind` operand:
+// every reference to the same built-in requirement resolves to a single key inst
+// (even across decls and the precompiled core module). See the lua definition
+// for the full rationale.
+FIDDLE()
+struct IRBuiltinRequirementKey : IRInst
+{
+    FIDDLE(leafInst())
+
+    // The `BuiltinRequirementKind`, as its integer value.
+    IRIntegerValue getKind() { return getIntVal(getKindOperand()); }
+};
+
+FIDDLE()
 struct IREntryPointParamDecoration : IRDecoration
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRSynthesizedParameterGroupDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 };
@@ -1028,6 +1059,40 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     }
 };
 
+/// An attribute that specifies the alignment of a type in a single layout unit.
+///
+/// The alignment operand comes first; the layout-unit operand is optional and
+/// defaults to `LayoutResourceKind::Uniform` (bytes) when absent. A type layout
+/// carries at most one of these per unit, and only when it occupies that unit
+/// (any size that is not definitely zero — a finite non-zero, infinite, or
+/// unknown extent); an absent attribute means the alignment for that unit is `1`,
+/// which mirrors how an absent `IRTypeSizeAttr` means a size of `0`.
+FIDDLE()
+struct IRTypeAlignmentAttr : public IRAttr
+{
+    FIDDLE(leafInst())
+
+    /// The `IRIntLit` holding the alignment value. The alignment is required, so
+    /// this operand is always present.
+    IRIntLit* getAlignmentInst() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntegerValue getAlignment() { return getIntVal(getAlignmentInst()); }
+
+    /// The `IRIntLit` holding the layout unit, or null when the unit operand is
+    /// omitted (which encodes the `Uniform` default).
+    IRIntLit* getResourceKindInst()
+    {
+        if (getOperandCount() > 1)
+            return cast<IRIntLit>(getOperand(1));
+        return nullptr;
+    }
+    LayoutResourceKind getResourceKind()
+    {
+        if (auto kindInst = getResourceKindInst())
+            return LayoutResourceKind(getIntVal(kindInst));
+        return LayoutResourceKind::Uniform;
+    }
+};
+
 // Layout
 
 /// Base type for instructions that represent layout information.
@@ -1067,6 +1132,36 @@ struct IRTypeLayout : IRLayout
     /// Get all the attributes representing size information.
     IROperandList<IRTypeSizeAttr> getSizeAttrs();
 
+    /// Find the attribute that stores alignment information for `kind`, or null
+    /// if none is present (meaning the alignment for `kind` is `1`).
+    IRTypeAlignmentAttr* findAlignmentAttr(LayoutResourceKind kind);
+
+    /// Get all the attributes representing alignment information.
+    IROperandList<IRTypeAlignmentAttr> getAlignmentAttrs();
+
+    /// Return the alignment for `kind`, or `1` when no alignment attribute is
+    /// present for it (matching the convention that an absent size attribute
+    /// means a size of zero).
+    IRIntegerValue getAlignment(LayoutResourceKind kind);
+
+    // The following are a matched set of convenience queries for the byte
+    // (`Uniform`) layout unit, derived from the size and alignment attributes.
+
+    /// Get the size, in bytes, of this type, or `0` when it consumes no bytes.
+    LayoutSize getSizeInBytes();
+
+    /// Get the alignment, in bytes, of this type, or `1` when no byte alignment
+    /// attribute is present.
+    IRIntegerValue getAlignmentInBytes();
+
+    /// Get the stride, in bytes, of this type: its byte size rounded up to its
+    /// byte alignment. A zero-sized type has a zero stride regardless of its
+    /// alignment; a non-finite size — unsized (infinite) or unknown (invalid) —
+    /// has no finite stride and is returned unchanged. The result is therefore a
+    /// `LayoutSize` rather than a plain integer, so those cases stay distinct
+    /// from a genuine zero stride.
+    LayoutSize getStrideInBytes();
+
     /// Unwrap any layers of array-ness and return the outer-most non-array type.
     IRTypeLayout* unwrapArray();
 
@@ -1087,7 +1182,16 @@ struct IRTypeLayout : IRLayout
         /// Add the resource usage specified by `sizeAttr`.
         void addResourceUsage(IRTypeSizeAttr* sizeAttr);
 
-        /// Add all resource usage from `typeLayout`.
+        /// Record the alignment of this type in the layout unit `kind`. The built
+        /// layout emits an `IRTypeAlignmentAttr` for `kind` only when that unit is
+        /// occupied (its size is not definitely zero) and the alignment is greater
+        /// than the implicit default of 1.
+        void addAlignment(LayoutResourceKind kind, IRIntegerValue alignment);
+
+        /// Record the alignment specified by `alignmentAttr`.
+        void addAlignment(IRTypeAlignmentAttr* alignmentAttr);
+
+        /// Add all resource usage (size and alignment) from `typeLayout`.
         void addResourceUsageFrom(IRTypeLayout* typeLayout);
 
 
@@ -1122,6 +1226,10 @@ struct IRTypeLayout : IRLayout
         {
             LayoutResourceKind kind = LayoutResourceKind::None;
             LayoutSize size = 0;
+            // Defaults to the identity alignment of 1, just as `size` defaults to
+            // 0. An alignment of 1 is exactly what an absent attribute encodes, so
+            // the builder emits an attribute only for alignments greater than 1.
+            IRIntegerValue alignment = 1;
         };
         ResInfo m_resInfos[SLANG_PARAMETER_CATEGORY_COUNT];
     };
@@ -1185,6 +1293,20 @@ struct IRArrayTypeLayout : IRTypeLayout
 
 
     IRTypeLayout* getElementTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
+
+    /// Get the stride, in bytes, between consecutive elements.
+    ///
+    /// This is the element's byte size rounded up to the array's byte alignment.
+    /// The array's own alignment — not the element type's context-free alignment —
+    /// is the element's in-array alignment, so under the constant-buffer and
+    /// std140 rules a `float[N]` strides by 16 bytes: the element is 4 bytes but
+    /// the array is aligned to 16, whereas the element type alone reports
+    /// alignment 4.
+    ///
+    /// This equals the front-end's `SequenceTypeLayout::uniformStride`, so it is
+    /// derived from the stored size/alignment rather than requiring that stride
+    /// to be preserved separately into the IR.
+    LayoutSize getElementStrideInBytes();
 
     struct Builder : Super::Builder
     {
@@ -2036,6 +2158,7 @@ struct IRSwitch : IRTerminatorInst
     UInt getCaseCount() { return (getOperandCount() - 3) / 2; }
     IRInst* getCaseValue(UInt index) { return getOperand(3 + index * 2 + 0); }
     IRBlock* getCaseLabel(UInt index) { return (IRBlock*)getOperand(3 + index * 2 + 1); }
+    IRUse* getCaseValueUse(UInt index) { return getOperands() + 3 + index * 2 + 0; }
     IRUse* getCaseLabelUse(UInt index) { return getOperands() + 3 + index * 2 + 1; }
 };
 
@@ -2693,6 +2816,15 @@ struct IRDebugFunction : IRInst
     IRInst* getCol() { return getOperand(2); }
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
+
+    // The function's lexical parent scope, or null when the function has none: at Minimal debug
+    // level (no compilation units exist), when its source has no compilation unit of its own (an
+    // #include'd/#line-remapped source), or for a function from an IR blob that predates this
+    // operand. The only parent scope produced is the DebugCompilationUnit of the source file the
+    // function is defined in, so an imported function resolves to its own module's compilation unit
+    // rather than the entry point's. The operand type is a general parent scope, not specifically a
+    // compilation unit, so a lexical scope can occupy it without changing the operand's meaning.
+    IRInst* getParentScope() { return getOperandCount() > 5 ? getOperand(5) : nullptr; }
 };
 
 FIDDLE()
@@ -2973,7 +3105,13 @@ struct IRCompilerDictionaryEntry : IRInst
         {
             if (auto dictValue = as<IRCompilerDictionaryValue>(child))
             {
-                return dictValue->getValue();
+                auto value = dictValue->getValue();
+                // Dictionary values are weak cache references. If DCE collected the cached
+                // result, the weak operand is rewritten to poison. Keep scanning because a later
+                // lookup may already have refreshed this cache row with a live replacement.
+                if (value && value->getOp() == kIROp_Poison)
+                    continue;
+                return value;
             }
         }
 
@@ -3460,6 +3598,17 @@ $(type_info.return_type) $(type_info.method_name)(
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
+    // Get the unique (deduplicated) requirement key for a built-in interface
+    // requirement identified by `kind` (a `BuiltinRequirementKind`). Because the
+    // inst is hoistable, repeated calls with the same `kind` return the same key
+    // inst, so a witness lookup and the witness-table entry always agree.
+    IRBuiltinRequirementKey* getBuiltinRequirementKey(IRIntegerValue kind)
+    {
+        IRInst* arg = getIntValue(getIntType(), kind);
+        return cast<IRBuiltinRequirementKey>(
+            emitIntrinsicInst(nullptr, kIROp_BuiltinRequirementKey, 1, &arg));
+    }
+
     IRCompilerDictionaryEntry* _getCompilerDictionaryEntry(List<IRInst*> const& keys);
 
     void addCompilerDictionaryEntry(
@@ -3476,6 +3625,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
 
     // Annotation helpers.
+    //
+    // Note: adding an annotation changes what `doesCalleeHaveSideEffect(target)`
+    // returns, so it must not happen while a callee-side-effect cache is live
+    // (see `IRDeadCodeEliminationOptions::calleeSideEffectCache`).
     void addAnnotation(IRInst* target, AnnotationKind kind, IRInst* value);
     IRInst* tryLookupAnnotation(IRInst* target, AnnotationKind kind);
 
@@ -3534,7 +3687,8 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* line,
         IRInst* col,
         IRInst* file,
-        IRInst* debugType);
+        IRInst* debugType,
+        IRInst* parentScope = nullptr);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
@@ -3872,7 +4026,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGpuForeach(List<IRInst*> args);
 
     IRLoadFromUninitializedMemory* emitLoadFromUninitializedMemory(IRType* type);
-    IRPoison* emitPoison(IRType* type);
+    IRPoison* getPoison(IRType* type);
 
     IRInst* emitReinterpret(IRInst* type, IRInst* value);
     IRInst* emitOutImplicitCast(IRInst* type, IRInst* value);
@@ -4605,6 +4759,9 @@ $(type_info.return_type) $(type_info.method_name)(
     //    IRLayout* getLayout(Layout* astLayout);
 
     IRTypeSizeAttr* getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size);
+    IRTypeAlignmentAttr* getTypeAlignmentAttr(
+        IRIntegerValue alignment,
+        LayoutResourceKind kind = LayoutResourceKind::Uniform);
     IRVarOffsetAttr* getVarOffsetAttr(LayoutResourceKind kind, UInt offset, UInt space = 0);
     IRStructFieldLayoutAttr* getFieldLayoutAttr(IRInst* key, IRVarLayout* layout);
     IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(IRTypeLayout* layout);
@@ -4833,6 +4990,16 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
     {
+        // A constant is dynamically uniform by definition, so it can never be
+        // NonUniform; never decorate one. This matters beyond tidiness: integer
+        // literals are deduplicated module-wide, so decorating a shared literal
+        // (e.g. a fixed [0] access-chain index reached via a non-uniform base)
+        // would make NonUniform propagation see every other uniform access chain
+        // that reuses that literal as "already NonUniform" and spuriously
+        // decorate it -- potentially pulling in an unrelated
+        // *ArrayNonUniformIndexing capability the shader does not need.
+        if (as<IRConstant>(value))
+            return;
         addDecoration(value, kIROp_SPIRVNonUniformResourceDecoration);
     }
 
@@ -5243,6 +5410,14 @@ $(type_info.return_type) $(type_info.method_name)(
             getIntValue(getIntType(), IRIntegerValue(enumValue)));
     }
 
+    // Mark `value` (an interface requirement key) with the built-in requirement
+    // role `kind` (a `BuiltinRequirementKind` integer value), so consumers can
+    // find the requirement by role instead of by entry order.
+    void addBuiltinRequirementDecoration(IRInst* value, IRIntegerValue kind)
+    {
+        addDecoration(value, kIROp_BuiltinRequirementDecoration, getIntValue(getIntType(), kind));
+    }
+
     void addKnownBuiltinDecoration(IRInst* value, UnownedStringSlice const& name)
     {
         auto enumValue = getKnownBuiltinDeclNameFromString(name);
@@ -5260,6 +5435,11 @@ $(type_info.return_type) $(type_info.method_name)(
     void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)
     {
         addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
+    }
+
+    void addSynthesizedParameterGroupDecoration(IRInst* inst)
+    {
+        addDecoration(inst, kIROp_SynthesizedParameterGroupDecoration);
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }

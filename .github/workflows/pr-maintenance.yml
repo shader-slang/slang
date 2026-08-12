@@ -1,0 +1,54 @@
+name: PR Maintenance
+
+# Thin caller for the reusable PR board-sync workflow. Declares the PR event
+# triggers (a reusable workflow cannot declare them itself) and delegates all
+# logic to pr-board-sync.yml. slang consumes its own reusable workflow so there
+# is a single source of truth; other shader-slang repos use the cross-repo form:
+#
+#   uses: shader-slang/slang/.github/workflows/pr-board-sync.yml@master
+#
+# pull_request_target is a privileged event that receives the secret even for
+# fork PRs, so it runs here directly. pull_request_review only receives the
+# secret for ORIGIN PRs, so the job below skips it for forks; fork reviews are
+# handled by the pr-review-fork-bridge.yml -> pr-review-fork-apply.yml
+# (workflow_run) relay. See pr-board-sync.yml for the board IDs and the secret.
+#
+# CI completion is NOT handled here. GitHub does not deliver check_suite events
+# for suites created by GitHub Actions (recursion prevention), so a check_suite
+# trigger never fires for this repo's Actions-based CI; CI completion is relayed
+# via workflow_run by pr-ci-complete.yml instead. The check_suite trigger below
+# is kept only to catch any non-Actions, GitHub-App-created check suites.
+
+on:
+  pull_request_target:
+    types:
+      [
+        opened,
+        reopened,
+        edited,
+        synchronize,
+        closed,
+        ready_for_review,
+        converted_to_draft,
+        enqueued,
+        dequeued,
+      ]
+  pull_request_review:
+    # dismissed matters too: dismissing a CHANGES_REQUESTED review (with no new
+    # commit) should move the PR out of Revising, and only this event signals it.
+    types: [submitted, dismissed]
+  check_suite:
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  board-sync:
+    # Run directly for everything except a fork PR's review (no secret there);
+    # fork reviews go through the workflow_run relay instead.
+    if: >-
+      github.event_name != 'pull_request_review' ||
+      github.event.pull_request.head.repo.fork == false
+    uses: ./.github/workflows/pr-board-sync.yml
+    secrets:
+      SLANG_PR_BOT_TOKEN: ${{ secrets.SLANG_PR_BOT_TOKEN }}

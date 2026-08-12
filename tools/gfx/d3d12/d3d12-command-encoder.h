@@ -152,7 +152,9 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL endDebugEvent() override;
 };
 
-class ComputeCommandEncoderImpl : public IComputeCommandEncoder, public ResourceCommandEncoderImpl
+class ComputeCommandEncoderImpl : public IComputeCommandEncoder,
+                                  public IComputeCommandEncoderD3D12,
+                                  public ResourceCommandEncoderImpl
 {
 public:
     SLANG_GFX_FORWARD_RESOURCE_COMMAND_ENCODER_IMPL(ResourceCommandEncoderImpl)
@@ -160,7 +162,9 @@ public:
     {
         if (uuid == GfxGUID::IID_IComputeCommandEncoder ||
             uuid == GfxGUID::IID_IResourceCommandEncoder || uuid == ISlangUnknown::getTypeGuid())
-            return this;
+            return static_cast<IComputeCommandEncoder*>(this);
+        if (uuid == GfxGUID::IID_IComputeCommandEncoderD3D12)
+            return static_cast<IComputeCommandEncoderD3D12*>(this);
         return nullptr;
     }
 
@@ -176,6 +180,9 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
     bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject) override;
+
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    bindRootObjectAsCompute(IShaderProgram* program, IShaderObject* rootObject) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL dispatchCompute(int x, int y, int z) override;
 

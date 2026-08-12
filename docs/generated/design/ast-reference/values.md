@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.7
-generated_at: 2026-05-12T09:38:10+00:00
-source_commit: 12bdd912949ee692a11a757b5829fe3ef819bebc
-watched_paths_digest: 4f74d91e4cf48490043c25f1aa4fe35ca34e369bae1bba7089a2d3a8a0006cd1
+model: claude-opus-5
+generated_at: 2026-08-03T13:57:34Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: aea6c67df76f1024b3cea1726b279a8ddc00bda3f01d9c6a25e65b7c80d11490
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -12,11 +12,9 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 The reference for the **non-Type** `Val` subclasses in the Slang AST:
 the `DeclRefBase` family, the `IntVal` family, the `Witness` family,
 the `ModifierVal` family, the `DifferentiateVal` family, and a few
-standalone Vals.
-
-Audience: a contributor reading or writing checker / IR-lowering code
-that touches compile-time values, conformance witnesses, or generic
-specialization.
+standalone Vals. It is for a contributor reading or writing checker /
+IR-lowering code that touches compile-time values, conformance
+witnesses, or generic specialization.
 
 ## Source
 
@@ -28,9 +26,27 @@ and `DeclRefBase` abstract bases are in
 `Val`, but its concrete classes are documented there to keep this
 page focused on the non-Type Vals.
 
+The central operation on every class below is substitution.
+`Val::substitute` and the lower-level `Val::substituteImpl` are
+declared on `Val` in
+[slang-ast-base.h](../../../../source/slang/slang-ast-base.h), and most
+of the classes on this page provide a `_substituteImplOverride` that
+rebuilds the node from substituted operands. The `SubstitutionSet`
+those methods take is declared in
+[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h),
+but its two traversal members —
+`SubstitutionSet::forEachGenericSubstitution` and
+`SubstitutionSet::forEachSubstitutionArg` — are defined at the bottom
+of [slang-ast-val.h](../../../../source/slang/slang-ast-val.h), and
+show that a substitution set is a chain of `GenericAppDeclRef` and
+`LookupDeclRef` links walked through `DeclRefBase::getBase()`. See
+[Substitution and the substitution cache](#substitution-and-the-substitution-cache)
+below.
+
 Recall from [base.md](base.md#val-nodebase) that `Val`s are
-hash-consed by the `ASTBuilder`: any two `Val`s with the same
-discriminator and operand list are the same `Val*`. The classes
+hash-consed by the `ASTBuilder`: any two `Val`s built through
+`ASTBuilder::getOrCreate` with the same discriminator and operand list
+are the same `Val*`. The classes
 listed below carry their data as generic
 `m_operands: List<ValNodeOperand>`, not as per-class C++ fields; the
 "Key fields" column therefore lists *operand slot* semantics rather
@@ -57,7 +73,7 @@ flowchart TD
   IntVal --> ConstantIntVal
   IntVal --> DeclRefIntVal
   IntVal --> TypeCastIntVal
-  IntVal --> FuncCallIntVal
+  IntVal --> BuiltinOperationIntVal
   IntVal --> SizeOfLikeIntVal
   IntVal --> FirstIntVal
   IntVal --> LastIntVal
@@ -81,6 +97,8 @@ flowchart TD
   Witness --> TypeCoercionWitness
   Witness --> NoneWitness
   Witness --> HasDiffTypeInfoWitness
+  Witness --> DeclaredVariadicPackCountWitness
+  Witness --> ConcreteVariadicPackCountWitness
   Witness --> NonEmptyPackWitness
   SubtypeWitness --> TypePackSubtypeWitness
   SubtypeWitness --> EachSubtypeWitness
@@ -126,12 +144,12 @@ can take. The user-facing API is the template `DeclRef<T>`, declared
 in [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
 and described in [base.md](base.md#support-types).
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DirectDeclRef` | `DeclRefBase` | `Decl* targetDecl` | (none) | A bare decl-ref to a `Decl` with no substitutions. |
-| `MemberDeclRef` | `DeclRefBase` | `parent: DeclRefBase`, `member: Decl` | (none) | A decl-ref expressed relative to a parent decl-ref. |
-| `LookupDeclRef` | `DeclRefBase` | `base: DeclRefBase`, `requirementKey`, witness operands | (none) | A decl-ref reached by lookup through a `SubtypeWitness` (used for interface-requirement satisfaction). |
-| `GenericAppDeclRef` | `DeclRefBase` | `base: DeclRefBase`, generic-arg `Val` operands | (none) | A generic decl-ref with its arguments applied. |
+| `DirectDeclRef` | `DeclRefBase` | `decl: Decl` (`getDecl()`) | (none) | A bare decl-ref to a `Decl` with no substitutions. |
+| `MemberDeclRef` | `DeclRefBase` | `decl: Decl`, `parent: DeclRefBase` (`getParentOperand()`) | (none) | A decl-ref expressed relative to a parent decl-ref. |
+| `LookupDeclRef` | `DeclRefBase` | `decl: Decl` (the decl to look up), `lookupSource: Type`, `witness: SubtypeWitness` | (none) | A decl-ref reached by lookup through a `SubtypeWitness` (used for interface-requirement satisfaction). |
+| `GenericAppDeclRef` | `DeclRefBase` | `decl: Decl` (the inner decl), `genericDeclRef: DeclRefBase`, argument `Val` operands from slot 2 (`getArgs()`) | (none) | A generic decl-ref with its arguments applied. |
 
 ### IntVal family
 
@@ -139,40 +157,43 @@ and described in [base.md](base.md#support-types).
 exist because some forms (constants) are immediately reducible while
 others (e.g. `DeclRefIntVal`) name an unsubstituted generic
 parameter and only collapse to a constant after substitution.
+Every `IntVal` stores its own `Type` in operand slot 0
+(`IntVal::getType()`), so the "Key fields" column below lists only the
+operands that follow that slot.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `ConstantIntVal` | `IntVal` | `value: int64_t`, `type: Type*` | (none) | A literal compile-time integer. |
-| `DeclRefIntVal` | `IntVal` | `declRef: DeclRefBase` (to a value generic param) | (none) | An unsubstituted generic value parameter. |
-| `TypeCastIntVal` | `IntVal` | `value: IntVal`, `targetType: Type` | (none) | An integer cast to a different integer type. |
-| `FuncCallIntVal` | `IntVal` | `funcDecl: DeclRefBase`, arg `IntVal` operands | (none) | A compile-time call to an integer-returning function. |
-| `SizeOfIntVal` | `SizeOfLikeIntVal` | `target type or expr` operand, optional layout operand | (none) | Compile-time `sizeof`. |
-| `AlignOfIntVal` | `SizeOfLikeIntVal` | (same shape as `SizeOfIntVal`) | (none) | Compile-time `alignof`. |
-| `CountOfIntVal` | `SizeOfLikeIntVal` | target-type operand | (none) | Compile-time `countof` (array length). |
-| `FirstIntVal` | `IntVal` | pack-operand | (none) | First element of an `IntVal` pack. |
-| `LastIntVal` | `IntVal` | pack-operand | (none) | Last element of an `IntVal` pack. |
-| `ConcreteIntValPack` | `IntVal` | list of `IntVal` operands | (none) | An already-bound pack of integer values. |
-| `TrimFirstIntValPack` | `IntVal` | pack-operand | (none) | Pack with the first element removed. |
-| `TrimLastIntValPack` | `IntVal` | pack-operand | (none) | Pack with the last element removed. |
-| `ShapeConcatIntValPack` | `ShapeTransformIntValPack` | list of pack operands | (none) | Concatenate `IntVal` packs. |
-| `ShapePermuteIntValPack` | `ShapeTransformIntValPack` | pack + permutation operands | (none) | Permute an `IntVal` pack. |
-| `ShapeSwapIntValPack` | `ShapeTransformIntValPack` | pack + swap-indices operands | (none) | Swap two entries in an `IntVal` pack. |
-| `ShapeReduceIntValPack` | `ShapeTransformIntValPack` | pack + reduction-op operands | (none) | Reduce an `IntVal` pack with a fold operation. |
-| `ExpandIntValPack` | `IntVal` | pack operands | (none) | `expand` of an `IntVal` pack. |
-| `EachIntVal` | `IntVal` | pack operand | (none) | `each` over an `IntVal` pack. |
-| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `requirementKey` | (none) | An integer value resolved through a witness-table lookup. |
-| `PolynomialIntVal` | `IntVal` | constant term + list of `PolynomialIntValTerm` operands | (none) | A polynomial in unsubstituted generic value parameters. |
-| `ErrorIntVal` | `IntVal` | (no operands) | (none) | Error placeholder; lets checking continue when an integer value cannot be computed. |
+| `ConstantIntVal` | `IntVal` | `value: IntegerLiteralValue` (`getValue()`) | (none) | A literal compile-time integer. |
+| `DeclRefIntVal` | `IntVal` | `declRef: DeclRef<VarDeclBase>` (to a value generic param) | (none) | An unsubstituted generic value parameter. |
+| `TypeCastIntVal` | `IntVal` | `base: Val` (`getBase()`) | (none) | An integer cast to a different integer type (the target type is the node's own `type` operand). |
+| `BuiltinOperationIntVal` | `IntVal` | `op: BuiltinOperationKind` (operand 1), arg `IntVal` operands (from slot 2) | (none) | A still-symbolic builtin operator (e.g. `N / 2`); folds to a `ConstantIntVal` once its operands are concrete. |
+| `SizeOfIntVal` | `SizeOfLikeIntVal` | `valArg: Type` (`getValArg()`) | (none) | Compile-time `sizeof` of a type. |
+| `AlignOfIntVal` | `SizeOfLikeIntVal` | `valArg: Type` (`getValArg()`) | (none) | Compile-time `alignof` of a type. |
+| `CountOfIntVal` | `SizeOfLikeIntVal` | `valArg: Val` (`getValArg()`) | (none) | Compile-time `countof`; the argument is any `Val`, not only a type. |
+| `FirstIntVal` | `IntVal` | `basePack: Val` | (none) | First element of an `IntVal` pack. |
+| `LastIntVal` | `IntVal` | `basePack: Val` | (none) | Last element of an `IntVal` pack. |
+| `ConcreteIntValPack` | `IntVal` | element `IntVal` operands (`getCount()` / `getElement(i)`) | (none) | An already-bound pack of integer values. |
+| `TrimFirstIntValPack` | `IntVal` | `basePack: Val` | (none) | Pack with the first element removed. |
+| `TrimLastIntValPack` | `IntVal` | `basePack: Val` | (none) | Pack with the last element removed. |
+| `ShapeConcatIntValPack` | `ShapeTransformIntValPack` | `leftPack: Val`, `rightPack: Val`, `axis: IntVal` | (none) | Concatenate two `IntVal` packs along an axis. |
+| `ShapePermuteIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `orderPack: Val` | (none) | Permute an `IntVal` pack by an order pack. |
+| `ShapeSwapIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `dim0: IntVal`, `dim1: IntVal` | (none) | Swap two entries in an `IntVal` pack. |
+| `ShapeReduceIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `axis: IntVal` | (none) | Drop one axis from an `IntVal` pack. |
+| `ExpandIntValPack` | `IntVal` | `patternVal: Val` plus captured-pack operands | (none) | An unexpanded value pattern over captured value packs (the value analogue of `ExpandType`). |
+| `EachIntVal` | `IntVal` | `basePack: Val` | (none) | Indexes into a value pack during substitution using the substitution's `packExpansionIndex`. |
+| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `key: Decl` (`getKey()`) | (none) | An integer value resolved through a witness-table lookup. |
+| `PolynomialIntVal` | `IntVal` | `constantTerm: IntegerLiteralValue` plus `PolynomialIntValTerm` operands | (none) | A polynomial in unsubstituted generic value parameters. |
+| `ErrorIntVal` | `IntVal` | (type operand only) | (none) | Error placeholder; lets checking continue when an integer value cannot be computed. |
 
 ### Polynomial helpers
 
 These are `Val`s (so they can be hash-consed) but are not `IntVal`s
 themselves: they appear as operands of a `PolynomialIntVal`.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `PolynomialIntValFactor` | `Val` | `param: DeclRefBase`, `power: int` | (none) | One factor `param^power` of a polynomial term. |
-| `PolynomialIntValTerm` | `Val` | `coefficient: int64_t`, list of `PolynomialIntValFactor` operands | (none) | One term of a `PolynomialIntVal`: coefficient times a product of factors. |
+| `PolynomialIntValFactor` | `Val` | `param: IntVal`, `power: IntegerLiteralValue` | (none) | One factor `param^power` of a polynomial term. |
+| `PolynomialIntValTerm` | `Val` | `constFactor: IntegerLiteralValue`, `paramFactors: OperandView<PolynomialIntValFactor>` | (none) | One term of a `PolynomialIntVal`: a constant factor times a product of `PolynomialIntValFactor`s. |
 
 ### Witness family
 
@@ -183,47 +204,59 @@ and that the checker passes around alongside generic substitutions.
 
 #### Subtype witnesses
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+`SubtypeWitness` fixes operand slots 0 and 1 as the `sub` and `sup`
+types (`getSub()` / `getSup()`), so the "Key fields" column lists only
+the operands that follow them. The two differentiation witnesses
+(`DiffTypeInfoWitness` and `HigherOrderDiffTypeTranslationWitness`)
+are the exception: they use slot 0 for their own operand and do not
+follow the `sub` / `sup` convention.
+
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DeclaredSubtypeWitness` | `SubtypeWitness` | `sub: Type`, `sup: Type`, declaration that introduced the relation | (none) | Evidence reported by an `InheritanceDecl` on a user-declared type. |
-| `TransitiveSubtypeWitness` | `SubtypeWitness` | composing witnesses (`A:B` and `B:C` -> `A:C`) | (none) | Subtype evidence obtained by composing two existing witnesses. |
-| `TypeEqualityWitness` | `SubtypeWitness` | `lhs: Type`, `rhs: Type` | (none) | Evidence that two types are equal (a special case of subtyping that goes both ways). |
-| `ExtractExistentialSubtypeWitness` | `SubtypeWitness` | existential decl operand | (none) | Evidence carried by an opened existential value. |
-| `DynamicSubtypeWitness` | `SubtypeWitness` | dynamic-dispatch operands | (none) | Evidence used for `DynamicType` dispatch. |
-| `TypePackSubtypeWitness` | `SubtypeWitness` | sub-pack, sup-pack, per-element witnesses | (none) | Element-wise pack subtyping. |
-| `EachSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | `each` over a `TypePackSubtypeWitness`. |
-| `FirstSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | First element of a pack-witness. |
-| `LastSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | Last element of a pack-witness. |
-| `TrimFirstSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | Pack-witness with the first element trimmed. |
-| `TrimLastSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | Pack-witness with the last element trimmed. |
-| `PackBranchSubtypeWitness` | `SubtypeWitness` | pack operand + empty / non-empty witnesses | (none) | Pack-conditional subtype witness. |
-| `ExpandSubtypeWitness` | `SubtypeWitness` | pack-witness operand | (none) | `expand` of a pack-witness. |
-| `DiffTypeInfoWitness` | `SubtypeWitness` | type operand | (none) | Evidence that a type has differential information. |
-| `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | function-type operands | (none) | Evidence for higher-order differentiable-type translation. |
+| `DeclaredSubtypeWitness` | `SubtypeWitness` | `declRef: DeclRef<Decl>` — the declaration that introduced the relation | (none) | Evidence reported by an in-scope declaration (an `InheritanceDecl`, or a `GenericTypeConstraintDecl` for a `where` clause). |
+| `TransitiveSubtypeWitness` | `SubtypeWitness` | `subToMid: SubtypeWitness`, `midToSup: SubtypeWitness` | (none) | Subtype evidence obtained by composing two existing witnesses. |
+| `TypeEqualityWitness` | `SubtypeWitness` | (`sub` / `sup` only) | (none) | Evidence that two types are equal (a special case of subtyping that goes both ways). |
+| `ExtractExistentialSubtypeWitness` | `SubtypeWitness` | `declRef: DeclRef<VarDeclBase>` — the opened existential value | (none) | Evidence carried by an opened existential value. |
+| `DynamicSubtypeWitness` | `SubtypeWitness` | (`sub` / `sup` only) | (none) | Evidence that a user-supplied `__Dynamic` type argument satisfies an existential type parameter. |
+| `TypePackSubtypeWitness` | `SubtypeWitness` | per-element `SubtypeWitness` operands (`getCount()` / `getWitness(i)`) | (none) | Element-wise pack subtyping. |
+| `EachSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | `each` over a pack witness. |
+| `FirstSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | First element of a pack witness. |
+| `LastSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Last element of a pack witness. |
+| `TrimFirstSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Pack witness with the first element trimmed. |
+| `TrimLastSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Pack witness with the last element trimmed. |
+| `PackBranchSubtypeWitness` | `SubtypeWitness` | `packOperand: Val`, `emptyWitness: SubtypeWitness`, `nonEmptyWitness: SubtypeWitness` | (none) | Pack-conditional subtype witness: selects a witness depending on whether the pack is empty. |
+| `ExpandSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | `expand` of a pattern witness. |
+| `DiffTypeInfoWitness` | `SubtypeWitness` | `thisParamType: Type`, `thisTypeDiffWitness`, `returnTypeDiffWitness`, per-parameter witnesses from slot 3 | (none) | Bundles the differential-type witnesses for a callable's `this`, return, and parameter types. |
+| `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | `baseWitness: Witness` | (none) | Evidence for higher-order differentiable-type translation. |
 
 #### Type-coercion witnesses
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `BuiltinTypeCoercionWitness` | `TypeCoercionWitness` | from-type / to-type operands | (none) | Coercion evidence for built-in conversions. |
-| `DeclRefTypeCoercionWitness` | `TypeCoercionWitness` | user-defined-conversion decl-ref | (none) | Coercion evidence backed by a user-defined conversion. |
+| `BuiltinTypeCoercionWitness` | `TypeCoercionWitness` | `fromType: Type`, `toType: Type` | (none) | Coercion evidence for built-in conversions. |
+| `DeclRefTypeCoercionWitness` | `TypeCoercionWitness` | `fromType: Type`, `toType: Type`, `declRef: DeclRef<Decl>` | (none) | Coercion evidence backed by a user-defined conversion. |
 
 #### Other witnesses
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `NoneWitness` | `Witness` | (no operands) | (none) | Empty / placeholder witness. |
-| `HasDiffTypeInfoWitness` | `Witness` | type operand | (none) | Evidence for the `IDifferentiable` constraint. |
-| `NonEmptyPackWitness` | `Witness` | pack operand | (none) | Evidence that a type pack is non-empty. |
+| `NoneWitness` | `Witness` | (no operands) | (none) | The "none" value of an optional constraint. |
+| `HasDiffTypeInfoWitness` | `Witness` | `declRef: DeclRef<HasDiffTypeInfoConstraintDecl>` | (none) | Evidence carried by a `HasDiffTypeInfoConstraintDecl`. |
+| `DeclaredVariadicPackCountWitness` | `Witness` | `declRef: DeclRef<GenericVariadicPackCountConstraintDecl>` | (none) | Unsubstituted evidence for a variadic-pack count constraint, carried by a `GenericVariadicPackCountConstraintDecl`. |
+| `ConcreteVariadicPackCountWitness` | `Witness` | `actualCount: IntVal`, `expectedCount: IntVal` | (none) | Evidence that a pack's actual element count matches the count a constraint expects. |
+| `NonEmptyPackWitness` | `Witness` | `pack: Val` | (none) | Evidence that a type pack is non-empty. |
 
 ### Modifier values
 
 `ModifierVal` is a `Val` representation of a modifier that needs to
 participate in deduplication (rather than the AST `Modifier`s that
-live in [modifiers.md](modifiers.md)). Used primarily inside
-`ModifiedType` and `ModifiedTypeExpr` to track type-level modifiers.
+live in [modifiers.md](modifiers.md)). These values are stored by
+`ModifiedType` to track type-level modifiers; checking a
+`ModifiedTypeExpr` is what produces them, by converting that
+expression's syntax-level `Modifiers` into `Val`s before building the
+`ModifiedType`.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `ModifierVal` | `Val` | (no operands) | (none) | Concrete base for type-level modifier values. |
 | `TypeModifierVal` | `ModifierVal` | (no operands) | (none) | Modifier that adjusts a type. |
@@ -235,22 +268,28 @@ live in [modifiers.md](modifiers.md)). Used primarily inside
 ### Differentiation values
 
 The `DifferentiateVal` family represents compile-time evidence of
-how to differentiate a callable; the checker materializes them
-alongside `ForwardDifferentiateExpr` / `BackwardDifferentiateExpr`
-(see [expressions.md](expressions.md)).
+how to differentiate a callable: every node stores just the `DeclRef` of
+the function being differentiated, and the concrete subclass says which
+derivative is meant — forward or backward mode, or one of the
+backward-derivative artifacts (intermediate type, primal, propagate).
+The corresponding surface syntax is `ForwardDifferentiateExpr` /
+`BackwardDifferentiateExpr`, see [expressions.md](expressions.md).
+The watched headers declare these shapes but contain no construction
+site for them; naming the producer would require adding the semantic
+checking sources to this page's `watched_paths`.
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
-| `DifferentiateVal` | `Val` | base function operand | (none) | Concrete base for differentiation Vals. |
-| `ForwardDifferentiateVal` | `DifferentiateVal` | base function operand | (none) | Forward-mode derivative. |
-| `BackwardDifferentiateVal` | `DifferentiateVal` | base function operand | (none) | Backward-mode derivative. |
-| `BackwardDifferentiateIntermediateTypeVal` | `DifferentiateVal` | base function operand | (none) | Intermediate-type of a backward derivative. |
-| `BackwardDifferentiatePrimalVal` | `DifferentiateVal` | base function operand | (none) | Primal companion of a backward derivative. |
-| `BackwardDifferentiatePropagateVal` | `DifferentiateVal` | base function operand | (none) | Propagate-phase Val of a backward derivative. |
+| `DifferentiateVal` | `Val` | `func: DeclRef<Decl>` (`getFunc()`) | (none) | Concrete base for differentiation Vals; represents the result of differentiating a function. |
+| `ForwardDifferentiateVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Forward-mode derivative. |
+| `BackwardDifferentiateVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Backward-mode derivative. |
+| `BackwardDifferentiateIntermediateTypeVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Intermediate-type of a backward derivative. |
+| `BackwardDifferentiatePrimalVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Primal companion of a backward derivative. |
+| `BackwardDifferentiatePropagateVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Propagate-phase Val of a backward derivative. |
 
 ### Misc Vals
 
-| Class | Parent | Operand semantics | Grammar | Summary |
+| Class | Parent | Key fields | Grammar | Summary |
 | --- | --- | --- | --- | --- |
 | `UIntSetVal` | `Val` | sequence of `ConstantIntVal` bitmasks | (none) | A hash-consed bitset used by the capability system. |
 
@@ -267,8 +306,15 @@ a generic parameter, not yet known. Modeling integer values as
 `Val`s gives Slang a single substitutable-and-hash-consable
 representation for both "fully known" and "still-symbolic" integers.
 `ConstantIntVal` is the leaf for a known constant;
-`DeclRefIntVal`, `WitnessLookupIntVal`, `FuncCallIntVal`, and
-`PolynomialIntVal` are the symbolic forms.
+`DeclRefIntVal`, `WitnessLookupIntVal`, `BuiltinOperationIntVal`, and
+`PolynomialIntVal` are the symbolic forms. `IntVal` also carries the
+link-time-constant hooks `isLinkTimeVal()` / `linkTimeResolve()`, so a
+value can stay symbolic past semantic checking and be resolved from a
+mangled-name-to-value map at link time; a `DeclRefIntVal` whose
+referenced declaration carries `ExternModifier` is the form that
+reports itself as link-time, and `TypeCastIntVal`,
+`BuiltinOperationIntVal`, and `PolynomialIntVal` propagate the property
+through their operands.
 
 ### PolynomialIntVal and polynomial canonicalization
 
@@ -280,16 +326,60 @@ that equations like `2*N + 3 == 3 + 2*N` resolve to the same
 hash-consed `PolynomialIntVal*`, which is essential for type
 equality on dependent array types.
 
+### BuiltinOperationIntVal and the single-representation invariant
+
+`BuiltinOperationIntVal` is the symbolic form of a builtin operator
+whose operands are not all concrete yet — for example `N / 2` where
+`N` is a generic value parameter. It identifies the operator by a
+`BuiltinOperationKind` enum (stored in operand slot 1) rather than a
+resolved operator `DeclRef`, so the same `IntVal` shape is used
+whether the expression was rewritten by the fast path
+(`BuiltinOperatorExpr`) or reached as a resolved operator call (`?:`,
+`&&`, `||`, or operators on enum / generic operands). It re-evaluates
+on substitution and folds to a `ConstantIntVal` once its operands
+become concrete. By invariant it is never constructed for `+`, `-`,
+`*`, or unary `-`: those are always a `PolynomialIntVal` so value
+unification can canonicalize them, and the constructor
+`SLANG_ASSERT`s this. (`BuiltinOperationKind` is documented in
+[base.md](base.md#support-types).)
+
 ### Witness and witness-table evidence
 
 A `Witness` is the "proof" portion of a conformance claim: whenever
-the checker proves "`T : I`", it constructs a witness whose runtime
-counterpart is an entry in a witness table. `DeclaredSubtypeWitness`
+the checker proves "`T : I`", it constructs a witness, which is
+compile-time conformance evidence recorded during semantic checking
+and consumed by later stages. `DeclaredSubtypeWitness`
 represents the proof carried by an `InheritanceDecl` on `T`;
 `TransitiveSubtypeWitness` represents the composition of two such
 proofs along an inheritance chain; `TypeEqualityWitness` represents
 the special case where the subtype relation is two-way equality. See
 the `witness table` entry in [../glossary.md](../glossary.md).
+
+### TypeEqualityWitness
+
+`TypeEqualityWitness` is the identity proof that a type is a subtype of
+itself, and the checker builds one (through
+`SemanticsVisitor::createTypeEqualityWitness`, which calls
+`ASTBuilder::getTypeEqualityWitness`) whenever a subtype obligation is
+discharged because the two types are the same type rather than by an
+inheritance step — the self facet of a non-decl-ref type in the
+inheritance graph, and the opened/projected type produced when an
+existential is unpacked, are the main cases. It is not the only way
+equality evidence is spelled: a declared equality constraint such as
+`where T == U` yields a `DeclaredSubtypeWitness` whose `isEquality()`
+is true, which is a different class. Code that must accept either form
+calls the `isTypeEqualityWitness` helper at the end of
+[slang-ast-val.h](../../../../source/slang/slang-ast-val.h) (lines
+1352-1388), which also looks through the pack witnesses. Every
+construction site funnels through
+`SemanticsVisitor::createTypeEqualityWitness` in
+[slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp)
+(line 531), which just forwards to `ASTBuilder::getTypeEqualityWitness`.
+Its callers are in
+[slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp):
+line 699 builds the self facet of a non-decl-ref type, and lines 2024
+and 2084 build the extracted and projected types of an opened
+existential.
 
 ### SubtypeWitness across packs
 
@@ -298,16 +388,23 @@ the `witness table` entry in [../glossary.md](../glossary.md).
 `ExpandSubtypeWitness` mirror the type-pack operators (see
 [types.md](types.md)) at the witness level. The checker carries
 one witness per element of a type pack so that variadic generics can
-be type-checked element-wise.
+be type-checked element-wise. Separately, the *count* of a variadic
+pack carries its own evidence: `DeclaredVariadicPackCountWitness`
+holds the still-symbolic count from a
+`GenericVariadicPackCountConstraintDecl`, and
+`ConcreteVariadicPackCountWitness` pairs the count a bound pack
+actually has (`actualCount: IntVal`) with the count the constraint
+asks for (`expectedCount: IntVal`); the former resolves into the
+latter once the pack is bound. Both operands of the concrete form are
+`IntVal`s, so the witness is comparing counts rather than holding on
+to the pack itself.
 
 ### ExtractExistentialSubtypeWitness
 
 When an existential value is opened (e.g. inside a generic that takes
 `some IFoo`), the checker manufactures an
 `ExtractExistentialSubtypeWitness` proving that the freshly-introduced
-opened-existential type conforms to the interface bound. The same
-witness is later read by the IR existential opcodes documented in
-[../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md).
+opened-existential type conforms to the interface bound.
 
 ### DeclRef family and the four shapes a decl-ref can take
 
@@ -324,15 +421,51 @@ is just a typed wrapper around a `DeclRefBase*`.
 
 ### Hash-consing and the ASTBuilder
 
-Every `Val` (and therefore every class on this page) is
+Almost every `Val` (and therefore almost every class on this page) is
 hash-consed by `ASTBuilder::getOrCreate*` (and its many specialized
-helpers). Two `Val`s with the same dynamic class and the same
-operand list are guaranteed to be the same `Val*`. This means the
+helpers). Two `Val`s created through those entry points with the same
+dynamic class and the same operand list are guaranteed to be the same
+`Val*`. The exception on this page is `DifferentiateVal`: its
+`_substituteImplOverride` builds the substituted replacement with
+`ASTBuilder::createByNodeType`, which instantiates the node directly
+instead of consulting the `getOrCreate` cache, so two equal substituted
+`DifferentiateVal`s can be distinct pointers. This means the
 checker can use pointer equality as type / value equality, but it
 also means *all* operands must themselves be canonical — the
 `Val::resolve()` machinery exists precisely to keep this invariant.
-See the `ASTBuilder` and `hash-consing` entries in
-[../glossary.md](../glossary.md).
+`Val::equals` is written in those terms: it succeeds when the two
+pointers are identical or when their `resolve()` results are, and each
+`Val` memoizes its resolved form in the private `m_resolvedVal` /
+`m_resolvedValEpoch` pair declared in
+[slang-ast-base.h](../../../../source/slang/slang-ast-base.h). Any
+cache keyed on `Val*` identity — inside or outside the AST — is only
+correct because one logical value has exactly one canonical
+representation, which is why classes such as `BuiltinOperationIntVal`
+assert away the possibility of a second spelling. See the `ASTBuilder`
+and `hash-consing` entries in [../glossary.md](../glossary.md).
+
+### Substitution and the substitution cache
+
+Substitution is the operation that turns an unspecialized `Val` into a
+specialized one: `Val::substitute` / `Val::substituteImpl` (declared on
+`Val` in
+[slang-ast-base.h](../../../../source/slang/slang-ast-base.h)) walk a
+`SubstitutionSet` and rebuild the node from substituted operands, and
+almost every class on this page supplies a `_substituteImplOverride`
+for that purpose. Because `Val`s form a shared DAG, the same subtree is
+reached many times during one substitution, so a `SubstitutionSet`
+carries a `substitutionCache: SubstitutionCache*` that memoizes the
+result of substituting a given `Val` under a given
+`packExpansionIndex`. That field is declared in
+[slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
+and the cache type itself, together with the `substituteValWithCache`
+helper that installs a cache for the outermost substitution and
+propagates it through copies of the `SubstitutionSet`, is defined in
+[slang-ast-substitution.h](../../../../source/slang/slang-ast-substitution.h).
+Neither of those headers is in this page's `watched_paths`, so the
+description here is limited to what the declaration sites state; if
+this page is to describe the caching in more detail, both should be
+added to the manifest entry for `ast-reference/values.md`.
 
 ## See also
 
@@ -347,6 +480,10 @@ See the `ASTBuilder` and `hash-consing` entries in
   `ForwardDifferentiateExpr`, ...).
 - [modifiers.md](modifiers.md) — AST modifiers (compare with the
   `ModifierVal` subhierarchy here).
+- [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)
+  — the stage that builds almost every value on this page: conformance
+  checking produces the `Witness` family, and constant folding and
+  generic argument checking produce the `IntVal` family.
 - [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md)
   — IR opcodes that consume witnesses (existential extract, generic
   specialization).

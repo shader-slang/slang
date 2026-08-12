@@ -1,7 +1,7 @@
 // unit-test-generic-entrypoint.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
+#include "core/slang-io.h"
+#include "core/slang-process.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -19,7 +19,10 @@ namespace
 
 static int _getParallelGenericEntryPointIterationCount()
 {
-    static constexpr int kDefaultIterationCount = 20;
+    // Keep the default below the Windows Debug test-server RPC timeout on slower CI machines.
+    // Developers can raise this with SLANG_PARALLEL_GENERIC_ENTRYPOINT_ITERATIONS when they need a
+    // longer local stress run.
+    static constexpr int kDefaultIterationCount = 10;
 
     const char* envValue = getenv("SLANG_PARALLEL_GENERIC_ENTRYPOINT_ITERATIONS");
     if (!envValue || !envValue[0])

@@ -17,7 +17,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -29,7 +32,10 @@ standard output = {
                 "resultType": {
                     "kind": "scalar",
                     "scalarType": "float32"
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -45,7 +51,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -61,7 +70,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -77,7 +89,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -90,7 +105,10 @@ standard output = {
                 "resultType": {
                     "kind": "scalar",
                     "scalarType": "int32"
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -107,7 +125,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "int32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -124,7 +145,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "int32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -137,7 +161,10 @@ standard output = {
                 "resultType": {
                     "kind": "scalar",
                     "scalarType": "uint32"
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -154,7 +181,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "uint32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -171,7 +201,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "uint32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -188,7 +221,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "float32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         },
         {
@@ -205,7 +241,10 @@ standard output = {
                         "kind": "scalar",
                         "scalarType": "uint32"
                     }
-                }
+                },
+                "sizes": [
+                    {"kind": "shaderResource", "value": 1}
+                ]
             }
         }
     ],
@@ -223,7 +262,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

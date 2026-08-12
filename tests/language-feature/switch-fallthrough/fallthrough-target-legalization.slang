@@ -26,12 +26,14 @@
 // CHECK-HLSL5: break
 // CHECK-HLSL5: case int(1):
 
-// WGSL should NOT have fall-through - case 0 has break before case 1
+// WGSL should NOT have fall-through - it is restructured by duplicating the fall-through
+// target's body into case 0, with no explicit terminating break (WGSL switch cases do not
+// fall through implicitly, so a case-terminating break would be redundant).
 // Warning should be emitted for WGSL (doesn't support fall-through)
 // CHECK-WGSL: warning[E41026]
 // CHECK-WGSL: case i32(0):
 // CHECK-WGSL: x_{{.*}} = i32(100)
-// CHECK-WGSL: break
+// CHECK-WGSL-NOT: break
 // CHECK-WGSL: case i32(1):
 
 // Metal should have fall-through - case 0 does NOT have break before case 1

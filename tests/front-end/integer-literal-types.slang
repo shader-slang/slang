@@ -1,4 +1,4 @@
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute
 //
 // Verifies that integer literals have correct types as specified in the
 // summary table at docs/language-reference/expressions-literal.md.
@@ -24,8 +24,8 @@
 // - tests/diagnostics/integer-literal-overflow.slang for overflow diagnostics.
 // - tests/front-end/integer-literal-types-intmin.slang for minimum
 //   negative integer values.
-//
-// Test enablement is tracked by https://github.com/shader-slang/slang/issues/11216
+// - tests/diagnostics/integer-literal-overflow-types.slang for correct types
+//   for overflown literals (warning cases)
 
 enum IntegerLiteralType
 {

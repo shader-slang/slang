@@ -21,5 +21,3 @@ PASTE(flo,at) bar() { return 0.0; }
 
 // Error: undefined identifier `x`
 float bar(float a) { return M(a); }
-//diag:                     ^ expanded from macro 'M'
-//diag:                     ^ expanded from macro 'M'

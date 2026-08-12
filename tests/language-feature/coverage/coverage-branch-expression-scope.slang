@@ -21,6 +21,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // Only the statement-level if/else contributes branch counters.
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}

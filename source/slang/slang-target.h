@@ -8,8 +8,8 @@
 // code generation and/or layout for that target.
 //
 
-#include "../compiler-core/slang-target-builtin-type-layout-info.h"
-#include "../core/slang-string.h"
+#include "compiler-core/slang-target-builtin-type-layout-info.h"
+#include "core/slang-string.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
@@ -69,6 +69,7 @@ class TargetRequest;
 
 /// Are we generating code for a D3D API?
 bool isD3DTarget(TargetRequest* targetReq);
+bool isD3DTarget(CodeGenTarget target);
 
 // Are we generating code for Metal?
 bool isMetalTarget(TargetRequest* targetReq);
@@ -100,6 +101,10 @@ bool isCPUTarget(CodeGenTarget target);
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
 bool isWGPUTarget(CodeGenTarget target);
+
+/// Does the target honor `[[vk::binding]]` on entry-point resource parameters?
+bool doesTargetSupportVkBindingOnEntryPointParameters(TargetRequest* targetReq);
+bool doesTargetSupportVkBindingOnEntryPointParameters(CodeGenTarget target);
 
 // Are we generating code for a Kernel-style target (as opposed to host-style target)
 bool isKernelTarget(CodeGenTarget codeGenTarget);

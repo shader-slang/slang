@@ -31,7 +31,7 @@ runs:
         config: ${{ inputs.config }}
         build-llvm: false
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
       with:
         name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
         path: github_artifact

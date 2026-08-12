@@ -38,7 +38,7 @@
 // support, your new type should be fully serializable.
 //
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 
 #include <optional>
 

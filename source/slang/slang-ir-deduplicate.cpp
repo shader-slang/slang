@@ -13,6 +13,12 @@ void IRDeduplicationContext::init(IRModule* module)
 
 void IRDeduplicationContext::removeHoistableInstFromGlobalNumberingMap(IRInst* instToRemove)
 {
+    if (!instToRemove->firstUse)
+    {
+        _removeGlobalNumberingEntry(instToRemove);
+        return;
+    }
+
     InstHashSet userWorkListSet(instToRemove->getModule());
     InstWorkList userWorkList(instToRemove->getModule());
     auto addToWorkList = [&](IRInst* i)

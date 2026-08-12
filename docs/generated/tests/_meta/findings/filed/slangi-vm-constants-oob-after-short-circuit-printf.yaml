@@ -1,0 +1,44 @@
+schema_version: 1
+id: slangi-vm-constants-oob-after-short-circuit-printf
+bundle: ast-reference/expressions
+suspected_kind: sigsegv
+title: "[slangi] VM constants-OOB on printf after short-circuit logic-and/or"
+observed_at: 2026-05-29T13:30:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
+  source_slang: docs/generated/tests/ast-reference/expressions/logic-and-short-circuit.slang
+  observed_summary: |
+    The bytecode VM aborts with "VM operand access out of bounds in constants
+    section: offset=76 size=4 sectionSize=76." right before the second printf
+    runs. The first printf executes and prints `counter-after-false-and=0`,
+    then the VM bails and the second printf never runs. Process exits 5.
+    Affects both Release and RelWithDebInfo builds at master HEAD
+    (5377f3e022077dc7941d5b35acea251b38a4a26f). A bisect across the 17 commits
+    in PR #11221's window (39cebbf01..9e16a6b7c) found the bug present on
+    *every* commit tested including the suspected-good anchor 39cebbf01, so
+    the regression predates the agentic-tests-bootstrap branch — exact bad
+    commit not yet identified.
+  exit_code: 5
+  stderr_tail: "VM operand access out of bounds in constants section: offset=76 size=4 sectionSize=76."
+expected:
+  claim: |
+    A `//TEST:INTERPRET` program that runs two `printf(...)` calls in `main()`
+    with a short-circuit `&&` between them must print both lines and exit 0.
+    The doc claim under test is that `LogicOperatorShortCircuitExpr` preserves
+    short-circuit semantics — observable as the bump-counter not advancing
+    when the left operand is false. The test is doc-anchored, not implementation-
+    anchored; the runtime is required to execute both printfs.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/expressions.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: 5377f3e022077dc7941d5b35acea251b38a4a26f
+  doc_anchor: docs/generated/design/ast-reference/expressions.md#nodes
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — same .slang prints both lines under an older slangi binary (build/RelWithDebInfo/bin/slangi from 2026-05-21, pre-dating whatever introduced the regression). The test CHECK patterns match the doc claim and the actual older-slangi output."
+    - "PR #11221 source change: ruled out — PR is doc-only, no source files touched, all CI test jobs skipped by the docs-only filter."
+    - "Single-pass commit between PR base and merge: ruled out — bisect over 39cebbf01..9e16a6b7c shows the bug already present at 39cebbf01. Window is too narrow; the bad commit is older than PR #11221's base. Suspect area is the VM bytecode emitter or the constants-section layout in source/slang/slang-emit-vm.cpp / slang-vm-bytecode.cpp."
+    - "Three other INTERPRET tests fail the same way — all use printf after a function call that takes inout and returns bool: logic-or-short-circuit.slang, ifstmt-predicate-evaluated-once.slang, and (TBD per regenerate.py verify). Suggests the trigger is the interaction of inout parameter lowering + bool-returning function + subsequent printf, not the short-circuit operator itself."

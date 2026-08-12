@@ -38,7 +38,7 @@
 
 // - `alias`: this defines an alias and does not introduce actual atoms.
 
-// How auto-doc works (automatic filling of `a3-02-reference-capability-atoms.md`):
+// How auto-doc works (automatic filling of `a4-02-reference-capability-atoms.md`):
 //
 // 1. `def`/`alias` are considered 'documentable atoms'
 //
@@ -179,6 +179,7 @@ def _GLSL_430 : _GLSL_420;
 def _GLSL_440 : _GLSL_430;
 def _GLSL_450 : _GLSL_440;
 def _GLSL_460 : _GLSL_450;
+alias _GLSL_latest = _GLSL_460;
 
 // Metal versions
 
@@ -198,9 +199,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 3.2.
+/// [Version]
+def metallib_3_2 : metallib_3_1;
+
 /// Represents MetalLib 4.0.
 /// [Version]
-def metallib_4_0 : metallib_3_1;
+def metallib_4_0 : metallib_3_2;
 
 /// Represents the latest MetalLib version.
 /// [Version]
@@ -223,6 +228,7 @@ def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
 def _sm_6_9 : _sm_6_8;
 def _sm_6_10 : _sm_6_9;
+alias _sm_latest = _sm_6_10;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
@@ -391,6 +397,10 @@ alias cpp_hlsl = cpp | hlsl;
 /// [Compound]
 alias cuda_glsl_hlsl = cuda | glsl | hlsl;
 
+/// CUDA, GLSL, and NVAPI code-gen targets
+/// [Compound]
+alias cuda_glsl_nvapi = cuda | glsl | hlsl_nvapi;
+
 /// CUDA, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
@@ -507,6 +517,8 @@ def geometry : stage;
 /// [Stage]
 def dispatch : stage;
 
+def _node : stage;
+
 def _raygen : stage;
 alias _raygeneration = _raygen;
 def _intersection : stage;
@@ -526,6 +538,12 @@ def SPV_EXT_fragment_shader_interlock : _spirv_1_0;
 /// Represents the SPIR-V extension for physical storage buffer.
 /// [EXT]
 def SPV_EXT_physical_storage_buffer : _spirv_1_3;
+
+/// Represents the SPIR-V extension for physical storage buffer (the KHR-promoted name for
+/// the same feature as SPV_EXT_physical_storage_buffer; folded into core SPIR-V 1.5). Its
+/// floor mirrors the EXT atom's, so requiring it does not raise the effective version.
+/// [EXT]
+def SPV_KHR_physical_storage_buffer : _spirv_1_3;
 
 /// Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.
 /// [EXT]
@@ -571,6 +589,10 @@ def SPV_KHR_fragment_shader_barycentric : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_non_semantic_info : _spirv_1_0;
 
+/// Represents the SPIR-V extension for shader abort (SPV_KHR_abort).
+/// [EXT]
+def SPV_KHR_abort : _spirv_1_0;
+
 /// Represents the SPIR-V extension for device-group information.
 /// [EXT]
 def SPV_KHR_device_group : _spirv_1_0;
@@ -608,10 +630,12 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
 /// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-/// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-/// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
+/// Per the SER spec it requires SPIR-V 1.4, SPV_KHR_ray_tracing, and a physical-storage-buffer
+/// extension. We model the physical-storage-buffer dependency as SPV_KHR_physical_storage_buffer
+/// (the name the emitter declares); the emitter adds that `OpExtension` on the pre-1.5 path
+/// (it is core from 1.5 on), while this dependency records the relationship in the model.
 /// [EXT]
-def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+def SPV_EXT_shader_invocation_reorder : _spirv_1_4 + SPV_KHR_ray_tracing + SPV_KHR_physical_storage_buffer;
 
 /// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
 /// Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
@@ -686,7 +710,15 @@ def SPV_KHR_untyped_pointers : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_bfloat16: _spirv_1_0;
 
+/// Represents the SPIR-V extension for 64-bit integer indexing of resources and arrays.
+/// [EXT]
+def SPV_EXT_shader_64bit_indexing : _spirv_1_0;
+
 // SPIRV Capabilities.
+
+/// Represents the SPIR-V AbortKHR capability for OpAbortKHR.
+/// [EXT]
+def spvAbort : SPV_KHR_abort;
 
 /// Represents the SPIR-V capability for DeviceGroup.
 /// [EXT]
@@ -856,6 +888,10 @@ def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_st
 /// [EXT]
 def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
 
+/// Represents the SPIR-V capability for sphere geometry.
+/// [EXT]
+def spvRayTracingSpheresGeometryNV : SPV_NV_linear_swept_spheres;
+
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
 def spvShaderClockKHR : SPV_KHR_shader_clock;
@@ -940,6 +976,10 @@ def spvBindlessTextureNV : SPV_NV_bindless_texture;
 /// [EXT]
 def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
 
+/// Represents the SPIR-V capability for 64-bit integer indexing of resources and arrays.
+/// [EXT]
+def spvShader64BitIndexingEXT : SPV_EXT_shader_64bit_indexing;
+
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
 // functionality of `TraceRay` and the related operations.
@@ -1012,6 +1052,7 @@ def _GL_KHR_shader_subgroup_rotate : _GLSL_140;
 def _GL_NV_compute_shader_derivatives : _GLSL_450;
 def _GL_NV_fragment_shader_barycentric : _GL_EXT_fragment_shader_barycentric;
 def _GL_NV_gpu_shader5 : _GL_ARB_gpu_shader5;
+def _GL_NV_linear_swept_spheres : _GL_EXT_ray_query;
 def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
@@ -1037,6 +1078,14 @@ alias GL_EXT_buffer_reference_uvec2 = _GL_EXT_buffer_reference_uvec2 | _spirv_1_
 /// Represents the GL_EXT_debug_printf extension.
 /// [EXT]
 alias GL_EXT_debug_printf = _GL_EXT_debug_printf | SPV_KHR_non_semantic_info;
+
+/// Represents the GL_EXT_shader_abort extension (VK_KHR_shader_abort).
+/// [EXT]
+def _GL_EXT_shader_abort : glsl;
+/// Represents the GL_EXT_shader_abort extension for GLSL targets, or the
+/// corresponding spvAbort capability for SPIR-V targets.
+/// [EXT]
+alias GL_EXT_shader_abort = _GL_EXT_shader_abort | spvAbort;
 
 /// Represents the GL_EXT_demote_to_helper_invocation extension.
 /// [EXT]
@@ -1251,6 +1300,10 @@ alias GL_NV_fragment_shader_barycentric = GL_EXT_fragment_shader_barycentric;
 /// [EXT]
 alias GL_NV_gpu_shader5 = GL_ARB_gpu_shader5;
 
+/// Represents the GL_NV_linear_swept_spheres extension.
+/// [EXT]
+alias GL_NV_linear_swept_spheres = _GL_NV_linear_swept_spheres;
+
 /// Represents the GL_NV_ray_tracing extension.
 /// [EXT]
 alias GL_NV_ray_tracing = GL_EXT_ray_tracing;
@@ -1319,9 +1372,10 @@ def ser_hlsl_native : _sm_6_9;
 alias ser_dxr = raytracing + ser_hlsl_native;
 
 /// Capabilities needed for shader-execution-reordering (all paths)
-/// Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+/// Defaults SPIR-V/GLSL to the cross-vendor standard EXT path; explicit NV still satisfies this
+/// through the NV-to-EXT capability hierarchy. Use ser_nv for APIs that require NV opcodes.
 /// [Compound]
-alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
+alias ser = raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
 
 /// NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
 /// Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
@@ -1473,12 +1527,16 @@ alias task = _amplification + _meshshading;
 /// [Stage]
 alias amplification = _amplification + _meshshading;
 
+/// Work-graph node stage (requires SM 6.8 or later)
+/// [Stage]
+alias node = _node + _sm_6_8;
+
 // shader stage groups
 /// Collection of all shader stages
 /// [Compound]
 alias any_stage = vertex | fragment | compute | hull | domain | geometry
                  | raygen | intersection | anyhit | closesthit | miss | mesh
-                 | amplification | callable
+                 | amplification | callable | node
                  ;
 
 /// Collection of shader stages
@@ -1941,6 +1999,10 @@ alias sm_6_10 = sm_6_10_version
              | sm_6_9
              ;
 
+/// Represents the latest HLSL shader model version.
+/// [Version]
+alias sm_latest = _sm_6_10;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -2144,6 +2206,10 @@ alias GLSL_460 = _GLSL_460
                // previous
                | GLSL_450
                ;
+
+/// Represents the latest GLSL version.
+/// [Version]
+alias GLSL_latest = _GLSL_460;
 
 /// User should not use this capability
 /// [Other]
@@ -2355,9 +2421,13 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 /// Capabilities required to query texture level info
 /// [Compound]
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
-/// Capabilities required for shadow texture LOD sampling on types
-/// natively supported by GLSL 1.50 (sampler1DShadow, sampler1DArrayShadow,
-/// sampler2DShadow).
+/// Capabilities required for plain shadow-comparison texture sampling that takes
+/// no explicit LOD (SampleCmp, SampleCmpLevelZero).
+/// [Compound]
+alias texture_shadow = texture_sm_4_1;
+/// Capabilities required for shadow texture LOD sampling with an explicit LOD
+/// (SampleCmpLevel) on types natively supported by GLSL 1.50 (sampler1DShadow,
+/// sampler1DArrayShadow, sampler2DShadow).
 /// [Compound]
 alias texture_shadowlod = texture_sm_4_1;
 /// Capabilities required for shadow texture LOD sampling on types
@@ -2365,10 +2435,14 @@ alias texture_shadowlod = texture_sm_4_1;
 /// samplerCubeArrayShadow).
 /// [Compound]
 alias texture_shadowlod_ext = texture_sm_4_1 | GL_EXT_texture_shadow_lod;
-/// Capabilities required for shadow texture sampling with bias and gradients.
+/// Capabilities required for shadow texture sampling with gradients (SampleCmpGrad).
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
 alias texture_shadowgrad = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
+/// Capabilities required for shadow-comparison texture sampling with an LOD bias
+/// (SampleCmpBias). New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+/// [Compound]
+alias texture_shadowbias = _sm_6_8 | _GLSL_150 | spirv_1_0 | GL_EXT_texture_shadow_lod;
 
 /// (GLSL/SPIRV) Capabilities required to use GLSL-tier-1 float-atomic operations
 /// [Compound]
@@ -2396,7 +2470,10 @@ alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
-alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
+alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | metallib_3_2 | cpp | llvm;
+/// Capabilities required to use 'abort'
+/// [Compound]
+alias abort = GL_EXT_shader_abort;
 /// Capabilities required to use basic TextureFootprint operations
 /// [Compound]
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
@@ -2430,6 +2507,23 @@ alias subgroup_basic = GL_KHR_shader_subgroup_basic
                      | wgsl
                      | metal
                      ;
+/// Capabilities required to use the subgroup-within-workgroup queries
+/// 'WaveGetWaveIndex' / 'WaveGetNumWaves'. These lower to GLSL
+/// gl_SubgroupID / gl_NumSubgroups and SPIR-V BuiltIn SubgroupId /
+/// NumSubgroups, which the GLSL and Vulkan SPIR-V environment specs
+/// restrict to compute-class execution models (compute, mesh,
+/// amplification/task); the restriction is encoded here so misuse is
+/// caught by the capability system rather than producing invalid
+/// GLSL / SPIR-V.
+/// [Compound]
+alias subgroup_workgroup_index = GL_KHR_shader_subgroup_basic + compute
+                               | GL_KHR_shader_subgroup_basic + mesh
+                               | GL_KHR_shader_subgroup_basic + amplification
+                               | _sm_6_0
+                               | _cuda_sm_7_0
+                               | wgsl
+                               | metal
+                               ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot'
 /// [Compound]
 alias subgroup_ballot = spirv_1_0 + GL_KHR_shader_subgroup_ballot
@@ -2575,6 +2669,32 @@ alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
 /// Collection of capabilities for linear swept spheres.
 /// [Compound]
 alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
+
+/// Collection of capabilities for the NV sphere-geometry accessors of an inline
+/// ray query. These are vendor (NV) extensions on every target, so the alias
+/// carries the `NV` suffix. Available on any RayQuery-capable stage, but each
+/// target must carry its sphere geometry support: GLSL requires
+/// `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+/// `spvRayTracingSpheresGeometryNV` (so a SPIR-V caller cannot satisfy this with
+/// plain ray query alone, and an LSS-only caller cannot reach the sphere
+/// accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
+/// [Compound]
+alias rayquery_sphere_nv = _GL_NV_linear_swept_spheres
+                         | _sm_6_3
+                         | spvRayQueryKHR + spvRayTracingSpheresGeometryNV;
+
+/// Collection of capabilities for the NV line-swept-spheres (LSS) accessors of
+/// an inline ray query. These are vendor (NV) extensions on every target, so the
+/// alias carries the `NV` suffix. Available on any RayQuery-capable stage, but
+/// each target must carry its LSS geometry support: GLSL requires
+/// `_GL_NV_linear_swept_spheres`; SPIR-V requires `spvRayQueryKHR` together with
+/// `spvRayTracingLinearSweptSpheresGeometryNV` (so a SPIR-V caller cannot satisfy
+/// this with plain ray query alone, and a sphere-only caller cannot reach the
+/// LSS accessors); HLSL/NVAPI carries the geometry support implicitly (`_sm_6_3`).
+/// [Compound]
+alias rayquery_lss_nv = _GL_NV_linear_swept_spheres
+                      | _sm_6_3
+                      | spvRayQueryKHR + spvRayTracingLinearSweptSpheresGeometryNV;
 
 /// hit object APIs allow raygen shaders, but not the non-hit object APIs. So we have this special
 /// capdef specifically for the hitobject variant.

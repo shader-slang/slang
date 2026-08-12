@@ -80,11 +80,7 @@ struct DeadCodeEliminationContext
         if (!undefInst)
         {
             IRBuilder builder(module);
-            if (auto firstChild = module->getModuleInst()->getFirstChild())
-                builder.setInsertBefore(firstChild);
-            else
-                builder.setInsertInto(module->getModuleInst());
-            undefInst = Slang::getUnitPoisonVal(&builder, module);
+            undefInst = Slang::getUnitPoisonVal(&builder);
         }
         return undefInst;
     }
@@ -520,7 +516,7 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                                                       ? SideEffectAnalysisOptions::None
                                                       : SideEffectAnalysisOptions::UseDominanceTree;
 
-    if (inst->mightHaveSideEffects(sideEffectOptions))
+    if (inst->mightHaveSideEffects(sideEffectOptions, options.calleeSideEffectCache))
     {
         return true;
     }
@@ -664,9 +660,16 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
             return true;
         break;
     case kIROp_CompilerDictionaryEntry:
+        // Dictionary entries use operand 1 as the opcode discriminator for the cached translation.
+        // Keep that single key operand strong so DCE cannot collect and recreate the opcode
+        // literal, while all IR-value keys remain weak cache references.
         if (operandIndex != 1)
             return true;
         break;
+    case kIROp_CompilerDictionaryValue:
+        // Compiler dictionaries cache translation results; their operands should not keep the
+        // cached IR alive after the real uses have been specialized away.
+        return true;
     default:
         break;
     }
@@ -682,6 +685,9 @@ bool eliminateDeadCode(IRModule* module, IRDeadCodeEliminationOptions const& opt
     DeadCodeEliminationContext context;
     context.module = module;
     context.options = options;
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!context.options.calleeSideEffectCache)
+        context.options.calleeSideEffectCache = &calleeSideEffectCache;
     return context.processModule();
 }
 
@@ -690,6 +696,9 @@ bool eliminateDeadCode(IRInst* root, IRDeadCodeEliminationOptions const& options
     DeadCodeEliminationContext context;
     context.module = root->getModule();
     context.options = options;
+    Dictionary<IRInst*, bool> calleeSideEffectCache;
+    if (!context.options.calleeSideEffectCache)
+        context.options.calleeSideEffectCache = &calleeSideEffectCache;
     return context.processInst(root);
 }
 

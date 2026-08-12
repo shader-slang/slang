@@ -126,9 +126,8 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
                                                                   ->resolve())
                                           : nullptr;
 
-    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType))
+    if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType); rawFwdDiffFuncType)
     {
-        SLANG_UNUSED(rawFwdDiffFuncType);
         if (auto substFwdDiffFuncType = as<FwdDiffFuncType>(substitutedDirectFuncType))
         {
             auto diffTypeWitness =
@@ -171,14 +170,24 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
         return witness;
     };
 
+    auto paramDecls = callableDeclRef.getDecl()->getParameters();
+    Index paramIndex = 0;
     for (auto paramType : funcType->getParamTypes())
     {
         auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
-        auto witness = getDiffWitness(paramValueType);
+        auto paramDecl = paramIndex < paramDecls.getCount() ? paramDecls[paramIndex] : nullptr;
+        auto witness = paramDecl && paramDecl->findModifier<NoDiffModifier>()
+                           ? nullptr
+                           : getDiffWitness(paramValueType);
         paramWitnesses.add(witness);
+        paramIndex++;
     }
 
-    SubtypeWitness* returnWitness = getDiffWitness(funcType->getResultType());
+    SubtypeWitness* returnWitness =
+        doesTypeHaveNoDiffModifier(funcType->getResultType()) ||
+                callableDeclRef.getDecl()->findModifier<NoDiffModifier>()
+            ? nullptr
+            : getDiffWitness(funcType->getResultType());
 
     auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
     Type* thisParamType = nullptr;
@@ -252,19 +261,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
 
-    // First, make sure both sub type and super type decl are ready for lookup.
-    if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
-    {
-        if (auto subDeclRefType = as<DeclRefType>(subType))
-        {
-            ensureDecl(subDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-        }
-    }
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        ensureDecl(superDeclRefType->getDeclRef().getDecl(), DeclCheckState::ReadyForLookup);
-    }
-
     SubtypeWitness* failureWitness = nullptr;
 
     // In the common case, we can use the pre-computed inheritance information for `subType`
@@ -281,7 +277,8 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType()->resolve();
+        auto rawFacetType = facet->getType();
+        auto facetType = as<Type>(rawFacetType->resolve());
         if (!facetType)
             continue;
 
@@ -306,8 +303,26 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
+        auto witness = as<SubtypeWitness>(facet->subtypeWitness->resolve());
+
+        // `getInheritanceInfo` for an interface *type* roots its facet witnesses at the
+        // interface's `ThisType` (treating the type as a requirement template; see #11469).
+        // When the query `subType` is the interface (existential box) itself, the facet
+        // witness's `sub` is the standalone `ThisType`, not the box we were asked about.
+        // Re-root the witness onto the queried `subType` so the returned witness satisfies
+        // the invariant `result->getSub() == subType`; this yields a well-formed,
+        // box-rooted witness instead of one anchored at a free-floating `ThisType`.
+        if (auto boxWitness = as<DeclaredSubtypeWitness>(witness))
+        {
+            if (boxWitness->getSub() != subType || boxWitness->getSup() != superType)
+                return m_astBuilder->getDeclaredSubtypeWitness(
+                    subType,
+                    superType,
+                    boxWitness->getDeclRef());
+        }
+        return witness;
     }
+
     //
     // TODO: We could expand upon the test using the facet list above
     // by taking the facet lists of both `subType` and `superType`

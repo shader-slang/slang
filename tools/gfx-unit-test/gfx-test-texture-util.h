@@ -80,7 +80,7 @@ struct ValidationTextureFormat : ValidationTextureFormatBase
             temp[3] = (T)mip;
             break;
         default:
-            assert("component count should be no greater than 4");
+            SLANG_ASSERT("component count should be no greater than 4");
             SLANG_CHECK_ABORT(false);
         }
     }
@@ -168,9 +168,9 @@ struct ValidationTextureData : RefObject
 
     void* getBlockAt(uint32_t x, uint32_t y, uint32_t z)
     {
-        assert(x < extent.width);
-        assert(y < extent.height);
-        assert(z < extent.depth);
+        SLANG_ASSERT(x < extent.width);
+        SLANG_ASSERT(y < extent.height);
+        SLANG_ASSERT(z < extent.depth);
 
         char* layerData = (char*)textureData + z * pitches.z;
         char* rowData = layerData + y * pitches.y;

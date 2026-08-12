@@ -237,6 +237,17 @@ public:
         return false;
     }
 
+    bool visitBuiltinOperatorExpr(BuiltinOperatorExpr* expr)
+    {
+        // A fast-path builtin operator has no callee decl to look up, but its operands may
+        // contain identifiers the user can hover / go-to.
+        PushNode pushNodeRAII(context, expr);
+        for (auto arg : expr->arguments)
+            if (dispatchIfNotNull(arg))
+                return true;
+        return false;
+    }
+
     bool visitVarExpr(VarExpr* expr)
     {
         if (expr->name && expr->declRef.getDecl())
@@ -487,6 +498,12 @@ public:
         if (dispatchIfNotNull(expr->typeExpr))
             return true;
         return dispatchIfNotNull(expr->value);
+    }
+    bool visitCastOptionalExpr(CastOptionalExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->valueArg))
+            return true;
+        return dispatchIfNotNull(expr->innerCoercedExpr);
     }
     bool visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* expr)
     {

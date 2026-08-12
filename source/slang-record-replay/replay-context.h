@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../core/slang-blob.h"
-#include "../core/slang-dictionary.h"
-#include "../core/slang-list.h"
-#include "../core/slang-memory-arena.h"
+#include "core/slang-blob.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-list.h"
+#include "core/slang-memory-arena.h"
 #include "replay-shared.h"
 #include "replay-stream.h"
 
@@ -80,8 +80,15 @@ static_assert(
     sizeof(CallIndexEntry) == CallIndexEntry::kSize,
     "CallIndexEntry must have expected fixed size");
 
+// Replay exceptions can be thrown across the slang shared-library boundary
+// and caught by type in the test executable when slang-test runs in-process
+// (server-count=1). They therefore carry SLANG_EXCEPTION_TYPE_VISIBLE
+// (core/slang-exception.h), which exports the RTTI on Itanium-ABI
+// (non-Windows) targets so the typed catch matches across dynamic libraries;
+// see that header for the full explanation.
+
 /// Exception thrown when trying to record an untracked interface.
-class UntrackedInterfaceException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE UntrackedInterfaceException : public Slang::Exception
 {
 public:
     UntrackedInterfaceException(ISlangUnknown* obj)
@@ -95,7 +102,7 @@ private:
 };
 
 /// Exception thrown when a handle is not found during playback.
-class HandleNotFoundException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE HandleNotFoundException : public Slang::Exception
 {
 public:
     HandleNotFoundException(uint64_t handle)
@@ -108,8 +115,8 @@ private:
     uint64_t m_handle;
 };
 
-/// Exception thrown when a handle is not found during playback.
-class UnresolvedTypeException : public Slang::Exception
+/// Exception thrown when a TypeReflection cannot be resolved during playback.
+class SLANG_EXCEPTION_TYPE_VISIBLE UnresolvedTypeException : public Slang::Exception
 {
 public:
     UnresolvedTypeException(slang::TypeReflection* type)
@@ -185,24 +192,24 @@ enum class TypeId : uint8_t
 SLANG_API const char* getTypeIdName(TypeId id);
 
 /// Exception thrown when type mismatch occurs during deserialization.
-class TypeMismatchException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE TypeMismatchException : public Slang::Exception
 {
 public:
     SLANG_API TypeMismatchException(TypeId expected, TypeId actual);
-    SLANG_API TypeId getExpected() const { return m_expected; }
-    SLANG_API TypeId getActual() const { return m_actual; }
+    TypeId getExpected() const { return m_expected; }
+    TypeId getActual() const { return m_actual; }
 
 private:
     TypeId m_expected, m_actual;
 };
 
 /// Exception thrown when data mismatch occurs during sync mode verification.
-class DataMismatchException : public Slang::Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE DataMismatchException : public Slang::Exception
 {
 public:
     SLANG_API DataMismatchException(size_t offset, size_t size);
-    SLANG_API size_t getOffset() const { return m_offset; }
-    SLANG_API size_t getSize() const { return m_size; }
+    size_t getOffset() const { return m_offset; }
+    size_t getSize() const { return m_size; }
 
 private:
     size_t m_offset, m_size;
@@ -392,6 +399,9 @@ public:
     {
         requireReplayArenaAllocation(offset, size);
     }
+
+    /// Allocates replay-owned arena storage from the module that owns the replay context.
+    SLANG_API void* allocateReplayArena(size_t sizeInBytes, size_t alignment);
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
@@ -595,14 +605,40 @@ public:
         unregisterProxyImpl(proxyIdentity);
     }
 
-    /// Register an interface object and get its handle.
-    /// Used when creating proxy objects to register them for handle tracking.
+    /// Registers `obj` in the handle registry and returns its handle, for tests.
+    ///
+    /// A production proxy is registered by wrapObject() as part of being
+    /// created; a test that needs a proxy the orphan bookkeeping will treat as
+    /// live has to register it explicitly, because
+    /// releaseOrphanedPlaybackProxies() skips anything absent from the registry.
     template<typename ProxyT>
     inline uint64_t testsOnlyRegisterProxy(ProxyT* obj)
     {
         ISlangUnknown* objUnknown = toSlangUnknown(obj);
         return testOnlyRegisterProxyImpl(objUnknown);
     }
+
+    /// Notes an orphaned playback reference for `proxy`, for tests.
+    ///
+    /// The production caller is the replay dispatcher, which a unit test cannot
+    /// drive, so without these wrappers the bookkeeping is only observable as a
+    /// sanitizer leak or double-free on a path no test reaches.
+    inline void testsOnlyNoteOrphanedProxy(ISlangUnknown* proxy)
+    {
+        notePlaybackOrphanedProxy(proxy);
+    }
+
+    /// Returns how many orphaned playback references are noted for `proxy`, for
+    /// tests. Zero when the proxy is not tracked at all.
+    inline uint32_t testsOnlyGetOrphanedRefCount(ISlangUnknown* proxy) const
+    {
+        return testOnlyGetOrphanedRefCountImpl(proxy);
+    }
+
+    /// Runs the playback-teardown sweep that releases every noted orphaned
+    /// reference, for tests. Production runs it from reset(), switchTo*(), and
+    /// destroySingleton().
+    inline void testsOnlyReleaseOrphanedProxies() { releaseOrphanedPlaybackProxies(); }
 
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
@@ -737,9 +773,31 @@ private:
     // Internal registeration using canonical ISlangUnknown* identities
     SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);
     SLANG_API void unregisterProxyImpl(ISlangUnknown* proxy);
+
+    /// Remember that the playback dispatcher created `proxy` for an output/return
+    /// value and dropped its owning creation reference into a discarded
+    /// temporary. Called only during playback; releaseOrphanedPlaybackProxies()
+    /// later releases the reference unless the replayed release stream already
+    /// destroyed the proxy first (issue #11936).
+    SLANG_API void notePlaybackOrphanedProxy(ISlangUnknown* proxy);
+
+    /// Release the still-live orphaned playback proxies recorded by
+    /// notePlaybackOrphanedProxy. Proxies whose recorded release stream already
+    /// balanced their creation reference destroyed themselves during replay and
+    /// were removed by unregisterProxyImpl, so only genuine leaks remain here.
+    /// Called at playback teardown (reset/switch/destroy).
+    SLANG_API void releaseOrphanedPlaybackProxies();
     SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
     SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
     SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
+
+    /// Number of orphaned playback references currently tracked for `proxy`, or
+    /// 0 if none. Exists so a test can assert the note/unnote balancing
+    /// directly: the alternative is inferring it from a sanitizer leak or
+    /// double-free report, which only fires on a path some test happens to
+    /// drive, and the entry-point wrapping that motivates the `unnote` is not
+    /// driven by any of them.
+    SLANG_API uint32_t testOnlyGetOrphanedRefCountImpl(ISlangUnknown* proxy) const;
     SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
     SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
 
@@ -776,6 +834,15 @@ private:
     // Proxy tracking: maps proxies to implementations and back
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+
+    // Proxies created by the playback dispatcher for an output/return value.
+    // During playback the wrapped object is handed back into a discarded
+    // temporary (callWithDefaults passes null outputs), so its owning creation
+    // reference has no owner. Keyed by canonical ISlangUnknown* identity -> the
+    // number of such orphaned references. releaseOrphanedPlaybackProxies()
+    // releases any that the recorded addRef/release stream did not already
+    // balance, at playback teardown (issue #11936). Empty outside playback.
+    Dictionary<ISlangUnknown*, uint32_t> m_playbackOrphanedProxies;
 
     // Replay directory management
     String m_replayDirectory = ".slang-replays"; ///< Base directory for replays
@@ -817,7 +884,7 @@ T* ReplayContext::readArrayInPlayback(RecordFlag flags, CountT& count)
     size_t sizeCount = static_cast<size_t>(arrayCount);
     size_t allocationSize = sizeCount * sizeof(T);
     requireReplayArenaAllocation(countOffset, allocationSize);
-    T* buf = m_arena.allocateArray<T>(sizeCount);
+    T* buf = reinterpret_cast<T*>(allocateReplayArena(allocationSize, alignof(T)));
     for (size_t i = 0; i < sizeCount; ++i)
     {
         new (&buf[i]) T{};
@@ -960,6 +1027,13 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);
+
+            // The wrapped proxy's owning reference flows back into a discarded
+            // output temporary (callWithDefaults passes null outputs on replay),
+            // so nothing releases it. Remember it so playback teardown can
+            // release the reference if the recorded release stream did not
+            // already balance it (issue #11936).
+            notePlaybackOrphanedProxy(toSlangUnknown(obj));
         }
     }
 }
