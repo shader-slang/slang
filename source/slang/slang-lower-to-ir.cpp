@@ -7207,9 +7207,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
     ///
-    /// The `subTypeWitness` is expected to witness the sub-type relationship
-    /// by naming a field (or chain of fields) that leads from the type of
-    /// `value` to the field that stores its members for `superType`.
+    /// `subTypeWitness` must be one of a closed set of witness shapes: a
+    /// `DeclaredSubtypeWitness` or `TransitiveSubtypeWitness` (which name the
+    /// field, or chain of fields, that stores `superType`'s members inside
+    /// `value`), or a `First`/`LastSubtypeWitness` pack-projection witness
+    /// (which is unwrapped to its pattern witness — see the cases below).
+    /// Any other shape is out of contract and aborts.
     ///
     LoweredValInfo emitCastToConcreteSuperTypeRec(
         LoweredValInfo const& value,
@@ -7235,16 +7238,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     witness);
             else
             {
-                SLANG_ASSERT(!"unhandled");
-                return nullptr;
+                SLANG_UNEXPECTED("transitive sub-to-mid is not a subtype witness");
+                UNREACHABLE_RETURN(nullptr);
             }
 
             if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getMidToSup()))
                 return emitCastToConcreteSuperTypeRec(subToMid, superType, witness);
             else
             {
-                SLANG_ASSERT(!"unhandled");
-                return nullptr;
+                SLANG_UNEXPECTED("transitive mid-to-sup is not a subtype witness");
+                UNREACHABLE_RETURN(nullptr);
             }
         }
         else if (auto firstSubtypeWitness = as<FirstSubtypeWitness>(subTypeWitness))
@@ -7252,7 +7255,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // `__first`/`__last` select a single element of a value pack before this cast runs
             // (the element is materialized by `kIROp_ExtractFirstFromPack`/`ExtractLastFromPack`),
             // so the projection to a concrete `superType` is governed by the pattern witness that
-            // relates that element type to `superType`.
+            // relates that element type to `superType`. The wrapper's super-type is its pattern
+            // witness's super-type by construction (getFirst/LastSubtypeWitness), so `superType`
+            // passes through the recursion unchanged; assert that invariant since the downstream
+            // `extractField(superType, ...)` depends on it.
+            SLANG_ASSERT(lowerType(context, firstSubtypeWitness->getSup()) == superType);
             return emitCastToConcreteSuperTypeRec(
                 value,
                 superType,
@@ -7260,6 +7267,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto lastSubtypeWitness = as<LastSubtypeWitness>(subTypeWitness))
         {
+            SLANG_ASSERT(lowerType(context, lastSubtypeWitness->getSup()) == superType);
             return emitCastToConcreteSuperTypeRec(
                 value,
                 superType,
@@ -7267,8 +7275,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else
         {
-            SLANG_ASSERT(!"unhandled");
-            return nullptr;
+            // The witness shapes above are the only ones that can reach a concrete-`struct` cast;
+            // any other shape is a front-end/lowering invariant violation, so abort rather than
+            // return a null that a caller would dereference.
+            SLANG_UNEXPECTED("unsupported witness shape for concrete-struct upcast");
+            UNREACHABLE_RETURN(nullptr);
         }
     }
 
