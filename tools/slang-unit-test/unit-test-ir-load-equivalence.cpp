@@ -34,6 +34,15 @@ SlangResult _compileWith(
     const UnownedStringSlice value(onDemand ? "1" : "0");
     SLANG_RETURN_ON_FAIL(PlatformUtil::setEnvironmentVariable(varName, &value));
 
+    // Read it back before spawning. A setter that reported success without taking
+    // effect would leave both children in the same mode, and this test would compare a
+    // run against itself and pass -- green while checking nothing. The child inherits
+    // the environment at creation, so confirming it here is enough.
+    StringBuilder readBack;
+    SLANG_RETURN_ON_FAIL(PlatformUtil::getEnvironmentVariable(varName, readBack));
+    if (readBack.produceString().getUnownedSlice() != value)
+        return SLANG_FAIL;
+
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(
         ExecutableLocation(unitTestContext->executableDirectory, "slangc"));
