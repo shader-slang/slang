@@ -71,6 +71,17 @@ def main():
     if not slangc.exists():
         sys.exit(f"slangc not found: {slangc}")
 
+    # Preflight: confirm the compiler actually runs. Without this, anything that stops it
+    # from starting -- a staged copy that cannot find its shared libraries, a half-written
+    # binary from a concurrent build -- lands in the "failed the same way under both"
+    # bucket and the run reports zero divergences, which reads as success while having
+    # compiled nothing.
+    probe = subprocess.run([str(slangc), "-v"], capture_output=True)
+    if probe.returncode != 0:
+        sys.exit(
+            f"{slangc} did not run (exit {probe.returncode}). "
+            f"stderr: {probe.stderr.decode(errors='replace').strip()[:300]}")
+
     sources = []
     for root in args.roots:
         p = Path(root)
@@ -107,6 +118,12 @@ def main():
 
     print(f"\n{len(sources)} shaders: {agreed} agreed, {both_failed} failed the same way "
           f"under both, {len(diverged)} diverged")
+    if sources and agreed == 0:
+        # Every shader was rejected, so the comparison only ever saw the error path.
+        # Technically "no divergence", but it establishes nothing about generated code.
+        print("WARNING: nothing compiled -- this run says nothing about codegen. The "
+              "command line likely does not fit this corpus (wrong entry point, or "
+              "shaders that are expected to fail).")
     return 1 if diverged else 0
 
 
