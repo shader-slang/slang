@@ -27,6 +27,7 @@ SlangResult _compileWith(
     UnitTestContext* unitTestContext,
     const String& sourcePath,
     bool onDemand,
+    bool dumpIR,
     RunResult& out)
 {
     const UnownedStringSlice varName("SLANG_ONDEMAND_IR");
@@ -43,6 +44,14 @@ SlangResult _compileWith(
     cmdLine.addArg("computeMain");
     cmdLine.addArg("-stage");
     cmdLine.addArg("compute");
+    if (dumpIR)
+    {
+        // Dumps the linked IR, builtin modules included -- which is where deferral
+        // acts, and where a divergence shows up even when it never reaches codegen.
+        cmdLine.addArg("-dump-ir");
+        cmdLine.addArg("-o");
+        cmdLine.addArg("/dev/null");
+    }
 
     ExecuteResult exeRes;
     SLANG_RETURN_ON_FAIL(ProcessUtil::execute(cmdLine, exeRes));
@@ -101,9 +110,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
     RunResult onDemand;
     RunResult eager;
+    RunResult onDemandIR;
+    RunResult eagerIR;
     const bool ranBoth =
-        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, true, onDemand)) &&
-        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, false, eager));
+        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, true, false, onDemand)) &&
+        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, false, false, eager)) &&
+        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, true, true, onDemandIR)) &&
+        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, false, true, eagerIR));
 
     // Restore before asserting, so a failure does not also corrupt later tests.
     if (hadPrevious)
@@ -128,4 +141,16 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     SLANG_CHECK(onDemand.exitCode == eager.exitCode);
     SLANG_CHECK(onDemand.out == eager.out);
     SLANG_CHECK(onDemand.err == eager.err);
+
+    // Compare the IR as well as the target code, because a decode divergence need not
+    // reach codegen: a global value that lost children can emit identical output. The
+    // dump includes the linked builtin modules, which is where deferral acts.
+    //
+    // Measured limit, so nobody over-trusts this: reintroducing the decoration-subtree
+    // bug this change fixed does *not* fail this test. Either no decoration in the
+    // builtin modules currently has children -- which was never established when that
+    // fix was made -- or this shader does not reach one. Breadth is what would find
+    // that; see extras/check-load-mode-equivalence.py.
+    SLANG_CHECK(onDemandIR.exitCode == eagerIR.exitCode);
+    SLANG_CHECK(onDemandIR.out == eagerIR.out);
 }

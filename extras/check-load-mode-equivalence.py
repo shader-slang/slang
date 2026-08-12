@@ -37,6 +37,9 @@ from pathlib import Path
 def compile_once(slangc, source, env_var, value, target, extra_args):
     env = dict(os.environ)
     env[env_var] = value
+    # No -o: the generated code goes to stdout, which is what gets compared. Sending it
+    # to /dev/null would leave only diagnostics, which agree in far more cases than the
+    # code does and would make this look green while checking almost nothing.
     cmd = [str(slangc), str(source), "-target", target] + extra_args
     try:
         p = subprocess.run(cmd, env=env, capture_output=True, timeout=120)
@@ -57,6 +60,10 @@ def main():
     ap.add_argument("--target", default="hlsl")
     ap.add_argument("--entry", default="computeMain")
     ap.add_argument("--limit", type=int, default=0, help="stop after N shaders (0 = all)")
+    ap.add_argument("--compare", choices=["target", "ir"], default="target",
+                    help="compare generated target code (default) or the IR itself. "
+                         "'ir' is more sensitive: a body that lost children may never "
+                         "reach codegen, so the emitted code can match while the IR does not")
     ap.add_argument("--quiet", action="store_true", help="only report divergences")
     args = ap.parse_args()
 
@@ -71,7 +78,10 @@ def main():
     if args.limit:
         sources = sources[: args.limit]
 
-    extra = ["-entry", args.entry, "-stage", "compute", "-o", os.devnull]
+    extra = ["-entry", args.entry, "-stage", "compute"]
+    if args.compare == "ir":
+        # -dump-ir writes the IR to stdout and needs -o to keep target code from mixing in.
+        extra += ["-dump-ir", "-o", os.devnull]
     diverged, both_failed, agreed = [], 0, 0
 
     for i, src in enumerate(sources, 1):
