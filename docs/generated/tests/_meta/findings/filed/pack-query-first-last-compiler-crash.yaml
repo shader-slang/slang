@@ -7,6 +7,13 @@ observed_at: "2026-06-02T07:02:43+00:00"
 scope: ir
 evidence:
   command: "./build/Release/bin/slangc /tmp/nonempty3.slang -target hlsl -entry computeMain -stage compute"
+  repro_source: |
+    int firstOfInts<each T>(expand each T args) where nonempty(T) where T == int {
+        return __first(args);
+    }
+    RWStructuredBuffer<int> outputBuffer;
+    [numthreads(1,1,1)]
+    void computeMain(uint3 id : SV_DispatchThreadID) { outputBuffer[0] = firstOfInts(42, 7); }
   source_slang: docs/generated/tests/conformance/generics/pack-nonempty-constraint-functional.slang
   observed_summary: |
     Calling `__first(args)` on a `expand each T args` pack parameter where `nonempty(T)` is

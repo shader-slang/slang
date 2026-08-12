@@ -2287,10 +2287,23 @@ FINDINGS_DIR = REPO_ROOT / "docs/generated/tests/_meta/findings"
 # The real guard against a spurious match -- including the URL case,
 # `https://…/findings/filed/test.yaml/comments` -- is `_finding_exists`: an id
 # that names no file is not a reference, however it was spelled.
+# Both spellings use the id grammar the *producer* fixes: `finding.schema.json`
+# declares `id` as `^[a-z0-9][a-z0-9-]*$`, so lowercase-kebab is the only form a
+# finding can be born with. Widening either recognizer past that would let this
+# consumer accept a spelling no finding can actually have.
+_FINDING_ID_HEAD = r"[a-z0-9]"
+_FINDING_ID_TAIL = r"[a-z0-9-]"
+
 _FINDING_REF_RE = re.compile(
-    r"(?<!\w)findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml"
+    rf"(?<!\w)findings/(?:filed/)?({_FINDING_ID_HEAD}{_FINDING_ID_TAIL}*)\.yaml"
 )
-_FINDING_ID_RE = re.compile(r"`([a-z0-9][a-z0-9-]{4,})`")
+
+# The bare form additionally demands 5+ characters. Unlike the path form it
+# scans undelimited prose, where every backticked token is a candidate and
+# `_finding_exists` turns each into a filesystem probe; the floor keeps short
+# inline code spans like `void` or `q` from becoming stat() calls. No finding is
+# anywhere near that short -- the shortest of the 82 committed ids is 21 chars.
+_FINDING_ID_RE = re.compile(rf"`({_FINDING_ID_HEAD}{_FINDING_ID_TAIL}{{4,}})`")
 
 
 def _finding_exists(candidate: str) -> bool:
@@ -2568,6 +2581,54 @@ def cmd_selftest(args, manifest: Manifest) -> int:
     check("finding missing path rejected", _finding_ref("see findings/nope.yaml"), None)
     check("finding missing bare id rejected", _finding_ref("`no-such-finding`"), None)
     check("finding absent entirely", _finding_ref("this is a compiler bug"), None)
+
+    # Both recognizers here, and the `finding_id` pattern in
+    # doc-gap-state.schema.json, must stay within the id grammar that
+    # finding.schema.json fixes at the producer. They drifted apart once --
+    # the two consumer-side patterns had been widened to `[A-Za-z0-9._-]`,
+    # so this driver would accept and store an id no finding could ever
+    # have. Pin all three against the producer rather than each other, so
+    # the schema stays the single source of truth.
+    producer_pattern = json.loads(
+        (REPO_ROOT / "docs/generated/tests/_meta/schema/finding.schema.json").read_text()
+    )["properties"]["id"]["pattern"]
+    check("producer id grammar unchanged", producer_pattern, "^[a-z0-9][a-z0-9-]*$")
+    ledger_schema = json.loads(
+        (META_DIR / "schema/doc-gap-state.schema.json").read_text()
+    )
+    check(
+        "ledger schema pins the producer's id grammar",
+        ledger_schema["$defs"]["entry"]["properties"]["finding_id"]["pattern"],
+        producer_pattern,
+    )
+    # Assert on the patterns themselves, not through `_finding_ref`: that
+    # function gates every candidate on `_finding_exists`, so a widened
+    # regex still returns None for an id no file has, and a check routed
+    # through it would pass no matter how wide the grammar got.
+    for spelling, pattern, probe in (
+        ("path form", _FINDING_REF_RE, "see findings/{}.yaml"),
+        ("bare id", _FINDING_ID_RE, "covered by `{}`"),
+    ):
+        # Each starts lowercase, so the *tail* grammar is what has to
+        # reject them; a probe starting with the offending character would
+        # be turned away by the head and prove nothing about the tail.
+        for bad in ("mixedCaseFindingId", "under_scored_finding_id", "dotted.finding.id"):
+            m = pattern.search(probe.format(bad))
+            check(
+                f"{spelling} grammar does not admit {bad!r}",
+                m.group(1) if m else None,
+                None,
+            )
+
+    # The bare form's 5-character floor, pinned so the comment explaining
+    # it stays true. The path form has no floor: `findings/` already
+    # delimits it, so there is nothing to disambiguate.
+    check("bare id ignores a 4-character code span", _FINDING_ID_RE.search("`abcd`"), None)
+    check(
+        "bare id accepts 5 characters",
+        _FINDING_ID_RE.search("`abcde`").group(1),
+        "abcde",
+    )
 
     # -- _gap_summary -------------------------------------------------
     check("summary short passthrough", _gap_summary("  a   b "), "a b")

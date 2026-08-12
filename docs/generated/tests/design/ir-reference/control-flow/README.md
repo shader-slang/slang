@@ -35,8 +35,19 @@ reachability obligation that separates `missingReturn` from
 keeps `discard` and `Printf` alive through DCE.
 
 Every opcode-shape test observes `-target <text-target> -dump-ir -o
-/dev/null`, so the assertion is made against the platform-neutral IR the
-front end hands off. Conditions, loop predicates and switch scrutinees
+/dev/null`. Note what that snapshot is _not_: it is not the raw output of
+AST lowering. `generateIRForTranslationUnit` runs a fixed mandatory pass
+block — `lowerErrorHandling`, `lowerDefer`, SCCP, `simplifyCFG` and the
+rest — _before_ it prints the `LOWER-TO-IR` dump, so the first snapshot
+is already post-normalization. Treating it as "the IR the front end hands
+off" produced three false `drift-from-source` gaps against
+[control-flow.md](../../../../design/ir-reference/control-flow.md) in the
+first intake cycle: `defer` already lowered, `unreachable` already
+present, a third `ifElse` shape already introduced by `simplifyCFG`. In
+each case the document was right and the observation was reading a later
+pipeline stage than it assumed. A claim about what lowering itself
+produces cannot be made from this dump; it needs the source, or a
+`-dump-ir-before` of the specific pass. Conditions, loop predicates and switch scrutinees
 are read from `uniform` globals so constant folding cannot collapse the
 structured terminator before it is observed, and results are sunk into an
 `RWStructuredBuffer` so DCE cannot remove the surrounding blocks. CHECK
