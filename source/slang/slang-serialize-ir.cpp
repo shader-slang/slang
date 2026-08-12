@@ -763,14 +763,6 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 }
 
 
-/// Allocates the instruction for `instIndex`, mirroring the sizing rules of the
-/// load-time allocation pass.
-///
-/// Needed because a deferred body's instructions were never allocated: the load
-/// pass left their slots empty. String and blob constants carry their characters
-/// inline, so their size depends on a length that is read from the payload stream;
-/// the cursor is positioned at that length here, and peeking does not disturb it
-/// because the payload switch consumes it immediately afterwards.
 /// Returns the allocation size an instruction of `op` needs beyond the base `IRInst`,
 /// advancing `stringLengthCursor` past the length entry of a string or blob constant.
 ///
@@ -816,6 +808,14 @@ static size_t _calcInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64&
     }
 }
 
+/// Allocates the instruction for `instIndex`, mirroring the sizing rules of the
+/// load-time allocation pass.
+///
+/// Needed because a deferred body's instructions were never allocated: the load
+/// pass left their slots empty. String and blob constants carry their characters
+/// inline, so their size depends on a length that is read from the payload stream;
+/// the cursor is positioned at that length here, and peeking does not disturb it
+/// because the payload switch consumes it immediately afterwards.
 IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringLengthCursor)
 {
     const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];

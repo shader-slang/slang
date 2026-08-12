@@ -2,6 +2,7 @@
 
 // slang-compiler-api.h transitively includes slang-ir.h, which declares
 // getLiveIRModuleCount.
+#include "core/slang-platform.h"
 #include "slang/slang-compiler-api.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -26,6 +27,18 @@ using namespace Slang;
 SLANG_UNIT_TEST(irModuleReleasedWithSession)
 {
     const Index before = getLiveIRModuleCount();
+    const Index deferredLoadersBefore = getDeferredBodyLoaderInstallCount();
+
+    // Deferred loading is on unless SLANG_ONDEMAND_LAZY_IR is explicitly "0".
+    StringBuilder lazyEnv;
+    bool lazyExpected = true;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_ONDEMAND_LAZY_IR"),
+            lazyEnv)))
+    {
+        const String text = lazyEnv.produceString();
+        lazyExpected = text.getLength() == 0 || text[0] != '0';
+    }
 
     {
         ComPtr<slang::IGlobalSession> globalSession;
@@ -57,6 +70,13 @@ SLANG_UNIT_TEST(irModuleReleasedWithSession)
         SLANG_CHECK_ABORT(module != nullptr);
 
         SLANG_CHECK(getLiveIRModuleCount() > before);
+
+        // The cycle this guards against can only form on the deferred path, so a run
+        // that never took that path proves nothing. Deferral is the default, so assert
+        // it happened unless the environment explicitly turned it off -- otherwise the
+        // test could stay green while checking nothing.
+        if (lazyExpected)
+            SLANG_CHECK(getDeferredBodyLoaderInstallCount() > deferredLoadersBefore);
     }
 
     // Everything above is out of scope, so every module those sessions created should

@@ -8867,6 +8867,21 @@ Index getLiveIRModuleCount()
     return g_liveIRModuleCount.load(std::memory_order_relaxed);
 }
 
+namespace
+{
+std::atomic<Index> g_deferredBodyLoaderInstallCount{0};
+}
+
+void _noteDeferredBodyLoaderInstalled()
+{
+    g_deferredBodyLoaderInstallCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+Index getDeferredBodyLoaderInstallCount()
+{
+    return g_deferredBodyLoaderInstallCount.load(std::memory_order_relaxed);
+}
+
 IRDecoration* IRInst::getFirstDecoration()
 {
     // Decoration lookup runs on every instruction of every module, so it does not

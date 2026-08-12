@@ -92,12 +92,21 @@ SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 //
 void _noteIRModuleCreated();
 void _noteIRModuleDestroyed();
+void _noteDeferredBodyLoaderInstalled();
 
 /// Number of `IRModule`s currently alive in this process.
 ///
 /// Exported so a separately linked unit-test tool can observe it; deliberately absent
 /// from the public `slang.h` API.
 SLANG_API Index getLiveIRModuleCount();
+
+/// Number of modules that have had a deferred-body loader installed on them.
+///
+/// Exists so the release test can tell that it exercised the deferred path at all. The
+/// cycle that test guards against is only reachable when a loader is installed, so
+/// without this the test passes just as happily on an eager load -- which is to say it
+/// could pass while checking nothing.
+SLANG_API Index getDeferredBodyLoaderInstallCount();
 
 struct IRDeferredBodyLoader : RefObject
 {
@@ -778,29 +787,14 @@ struct IRInst
     /// decoration, because callers overwhelmingly use it as the head of a loop
     /// that walks on into the children. Such a loop against an unmaterialized
     /// body would find the decorations, no children, and report that there are
-    /// none -- a silent wrong answer rather than a crash. Decoration-only
-    /// scanners that must not pay for materialization use
-    /// `getFirstDecorationOrChildWithoutMaterializing` below, whose name is
-    /// deliberately hard to reach for by accident.
+    /// none -- a silent wrong answer rather than a crash.
+    ///
+    /// Decoration lookup, which must not pay for materialization, does not come
+    /// through here: `getFirstDecoration` reads the list head directly, with the
+    /// acquire that pairs with a body being published.
     IRInst* getFirstDecorationOrChild()
     {
         ensureBodyMaterialized();
-        return m_decorationsAndChildren.first;
-    }
-
-    /// Head of the combined list *without* materializing a deferred body.
-    ///
-    /// Valid only for walking decorations, which always precede children in this
-    /// list and are never deferred. Stopping at the first non-decoration is the
-    /// caller's obligation: on an instruction whose body is still encoded, the
-    /// children are simply not linked yet, so a walk that continues past the
-    /// decorations silently sees an empty body.
-    ///
-    /// This exists so that decoration lookup -- which runs on every instruction of
-    /// every module -- does not force materialization of bodies no one asked for,
-    /// which would defeat deferred loading entirely.
-    IRInst* getFirstDecorationOrChildWithoutMaterializing()
-    {
         return m_decorationsAndChildren.first;
     }
 
@@ -2319,7 +2313,11 @@ public:
 
     /// Installs the loader that supplies deferred instruction bodies for this
     /// module. See `IRDeferredBodyLoader`.
-    void setDeferredBodyLoader(IRDeferredBodyLoader* loader) { m_deferredBodyLoader = loader; }
+    void setDeferredBodyLoader(IRDeferredBodyLoader* loader)
+    {
+        m_deferredBodyLoader = loader;
+        _noteDeferredBodyLoaderInstalled();
+    }
     IRDeferredBodyLoader* getDeferredBodyLoader() const { return m_deferredBodyLoader; }
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
