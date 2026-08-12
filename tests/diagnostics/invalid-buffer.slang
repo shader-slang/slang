@@ -7,8 +7,8 @@ Buffer b0;
 
 Buffer<> b1;
 /*diag:
-^^^^^^ cannot specialize generic
-^^^^^^ cannot specialize generic 'Buffer' with the provided arguments.
+^^^^^^ wrong number of generic arguments
+^^^^^^ generic 'Buffer' expects 2 generic argument(s) but 0 were provided
 */
 
 [numthreads(1,1,1)]

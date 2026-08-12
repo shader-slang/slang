@@ -24,6 +24,16 @@ test maps to a documented claim) would erode. See
 `docs/generated/tests/_meta/prompts/_common.md` for the full statement of this
 contract.
 
+This restriction is about **provenance, not breadth**. It forbids choosing
+tests by looking at uncovered code; it does **not** forbid systematically
+expanding a documented *family* (per-op, per-type, per-shape variants) when
+the family is confirmed by an authoritative surface — the language
+reference or the core-module declarations — and each variant's behaviour is
+established by *running the compiler*, not assumed. That is the
+[`_claims.md` § Systematic variant expansion](_claims.md) rule, and it is
+the primary lever for deepening emission / legalization coverage when the
+design doc states a rule generically without enumerating its cells.
+
 ## What to do
 
 1. **Re-read the source doc carefully.** Do not skim. Look for
@@ -58,11 +68,13 @@ contract.
    (`filecheck=NAME` / `filecheck-buffer=NAME` / `diag=NAME`) and
    carry at least one matching `// NAME:` pattern (or the FileCheck
    variants `NAME-DAG:` / `NAME-NEXT:` / etc.). Lint rejects tests
-   that run but verify nothing. You do not need to execute the test
-   locally — CI runs the full matrix and catches behavioral
-   failures. If the test targets a backend your runtime cannot run
-   (`-target dxil`, `-target dx12`, `-target cuda`, etc.), commit it
-   anyway; CI validates it.
+   that run but verify nothing. **Verify locally before commit** with
+   `regenerate.py verify <bundle>` (see the `## Verify before
+   committing` section in `_common.md` for the contract). Tests
+   targeting backends your runtime doesn't have (`-target dxil`,
+   `-target dx12`, GPU-runtime execution) come back as `ignored`;
+   that's fine — commit them and CI validates. Tests that come back
+   as `FAILED` must be fixed before commit.
 
 4. **Do not modify existing tests.** Bootstrap tests are stable. If
    you find a flaw in an existing test, write the finding into
@@ -78,6 +90,18 @@ contract.
    and fed back into the doc-regeneration workflow. Write the
    **Suggested addition** cell as an actionable instruction so the
    doc-regen agent can act on it verbatim.
+
+6. **Expand documented families systematically (the depth lever).** When
+   the source doc names a family or grid generically — "the atomic
+   intrinsics", "the buffer-layout rules", "the supported numeric widths" —
+   but does not enumerate its members, instantiate the individual cells per
+   [`_claims.md` § Systematic variant expansion](_claims.md): enumerate
+   candidate cells from the language-reference / core-module surface, **run
+   each one and classify** (clean output → pin the real emitted text; clean
+   rejection → negative test; crash/abort → a finding, never a loosened
+   green test), prune cells that emit identically, and record the doc gap
+   that the family was not enumerated. This is how a re-read pass adds
+   emission depth without ever consulting a coverage report.
 
 ## Update README.md
 
@@ -118,8 +142,15 @@ Run, in order:
 
 ```bash
 python3 docs/generated/tests/_meta/regenerate.py lint <bundle>
+python3 docs/generated/tests/_meta/regenerate.py verify <bundle>
 python3 docs/generated/tests/_meta/regenerate.py mark-fresh <bundle> --model <your-id>
 ```
+
+`verify` runs `slang-test` against the bundle and reports
+pass / ignored / FAILED counts. Every FAILED test must be fixed
+before `mark-fresh`. Tests reported as `ignored` (e.g. `-target
+dxil` with no DXC, GPU-runtime tests with no driver) are fine to
+commit — CI nightly validates them.
 
 Fix any lint errors by re-reading the source doc, not by adjusting the
 tests to silence the linter.

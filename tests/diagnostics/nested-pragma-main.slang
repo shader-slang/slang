@@ -6,4 +6,7 @@ module nested_pragma_test;
 
 __include "nested-pragma-impl1.slang";
 
-// CHECK-NOT: warning 30856
+// The root-level disable suppresses 30856 across the nested `__include`s (no push/pop here),
+// so it must not appear. (The diagnostic renders as `warning[E30856]`; match on the `E30856`
+// code so this check is not vacuous.)
+// CHECK-NOT: E30856

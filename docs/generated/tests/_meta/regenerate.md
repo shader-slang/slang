@@ -30,39 +30,39 @@ All commands run from the repository root.
 python3 docs/generated/tests/_meta/regenerate.py <subcommand> [args...]
 ```
 
-| Subcommand                                          | Purpose                                                                                             |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| `list`                                              | Print every bundle in the manifest                                                                  |
-| `list-stale`                                        | Classify each bundle as `missing`, `stale`, or `fresh`                                              |
-| `digest <bundle>`                                   | Compute current watched-paths and source-doc digests                                                |
-| `show <bundle>`                                     | Manifest entry + resolved source files + source doc                                                 |
-| `mark-fresh <bundle> [--commit SHA] [--model NAME]` | Record a fresh entry                                                                                |
-| `lint [<bundle>...]`                                | Structural linter (README.md front-matter, every `.slang` has a `//META` block, `doc_ref` resolves) |
-| `index [--write]`                                   | (Re)generate the suite `INDEX.md` navigation table                                                  |
-| `doc-gaps [--source-doc <path>] [--format md\|json]` | Aggregate doc-gap rows across bundles, grouped by source doc                                       |
-| `coverage-gaps <bundle> [--from <report.txt>]`      | (Phase E support) per-bundle uncovered-target rollup; bundle-level only                             |
-| `expansion-candidates [--from <report.json>]`       | (Phase E) rank bundles by under-coverage; outputs bundle keys + scores only                         |
-| `review-status / mark-reviewed / mark-remediated`   | (Phase D) two-stage review/remediation. Stubs currently.                                            |
-| `findings list [--include-filed]`                   | (Phase F) list pending compiler-bug findings                                                        |
-| `findings show <id>`                                | (Phase F) render the issue body markdown for a finding                                              |
-| `findings file <id> [--dry-run]`                    | (Phase F) `gh issue create` + set project fields; moves YAML to `findings/filed/`                   |
-| `findings dup <id> --of <issue-number>`             | (Phase F) record a finding as duplicate of an existing issue; no filing                             |
+| Subcommand                                                                               | Purpose                                                                                                                                                         |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list`                                                                                   | Print every bundle in the manifest                                                                                                                              |
+| `list-stale`                                                                             | Classify each bundle as `missing`, `stale`, or `fresh`                                                                                                          |
+| `digest <bundle>`                                                                        | Compute current watched-paths and source-doc digests                                                                                                            |
+| `show <bundle>`                                                                          | Manifest entry + resolved source files + source doc                                                                                                             |
+| `mark-fresh <bundle> [--commit SHA] [--model NAME]`                                      | Record a fresh entry                                                                                                                                            |
+| `lint [<bundle>...]`                                                                     | Structural linter (README.md front-matter, every `.slang` has a `//META` block, `doc_ref` resolves)                                                             |
+| `index [--write]`                                                                        | (Re)generate the suite `INDEX.md` navigation table                                                                                                              |
+| `doc-gaps [--source-doc <path>] [--tree design\|language-reference] [--format md\|json]` | Aggregate doc-gap rows across bundles, grouped by the document each gap is anchored to, each row carrying the `gap_id` the doc side tracks its resolution under |
+| `coverage-gaps <bundle> [--from <report.txt>]`                                           | (Phase E support) per-bundle uncovered-target rollup; bundle-level only                                                                                         |
+| `expansion-candidates [--from <report.json>]`                                            | (Phase E) rank bundles by under-coverage; outputs bundle keys + scores only                                                                                     |
+| `review-status / mark-reviewed / mark-remediated`                                        | (Phase D) two-stage review/remediation. Stubs currently.                                                                                                        |
+| `findings list [--include-filed]`                                                        | (Phase F) list pending compiler-bug findings                                                                                                                    |
+| `findings show <id>`                                                                     | (Phase F) render the issue body markdown for a finding                                                                                                          |
+| `findings file <id> [--dry-run]`                                                         | (Phase F) `gh issue create` + set project fields; moves YAML to `findings/filed/`                                                                               |
+| `findings dup <id> --of <issue-number>`                                                  | (Phase F) record a finding as duplicate of an existing issue; no filing                                                                                         |
 
 `<bundle>` is the manifest key (e.g. `pipeline/03-semantic-check`),
 which equals the bundle directory under `docs/generated/tests/`.
 
 ## Phase status
 
-| Phase | Description | Status |
-| --- | --- | --- |
-| A | Framework scaffold (driver, schemas, base prompts, manifest) | implemented |
-| B1 | Bootstrap generation across 44 behaviorally-normative bundles | implemented |
-| B1.5 / B1.6 / B1.7 / B1.8 | Boundary expansion, coverage-driven metadata refinement, catalog sweep, GPU-target expansion | implemented |
-| B2 | `slang-test` nightly job runs the suite via `-test-dir docs/generated/tests/` | planned |
-| C | Cross-link pass — bundles consume each other's READMEs | planned |
-| D | Review + remediation against a non-Claude model | scaffolded (schemas + prompts + state file in place) |
-| E | Coverage-driven expansion loop | scaffolded (`coverage-gaps`, `expansion-candidates` stubs the data flow) |
-| F | Structured compiler-bug findings + operator-driven filing | implemented |
+| Phase                     | Description                                                                                  | Status                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| A                         | Framework scaffold (driver, schemas, base prompts, manifest)                                 | implemented                                                              |
+| B1                        | Bootstrap generation across 44 behaviorally-normative bundles                                | implemented                                                              |
+| B1.5 / B1.6 / B1.7 / B1.8 | Boundary expansion, coverage-driven metadata refinement, catalog sweep, GPU-target expansion | implemented                                                              |
+| B2                        | `slang-test` nightly job runs the suite via `-test-dir docs/generated/tests/`                | implemented                                                              |
+| C                         | Cross-link pass — bundles consume each other's READMEs                                       | planned                                                                  |
+| D                         | Review + remediation against a non-Claude model                                              | scaffolded (schemas + prompts + state file in place)                     |
+| E                         | Coverage-driven expansion loop                                                               | scaffolded (`coverage-gaps`, `expansion-candidates` stubs the data flow) |
+| F                         | Structured compiler-bug findings + operator-driven filing                                    | implemented                                                              |
 
 To check the suite's current state:
 
@@ -103,12 +103,12 @@ files as additional context):
 
 ## Phase B2 — Slang-test wiring
 
-A separate PR. The nightly job invokes `slang-test` with
-`-test-dir docs/generated/tests/`, which selects exactly this suite
-without any category filter on the `.slang` files themselves. Add
-`.github/workflows/agentic-tests-nightly.yml` modeled on
-`coverage-nightly.yml`. The nightly is advisory: it does not gate
-PR merges.
+Landed via
+`.github/workflows/nightly-slang-test.yml`. The nightly job
+invokes `regenerate.py verify`, which wraps `slang-test` with
+`-test-dir docs/generated/tests` and applies the suite-level
+expected-failures list + `requires-tool` filtering. The nightly is
+advisory: it does not gate PR merges.
 
 ## Phase C — Cross-link pass
 
@@ -185,8 +185,9 @@ Then `regenerate.py mark-fresh <bundle>`.
 
 The intended attachment points:
 
-- **Nightly run.** `agentic-tests-nightly.yml`, scheduled
-  ~`0 4 * * *` (after `coverage-nightly`), runs
+- **Nightly run.** `nightly-slang-test.yml`, scheduled
+  `0 4 * * *` (after `nightly-slang-coverage-test.yml`'s `02:00` slot), runs
+  `regenerate.py verify` which wraps
   `slang-test -test-dir docs/generated/tests`. Advisory only; never
   blocks PRs.
 - **Lint on PR.** A check workflow that runs

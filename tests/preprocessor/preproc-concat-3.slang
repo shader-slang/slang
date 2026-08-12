@@ -16,8 +16,5 @@
 // Old Slang output: aabb ;
 
 CONCAT(CONCAT(A2, A2), CONCAT(B2, B2));
-/*diag:
-^^^^^^ expanded from macro 'CONCAT'
-*/
 
 // CHECK: CONCAT ( a , a ) CONCAT ( b , b )

@@ -7,9 +7,9 @@ void f()
 {
 	int i;
 #pragma warning (disable : 30081 15205)
-	// CHECK-NOT: ([[# @LINE+1]]): warning 30081:
+	// CHECK-NOT: warning[E30081]
 	i = GetValue();
-	// CHECK-NOT: ([[# @LINE+1]]): warning 15205:
+	// CHECK-NOT: warning[E15205]
 #if MY_MACRO
 
 #endif

@@ -128,9 +128,20 @@ Run, in order:
 
 ```bash
 python3 docs/generated/tests/_meta/regenerate.py lint <bundle>
+python3 docs/generated/tests/_meta/regenerate.py verify <bundle>
 python3 docs/generated/tests/_meta/regenerate.py mark-fresh <bundle> --model <your-id>
 # (mark-remediated is a Phase D wiring; for now, the report is just saved.)
 ```
 
 If `lint` fails, fix the structural issue (front-matter, doc_ref,
 duplicate names) before declaring done.
+
+If `verify` shows FAILED tests — including ones you didn't edit —
+address them in this remediation pass: either fix them (prefer
+this), file a finding under
+`docs/generated/tests/_meta/findings/` if the failure looks like a
+real compiler bug, or document why the failure is out of scope in
+your remediation report. Tests reported as `ignored` (no local
+runner for that backend) are fine to leave as-is — CI nightly
+validates them. See the `## Verify before committing` section in
+`_common.md` for the full contract.

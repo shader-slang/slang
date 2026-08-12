@@ -1,7 +1,7 @@
 // render-d3d11.h
 #pragma once
 
-#include "../renderer-shared.h"
+#include "gfx/renderer-shared.h"
 
 namespace gfx
 {

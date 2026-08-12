@@ -27,7 +27,7 @@ float get_thread_6_value(float v, uint group_thread_id)
     if (group_thread_id == 6)
     {
         s_shared = detach(v);
-        // CHECK-NOT: warning 42050
+        // CHECK-NOT: warning[E42050]
 
     }
     GroupMemoryBarrierWithGroupSync();

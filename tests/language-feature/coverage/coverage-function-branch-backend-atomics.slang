@@ -5,7 +5,10 @@
 // by coverage-wgsl-skip.slang because it is an unsupported target for
 // coverage instrumentation today.
 
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_5_0
+// HLSL TEST pins `-trace-coverage-counter-width 32` because cs_5_0
+// does not support the default uint64 path (no `uint64_t` type, no
+// SM 6.6 `InterlockedAdd(uint64_t*, ...)` overload).
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_5_0 -trace-coverage-counter-width 32
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile glsl_450
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage
 

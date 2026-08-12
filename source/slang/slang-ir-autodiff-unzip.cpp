@@ -231,6 +231,8 @@ struct UnzippingContext
             AnnotationKind::BackwardDerivativeApply);
         auto applyBwdFuncType = cast<IRFuncType>(
             diffTypeContext.resolveType(&globalBuilder, applyBwdFunc->getDataType()));
+        applyBwdFuncType =
+            maybeExpandConcreteFuncTypePacks(&globalBuilder, applyBwdFunc, applyBwdFuncType);
 
         List<IRInst*> applyFuncArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
@@ -335,6 +337,7 @@ struct UnzippingContext
 
         auto rematFuncType =
             cast<IRFuncType>(diffTypeContext.resolveType(&globalBuilder, rematFunc->getDataType()));
+        rematFuncType = maybeExpandConcreteFuncTypePacks(&globalBuilder, rematFunc, rematFuncType);
 
         // MinimalContext is always the first parameter of remat (remat is static,
         // and RematFuncType includes the this-type as an explicit parameter).
@@ -863,62 +866,6 @@ struct ExtractPrimalFuncContext
             shouldReportCheckpoints = autodiffContext->targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::ReportCheckpointIntermediates);
         }
-    }
-
-    IRInst* cloneGenericHeader(IRBuilder& builder, IRCloneEnv& cloneEnv, IRGeneric* gen)
-    {
-        auto newGeneric = builder.emitGeneric();
-        newGeneric->setFullType(builder.getTypeKind());
-        for (auto decor : gen->getDecorations())
-            cloneDecoration(decor, newGeneric);
-        builder.emitBlock();
-        auto originalBlock = gen->getFirstBlock();
-        for (auto child = originalBlock->getFirstChild(); child != originalBlock->getLastParam();
-             child = child->getNextInst())
-        {
-            cloneInst(&cloneEnv, &builder, child);
-        }
-        return newGeneric;
-    }
-
-    IRInst* createGenericIntermediateType(IRGeneric* gen)
-    {
-        IRBuilder builder(module);
-        builder.setInsertBefore(gen);
-        IRCloneEnv intermediateTypeCloneEnv;
-        auto clonedGen = cloneGenericHeader(builder, intermediateTypeCloneEnv, gen);
-        auto structType = builder.createStructType();
-        builder.emitReturn(structType);
-        auto func = findGenericReturnVal(gen);
-        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-        {
-            StringBuilder newName;
-            newName << nameHint->getName() << "_Intermediates";
-            builder.addNameHintDecoration(structType, UnownedStringSlice(newName.getBuffer()));
-        }
-        return clonedGen;
-    }
-
-    IRInst* createIntermediateType(IRGlobalValueWithCode* func)
-    {
-        if (func->getOp() == kIROp_Generic)
-            return createGenericIntermediateType(as<IRGeneric>(func));
-        IRBuilder builder(module);
-        builder.setInsertBefore(func);
-
-        auto intermediateType = builder.createStructType();
-
-        builder.addDecoration(intermediateType, kIROp_OptimizableTypeDecoration);
-        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
-        {
-            StringBuilder newName;
-            newName << nameHint->getName() << "_Intermediates";
-            builder.addNameHintDecoration(
-                intermediateType,
-                UnownedStringSlice(newName.getBuffer()));
-        }
-
-        return intermediateType;
     }
 
     IRInst* generatePrimalFuncType(
@@ -1600,7 +1547,7 @@ IRFunc* splitApplyAndPropFuncs(
                 }
 
                 newOperands.add(
-                    builder.emitPoison(tupleNameType)); // For the tuple name type operand.
+                    builder.getPoison(tupleNameType)); // For the tuple name type operand.
                 auto newMakeTuple = builder.emitMakeTuple(newOperands);
                 makeStruct->replaceUsesWith(newMakeTuple);
                 makeStruct->removeAndDeallocate();

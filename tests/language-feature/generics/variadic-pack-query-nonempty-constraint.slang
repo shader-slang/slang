@@ -110,7 +110,7 @@ void badMismatchedForward<let each P : int, let each Q : int>() where nonempty(P
 }
 
 int badSpecialization = goodValueUse<>();
-//CHECK:                              ^ could not specialize generic for arguments of type ()
+//CHECK:                              ^ could not satisfy the generic constraint 'nonempty(D)'
 
 interface IMarker {}
 

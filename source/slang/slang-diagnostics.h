@@ -1,11 +1,11 @@
 #ifndef SLANG_DIAGNOSTICS_H
 #define SLANG_DIAGNOSTICS_H
 
-#include "../compiler-core/slang-diagnostic-sink.h"
-#include "../compiler-core/slang-source-loc.h"
-#include "../compiler-core/slang-token.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-writer.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-source-loc.h"
+#include "compiler-core/slang-token.h"
+#include "core/slang-basic.h"
+#include "core/slang-writer.h"
 #include "slang.h"
 
 namespace Slang

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -preserve-params -O0
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -preserve-params
 
 // Test that -preserve-params option preserves shader paraemter declarations in the output spirv code.
 

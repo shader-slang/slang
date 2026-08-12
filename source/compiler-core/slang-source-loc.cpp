@@ -1,9 +1,9 @@
 // slang-source-loc.cpp
 #include "slang-source-loc.h"
 
-#include "../core/slang-char-encode.h"
-#include "../core/slang-string-escape-util.h"
-#include "../core/slang-string-util.h"
+#include "core/slang-char-encode.h"
+#include "core/slang-string-escape-util.h"
+#include "core/slang-string-util.h"
 #include "slang-artifact-desc-util.h"
 #include "slang-artifact-impl.h"
 #include "slang-artifact-representation-impl.h"
@@ -22,7 +22,6 @@ const String PathInfo::getMostUniqueIdentity() const
         return uniqueIdentity;
     case Type::FoundPath:
     case Type::FromString:
-    case Type::MacroExpansion:
         {
             return foundPath;
         }
@@ -38,7 +37,6 @@ String PathInfo::getName() const
     case Type::Normal:
     case Type::FromString:
     case Type::FoundPath:
-    case Type::MacroExpansion:
         {
             return foundPath;
         }
@@ -63,11 +61,6 @@ bool PathInfo::operator==(const ThisType& rhs) const
         {
             return true;
         }
-    case Type::MacroExpansion:
-        {
-            // Two MacroExpansion PathInfos are equal if they name the same macro.
-            return foundPath == rhs.foundPath;
-        }
     case Type::Normal:
         {
             return foundPath == rhs.foundPath && uniqueIdentity == rhs.uniqueIdentity;
@@ -89,9 +82,6 @@ void PathInfo::appendDisplayName(StringBuilder& out) const
 {
     switch (type)
     {
-    case Type::MacroExpansion:
-        out << "macro '" << foundPath << "'";
-        break;
     case Type::TokenPaste:
         out << "[Token Paste]";
         break;
@@ -626,13 +616,10 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!! SourceFile !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void SourceFile::setContents(ISlangBlob* blob)
+ComPtr<ISlangBlob> SourceFile::decodeContentBlob(ISlangBlob* rawBlob)
 {
-    const UInt rawContentSize = blob->getBufferSize();
-
-    SLANG_ASSERT(rawContentSize == m_contentSize);
-
-    Byte* rawContentBegin = (Byte*)blob->getBufferPointer();
+    const UInt rawContentSize = rawBlob->getBufferSize();
+    const Byte* rawContentBegin = (const Byte*)rawBlob->getBufferPointer();
 
     // Query the encoding type and discard the Unicode Byte-Order-Marker before decoding
     size_t offset;
@@ -642,23 +629,27 @@ void SourceFile::setContents(ISlangBlob* blob)
     if (offset == 0 && type == CharEncodeType::UTF8)
     {
         // Fast-path: If the input is UTF-8 without a BOM, we can use it directly.
-        m_contentBlob = blob;
+        return ComPtr<ISlangBlob>(rawBlob);
     }
-    else
-    {
-        // Slow path: Allocate and decode a new buffer for the data, then move that into
-        // m_contentBlob.
-        List<char> decodedBuffer;
-        CharEncoding::getEncoding(type)->decode(
-            rawContentBegin + offset,
-            int(rawContentSize - offset),
-            decodedBuffer);
 
-        auto size = decodedBuffer.getCount();
-        ScopedAllocation temp;
-        temp.attach(decodedBuffer.detachBuffer(), size);
-        m_contentBlob = RawBlob::moveCreate(temp);
-    }
+    // Slow path: Allocate and decode a new buffer for the data, then move that into a fresh blob.
+    List<char> decodedBuffer;
+    CharEncoding::getEncoding(type)->decode(
+        rawContentBegin + offset,
+        int(rawContentSize - offset),
+        decodedBuffer);
+
+    auto size = decodedBuffer.getCount();
+    ScopedAllocation temp;
+    temp.attach(decodedBuffer.detachBuffer(), size);
+    return RawBlob::moveCreate(temp);
+}
+
+void SourceFile::setContents(ISlangBlob* blob)
+{
+    SLANG_ASSERT(blob->getBufferSize() == m_contentSize);
+
+    m_contentBlob = decodeContentBlob(blob);
 
     char const* decodedContentBegin = (char const*)m_contentBlob->getBufferPointer();
     const UInt decodedContentSize = m_contentBlob->getBufferSize();
