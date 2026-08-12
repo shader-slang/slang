@@ -22,7 +22,7 @@ void foo(const int constParam)
 //CHECK:     ^ undefined SPIR-V id
 //CHECK:     ^ SPIRV id '%d' is not defined in the current assembly block location
         %r : $$int = OpIAdd %r %r
-//CHECK:^ too many operands
+//CHECK:^ warning E29106
 //CHECK:^ too many operands for OpLoad (expected max 4), did you forget a semicolon?
 //CHECK:   ^ unexpected token
 //CHECK:   ^ unexpected ':'

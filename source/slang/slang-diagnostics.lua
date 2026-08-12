@@ -1163,6 +1163,13 @@ warning(
     span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
 )
 
+err(
+    "spirv-instruction-takes-no-operands",
+    29118,
+    "SPIR-V instruction takes no operands",
+    span { loc = "location", message = "~opcode does not take any operands" }
+)
+
 
 -- Load semantic checking diagnostics (part 1)
 -- (inlined from slang-diagnostics-semantic-checking-1.lua)
