@@ -726,7 +726,37 @@ struct SerializedArray
 
     /// True if this is a view into serialized data rather than an owned copy, and
     /// therefore depends on that data staying alive.
-    bool isView() const { return _count != 0 && _owned.getCount() == 0; }
+    ///
+    /// Stored rather than inferred. Deriving it from "`_count` is non-zero and `_owned`
+    /// is empty" made an empty view indistinguishable from an empty owned array, and
+    /// kept that case unreachable only because a reader elsewhere declines to hand back
+    /// a zero-length run -- an invariant enforced in a different file from the one that
+    /// depends on it.
+    bool isView() const { return _isView; }
+
+    /// Points this at `count` elements of serialized data it does not own.
+    ///
+    /// The one way to become a view. Named so that the three fields are only ever moved
+    /// between consistent states together: a caller that set them individually could
+    /// leave `_data` pointing into the blob while `isView()` reported ownership, which
+    /// is the dangling case copy/move goes to some trouble to avoid.
+    void adoptView(T const* data, Count count)
+    {
+        _owned = List<T>();
+        _data = data;
+        _count = count;
+        _isView = true;
+    }
+
+    /// Discards any view and prepares to accumulate owned elements.
+    void beginOwned(Count reserveCount)
+    {
+        _owned.clear();
+        if (reserveCount > 0)
+            _owned.reserve(reserveCount);
+        _isView = false;
+        setFromOwned();
+    }
 
     /// Copies the referenced data into this object, so it no longer depends on the
     /// serialized blob. A no-op if it is already owned.
@@ -737,12 +767,14 @@ struct SerializedArray
         _owned.setCount(_count);
         ::memcpy(_owned.getBuffer(), _data, size_t(_count) * sizeof(T));
         _data = _owned.getBuffer();
+        _isView = false;
     }
 
     void setFromOwned()
     {
         _data = _owned.getBuffer();
         _count = _owned.getCount();
+        _isView = false;
     }
 
     SerializedArray() = default;
@@ -776,6 +808,7 @@ private:
     void _copyFrom(SerializedArray const& other)
     {
         _owned = other._owned;
+        _isView = other._isView;
         if (other.isView())
         {
             _data = other._data;
@@ -790,6 +823,7 @@ private:
     void _moveFrom(SerializedArray&& other)
     {
         const bool otherWasView = other.isView();
+        _isView = otherWasView;
         T const* otherData = other._data;
         Count otherCount = other._count;
         _owned = static_cast<List<T>&&>(other._owned);
@@ -804,11 +838,18 @@ private:
         }
         other._data = nullptr;
         other._count = 0;
+        other._isView = false;
     }
 
-public:
+private:
+    // Private because the three of them describe one state together: `_data` points
+    // either into `_owned` or into serialized data, and `_isView` says which. A caller
+    // that set them individually could leave `_data` referring to a blob while this
+    // object reported ownership, which is the dangling case copy, move and `makeOwned`
+    // go to some trouble to avoid. Every transition between states has a name above.
     T const* _data = nullptr;
     Count _count = 0;
+    bool _isView = false;
     List<T> _owned;
 };
 
@@ -1095,23 +1136,18 @@ void serialize(S const& serializer, SerializedArray<T>& value)
                     // would make this object claim ownership while `_data` points into
                     // the serialized blob -- `makeOwned()` would then do nothing and the
                     // mutators would edit storage that `_data` does not refer to.
-                    value._owned = List<T>();
-                    value._data = view;
-                    value._count = remaining;
+                    value.adoptView(view, remaining);
                     return;
                 }
             }
         }
-        value._owned.clear();
-        if (remaining > 0)
-            value._owned.reserve(remaining);
+        value.beginOwned(remaining);
         while (hasElements(serializer))
         {
             T element;
             serialize(serializer, element);
-            value._owned.add(element);
+            value.add(element);
         }
-        value.setFromOwned();
     }
 }
 
