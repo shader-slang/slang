@@ -29,15 +29,15 @@ SLANG_UNIT_TEST(irModuleReleasedWithSession)
     const Index before = getLiveIRModuleCount();
     const Index deferredLoadersBefore = getDeferredBodyLoaderInstallCount();
 
-    // Deferred loading is on unless SLANG_ONDEMAND_LAZY_IR is explicitly "0".
-    StringBuilder lazyEnv;
-    bool lazyExpected = true;
+    // Deferred loading is on unless SLANG_ONDEMAND_IR is explicitly "0".
+    StringBuilder onDemandEnv;
+    bool onDemandExpected = true;
     if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-            UnownedStringSlice("SLANG_ONDEMAND_LAZY_IR"),
-            lazyEnv)))
+            UnownedStringSlice("SLANG_ONDEMAND_IR"),
+            onDemandEnv)))
     {
-        const String text = lazyEnv.produceString();
-        lazyExpected = text.getLength() == 0 || text[0] != '0';
+        const String text = onDemandEnv.produceString();
+        onDemandExpected = text.getLength() == 0 || text[0] != '0';
     }
 
     {
@@ -75,7 +75,7 @@ SLANG_UNIT_TEST(irModuleReleasedWithSession)
         // that never took that path proves nothing. Deferral is the default, so assert
         // it happened unless the environment explicitly turned it off -- otherwise the
         // test could stay green while checking nothing.
-        if (lazyExpected)
+        if (onDemandExpected)
             SLANG_CHECK(getDeferredBodyLoaderInstallCount() > deferredLoadersBefore);
     }
 

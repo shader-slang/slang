@@ -50,7 +50,7 @@ class TargetRequest;
 // store, so a reader either sees no body or sees one whose instructions are fully
 // written. The decoration walk is the only reader that can observe that link without
 // going through `ensureBodyMaterialized`, by design -- materializing during decoration
-// lookup would defeat lazy loading entirely -- so it loads the link with acquire.
+// lookup would defeat on-demand loading entirely -- so it loads the link with acquire.
 //
 // Alternatives were implemented and measured before settling here. Relying on the
 // address dependency instead of acquire is free but formally a data race; taking the

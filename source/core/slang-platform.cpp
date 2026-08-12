@@ -374,6 +374,24 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 #endif // _WIN32
 
 
+/* static */ SlangResult PlatformUtil::setEnvironmentVariable(
+    const UnownedStringSlice& name,
+    const UnownedStringSlice* value)
+{
+    const String nameStr(name);
+#ifdef _WIN32
+    // _putenv_s removes the variable when handed an empty string, which is the same
+    // observable state as never having set it.
+    const String valueStr = value ? String(*value) : String();
+    return _putenv_s(nameStr.getBuffer(), valueStr.getBuffer()) == 0 ? SLANG_OK : SLANG_FAIL;
+#else
+    if (!value)
+        return ::unsetenv(nameStr.getBuffer()) == 0 ? SLANG_OK : SLANG_FAIL;
+    const String valueStr(*value);
+    return ::setenv(nameStr.getBuffer(), valueStr.getBuffer(), 1) == 0 ? SLANG_OK : SLANG_FAIL;
+#endif
+}
+
 /* static */ SlangResult PlatformUtil::getEnvironmentVariable(
     const UnownedStringSlice& name,
     StringBuilder& out)

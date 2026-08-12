@@ -538,7 +538,7 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 
 //
 /// True if builtin-module instruction bodies should be left encoded until something
-/// reads them. **On by default**; `SLANG_ONDEMAND_LAZY_IR=0` forces the eager load.
+/// reads them. **On by default**; `SLANG_ONDEMAND_IR=0` forces the eager load.
 ///
 /// The override exists because the two paths must produce identical results, and the
 /// cheapest way to investigate a suspected difference is to run the same binary both
@@ -550,13 +550,13 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 /// environment lookup is not safe against a concurrent write. Uses
 /// `PlatformUtil::getEnvironmentVariable` rather than `getenv`, which MSVC
 /// deprecates and this build treats as an error.
-static bool isLazyIRLoadEnabled()
+static bool isOnDemandIRLoadEnabled()
 {
     static const bool enabled = []
     {
         StringBuilder value;
         if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice("SLANG_ONDEMAND_LAZY_IR"),
+                UnownedStringSlice("SLANG_ONDEMAND_IR"),
                 value)))
         {
             return true;
@@ -842,7 +842,7 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
     const auto thisInstIndex = instIndex++;
     IRInst* inst = insts()[thisInstIndex];
 
-    // Under lazy load this instruction may have been skipped. Its operand and
+    // Under on-demand load this instruction may have been skipped. Its operand and
     // payload entries still have to be consumed so the cursors stay aligned for
     // the instructions that were kept.
     const auto& allocInfo = flat.instAllocInfo[thisInstIndex];
@@ -1027,7 +1027,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     IRInst** const insts = decoder->insts();
     insts[-1] = nullptr;
 
-    // Lazy load materializes only what a symbol index needs -- the module inst,
+    // An on-demand load materializes only what a symbol index needs -- the module inst,
     // each module-scope global, and each global's decorations -- and leaves each
     // global's body encoded until something asks for its children.
     //
@@ -1039,9 +1039,9 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // table spans point into them, and a body is decoded long after this returns. A
     // caller that reads out of its own buffer supplies no blob, and gets an eager load.
     decoder->blobHoldingSerializedData = readContext.getBlobHoldingSerializedData();
-    const bool lazyIRLoad = isLazyIRLoadEnabled() && decoder->blobHoldingSerializedData;
+    const bool onDemandIRLoad = isOnDemandIRLoadEnabled() && decoder->blobHoldingSerializedData;
     List<uint8_t> materializeInst;
-    if (lazyIRLoad)
+    if (onDemandIRLoad)
     {
         materializeInst.setCount(numInsts);
         ::memset(materializeInst.getBuffer(), 0, size_t(numInsts));
@@ -1056,7 +1056,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // it without materializing, so its children have to be kept too: they are
         // reachable only through the decoration, and nothing on that path would ever
         // trigger a materialization to supply them. Keeping just the decoration inst
-        // would silently give a decoration-with-children no children under lazy load.
+        // would silently give a decoration-with-children no children under on-demand load.
         bool inDecorationSubtree = false;
         for (Int64 i = 0; i < numInsts; ++i)
         {
@@ -1095,12 +1095,12 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // In skeleton mode the skipped instructions are never allocated; the
         // preorder walk below still consumes their operand and payload cursors so
         // that positions stay correct for the instructions that are kept.
-        insts[instIndex] = (lazyIRLoad && !materializeInst[instIndex])
+        insts[instIndex] = (onDemandIRLoad && !materializeInst[instIndex])
                                ? nullptr
                                : module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
-    decoder->deferBodies = lazyIRLoad;
+    decoder->deferBodies = onDemandIRLoad;
     const auto moduleInst = decoder->decodeInst(nullptr, 0);
 
     // Keep the decoder alive so the bodies it skipped can still be decoded. It
