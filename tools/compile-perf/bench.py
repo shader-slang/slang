@@ -180,8 +180,17 @@ def build_api_driver(out_dir):
     return out
 
 
-def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
+def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
     """Return (commands, primary_outfile_for_parsing_index).
+
+    `src_dir` holds the workload's .slang sources and is treated as READ-ONLY;
+    every artifact the compiler produces — the -o output, precompiled
+    .slang-module files, reflection JSON — goes to `out_dir`. The two are the
+    same directory on the default path, and differ under `bench.py --corpus`,
+    where src_dir is a corpus prepared by another job or another machine and is
+    not ours to write into (it may be read-only, or shared by several runs).
+    Separating them here rather than at the call site keeps every artifact path
+    in one function, so a new one cannot quietly default to the corpus.
 
     For "link" mode the timed command is the final main compile (last element);
     module precompiles are setup and run once (not timed).
@@ -192,7 +201,10 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
         if spec.api_cmd == "session-create":
             timed += ["--iters", str(size)]
         else:
-            timed += ["--dir", gen_dir]
+            # --out-dir for the same reason as -o below: module-graph-bin
+            # serializes .slang-module binaries, and the driver writes them
+            # there instead of beside the sources it read.
+            timed += ["--dir", src_dir, "--out-dir", out_dir]
         if spec.api_root:
             timed += ["--root", spec.api_root]
         timed += spec.api_flags
@@ -200,10 +212,10 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     main = next((f for f in files if "main" in f), None)
     if spec.mode == "module":
         f = list(files)[0]
-        out = os.path.join(gen_dir, "out.slang-module")
+        out = os.path.join(out_dir, "out.slang-module")
         return {
             "setup": [],
-            "timed": [slangc, PERF_FLAG, os.path.join(gen_dir, f),
+            "timed": [slangc, PERF_FLAG, os.path.join(src_dir, f),
                       *spec.extra_flags, "-o", out],
         }
     if spec.mode == "link":
@@ -211,28 +223,39 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
         for f in files:
             if f == main:
                 continue
-            setup.append([slangc, os.path.join(gen_dir, f), "-o",
-                          os.path.join(gen_dir, f.replace(".slang", ".slang-module"))])
-        out = os.path.join(gen_dir, "out.spv")
-        timed = [slangc, PERF_FLAG, "-I", gen_dir,
-                 os.path.join(gen_dir, main), *spec.extra_flags, "-o", out]
+            setup.append([slangc, os.path.join(src_dir, f), "-o",
+                          os.path.join(out_dir, f.replace(".slang", ".slang-module"))])
+        out = os.path.join(out_dir, "out.spv")
+        # BOTH roots on the include path, out_dir first: the precompiled
+        # modules live there while their sources live in src_dir, and the link
+        # must resolve an import to the .slang-module rather than recompile the
+        # .slang next to it — which is what this workload measures. Deduped so
+        # the default path, where the two roots ARE one directory, emits the
+        # single -I it always did and its recorded cmd stays comparable with
+        # every result already in the series.
+        includes = []
+        for d in (out_dir, src_dir):
+            if d not in includes:
+                includes += ["-I", d]
+        timed = [slangc, PERF_FLAG, *includes,
+                 os.path.join(src_dir, main), *spec.extra_flags, "-o", out]
         return {"setup": setup, "timed": timed}
     # "target" mode: single or multi-file compile to a GPU target. For single-file
     # workloads spec.main_file (or the first file) is the entry point. For corpus
-    # workloads (e.g. mdl_dxr), spec.main_file names the root; -I gen_dir lets
+    # workloads (e.g. mdl_dxr), spec.main_file names the root; -I src_dir lets
     # sibling imports resolve without explicit paths. reflection_json attaches a
     # per-run output path so the layout/reflection serializer is exercised without
     # polluting the results directory.
     f = spec.main_file or main or list(files)[0]
-    out = os.path.join(gen_dir, "out." + _target_ext(spec.extra_flags))
+    out = os.path.join(out_dir, "out." + _target_ext(spec.extra_flags))
     extra = list(spec.extra_flags)
-    # reflection JSON needs a writable path; gen_dir is per-run and writable.
+    # reflection JSON needs a writable path; out_dir is per-run and writable.
     if getattr(spec, "reflection_json", False):
-        extra += ["-reflection-json", os.path.join(gen_dir, "reflect.json")]
-    # -I gen_dir lets multi-file corpora resolve imports; harmless for single files
+        extra += ["-reflection-json", os.path.join(out_dir, "reflect.json")]
+    # -I src_dir lets multi-file corpora resolve imports; harmless for single files
     return {
         "setup": [],
-        "timed": [slangc, PERF_FLAG, "-I", gen_dir, os.path.join(gen_dir, f),
+        "timed": [slangc, PERF_FLAG, "-I", src_dir, os.path.join(src_dir, f),
                   *extra, "-o", out],
     }
 
@@ -304,16 +327,18 @@ def real_error(text, benign=_BENIGN):
     return None
 
 
-def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None,
+def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
              prepared=False):
-    gen_dir = os.path.join(gen_root, corpus.dir_name(spec, size))
+    src_dir = os.path.join(src_root, corpus.dir_name(spec, size))
+    out_dir = os.path.join(out_root, corpus.dir_name(spec, size))
     # Where the sources come from is corpus.py's problem, not this function's:
     # generated here, or already prepared by an earlier step / another machine
     # (bench.py --corpus). Either way what follows measures a directory.
     if prepared:
-        files = corpus.prepared_files(gen_dir)
+        files = corpus.prepared_files(src_dir)
     else:
-        files = corpus.materialize(spec, size, gen_dir)
+        files = corpus.materialize(spec, size, src_dir)
+    os.makedirs(out_dir, exist_ok=True)
 
     # An api workload without a driver+libslang must fail loudly (not silently
     # skip): a missing host compiler or unrecognized package layout would
@@ -329,7 +354,7 @@ def run_spec(slangc, spec, size, samples, warmup, gen_root, api=None,
             "crash_codes": None,
         }
 
-    cmds = build_commands(slangc, spec, gen_dir, files, size=size, api=api)
+    cmds = build_commands(slangc, spec, src_dir, files, out_dir, size=size, api=api)
     # A failed setup step (e.g. a module that didn't precompile in link mode) must
     # fail the workload — otherwise the timed compile runs against missing inputs.
     setup_ok = True
@@ -448,7 +473,10 @@ def main():
                          "<workload>_n<size>/ per run)")
     ap.add_argument("--api-driver", default=None,
                     help="prebuilt api-driver binary (default: build it from "
-                         "native/api-driver.cpp with the host compiler)")
+                         "native/api-driver.cpp with the host compiler). Build "
+                         "it from THIS tree: the driver is passed --out-dir, "
+                         "which one predating that flag ignores, leaving it "
+                         "writing module binaries into the --corpus tree")
     ap.add_argument("--libslang", default=None,
                     help="slang shared library for api workloads (default: "
                          "derived from --slangc's package layout)")
@@ -500,11 +528,21 @@ def main():
     if args.corpus and args.prepare:
         sys.exit("--prepare and --corpus are opposite halves of the same split; "
                  "pass one")
+    # Directories this process created and therefore must remove; tracked as we
+    # go rather than re-derived from the flags at exit, so a root can never be
+    # deleted because the conditions drifted apart.
+    scratch_roots = []
+
+    def scratch(prefix):
+        d = tempfile.mkdtemp(prefix=prefix)
+        scratch_roots.append(d)
+        return d
+
     # --corpus reads a prepared tree; --prepare writes one; otherwise scratch.
-    gen_root = (os.path.abspath(args.corpus) if args.corpus
+    src_root = (os.path.abspath(args.corpus) if args.corpus
                 else os.path.abspath(args.prepare) if args.prepare
                 else os.path.abspath(args.gen_dir) if args.gen_dir
-                else tempfile.mkdtemp(prefix="perfsuite_gen_"))
+                else scratch("perfsuite_gen_"))
 
     # --prepare: materialize and stop. No slangc is invoked, so this half of
     # the split runs anywhere — including a machine that has the tree but no
@@ -514,11 +552,11 @@ def main():
         for spec in specs:
             for size in (spec.sweep_sizes if args.sweep and spec.sweep_sizes
                          else [spec.default_size]):
-                dest = os.path.join(gen_root, corpus.dir_name(spec, size))
+                dest = os.path.join(src_root, corpus.dir_name(spec, size))
                 names = corpus.materialize(spec, size, dest)
                 total += len(names)
                 print(f"[prep] {spec.name:24s} n={size:<6} {len(names):4d} file(s)")
-        print(f"\nwrote {total} file(s) to {gen_root}")
+        print(f"\nwrote {total} file(s) to {src_root}")
         return
 
     # Everything below MEASURES, so slangc and the results directory are
@@ -531,13 +569,27 @@ def main():
         sys.exit(f"slangc not found: {slangc}")
     root = os.path.join(os.path.abspath(args.out), args.label)
     os.makedirs(root, exist_ok=True)
-    os.makedirs(gen_root, exist_ok=True)
+    os.makedirs(src_root, exist_ok=True)
+
+    # Compiler artifacts go to their OWN root when the sources came from
+    # --corpus. That tree is the caller's input — prepared by another job or
+    # another machine, possibly read-only, possibly shared by several runs — so
+    # writing out.spv, .slang-module files and reflect.json into it would
+    # mutate somebody else's data and make a second run's inputs depend on the
+    # first run's outputs. Everywhere else the two roots are the same directory,
+    # which is what keeps the default path's layout (and --gen-dir's, where the
+    # point is to inspect sources and outputs together) exactly as it was.
+    out_root = src_root
+    if args.corpus:
+        out_root = (os.path.abspath(args.gen_dir) if args.gen_dir
+                    else scratch("perfsuite_out_"))
+        os.makedirs(out_root, exist_ok=True)
 
     # Resolve the api-driver + libslang once when any api workload is selected.
     api = None
     if any(s.mode == "api" for s in specs):
         libslang = os.path.abspath(args.libslang) if args.libslang else find_libslang(slangc)
-        driver = os.path.abspath(args.api_driver) if args.api_driver else build_api_driver(gen_root)
+        driver = os.path.abspath(args.api_driver) if args.api_driver else build_api_driver(out_root)
         if libslang and driver:
             api = {"driver": driver, "libslang": libslang}
         else:
@@ -556,7 +608,8 @@ def main():
             # going; bench still exits non-zero at the end via the ok-count.
             try:
                 rec = run_spec(slangc, spec, size, args.samples, args.warmup,
-                               gen_root, api=api, prepared=bool(args.corpus))
+                               src_root, out_root, api=api,
+                               prepared=bool(args.corpus))
             except Exception as e:  # noqa: BLE001 — isolation is the contract
                 rec = {
                     "workload": spec.name, "bucket": spec.bucket, "size": size,
@@ -592,11 +645,12 @@ def main():
 
     # results.json is the single source of truth (summary AND raw samples per
     # timer); the analysis/report tools read it directly. No CSV is emitted.
-    # Only a scratch tree is ours to delete. With --corpus, gen_root is the
-    # caller's prepared corpus — deleting it would destroy the input we were
-    # asked to measure, and with --prepare it is the output just written.
-    if not (args.gen_dir or args.corpus or args.prepare):
-        shutil.rmtree(gen_root, ignore_errors=True)
+    # Only a tree THIS process created is ours to delete, which is exactly what
+    # scratch_roots records. A --corpus tree is the caller's prepared input —
+    # deleting it would destroy what we were asked to measure — and a --gen-dir
+    # tree was passed in precisely so its contents survive for inspection.
+    for d in scratch_roots:
+        shutil.rmtree(d, ignore_errors=True)
 
     n_ok = sum(1 for r in this_run if r["ok"])
     print(f"\n{n_ok}/{len(this_run)} runs ok")
