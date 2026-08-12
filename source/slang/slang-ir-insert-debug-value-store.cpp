@@ -113,6 +113,23 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>();
     if (!funcDebugLoc)
         return;
+
+    // Pre-populate mapVarToDebugVar with params that were already processed in a previous
+    // invocation of this function. A param has already been processed if there is an
+    // IRDebugValue instruction in the entry block that uses the param as its value operand.
+    // This allows this function to be called again after the specialization pass has run to
+    // instrument variables that were of unresolved IRSpecialize type during the first pass.
+    HashSet<IRInst*> alreadyProcessedParams;
+    for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
+    {
+        if (auto debugValue = as<IRDebugValue>(inst))
+        {
+            auto val = debugValue->getValue();
+            if (as<IRParam>(val))
+                alreadyProcessedParams.add(val);
+        }
+    }
+
     List<IRInst*> params;
     for (auto param : firstBlock->getParams())
     {
@@ -136,6 +153,15 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         }
         if (!isDebuggableType(paramType))
             continue;
+
+        // Skip params that were already instrumented in a previous pass. Increment paramIndex
+        // so that unprocessed params following this one get the correct argument index.
+        if (alreadyProcessedParams.contains(param))
+        {
+            paramIndex++;
+            continue;
+        }
+
         auto debugVar = builder.emitDebugVar(
             paramType,
             funcDebugLoc->getSource(),
@@ -188,9 +214,18 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                 if (auto debugLoc = varInst->findDecoration<IRDebugLocationDecoration>())
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
-                    builder.setInsertBefore(varInst);
                     if (!isDebuggableType(varType))
                         continue;
+
+                    // Skip IRVar instances that were already instrumented in a previous pass.
+                    // insertDebugValueStore always inserts the IRDebugVar immediately before the
+                    // IRVar it corresponds to, so the presence of kIROp_DebugVar as the
+                    // immediately preceding instruction is a reliable marker.
+                    auto prevInst = varInst->getPrevInst();
+                    if (prevInst && prevInst->getOp() == kIROp_DebugVar)
+                        continue;
+
+                    builder.setInsertBefore(varInst);
                     auto debugVar = builder.emitDebugVar(
                         varType,
                         debugLoc->getSource(),
