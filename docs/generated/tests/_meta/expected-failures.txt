@@ -189,27 +189,12 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffe
 # triage.)
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
-# Pending: docs/generated/tests/_meta/findings/spirv-sample-decoration-missing-samplerateshading-capability.yaml
-# The `-target spirv-asm` directive this branch's fan-out pass added to
-# `sample-interpolation-emits-on-hlsl.slang` exposes a compiler bug rather
-# than a test bug: `sample` interpolation lowers to `OpDecorate ... Sample`
-# while the module declares only `OpCapability Shader`, so spirv-val rejects
-# it with "Operand 2 of Decorate requires one of these capabilities:
-# SampleRateShading". Only the 4th directive (`-target spirv-asm`, sub-test
-# `.3`) fails; the hlsl/glsl/metal directives pass and must keep reporting.
-# Remove this entry once the emitter declares the capability. (Will become a
-# tracking issue after human triage.)
-docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang.3
 
-# https://github.com/shader-slang/slang/issues/12441 — SPIR-V emit produces
-# modules that fail spirv-val. `sample` interpolation writes
-# `OpDecorate ... Sample` without declaring the SampleRateShading capability;
-# and arithmetic on a value loaded from a `unorm`/`snorm` texture selects
-# `OpIAdd` for float data, because the `Attributed(Float, unorm)` element type
-# is not looked through when classifying. Both only fail where SPIR-V
-# validation is enabled, i.e. the nightly. Remove these entries when 12441 is
-# fixed.
-docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang.1
+# https://github.com/shader-slang/slang/issues/12441 — arithmetic on a value
+# loaded from a `unorm`/`snorm` texture selects `OpIAdd` for float data,
+# because the `Attributed(Float, unorm)` element type is not looked through
+# when classifying. Only fails where SPIR-V validation is enabled, i.e. the
+# nightly. Remove this entry when that half of 12441 is fixed.
 docs/generated/tests/coverage/emit/spirv-unorm-snorm-image-format-by-width.slang
 
 # https://github.com/shader-slang/slang/issues/12442 — render-test blanks the
