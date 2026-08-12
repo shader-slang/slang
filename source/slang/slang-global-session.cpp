@@ -16,7 +16,6 @@
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
 
-
 extern Slang::String get_slang_cuda_prelude();
 extern Slang::String get_slang_cpp_prelude();
 extern Slang::String get_slang_hlsl_prelude();
@@ -699,7 +698,6 @@ SlangResult Session::_readBuiltinModule(
         astChunk,
         sourceLocReader,
         SourceLoc());
-
     if (!moduleDecl)
     {
         return SLANG_FAIL;

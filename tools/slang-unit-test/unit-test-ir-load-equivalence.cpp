@@ -81,7 +81,7 @@ SlangResult _compileWith(
 // global value that had lost its children.
 //
 // Deliberately narrow: one shader, output and exit status compared. For breadth across
-// the whole test corpus, see extras/check-ir-load-equivalence.py, which is a development
+// the whole test corpus, see extras/check-load-mode-equivalence.py, which is a development
 // aid rather than something to run on every build.
 SLANG_UNIT_TEST(irLoadEquivalence)
 {
