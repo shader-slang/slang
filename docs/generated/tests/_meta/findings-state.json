@@ -189,6 +189,23 @@
       "dup_of": 12440,
       "title": "getStringHash on a non-literal String segfaults instead of E41023"
     },
+    "grammar-do-catch-cpu-execution-sigsegv": {
+      "issue": 12499,
+      "labels": [
+        "Test Agent Finding",
+        "bug"
+      ],
+      "project_fields": {
+        "Estimate": "ok",
+        "Priority": "ok",
+        "Release": "ok",
+        "Size": "ok",
+        "Status": "ok"
+      },
+      "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2OwLo",
+      "title": "do...catch/throws/try shader segfaults executing on CPU compute backend",
+      "url": "https://github.com/shader-slang/slang/issues/12499"
+    },
     "new-expr-with-constructor-args-internal-error": {
       "issue": 12485,
       "labels": [
