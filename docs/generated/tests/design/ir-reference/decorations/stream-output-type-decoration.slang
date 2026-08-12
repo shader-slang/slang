@@ -50,12 +50,11 @@ void main(
     buf[primitiveID] = v.position;
 }
 
-// In the early `-dump-ir` snapshot the decoration prints as the
-// `streamOutputTypeLayout` inst rather than the
-// `streamOutputTypeDecoration` name documented in the IR reference —
-// both refer to the same conceptual decoration on the geometry-shader
-// entry point at different lowering phases. The CHECK matches what the
-// dump emits at this stage. Wildcard the operand text since the inst
+// The `-dump-ir` snapshot at this phase emits the
+// `streamOutputTypeLayout` type-layout inst, so that is what these
+// CHECKs match — not the `streamOutputTypeDecoration` decoration of the
+// same subject matter. The two are distinct insts, not one decoration
+// seen at two lowering phases. Wildcard the operand text since the inst
 // id is unstable.
 // CHECK-DAG: streamOutputTypeLayout
 // CHECK-DAG: nameHint("main")

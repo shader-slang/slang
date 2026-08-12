@@ -258,10 +258,12 @@ node class the compiler was built with; the parser then runs no
 attribute-specific logic at all, and the attribute's checking —
 including which declarations it may be placed on — comes from that C++
 class. A user module can therefore add a new *spelling* for an
-existing attribute class, but not a genuinely new attribute; all 110
-`attribute_syntax` declarations in the tree are in
-[core.meta.slang](../../../../source/slang/core.meta.slang) and
-[hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang).
+existing attribute class, but not a genuinely new attribute. All 126
+`attribute_syntax` declarations in the tree ship with the compiler:
+108 in [core.meta.slang](../../../../source/slang/core.meta.slang),
+8 in [diff.meta.slang](../../../../source/slang/diff.meta.slang),
+8 in [workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang),
+and 2 in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang).
 
 ### NamespaceDecl, ModuleDecl, FileDecl
 
