@@ -59,6 +59,11 @@
       "title": "[spirv] enum-to-int cast unhandled by spirv-emit on -target spirv-asm path",
       "url": "https://github.com/shader-slang/slang/issues/11315"
     },
+    "check-decl-enum-tag-not-first-internal-error": {
+      "fixed_at": "6122d03def",
+      "note": "re-ran the recorded command: emits E30821 alone and recovers; the 'Unexpected witness structure' E99997 internal error is gone",
+      "title": "enum tag type after interface base aborts with E99997 internal error"
+    },
     "constrained-type-param-segv": {
       "issue": 11316,
       "labels": [
@@ -92,6 +97,11 @@
       "project_item_id": "PVTI_lADOAb2kZs4AcYVszguCHHA",
       "title": "[slangi] countof(fixed-size local array) returns byte width, not element count",
       "url": "https://github.com/shader-slang/slang/issues/11317"
+    },
+    "cpu-get-string-hash-slang-test-segfault": {
+      "fixed_at": "6122d03def",
+      "note": "the committed test passes 1/1 under slang-test where it previously took the process down with SIGSEGV",
+      "title": "[cpu] COMPARE_COMPUTE kernel calling getStringHash segfaults slang-test"
     },
     "dead-diagnostic-codes-umbrella": {
       "issue": 11320,
@@ -167,6 +177,11 @@
       "note": "Exact match: CUDA target ICEs on vertex/fragment shaders instead of clear diagnostic",
       "title": "[cuda] slangc SIGSEGVs when a `[shader(\"fragment\")]` entry point is compiled wi\u2026"
     },
+    "generics-existentials-global-generic-param-constraint-sigsegv": {
+      "fixed_at": "6122d03def",
+      "note": "now diagnoses E38207 'global generic parameter used in code without a concrete binding' instead of segfaulting; a diagnostic was added for exactly this case",
+      "title": "Constrained module-scope `type_param T : I` with interface dispatch SIGSEGVs"
+    },
     "getlegalizedspirvglobalparamaddr-reaches-emit-ice": {
       "issue": 12493,
       "labels": [
@@ -205,6 +220,16 @@
       "project_item_id": "PVTI_lADOAb2kZs4AcYVszg2OwLo",
       "title": "do...catch/throws/try shader segfaults executing on CPU compute backend",
       "url": "https://github.com/shader-slang/slang/issues/12499"
+    },
+    "ir-types-unorm-snorm-struct-field-sigsegv": {
+      "fixed_at": "6122d03def",
+      "note": "unorm/snorm float struct field now compiles, exit 0, with -dump-ir on -target hlsl",
+      "title": "`unorm`/`snorm` float struct field SIGSEGVs slangc on every target"
+    },
+    "metadata-unorm-structured-buffer-element-sigsegv": {
+      "fixed_at": "6122d03def",
+      "note": "RWStructuredBuffer<unorm float> now compiles, exit 0",
+      "title": "slangc segfaults on RWStructuredBuffer<unorm float> / <snorm float>"
     },
     "new-expr-with-constructor-args-internal-error": {
       "issue": 12485,

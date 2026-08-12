@@ -110,6 +110,14 @@ REVIEWS_DIR = META_DIR / "reviews"
 REMEDIATIONS_DIR = META_DIR / "remediations"
 FINDINGS_DIR = META_DIR / "findings"
 FINDINGS_FILED_DIR = FINDINGS_DIR / "filed"
+
+# Findings that stopped reproducing before anyone filed them. Kept apart
+# from findings/filed/ because that directory means "an issue exists for
+# this"; these have no issue and never will. Without somewhere to put
+# them they stay in the pending queue forever and every triage pass
+# re-tests them from scratch -- five findings were in exactly that state
+# when this was added.
+FINDINGS_RESOLVED_DIR = FINDINGS_DIR / "resolved"
 FINDINGS_STATE_PATH = META_DIR / "findings-state.json"
 
 # Required META keys on every generated .slang test file. The block lives
@@ -609,20 +617,23 @@ def save_findings_state(state: dict) -> None:
     )
 
 
-def list_finding_paths(include_filed: bool = False) -> list[Path]:
+def list_finding_paths(
+    include_filed: bool = False, include_resolved: bool = False
+) -> list[Path]:
     """Return sorted list of finding YAML paths under _meta/findings/.
 
-    Pending findings live directly under findings/; filed ones move to
-    findings/filed/ and are excluded by default.
+    Pending findings live directly under findings/. Ones with an issue
+    move to findings/filed/, ones that stopped reproducing before anyone
+    filed them move to findings/resolved/; both are excluded by default,
+    because the bare list is the work queue.
     """
     if not FINDINGS_DIR.exists():
         return []
-    out: list[Path] = []
-    for p in sorted(FINDINGS_DIR.glob("*.yaml")):
-        out.append(p)
+    out: list[Path] = [p for p in sorted(FINDINGS_DIR.glob("*.yaml"))]
     if include_filed and FINDINGS_FILED_DIR.exists():
-        for p in sorted(FINDINGS_FILED_DIR.glob("*.yaml")):
-            out.append(p)
+        out.extend(sorted(FINDINGS_FILED_DIR.glob("*.yaml")))
+    if include_resolved and FINDINGS_RESOLVED_DIR.exists():
+        out.extend(sorted(FINDINGS_RESOLVED_DIR.glob("*.yaml")))
     return out
 
 
@@ -800,22 +811,25 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
 def lint_findings() -> list[LintIssue]:
     """Validate every pending finding YAML.
 
-    Filed findings (under findings/filed/) are immutable history and are
-    not re-validated — their citations or referenced paths may have
-    rotted since filing, and that is acceptable for a historical record.
+    Retired findings — filed ones under findings/filed/, ones that
+    stopped reproducing under findings/resolved/ — are immutable history
+    and are not re-validated. Their citations or referenced paths may
+    have rotted since, and that is acceptable for a historical record.
 
     They are still checked for *parseability*, though, which is a
-    different thing from rot. A filed finding that no longer loads is not
-    stale history, it is unreadable history: every tool that walks the
-    whole corpus trips over it, and the record it was meant to preserve
-    is effectively gone. One shipped that way in the bootstrap commit —
-    an unquoted `observed_summary` containing `spirv-emit: castToVoid`,
-    where the colon-space turned the scalar into a mapping — and went
-    unnoticed because this function skipped the directory entirely.
+    different thing from rot. A retired finding that no longer loads is
+    not stale history, it is unreadable history: every tool that walks
+    the whole corpus trips over it, and the record it was meant to
+    preserve is effectively gone. One shipped that way in the bootstrap
+    commit — an unquoted `observed_summary` containing
+    `spirv-emit: castToVoid`, where the colon-space turned the scalar
+    into a mapping — and went unnoticed because this function skipped
+    the directory entirely.
     """
     issues: list[LintIssue] = []
-    pending = list_finding_paths(include_filed=False)
-    for p in set(list_finding_paths(include_filed=True)) - set(pending):
+    pending = set(list_finding_paths(include_filed=False))
+    retired = set(list_finding_paths(include_filed=True, include_resolved=True)) - pending
+    for p in sorted(retired):
         try:
             load_finding(p)
         except Exception as exc:  # noqa: BLE001
@@ -823,7 +837,7 @@ def lint_findings() -> list[LintIssue]:
                 LintIssue(
                     str(p.relative_to(REPO_ROOT)),
                     "error",
-                    f"filed finding no longer parses as YAML: {exc}",
+                    f"retired finding no longer parses as YAML: {exc}",
                 )
             )
     seen_bundles_in_manifest = set(load_manifest().bundles.keys())
@@ -3650,13 +3664,77 @@ def cmd_findings_dup(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_findings_fixed(args: argparse.Namespace) -> int:
+    """Record that a pending finding no longer reproduces, and retire it.
+
+    Triage keeps turning up findings that were real when observed and are
+    fixed by the time anyone looks. Before this existed there was nowhere
+    to put that result: the finding stayed pending, so the next pass
+    re-tested it from scratch. Five were in that state when this landed --
+    four from the sigsegv sweep plus one that only got cleared because it
+    happened to also duplicate an open issue.
+
+    The command deliberately demands evidence. `--verified-at` is required
+    and must name the compiler commit the re-test ran against, because
+    "fixed" without a commit is unfalsifiable: a later regression cannot
+    be distinguished from a triage that was wrong, and this whole channel
+    exists because unverified claims produced false results before. The
+    finding YAML is kept -- retiring is not deleting, and a fixed finding
+    is the seed of the regression test nobody has written yet.
+    """
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    findings_map = state.setdefault("findings", {})
+    existing = findings_map.get(args.id, {})
+    if existing.get("issue"):
+        print(
+            f"error: {args.id} is filed as #{existing['issue']}; close the issue"
+            " instead of retiring the finding",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("dup_of"):
+        print(
+            f"error: {args.id} is already marked dup-of #{existing['dup_of']}",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("fixed_at"):
+        print(
+            f"error: {args.id} already retired as fixed at {existing['fixed_at']}",
+            file=sys.stderr,
+        )
+        return 1
+    findings_map[args.id] = {
+        "fixed_at": args.verified_at,
+        "title": compute_finding_title(finding),
+    }
+    if args.note:
+        findings_map[args.id]["note"] = args.note
+    save_findings_state(state)
+    _move_to_resolved(p)
+    print(f"  retired {args.id} as fixed at {args.verified_at}")
+    try:
+        where = FINDINGS_RESOLVED_DIR.relative_to(REPO_ROOT)
+    except ValueError:
+        where = FINDINGS_RESOLVED_DIR
+    print(f"  moved finding to {where}/")
+    return 0
+
+
 def _resolve_finding_path(fid: str) -> Path | None:
-    candidate = FINDINGS_DIR / f"{fid}.yaml"
-    if candidate.exists():
-        return candidate
-    filed = FINDINGS_FILED_DIR / f"{fid}.yaml"
-    if filed.exists():
-        return filed
+    for base in (FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR):
+        candidate = base / f"{fid}.yaml"
+        if candidate.exists():
+            return candidate
     return None
 
 
@@ -3668,6 +3746,12 @@ def _issue_number_from_url(url: str) -> int | None:
 def _move_to_filed(p: Path) -> None:
     FINDINGS_FILED_DIR.mkdir(parents=True, exist_ok=True)
     dest = FINDINGS_FILED_DIR / p.name
+    p.rename(dest)
+
+
+def _move_to_resolved(p: Path) -> None:
+    FINDINGS_RESOLVED_DIR.mkdir(parents=True, exist_ok=True)
+    dest = FINDINGS_RESOLVED_DIR / p.name
     p.rename(dest)
 
 
@@ -4215,6 +4299,25 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_fd.set_defaults(func=cmd_findings_dup)
 
+    p_fx = find_sub.add_parser(
+        "fixed",
+        help="retire a pending finding that no longer reproduces"
+        " (no filing; moves YAML to resolved/)",
+    )
+    p_fx.add_argument("id")
+    p_fx.add_argument(
+        "--verified-at",
+        required=True,
+        metavar="COMMIT",
+        help="compiler commit the re-test ran against; required, because"
+        " 'fixed' without one cannot be told apart from a later regression",
+    )
+    p_fx.add_argument(
+        "--note",
+        help="optional one-line note on what was re-run and what it showed",
+    )
+    p_fx.set_defaults(func=cmd_findings_fixed)
+
     return p
 
 
@@ -4499,6 +4602,65 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         _repro_body({"evidence": {k: v for k, v in inline_only.items() if k != "repro_source"}})[:1],
         "{",
     )
+
+    # `findings fixed` retires a finding that stopped reproducing. The
+    # guards are the point: a finding that is filed, already deduped, or
+    # already retired must not be retired again, or the state entry that
+    # records where it went is silently overwritten. Exercised through
+    # the real command against a temporary state file rather than by
+    # re-implementing the checks here.
+    with tempfile.TemporaryDirectory() as td:
+        import argparse as _ap
+
+        real_state, real_dir, real_filed, real_res = (
+            FINDINGS_STATE_PATH, FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR,
+        )
+        g = globals()
+        try:
+            root = Path(td)
+            g["FINDINGS_STATE_PATH"] = root / "state.json"
+            g["FINDINGS_DIR"] = root / "findings"
+            g["FINDINGS_FILED_DIR"] = root / "findings" / "filed"
+            g["FINDINGS_RESOLVED_DIR"] = root / "findings" / "resolved"
+            g["FINDINGS_DIR"].mkdir(parents=True)
+            (g["FINDINGS_DIR"] / "x.yaml").write_text(
+                'id: x\ntitle: a finding\nobserved_at: "2026-01-01T00:00:00+00:00"\n',
+                encoding="utf-8",
+            )
+
+            def run(fid, commit="abc123"):
+                return cmd_findings_fixed(
+                    _ap.Namespace(id=fid, verified_at=commit, note=None)
+                )
+
+            check("fixed: unknown id rejected", run("nope"), 1)
+            check("fixed: retires a pending finding", run("x"), 0)
+            check(
+                "fixed: YAML moved to resolved/, not deleted",
+                (g["FINDINGS_RESOLVED_DIR"] / "x.yaml").exists(),
+                True,
+            )
+            entry = json.loads(g["FINDINGS_STATE_PATH"].read_text())["findings"]["x"]
+            check("fixed: records the verifying commit", entry.get("fixed_at"), "abc123")
+            check("fixed: retiring twice is refused", run("x"), 1)
+
+            # A filed finding must not be retirable -- the issue is the
+            # record, and closing it is a different action.
+            st = json.loads(g["FINDINGS_STATE_PATH"].read_text())
+            st["findings"]["y"] = {"issue": 999}
+            g["FINDINGS_STATE_PATH"].write_text(json.dumps(st), encoding="utf-8")
+            (g["FINDINGS_DIR"] / "y.yaml").write_text("id: y\n", encoding="utf-8")
+            check("fixed: refuses a finding that is already filed", run("y"), 1)
+            check(
+                "fixed: refused finding stays put",
+                (g["FINDINGS_DIR"] / "y.yaml").exists(),
+                True,
+            )
+        finally:
+            g["FINDINGS_STATE_PATH"] = real_state
+            g["FINDINGS_DIR"] = real_dir
+            g["FINDINGS_FILED_DIR"] = real_filed
+            g["FINDINGS_RESOLVED_DIR"] = real_res
 
     # An unquoted ISO timestamp is a YAML date, not a string, and the two
     # spellings are indistinguishable in the file. `findings list` used to

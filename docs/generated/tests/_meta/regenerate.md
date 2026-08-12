@@ -47,6 +47,7 @@ python3 docs/generated/tests/_meta/regenerate.py <subcommand> [args...]
 | `findings show <id>`                                                                     | (Phase F) render the issue body markdown for a finding                                                                                                          |
 | `findings file <id> [--dry-run]`                                                         | (Phase F) `gh issue create` + set project fields; moves YAML to `findings/filed/`                                                                               |
 | `findings dup <id> --of <issue-number>`                                                  | (Phase F) record a finding as duplicate of an existing issue; no filing                                                                                         |
+| `findings fixed <id> --verified-at <commit>`                                             | (Phase F) retire a finding that no longer reproduces; no filing; moves YAML to `findings/resolved/`                                                             |
 
 `<bundle>` is the manifest key (e.g. `pipeline/03-semantic-check`),
 which equals the bundle directory under `docs/generated/tests/`.
