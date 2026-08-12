@@ -191,13 +191,19 @@ public:
     }
 
     // Returns true when `deriv` is recognized as side-effect free for the
-    // carry-set tightening. Mirrors `isReadNoneCallee`'s structure for
-    // recursion through `IRSpecialize` / `IRGeneric` / autodiff translate
-    // ops, but also accepts a `[PreferRecompute]` *built-in* derivative as a
-    // positive purity signal — the macros in `diff.meta.slang` annotate the
+    // carry-set tightening. It unwraps `IRSpecialize` / `IRGeneric` / autodiff
+    // translate ops with exactly the same arms as `isReadNoneCallee`, so the
+    // two agree on which shapes reach a leaf; only the leaf predicate is wider
+    // here, additionally accepting a `[PreferRecompute]` *built-in* derivative
+    // as a positive purity signal. The macros in `diff.meta.slang` annotate the
     // built-in math derivatives with `[PreferRecompute]` instead of
     // `[__readNone]`, and at this phase (before `propagateFuncProperties`)
     // they are not yet readNone-marked.
+    //
+    // The two stay hand-synced rather than sharing one walker: factoring the
+    // traversal means threading a leaf predicate through `isReadNoneCallee`,
+    // which has three other callers. If the arms drift, the negative test
+    // `no-diff-carry-readnone-derivative-clean.slang` catches it.
     //
     // `[PreferRecompute]` is only honored for built-in derivatives, gated on
     // `[__target_intrinsic]` as the best-available built-in proxy at this
@@ -217,8 +223,10 @@ public:
     // no robust phase-local signal separates built-in pure derivatives from
     // user code here (`propagateFuncProperties` runs later). The fully sound
     // fix is to mark the pure built-in derivatives `[__readNone]` in
-    // `diff.meta.slang` and drop this proxy — deferred pending maintainer
-    // direction (see shader-slang/slang#11374).
+    // `diff.meta.slang` and drop this proxy; that audit is per-derivative
+    // rather than a sweep, because some built-in derivatives are genuinely
+    // impure (`DiffTensorView::load_backward` accumulates with an atomic).
+    // Tracked in shader-slang/slang#12502.
     bool isDerivativeAssumedReadNone(IRInst* deriv)
     {
         if (!deriv)
@@ -226,6 +234,21 @@ public:
 
         if (isReadNoneCallee(deriv))
             return true;
+
+        // Unwrap the same wrappers `isReadNoneCallee` unwraps, with the same
+        // arms, so the two agree on which shapes reach a leaf. Only the leaf
+        // predicate below differs.
+        if (as<IRSpecialize>(deriv))
+        {
+            if (auto specialize = as<IRSpecialize>(deriv->getOperand(0)))
+                return isDerivativeAssumedReadNone(specialize);
+            else if (auto generic = as<IRGeneric>(deriv->getOperand(0)))
+            {
+                auto genericReturnVal = getInnerMostGenericReturnVal(generic);
+                return genericReturnVal ? isDerivativeAssumedReadNone(genericReturnVal) : false;
+            }
+            return false;
+        }
 
         if (as<IRTranslateBase>(deriv))
         {
@@ -245,13 +268,6 @@ public:
             }
         }
 
-        // Wrappers may nest (e.g. IRSpecialize<IRTranslateBase<IRSpecialize<IRGeneric>>>),
-        // so recurse rather than unwrap iteratively.
-        if (auto specialize = as<IRSpecialize>(deriv))
-            return isDerivativeAssumedReadNone(specialize->getOperand(0));
-        if (auto generic = as<IRGeneric>(deriv))
-            return isDerivativeAssumedReadNone(findGenericReturnVal(generic));
-
         if (auto func = as<IRFunc>(deriv))
         {
             auto preferRecompute = func->findDecoration<IRPreferRecomputeDecoration>();
@@ -260,26 +276,49 @@ public:
             // Only trust `[PreferRecompute]` for built-in derivatives.
             if (!func->findDecoration<IRTargetIntrinsicDecoration>())
                 return false;
-            // Operand 0 is the `SideEffectBehavior` (Warn = 0, Allow = 1; see
-            // core.meta.slang). Only the default `Warn` form is treated as
-            // side-effect free — `Allow` opts out of that guarantee.
-            enum
-            {
-                SideEffectBehavior_Allow = 1
-            };
-            if (auto behavior = as<IRIntLit>(preferRecompute->getOperand(0)))
-                return behavior->getValue() != SideEffectBehavior_Allow;
-            return true;
+            // Operand 0 is the `SideEffectBehavior`. Lowering always builds it
+            // as an integer literal (`slang-lower-to-ir.cpp`, the
+            // `PreferRecomputeAttribute` case), so a non-literal here is
+            // out-of-contract rather than a shape to tolerate — treating it as
+            // pure would silently suppress the diagnostic this gate exists to
+            // produce. Only the default `Warn` form is side-effect free;
+            // `Allow` opts out of that guarantee.
+            auto behavior = as<IRIntLit>(preferRecompute->getOperand(0));
+            SLANG_RELEASE_ASSERT(behavior);
+            return behavior->getValue() != (IRIntegerValue)SideEffectBehavior::Allow;
         }
         return false;
     }
 
-    bool allAssociatedDerivativesReadNone(
+    bool allAssociatedDerivativesAssumedReadNone(
         DifferentiableTypeConformanceContext& ctx,
         IRInst* callee)
     {
-        // BackwardDerivativeContextRemat is intentionally omitted — its
-        // translate-ops are unconditionally readNone in isReadNoneCallee.
+        // The derivative kinds whose association value is a *callee* that runs
+        // after the autodiff transform, and so can carry side effects.
+        //
+        // The other differentiability-related kinds are deliberately absent:
+        //
+        //  - `BackwardDerivativeContext` and `BackwardDerivativeMinimalContext`
+        //    associate a *type*, not a callee — the `BwdCallable` /
+        //    minimal-context types (see `slang-check-expr.cpp`'s
+        //    `BwdCallable` registration and the `_lookupWitness` calls in
+        //    `slang-ir-autodiff-fwd.cpp`). There is no body to be impure.
+        //  - `BackwardDerivativeContextRemat` associates a remat callee, but its
+        //    value is always a `kIROp_Backward*Remat*` translate op, which
+        //    `isReadNoneCallee` reports readNone unconditionally; remat
+        //    rematerializes context and never runs the user's derivative body.
+        //  - The remaining kinds describe differential types/witnesses
+        //    (`DifferentialPairType`, `DifferentialZero`, ...) or the fwd-diff
+        //    witness tables, none of which are callees.
+        //
+        // Omitting a kind that *should* be here suppresses an E41031 silently,
+        // so no test fails to report the mistake. Mirror the `cloneAnnotations`
+        // precedent in slang-ir-link.cpp and force the decision to be re-made.
+        static_assert(
+            int(AnnotationKind::CountOf) == 16,
+            "AnnotationKind changed: does the new kind associate a derivative "
+            "callee that can have side effects? If so, add it here.");
         static const AnnotationKind kDerivativeKinds[] = {
             AnnotationKind::ForwardDerivative,
             AnnotationKind::BackwardDerivativeApply,
@@ -606,7 +645,7 @@ public:
                     // also require every associated derivative variant to be
                     // readNone before treating the call as elidable (#11374).
                     if (!isReadNoneCallee(callee) ||
-                        !allAssociatedDerivativesReadNone(diffTypeContext, callee))
+                        !allAssociatedDerivativesAssumedReadNone(diffTypeContext, callee))
                         return true;
 
                     // For readNone callees, a call carries a derivative only

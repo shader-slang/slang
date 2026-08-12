@@ -7,8 +7,10 @@
 // a user-defined [ForwardDerivative] / [BackwardDerivative] variant that
 // writes to memory, and that variant is what runs after the autodiff
 // transform. If the gate skips the call based only on the primary's
-// readNone-ness, the missing-no_diff diagnostic that #11285 expected to
-// fire here is silently suppressed.
+// readNone-ness, the missing-no_diff diagnostic that #11374 expects to
+// fire here is silently suppressed. (#11285 pulled the other way: it was
+// a false-positive report — E41031 firing where no derivative flowed in —
+// and #11286 fixed it by making the diagnostic stop firing there.)
 //
 // This file exercises a custom backward-derivative variant with side
 // effects. With the fix in slang-ir-check-differentiability.cpp, the gate
