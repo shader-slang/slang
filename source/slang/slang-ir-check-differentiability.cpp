@@ -201,9 +201,10 @@ public:
     // they are not yet readNone-marked.
     //
     // The two stay hand-synced rather than sharing one walker: factoring the
-    // traversal means threading a leaf predicate through `isReadNoneCallee`,
-    // which has three other callers. If the arms drift, the negative test
-    // `no-diff-carry-readnone-derivative-clean.slang` catches it.
+    // traversal would mean threading a leaf predicate through
+    // `isReadNoneCallee`, which has three other callers in unrelated passes.
+    // `no-diff-carry-readnone-derivative-generic.slang` covers the
+    // specialize-of-generic arm, so dropping an arm is not silent.
     //
     // `[PreferRecompute]` is only honored for built-in derivatives, gated on
     // `[__target_intrinsic]` as the best-available built-in proxy at this
