@@ -16,6 +16,7 @@
 #include "compiler-core/slang-command-line-args.h"
 #include "compiler-core/slang-include-system.h"
 #include "compiler-core/slang-name.h"
+#include "compiler-core/slang-rich-diagnostics-render.h"
 #include "core/slang-riff.h"
 #include "core/slang-smart-pointer.h"
 #include "slang-ast-base.h"
@@ -184,6 +185,19 @@ public:
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) override;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData) override;
+
+    /// Install the user-registered diagnostic callback onto a freshly created sink.
+    /// Called at every Linkage/ComponentType ISession method call site after sink creation.
+    void installDiagnosticCallback(DiagnosticSink& sink) const;
+
+    /// Static thunk that converts a GenericDiagnostic to SlangStructuredDiagnostic and
+    /// forwards it to the user-supplied callback stored on the Linkage.
+    static void richDiagnosticThunk(
+        const GenericDiagnostic& diag,
+        SourceManager*            sm,
+        void*                     userData);
 
     // Updates the supplied builder with linkage-related information, which includes preprocessor
     // defines, the compiler version, and other compiler options. This is then merged with the hash
@@ -490,5 +504,8 @@ private:
     List<Type*> m_specializedTypes;
 
     RefPtr<SharedSemanticsContext> m_semanticsForReflection;
+
+    SlangRichDiagnosticCallback m_diagnosticCallback     = nullptr;
+    void*                       m_diagnosticCallbackData = nullptr;
 };
 } // namespace Slang

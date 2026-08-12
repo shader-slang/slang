@@ -254,6 +254,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCode(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    linkage->installDiagnosticCallback(sink);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -312,6 +313,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    linkage->installDiagnosticCallback(sink);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -338,6 +340,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointMetadata(
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    linkage->installDiagnosticCallback(sink);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -532,6 +535,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointCompileResult
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    linkage->installDiagnosticCallback(sink);
 
     IArtifact* artifact = targetProgram->getOrCreateEntryPointResult(entryPointIndex, &sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -571,6 +575,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetHostCallable(
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    linkage->installDiagnosticCallback(sink);
 
     IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
     sink.getBlobIfNeeded(outDiagnostics);
@@ -749,6 +754,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
         DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
         applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
         applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+        linkage->installDiagnosticCallback(sink);
 
         IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
         sink.getBlobIfNeeded(outDiagnostics);
@@ -770,6 +776,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
             applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
             applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+            linkage->installDiagnosticCallback(sink);
             sink.diagnose(Diagnostics::CompilationAbortedDueToException{
                 .exceptionType = typeid(e).name(),
                 .exceptionMessage = e.Message});
