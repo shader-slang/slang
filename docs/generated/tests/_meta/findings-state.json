@@ -393,6 +393,11 @@
       "title": "slangc never terminates on -target spirv for a function returning Optional<T*>",
       "url": "https://github.com/shader-slang/slang/issues/12498"
     },
+    "spirv-sample-decoration-missing-samplerateshading-capability": {
+      "dup_of": 12441,
+      "note": "duplicate of part 1 of #12441, and already fixed on master by #12467 (af1c5a7388): re-tested with SLANG_RUN_SPIRV_VALIDATION=1, the module now declares OpCapability SampleRateShading and validates. #12441 stays open for its part 2 (integer opcode on unorm/snorm texel arithmetic), which still reproduces",
+      "title": "SPIR-V: sample interpolation omits OpCapability SampleRateShading"
+    },
     "switch-case-decl-used-in-later-case-invalid-cpp-emit": {
       "dup_of": 12461,
       "note": "nv-slang-bot filed the same defect independently on 2026-08-10; its report is stronger, showing -validate-ir reports 'def must dominate use' at every -g level, so the malformed IR predates emit and -g2 only lets it survive",
