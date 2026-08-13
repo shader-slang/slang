@@ -28,6 +28,7 @@ paths agree.
 """
 
 import argparse
+import difflib
 import os
 import subprocess
 import sys
@@ -52,6 +53,66 @@ def compile_once(slangc, source, env_var, value, target, extra_args):
         return "timeout", b"", b""
 
 
+def _decode(raw):
+    """Bytes to text for display. Generated code and diagnostics are text in practice, but
+    a miscompile can emit anything, and a crash in the middle of writing can truncate a
+    multi-byte sequence -- so decoding must not itself raise."""
+    if isinstance(raw, bytes):
+        return raw.decode(errors="replace")
+    return str(raw)
+
+
+def save_outputs(out_dir, source, args, on, off):
+    """Writes both runs' stdout and stderr under `out_dir`, mirroring the shader's path.
+
+    Mirroring rather than flattening keeps two shaders with the same basename -- which the
+    corpus has plenty of -- from overwriting each other. Returns the directory written to,
+    so the caller can point a human or a diff tool at it.
+    """
+    dest = Path(out_dir) / Path(source).with_suffix("")
+    dest.mkdir(parents=True, exist_ok=True)
+    for label, value, result in (("on", args.on, on), ("off", args.off, off)):
+        # The value is in the filename because the point of this tool is comparing two
+        # settings; "on"/"off" alone would not say which setting produced what.
+        (dest / f"{label}-{args.var}={value}.stdout").write_bytes(
+            result[1] if isinstance(result[1], bytes) else str(result[1]).encode())
+        (dest / f"{label}-{args.var}={value}.stderr").write_bytes(
+            result[2] if isinstance(result[2], bytes) else str(result[2]).encode())
+        (dest / f"{label}-{args.var}={value}.exit").write_text(f"{result[0]}\n")
+    return dest
+
+
+def print_diff(source, args, on, off, max_lines):
+    """Prints a unified diff of whichever streams differ.
+
+    Both streams are diffed rather than just the first that differs: a divergence can show
+    up in generated code, in diagnostics, or in both, and seeing only one of them has sent
+    more than one investigation down the wrong path.
+    """
+    for stream, index in (("stdout", 1), ("stderr", 2)):
+        if on[index] == off[index]:
+            continue
+        lines = list(difflib.unified_diff(
+            _decode(off[index]).splitlines(keepends=True),
+            _decode(on[index]).splitlines(keepends=True),
+            fromfile=f"{source} [{args.var}={args.off}] {stream}",
+            tofile=f"{source} [{args.var}={args.on}] {stream}",
+        ))
+        if not lines:
+            # Same text, different bytes -- a trailing-newline or encoding difference that
+            # the line-based diff cannot show. Say so rather than printing nothing.
+            print(f"  {stream}: differs in bytes but not in lines "
+                  f"({len(off[index])} vs {len(on[index])} bytes)")
+            continue
+        shown = lines if max_lines <= 0 else lines[:max_lines]
+        print(f"  --- {stream} diff ---")
+        for line in shown:
+            print("  " + line.rstrip("\n"))
+        if len(shown) < len(lines):
+            print(f"  ... {len(lines) - len(shown)} more diff lines "
+                  f"(raise --diff-lines, or use --out-dir to keep the full outputs)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("roots", nargs="*", default=["tests"],
@@ -69,6 +130,19 @@ def main():
                          "'ir' is more sensitive: a body that lost children may never "
                          "reach codegen, so the emitted code can match while the IR does not")
     ap.add_argument("--quiet", action="store_true", help="only report divergences")
+    ap.add_argument("--diff", action="store_true",
+                    help="print a unified diff of the two outputs for each divergence, "
+                         "instead of only reporting that they differ")
+    ap.add_argument("--diff-lines", type=int, default=60,
+                    help="max diff lines to print per divergence (0 = unlimited)")
+    ap.add_argument("--out-dir", metavar="DIR",
+                    help="write each run's stdout/stderr to DIR, so the outputs can be "
+                         "inspected or diffed with other tools. By default only divergences "
+                         "are written; use --save-all to keep every shader's output")
+    ap.add_argument("--save-all", action="store_true",
+                    help="with --out-dir, write outputs for every shader rather than only "
+                         "for divergences. This is a lot of files -- the full corpus is "
+                         "~8300 shaders x 2 modes -- so it is off by default")
     args = ap.parse_args()
 
     slangc = Path(args.slangc)
@@ -126,6 +200,14 @@ def main():
                 print("  stdout differs")
             if on[2] != off[2]:
                 print("  stderr differs")
+            if args.out_dir:
+                written = save_outputs(args.out_dir, src, args, on, off)
+                print(f"  written: {written}")
+            if args.diff:
+                print_diff(src, args, on, off, args.diff_lines)
+
+        if args.out_dir and args.save_all and on == off:
+            save_outputs(args.out_dir, src, args, on, off)
         if not args.quiet and i % 100 == 0:
             print(f"... {i}/{len(sources)}  agreed={agreed} negative={negative_agreed} "
                   f"entry-mismatch={entry_mismatch} diverged={len(diverged)}",
