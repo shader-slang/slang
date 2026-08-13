@@ -884,8 +884,13 @@ static size_t _calcInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64&
 /// Needed because a deferred body's instructions were never allocated: the load
 /// pass left their slots empty. String and blob constants carry their characters
 /// inline, so their size depends on a length that is read from the payload stream;
-/// the cursor is positioned at that length here, and peeking does not disturb it
-/// because the payload switch consumes it immediately afterwards.
+/// the cursor is positioned at that length here, and reading it *advances* the cursor
+/// past it -- `flat.stringLengths[stringLengthCursor++]`. That is why the caller passes
+/// its own cursor by reference and why the payload switch below does not read the length
+/// again. An earlier version of this comment claimed the read "does not disturb" the
+/// cursor, which is the opposite of what it does; anyone who believed it and added a
+/// second read, or removed this one as redundant, would have shifted every subsequent
+/// string constant by one entry.
 IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringLengthCursor)
 {
     const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
