@@ -102,7 +102,16 @@ _CLAUDE_FAMILY_TOKENS = ("claude", "anthropic")
 
 
 def _rel_to_repo(path: Path) -> str:
-    return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    """Repo-relative label for a path, or the path itself if it lies outside.
+
+    The fallback exists so that a pure, path-taking lint can be exercised
+    against a temporary fixture in `selftest` without the label lookup being
+    the thing that fails. Every real call site passes a path under the repo.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except ValueError:
+        return str(path)
 
 
 # --------------------------------------------------------------------------
@@ -880,6 +889,89 @@ def lint_doc(spec: DocSpec) -> list[LintIssue]:
                 )
             )
     issues.extend(lint_markdown_tables(spec.path, text))
+    return issues
+
+
+_LIQUID_OPENER_RE = re.compile(r"\{\{|\{%")
+
+
+def lint_liquid_safe(md_path: Path) -> list[LintIssue]:
+    r"""Check one file for a raw Liquid opener (`{{` or `{%`) in its body.
+
+    GitHub Pages runs Jekyll, which treats any file carrying YAML
+    front-matter as a *page* and renders Liquid over its body BEFORE
+    Markdown -- so a `{{` inside a code span or a fenced block is still an
+    opening Liquid tag. How that fails depends on what follows it, and both
+    outcomes are wrong:
+
+    - Unterminated: Liquid's scan for the closing `}}` uses `/\}\}?/`
+      against a non-greedy body, so it stops at the FIRST `}`. In
+      `float2x2 m = {{1,2},{3,4}}` that is the single `}` after `1,2`, so
+      the tag never closes, Liquid raises "Variable ... was not properly
+      terminated", and the ENTIRE site build aborts. This took the Pages
+      build down for five days (fixed for the tests tree by #12511).
+    - Terminated: a `{{[0-9]+}}` FileCheck wildcard parses fine and is then
+      evaluated as a template expression, rendering empty -- so the pattern
+      the prose is documenting silently does not appear on the page.
+
+    These files are also read on github.com, where Liquid is NOT processed,
+    so the fix cannot be a `{% raw %}` wrapper or an HTML entity inside a
+    backtick span: both show up literally there. Two spellings are correct
+    on both surfaces -- space the braces where whitespace is semantically
+    irrelevant (`{ {1,2},{3,4} }`), or show an exact token with numeric
+    entities in a raw `<code>` element
+    (`<code>&#123;&#123;.*&#125;&#125;</code>`, which renders as `{{.*}}`
+    everywhere while never presenting a literal `{{` to Liquid).
+
+    Files WITHOUT front-matter are skipped, and that is the whole rule
+    rather than a filename convention: Jekyll copies them verbatim, so
+    their `{{` never reaches Liquid. Keying on the property Jekyll itself
+    keys on is what keeps a newly-invented output file type covered
+    automatically.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    fm = _FM_RE.match(text)
+    if not fm:
+        return issues
+    fm_end_line = text.count("\n", 0, fm.end())
+    for lineno, line in enumerate(text.split("\n"), start=1):
+        if lineno <= fm_end_line:
+            continue
+        if _LIQUID_OPENER_RE.search(line):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"line {lineno} has a raw Liquid opener that the GitHub "
+                    f"Pages build renders (an unterminated one aborts the "
+                    f"whole build); space the braces or write the exact "
+                    f"token as `<code>&#123;&#123;...&#125;&#125;</code>`",
+                )
+            )
+    return issues
+
+
+def lint_liquid_safe_tree() -> list[LintIssue]:
+    """Run `lint_liquid_safe` over every Markdown file in the generated tree.
+
+    Deliberately a tree walk rather than a pass over the manifest's docs:
+    the hazard belongs to every file Jekyll publishes, and this tree emits
+    several kinds the manifest does not enumerate -- reviews, remediations,
+    gap-intake reports. A per-category hook would leave the next new kind
+    unguarded, which is exactly how the eight raw openers in
+    `_meta/gap-intake/` arrived unnoticed.
+
+    Tree-wide, so it runs on a full lint only, matching `lint_doc_gap_state`
+    -- CI's gate is a full run.
+    """
+    issues: list[LintIssue] = []
+    for md in sorted(DOCS_ROOT.rglob("*.md")):
+        issues.extend(lint_liquid_safe(md))
     return issues
 
 
@@ -2514,6 +2606,10 @@ def cmd_lint(args, manifest: Manifest) -> int:
     # The doc-gap ledger is tree-wide, not per-document, so it is checked
     # only on a full lint run.
     if not explicit_targets:
+        for issue in lint_liquid_safe_tree():
+            print(f"{issue.severity}: {issue.doc}: {issue.message}")
+            if issue.severity == "error":
+                any_error = True
         for issue in lint_doc_gap_state():
             print(f"{issue.severity}: {issue.doc}: {issue.message}")
             if issue.severity == "error":
@@ -2742,6 +2838,77 @@ def cmd_selftest(args, manifest: Manifest) -> int:
         any("schema_version" in m for m in lint_state({}, version=2)),
         True,
     )
+
+    # -- lint_liquid_safe ---------------------------------------------
+    # The Pages guard. Every branch below is one the committed tree cannot
+    # exercise: a full `lint` run over a clean tree proves only that no file
+    # currently trips it, which is equally true of a check that never fires.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as _td:
+        _tmp = Path(_td)
+
+        def _liquid_issues(name: str, body: str) -> int:
+            f = _tmp / name
+            f.write_text(body, encoding="utf-8")
+            return len(lint_liquid_safe(f))
+
+        _FM = "---\ntitle: x\n---\n\n"
+        # The shape that took the site down: the scan for `}}` stops at the
+        # first single `}`, so the tag never closes.
+        check(
+            "liquid: unterminated opener is an error",
+            _liquid_issues("fatal.md", _FM + "probe `float2x2 m = {{1,2},{3,4}}` here\n"),
+            1,
+        )
+        # And the shape that merely renders empty -- also rejected, because
+        # the documented pattern silently does not survive to the page.
+        check(
+            "liquid: terminated opener is still an error",
+            _liquid_issues("wildcard.md", _FM + "matches `{{[0-9]+}}` there\n"),
+            1,
+        )
+        # A fenced block is not a shelter: Liquid runs before Markdown.
+        check(
+            "liquid: opener inside a fence is an error",
+            _liquid_issues("fence.md", _FM + "```\n{{ x }}\n```\n"),
+            1,
+        )
+        # Statement tags too, not just output tags.
+        check(
+            "liquid: statement opener is an error",
+            _liquid_issues("stmt.md", _FM + "a {% if x %} b\n"),
+            1,
+        )
+        # Both dual-safe spellings must pass, or the rule the prompt teaches
+        # would be unfollowable.
+        check(
+            "liquid: spaced braces pass",
+            _liquid_issues("spaced.md", _FM + "write `{ {1,2},{3,4} }` instead\n"),
+            0,
+        )
+        check(
+            "liquid: entity spelling passes",
+            _liquid_issues(
+                "entity.md",
+                _FM + "shows <code>&#123;&#123;[0-9]+&#125;&#125;</code> exactly\n",
+            ),
+            0,
+        )
+        # No front-matter means Jekyll copies the file verbatim and Liquid
+        # never sees it. Keying on front-matter rather than on a filename is
+        # what keeps a new output kind covered without being listed.
+        check(
+            "liquid: no front-matter is skipped",
+            _liquid_issues("plain.md", "no front matter, so `{{1,2},{3,4}}` is fine\n"),
+            0,
+        )
+        # Front-matter itself is stripped before Liquid runs.
+        check(
+            "liquid: opener inside front-matter is ignored",
+            _liquid_issues("fm.md", "---\ntitle: \"{{x}}\"\n---\n\nbody\n"),
+            0,
+        )
 
     for f in failures:
         print(f"FAIL {f}")
