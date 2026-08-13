@@ -903,25 +903,38 @@ public:
 
     bool hasElements();
 
-    /// Number of container elements not yet read.
+    /// Number of elements not yet read from the container or record being read.
     ///
     /// Exposed so that a container being deserialized can size its storage once
     /// up front instead of growing while it reads; the fossil format records the
     /// count, so this is known before any element is decoded.
+    ///
+    /// **Precondition: a container or record must be open.** `remainingValueCount`
+    /// means "elements left" only in those two states; in any other it holds
+    /// whatever the previous state left behind, and callers size storage off this
+    /// value, so a stale one would be read as a real count. Asserted, not returned
+    /// as a failure, because there is no correct answer to give.
+    ///
+    /// Note that this admits *records* as well as containers, whereas the two bulk
+    /// helpers below accept containers only -- they additionally need the fixed
+    /// element stride that a container has and a record does not. So a state can
+    /// legitimately have a remaining count here and still be refused there.
     Count getRemainingElementCount();
 
-    /// Points `outData` at `count` scalar elements of type `T` in the serialized
-    /// data itself, returning false if that is not possible for the current state.
+    /// True if the reader is positioned to hand back `count` elements of type `T`
+    /// as one contiguous run.
     ///
-    /// Same conditions as `tryReadContiguousScalars`, but hands back the stored
-    /// bytes rather than copying them. The caller is then reading directly out of
-    /// the serialized blob, and must keep that blob alive for as long as it uses
-    /// the result.
+    /// The shared precondition of the two bulk paths below, named once so they
+    /// cannot drift apart: both must agree exactly on when the fast path is legal,
+    /// and one of them handing back a span the other would have refused is a
+    /// silent out-of-bounds read rather than a diagnosable error.
+    ///
+    /// Requires a *container* specifically -- records have no fixed element stride
+    /// -- with a stride equal to `sizeof(T)`, and at least `count` elements left.
+    /// A non-positive `count` is refused so that callers need not special-case it.
     template<typename T>
-    bool tryGetContiguousScalars(T const*& outData, Count count)
+    bool canReadContiguousScalars(Count count)
     {
-        static_assert(std::is_arithmetic<T>::value, "spans are only for scalar elements");
-
         if (count <= 0)
             return false;
         auto& state = getState();
@@ -931,11 +944,34 @@ public:
             return false;
         if (Count(state.remainingValueCount) < count)
             return false;
+        return true;
+    }
+
+    /// Points `outData` at `count` scalar elements of type `T` in the serialized
+    /// data itself, returning false if that is not possible for the current state.
+    ///
+    /// Same conditions as `tryReadContiguousScalars` -- both gate on
+    /// `canReadContiguousScalars<T>`, so they accept and refuse identically -- but
+    /// hands back the stored bytes rather than copying them. The caller is then
+    /// reading directly out of the serialized blob, and must keep that blob alive
+    /// for as long as it uses the result.
+    template<typename T>
+    bool tryGetContiguousScalars(T const*& outData, Count count)
+    {
+        static_assert(std::is_arithmetic<T>::value, "spans are only for scalar elements");
+
+        if (!canReadContiguousScalars<T>(count))
+            return false;
+        auto& state = getState();
 
         T const* const base = (T const*)state.dataCursor;
 
-        // Read the first element the ordinary way so its layout is still validated,
-        // then step the cursor over the rest.
+        // Read the first element the ordinary way so its layout is still validated.
+        // This is not just a check: `_readSimpleVal<T>()` also advances `dataCursor`
+        // past that element and decrements `remainingValueCount` by one. The
+        // arithmetic below is written against that -- it steps over `count - 1`
+        // elements, not `count` -- so removing the validating read would silently
+        // leave the cursor one element short.
         (void)_readSimpleVal<T>();
         const Count remaining = count - 1;
         if (remaining > 0)
@@ -958,26 +994,22 @@ public:
     /// dominates deserialization time.
     ///
     /// The first element is read through the ordinary path so that its layout is
-    /// validated as usual; only the remainder is copied directly. Returns false
-    /// (having read nothing) when the state is not a container, when the stride
-    /// does not match, or when fewer than `count` elements remain, leaving the
-    /// caller to fall back to the per-element path.
+    /// validated as usual; only the remainder is copied directly. Returns false,
+    /// having read nothing and left the cursor untouched, whenever
+    /// `canReadContiguousScalars<T>` refuses -- leaving the caller to fall back to
+    /// the per-element path.
     template<typename T>
     bool tryReadContiguousScalars(T* dest, Count count)
     {
         static_assert(std::is_arithmetic<T>::value, "bulk read is only for scalar elements");
 
-        if (count <= 0)
+        if (!canReadContiguousScalars<T>(count))
             return false;
         auto& state = getState();
-        if (state.type != State::Type::Container)
-            return false;
-        if (state.dataStride != sizeof(T))
-            return false;
-        if (Count(state.remainingValueCount) < count)
-            return false;
 
-        // Validates the element layout, and advances the cursor by one.
+        // Validates the element layout, and advances the cursor and
+        // `remainingValueCount` by one -- which is why the copy below starts at
+        // `dest + 1` and covers `count - 1` elements.
         dest[0] = _readSimpleVal<T>();
 
         const Count remaining = count - 1;
