@@ -326,6 +326,53 @@ struct IRInstListBase
     Iterator end();
 };
 
+/// The decorations of an instruction, as a list that ends where the decorations do.
+///
+/// Terminates on the first non-decoration rather than on a saved `last->next` sentinel,
+/// which is what every other instruction list does. The distinction only matters under
+/// on-demand loading, and it is the difference between a stable end and a moving one:
+/// `last->next` for a global with a deferred body is the slot `materializeDeferredBody`
+/// publishes the body into. A walker that snapshots `end` while the body is still
+/// deferred captures null, and if another thread publishes before the walk reaches the
+/// last decoration, the walk sees `bodyFirst != end` and continues *into the body*,
+/// iterating body instructions as though they were decorations.
+///
+/// Every consumer today re-checks the opcode -- `findDecorationImpl` compares `getOp()`
+/// -- so that produced no wrong answers, but "all 111 call sites happen to op-filter" is
+/// not an invariant worth resting on, and the design comment on `irLoadInstLink` already
+/// claims decoration lookup stops at the first non-decoration. This makes that claim
+/// true rather than aspirational, and the end value immutable rather than raced.
+struct IRDecorationList
+{
+    IRDecorationList() {}
+    explicit IRDecorationList(IRInst* first)
+        : first(first)
+    {
+    }
+
+    IRInst* first = nullptr;
+
+    struct Iterator
+    {
+        IRInst* inst = nullptr;
+
+        Iterator() {}
+        explicit Iterator(IRInst* inst)
+            : inst(inst)
+        {
+        }
+
+        void operator++();
+        IRDecoration* operator*() { return (IRDecoration*)inst; }
+        bool operator!=(Iterator const& other) const { return inst != other.inst; }
+    };
+
+    Iterator begin() { return Iterator(first); }
+    /// Always null: a list that ends by type needs no sentinel from the list itself,
+    /// which is exactly why this one cannot be invalidated by a concurrent publication.
+    Iterator end() { return Iterator(nullptr); }
+};
+
 // Specialization of `IRInstListBase` for the case where
 // we know (or at least expect) all of the instructions
 // to be of type `T`
@@ -738,7 +785,7 @@ struct IRInst
     //
     IRDecoration* getFirstDecoration();
     IRDecoration* getLastDecoration();
-    IRInstList<IRDecoration> getDecorations();
+    IRDecorationList getDecorations();
 
     // Look up a decoration in the list of decorations
     IRDecoration* findDecorationImpl(IROp op);

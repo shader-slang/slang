@@ -8913,9 +8913,21 @@ IRDecoration* IRInst::getLastDecoration()
     return decoration;
 }
 
-IRInstList<IRDecoration> IRInst::getDecorations()
+IRDecorationList IRInst::getDecorations()
 {
-    return IRInstList<IRDecoration>(getFirstDecoration(), getLastDecoration());
+    // Only the head is needed: the list ends where the decorations do, by type.
+    return IRDecorationList(getFirstDecoration());
+}
+
+void IRDecorationList::Iterator::operator++()
+{
+    // Acquire, because for a global whose body is deferred this link is the one a
+    // concurrent materialization publishes into.
+    inst = irLoadInstLink(inst->next);
+    // And stop here rather than at a saved sentinel, so a body appearing mid-walk ends
+    // the iteration instead of being walked as though it were more decorations.
+    if (inst && !as<IRDecoration>(inst))
+        inst = nullptr;
 }
 
 void IRInst::_materializeDeferredBody()
