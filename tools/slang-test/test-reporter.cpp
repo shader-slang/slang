@@ -260,6 +260,8 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_passedTestCount += other->m_passedTestCount;
     m_expectedFailedTestCount += other->m_expectedFailedTestCount;
     m_totalTestCount += other->m_totalTestCount;
+    m_testServerLossCount += other->m_testServerLossCount;
+    m_testServerLossTests.addRange(other->m_testServerLossTests);
 
     // A deferral and the final result that redeems it can be recorded by two different
     // sub-reporters, because the retry pass is run by a fresh set of threads. Merge both sets and
@@ -273,6 +275,20 @@ void TestReporter::consolidateWith(TestReporter* other)
     for (const auto& name : other->m_dispatchFailures)
         m_dispatchFailures.add(name);
     m_dispatchFailureCount += other->m_dispatchFailureCount;
+}
+
+void TestReporter::recordTestServerLoss()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
+    m_testServerLossCount++;
+    // Name it. A single loss is noise, but the same test appearing night after night is the
+    // shortlist for whatever is killing the servers -- and that pattern is only visible if
+    // the victim is recorded even when it went on to pass.
+    if (m_inTest && m_currentInfo.name.getLength())
+    {
+        m_testServerLossTests.add(m_currentInfo.name);
+    }
 }
 
 void TestReporter::dumpOutputDifference(const String& expectedOutput, const String& actualOutput)
@@ -866,6 +882,29 @@ void TestReporter::outputSummary()
                     {
                         printf("%s\n", testInfo.name.getBuffer());
                     }
+                }
+                printf("---\n");
+            }
+
+            // Reported unconditionally when non-zero, INCLUDING on an otherwise clean run.
+            // These tests passed, so nothing above mentions them; without this block a run
+            // that lost fifteen servers is typographically identical to one that lost none.
+            if (m_testServerLossCount)
+            {
+                // "recovered", not "passed": the retry only proves an RPC came back from a
+                // fresh server. The test's own verdict is decided afterwards and can still
+                // be a failure, so a name here may legitimately appear in the failing list
+                // above too -- what this block asserts is that the server death was not the
+                // reason.
+                printf(
+                    "\nwarning: %d test server loss(es); the server died under each test below "
+                    "and the request succeeded on a freshly spawned one, so the loss was the "
+                    "server's doing and not the test's:\n",
+                    m_testServerLossCount);
+                printf("---\n");
+                for (const auto& name : m_testServerLossTests)
+                {
+                    printf("%s\n", name.getBuffer());
                 }
                 printf("---\n");
             }
