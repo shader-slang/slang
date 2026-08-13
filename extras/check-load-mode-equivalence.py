@@ -180,11 +180,25 @@ def main():
     diverged, agreed = [], 0
     negative_agreed = 0   # failed identically, having actually diagnosed something
     entry_mismatch = 0    # failed identically, but only because -entry did not match
+    # Bytes actually compared, and agreements where there was nothing to compare.
+    #
+    # Tracked because "0 diverged" is only meaningful if the comparison had content. The
+    # in-suite equivalence test shipped for weeks comparing stdout while `-dump-ir` writes
+    # to stderr, so it was asserting that two empty strings matched and was green for no
+    # reason. This script compares the whole (exit, stdout, stderr) tuple and so does not
+    # have that bug, but the failure mode is quiet enough to be worth measuring rather
+    # than reasoning about.
+    compared_bytes = 0
+    empty_agreements = 0
 
     for i, src in enumerate(sources, 1):
         on = compile_once(slangc, src, args.var, args.on, args.target, extra)
         off = compile_once(slangc, src, args.var, args.off, args.target, extra)
         if on == off:
+            payload = len(on[1]) + len(on[2])
+            compared_bytes += payload
+            if payload == 0:
+                empty_agreements += 1
             if on[0] == 0:
                 agreed += 1
             elif ENTRY_POINT_MISMATCH in on[2]:
@@ -219,6 +233,23 @@ def main():
     print(f"  {entry_mismatch:5d}  skipped: no '{args.entry}' entry point, so only the load "
           f"path was compared")
     print(f"  {len(diverged):5d}  DIVERGED")
+    if compared_bytes >= 1_000_000:
+        size = f"{compared_bytes / 1e6:.1f} MB"
+    elif compared_bytes >= 1000:
+        size = f"{compared_bytes / 1e3:.1f} KB"
+    else:
+        size = f"{compared_bytes} bytes"
+    # Reported in whatever unit keeps it legible: "0.0 MB" reads as "nothing was
+    # compared", which is the exact ambiguity this line exists to remove.
+    print(f"\n  compared {size} of output across matching runs")
+    if empty_agreements:
+        # Not necessarily wrong -- a shader can legitimately produce nothing on both
+        # streams -- but if it is most of the corpus, the run agreed about nothing.
+        print(f"  {empty_agreements} agreement(s) compared no output at all")
+        if empty_agreements > len(sources) // 2:
+            print("WARNING: most agreements compared empty output. Check that the "
+                  "command line produces the artifact you meant to compare -- with "
+                  "--compare ir the payload lands on stderr, not stdout.")
     if sources and agreed == 0:
         # Every shader was rejected, so the comparison only ever saw the error path.
         # Technically "no divergence", but it establishes nothing about generated code.
