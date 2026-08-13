@@ -705,14 +705,29 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     }
     Int64 getInstCount() const { return flat.instAllocInfo.getCount(); }
 
+    /// Why an operand is being read, which decides whether a null result is a violation.
+    ///
+    /// A bare `true`/`false` at the call site said nothing about the distinction it
+    /// selects, and the distinction is the load-bearing one: it is the difference between
+    /// "this must resolve or the whole deferral scheme is unsound" and "a null here is
+    /// the expected answer".
+    enum class OperandUse
+    {
+        /// The result is about to be wired into a live instruction, so it must resolve.
+        WireIntoLiveInst,
+        /// The operand belongs to an instruction the walk deliberately skipped, and is
+        /// read only to keep the cursors aligned. Such operands may name other skipped
+        /// instructions, where null is the correct result.
+        ConsumeForSkippedInst,
+    };
+
     /// Reads one operand index and resolves it to an instruction.
     ///
-    /// `mustResolve` says whether the result is about to be wired into a live
-    /// instruction. The walk also consumes operands for instructions it skipped, to keep
-    /// the cursors aligned, and those may refer to other skipped instructions -- so a
-    /// null result is expected there and only a violation here.
-    IRInst* readInstRef(bool mustResolve)
+    /// Advances the operand cursor by one either way; the `use` only decides how strictly
+    /// the result is checked.
+    IRInst* readInstRef(OperandUse use)
     {
+        const bool mustResolve = (use == OperandUse::WireIntoLiveInst);
         SLANG_RELEASE_ASSERT(operandCursor < flat.operandIndices.getCount());
         const auto index = flat.operandIndices[operandCursor++];
         SLANG_RELEASE_ASSERT(index >= -1 && index < getInstCount());
@@ -728,9 +743,15 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
 
     /// Decodes the instruction at the cursor and, recursively, its children.
     ///
-    /// A null return means the instruction was deliberately not materialized; its
-    /// operand and payload entries are still consumed so that the cursors stay
-    /// aligned for the instructions that are kept.
+    /// **Advances every cursor it touches** -- instruction, operand, literal, string
+    /// length and string data -- for the subtree it walks. That is the central side
+    /// effect and the reason the decode order is fixed: the payload for instruction *i*
+    /// is "the next unread entry", not something addressable by index, so the cursors
+    /// are the only thing that says where the next instruction's data begins.
+    ///
+    /// A null return means the instruction was deliberately not materialized. Its
+    /// operand and payload entries are consumed anyway, precisely so that the cursors
+    /// stay aligned for the instructions that are kept.
     IRInst* decodeInst(IRInst* parent, Int64 depth);
 
     /// Allocates the instruction for a given index; see the definition.
@@ -841,7 +862,7 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
 /// doing so, dropped both range checks below, which are what keep a corrupt or
 /// future-version table from truncating `numChars` or overflowing the allocation
 /// size that the subsequent `memcpy` writes into.
-static size_t _calcInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64& stringLengthCursor)
+static size_t _readInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64& stringLengthCursor)
 {
     switch (op)
     {
@@ -904,7 +925,7 @@ IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringL
         foundUnrecognizedInstructions = true;
     }
 
-    const size_t minSizeInBytes = _calcInstMinSizeInBytes(op, flat, stringLengthCursor);
+    const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, stringLengthCursor);
     return module->_allocateInst(op, allocInfo.operandCount, minSizeInBytes);
 }
 
@@ -934,15 +955,15 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
     if (inst)
     {
         inst->sourceLoc = flat.sourceLocs[thisInstIndex];
-        inst->typeUse.init(inst, readInstRef(true));
+        inst->typeUse.init(inst, readInstRef(OperandUse::WireIntoLiveInst));
         for (Int64 o = 0; o < thisOperandCount; ++o)
-            inst->getOperands()[o].init(inst, readInstRef(true));
+            inst->getOperands()[o].init(inst, readInstRef(OperandUse::WireIntoLiveInst));
     }
     else
     {
-        readInstRef(false); // type use
+        readInstRef(OperandUse::ConsumeForSkippedInst); // type use
         for (Int64 o = 0; o < thisOperandCount; ++o)
-            readInstRef(false);
+            readInstRef(OperandUse::ConsumeForSkippedInst);
     }
 
     // Handle special instructions
@@ -1249,7 +1270,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             readContext._foundUnrecognizedInstructions = true;
             op = kIROp_Unrecognized;
         }
-        const size_t minSizeInBytes = _calcInstMinSizeInBytes(op, flat, allocStringLengthCursor);
+        const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, allocStringLengthCursor);
         // Under on-demand load the skipped instructions are never allocated; the
         // preorder walk below still consumes their operand and payload cursors so
         // that positions stay correct for the instructions that are kept.
