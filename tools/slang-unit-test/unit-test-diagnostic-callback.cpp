@@ -3,6 +3,7 @@
 // Tests for ISession::setDiagnosticCallback and the SlangRichDiagnosticCallback /
 // SlangStructuredDiagnostic API.
 
+#include "core/slang-basic.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
