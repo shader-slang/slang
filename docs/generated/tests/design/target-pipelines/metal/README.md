@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: 56c4483a0a07c101a86ac196e98bf570ba86e4546adc312bf2a975d324b64ad9
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 0d4fa8b278a0dd34659e69f7b9ad69965d11c08f9a6f79c3e16ece66be235df9
 source_doc: docs/generated/design/target-pipelines/metal.md
-source_doc_digest: 37478460b6927f203a2e745d280b7f242f79da0e9bcccb0f8e238310db8438e4
+source_doc_digest: ffc029803379411a1df51804a20cebcb2622f62d9dcf024e0f9d28c30b81267f
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -69,12 +69,192 @@ resource parameter. They currently do not, so the test is listed in
 `_meta/expected-failures.txt` against the pending finding
 `metal-append-buffer-params-missing-binding-slot`.
 
+The `## Claims` section below is the bundle's ground-truth enumeration;
+every claim in it is either covered by a row of `## Functional coverage`
+or classified in `## Untested claims`. Two of the doc's sections —
+`### Entry-point shape` and `### Resource-type spellings` — were added
+after the previous regeneration of this bundle, in answer to doc-gap rows
+this README used to carry, so the tests for their claims (the rename
+warning and its non-`main` carve-out, the `metallib_4_0`
+required-threads prefix, the `[[object]]` / `[[payload]]` /
+`[[stage_in]]` attributes, and the multisampled, texture-buffer,
+write-only, acceleration-structure and ray-query type spellings) are the
+newest in the bundle and those gap rows are gone.
+
 CHECK patterns follow the Metal-specific hygiene the doc's surface
 forces: `[[kernel]]`, `[[buffer(N)]]` and friends are matched as bare
 substrings because FileCheck reads a literal `[[...]]` as a variable
 reference; mangled identifiers use `{{[0-9]+}}` wildcards; and the entry
 function is matched as `main_0`, since Slang renames user entry points
 on this target.
+
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md), grouped by
+the document's own headings.
+
+**`#high-level-phase-diagram`**
+
+1. `Metal`, `MetalLib` and `MetalLibAssembly` share the Metal legalization pipeline and differ only in the downstream tool that consumes the emitted text, so `linkAndOptimizeIR` always runs with `CodeGenTarget::Metal`.
+2. Most of the pipeline is gated by a `RequiredLoweringPassSet` flag computed by two `calcRequiredLoweringPassSet` scans whose flags accumulate rather than reset, so a stale-true flag is harmless and a false-negative is impossible.
+3. Metal takes the `default` arm of nearly every per-target switch in Phases A and B; its divergence is concentrated in Phase C plus a handful of Phase-B decisions and the Phase-A coverage counter-width cap.
+
+**`#phase-a-link-and-entry-point-prep`**
+
+4. Metal is non-Khronos, so the `!isKhronosTarget && reqSet.glslSSBO` gate lets `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` fire.
+5. `lowerEnumType` collapses an `enum` to its underlying integer when `reqSet.enumType` is set.
+6. `reqSet.enumType` is set by `kIROp_EnumType` *and* by the surviving-cast opcodes, so a degenerate enum-to-int cast still triggers the pass after constant folding removed the last live enum type.
+7. `instrumentCoverage` takes a counter byte width (default `kDefaultCoverageCounterByteWidth`, overridable) and a `coverageBoolean` flag that is off by default.
+8. A counter width that is neither 4 nor 8 raises `Diagnostics::CoverageCounterWidthBytesInvalid` / `E45114` on the API path, the counterpart of the CLI's `E45113`.
+9. `stripDebugInfo`, `bindExistentialSlots`, `lowerLValueCast` and the other `reqSet.*`-gated Phase-A passes are reached through the shared `default` arm rather than a Metal-specific gate.
+10. The CUDA / CUDAHeader entry-point-param arm (`collectOptiXEntryPointUniformParams`) and the CPP / Host\* arms are filtered out for Metal.
+
+**`#phase-b-specialization-and-type-legalization`**
+
+11. `lowerCombinedTextureSamplers` fires on Metal (the HLSL / Metal / WGSL arm), still subject to `reqSet.combinedTextureSamplers`.
+12. `lowerAppendConsumeStructuredBuffers` fires on Metal because the gate is `target != HLSL && reqSet.appendConsumeStructuredBuffer`.
+13. Metal alone runs an extra `lowerBufferElementTypeToStorageType` with the `MetalParameterBlock` policy *before* the general resource legalization, translating resource-typed fields inside parameter blocks into descriptor handles.
+14. `legalizeEmptyTypes` runs in the Metal arm of the inner switch, under `shouldLegalizeExistentialAndResourceTypes`.
+15. `wrapCBufferElementsForMetal` fires for every Metal output.
+16. `lowerCooperativeVectors` runs for Metal via the `default` arm.
+17. `checkStaticAssert` evaluates `static_assert` after specialization.
+18. `addUserTypeHintDecorations` is reachable on a Metal compile whenever `VulkanEmitReflection` is set, but carries no Metal-specific behaviour.
+19. The HLSL-only `legalizeNonVectorCompositeSelect`, `wrapStructuredBuffersOfMatrices`, `legalizeNonStructParameterToStructForHLSL` and `validateBarrierFlagsForHLSL` arms, and the CUDA / PyTorch / CPP arms, are filtered out for Metal.
+20. Under `minimalOptimization` the SCCP + DCE pair replaces the post-force-inlining `simplifyIR`, a generics-gated `eliminateDeadCode` replaces the fast `simplifyIR`, and the `!shouldLegalizeExistentialAndResourceTypes` else-path runs only `legalizeEmptyTypes`.
+
+**`#phase-c-metal-legalization-lowering-phi-elimination`**
+
+21. `legalizeByteAddressBufferOps` runs with Metal options (`scalarizeVectorLoadStore`, `treatGetEquivalentStructuredBufferAsGetThis`, `translateToStructuredBufferOps=false`, `lowerBasicTypeOps`) that together leave only 4-byte word accesses for emit.
+22. The byte-address buffer itself is emitted as a `uint32_t device*`.
+23. A surviving `ByteAddressBufferLoad` renders as `as_type<T>(buf[(offset)>>2])` and a `ByteAddressBufferStore` as `buf[(offset)>>2] = as_type<uint32_t>(v)`.
+24. `legalizeLogicalAndOr` runs for Metal (`isMetalTarget`).
+25. `legalizeImageSubscript` runs in the Metal / GLSL / SPIR-V arm because MSL uses Metal-specific texture access patterns.
+26. `floatNonUniformResourceIndex` runs for Metal (`!isSPIRV`) with `NonUniformResourceIndexFloatMode::Textual`.
+27. The HLSL-spelled `NonUniformResourceIndex(index)` cannot feed that pass on Metal: its `[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]` capability set excludes Metal, so a Metal use is rejected with `error 36107` at check time.
+28. The reachable Metal surface is `nonuniform(handle)` on a `DescriptorHandle<T>`, declared with the same `__intrinsic_op` and carrying no `[require]`.
+29. Metal goes through `undoParameterCopy`, then `transformParamsToConstRef`, then falls through to `moveGlobalVarInitializationToEntryPoints` and `introduceExplicitGlobalContext`.
+30. `lowerBitCast` is gated on `reqSet.bitcast`.
+31. `specializeAddressSpaceForMetal` annotates IR pointers with Metal's address spaces before emit.
+32. `eliminatePhis` runs with the **default** options on Metal, in contrast to SPIR-V.
+33. The late Metal-only `MetalPointerLowering` block converts pointer fields inside buffer pointee types to `UIntPtr`, and is followed by a second `performForceInlining`, `eliminatePhis` and `simplifyNonSSAIR`.
+34. `collectCooperativeMetadata` runs when `targetCaps` implies `cooperative_matrix` or `cooperative_vector`.
+35. `legalizeArrayReturnType` is filtered out for Metal (`!isMetalTarget && !isSPIRV`), so an array-returning function survives.
+36. `synthesizeActiveMask`, `resolveTextureFormat`, `legalizeEntryPointsForGLSL`, `lowerImmutableBufferLoadForCUDA`, `performIntrinsicFunctionInlining` and the other sibling-target passes are filtered out for Metal.
+37. `collectMetadata` takes `targetProgram`, and under a `descriptor_handle` capability the pipeline first forces `targetProgram->getOrCreateLayout(sink)`.
+
+**`#phase-d-metal-emit-and-downstream-tools`**
+
+38. The bare `Metal` target stops at the text artifact; `MetalLib` adds the Apple `metal` compile step and `MetalLibAssembly` adds a further `metal-objdump --disassemble` on the intermediate `.metallib`.
+39. `printf` becomes MSL shader logging: the emitter writes `os_log_default.log(...)` and pulls in `<metal_logging>` on demand because the header only exists from MSL 3.2 onward.
+40. A `precise` local does not emit the HLSL/GLSL keyword; the emitter reports `Diagnostics::PreciseQualifierUnsupportedOnTarget` (warning `56005`) and emits nothing.
+41. Finite `half` and `float` literals get an explicit `h` / `f` suffix so MSL does not type a bare decimal as `double`.
+42. Non-finite literals stay bare and are spelled as divisions — `(0.0 / 0.0)`, `(1.0 / 0.0)`, `(-1.0 / 0.0)`.
+43. `double` is not an emittable Metal type at all: a shader that carries one to Metal emit aborts with an internal error (`E99997`) rather than being rejected by a capability diagnostic.
+44. `kIROp_MetalPackedVectorType` renders as MSL `packed_T<N>` (e.g. `packed_float3`).
+45. A `kIROp_SubpassLoad` that survives to emit is rejected with an unexpected-instruction diagnostic, because the lowering pass should already have replaced it.
+46. The Metal prelude is the `<metal_stdlib>` / `<metal_math>` / `<metal_texture>` include block followed by `using namespace metal;`, with no target-identification header comment.
+47. The `SourceWriter` emits `#line N "file"` directives into Metal output so downstream errors map back to Slang source.
+
+**`#entry-point-shape`**
+
+48. An entry point named exactly `main` is renamed through `_generateUniqueName` to `main_0` and the rename is reported as warning `40100`.
+49. Entry points with any other name are left alone.
+50. The stage attribute is one of `[[vertex]]`, `[[fragment]]`, `[[kernel]]`, `[[mesh]]`, or `[[object]]`.
+51. Any other stage is a `SLANG_ABORT_COMPILATION("unsupported stage.")`.
+52. The HLSL `[numthreads(X,Y,Z)]` attribute has no unconditional MSL counterpart and is not emitted; Metal takes the threadgroup size from the dispatch call.
+53. It reappears only when `targetCaps` implies `metallib_4_0`, where the compute, mesh and amplification arms prefix the stage attribute with `[[required_threads_per_threadgroup(X, Y, Z)]]`.
+54. A compute entry point therefore emits as `[[kernel]] void main_0(...)` at the default language version.
+
+**`#resource-type-spellings`**
+
+55. `Texture1D` / `Texture2D` / `Texture3D` / `TextureCube` emit as `texture1d` / `texture2d` / `texture3d` / `texturecube`, each `<T, access::sample>`, with `[[texture(N)]]`.
+56. `Texture2DMS<T>` and `Texture2DArray<T>` take the same stem plus `_ms` and/or `_array`, in that order — e.g. `texture2d_ms_array<T, ...>`.
+57. `RWTexture*<T>` takes the same stem with `access::read_write`; a write-only access mode gives `access::write`.
+58. A shadow / comparison texture turns the `texture` prefix into `depth` — e.g. `depth2d<T, access::sample>`.
+59. `Buffer<T>` emits as `texture_buffer<T>`, and a read-access texture buffer or multisampled texture takes `access::read` rather than `access::sample`.
+60. `StructuredBuffer<T>` / `RWStructuredBuffer<T>` emit as `T device*` with `[[buffer(N)]]`.
+61. `ByteAddressBuffer` and its RW / rasterizer-ordered forms emit as `uint32_t device*`.
+62. `ConstantBuffer<T>` / `ParameterBlock<T>` emit as `T constant*`.
+63. `RaytracingAccelerationStructure` emits as `metal::raytracing::acceleration_structure<metal::raytracing::instancing>` with `[[buffer(N)]]`.
+64. `SamplerState` / `SamplerComparisonState` emit as `sampler` with `[[sampler(N)]]`.
+65. `RayQuery` emits as `raytracing::intersection_query<raytracing::triangle_data, raytracing::instancing>` and takes no attribute.
+66. `LayoutResourceKind::VaryingInput` and `MetalPayload` put `[[stage_in]]` and `[[payload]]` on the parameter instead of a numbered slot.
+67. The `depth*` spelling is not produced by declaring a depth texture: a `SampleCmp*` on an ordinary `Texture2D` goes through the core-module-declared `MetalCastToDepthTexture` opcode.
+
+**`#conditional-gates` / `#requiredloweringpassset-flags` / `#metal-specific-runtime-predicates`**
+
+68. Thirty of the thirty-four `RequiredLoweringPassSet` flags gate at least one pass on the Metal path.
+69. `nonVectorCompositeSelect`, `derivativePyBindWrapper`, `dynamicResource` and `barrierFlagValidation` exist but never gate a Metal pass.
+70. `reqSet.reinterpret` is the one flag that can be **set during** the pipeline: `lowerTaggedUnionTypes` sets it when it reports a change.
+71. Vulkan cross-API option flags are filtered out of the Metal pipeline and leave the emitted MSL unchanged.
+
+**`#loops-in-the-pipeline`**
+
+72. Metal has no iterative passes in `linkAndOptimizeIR`; `legalizeIRForMetal` is single-pass.
+73. `eliminatePhis` and `simplifyNonSSAIR` each run twice, as two distinct call sites rather than as a loop.
+
+**`#legalizeirformetal`**
+
+74. `legalizeSubpassInputsForMetal` turns each subpass-input global into an entry-point fragment parameter carrying `[[color(N)]]` from its `InputAttachmentIndex`, and rewrites every `SubpassLoad` use into a reference to it.
+75. A subpass-input global that no fragment entry point reaches produces `Diagnostics::SubpassInputUsedOutsideEntryPoint`, but that message is defence in depth: a user-written non-fragment use is rejected first with `error 36107`.
+76. Multisampled subpass loads produce `Diagnostics::MultisampledSubpassInputNotSupportedOnMetal`.
+77. `legalizeShaderOutputParamsForMetal` runs for both vertex and fragment, and a fragment writing its colour through `out float4 : SV_Target` emits as a synthesized result struct whose field carries `[[color(0)]]`.
+78. `retargetEntryPointParamDecorations` re-points a hoisted global uniform's decorations at the wrapper, so the uniform still receives its `[[buffer(N)]]` argument instead of reading uninitialized memory.
+79. `legalizeEntryPointVaryingParamsForMetal` restructures the `[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]` / `[[stage_in]]` annotations and synthesizes the per-entry-point parameter struct the emitter expects.
+
+**`#specializeaddressspaceformetal`**
+
+80. Metal's explicit address spaces (`device`, `constant`, `threadgroup`, `thread`) are assigned inside `linkAndOptimizeIR`, not deferred to the emitter as SPIR-V does.
+81. `AddressSpace::StorageBuffer` maps to `AddressSpace::Global` because Metal has no distinct storage-buffer space, and such pointers render as `device*`.
+
+**`#metals-three-lowerbufferelementtypetostoragetype-invocations`**
+
+82. The `MetalParameterBlock` policy pre-translates resource-typed fields inside parameter blocks into descriptor handles — the bindless half of "bindful for constant buffers, bindless for parameter blocks".
+83. The `Metal` policy lowers matrices stored in `device` buffers into arrays of packed vectors and inserts pack/unpack conversion helpers.
+84. The `MetalPointerLowering` policy converts pointer fields inside buffer pointee types to `UIntPtr`, because Metal rejects pointer-to-pointer in buffer element types.
+
+**`#wrapcbufferelementsformetal`**
+
+85. The pass wraps a constant-buffer element type Metal disallows (such as a `StructuredBuffer<U>` directly under `constant T*`) into a separate `struct` so the emitted MSL is valid.
+
+**`#legalizeemptytypes-runs-twice`**
+
+86. `legalizeEmptyTypes` runs twice — once inside the existential/resource block and once unconditionally as a safety net for empty types introduced by Phase-C passes.
+
+**`#undoparametercopy--transformparamstoconstref`**
+
+87. `undoParameterCopy` removes the explicit copy-in/copy-out wrappers the front end introduced for `inout` parameters.
+88. `transformParamsToConstRef` converts struct parameters to const references.
+
+**`#legalizeimagesubscript`**
+
+89. MSL uses `texture2d<T>::read(uint2)` rather than a generic subscript operator, so the pass rewrites IR-level image subscripts into the target-appropriate texture-access form.
+
+**`#eliminatephis-with-default-options`**
+
+90. The emitted MSL uses explicit per-branch assignments to function-local variables, which is what the default phi elimination produces.
+
+**`#descriptorhandlet-parameter-binding-emission`**
+
+91. `emitFuncParamLayoutImpl` unwraps `IRDescriptorHandleType` before the per-resource-kind type tests, so a bindless `DescriptorHandle<T>` parameter takes the same binding attribute `T` would.
+
+**`#metal-caps-coverage-counters-to-32-bits`**
+
+92. The coverage counter width is clamped to 4 when the target is Metal, the width exceeds 4, and boolean mode is off, because MSL has no 64-bit atomic fetch-add.
+93. The uncapped default of 8 is clamped silently, while an explicitly requested 8 produces the warning `Diagnostics::CoverageCounterWidthCappedForMetal` (code `45115`).
+94. Boolean mode is exempt from the cap, because it writes plain non-atomic stores that MSL accepts at either width.
+
+**`#where-the-metal-specific-opcodes-come-from`**
+
+95. `metalSetVertex`, `metalSetPrimitive` and `metalSetIndices` are produced from the core module rather than from an IR pass, and the emitter maps them to `_slang_mesh.set_vertex` / `set_primitive` / `set_index`.
+96. `MetalCastToDepthTexture` arrives the same way, from an `__intrinsic_op` declaration, and is consumed both by `legalizeIRForMetal` and by the emitter.
+97. `MetalAtomicCast` has no producer at `source_commit`, so its two emitter arms are unreachable; the `emitMetalSetVertex` / `emitMetalSetPrimitive` / `emitMetalSetIndices` `IRBuilder` factories likewise have no callers.
+
+**`#downstream-apple-metal-compiler`**
+
+98. For `MetalLib` the emitted text is handed to Apple's `metal` tool (`PassThroughMode::MetalC`); for `MetalLibAssembly` that `.metallib` is then disassembled with `metal-objdump --disassemble`.
+99. Slang does not validate the Metal source it emits; all MSL grammar checking and optimization is delegated to the Apple tool.
+100. The `-std=metal*` flag is the maximum of the capability set's floor and what the `MetalExtensionTracker` recorded, falling back to `-std=metal3.1`, and `-fmetal-enable-logging` is added when `requireLogging()` was recorded.
 
 ## Functional coverage
 
@@ -144,6 +324,20 @@ on this target.
 | Mesh-shader output writes lower to the Metal-only `metalSetVertex` / `metalSetIndices` opcodes, which the emitter renders as `_slang_mesh.set_vertex(...)` / `_slang_mesh.set_index(...)`.                             | functional | [#where-the-metal-specific-opcodes-come-from](../../../../design/target-pipelines/metal.md#where-the-metal-specific-opcodes-come-from)                                     | [`mesh-output-set-vertex-and-index.slang`](mesh-output-set-vertex-and-index.slang)                                 |
 | A `ConstantBuffer<T>` emits as a `T constant*` pointer parameter with a positional `[[buffer(N)]]` slot.                                                                                                               | functional | [#wrapcbufferelementsformetal](../../../../design/target-pipelines/metal.md#wrapcbufferelementsformetal)                                                                   | [`constant-buffer-in-constant-address-space.slang`](constant-buffer-in-constant-address-space.slang)               |
 | `wrapCBufferElementsForMetal` rewrites a `float4x4` cbuffer element into a `_MatrixStorage_..._natural_<N>` struct inside a `SLANG_ParameterGroup_<name>` wrapper.                                                     | functional | [#wrapcbufferelementsformetal](../../../../design/target-pipelines/metal.md#wrapcbufferelementsformetal)                                                                   | [`cbuffer-matrix-storage-wrap.slang`](cbuffer-matrix-storage-wrap.slang)                                           |
+| A byte-address buffer is emitted as a `uint32_t device*` and a surviving load indexes it by word, as `as_type<T>(buf[(offset)>>2])`. | expansion | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | [`byte-address-buffer-uint32-device-pointer.slang`](byte-address-buffer-uint32-device-pointer.slang) |
+| The Metal-reachable non-uniform surface is `nonuniform(handle)` on a `DescriptorHandle<T>`, which carries no capability requirement and compiles to the plain underlying resource access. | functional | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | [`nonuniform-descriptor-handle-metal.slang`](nonuniform-descriptor-handle-metal.slang) |
+| Negative: the HLSL-spelled `NonUniformResourceIndex(index)` cannot feed the Metal pipeline because its capability set excludes Metal, so the entry point is rejected with E36107 at check time. | negative | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | [`nonuniform-resource-index-rejected-metal.slang`](nonuniform-resource-index-rejected-metal.slang) |
+| Boundary: negative infinity is the third non-finite spelling and is emitted bare as the division `(-1.0 / 0.0)` with no `f` suffix. | boundary | [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools) | [`negative-infinity-emitted-as-division.slang`](negative-infinity-emitted-as-division.slang) |
+| An entry point named exactly `main` is renamed on Metal and the rename is reported as warning E40100 rather than applied silently. | negative | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | [`main-entry-point-renamed-warning.slang`](main-entry-point-renamed-warning.slang) |
+| An entry point whose name is not exactly `main` is left alone: it keeps its Slang spelling in the emitted Metal and no rename warning is reported. | boundary | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | [`non-main-entry-point-name-preserved.slang`](non-main-entry-point-name-preserved.slang) |
+| Under a `metallib_4_0` capability set the compute stage attribute is prefixed with `[[required_threads_per_threadgroup(X, Y, Z)]]` built from the Slang thread-group size. | expansion | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | [`required-threads-per-threadgroup-metallib-4-0.slang`](required-threads-per-threadgroup-metallib-4-0.slang) |
+| An amplification entry point is emitted with the `[[object]]` stage attribute and its dispatch payload parameter carries `[[payload]]` instead of a numbered binding slot. | expansion | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | [`amplification-object-and-payload-attributes.slang`](amplification-object-and-payload-attributes.slang) |
+| A multisampled texture takes the `_ms` stem suffix and a multisampled array takes `_ms_array` in that order, both emitted with `access::read`. | expansion | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`texture2dms-and-array-metal-spellings.slang`](texture2dms-and-array-metal-spellings.slang) |
+| A `Buffer<T>` is a texture-kind resource on Metal: it emits as `texture_buffer<T, access::read>` and takes a `[[texture(N)]]` slot rather than a buffer slot. | expansion | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`texture-buffer-access-read.slang`](texture-buffer-access-read.slang) |
+| A write-only texture access mode gives `access::write` rather than the `access::read_write` a read-write texture gets, and its store lowers to `.write(...)`. | expansion | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`wtexture2d-access-write.slang`](wtexture2d-access-write.slang) |
+| A `RaytracingAccelerationStructure` emits as `metal::raytracing::acceleration_structure<metal::raytracing::instancing>` and takes a `[[buffer(N)]]` slot. | expansion | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`raytracing-acceleration-structure-buffer-slot.slang`](raytracing-acceleration-structure-buffer-slot.slang) |
+| A `RayQuery` becomes a `raytracing::intersection_query<raytracing::triangle_data, raytracing::instancing>` local and takes no binding attribute at all. | expansion | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`rayquery-intersection-query-spelling.slang`](rayquery-intersection-query-spelling.slang) |
+| A varying-input parameter takes `[[stage_in]]` instead of a numbered slot, and the fragment entry point carries the `[[fragment]]` stage attribute. | functional | [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | [`fragment-stage-in-varying-input.slang`](fragment-stage-in-varying-input.slang) |
 
 ## Untested claims
 
@@ -157,22 +351,23 @@ on this target.
 | `wrapCBufferElementsForMetal` fires for every Metal output including `MetalLibAssembly`, because that target is produced by disassembling an intermediate `MetalLib` compiled from intermediate `Metal` source.                                                                                                         | gpu-metal-toolchain   | [#wrapcbufferelementsformetal](../../../../design/target-pipelines/metal.md#wrapcbufferelementsformetal)                                                 | Confirming the wrapper on the `metallib-asm` path needs the Apple toolchain _and_ a wrapper-struct name that survives into `metal-objdump` disassembly, which the doc does not pin.                                                                                                 |
 | `MetalAtomicCast` is handled by `MetalSourceEmitter::tryEmitInstStmtImpl` and by `CLikeSourceEmitter`, but nothing produces it at `source_commit`: no `__intrinsic_op` declaration, `IRBuilder` method, or IR pass creates the opcode.                                                                                  | implementation-detail | [#where-the-metal-specific-opcodes-come-from](../../../../design/target-pipelines/metal.md#where-the-metal-specific-opcodes-come-from)                   | The doc's claim is precisely that the two emitter arms are unreachable, so by construction no Slang source reaches them. The same applies to the `emitMetalSetVertex` / `emitMetalSetPrimitive` / `emitMetalSetIndices` `IRBuilder` factories the doc records as having no callers. |
 | `instrumentCoverage`'s counter-width **validation** (as opposed to the Metal cap): a width that is neither 4 nor 8 raises `CoverageCounterWidthBytesInvalid` / `E45114` on the API path, the counterpart of the CLI's `E45113`.                                                                                         | needs-unit-test       | [#phase-a-link-and-entry-point-prep](../../../../design/target-pipelines/metal.md#phase-a-link-and-entry-point-prep)                                     | The doc attributes `E45114` to the compiler-option API path rather than a `slangc` flag; a C++ unit test setting `CompilerOptionName::TraceCoverageCounterByteWidth` directly is what would verify it. This is also not Metal-specific.                                             |
-| `floatNonUniformResourceIndex` runs for Metal (gated on `!isSPIRV`) with `NonUniformResourceIndexFloatMode::Textual`.                                                                                                                                                                                                   | out-of-bundle         | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | The intrinsic's core-module capability set excludes Metal, so `NonUniformResourceIndex(...)` is rejected with `E36107` before any pass runs — see the `drift-from-source` row below. The pass itself is exercised on targets whose capability set admits the intrinsic.             |
-| `legalizeSubpassInputsForMetal` reports `SubpassInputUsedOutsideEntryPoint` for a subpass input reachable from a non-fragment entry point.                                                                                                                                                                              | out-of-bundle         | [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal)                                                                   | The capability checker rejects `SubpassLoad` on a Metal compute entry point with `E36107` long before the legalization pass runs, so the pass's own diagnostic is unreachable from Slang source — see the `cascading-only-mention` row below.                                       |
+| `floatNonUniformResourceIndex` runs for Metal (gated on `!isSPIRV`) with `NonUniformResourceIndexFloatMode::Textual`, and the pass itself rewrites the index. | out-of-bundle | [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination) | Both Metal surfaces are now covered here — the HLSL spelling's rejection and the `nonuniform(handle)` form that compiles — but neither leaves a token in the emitted MSL that distinguishes the floated form from an unfloated one, so what the pass *does* is exercised on the targets whose textual mode is observable. |
+| `legalizeSubpassInputsForMetal` reports `SubpassInputUsedOutsideEntryPoint` for a subpass input reachable from a non-fragment entry point.                                                                                                                                                                              | out-of-bundle         | [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal)                                                                   | The capability checker rejects `SubpassLoad` on a Metal compute entry point with `E36107` long before the legalization pass runs, so the pass's own diagnostic is unreachable from Slang source; the doc now records this shadowing itself.                                       |
 | `addUserTypeHintDecorations` is reachable on a Metal compile whenever `VulkanEmitReflection` is set, but carries no Metal-specific behaviour.                                                                                                                                                                           | implementation-detail | [#phase-b-specialization-and-type-legalization](../../../../design/target-pipelines/metal.md#phase-b-specialization-and-type-legalization)               | The doc states the pass has no Metal-specific effect, so there is nothing target-specific to assert; the decoration it adds is consumed by Vulkan reflection, not by Metal emit.                                                                                                    |
 | `stripDebugInfo`, `bindExistentialSlots`, `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers`, `lowerLValueCast` and the other `reqSet.*`-gated Phase-A/B passes that Metal reaches through the `default` arm.                                                                                                     | out-of-bundle         | [#requiredloweringpassset-flags](../../../../design/target-pipelines/metal.md#requiredloweringpassset-flags)                                             | The doc marks these as shared shader-pipeline behaviour that Metal reaches by falling through rather than by a Metal-specific gate; they are covered in [`design/pipeline/05-ir-passes`](../../pipeline/05-ir-passes/README.md).                                                    |
+| `double` is not an emittable Metal type at all: a shader that carries one to Metal emit aborts with an internal error (`E99997`) rather than being rejected by a capability diagnostic. | unsupported-on-target | [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools) | Confirmed by compiling a `uniform double` kernel to `-target metal`, which reports `error[E99997] ... unexpected: 'double' type emitted`. The doc calls this a known gap rather than designed behaviour, so pinning the internal error as expected output would encode a bug as a contract; the claim is recorded here instead. |
+| Any stage other than `[[vertex]]`, `[[fragment]]`, `[[kernel]]`, `[[mesh]]` or `[[object]]` is a `SLANG_ABORT_COMPILATION("unsupported stage.")`. | implementation-detail | [#entry-point-shape](../../../../design/target-pipelines/metal.md#entry-point-shape) | The five attributes cover every stage a Metal entry point can legally declare, so the abort arm is only reachable from IR that did not come through the entry-point capability check; no `.slang` input selects it. |
+| A `kIROp_SubpassLoad` that survives to emit is rejected with an unexpected-instruction diagnostic, because the lowering pass should already have replaced it. | implementation-detail | [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools) | The claim is that the emitter arm is unreachable when the pipeline is correct: every `SubpassLoad` a fragment entry point can express is rewritten by `legalizeSubpassInputsForMetal` first, so no Slang source reaches the diagnostic. |
+| Slang does not validate the Metal source it emits; all MSL grammar checking and optimization is delegated to the Apple tool. | gpu-metal-toolchain | [#downstream-apple-metal-compiler](../../../../design/target-pipelines/metal.md#downstream-apple-metal-compiler) | Proving the *absence* of validation needs emitted MSL that Slang accepts and the Apple compiler rejects, which cannot be adjudicated without the toolchain the runner lacks. |
+| `reqSet.reinterpret` is the one flag that can be set during the pipeline: `lowerTaggedUnionTypes` sets it when it reports a change. | implementation-detail | [#requiredloweringpassset-flags](../../../../design/target-pipelines/metal.md#requiredloweringpassset-flags) | The feedback edge only decides whether a later pass bothers to walk the module; both the set and unset paths converge on the same emitted MSL, so no directive distinguishes them. |
+| Thirty of the thirty-four `RequiredLoweringPassSet` flags gate at least one pass on the Metal path, and `nonVectorCompositeSelect` / `derivativePyBindWrapper` / `dynamicResource` / `barrierFlagValidation` never do. | internal-source-fact | [#requiredloweringpassset-flags](../../../../design/target-pipelines/metal.md#requiredloweringpassset-flags) | A count of `bool` members on a C++ struct and which call sites read them; the four unused flags have no Metal call site by definition, so there is nothing to observe through `slangc`. |
+| `legalizeEntryPointVaryingParamsForMetal` restructures the `[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]` / `[[stage_in]]` annotations and synthesizes the per-entry-point parameter struct the emitter expects. | out-of-bundle | [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal) | Stated at the level of "the pass arranges what the emitter needs", with no marker of its own: every observable consequence is already asserted by the attribute and parameter-struct tests in this bundle rather than by a test aimed at the pass. |
 
 ## Doc gaps observed
 
 | Anchor                                                                                                                                                                     | Kind                   | Gap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Suggested addition                                                                                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                           | drift-from-source      | The doc says half and float literals get an explicit suffix while "NaN / infinity and `BaseType::Double` literals are still emitted bare", which reads as though a `double` value reaches Metal emit and prints without a suffix. It does not: any `double`-typed value aborts the compile with `error[E99997] ... InternalError ... unexpected: 'double' type emitted`, so the `BaseType::Double` arm of the suffix logic is unreachable from Slang source on this target.                                      | Replace the `BaseType::Double` clause with a statement that `double` is not an emittable Metal type at all, and say what a user should expect when a shader uses one (today: an internal error, which is itself worth calling out as a known gap). Keep the NaN / infinity clause, which is accurate — infinity emits as the bare division `(1.0 / 0.0)`. |
-| [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination)                   | drift-from-source      | Row 7 of the Phase-C table lists `floatNonUniformResourceIndex` as running for Metal because its gate is `!isSPIRV(target)`, which implies `NonUniformResourceIndex(...)` is usable in a Metal shader. It is not reachable: the intrinsic's core-module capability set excludes Metal, so any use is rejected at check time with `error[E36107]: unavailable features in entry point ... not available in 'compute' stage for 'metal' compilation target` before the pass could run.                             | Add a note on the `floatNonUniformResourceIndex` row that the pass is gated in by target predicate but has no Slang surface on Metal, because the intrinsic's capability requirement excludes the target — or, if the intent is that Metal should support it, say so and mark the capability gate as the blocker.                                         |
 | [#phase-b-specialization-and-type-legalization](../../../../design/target-pipelines/metal.md#phase-b-specialization-and-type-legalization)                                 | undocumented-behavior  | The doc records that `lowerAppendConsumeStructuredBuffers` fires for Metal but does not describe what the emitted parameter list looks like afterwards. In practice the buffer becomes two kernel parameters (`<name>_elements` and `<name>_counter`), and — unlike every other resource parameter — neither receives a `[[buffer(N)]]` attribute, while an ordinary `RWStructuredBuffer` declared beside them is emitted with `[[buffer(3)]]`.                                                                  | Add a short emitted-MSL example under the `lowerAppendConsumeStructuredBuffers` row showing the element/counter parameter split and the atomic counter bump, and state explicitly whether both parameters are expected to carry binding slots (a pending finding says they should).                                                                       |
-| [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal)                                                                                     | cascading-only-mention | The doc says subpass inputs reachable from a non-fragment entry point produce `Diagnostics::SubpassInputUsedOutsideEntryPoint`. From Slang source that diagnostic never appears: a `SubpassLoad` on a Metal compute entry point is rejected earlier by the capability checker with `error[E36107]: unavailable features in entry point`, so the pass's own message is always shadowed.                                                                                                                           | Note on that bullet that the diagnostic is a defence-in-depth check for IR that reaches the pass by other routes, and that user-written non-fragment uses are caught first by the entry-point capability check with `E36107`.                                                                                                                             |
 | [#wrapcbufferelementsformetal](../../../../design/target-pipelines/metal.md#wrapcbufferelementsformetal)                                                                   | missing-example        | The section explains _why_ the wrapper exists (Metal disallows some constant-buffer element types) but never shows the emitted result, so a reader cannot tell that a `cbuffer M { float4x4 mat; }` becomes a `SLANG_ParameterGroup_M_natural_<N>` struct whose matrix field is a `_MatrixStorage_float4x4_ColMajornatural_<M>` holding `array<float4, int(4)> data_0`.                                                                                                                                          | Add a two-block before/after example: the Slang `cbuffer` on one side and the emitted MSL structs on the other, naming the `SLANG_ParameterGroup_<name>_natural_<N>` and `_MatrixStorage_<spelling>natural_<M>` conventions explicitly.                                                                                                                   |
-| [#phase-c-metal-legalization-lowering-phi-elimination](../../../../design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination)                   | missing-example        | Row 1 lists the four Metal options passed to `legalizeByteAddressBufferOps` but never shows what they produce, so the connection between `lowerBasicTypeOps=true` and the emitted text is left to the reader. The observable form is a pointer-indexed word read wrapped in a reinterpret, e.g. `as_type<uint>(src[(off) >> 2])`.                                                                                                                                                                                | Add one line of emitted MSL under that row showing a `Load<uint>` and a `Store<uint>` after lowering, so the option names are tied to concrete output.                                                                                                                                                                                                    |
-| [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                           | missing-surface        | Phase D describes the emitter's special cases (`printf`, `precise`, literal suffixes, `DescriptorHandle` unwrapping) but never states the two facts every emitted signature depends on: Slang renames the user entry point (`main` becomes `main_0`, with warning `E40100`), and `[numthreads(X,Y,Z)]` is dropped because Metal takes the threadgroup size from the dispatch call.                                                                                                                               | Add a short "entry-point shape" paragraph to Phase D naming the rename (with the warning code) and the dropped `numthreads` attribute, with one emitted `[[kernel]] void main_0(...)` signature as the example.                                                                                                                                           |
-| [#phase-d-metal-emit-and-downstream-tools](../../../../design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools)                                           | missing-surface        | The section names `emitSimpleTypeImpl`'s rendering of `packed_T<N>` and the `[[buffer(N)]]` / `[[texture(N)]]` / `[[sampler(N)]]` attribute selection, but nowhere maps Slang's resource types to their MSL spellings. A reader cannot tell that `Texture1D` becomes `texture1d`, `Texture2DArray` becomes `texture2d_array`, `TextureCube` becomes `texturecube`, `RWTexture3D<T>` becomes `texture3d<T, access::read_write>`, or that a comparison sample forces a cast into `depth2d<T, access::sample>`.     | Add a resource-type mapping table to Phase D with one row per Slang resource type, its Metal type, and its attribute kind, including the `access::sample` / `access::read_write` distinction and the `depth2d` cast for `SampleCmp*`.                                                                                                                     |
 | [#metals-three-lowerbufferelementtypetostoragetype-invocations](../../../../design/target-pipelines/metal.md#metals-three-lowerbufferelementtypetostoragetype-invocations) | ambiguous-claim        | The `Metal` policy is described as lowering "matrices stored in `device` buffers into arrays of _packed_ vectors — `IRMetalPackedVectorType`, emitted as MSL `packed_T<N>` (e.g. `packed_float3`, 12 bytes / 4-byte alignment)". It is not stated whether the rewrite applies to every column count or only to those whose natural row is not already tightly packed, so a reader cannot predict what a `float4x4` device-buffer field becomes. The tests here therefore assert only the 2- and 3-column shapes. | State the exact matrix shapes the policy rewrites — either "all matrices, including 4-column ones" or the column-count carve-out — with one emitted-MSL example per shape.                                                                                                                                                                                |
-| [#legalizeirformetal](../../../../design/target-pipelines/metal.md#legalizeirformetal)                                                                                     | missing-example        | The section explains that `legalizeShaderOutputParamsForMetal` now runs for both vertex and fragment because a fragment writing through `out float4 : SV_Target` previously failed with "Unknown addressspace encountered", but does not show the resulting shape. The emitted form is a synthesized `main_Result_<N>` struct whose field carries `[[color(0)]]`, returned by value from the `[[fragment]]` function.                                                                                            | Add the before/after for the fragment case: the Slang `void main(..., out float4 color : SV_Target)` and the emitted `struct main_Result_0 { float4 color_0 [[color(0)]]; }` plus the rewritten signature.                                                                                                                                                |
+| [#resource-type-spellings](../../../../design/target-pipelines/metal.md#resource-type-spellings) | ambiguous-claim | Every row of the mapping table writes the MSL type argument as `T`, e.g. `texture2d<T, access::sample>`, which reads as though `T` is the Slang element type the user declared. It is not: a `Texture2D<float4>` emits as `texture2d<float, access::sample>` and a `Texture2DMS<float4>` as `texture2d_ms<float, access::read>` -- the vector is dropped and only its scalar component reaches the MSL type argument. | State once above the table that `T` denotes the *scalar* component of the declared element type, and change one row's example to show the substitution concretely (`Texture2D<float4>` becoming `texture2d<float, access::sample>`). |

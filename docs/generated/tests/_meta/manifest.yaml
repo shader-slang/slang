@@ -84,7 +84,7 @@ bundles:
       - design/pipeline/01-lex-preprocess
     coverage_targets:
       - source/slang/slang-parser.cpp
-    size_cap_files: 60
+    size_cap_files: 100
 
   design/pipeline/03-semantic-check:
     source_doc: docs/generated/design/pipeline/03-semantic-check.md
@@ -111,7 +111,7 @@ bundles:
       - source/slang/slang-check-stmt.cpp
       - source/slang/slang-check-type.cpp
       - source/slang/slang-check-overload.cpp
-    size_cap_files: 80
+    size_cap_files: 120
 
   design/pipeline/04-ast-to-ir:
     source_doc: docs/generated/design/pipeline/04-ast-to-ir.md
@@ -128,7 +128,7 @@ bundles:
       - source/slang/slang-ast-builder.cpp
       - source/slang/slang-ast-type.cpp
       - source/slang/slang-ast-val.cpp
-    size_cap_files: 150
+    size_cap_files: 200
 
   design/pipeline/04b-pre-link-passes:
     source_doc: docs/generated/design/pipeline/04b-pre-link-passes.md
@@ -236,7 +236,7 @@ bundles:
       - design/syntax-reference/keywords-and-builtins
     coverage_targets:
       - source/slang/slang-parser.cpp
-    size_cap_files: 80
+    size_cap_files: 120
 
   # --- cross-cutting/ ---------------------------------------------------
 
@@ -255,7 +255,7 @@ bundles:
     coverage_targets:
       - source/compiler-core/slang-diagnostic-sink.cpp
       - source/slang/slang-diagnostics.cpp
-    size_cap_files: 60
+    size_cap_files: 80
 
   design/cross-cutting/ir-instructions:
     source_doc: docs/generated/design/cross-cutting/ir-instructions.md
@@ -284,7 +284,7 @@ bundles:
     coverage_targets:
       - source/slang/slang-capability.cpp
       - source/slang/slang-profile.cpp
-    size_cap_files: 40
+    size_cap_files: 60
 
   design/cross-cutting/core-module:
     source_doc: docs/generated/design/cross-cutting/core-module.md
@@ -349,7 +349,7 @@ bundles:
       - design/syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
-    size_cap_files: 80
+    size_cap_files: 110
 
   design/ast-reference/expressions:
     source_doc: docs/generated/design/ast-reference/expressions.md
@@ -400,7 +400,7 @@ bundles:
       - design/syntax-reference/grammar
     coverage_targets:
       - source/slang/slang-parser.cpp
-    size_cap_files: 60
+    size_cap_files: 80
 
   design/ast-reference/values:
     source_doc: docs/generated/design/ast-reference/values.md
@@ -428,7 +428,7 @@ bundles:
       - design/ast-reference/statements
     coverage_targets:
       - source/slang/slang-lookup.cpp
-    size_cap_files: 50
+    size_cap_files: 75
 
   design/name-resolution/lookup:
     source_doc: docs/generated/design/name-resolution/lookup.md
@@ -461,7 +461,7 @@ bundles:
       - design/name-resolution/scopes
     coverage_targets:
       - source/slang/slang-check-modifier.cpp
-    size_cap_files: 40
+    size_cap_files: 60
 
   design/name-resolution/overload-resolution:
     source_doc: docs/generated/design/name-resolution/overload-resolution.md
@@ -478,7 +478,7 @@ bundles:
     coverage_targets:
       - source/slang/slang-check-overload.cpp
       - source/slang/slang-check-conversion.cpp
-    size_cap_files: 70
+    size_cap_files: 120
 
   # --- ir-reference/ -----------------------------------------------------
 
@@ -513,7 +513,7 @@ bundles:
       - design/ir-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 150
+    size_cap_files: 200
 
   design/ir-reference/control-flow:
     source_doc: docs/generated/design/ir-reference/control-flow.md
@@ -529,7 +529,7 @@ bundles:
       - design/ast-reference/statements
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 60
+    size_cap_files: 80
 
   design/ir-reference/structure:
     source_doc: docs/generated/design/ir-reference/structure.md
@@ -563,7 +563,7 @@ bundles:
       - design/ir-reference/structure
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 60
+    size_cap_files: 80
 
   design/ir-reference/resources-and-atomics:
     source_doc: docs/generated/design/ir-reference/resources-and-atomics.md
@@ -580,7 +580,7 @@ bundles:
       - design/ir-reference/types
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 100
+    size_cap_files: 140
 
   design/ir-reference/differentiation:
     source_doc: docs/generated/design/ir-reference/differentiation.md
@@ -630,7 +630,7 @@ bundles:
       - design/pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 70
+    size_cap_files: 90
 
   design/ir-reference/misc:
     source_doc: docs/generated/design/ir-reference/misc.md
@@ -645,7 +645,7 @@ bundles:
       - design/pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 30
+    size_cap_files: 45
 
   # --- target-pipelines/ -------------------------------------------------
 
@@ -686,7 +686,7 @@ bundles:
       - source/slang/slang-emit-hlsl.cpp
       - source/slang/slang-ir-hlsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
-    size_cap_files: 170
+    size_cap_files: 200
 
   design/target-pipelines/metal:
     source_doc: docs/generated/design/target-pipelines/metal.md
