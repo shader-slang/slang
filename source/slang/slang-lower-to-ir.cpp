@@ -7026,7 +7026,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             auto val = lowerRValueExpr(context, expr->value);
             auto optType = lowerType(context, expr->type);
-            auto irVal = context->irBuilder->emitMakeOptionalValue(optType, val.val);
+            // A base-subobject upcast (e.g. `b as A` for `struct B : A`) lowers to
+            // a Ptr-flavored l-value, but the Optional payload must be a value, so
+            // materialize it here rather than packing the raw pointer.
+            auto irVal =
+                context->irBuilder->emitMakeOptionalValue(optType, getSimpleVal(context, val));
             return LoweredValInfo::simple(irVal);
         }
         else
