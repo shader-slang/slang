@@ -17,6 +17,7 @@ Examples:
         --only autodiff --samples 7
 """
 import argparse
+import ctypes  # for the Win32 peak-RSS struct; import is safe on every platform
 import json
 import os
 import re
@@ -29,6 +30,49 @@ import tempfile
 import time
 
 from lib import analyze, corpus, manifest
+
+
+def parse_mem(text):
+    """Extract {name: kb} from the api-driver's "[MEM] name\tNNNkb" lines —
+    point-in-time RSS deltas recorded around selected API phases (see
+    native/api-driver.cpp reportMemDeltas, the producing printf), kept
+    separate from the ms timers so nothing downstream mistakes kilobytes for
+    milliseconds. Fields are TAB-delimited, matching the producer exactly.
+    Counter names must end in "Kb" — that suffix is what analyze.unit_of
+    keys the kb-vs-ms display classification on."""
+    out = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("[MEM]"):
+            continue
+        toks = line[len("[MEM]"):].strip().split("\t")
+        # Two DIFFERENT suffix contracts meet here, and the case matters:
+        # the VALUE token ends in lowercase "kb" (the api-driver's %.0fkb
+        # print format), while the counter NAME must end in capitalized
+        # "Kb" (analyze.unit_of's display-classification convention).
+        if len(toks) == 2 and toks[1].endswith("kb"):
+            # A `raise`, not an `assert`, and ahead of the value parse — both
+            # deliberately. This runs on the perf runner rather than under
+            # check-python-core, so an assert would be erased by `python -O`,
+            # taking with it the guard against the failure the asymmetry below
+            # describes; and placing it before the try keeps it structurally
+            # impossible for the value path's `except ValueError` to swallow
+            # it, rather than merely adjacent to it.
+            #
+            # Loud rather than skipped, deliberately, and the asymmetry with
+            # the value path is the point: a bad VALUE loses one sample, while
+            # a name that does not end in Kb is classified as milliseconds by
+            # unit_of, so ~200,000 kb charts as 200,000 ms and trend gates it
+            # on a 2 ms floor. Wrong units are worse than no units.
+            if not toks[0].endswith("Kb"):
+                raise ValueError(f"memory counter '{toks[0]}' must end in Kb "
+                                 "(analyze.unit_of contract)")
+            try:
+                val = float(toks[1][:-2])
+            except ValueError:
+                continue
+            out[toks[0]] = val
+    return out
 
 
 def parse_timers(text):
@@ -177,7 +221,39 @@ def build_api_driver(out_dir):
         sys.stderr.write("compile-perf: api-driver build failed:\n"
                          + r.stdout.decode("utf-8", "replace") + "\n")
         return None
-    return out
+    return out if _driver_rss_reader_ok(out) else None
+
+
+def _driver_rss_reader_ok(driver):
+    """Run the driver's --selfcheck-mem and report whether currentRssKb reads
+    true units on this host.
+
+    currentRssKb is the C++ producer of every memory number here, and its
+    three platform branches are the one part of the feature with no
+    import-time coverage: this module compiles that file ad hoc, so it never
+    enters the tests/ harness, and check-python-core is Python-only and Linux-
+    only. The check measures the reader against a KNOWN allocation, which is
+    why it can run here at all — it needs no libslang, no corpus, and nothing
+    true about Slang's own footprint.
+
+    Failing the DRIVER (returning None, so api workloads record
+    "api-driver or libslang unavailable") rather than raising is deliberate:
+    a mis-scaled reader is exactly as unusable as a missing one, and this way
+    the target-mode half of the suite still produces its numbers."""
+    try:
+        r = subprocess.run([driver, "--selfcheck-mem"], stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        sys.stderr.write(f"compile-perf: api-driver --selfcheck-mem did not run: {e}\n")
+        return False
+    if r.returncode != 0:
+        sys.stderr.write(
+            "compile-perf: api-driver RSS reader self-check failed; refusing to "
+            "measure memory with it (every [MEM] value would be wrong by the "
+            "same factor and would chart as a believable curve):\n"
+            + r.stdout.decode("utf-8", "replace") + "\n")
+        return False
+    return True
 
 
 def api_driver_supports_out_dir(driver):
@@ -278,45 +354,178 @@ def build_commands(slangc, spec, src_dir, files, out_dir, size=None, api=None):
     }
 
 
-# GNU /usr/bin/time -v gives per-process peak RSS; detect once.
-def _detect_gnu_time():
+# Peak RSS collection: per-child ru_maxrss via os.wait4 on POSIX,
+# PeakWorkingSetSize via GetProcessMemoryInfo on Windows (below).
+
+
+class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+    """The Win32 PROCESS_MEMORY_COUNTERS struct that GetProcessMemoryInfo
+    fills in. Defined at module scope, and with FIXED-WIDTH field types, so
+    its binary layout can be pinned by a self-check on any platform.
+
+    The DWORD fields are ctypes.c_uint32 rather than ctypes.wintypes.DWORD
+    deliberately. On Windows the two are identical (DWORD is c_ulong, which
+    is 4 bytes under LLP64), but ctypes.wintypes is importable on POSIX too,
+    where c_ulong is 8 bytes — so a wintypes.DWORD version of this struct
+    silently has a DIFFERENT layout off Windows and cannot be checked
+    anywhere but the platform it is used on. Spelling the width explicitly
+    makes the layout identical everywhere, which is what lets the assertion
+    at the bottom of this module catch a mis-ordered or mis-typed field.
+    A wrong layout would not raise: it would read PeakWorkingSetSize from
+    the wrong offset and return a believable but incorrect number."""
+
+    _fields_ = [("cb", ctypes.c_uint32),
+                ("PageFaultCount", ctypes.c_uint32),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t)]
+
+
+def _windows_peak_rss_kb(popen):
+    """PeakWorkingSetSize of a finished subprocess in KB via
+    GetProcessMemoryInfo — the Windows equivalent of POSIX ru_maxrss. Reads
+    through the still-open Popen handle, so it must run before the Popen is
+    garbage-collected. Depends on the CPython-internal `popen._handle`
+    attribute (no public accessor exists); if a CPython release renames it,
+    the AttributeError lands in the except below and Windows memory
+    collection degrades to None — check here first if rss_kb goes null on
+    the runner after a Python upgrade. Returns None if the query fails."""
     try:
-        r = subprocess.run(["/usr/bin/time", "-v", "true"],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        return b"Maximum resident set size" in r.stderr
+        # wintypes stays function-local: it is only needed for the call
+        # signature, and only Windows ever reaches here. The struct itself is
+        # at module scope so its layout can be self-checked (see above).
+        from ctypes import wintypes
+
+        pmc = PROCESS_MEMORY_COUNTERS()
+        pmc.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS)
+        psapi = ctypes.WinDLL("psapi")
+        fn = psapi.GetProcessMemoryInfo
+        # Declare the signature: without argtypes ctypes coerces the handle
+        # through a C int, which can truncate 64-bit HANDLE values.
+        fn.argtypes = [wintypes.HANDLE,
+                       ctypes.POINTER(PROCESS_MEMORY_COUNTERS), wintypes.DWORD]
+        fn.restype = wintypes.BOOL
+        if fn(wintypes.HANDLE(popen._handle), ctypes.byref(pmc), pmc.cb):
+            return _pmc_peak_kb(pmc)
     except Exception:  # noqa: BLE001
-        return False
+        pass
+    return None
 
 
-_GNU_TIME = _detect_gnu_time()
+def _pmc_peak_kb(pmc):
+    """PeakWorkingSetSize out of a filled PROCESS_MEMORY_COUNTERS, in KB.
+
+    Win32 reports the field in BYTES, so this is the Windows counterpart of
+    _maxrss_to_kb's unit rule and fails the same way — a dropped or doubled
+    /1024 scales every Windows memory number by 1024 and renders as a
+    perfectly plausible chart. Split out of the query so at least the
+    conversion is exercised on the Linux CI: everything around it (the psapi
+    call, the argtypes handle declaration, popen._handle) can only run on the
+    Windows runner, but this part is pure arithmetic on a struct that has an
+    identical layout everywhere (see PROCESS_MEMORY_COUNTERS)."""
+    return pmc.PeakWorkingSetSize / 1024.0
+
+
+def _maxrss_to_kb(ru_maxrss, platform):
+    """Convert a getrusage ru_maxrss field to kilobytes for the given
+    sys.platform string. The field's UNIT is platform-specific: kilobytes on
+    Linux, but BYTES on macOS, which inherited the BSD definition. Isolated
+    into its own function because getting it wrong scales every memory number
+    on one platform by 1024 — which renders as a perfectly plausible chart
+    rather than an error — so the rule is pinned by a self-check below."""
+    return ru_maxrss / (1024.0 if platform == "darwin" else 1.0)
+
+
+def _reap_posix(proc, wait4=None):
+    """Reap a finished child with os.wait4, set proc.returncode from its wait
+    status, and return its peak RSS in KB.
+
+    wait4 rather than Popen.wait so ru_maxrss is per-child: a
+    getrusage(RUSAGE_CHILDREN) high-water mark would smear one workload's
+    peak onto every later one in the same sweep.
+
+    `wait4` is a parameter so the status decode and unit conversion can be
+    exercised against a stub instead of a live process — this is the sole
+    source of BOTH the return code and the memory number on Linux, so a
+    regression here would null out every rss series at once.
+
+    It defaults to None and resolves os.wait4 in the BODY rather than in the
+    signature, because a default-argument expression is evaluated once when
+    the def statement runs at import. os.wait4 is POSIX-only, so binding it
+    in the signature would raise AttributeError while merely importing this
+    module on Windows — a platform that never calls this function, and whose
+    own path (_windows_peak_rss_kb) is right below. Do not "simplify" this
+    back into the signature.
+
+    Raises RuntimeError if the child cannot be reaped, rather than returning a
+    number it cannot stand behind. main() catches that per workload (its
+    try/except around run_spec is the isolation contract), so the workload is
+    recorded with ok=False and the sweep continues to the next one — the run
+    still ends non-zero through the ok-count. The translation lives HERE
+    rather than in the caller so the stub-driven self-check can reach it
+    without spawning a process — see the ECHILD case at the bottom of this
+    module."""
+    if wait4 is None:
+        wait4 = os.wait4
+    try:
+        _pid, status, ru = wait4(proc.pid, 0)
+    except ChildProcessError as e:
+        # Nothing in this tool reaps the child, so ECHILD means the
+        # ENVIRONMENT auto-reaped it — SIGCHLD set to SIG_IGN — and the exit
+        # status is gone. Falling back to Popen.wait() does not recover it
+        # and is actively harmful: CPython's Popen._try_wait catches
+        # ChildProcessError and substitutes returncode = 0, so a compile that
+        # FAILED would be recorded as a clean run with no memory number.
+        # Raising is what keeps a fabricated success out of results.json;
+        # main() then books this workload as failed and moves on.
+        raise RuntimeError(
+            "os.wait4 could not reap the compile child (ECHILD): the "
+            "environment reaped it first, which happens when SIGCHLD is set "
+            "to SIG_IGN. Its exit status and peak RSS are unrecoverable, and "
+            "Popen.wait() would report success for a failed compile, so this "
+            "workload is recorded as failed rather than measured. If every "
+            "workload fails this way, re-run with default SIGCHLD handling."
+        ) from e
+    proc.returncode = os.waitstatus_to_exitcode(status)
+    return _maxrss_to_kb(ru.ru_maxrss, sys.platform)
 
 
 def run_once(cmd):
     """Run one compile; return (rc, wall_ms, combined_text, rss_kb_or_None).
 
-    When GNU time is available the command is wrapped so its peak RSS is written
-    to a side file (keeping the compiler's own stdout/stderr clean for parsing)."""
-    memfile = None
-    runcmd = cmd
-    if _GNU_TIME:
-        memfd, memfile = tempfile.mkstemp(prefix="bench_mem_")
-        os.close(memfd)
-        runcmd = ["/usr/bin/time", "-v", "-o", memfile] + cmd
+    rss is the child's peak resident set (peak working set on Windows) in KB.
+    Platform constants differ slightly (working set vs RSS), but the tracked
+    series compares within one runner fingerprint, never across platforms.
+
+    Raises RuntimeError on POSIX if the child cannot be reaped (see
+    _reap_posix): the exit code is unrecoverable there, so it propagates
+    instead of returning a tuple whose rc would be a guess. main()'s
+    per-workload try/except turns that into one failed workload."""
     t0 = time.perf_counter()
-    proc = subprocess.run(runcmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    wall = (time.perf_counter() - t0) * 1000.0
-    text = proc.stdout.decode("utf-8", "replace")
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+    # Drain stdout to EOF BEFORE reaping. subprocess.run did this atomically;
+    # the manual Popen here does not, and reaping first would deadlock as soon
+    # as a workload outgrew the OS pipe buffer (~64 KB): the child blocks
+    # writing, we block waiting for it to exit. The bug would not appear on a
+    # small workload, so keep the read above the reap.
+    out = proc.stdout.read()
     rss = None
-    if memfile:
-        try:
-            with open(memfile, encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    if "Maximum resident set size" in line:
-                        rss = float(line.rsplit(":", 1)[1].strip())  # kbytes
-                        break
-        except Exception:  # noqa: BLE001
-            pass
-        os.unlink(memfile)
+    if os.name == "nt":
+        proc.wait()
+        rss = _windows_peak_rss_kb(proc)
+    else:
+        # No try/except: _reap_posix already translates ECHILD into a
+        # RuntimeError explaining why no trustworthy rc exists, and letting it
+        # reach main()'s per-workload handler is the point.
+        rss = _reap_posix(proc)
+    wall = (time.perf_counter() - t0) * 1000.0
+    text = out.decode("utf-8", "replace")
     return proc.returncode, wall, text, rss
 
 
@@ -376,7 +585,7 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
             "workload": spec.name, "bucket": spec.bucket, "size": size,
             "mode": spec.mode, "ok": False, "setup_ok": False,
             "got_timers": False, "samples": samples, "warmup": warmup,
-            "wall_ms": None, "rss_kb": None, "timers": {},
+            "wall_ms": None, "rss_kb": None, "memory": None, "timers": {},
             "primary_timers": spec.primary_timers, "cmd": "",
             "error": "api-driver or libslang unavailable (see stderr)",
             "crash_codes": None,
@@ -403,6 +612,7 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         run_once(timed)
 
     per_timer = {}
+    per_mem = {}
     walls = []
     rsses = []
     last_text = ""
@@ -433,6 +643,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         sample_ok.append(err is None)  # ok when no compile error
         for name, ms in parse_timers(text).items():
             per_timer.setdefault(name, []).append(ms)
+        for name, kb in parse_mem(text).items():
+            per_mem.setdefault(name, []).append(kb)
 
     err = real_error(last_text, benign)
     got_timers = bool(per_timer)
@@ -456,6 +668,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "warmup": warmup,
         "wall_ms": stats(walls),
         "rss_kb": stats(rsses) if rsses else None,
+        "memory": ({k: stats(v) for k, v in sorted(per_mem.items())}
+                   if per_mem else None),
         "timers": {k: stats(v) for k, v in sorted(per_timer.items())},
         "primary_timers": spec.primary_timers,
         "cmd": " ".join(timed),
@@ -662,7 +876,7 @@ def main():
                     "mode": spec.mode, "ok": False, "setup_ok": False,
                     "got_timers": False, "samples": args.samples,
                     "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
-                    "timers": {}, "primary_timers": spec.primary_timers,
+                    "memory": None, "timers": {}, "primary_timers": spec.primary_timers,
                     "cmd": "", "error": str(e), "crash_codes": None,
                 }
             rec["label"] = args.label
@@ -706,12 +920,11 @@ def main():
 
 
 # Import-time self-checks (the directory idiom), run by check-python-core.yml
-# on every PR touching these files. bench.py had none, which mattered here:
-# the samples are stored RAW deliberately, and nothing else in the suite reads
-# them yet, so a future edit rounding them would import cleanly, merge, and
-# surface only as silently altered measurements — and as a rejected BenchView
-# submission, since a summary computed from raw values does not match one
-# recomputed from rounded samples.
+# on every PR touching these files. The samples are stored RAW deliberately,
+# and nothing else in the suite reads them yet, so a future edit rounding them
+# would import cleanly, merge, and surface only as silently altered
+# measurements — and as a rejected BenchView submission, since a summary
+# computed from raw values does not match one recomputed from rounded samples.
 # Both extrema carry a 5th decimal so that dropping their round() is
 # observable. A value that is already exact at 4 places (3.0, say) asserts
 # nothing about rounding: it compares equal either way, so the check would
@@ -764,6 +977,157 @@ def _check_build_commands():
 
 _check_build_commands()
 del _check_build_commands
+
+# Import-time self-check pinning the [MEM] line contract to api-driver.cpp's
+# printf format (TAB-delimited, kb suffix): a format drift would otherwise
+# silently degrade the memory feature to "no data" with nothing failing.
+assert parse_mem("[MEM] apiCreateGlobalSessionRssDeltaKb\t20480kb\nnoise\n[*] x\t1\t2ms") == \
+    {"apiCreateGlobalSessionRssDeltaKb": 20480.0}, \
+    "parse_mem: [MEM] line contract drifted vs api-driver.cpp"
+assert parse_mem("[MEM] malformed") == {}, "parse_mem must ignore malformed lines"
+
+# The Kb-suffix branch, which the two checks above never reach: "malformed" is
+# rejected on token COUNT, so nothing so far drives a line that is structurally
+# fine but whose counter NAME breaks the analyze.unit_of contract.
+#
+# ValueError, not AssertionError, is what this must catch — and catching the
+# specific type is the point of the check, not incidental to it. The guard has
+# to survive `python -O` on the perf runner (see parse_mem), which an assert
+# would not, so a future edit "simplifying" the raise back to an assert has to
+# fail here rather than pass quietly and disarm the guard in production.
+_rejected = None
+try:
+    parse_mem("[MEM] badname\t100kb")
+except ValueError as _e:
+    _rejected = str(_e)
+assert _rejected and "unit_of contract" in _rejected, \
+    ("parse_mem must REJECT a counter name not ending in Kb, citing the "
+     f"unit_of contract; got {_rejected!r}")
+del _rejected
+
+# Tie the parser to its PRODUCER, not to a restatement of it. The assertion
+# above proves parse_mem is self-consistent with a literal typed in this file,
+# which is not the drift that breaks memory collection: that drift is on the
+# C++ side (tab -> space, "kb" -> "KB", a counter name without the Kb suffix
+# unit_of depends on). Rebuilding the format string in Python would just be a
+# second hand-copy of the same literal. The producer is a sibling file, so the
+# only version of this check that genuinely couples the two is to read it.
+# Guarded on existence rather than asserted: bench.py is usable for non-api
+# workloads without the driver source, and CI always has it.
+_DRIVER_SRC = os.path.join(HERE, "native", "api-driver.cpp")
+if os.path.exists(_DRIVER_SRC):
+    assert r'printf("[MEM] %s\t%.0fkb\n"' in analyze.read_text(_DRIVER_SRC), \
+        ("api-driver.cpp's [MEM] printf format no longer matches what parse_mem "
+         "parses; memory collection would silently degrade to 'no data'")
+del _DRIVER_SRC
+
+
+# Import-time self-check for the ru_maxrss unit rule. Pure and platform-free
+# (the platform is a parameter), so both branches are exercised on every host
+# rather than only the one running the check.
+assert _maxrss_to_kb(2048, "linux") == 2048.0, "Linux ru_maxrss is already KB"
+assert _maxrss_to_kb(2048 * 1024, "darwin") == 2048.0, "macOS ru_maxrss is BYTES"
+
+
+# Import-time guard against re-introducing a POSIX-only default argument.
+# os.wait4 does not exist on Windows, and a default-argument expression is
+# evaluated when the def statement runs — so `def _reap_posix(proc,
+# wait4=os.wait4)` raises AttributeError while merely IMPORTING this module
+# on Windows, before any os.name branch can protect it. This check runs on
+# every platform because the POSIX hosts are the ones that would not notice.
+assert _reap_posix.__defaults__ == (None,), \
+    "_reap_posix must resolve os.wait4 in its body, not bind it as a default"
+
+
+# Import-time self-check for the Win32 struct layout. Runs on every platform
+# — which is the point: the fields are fixed-width (see the class docstring),
+# so the layout here is the layout Windows sees, and a mis-ordered or
+# mis-typed field is caught on the Linux CI rather than by a believable wrong
+# number on the Windows runner. The expected values are the x64 ABI's:
+# two 4-byte DWORDs, then eight 8-byte SIZE_T fields at offset 8.
+assert ctypes.sizeof(ctypes.c_size_t) == 8, \
+    "these offsets assume a 64-bit host; revisit if a 32-bit runner appears"
+assert ctypes.sizeof(PROCESS_MEMORY_COUNTERS) == 72, \
+    "PROCESS_MEMORY_COUNTERS layout drifted from the Win32 x64 definition"
+assert PROCESS_MEMORY_COUNTERS.PeakWorkingSetSize.offset == 8, \
+    "PeakWorkingSetSize must follow the two DWORDs; a wrong offset reads garbage"
+assert PROCESS_MEMORY_COUNTERS.cb.offset == 0, "cb must be the first field"
+
+# And the Windows unit rule, on the same struct. The psapi call around it only
+# runs on the Windows runner, but the bytes->KB conversion is pure and the
+# struct layout is identical everywhere, so the half that silently scales
+# every Windows number by 1024 is checkable on the Linux CI.
+_pmc = PROCESS_MEMORY_COUNTERS()
+_pmc.PeakWorkingSetSize = 2048 * 1024
+assert _pmc_peak_kb(_pmc) == 2048.0, "PeakWorkingSetSize is BYTES; report KB"
+del _pmc
+
+
+# Import-time self-check for the POSIX reaping path, driven by a stub wait4 so
+# no process is spawned at import. This path is the only source of BOTH the
+# return code and the peak RSS on Linux, and its failure mode is silent
+# (rss_kb: null across every workload, or a fabricated returncode), so the
+# status decode and the wait4 call convention are pinned here.
+if os.name != "nt":  # the function, and the wait-status encoding, are POSIX-only
+    class _StubProc:
+        pid = 4321
+        returncode = None
+
+    class _StubRusage:
+        # KB on Linux, bytes on macOS — matched to the host so the expected
+        # value below is the same 2 MiB either way.
+        ru_maxrss = 2048 * (1024 if sys.platform == "darwin" else 1)
+
+    _seen = []
+
+    def _stub_wait4(pid, flags):
+        _seen.append((pid, flags))
+        return pid, 0x100, _StubRusage()  # wait status for "exited with code 1"
+
+    _p = _StubProc()
+    assert _reap_posix(_p, wait4=_stub_wait4) == 2048.0, \
+        "_reap_posix: ru_maxrss must reach the caller as KB"
+    assert _p.returncode == 1, \
+        "_reap_posix: returncode must come from the wait status, not Popen"
+    assert _seen == [(4321, 0)], \
+        "_reap_posix: wait4 must be called blocking on the child's own pid"
+
+    # The ECHILD branch — the highest-stakes path here, because the fallback
+    # it refuses (Popen.wait) would record a FAILED compile as a clean run.
+    # Reachable from this stub only because the translation lives inside
+    # _reap_posix rather than in run_once, which cannot be driven without
+    # spawning a process.
+    def _stub_wait4_echild(pid, flags):
+        raise ChildProcessError(10, "No child processes")
+
+    _p2 = _StubProc()
+    try:
+        _reap_posix(_p2, wait4=_stub_wait4_echild)
+        raise AssertionError("_reap_posix must not swallow ECHILD")
+    except RuntimeError as _e:
+        assert isinstance(_e.__cause__, ChildProcessError), \
+            "_reap_posix must chain the original ECHILD as __cause__"
+        assert "SIGCHLD" in str(_e), \
+            "_reap_posix: the ECHILD message must name the cause to look for"
+    assert _p2.returncode is None, \
+        "_reap_posix must NOT leave a fabricated returncode after ECHILD"
+    # `_e` needs no del: Python unbinds an `except ... as` name at block exit.
+    del _StubProc, _StubRusage, _seen, _stub_wait4, _stub_wait4_echild, _p, _p2
+
+
+# Import-time self-check for the Windows collector's degradation path, which
+# runs on every host: given an object without the CPython-internal `_handle`
+# the function must return None rather than raise, because run_once treats a
+# None rss as "no memory number this sample" and a raise would sink the sweep.
+# This is the failure the docstring warns about — a CPython release renaming
+# `_handle` — and on POSIX the missing WinDLL takes the same except path.
+class _NoHandle:
+    pass
+
+
+assert _windows_peak_rss_kb(_NoHandle()) is None, \
+    "_windows_peak_rss_kb must degrade to None, not raise, when the query fails"
+del _NoHandle
 
 
 if __name__ == "__main__":

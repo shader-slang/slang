@@ -612,6 +612,7 @@ class TestPendingApprovals(unittest.TestCase):
             "branch": "topic",
             "title": "Some PR",
             "waited_min": 5,
+            "pr_number": None,
         }
         row.update(kw)
         return row
@@ -651,6 +652,16 @@ class TestPendingApprovals(unittest.TestCase):
         # A merge_group run holds up the whole queue, not just its own PR.
         html = self._render([self._row(event="merge_group")])
         self.assertIn("<strong>merge_group</strong>", html)
+
+    def test_pr_number_renders_as_link(self):
+        html = self._render([self._row(pr_number=12345)])
+        self.assertIn("/pull/12345", html)
+        self.assertIn("#12345", html)
+
+    def test_no_pr_number_renders_empty_cell(self):
+        html = self._render([self._row(pr_number=None)])
+        # Empty PR cell — no pull URL in the table
+        self.assertNotIn("/pull/", html)
 
     def test_titles_are_escaped_exactly_once(self):
         # _link already escapes, so escaping the title before passing it in
@@ -717,6 +728,18 @@ class TestPendingApprovals(unittest.TestCase):
             data = ci_health.fetch_pending_approvals("shader-slang/slang")
 
         self.assertEqual(data["pending"][0]["waited_min"], 0)
+
+    def test_pr_number_extracted_from_pull_requests(self):
+        run = {"id": 1, "created_at": "2026-08-11T00:00:00Z", "pull_requests": [{"number": 999}]}
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+        self.assertEqual(data["pending"][0]["pr_number"], 999)
+
+    def test_pr_number_is_none_when_no_pull_requests(self):
+        run = {"id": 1, "created_at": "2026-08-11T00:00:00Z", "pull_requests": []}
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+        self.assertIsNone(data["pending"][0]["pr_number"])
 
 class TestHealthApiBounds(unittest.TestCase):
     def test_recent_failures_query_is_bounded_by_created_range(self):

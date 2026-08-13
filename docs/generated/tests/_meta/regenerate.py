@@ -110,6 +110,14 @@ REVIEWS_DIR = META_DIR / "reviews"
 REMEDIATIONS_DIR = META_DIR / "remediations"
 FINDINGS_DIR = META_DIR / "findings"
 FINDINGS_FILED_DIR = FINDINGS_DIR / "filed"
+
+# Findings that stopped reproducing before anyone filed them. Kept apart
+# from findings/filed/ because that directory means "an issue exists for
+# this"; these have no issue and never will. Without somewhere to put
+# them they stay in the pending queue forever and every triage pass
+# re-tests them from scratch -- five findings were in exactly that state
+# when this was added.
+FINDINGS_RESOLVED_DIR = FINDINGS_DIR / "resolved"
 FINDINGS_STATE_PATH = META_DIR / "findings-state.json"
 
 # Required META keys on every generated .slang test file. The block lives
@@ -609,25 +617,49 @@ def save_findings_state(state: dict) -> None:
     )
 
 
-def list_finding_paths(include_filed: bool = False) -> list[Path]:
+def list_finding_paths(
+    include_filed: bool = False, include_resolved: bool = False
+) -> list[Path]:
     """Return sorted list of finding YAML paths under _meta/findings/.
 
-    Pending findings live directly under findings/; filed ones move to
-    findings/filed/ and are excluded by default.
+    Pending findings live directly under findings/. Ones with an issue
+    move to findings/filed/, ones that stopped reproducing before anyone
+    filed them move to findings/resolved/; both are excluded by default,
+    because the bare list is the work queue.
     """
     if not FINDINGS_DIR.exists():
         return []
-    out: list[Path] = []
-    for p in sorted(FINDINGS_DIR.glob("*.yaml")):
-        out.append(p)
+    out: list[Path] = [p for p in sorted(FINDINGS_DIR.glob("*.yaml"))]
     if include_filed and FINDINGS_FILED_DIR.exists():
-        for p in sorted(FINDINGS_FILED_DIR.glob("*.yaml")):
-            out.append(p)
+        out.extend(sorted(FINDINGS_FILED_DIR.glob("*.yaml")))
+    if include_resolved and FINDINGS_RESOLVED_DIR.exists():
+        out.extend(sorted(FINDINGS_RESOLVED_DIR.glob("*.yaml")))
     return out
 
 
 def load_finding(path: Path) -> dict:
-    return _load_yaml(path.read_text(encoding="utf-8")) or {}
+    """Load a finding, normalizing `observed_at` to the ISO string the
+    schema declares.
+
+    An unquoted ISO timestamp is a *date* in YAML, not a string, so
+    `observed_at: 2026-08-04T00:00:00+00:00` loads as a `datetime` while
+    the quoted spelling next to it loads as `str`. Both are the same
+    instant and both look identical in the file, so the difference is
+    invisible until something does string work on the value -- which is
+    how `findings list` came to abort partway through the queue with
+    `'datetime.datetime' object is not subscriptable`. 21 of the 83
+    committed findings use the unquoted spelling.
+
+    Normalizing here rather than at the call site keeps one in-memory
+    contract for every consumer, and matches what the schema already
+    says the field is. The files are left alone: 10 of the 21 are under
+    findings/filed/, which is immutable history.
+    """
+    finding = _load_yaml(path.read_text(encoding="utf-8")) or {}
+    observed = finding.get("observed_at")
+    if isinstance(observed, (_dt.datetime, _dt.date)):
+        finding["observed_at"] = observed.isoformat()
+    return finding
 
 
 def _lint_finding_reproducibility(where: str, ev: dict) -> list[LintIssue]:
@@ -779,11 +811,35 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
 def lint_findings() -> list[LintIssue]:
     """Validate every pending finding YAML.
 
-    Filed findings (under findings/filed/) are immutable history and are
-    not re-validated — their citations or referenced paths may have
-    rotted since filing, and that is acceptable for a historical record.
+    Retired findings — filed ones under findings/filed/, ones that
+    stopped reproducing under findings/resolved/ — are immutable history
+    and are not re-validated. Their citations or referenced paths may
+    have rotted since, and that is acceptable for a historical record.
+
+    They are still checked for *parseability*, though, which is a
+    different thing from rot. A retired finding that no longer loads is
+    not stale history, it is unreadable history: every tool that walks
+    the whole corpus trips over it, and the record it was meant to
+    preserve is effectively gone. One shipped that way in the bootstrap
+    commit — an unquoted `observed_summary` containing
+    `spirv-emit: castToVoid`, where the colon-space turned the scalar
+    into a mapping — and went unnoticed because this function skipped
+    the directory entirely.
     """
     issues: list[LintIssue] = []
+    pending = set(list_finding_paths(include_filed=False))
+    retired = set(list_finding_paths(include_filed=True, include_resolved=True)) - pending
+    for p in sorted(retired):
+        try:
+            load_finding(p)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    str(p.relative_to(REPO_ROOT)),
+                    "error",
+                    f"retired finding no longer parses as YAML: {exc}",
+                )
+            )
     seen_bundles_in_manifest = set(load_manifest().bundles.keys())
     for p in list_finding_paths(include_filed=False):
         try:
@@ -986,12 +1042,23 @@ def compute_finding_labels(finding: dict, state: dict) -> list[str]:
 def _repro_body(finding: dict) -> str:
     """Return the .slang source block for the issue body.
 
-    Prefers evidence.minimized_repro when present; otherwise reads
-    evidence.source_slang from disk.
+    Prefers the operator's `minimized_repro`, then the agent's inlined
+    `repro_source`, and only then reads `source_slang` from disk.
+
+    The `repro_source` step is not optional politeness: the reproducibility
+    rule tells an agent whose failing input was a scratch file to inline it
+    there, precisely because `source_slang` then names a *different*
+    program -- the committed test the scratch input was derived from.
+    Falling through to disk in that case pairs the recorded command with a
+    shader that does not reproduce the bug, which is the exact confusion
+    the rule exists to prevent. This function honoured `minimized_repro`
+    but not `repro_source`, so until now it did just that.
     """
     ev = finding.get("evidence") or {}
     if ev.get("minimized_repro"):
         return str(ev["minimized_repro"]).rstrip() + "\n"
+    if ev.get("repro_source"):
+        return str(ev["repro_source"]).rstrip() + "\n"
     src = ev.get("source_slang")
     if not src:
         return "(no source_slang on finding)\n"
@@ -3597,13 +3664,77 @@ def cmd_findings_dup(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_findings_fixed(args: argparse.Namespace) -> int:
+    """Record that a pending finding no longer reproduces, and retire it.
+
+    Triage keeps turning up findings that were real when observed and are
+    fixed by the time anyone looks. Before this existed there was nowhere
+    to put that result: the finding stayed pending, so the next pass
+    re-tested it from scratch. Five were in that state when this landed --
+    four from the sigsegv sweep plus one that only got cleared because it
+    happened to also duplicate an open issue.
+
+    The command deliberately demands evidence. `--verified-at` is required
+    and must name the compiler commit the re-test ran against, because
+    "fixed" without a commit is unfalsifiable: a later regression cannot
+    be distinguished from a triage that was wrong, and this whole channel
+    exists because unverified claims produced false results before. The
+    finding YAML is kept -- retiring is not deleting, and a fixed finding
+    is the seed of the regression test nobody has written yet.
+    """
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    findings_map = state.setdefault("findings", {})
+    existing = findings_map.get(args.id, {})
+    if existing.get("issue"):
+        print(
+            f"error: {args.id} is filed as #{existing['issue']}; close the issue"
+            " instead of retiring the finding",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("dup_of"):
+        print(
+            f"error: {args.id} is already marked dup-of #{existing['dup_of']}",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("fixed_at"):
+        print(
+            f"error: {args.id} already retired as fixed at {existing['fixed_at']}",
+            file=sys.stderr,
+        )
+        return 1
+    findings_map[args.id] = {
+        "fixed_at": args.verified_at,
+        "title": compute_finding_title(finding),
+    }
+    if args.note:
+        findings_map[args.id]["note"] = args.note
+    save_findings_state(state)
+    _move_to_resolved(p)
+    print(f"  retired {args.id} as fixed at {args.verified_at}")
+    try:
+        where = FINDINGS_RESOLVED_DIR.relative_to(REPO_ROOT)
+    except ValueError:
+        where = FINDINGS_RESOLVED_DIR
+    print(f"  moved finding to {where}/")
+    return 0
+
+
 def _resolve_finding_path(fid: str) -> Path | None:
-    candidate = FINDINGS_DIR / f"{fid}.yaml"
-    if candidate.exists():
-        return candidate
-    filed = FINDINGS_FILED_DIR / f"{fid}.yaml"
-    if filed.exists():
-        return filed
+    for base in (FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR):
+        candidate = base / f"{fid}.yaml"
+        if candidate.exists():
+            return candidate
     return None
 
 
@@ -3615,6 +3746,12 @@ def _issue_number_from_url(url: str) -> int | None:
 def _move_to_filed(p: Path) -> None:
     FINDINGS_FILED_DIR.mkdir(parents=True, exist_ok=True)
     dest = FINDINGS_FILED_DIR / p.name
+    p.rename(dest)
+
+
+def _move_to_resolved(p: Path) -> None:
+    FINDINGS_RESOLVED_DIR.mkdir(parents=True, exist_ok=True)
+    dest = FINDINGS_RESOLVED_DIR / p.name
     p.rename(dest)
 
 
@@ -4162,6 +4299,25 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_fd.set_defaults(func=cmd_findings_dup)
 
+    p_fx = find_sub.add_parser(
+        "fixed",
+        help="retire a pending finding that no longer reproduces"
+        " (no filing; moves YAML to resolved/)",
+    )
+    p_fx.add_argument("id")
+    p_fx.add_argument(
+        "--verified-at",
+        required=True,
+        metavar="COMMIT",
+        help="compiler commit the re-test ran against; required, because"
+        " 'fixed' without one cannot be told apart from a later regression",
+    )
+    p_fx.add_argument(
+        "--note",
+        help="optional one-line note on what was re-run and what it showed",
+    )
+    p_fx.set_defaults(func=cmd_findings_fixed)
+
     return p
 
 
@@ -4416,6 +4572,118 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         len(repro_warns({"command": "slangc a.slang", "source_slang": "docs/nope.slang"})),
         1,
     )
+
+    # The lint rule and the issue renderer have to agree on what counts as
+    # the repro, or the rule accepts a finding that then files an issue
+    # showing a different program. `_repro_body` honoured `minimized_repro`
+    # but not `repro_source`, so a finding that satisfied the rule the
+    # intended way still rendered `source_slang` from disk.
+    # `source_slang` here points at a real committed file so the fallback
+    # path is exercised; the comparisons are truncated so that a
+    # regression -- which returns that whole file -- reports a short
+    # prefix instead of dumping it into the selftest output.
+    inline_only = {
+        "command": "slangc /tmp/x.slang -target hlsl",
+        "source_slang": "docs/generated/tests/_meta/schema/finding.schema.json",
+        "repro_source": "void main() { /* the scratch variant */ }",
+    }
+    check(
+        "issue body prefers the inlined repro over source_slang on disk",
+        _repro_body({"evidence": inline_only}).strip()[:41],
+        "void main() { /* the scratch variant */ }",
+    )
+    check(
+        "operator minimization still outranks the agent's inline repro",
+        _repro_body({"evidence": dict(inline_only, minimized_repro="void main() {}")}).strip()[:14],
+        "void main() {}",
+    )
+    check(
+        "committed source_slang is still read when nothing is inlined",
+        _repro_body({"evidence": {k: v for k, v in inline_only.items() if k != "repro_source"}})[:1],
+        "{",
+    )
+
+    # `findings fixed` retires a finding that stopped reproducing. The
+    # guards are the point: a finding that is filed, already deduped, or
+    # already retired must not be retired again, or the state entry that
+    # records where it went is silently overwritten. Exercised through
+    # the real command against a temporary state file rather than by
+    # re-implementing the checks here.
+    with tempfile.TemporaryDirectory() as td:
+        import argparse as _ap
+
+        real_state, real_dir, real_filed, real_res = (
+            FINDINGS_STATE_PATH, FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR,
+        )
+        g = globals()
+        try:
+            root = Path(td)
+            g["FINDINGS_STATE_PATH"] = root / "state.json"
+            g["FINDINGS_DIR"] = root / "findings"
+            g["FINDINGS_FILED_DIR"] = root / "findings" / "filed"
+            g["FINDINGS_RESOLVED_DIR"] = root / "findings" / "resolved"
+            g["FINDINGS_DIR"].mkdir(parents=True)
+            (g["FINDINGS_DIR"] / "x.yaml").write_text(
+                'id: x\ntitle: a finding\nobserved_at: "2026-01-01T00:00:00+00:00"\n',
+                encoding="utf-8",
+            )
+
+            def run(fid, commit="abc123"):
+                return cmd_findings_fixed(
+                    _ap.Namespace(id=fid, verified_at=commit, note=None)
+                )
+
+            check("fixed: unknown id rejected", run("nope"), 1)
+            check("fixed: retires a pending finding", run("x"), 0)
+            check(
+                "fixed: YAML moved to resolved/, not deleted",
+                (g["FINDINGS_RESOLVED_DIR"] / "x.yaml").exists(),
+                True,
+            )
+            entry = json.loads(g["FINDINGS_STATE_PATH"].read_text())["findings"]["x"]
+            check("fixed: records the verifying commit", entry.get("fixed_at"), "abc123")
+            check("fixed: retiring twice is refused", run("x"), 1)
+
+            # A filed finding must not be retirable -- the issue is the
+            # record, and closing it is a different action.
+            st = json.loads(g["FINDINGS_STATE_PATH"].read_text())
+            st["findings"]["y"] = {"issue": 999}
+            g["FINDINGS_STATE_PATH"].write_text(json.dumps(st), encoding="utf-8")
+            (g["FINDINGS_DIR"] / "y.yaml").write_text("id: y\n", encoding="utf-8")
+            check("fixed: refuses a finding that is already filed", run("y"), 1)
+            check(
+                "fixed: refused finding stays put",
+                (g["FINDINGS_DIR"] / "y.yaml").exists(),
+                True,
+            )
+        finally:
+            g["FINDINGS_STATE_PATH"] = real_state
+            g["FINDINGS_DIR"] = real_dir
+            g["FINDINGS_FILED_DIR"] = real_filed
+            g["FINDINGS_RESOLVED_DIR"] = real_res
+
+    # An unquoted ISO timestamp is a YAML date, not a string, and the two
+    # spellings are indistinguishable in the file. `findings list` used to
+    # abort partway through the queue on the unquoted ones; `load_finding`
+    # now normalizes, so consumers see one type regardless of spelling.
+    with tempfile.TemporaryDirectory() as td:
+        both = Path(td) / "f.yaml"
+        for spelling in ("2026-08-04T00:00:00+00:00", '"2026-08-04T00:00:00+00:00"'):
+            both.write_text(f"id: x\nobserved_at: {spelling}\n", encoding="utf-8")
+            loaded = load_finding(both)["observed_at"]
+            # Compare the type before slicing: a regression here returns a
+            # datetime, and slicing that raises rather than reporting,
+            # which would abort the rest of the selftest.
+            check(
+                f"observed_at loads as str for spelling {spelling}",
+                type(loaded).__name__,
+                "str",
+            )
+            check(
+                f"observed_at keeps its date for spelling {spelling}",
+                str(loaded)[:10],
+                "2026-08-04",
+            )
 
     # `--tree` routing: two production callers depend on this prefix split
     # (the workflow passes `language-reference`, the design driver always

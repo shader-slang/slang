@@ -7,6 +7,20 @@ scope: ir
 title: "slangi VM aborts with working-set out-of-bounds on any __bwd_diff call"
 evidence:
   command: "build/RelWithDebInfo/bin/slangi /tmp/tb0.slang"
+  repro_source: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    [Differentiable]
+    float f(float x)
+    {
+        return x * x;
+    }
+
+    void main()
+    {
+        DifferentialPair<float> dp = DifferentialPair<float>(3.0, 0.0);
+        __bwd_diff(f)(dp, 1.0);
+        printf("%f\n", dp.d);
+    }
   source_slang: docs/generated/tests/coverage/autodiff/bwd-square-emits-bwd-prop-fn.slang
   observed_summary: "Running a reverse-mode (__bwd_diff) differentiable function under the bytecode interpreter aborts with 'VM operand access out of bounds in working set section: offset=84 size=8 sectionSize=88.' (exit 5)."
   exit_code: 5
