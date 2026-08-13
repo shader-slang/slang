@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#diagnostics-during-lowering
-//META: doc_section_digest=648027637f6fa9553cdccbac6872d44ba7b96fd6439288fc7af0d43ddadf8360
+//META: doc_section_digest=90444c4cb9fc02bd4dc517a83c3f36f04807193346a8cbe99ca628ff372a49b8
 //META: purpose=A statement placed inside a `switch` body before the first `case` label is unreachable and lowering warns once for that leading run.
 //META: intent=negative
 //META: pipeline_stage=lower
