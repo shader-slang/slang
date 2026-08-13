@@ -6156,16 +6156,19 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        // We lay out a modified type as the type it modifies. `unorm` and
-        // `snorm` say how a texel is interpreted, not how storage for it is
-        // reserved, so `unorm float` lays out exactly as `float`.
+        // We lay out a modified type as the type it modifies. This relies on
+        // every type modifier being layout-neutral, which holds for all three
+        // that exist: `unorm` and `snorm` say how a texel is interpreted, and
+        // `no_diff` records differentiability. None change size, alignment or
+        // resource usage, so `unorm float` lays out exactly as `float`. The
+        // matching IR-side assumption is asserted in `slang-ir-layout.cpp`.
         //
         // Reachable for any non-texture carrier, e.g. the element type of
         // `RWStructuredBuffer<unorm float>`, which `createStructuredBufferTypeLayout`
         // recurses into. Without this case that recursion falls through to the
         // catch-all below, which is UB in a release build (issue #12535).
-        // Whether the modifier belongs there at all is issue #8870; layout has
-        // to be total over types either way.
+        // Whether the modifier belongs on such a carrier at all is issue #8870;
+        // until it is rejected earlier, layout must not fall into that sink.
         //
         return _createTypeLayout(context, modifiedType->getBase());
     }
