@@ -1147,14 +1147,22 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // depends on nothing, so it is skipped.
         auto spanIsInsideBlob = [&](const Byte* data, Count sizeInBytes)
         { return data >= blobBegin && data + sizeInBytes <= blobEnd; };
-        const bool spansAreOwnedByTheBlob =
-            (!flat.operandIndices.isView() ||
-             spanIsInsideBlob(
-                 (const Byte*)flat.operandIndices.getBuffer(),
-                 flat.operandIndices.getCount() * Count(sizeof(Int64)))) &&
-            (!flat.stringChars.isView() || spanIsInsideBlob(
-                                               (const Byte*)flat.stringChars.getBuffer(),
-                                               flat.stringChars.getCount()));
+
+        // Every view-capable array, not a sample of them. Which ones actually end up as
+        // views depends on the backend and on what the module contains -- one with no
+        // string constants leaves `stringChars` empty and owned -- so checking a subset
+        // would pass whenever the arrays it happened to pick were the owned ones.
+        auto arrayIsSafe = [&](auto const& array, size_t elementSize)
+        {
+            return !array.isView() || spanIsInsideBlob(
+                                          (const Byte*)array.getBuffer(),
+                                          array.getCount() * Count(elementSize));
+        };
+        const bool spansAreOwnedByTheBlob = arrayIsSafe(flat.childCounts, sizeof(Int64)) &&
+                                            arrayIsSafe(flat.operandIndices, sizeof(Int64)) &&
+                                            arrayIsSafe(flat.stringLengths, sizeof(Int64)) &&
+                                            arrayIsSafe(flat.stringChars, sizeof(uint8_t)) &&
+                                            arrayIsSafe(flat.literals, sizeof(UInt64));
 
         if (!spansAreOwnedByTheBlob)
         {
