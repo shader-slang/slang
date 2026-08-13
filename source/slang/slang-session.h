@@ -196,8 +196,8 @@ public:
     /// forwards it to the user-supplied callback stored on the Linkage.
     static void richDiagnosticThunk(
         const GenericDiagnostic& diag,
-        SourceManager*            sm,
-        void*                     userData);
+        SourceManager* sm,
+        void* userData);
 
     // Updates the supplied builder with linkage-related information, which includes preprocessor
     // defines, the compiler version, and other compiler options. This is then merged with the hash
@@ -505,7 +505,7 @@ private:
 
     RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
-    SlangRichDiagnosticCallback m_diagnosticCallback     = nullptr;
-    void*                       m_diagnosticCallbackData = nullptr;
+    SlangRichDiagnosticCallback m_diagnosticCallback = nullptr;
+    void* m_diagnosticCallbackData = nullptr;
 };
 } // namespace Slang

@@ -904,39 +904,34 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::getLoadedModule(SlangInt ind
 SLANG_NO_THROW void SLANG_MCALL
 Linkage::setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData)
 {
-    m_diagnosticCallback     = callback;
+    m_diagnosticCallback = callback;
     m_diagnosticCallbackData = userData;
 }
 
 // Static thunk: converts GenericDiagnostic + SourceManager* into SlangStructuredDiagnostic
 // and forwards it to the user-supplied callback stored on the Linkage.
 /* static */
-void Linkage::richDiagnosticThunk(
-    const GenericDiagnostic& diag,
-    SourceManager*            sm,
-    void*                     userData)
+void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* sm, void* userData)
 {
     auto* linkage = static_cast<Linkage*>(userData);
     if (!linkage->m_diagnosticCallback)
         return;
 
     // Resolve the primary span location.
-    HumaneSourceLoc primaryBegin =
-        (sm && diag.primarySpan.range.begin.isValid())
-            ? sm->getHumaneLoc(diag.primarySpan.range.begin)
-            : HumaneSourceLoc{};
-    HumaneSourceLoc primaryEnd =
-        (sm && diag.primarySpan.range.end.isValid())
-            ? sm->getHumaneLoc(diag.primarySpan.range.end)
-            : HumaneSourceLoc{};
+    HumaneSourceLoc primaryBegin = (sm && diag.primarySpan.range.begin.isValid())
+                                       ? sm->getHumaneLoc(diag.primarySpan.range.begin)
+                                       : HumaneSourceLoc{};
+    HumaneSourceLoc primaryEnd = (sm && diag.primarySpan.range.end.isValid())
+                                     ? sm->getHumaneLoc(diag.primarySpan.range.end)
+                                     : HumaneSourceLoc{};
 
     SlangDiagnosticSpan primarySpan = {};
-    primarySpan.filename            = primaryBegin.pathInfo.foundPath.getBuffer();
-    primarySpan.startLine           = (uint32_t)primaryBegin.line;
-    primarySpan.startCol            = (uint32_t)primaryBegin.column;
-    primarySpan.endLine             = (uint32_t)primaryEnd.line;
-    primarySpan.endCol              = (uint32_t)primaryEnd.column;
-    primarySpan.message             = diag.primarySpan.message.getBuffer();
+    primarySpan.filename = primaryBegin.pathInfo.foundPath.getBuffer();
+    primarySpan.startLine = (uint32_t)primaryBegin.line;
+    primarySpan.startCol = (uint32_t)primaryBegin.column;
+    primarySpan.endLine = (uint32_t)primaryEnd.line;
+    primarySpan.endCol = (uint32_t)primaryEnd.column;
+    primarySpan.message = diag.primarySpan.message.getBuffer();
 
     // Resolve secondary spans.  Keep HumaneSourceLoc objects alive so that
     // pathInfo.foundPath.getBuffer() pointers remain valid while we build the array.
@@ -946,28 +941,28 @@ void Linkage::richDiagnosticThunk(
     secSpans.reserve(diag.secondarySpans.getCount());
     for (const DiagnosticSpan& sec : diag.secondarySpans)
     {
-        HumaneSourceLoc b =
-            (sm && sec.range.begin.isValid()) ? sm->getHumaneLoc(sec.range.begin) : HumaneSourceLoc{};
+        HumaneSourceLoc b = (sm && sec.range.begin.isValid()) ? sm->getHumaneLoc(sec.range.begin)
+                                                              : HumaneSourceLoc{};
         HumaneSourceLoc e =
             (sm && sec.range.end.isValid()) ? sm->getHumaneLoc(sec.range.end) : HumaneSourceLoc{};
         secBeginLocs.add(b);
         SlangDiagnosticSpan s = {};
-        s.filename            = secBeginLocs.getLast().pathInfo.foundPath.getBuffer();
-        s.startLine           = (uint32_t)b.line;
-        s.startCol            = (uint32_t)b.column;
-        s.endLine             = (uint32_t)e.line;
-        s.endCol              = (uint32_t)e.column;
-        s.message             = sec.message.getBuffer();
+        s.filename = secBeginLocs.getLast().pathInfo.foundPath.getBuffer();
+        s.startLine = (uint32_t)b.line;
+        s.startCol = (uint32_t)b.column;
+        s.endLine = (uint32_t)e.line;
+        s.endCol = (uint32_t)e.column;
+        s.message = sec.message.getBuffer();
         secSpans.add(s);
     }
 
-    SlangStructuredDiagnostic pub  = {};
-    pub.severity                   = (SlangSeverity)diag.severity;
-    pub.code                       = diag.code;
-    pub.message                    = diag.message.getBuffer();
-    pub.primarySpan                = primarySpan;
-    pub.secondarySpans             = secSpans.getCount() > 0 ? secSpans.getBuffer() : nullptr;
-    pub.secondarySpanCount         = (uint32_t)secSpans.getCount();
+    SlangStructuredDiagnostic pub = {};
+    pub.severity = (SlangSeverity)diag.severity;
+    pub.code = diag.code;
+    pub.message = diag.message.getBuffer();
+    pub.primarySpan = primarySpan;
+    pub.secondarySpans = secSpans.getCount() > 0 ? secSpans.getBuffer() : nullptr;
+    pub.secondarySpanCount = (uint32_t)secSpans.getCount();
 
     linkage->m_diagnosticCallback(&pub, linkage->m_diagnosticCallbackData);
 }

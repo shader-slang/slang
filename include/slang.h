@@ -2046,40 +2046,40 @@ public:                                                              \
 */
     typedef void (*SlangDiagnosticCallback)(char const* message, void* userData);
 
-/** A span of source code, used to highlight a location in a diagnostic. */
-struct SlangDiagnosticSpan
-{
-    const char* filename;  /**< Source file path; empty string if unavailable. */
-    uint32_t    startLine; /**< 1-based start line; 0 if unavailable. */
-    uint32_t    startCol;  /**< 1-based start column; 0 if unavailable. */
-    uint32_t    endLine;   /**< 1-based end line; 0 if unavailable. */
-    uint32_t    endCol;    /**< 1-based end column; 0 if unavailable. */
-    const char* message;   /**< Label shown at this location; may be empty. */
-};
+    /** A span of source code, used to highlight a location in a diagnostic. */
+    struct SlangDiagnosticSpan
+    {
+        const char* filename; /**< Source file path; empty string if unavailable. */
+        uint32_t startLine;   /**< 1-based start line; 0 if unavailable. */
+        uint32_t startCol;    /**< 1-based start column; 0 if unavailable. */
+        uint32_t endLine;     /**< 1-based end line; 0 if unavailable. */
+        uint32_t endCol;      /**< 1-based end column; 0 if unavailable. */
+        const char* message;  /**< Label shown at this location; may be empty. */
+    };
 
-/** A fully structured diagnostic, passed to SlangRichDiagnosticCallback.
+    /** A fully structured diagnostic, passed to SlangRichDiagnosticCallback.
 
-    All `const char*` pointers are valid only for the duration of the callback invocation.
-*/
-struct SlangStructuredDiagnostic
-{
-    SlangSeverity              severity;           /**< Effective severity after overrides. */
-    int64_t                    code;               /**< Numeric error code, e.g. 30013 for E30013. Negative means no code. */
-    const char*                message;            /**< Primary human-readable message. */
-    SlangDiagnosticSpan        primarySpan;        /**< Primary source location and label. */
-    const SlangDiagnosticSpan* secondarySpans;     /**< Additional highlighted locations; may be null. */
-    uint32_t                   secondarySpanCount; /**< Number of entries in secondarySpans. */
-};
+        All `const char*` pointers are valid only for the duration of the callback invocation.
+    */
+    struct SlangStructuredDiagnostic
+    {
+        SlangSeverity severity; /**< Effective severity after overrides. */
+        int64_t code; /**< Numeric error code, e.g. 30013 for E30013. Negative means no code. */
+        const char* message;             /**< Primary human-readable message. */
+        SlangDiagnosticSpan primarySpan; /**< Primary source location and label. */
+        const SlangDiagnosticSpan*
+            secondarySpans;          /**< Additional highlighted locations; may be null. */
+        uint32_t secondarySpanCount; /**< Number of entries in secondarySpans. */
+    };
 
-/** Callback type for receiving structured diagnostics.
+    /** Callback type for receiving structured diagnostics.
 
-    @param diagnostic  Pointer to the diagnostic data; valid only during the call.
-    @param userData    The opaque pointer passed to setDiagnosticCallback.
-    @return            Reserved for future use; return true.
-*/
-typedef bool (*SlangRichDiagnosticCallback)(
-    const SlangStructuredDiagnostic* diagnostic,
-    void*                            userData);
+        @param diagnostic  Pointer to the diagnostic data; valid only during the call.
+        @param userData    The opaque pointer passed to setDiagnosticCallback.
+        @return            Reserved for future use; return true.
+    */
+    typedef bool (
+        *SlangRichDiagnosticCallback)(const SlangStructuredDiagnostic* diagnostic, void* userData);
 
     /*!
     @brief Get the build version 'tag' string. The string is the same as
