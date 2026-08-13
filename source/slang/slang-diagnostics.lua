@@ -1163,6 +1163,10 @@ warning(
     span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
 )
 
+-- Distinct from the E29106 "too many operands" *warning* above: that one is the
+-- parser's recovery guess (the extra tokens are likely a missing semicolon), so
+-- it stays a warning; this is the checker finding an opcode that takes no
+-- operands at all, which is a definite error (see visitSPIRVAsmExpr).
 err(
     "spirv-instruction-takes-no-operands",
     29118,

@@ -21,6 +21,11 @@ void foo(const int constParam)
             %d
 //CHECK:     ^ undefined SPIR-V id
 //CHECK:     ^ SPIRV id '%d' is not defined in the current assembly block location
+        // The `warning` severity checked below is deliberate: E29106 is the
+        // parser's recovery guess (missing semicolon), so it stays a warning.
+        // The zero-operand case is a hard error (E29118) instead — see
+        // too-many-operands-zero-operand-op.slang and shader-slang/slang#12497.
+        // Unifying the two would silently reintroduce the abort.
         %r : $$int = OpIAdd %r %r
 //CHECK:^ warning E29106
 //CHECK:^ too many operands for OpLoad (expected max 4), did you forget a semicolon?
