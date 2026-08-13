@@ -1651,15 +1651,11 @@ void _testConcurrentBodyMaterialization(
     // Counted from the pre-serialization module, so the expectation does not come from the
     // path under test.
     List<Index> expected;
+    for (IRInst* child : original->getModuleInst()->getChildren())
     {
-        Index index = 0;
-        for (IRInst* child : original->getModuleInst()->getChildren())
-        {
-            if (child->getOp() != kIROp_Func)
-                continue;
-            expected.add(_countChildrenOf(child));
-            index++;
-        }
+        if (child->getOp() != kIROp_Func)
+            continue;
+        expected.add(_countChildrenOf(child));
     }
     if (expected.getCount() != funcs.getCount())
         return;
