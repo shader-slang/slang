@@ -129,11 +129,13 @@ SLANG_API void _testRoundTripDecorationWithChildren(
 /// `outMismatches` counts observations where a thread saw a body with the wrong number of
 /// instructions, which is what a torn or partially published body looks like.
 ///
-/// Scoped to materialization on purpose. Running whole compiles concurrently on a shared
-/// global session crashes on `master` today, with on-demand loading on or off, so a test
-/// written that way would report a pre-existing limitation rather than anything about this
-/// mechanism. What this exercises is exactly what the loader's mutex and the
-/// acquire/release publication of a body claim to make safe, and nothing more.
+/// Scoped to materialization on purpose. Running whole compiles concurrently against one
+/// shared global session is documented as unsupported -- `include/slang.h` states a global
+/// session is not thread-safe and front-end work needs external synchronization -- and it
+/// does indeed crash, with on-demand loading on or off alike. A test written that way would
+/// be exercising unsupported usage rather than this mechanism. What this drives instead is
+/// exactly what the loader's mutex and the acquire/release publication of a body claim to
+/// make safe, and nothing more.
 SLANG_API void _testConcurrentBodyMaterialization(
     slang::IGlobalSession* globalSession,
     Index& outDeferredCount,

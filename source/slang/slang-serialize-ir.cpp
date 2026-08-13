@@ -650,11 +650,26 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
 
     /// Serialises deferred decoding.
     ///
-    /// A global session is shared across threads, so two compiles can reach the
-    /// same builtin module at once. The decode mutates state that is global to the
-    /// module -- the cursors, the instruction array and the module's arena -- so it
-    /// is serialised wholesale rather than per instruction. Contention is limited
-    /// to the first touch of each body.
+    /// The decode mutates state that is global to the module -- the cursors, the
+    /// instruction array and the module's arena -- so it is serialised wholesale
+    /// rather than per instruction. Contention is limited to the first touch of
+    /// each body.
+    ///
+    /// The concurrency this guards against is the one Slang actually supports.
+    /// Running whole compiles against a shared global session is *not* supported --
+    /// `include/slang.h` says a global session is not thread-safe and that
+    /// front-end work must be externally synchronized -- so that is not the
+    /// justification. What is supported, per the serial-frontend/parallel-backend
+    /// workflow in docs/user-guide/08-compiling.md, is calling `getEntryPointCode`
+    /// and friends concurrently on a linked component type. Those run target
+    /// passes and emit over IR that can still reference a builtin module, so a
+    /// body can be first touched from several backend threads at once.
+    ///
+    /// Whether that path reaches a *still-deferred* body in practice, rather than
+    /// one that linking already materialized, is not established: a 16-thread
+    /// parallel-backend run is clean with on-demand loading on and off alike, which
+    /// is consistent with either. So this is currently insurance whose cost is a
+    /// single uncontended lock on first touch, not a measured-necessary guard.
     std::mutex mutex;
 
     Int64 instIndex = 0;

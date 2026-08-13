@@ -84,11 +84,15 @@ SLANG_UNIT_TEST(irDeferredBodyKeepsDecorationChildren)
 //
 // The other tests here are single-threaded, which leaves that protocol unexercised.
 //
-// Deliberately scoped to materialization rather than to whole compiles. Running full
-// compiles concurrently on one shared global session crashes on this tree with on-demand
-// loading *either* on or off -- measured, not assumed -- so a test written that way would
-// be reporting a pre-existing limitation of the compiler rather than anything about this
-// mechanism, and would fail no matter what this PR did.
+// Deliberately scoped to materialization rather than to whole compiles. Compiling
+// concurrently against one shared global session is documented as unsupported --
+// `include/slang.h` states a global session is not thread-safe and that front-end work
+// requires external synchronization -- and measurably crashes, with on-demand loading
+// either on or off. A test shaped that way would be exercising unsupported usage rather
+// than this mechanism, and would fail no matter what this PR did.
+//
+// The concurrency Slang does support is the serial-frontend/parallel-backend workflow in
+// docs/user-guide/08-compiling.md, and that is clean here at 16 threads in both modes.
 SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
 {
     ComPtr<slang::IGlobalSession> globalSession;
