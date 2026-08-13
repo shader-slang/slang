@@ -16,6 +16,171 @@
 namespace Slang
 {
 
+// Represents a work item for packing `inout` or `out` arguments after a concrete call.
+struct ArgumentPackWorkItem
+{
+    enum Kind
+    {
+        Pack,
+        UpCast,
+    } kind = Pack;
+
+    // A `AnyValue` typed destination.
+    IRInst* dstArg = nullptr;
+    // A concrete value to be packed.
+    IRInst* concreteArg = nullptr;
+};
+
+bool isAnyValueType(IRType* type)
+{
+    if (as<IRAnyValueType>(type) || as<IRUntaggedUnionType>(type))
+        return true;
+    return false;
+}
+
+static IRInst* unpackDifferentialPairArg(
+    IRBuilder* builder,
+    IRDifferentialPairType* pairType,
+    IRTupleType* tupleType,
+    IRInst* arg);
+
+// Unpack an `arg` of `IRAnyValue` into concrete type if necessary, to make it feedable into the
+// parameter. If `arg` represents a AnyValue typed variable passed in to a concrete `out`
+// parameter, this function indicates that it needs to be packed after the call by setting
+// `packAfterCall`.
+IRInst* maybeUnpackArg(
+    IRBuilder* builder,
+    IRType* paramType,
+    IRInst* arg,
+    ArgumentPackWorkItem& packAfterCall)
+{
+    packAfterCall.dstArg = nullptr;
+    packAfterCall.concreteArg = nullptr;
+
+    // If either paramType or argType is a pointer type
+    // (because of `inout` or `out` modifiers), we extract
+    // the underlying value type first.
+    IRType* paramValType = paramType;
+    IRType* argValType = arg->getDataType();
+    IRInst* argVal = arg;
+    if (auto ptrType = as<IRPtrTypeBase>(paramType))
+    {
+        paramValType = ptrType->getValueType();
+    }
+    auto argType = arg->getDataType();
+    if (auto argPtrType = as<IRPtrTypeBase>(argType))
+    {
+        argValType = argPtrType->getValueType();
+    }
+
+    if (auto pairType = as<IRDifferentialPairType>(paramValType))
+    {
+        if (auto tupleType = as<IRTupleType>(argValType))
+        {
+            // An existential differential pair is represented as a tuple at a dynamic
+            // witness-table boundary. The concrete implementation expects its nominal pair. For
+            // an inout pair, marshal the updated concrete pair back into the tuple after the call.
+            if (as<IRPtrTypeBase>(paramType))
+            {
+                auto tempVar = builder->emitVar(paramValType);
+                if (as<IRBorrowInOutParamType>(paramType))
+                {
+                    auto initialValue = unpackDifferentialPairArg(
+                        builder,
+                        pairType,
+                        tupleType,
+                        builder->emitLoad(arg));
+                    builder->emitStore(tempVar, initialValue);
+                }
+
+                packAfterCall.kind = ArgumentPackWorkItem::Kind::UpCast;
+                packAfterCall.dstArg = arg;
+                packAfterCall.concreteArg = tempVar;
+                return tempVar;
+            }
+
+            return unpackDifferentialPairArg(builder, pairType, tupleType, argVal);
+        }
+    }
+
+    // Unpack `arg` if the parameter expects concrete type but
+    // `arg` is an AnyValue.
+    if (!isAnyValueType(paramValType) && isAnyValueType(argValType))
+    {
+        // if parameter expects an `out` pointer, store the unpacked val into a
+        // variable and pass in a pointer to that variable.
+        if (as<IRPtrTypeBase>(paramType))
+        {
+            auto tempVar = builder->emitVar(paramValType);
+            if (as<IRBorrowInOutParamType>(paramType))
+                builder->emitStore(
+                    tempVar,
+                    builder->emitUnpackAnyValue(paramValType, builder->emitLoad(arg)));
+
+            // tempVar needs to be unpacked into original var after the call.
+            packAfterCall.kind = ArgumentPackWorkItem::Kind::Pack;
+            packAfterCall.dstArg = arg;
+            packAfterCall.concreteArg = tempVar;
+            return tempVar;
+        }
+        else
+        {
+            return builder->emitUnpackAnyValue(paramValType, argVal);
+        }
+    }
+
+    // Reinterpret 'arg' if it is being passed to a parameter with
+    // a different type collection. For now, we'll approximate this
+    // by checking if the types are different, but this should be
+    // encoded in the types.
+    //
+    if (as<IRTaggedUnionType>(paramValType) && as<IRTaggedUnionType>(argValType) &&
+        paramValType != argValType)
+    {
+        // if parameter expects an `out` pointer, store the unpacked val into a
+        // variable and pass in a pointer to that variable.
+        if (as<IROutParamType>(paramType))
+        {
+            auto tempVar = builder->emitVar(paramValType);
+
+            // tempVar needs to be unpacked into original var after the call.
+            packAfterCall.kind = ArgumentPackWorkItem::Kind::UpCast;
+            packAfterCall.dstArg = arg;
+            packAfterCall.concreteArg = tempVar;
+            return tempVar;
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Unexpected upcast for non-out parameter");
+        }
+    }
+    return arg;
+}
+
+// Marshals the tuple representation of an abstract differential pair into the concrete pair type
+// required by a witness-table implementation.
+static IRInst* unpackDifferentialPairArg(
+    IRBuilder* builder,
+    IRDifferentialPairType* pairType,
+    IRTupleType* tupleType,
+    IRInst* arg)
+{
+    SLANG_RELEASE_ASSERT(tupleType->getOperandCount() == 2);
+
+    auto primalArg = builder->emitGetTupleElement((IRType*)tupleType->getOperand(0), arg, 0);
+    auto differentialArg = builder->emitGetTupleElement((IRType*)tupleType->getOperand(1), arg, 1);
+
+    ArgumentPackWorkItem unusedPackWork;
+    auto primal = maybeUnpackArg(builder, pairType->getValueType(), primalArg, unusedPackWork);
+    SLANG_RELEASE_ASSERT(!unusedPackWork.concreteArg);
+
+    auto differentialType = getConcreteDifferentialType(builder, pairType);
+    auto differential = maybeUnpackArg(builder, differentialType, differentialArg, unusedPackWork);
+    SLANG_RELEASE_ASSERT(!unusedPackWork.concreteArg);
+
+    return builder->emitMakeDifferentialPair(pairType, primal, differential);
+}
+
 IRStringLit* _getWitnessTableWrapperFuncName(IRModule* module, IRFunc* func)
 {
     IRBuilder builderStorage(module);
@@ -98,7 +263,14 @@ IRFunc* emitWitnessTableWrapper(
 
     // Pack all `out` arguments.
     for (auto item : argsToPack)
-        writeBackUnpackedArg(builder, item);
+    {
+        auto anyValType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
+        auto concreteVal = builder->emitLoad(item.concreteArg);
+        auto packedVal = (item.kind == ArgumentPackWorkItem::Kind::Pack)
+                             ? builder->emitPackAnyValue(anyValType, concreteVal)
+                             : upcastSet(builder, concreteVal, anyValType);
+        builder->emitStore(item.dstArg, packedVal);
+    }
 
     // Pack return value if necessary.
     if (!isAnyValueType(call->getDataType()) &&
