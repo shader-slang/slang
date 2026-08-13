@@ -8799,9 +8799,24 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
                 AddToLookupResult(filteredLookupResult, lookupResult);
             }
         }
+
+        // If the filter removed every candidate, don't fall through to an empty result
+        // (which would silently produce an `ErrorType` base). This happens when a member
+        // name is declared as an interface requirement in more than one interface in the
+        // base's hierarchy -- e.g. a derived interface shadows an inherited requirement --
+        // so no concrete definition remains to prefer. Rank the original candidates instead:
+        // `refineLookup` re-applies the lookup mask so `extern` members stay excluded, and
+        // `resolveOverloadedLookup` keeps the ranked survivors -- a single winner (the more
+        // derived requirement) or, if incomparable, an overload the enclosing member lookup
+        // will diagnose.
+        auto resolvedLookup =
+            filteredLookupResult.isValid()
+                ? filteredLookupResult
+                : resolveOverloadedLookup(
+                      refineLookup(overloadedExpr->lookupResult2, LookupMask::Default));
         baseExpr = createLookupResultExpr(
             overloadedExpr->name,
-            filteredLookupResult,
+            resolvedLookup,
             overloadedExpr->base,
             overloadedExpr->loc,
             overloadedExpr);
