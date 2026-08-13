@@ -9249,9 +9249,24 @@ void IRInst::replaceUsesWith(IRInst* other)
 
 // Insert this instruction into the same basic block
 // as `other`, right before it.
+// Materialize before reading a neighbour link.
+//
+// `_insertAt` materializes the parent, but these callers read `other`'s neighbour to
+// compute where to splice, and they read it *before* `_insertAt` runs. On the last
+// decoration of a global whose body is still encoded, that link reads as null; the
+// materialization inside `_insertAt` then attaches the body to it, and the splice
+// proceeds against the stale null -- overwriting the body's first instruction and the
+// parent's last pointer, orphaning the whole body.
+static void _materializeParentOf(IRInst* other)
+{
+    if (auto parent = other->getParent())
+        parent->ensureBodyMaterialized();
+}
+
 void IRInst::insertBefore(IRInst* other)
 {
     SLANG_ASSERT(other);
+    _materializeParentOf(other);
     if (other->getPrevInst() == this)
         return;
     if (other == this)
@@ -9317,6 +9332,7 @@ void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 void IRInst::insertAfter(IRInst* other)
 {
     SLANG_ASSERT(other);
+    _materializeParentOf(other);
     removeFromParent();
     _insertAt(other, other->getNextInst(), other->getParent());
 }
