@@ -191,6 +191,19 @@ public:
     std::size_t getCount() const { return map.size(); }
     std::size_t getBucketCount() const { return map.bucket_count(); }
 
+    /// Return the number of bytes this dictionary has allocated from the heap.
+    ///
+    /// The underlying map stores its entries in one dense array plus a separate bucket index, and
+    /// both are counted: the entry array is sized by its *capacity* rather than its count, because
+    /// capacity is what is resident. Anything the keys or values own in turn (a `List` value, a
+    /// heap-allocated `String` key) is NOT included — this measures the dictionary's own storage,
+    /// so a caller holding such values must walk them itself.
+    std::size_t calcTotalMemoryAllocated() const
+    {
+        return map.values().capacity() * sizeof(typename InnerMap::value_type) +
+               map.bucket_count() * sizeof(typename InnerMap::bucket_type);
+    }
+
     //
     // Lookup
     //

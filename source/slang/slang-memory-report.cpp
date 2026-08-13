@@ -8,11 +8,68 @@
 #include "slang-module.h"
 #include "slang-session.h"
 
+#if defined(_WIN32)
+#include <psapi.h>
+#include <windows.h>
+#ifdef _MSC_VER
+// Link psapi where the symbol lives, following slang-win-visual-studio-util.cpp's use of the same
+// pragma for advapi32/Shell32 — this keeps a single-caller platform dependency out of the build
+// files.
+#pragma comment(lib, "psapi")
+#endif
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#else
+#include <cstdio>
+#include <unistd.h>
+#endif
+
 namespace Slang
 {
 
 namespace
 {
+
+/// Return the process's current resident set in bytes, or 0 if it cannot be determined.
+///
+/// Resident memory, deliberately, not virtual size: the question this answers is how much physical
+/// memory the compiler is actually costing the machine, which is also what the suite's peak-RSS
+/// measurement records, so the two are directly comparable.
+///
+/// This duplicates the reader in `tools/compile-perf/native/api-driver.cpp` rather than sharing
+/// one. The driver is a separate executable that dlopens libslang and must measure processes built
+/// from Slang versions predating this file, so there is no build in which one copy could serve
+/// both. Any change here should be mirrored there.
+size_t currentProcessRssBytes()
+{
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS counters;
+    counters.cb = sizeof(counters);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
+        return size_t(counters.WorkingSetSize);
+    return 0;
+#elif defined(__APPLE__)
+    mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) ==
+        KERN_SUCCESS)
+        return size_t(info.resident_size);
+    return 0;
+#else
+    FILE* file = fopen("/proc/self/statm", "r");
+    if (!file)
+        return 0;
+    long totalPages = 0;
+    long residentPages = 0;
+    const int fieldsRead = fscanf(file, "%ld %ld", &totalPages, &residentPages);
+    fclose(file);
+    if (fieldsRead != 2)
+        return 0;
+    // The second field is resident pages; the first is total program size and would overstate the
+    // footprint by counting memory that was never faulted in.
+    return size_t(residentPages) * size_t(sysconf(_SC_PAGESIZE));
+#endif
+}
 
 /// Sums the arenas and blobs reachable from a linkage, counting each underlying object once.
 ///
@@ -51,7 +108,13 @@ struct MemoryWalker
     {
         if (!irModule)
             return;
-        addArena(irModule->getMemoryArena(), report.irArenaUsed, report.irArenaReserved);
+        // Guarded by the arena's first-visit check rather than its own, so the side tables are
+        // counted exactly when their module's arena is — one `if` cannot drift from the other.
+        if (!firstVisit(&irModule->getMemoryArena()))
+            return;
+        report.irArenaUsed += irModule->getMemoryArena().calcTotalMemoryUsed();
+        report.irArenaReserved += irModule->getMemoryArena().calcTotalMemoryAllocated();
+        report.irSideTables += irModule->calcSideTableMemoryAllocated();
     }
 
     void addModule(Module* module)
@@ -60,6 +123,22 @@ struct MemoryWalker
             return;
         addASTBuilder(module->getASTBuilder());
         addIRModule(module->getIRModule());
+    }
+
+    /// Add everything a linkage owns: its own AST builder, the modules loaded through it, the IR
+    /// modules it produced, and its source managers.
+    void addLinkage(Linkage* linkage)
+    {
+        if (!linkage)
+            return;
+        addASTBuilder(linkage->getASTBuilder());
+        for (const RefPtr<LoadedModule>& module : linkage->loadedModulesList)
+            addModule(module);
+        // IR modules produced by this linkage that no `Module` owns — the linked and specialized
+        // clones built during code generation. Counted as IR like any other IR module.
+        for (const RefPtr<IRModule>& irModule : linkage->compiledModules)
+            addIRModule(irModule);
+        addSourceManager(linkage->getSourceManager());
     }
 
     /// Add a source manager's own arena and the retained text of its files, then its parent.
@@ -94,23 +173,25 @@ MemoryReport captureMemoryReport(Linkage* linkage)
     if (!linkage)
         return walker.report;
 
-    walker.addASTBuilder(linkage->getASTBuilder());
-    for (const RefPtr<LoadedModule>& module : linkage->loadedModulesList)
-        walker.addModule(module);
-
-    // IR modules produced by this linkage that no `Module` owns — the linked and specialized
-    // clones built during code generation. They are counted as IR like any other IR module.
-    for (const RefPtr<IRModule>& irModule : linkage->compiledModules)
-        walker.addIRModule(irModule);
+    walker.addLinkage(linkage);
 
     if (Session* globalSession = linkage->getSessionImpl())
     {
+        // The builtin linkage is walked as a linkage in its own right, not merely as a source of
+        // core modules. `Session::loadBuiltinModule` builds core-module AST into ITS root
+        // `ASTBuilder` rather than into a per-module one, so reaching the core modules alone would
+        // report a core-module AST of a few megabytes and silently charge the rest to the
+        // unattributed remainder.
+        walker.addLinkage(globalSession->getBuiltinLinkage());
         for (const RefPtr<Module>& coreModule : globalSession->coreModules)
             walker.addModule(coreModule);
         walker.addSourceManager(&globalSession->builtinSourceManager);
     }
 
-    walker.addSourceManager(linkage->getSourceManager());
+    // Read last, so the total covers everything the walk itself allocated (the visited set) rather
+    // than reporting a total from before that allocation and charging the difference to the
+    // residual.
+    walker.report.processRss = currentProcessRssBytes();
 
     return walker.report;
 }
@@ -129,9 +210,27 @@ void appendMemoryReportLines(const MemoryReport& report, StringBuilder& out)
     emit("astArenaReservedKb", report.astArenaReserved);
     emit("irArenaUsedKb", report.irArenaUsed);
     emit("irArenaReservedKb", report.irArenaReserved);
+    emit("irSideTablesKb", report.irSideTables);
     emit("sourceArenaUsedKb", report.sourceArenaUsed);
     emit("sourceArenaReservedKb", report.sourceArenaReserved);
     emit("sourceContentKb", report.sourceContent);
+
+    // Emitted only when the platform reader worked. A failed read yields 0, and publishing that
+    // would make the residual below read as a large negative clamped to zero — a component-sums-
+    // equal-the-total story that happens to be false. Absent is honest; zero is not.
+    if (report.processRss == 0)
+        return;
+    emit("endOfCompileRssKb", report.processRss);
+
+    // The residual is computed here, beside the components, rather than left to the consumer: the
+    // subtraction is only correct if it names EVERY component, so deriving it downstream would
+    // silently go wrong the next time a component is added here. `reserved` is the term that
+    // belongs in it, not `used`, because reserved is what is resident and therefore what the
+    // process RSS actually contains.
+    const size_t attributed = report.astArenaReserved + report.irArenaReserved +
+                              report.irSideTables + report.sourceArenaReserved +
+                              report.sourceContent;
+    emit("unattributedKb", report.processRss > attributed ? report.processRss - attributed : 0);
 }
 
 } // namespace Slang

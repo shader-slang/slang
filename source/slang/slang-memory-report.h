@@ -27,6 +27,19 @@ struct MemoryReport
 
     /// Retained text of every loaded source file, which the arenas above do not own.
     size_t sourceContent = 0;
+
+    /// IR lookup tables that live on the heap rather than in any `IRModule` arena — the
+    /// deduplication context's maps and the modules' own side maps. Part of IR's cost, counted
+    /// apart from `irArena*` because it scales with instruction count independently of the
+    /// instructions' own bytes.
+    size_t irSideTables = 0;
+
+    /// The process's resident set at the instant this report was taken, or 0 if the platform
+    /// reader failed. This is what makes the rest of the report interpretable: without a total
+    /// captured at the SAME moment, the components could only be compared against a peak measured
+    /// over the whole process lifetime, and the difference between the two would conflate
+    /// "memory we have not attributed" with "memory that was already freed".
+    size_t processRss = 0;
 };
 
 /// Return what `linkage` and its global session are holding at the instant of the call.
