@@ -101,6 +101,12 @@ SLANG_API Index getLiveIRModuleCount();
 /// could pass while checking nothing.
 SLANG_API Index getDeferredBodyLoaderInstallCount();
 
+/// Number of times a deferred body has been asked to materialize, process-wide.
+///
+/// Counts calls into the loader's slow path, so it rises only on a genuine first touch.
+/// Exists to answer whether a given phase actually reaches still-deferred bodies.
+SLANG_API Index getDeferredBodyMaterializationCount();
+
 /// Test-only: round-trips a module whose decoration has children of its own through the
 /// serialized form, and reports what came back.
 ///

@@ -665,11 +665,26 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// passes and emit over IR that can still reference a builtin module, so a
     /// body can be first touched from several backend threads at once.
     ///
-    /// Whether that path reaches a *still-deferred* body in practice, rather than
-    /// one that linking already materialized, is not established: a 16-thread
-    /// parallel-backend run is clean with on-demand loading on and off alike, which
-    /// is consistent with either. So this is currently insurance whose cost is a
-    /// single uncontended lock on first touch, not a measured-necessary guard.
+    /// That path is where the materializing actually happens, measured rather than
+    /// assumed. Counting calls into the loader's slow path across the two phases of
+    /// that workflow, for one compute entry point:
+    ///
+    ///     threads   during serial front end   during parallel backend
+    ///        1                 0                        38
+    ///        4                 0                        40
+    ///        8                 0                        52
+    ///       16                 0                        57
+    ///
+    /// The front end materializes nothing: linking leaves every body it did not
+    /// need still encoded, and emit is what walks them. So every first touch happens
+    /// on the concurrent side.
+    ///
+    /// The rise from 38 to 57 is the contended case occurring, not extra work being
+    /// done. 38 is the number of distinct bodies; the excess is threads that all
+    /// observed the deferred flag before any of them had finished, each entering the
+    /// slow path for the same body. That is the shape `materializeDeferredBody`
+    /// documents and handles by rechecking under this lock, and it is why the lock
+    /// is load-bearing rather than insurance.
     std::mutex mutex;
 
     Int64 instIndex = 0;

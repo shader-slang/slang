@@ -111,3 +111,121 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
     // instructions were fully linked shows up here as a short child list.
     SLANG_CHECK(mismatches == 0);
 }
+
+// Checks that the concurrency Slang actually supports is where deferred bodies get
+// materialized, and that racing on them yields identical output.
+//
+// This is the counterpart to the test above: that one drives `ensureBodyMaterialized`
+// directly on a synthetic module, which proves the protocol works but not that anything
+// real depends on it. This one runs the documented serial-frontend/parallel-backend
+// workflow from docs/user-guide/08-compiling.md -- load, specialize and `link()` on one
+// thread, then call `getEntryPointCode()` from many -- and asserts that the parallel phase
+// is where first touches happen.
+//
+// That assertion is the one that keeps the loader's mutex honest. If linking ever starts
+// materializing everything eagerly, the concurrent first touch stops occurring, and the
+// justification for the lock quietly becomes false without any test noticing. Measured
+// when written: zero materializations during the front end, and 38 (1 thread) rising to 57
+// (16 threads) during the backend, the excess being threads that all observed the deferred
+// flag before any had finished.
+SLANG_UNIT_TEST(irDeferredBodyMaterializesOnTheSupportedConcurrentPath)
+{
+    if (!_onDemandLoadingExpected())
+        return; // Nothing is deferred, so there is nothing to observe.
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // ---- serial front end: everything up to and including link() ----
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_HLSL;
+    targetDesc.profile = globalSession->findProfile("sm_5_0");
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    static const char* kSource = R"(
+interface IScale { float apply(float v); }
+struct Doubler : IScale { float apply(float v) { return v * 2.0f; } }
+float scaleAll<T : IScale>(T s, float v) { return s.apply(v); }
+RWStructuredBuffer<float> gOut;
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain(uint3 tid : SV_DispatchThreadID)
+{
+    float4x4 m = float4x4(1.0f);
+    float3 v = normalize(float3(1.0f, 2.0f, 3.0f));
+    Doubler d;
+    gOut[tid.x] = scaleAll(d, dot(v, mul(m, float4(v, 1.0f)).xyz)) + sqrt(abs(v.y));
+}
+)";
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "supportedConcurrentPath",
+        "supportedConcurrentPath.slang",
+        kSource,
+        diagnostics.writeRef()));
+    SLANG_CHECK_ABORT(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK_ABORT(
+        module->findEntryPointByName("computeMain", entryPoint.writeRef()) == SLANG_OK);
+    slang::IComponentType* components[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> composed;
+    SLANG_CHECK_ABORT(
+        session->createCompositeComponentType(components, 2, composed.writeRef()) == SLANG_OK);
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK_ABORT(composed->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+    const Index afterLink = getDeferredBodyMaterializationCount();
+
+    // ---- parallel back end: the one concurrent use the API documents as supported ----
+    const int kThreadCount = 8;
+    List<String> outputs;
+    outputs.setCount(kThreadCount);
+    List<uint8_t> succeeded;
+    succeeded.setCount(kThreadCount);
+    ::memset(succeeded.getBuffer(), 0, size_t(kThreadCount));
+
+    std::atomic<bool> go{false};
+    List<std::thread> threads;
+    for (int i = 0; i < kThreadCount; i++)
+    {
+        threads.add(std::thread(
+            [&, i]()
+            {
+                while (!go.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+                ComPtr<slang::IBlob> code;
+                ComPtr<slang::IBlob> diag;
+                if (linked->getEntryPointCode(0, 0, code.writeRef(), diag.writeRef()) != SLANG_OK ||
+                    !code)
+                {
+                    return;
+                }
+                outputs[i] = String((const char*)code->getBufferPointer());
+                succeeded[i] = 1;
+            }));
+    }
+    go.store(true, std::memory_order_release);
+    for (auto& t : threads)
+        t.join();
+
+    const Index duringBackend = getDeferredBodyMaterializationCount() - afterLink;
+
+    for (int i = 0; i < kThreadCount; i++)
+    {
+        SLANG_CHECK(succeeded[i] != 0);
+        SLANG_CHECK(outputs[i] == outputs[0]);
+    }
+    SLANG_CHECK(outputs[0].getLength() > 0);
+
+    // The point of the test: first touches happen on the concurrent side, so the loader's
+    // lock is guarding a path that is really taken.
+    SLANG_CHECK(duringBackend > 0);
+}

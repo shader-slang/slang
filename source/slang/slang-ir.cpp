@@ -8882,6 +8882,16 @@ Index getDeferredBodyLoaderInstallCount()
     return g_deferredBodyLoaderInstallCount.load(std::memory_order_relaxed);
 }
 
+namespace
+{
+std::atomic<Index> g_deferredBodyMaterializationCount{0};
+}
+
+Index getDeferredBodyMaterializationCount()
+{
+    return g_deferredBodyMaterializationCount.load(std::memory_order_relaxed);
+}
+
 IRDecoration* IRInst::getFirstDecoration()
 {
     // Decoration lookup runs on every instruction of every module, so it does not
@@ -8923,6 +8933,7 @@ void IRInst::_materializeDeferredBody()
     // serialized blob, with no diagnostic, and leave the flag set so that every
     // later access repeats this slow path.
     SLANG_RELEASE_ASSERT(loader);
+    g_deferredBodyMaterializationCount.fetch_add(1, std::memory_order_relaxed);
     loader->materializeDeferredBody(this);
 }
 
