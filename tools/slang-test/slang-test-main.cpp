@@ -1372,13 +1372,24 @@ static RPCAttemptOutcome _executeRPCOnce(
 
     if (waitFailed || !rpcConnection->hasMessage())
     {
-        // waitForResult folds three causes into one failure code, so ask the transport which
-        // it was: a live-but-slow server is a timeout (this test's problem), while a closed
-        // or errored pipe is a lost server (not this test's problem).
-        auto* connection = rpcConnection->getUnderlyingConnection();
-        const bool serverGone =
-            connection && (connection->getReadState() == HTTPPacketConnection::ReadState::Closed ||
-                           connection->getReadState() == HTTPPacketConnection::ReadState::Error);
+        // A malformed HTTP header or JSON value leaves the connection unusable just like EOF,
+        // but starting a fresh server cannot repair a protocol disagreement. Keep it out of the
+        // loss retry and attribution paths.
+        const auto readError = rpcConnection->getReadError();
+        if (readError == JSONRPCConnection::ReadError::Protocol)
+        {
+            context->getTestReporter()->message(
+                TestMessageType::RunError,
+                "JSON RPC protocol error: the test server returned a malformed HTTP or JSON "
+                "response");
+            context->destroyRPCConnection();
+            return RPCAttemptOutcome::ProtocolError;
+        }
+
+        // A live-but-slow server has no read error and is a timeout (this test's problem), while
+        // EOF or a transport failure is a lost connection (not this test's problem).
+        const bool serverGone = readError == JSONRPCConnection::ReadError::ConnectionClosed ||
+                                readError == JSONRPCConnection::ReadError::Transport;
         const RPCAttemptOutcome outcome =
             serverGone ? RPCAttemptOutcome::Lost : RPCAttemptOutcome::TimedOut;
 
@@ -1479,10 +1490,13 @@ static Result _executeRPC(
 
     if (second == RPCAttemptOutcome::Ok)
     {
-        // The RPC is fine; the server was not. Record the loss so it stays countable --
-        // silently absorbing these is how a rate that climbs from 14 a night to 140 stays
-        // invisible -- but do not charge it to the test.
-        context->getTestReporter()->recordTestServerLoss();
+        // The RPC is fine; if a server was actually lost, keep that loss countable. A recovered
+        // StartFailed means no server existed, so recording it here would make the summary claim
+        // that one died.
+        if (first == RPCAttemptOutcome::Lost)
+        {
+            context->getTestReporter()->recordTestServerLoss();
+        }
         return SLANG_OK;
     }
 
