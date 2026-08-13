@@ -122,15 +122,15 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     //
     // Two complementary signals cover all param kinds:
     //
-    //  1. In-params: the first pass emits IRDebugValue(debugVar, paramValue) immediately after
-    //     the param list, so scanning for IRDebugValue whose value-operand is an IRParam gives
-    //     a direct set of already-processed in-params.
+    //  1. In-params and borrow-in params: the first pass emits an IRDebugValue whose value is
+    //     the IRParam directly (for plain in-params) or an IRLoad of the IRParam (for borrow-in
+    //     params). Scanning for both shapes gives a set of already-processed by-value params.
     //
-    //  2. Out-params (e.g. `this` in an initializer): the first pass does NOT emit an initial
-    //     IRDebugValue (the param is uninitialized), so signal (1) misses them. However,
-    //     copyNameHintAndDebugDecorations always copies the IRNameHintDecoration from the param
-    //     to its IRDebugVar, and IRDebugVar records for params carry a non-null argIndex operand.
-    //     Scanning for such IRDebugVar records and collecting their name hints covers out-params.
+    //  2. Out-params (e.g. `this` in an initializer) and proxy-var params: the first pass does
+    //     NOT emit an initial IRDebugValue, so signal (1) misses them. However,
+    //     copyNameHintAndDebugDecorations copies the IRNameHintDecoration from the param to its
+    //     IRDebugVar, and IRDebugVar records for params carry a non-null argIndex operand.
+    //     Scanning for such IRDebugVar records and collecting their name hints covers these cases.
     HashSet<IRInst*> alreadyProcessedInParams;
     HashSet<UnownedStringSlice> existingParamDebugVarNames;
     for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
@@ -139,7 +139,15 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         {
             auto val = debugValue->getValue();
             if (as<IRParam>(val))
+            {
                 alreadyProcessedInParams.add(val);
+            }
+            else if (auto load = as<IRLoad>(val))
+            {
+                // Borrow-in params emit IRDebugValue(debugVar, IRLoad(param)).
+                if (as<IRParam>(load->getPtr()))
+                    alreadyProcessedInParams.add(load->getPtr());
+            }
         }
         else if (auto debugVar = as<IRDebugVar>(inst))
         {
