@@ -66,10 +66,18 @@ SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
 
 /// Acquire-load a `next`/`first` link of an instruction list.
 ///
-/// Applied to all list traversal, not only the decoration walk: `findDecoration`
-/// iterates through `IRInstListBase::Iterator`, whose `operator++` and `end()` read
-/// these links directly, so putting the barrier only on the named decoration
-/// accessors left the path that actually walks the list unsynchronized.
+/// Applied to the traversals that can run *without* materializing first, which is where
+/// a concurrent publication can be observed. `findDecoration` iterates through
+/// `IRInstListBase::Iterator`, whose `operator++` and `end()` read these links directly,
+/// so putting the barrier only on the named decoration accessors left the path that
+/// actually walks the list unsynchronized. `IRInstList<T>::end()` needs it for the same
+/// reason and is easy to miss, because it *shadows* the base rather than inheriting it --
+/// and `getDecorations()` returns exactly that type.
+///
+/// Lists reached only through materializing accessors -- `IRFilteredInstList`,
+/// `IRModifiableInstList`, both built from `getChildren()`/`getFirstChild()` -- do not
+/// need it: the caller has already synchronized on the deferred flag, whose release/acquire
+/// pair orders everything the materializing thread wrote.
 SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 {
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
@@ -1095,7 +1103,13 @@ T* IRInst::findDecoration()
 template<typename T>
 typename IRInstList<T>::Iterator IRInstList<T>::end()
 {
-    return Iterator(last ? last->next : nullptr);
+    // Acquire, for the same reason as `IRInstListBase::end()`, which this shadows rather
+    // than inherits. Missing it here left the typed lists reading the publication link
+    // raw -- and `getDecorations()` is one of them, which is precisely the walk that is
+    // allowed to observe a deferred body's link without going through
+    // `ensureBodyMaterialized()`. Fixing only the base class covered the untyped walk and
+    // left the typed one unsynchronized.
+    return Iterator(last ? irLoadInstLink(last->next) : nullptr);
 }
 
 template<typename T>
