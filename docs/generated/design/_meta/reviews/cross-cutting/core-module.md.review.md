@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:19:16+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:18:42+00:00
 target_doc: cross-cutting/core-module.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 19ad329c51b4e53e37b131c94d49631623fa525a7de092b35d5852c27a4bca02
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 758f3793c6cde62bb10f3ecad0e65bcabd0d3115b5629165afe8408e4fab2f78
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,34 +13,37 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 1
+finding_count: 2
 severity_breakdown:
-  critical: 0
-  major: 0
-  minor: 1
+  critical: 1
+  major: 1
+  minor: 0
   nit: 0
 ---
 
 # Review report for cross-cutting/core-module.md
 
 ## Summary
-The document satisfies the requested structure and all relative links resolve at the target source commit. One minor factual issue remains: the core-module inventory names `Result` as a provided type, but the watched meta-Slang files at the target commit do not declare such a type.
+
+The document satisfies the required structure, covers all resolved meta-slang and prelude files, and is broadly accurate. Two source-alignment errors remain: the non-embedded build can still compile the core module eagerly and fail during the build, and default preludes are emitted into generated source as embedded text rather than referenced through generated `#include` directives.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show cross-cutting/core-module.md` and reviewed the resolved watched paths plus the dependency document `architecture/overview.md`.
-- Checked front matter for the required generated-doc keys, source commit shape, warning string, and watched-path digest value.
-- Resolved all 41 markdown links in the document against `52339028a2aa703271533454c6b9528a534bac31`; no dangling links were found.
-- Verified the required prompt sections: shipped-code families, core module, GLSL module, standard modules, preludes, and building the core module.
-- Spot-checked more than 10 source claims, including the `*.meta.slang` file set, the core and GLSL embedding CMake targets, generated module headers, neural standard-module output layout, every listed prelude header, and representative declarations in `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, and `glsl.meta.slang`.
-- Checked that no body line-number citations needed verification; the document uses file links without source line anchors.
+
+- Read `_review.md`, `_common.md`, the per-document prompt, the target document, `architecture/overview.md`, and the complete resolved file list from `regenerate.py show`.
+- Verified 31 factual claims at commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`, including meta-module declarations, autodiff types and conformances, standard-module contents and import paths, compiler selection, build products, cache format, and prelude selection.
+- Verified every line-number citation in the body; the document contains no explicit source line-number citations.
+- Resolved all 59 Markdown-link occurrences (45 distinct destinations) at the recorded commit and confirmed all referenced generated pages are manifest entries.
+- Recomputed the watched-path digest, confirmed all mandatory front-matter fields, ran the document lint, and confirmed the 20,211-byte document is below its 24,576-byte cap.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Core module`, lines 100-105 | The page says the core declarations include `Optional`, `Result`, and `Tuple`, but `Result` was not found in the watched meta-Slang sources at the recorded source commit. | `source/slang/core.meta.slang:1790` declares `Optional`, `source/slang/core.meta.slang:1921` declares `Tuple`, and a search of the watched `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, and `glsl.meta.slang` files at `52339028a2aa703271533454c6b9528a534bac31` found no `Result` declaration. | Remove `Result` from that sentence, or replace it with a type that is actually declared in the watched meta-Slang files. |
+| F-001 | critical | `## Core module`, lines 74-80; `## Building the core module`, lines 267-270 and 377-380 | The repeated claim that with `SLANG_EMBED_CORE_MODULE=OFF` meta-source errors surface only at runtime is false for the documented build graph. A non-embedded shared build creates the `ALL` target `generate_core_module_cache`, which depends on `generate_core_module`; both standard modules also depend on `generate_core_module`, and their module targets are `ALL`. Thus the build can run `slang-bootstrap -compile-core-module` and report meta-source errors before any normal session starts, even though C++ source compilation is decoupled from core-module compilation. | `source/slang/CMakeLists.txt:370-404` defines the eager cache target and its dependency on `generate_core_module`; `source/slang-core-module/CMakeLists.txt:141-174` shows that target runs `slang-bootstrap -compile-core-module`; `source/standard-modules/neural/CMakeLists.txt:53-82` and `source/standard-modules/experimental/CMakeLists.txt:46-64` make the standard-module `ALL` targets depend on the same generator target. | Replace all “only at runtime” wording with the narrower invariant: disabling embedding separates core-module compilation from C++ compilation. Explain that the normal full/shared build may still compile the module eagerly for the archive, standard modules, or runtime cache; runtime compilation is the fallback when no valid cache or embedded module is available. |
+| F-002 | major | `## Preludes`, lines 235-240 | The document says prelude headers are emitted alongside target output and referenced through `#include "<prelude>"`-style mechanisms. The default compiler path instead embeds each `*-prelude.h` into the compiler as a string, registers the CUDA/C++/HLSL strings on the global session, and writes the selected string directly into generated source. A custom prelude string may itself contain an include, but that is not how the shipped default preludes are brought into scope. | `prelude/CMakeLists.txt:2-20` runs `slang-embed` on each prelude header; `source/slang/slang-global-session.cpp:125-128` registers the embedded default strings; `source/slang/slang-emit.cpp:2937-2951` emits the Torch, host, or language prelude string directly through `sourceWriter.emit(...)`. | Replace the sidecar-header/`#include` description with the embedded-string flow. Note separately that the headers are installed and that callers can override a language prelude with text containing an include if desired. |
 
 ## No-issues notes
-- The page mentions every resolved prelude header under `prelude/`.
-- The standard-module section correctly identifies `neural` as the only module under `source/standard-modules/` at the target commit.
-- The embedding description matches the generator-expression wiring in `source/slang/CMakeLists.txt` and the generated-header flow in `source/slang-core-module/CMakeLists.txt`.
+
+- All four watched `*.meta.slang` files and all nine resolved `prelude/*.h` files are mentioned.
+- The standard-module import paths, build compiler selection, and `-load-core-module` dependency match the two module CMake files.
+- The core archive, core embeddable header, and GLSL embeddable header are correctly described as outputs of one `-compile-core-module` command.

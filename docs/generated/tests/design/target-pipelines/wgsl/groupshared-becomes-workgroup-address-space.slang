@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:46:22Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#specializeaddressspaceforwgsl
-//META: doc_section_digest=55422c2a92758737eb6eb0ac0f489a44b06df5c80b1e2907ff718d43d17483b7
+//META: doc_section_digest=1d1402207447152945827eb2116a3e8f41c3d12b984d1cc985e2781cd1f4a752
 //META: purpose=groupshared declarations are tagged var<workgroup> by specializeAddressSpaceForWGSL
 //META: intent=functional
 //META: pipeline_stage=ir-pass

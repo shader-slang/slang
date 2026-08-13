@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#global-state
-//META: doc_section_digest=985b6b6d7f1d6d80faf5341c61142918f8a6c84c4b159badfdedc255cca3c5a8
-//META: purpose=A `static const int` at module scope lowers to a globalConstant opcode wrapping the literal value.
+//META: doc_section_digest=100b91a908217e68795cbc9dac7393e0325718d4c3df831fe3616ee38716a45a
+//META: purpose=A static const int at module scope lowers to a globalConstant opcode wrapping the literal value.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A module-scope `static const int gK = 42;` should emit
-// `let %gK : Int = globalConstant(42 : Int)` — the value is wrapped
-// by the `globalConstant` opcode, not emitted as a bare integer
-// literal at module scope.
+// Verifies that a module-scope `static const` keeps a dedicated opcode instead
+// of being propagated into its uses at lowering time. CHECK requires
+// `let %gK : Int = globalConstant(42 : Int)`; a plain `let %gK : Int = 42 : Int`
+// would mean the constant lost its module-scope identity (and with it the
+// linkage that lets another module refer to it).
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#enumdecl-and-enumcasedecl
-//META: doc_section_digest=b72726890459268d21bfd18ef8977151c7699c0ba49e17682e79c4cb2cfa2ff4
-//META: purpose=An EnumDecl is treated as an AggTypeDecl so enum types can have conformances; an interface-constrained generic accepts an enum value.
+//META: doc_section_digest=c018493cff4ea0d125fd96032328c7a624df200e9019bef0883c86de143f6642
+//META: purpose=An EnumDecl is an aggregate type declaration, so an enum can be given an interface conformance and dispatched through a constrained generic.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented note that "EnumDecl is treated as an
-// AggTypeDecl so that enum types can have conformances and member
-// functions like any other type." An enum extension adds an
-// interface conformance; the interface-constrained generic call
-// dispatches through the enum value.
+// Verifies that an enum participates in the same conformance machinery as a
+// struct. An extension adds an interface conformance to the enum, and an
+// interface-constrained generic is called with an enum value; the CHECK
+// asserts the value the conformance's method returns for that case.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

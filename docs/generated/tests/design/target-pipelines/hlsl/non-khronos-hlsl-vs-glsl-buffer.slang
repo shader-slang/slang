@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:16:11+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#hlsl-specific-runtime-predicates
-//META: doc_section_digest=05a2ea3acb9ebb0668e90f202fe188cf4ca1f104177b22521b8652d6efbd73eb
+//META: doc_section_digest=5aff8e92c7894cdefb24e2d630b00a42766e9a4798e9e1fc37d94061ca29ab6e
 //META: purpose=HLSL is non-Khronos: an RWStructuredBuffer is HLSL-shaped (register(uN)) on HLSL but GLSL-shaped (layout buffer) on GLSL.
 //META: intent=functional
 //META: pipeline_stage=emit

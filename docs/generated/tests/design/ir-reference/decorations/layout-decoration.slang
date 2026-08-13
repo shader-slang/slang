@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-layoutdecoration
-//META: doc_section_digest=31fd6c29642b2014d16781ceb9cd5a2070d0dd3d7233c66a65799e59f1cdeb9c
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout--layoutdecoration
+//META: doc_section_digest=9aea9e5f0576048132cb69783d0a9675d51a7a43153f52ed20527c7dae4045f3
 //META: purpose=The layout decoration attaches a Layout opcode reference to a global parameter; the operand is an inst-reference to a Layout instruction.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Per the doc: "layout attaches a Layout opcode (documented in
-// metadata.md) to a parameter, type, or variable. The Layout itself
-// carries the offset / size / register binding information; layout
-// is the link." The dump prints [layout(%N)] where %N is an
-// unstable inst-reference ID; the test wildcards the reference.
+// Verifies that `layout` is a *link* rather than a container: its operand
+// is an inst reference to a separate `Layout` opcode that holds the
+// offset/size/register data. The CHECK matches `[layout(%N)]` with the
+// reference id wildcarded, because inst numbering is assigned by the dump
+// printer and is not stable.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

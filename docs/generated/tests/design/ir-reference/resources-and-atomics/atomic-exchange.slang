@@ -1,16 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=f394bf1461f5876676bdb5fa5c51feaa920cf5ef0986df9fe1bbf0db976d5a30
+//META: doc_section_digest=534618adad82acb65da181567998c07a77381ecf27996abdf7535de5b49ec7b3
 //META: purpose=`Atomic<T>::exchange(v)` lowers to `atomicExchange(%ptr, %val, %order)`, the swap primitive that returns the previously stored value.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `atomicExchange` as the unconditional swap; the
-// returned value is the previous content.
+// Verifies the unconditional swap. The new value is thread-derived so
+// it stays an SSA operand, and the CHECK allows exactly one operand
+// after it — the memory order — which is what separates `atomicExchange`
+// from the two-order `atomicCompareExchange`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 
@@ -26,4 +28,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // IR-LABEL: func %main
-// IR: atomicExchange(%{{[^,]+}}, %{{[^,]+}}, {{.*}})
+// IR: atomicExchange(%{{[^,]+}}, %{{[^,]+}}, {{[^,)]+}})

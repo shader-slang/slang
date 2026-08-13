@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#arrays
-//META: doc_section_digest=fa1a8caf9cb2dd874328b2b826017621c7f1df8e509df2e908e25b520003a421
+//META: doc_section_digest=c077a7ede5d6d5b6b14b9cd00c6b8c5162dbde144a6ae57c354c39ace0febb74
 //META: purpose=Stress: Array composes with a user-struct element; the element-type operand names the struct IR identity.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Arrays" row says the element-type operand is any
-// IR type. Combining `Array` with a user struct surfaces
-// `Array(%Point, 4 : Int)` — the struct's IR identity sits in
+// Array composes with a user-struct element; the element-type operand
+// names the struct IR identity. Combining `Array` with a user struct
+// surfaces `Array(%Point, 4 : Int)` — the struct's IR identity sits in
 // the first operand slot.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main

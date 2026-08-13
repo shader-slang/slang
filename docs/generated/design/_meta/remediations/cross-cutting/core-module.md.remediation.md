@@ -1,13 +1,13 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:08:38Z
 target_doc: cross-cutting/core-module.md
 review_report: ../../reviews/cross-cutting/core-module.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 1
+  fixed: 2
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
@@ -18,10 +18,16 @@ actions:
 
 ## Summary
 
-The review reported one minor finding, which was fixed. The `## Core module` provided-types sentence listed `Result`, but a search of the watched `core.meta.slang`, `hlsl.meta.slang`, `diff.meta.slang`, and `glsl.meta.slang` files at the source commit found `Result` only in comments, never as a declared type. The sentence now names only `Optional` and `Tuple`, both confirmed declared in `source/slang/core.meta.slang` (lines 1805 and 1921).
+Both findings were verified against the build files and both were
+correct, so both were fixed. The critical finding (F-001) was applied
+in three places where the page repeated the false "errors surface only
+at runtime" claim for `SLANG_EMBED_CORE_MODULE=OFF`; the major finding
+(F-002) rewrote the prelude delivery description. No findings were
+rejected, deferred, or escalated.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | `Result` not declared in any watched meta-slang file (only in comments at `hlsl.meta.slang:12902` etc.); `Optional`/`Tuple` confirmed at `core.meta.slang:1805,1921`. | Dropped `Result` from the provided-types sentence; now reads `Optional` and `Tuple`. |
+| F-001 | fixed | Verified: `source/slang/CMakeLists.txt:393-404` makes `generate_core_module_cache` an `ALL` target depending on `generate_core_module`, which runs `slang-bootstrap -compile-core-module` (`source/slang-core-module/CMakeLists.txt:141-166`); `source/standard-modules/neural/CMakeLists.txt:54,82` and `.../experimental/CMakeLists.txt:49` add the same dependency under `ALL`. A non-embedded build therefore compiles the meta-source during the build. | Rewrote the three "surface at runtime" passages (`## Core module`; `## Building the core module` option list and step 4) to say errors surface from the separate `generate_core_module` step that a normal build still runs, with runtime compilation as the no-cache fallback. |
+| F-002 | fixed | Verified: `prelude/CMakeLists.txt:6-21` runs `slang-embed` per `*-prelude.h`; `source/slang/slang-global-session.cpp:126-128` registers the embedded CUDA/C++/HLSL strings; `source/slang/slang-emit.cpp:2940-2951` writes the selected prelude string via `sourceWriter.emit`. The `#include "<prelude>"` description was wrong for the default path. | Replaced the sidecar-header/`#include` sentence in `## Preludes` with the embed-to-string flow, keeping a note that the headers are installed and a custom prelude string may include one. |

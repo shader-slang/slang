@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=63ee1ec4667453d54a2bcd56e4fb65f66647e427edd024e6dec258599bc428c6
+//META: doc_section_digest=221e203d328edd373a1da34064baee6a2aab4c19c403c7438de72b93ad6ee5f5
 //META: purpose=Expansion: a scalar UInt16 surfaces as the IR type of a uniform uint16_t global_param.
 //META: intent=expansion
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Basic scalar types table lists `UInt16` as the 16-bit
-// unsigned integer. A bare `uniform uint16_t` exercises the
-// scalar storage form for the narrow unsigned type.
+// a scalar UInt16 surfaces as the IR type of a uniform uint16_t
+// global_param. A bare `uniform uint16_t` exercises the scalar storage
+// form for the narrow unsigned type.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

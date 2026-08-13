@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers
-//META: doc_section_digest=649151368fdbf5799c5b5465837a522d66af4e2a0ea43703031b86df41af5fcc
+//META: doc_section_digest=96a720a22bcbf95fd50a791728387696a93f2171d6c726d180d1b7d56de54df4
 //META: purpose=An `in` parameter is a copy; mutation inside the callee does not propagate to the caller.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `InModifier` indicates the default parameter direction: the callee
-// receives a copy of the value. Assigning the parameter inside the
-// callee changes only the local copy.
+// Verifies that `in` names the copy-in-only direction: the callee gets its
+// own copy of the argument. `stomp` overwrites its `in` parameter with 999 and
+// CHECK asserts the caller still observes 7, which is only true if the write
+// stayed inside the callee's copy.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

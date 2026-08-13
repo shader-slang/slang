@@ -1,18 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=de6a2b24718ef9344624fa3cfc660b5e13c913b28787d2b06b2db1085587ae5e
-//META: purpose=`uniform` scalar/struct globals are packed into a GlobalParams struct that is passed as a `constant*` parameter via introduceExplicitGlobalContext (Metal fallthrough chain).
+//META: doc_section_digest=2a4c97aeaacd2a9728a83c1944ef99c7efe30fe3fe60ef075d8d47044f03eefc
+//META: purpose=`introduceExplicitGlobalContext` (reached by the Metal fallthrough) packs loose `uniform` globals into a `GlobalParams` struct passed as a `constant*` kernel parameter.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `introduceExplicitGlobalContext` (via the Metal fallthrough
-// into the ShaderLLVMIR arm) collects loose `uniform` globals
-// into a `GlobalParams_0` struct and passes a `constant*` of
-// that struct as a kernel parameter.
+// Verifies that Metal falls through the `undoParameterCopy` /
+// `transformParamsToConstRef` arm into the shader-object arm, which is
+// what runs `introduceExplicitGlobalContext`. Module-scope `uniform`
+// scalars have no home in an MSL kernel signature, so they must be
+// gathered into one struct and passed by pointer. CHECK asserts a
+// `GlobalParams_<N>` struct is declared and that the kernel receives a
+// `GlobalParams_<N> constant*` argument.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=A BinaryExpr arithmetic site (`a + b`) lowers to the corresponding pure-value IR opcode (`add`) — the doc's "Pure value insts (IRAdd, IRMul, ...)" claim.
+//META: doc_section_digest=37a00b76a98a13c2f3cd47117e12f237fbf042ab8ec479231f23490859cc4497
+//META: purpose=A builtin arithmetic site (`a + b`, a checker fast-path BuiltinOperatorExpr) lowers to a single pure-value IR opcode (`add`) — the doc's "single pure value inst (IRAdd, IRMul, ...)" row.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

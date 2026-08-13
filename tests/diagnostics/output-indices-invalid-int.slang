@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0 -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -skip-spirv-validation
 
 // Regression test for #9435: signed `int` is not a valid
 // `OutputIndices` element type; only `uint`/`uint2`/`uint3` are.

@@ -1,25 +1,36 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#inputs-and-outputs
-//META: doc_section_digest=85c534d82e8549dc778af3fda4ed6b0174cc56ffa67072e5ed391a2e0a2d7858
-//META: purpose=The checker attaches a Type to every Expr; arithmetic between int and float coerces to float and the result type matches that.
+//META: doc_section_digest=325192a5d2be9d9ec0f3812a36230d5c900a48f1c7af5d97ada17cd1926349b1
+//META: purpose=The checker attaches a Type to every Expr, so a mixed int/float sum is typed float and selects the float overload at the enclosing call.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that the checker has resolved the type of `i + f`: if the
-// expression were not type-attached, the implicit int->float coercion
-// would not happen and the printed value would be different.
+// Verifies the "types attached" half of the output contract by making the
+// attached type observable. Two `probe` overloads differ only in parameter
+// type, so which one runs is decided purely by the `Type*` the checker
+// hung on the `i + f` expression. CHECK asserts the float overload ran,
+// which is only possible if the sum was typed float rather than int.
 
 //TEST:INTERPRET(filecheck=CHECK):
+
+int probe(float v)
+{
+    return 1;
+}
+
+int probe(int v)
+{
+    return 2;
+}
 
 void main()
 {
     int i = 3;
-    float f = 1.5;
-    float r = i + f;
-    // CHECK: r=4.5
-    printf("r=%g\n", r);
+    float f = 0.5f;
+    // CHECK: k=1
+    printf("k=%d\n", probe(i + f));
 }

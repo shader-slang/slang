@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#functions-and-generics
-//META: doc_section_digest=946edb590d3d1e528eec5aad3551de2e1f970420353f74e798c659afca170ea1
+//META: doc_section_digest=65157f975f1cbb6740bfae10984ea872d190878fcc32a62888fced45d662037d
 //META: purpose=A function call lowers to a call opcode whose first operand is the callee func and remaining operands are the arguments.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Calling `triple(n)` inside `main` should produce `call %triple(...)`
-// in the caller body — the structural link between caller and callee
-// runs through the `call` opcode, whose first operand is the callee
-// `func` value.
+// Verifies the caller-to-callee structural link. `triple(n)` is called from
+// `main` with a uniform argument (so the call is not constant-folded away);
+// CHECK-LABEL scopes the search to `main`'s body and CHECK then requires
+// `call %triple(%n)` — callee first, argument tail after.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#module-and-namespace
-//META: doc_section_digest=29b1e50e76ce09df697e30313ad1997122b36545720e82abde315d7de649b1b6
-//META: purpose=A UsingDecl captures the current scope and injects the named namespace into the sibling-scope chain so the namespace's unqualified names become reachable at the use site.
+//META: doc_section_digest=66e95bef72b71123f8c26c9d474bc27387f02bb7f3d1da7825ec57b318af2eef
+//META: purpose=The target of a using declaration is attached to the scope chain as a sibling, so the namespace's names become reachable unqualified at the use site.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// "`UsingDecl` captures the current scope at parse time and injects
-// names at check time via the same sibling-scope mechanism." Verify
-// that after `using namespace Foo`, `answer()` resolves unqualified
-// at the call site through the sibling chain.
+// Verifies the sibling-chain half of the namespace machinery. A
+// namespace cannot be merged into the enclosing container, so `using`
+// splices it in as a sibling and the sibling loop of the scope walk is
+// what reaches it. CHECK asserts 42 from an unqualified call, which
+// would be undefined without that splice.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -1,5 +1,4 @@
-Shader Coverage Counter Placement
-=================================
+# Shader Coverage Counter Placement
 
 This document describes where Slang inserts coverage counters for the
 current shader coverage modes. It is about instrumentation placement,
@@ -18,20 +17,21 @@ coverageAtomic("name"); // increment counter at __slang_coverage[slot]
 The real compiler first emits marker IR ops during AST lowering. The
 IR coverage pass later assigns numeric counter slots, synthesizes the
 hidden `__slang_coverage` buffer, and rewrites each marker to a counter
-increment. The increment is a per-lane `AtomicAdd(__slang_coverage[slot],
-1)` on non-wave targets and a wave-aggregated form (one atomic per wave,
-addend = active-lane count) on wave-capable targets — see the lowering
-described in [`shader-coverage.md`](shader-coverage.md) (issue #11509).
-This placement document is about *where* markers go, which is identical
-for both lowerings. Slot numbers are not part of the placement contract;
-the metadata maps each source coverage entry to the slot chosen for
-that compile.
+update. There are three rewrite forms: a plain non-atomic store of `1`
+under `-trace-coverage-boolean` (hit/not-hit), a per-lane
+`AtomicAdd(__slang_coverage[slot], 1)` in counting mode on non-wave
+targets, and a wave-aggregated form (one atomic per wave, addend =
+active-lane count) in counting mode on wave-capable targets — see the
+lowerings described in [`shader-coverage.md`](shader-coverage.md)
+(issue #11509). Placement is identical across all three; everything in
+this document applies to each. Slot numbers are not part of the
+placement contract; the metadata maps each source coverage entry to the
+slot chosen for that compile.
 
 Modes are independent. Enabling more than one mode adds the markers
 from each enabled mode into the same counter buffer.
 
-Line Coverage: `-trace-coverage`
---------------------------------
+## Line Coverage: `-trace-coverage`
 
 Line coverage inserts a counter before each executable statement that
 has a valid source location. Purely structural statement wrappers,
@@ -88,8 +88,7 @@ The marker on the `while` statement counts execution reaching the loop
 statement. It does not count each loop-condition evaluation. Per-arm
 loop condition counts come from branch coverage.
 
-Function Coverage: `-trace-function-coverage`
----------------------------------------------
+## Function Coverage: `-trace-function-coverage`
 
 Function coverage inserts one counter at the entry of each
 user-authored function body that is lowered to executable IR. It
@@ -131,7 +130,11 @@ void someFunction()
 ```
 
 The coverage metadata records both display and mangled function names
-when available. Reports can aggregate multiple runtime counters that
+when available. Generic specializations share one source-level
+function entry: specializing `helper<T>` for three different `T`s
+still produces a single `helper` entry in the metadata, so reports
+stay source-oriented instead of fanning out per specialization.
+Reports can aggregate multiple runtime counters that
 attribute to the same source function, but hosts must use the metadata
 rather than assuming counter-slot identity across compiles or shader
 permutations. Lambda and constructor entries can have compiler-facing
@@ -139,8 +142,7 @@ display names such as `$init` or `()`; consumers should treat the
 mangled name and source location as the stable identity for those
 entries.
 
-Branch Coverage: `-trace-branch-coverage`
------------------------------------------
+## Branch Coverage: `-trace-branch-coverage`
 
 Branch coverage inserts counters at selected control-flow arm entry
 points. It answers "which branch outcome was selected?" It does not
@@ -347,8 +349,7 @@ If a switch has no `default`, branch coverage creates a synthetic
 no-match default arm so the report can distinguish "no case matched"
 from "the switch was not reached."
 
-Combined Function and Branch Coverage
--------------------------------------
+## Combined Function and Branch Coverage
 
 With function and branch coverage enabled, but line coverage disabled,
 the resulting instrumentation is closer to control-flow outcome
@@ -404,8 +405,7 @@ This is the mode to use when the goal is to reduce probe density while
 still answering whether functions and control-flow outcomes were
 exercised.
 
-Interactions with Optimization and Variants
--------------------------------------------
+## Interactions with Optimization and Variants
 
 Coverage marker ops are emitted before most IR optimization and are
 rewritten to atomics after linking. Normal compiler transformations
@@ -420,8 +420,7 @@ attribution fields in `CoverageEntryInfo` or `.coverage-manifest.json`,
 not by assuming that counter slot `K` means the same source location
 in two different compiles.
 
-Future Region Coverage
-----------------------
+## Future Region Coverage
 
 The current modes all use one direct runtime counter per emitted
 source entry. Future source-region coverage may move toward a

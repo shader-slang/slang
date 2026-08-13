@@ -1,27 +1,28 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/06-emit.md#backends
-//META: doc_section_digest=d646ec1bfe54ca64d7afa27f7a26e793849f961a190aeb5f3c004156a5cb2217
-//META: purpose=Each backend renders an RWStructuredBuffer resource binding in its target-specific form: HLSL register(uN), GLSL layout(std430, binding=N), SPIR-V OpDecorate Binding/DescriptorSet, Metal buffer(N), WGSL @binding(N) @group(N).
+//META: doc_section_digest=b39e80b2c14d1286101fea456d02c0ad8020250e1022fdc6eccd5a974bcbef9d
+//META: purpose=The same `RWStructuredBuffer<int>` global is rendered in each backend's own resource-binding vocabulary: HLSL `register(u0)`, GLSL `layout(std430, binding = 0)`, SPIR-V `Binding`/`DescriptorSet` decorations, Metal a `buffer(N)` kernel argument, WGSL `@binding(0) @group(0)`, and a `GlobalParams` field on CUDA and C++.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A vk::binding(5, 2) is the source-level signal. Each backend turns
-// it into its own resource-binding spelling. Metal does not honour
-// vk::binding for buffer index selection (Metal assigns buffer
-// indices positionally), so we only check that Metal emits *some*
-// `buffer(N)` marker — not a specific N.
+// Verifies that resource binding is a per-backend emit decision rather than a
+// shared spelling. One buffer declared identically in Slang is compiled to
+// every text target; each prefix asserts the binding form only that backend
+// uses. CUDA and C++ have no binding table at all, so the assertion there is
+// that the buffer became a field of the global-parameter struct instead.
 
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
 //TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
 //TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
 
-[vk::binding(5, 2)]
 RWStructuredBuffer<int> outBuf;
 
 [shader("compute")]
@@ -31,9 +32,15 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[tid.x] = int(tid.x);
 }
 
-// HLSL: RWStructuredBuffer<int{{.*}}> outBuf_{{[0-9]+}} : register(u{{[0-9]+}})
-// GLSL: layout(std430, binding = 5, set = 2) buffer
-// SPIRV-DAG: OpDecorate %outBuf Binding 5
-// SPIRV-DAG: OpDecorate %outBuf DescriptorSet 2
-// METAL: buffer({{[0-9]+}})
-// WGSL: @binding(5) @group(2){{.*}}var<storage, read_write> outBuf
+// HLSL: register(u0)
+// GLSL: layout(std430, binding = 0) buffer
+// SPIRV-DAG: OpDecorate %outBuf Binding 0
+// SPIRV-DAG: OpDecorate %outBuf DescriptorSet 0
+// METAL: buffer(0)
+// WGSL: @binding(0) @group(0)
+// CUDA: struct GlobalParams_{{[0-9]+}}
+// CUDA-NEXT: {
+// CUDA-NEXT: RWStructuredBuffer<int> outBuf_{{[0-9]+}};
+// CPP: struct GlobalParams_{{[0-9]+}}
+// CPP-NEXT: {
+// CPP-NEXT: RWStructuredBuffer<int32_t> outBuf_{{[0-9]+}};

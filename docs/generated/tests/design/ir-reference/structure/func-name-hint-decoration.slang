@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#func
-//META: doc_section_digest=1ffac9b7fdcad876f978c7247b8626d96221178b89de6dd5e191f70ce0142862
-//META: purpose=Function-level decorations like NameHint attach to the func opcode itself rather than to its body, per the doc's notable-opcodes note on func.
+//META: doc_section_digest=8bdd4611fe4bde5f67b7b4377a4dac327c9defdb39a0f44cd421464470e7c1fd
+//META: purpose=Function-level decorations like NameHint attach to the func opcode itself rather than to its body.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Per the doc's `### func` notable-opcode discussion, decorations
-// such as `NameHintDecoration` attach to the `func` inst itself
-// rather than to its body. A user-defined `pickMax` should emit
-// `[nameHint("pickMax")]` immediately before the `func %pickMax`
-// header line.
+// Verifies that a function-level decoration is printed on the `func` inst and
+// not on any inst inside its body. CHECK matches `[nameHint("pickMax")]` and
+// then requires the *immediately following* line (CHECK-NEXT) to be the
+// `func %pickMax` header, which is only true if the decoration is attached to
+// the `func` rather than to a block or a body instruction.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

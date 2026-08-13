@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#how-the-passes-are-ordered
-//META: doc_section_digest=c06c7e69cd34636d41e63eeea18fb6cc8b82ab5dcea4b909122919abf39cf05a
+//META: doc_section_digest=8c2399bb52b8c73672b650988472d702e960652d15b734a0320c08eaf784bc66
 //META: purpose=The DCE / cleanup category runs multiple times during `linkAndOptimizeIR`; multiple `### AFTER eliminateDeadCode:` headers appear in the dump.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

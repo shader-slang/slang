@@ -19,4 +19,4 @@ void main()
     bar(10.0f, out2);
 }
 
-// CHECK-NOT: warning 15615
+// CHECK-NOT: warning[E15615]

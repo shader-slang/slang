@@ -2,7 +2,14 @@
 
 #include "slang-blob.h"
 #include "slang-char-util.h"
+#include "slang-math.h"
 #include "slang-text-io.h"
+
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
 
 namespace Slang
 {
@@ -973,6 +980,144 @@ int StringUtil::parseIntAndAdvancePos(UnownedStringSlice text, Index& pos)
     if (isNeg)
         result = -result;
     return result;
+}
+
+String StringUtil::makeMinimalHexFloat(double value)
+{
+    static constexpr char hexChars
+        [16]{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
+    char buf[32]{};
+    std::size_t i{};
+
+    if (std::signbit(value))
+    {
+        buf[i++] = '-';
+        value = std::abs(value);
+    }
+
+    if (std::isfinite(value))
+    {
+        int exp;
+        std::uint64_t mantissa;
+
+        if (value == 0.0)
+        {
+            exp = 0;
+            mantissa = 0U;
+        }
+        else
+        {
+            double fraction = std::frexp(value, &exp);
+
+            // returned fraction: 0.xxxxxxxx...
+
+            mantissa = static_cast<std::uint64_t>(fraction * std::exp2(53));
+            // mantissa is now xxxxxxx... (integer number)
+
+            // adjust exponent, since we print 1.xxxxx...
+            --exp;
+
+            // Now the floating point number is adjusted to:
+            //
+            // mantissa[52] '.' mantissa[51] mantissa[50] ... mantissa[0] 'p' <exp>
+        }
+
+        buf[i++] = '0';
+        buf[i++] = 'x';
+        buf[i++] = mantissa & (uint64_t{1} << 52) ? '1' : '0';
+        mantissa &= ~(uint64_t{1} << 52);
+        if (mantissa)
+        {
+            buf[i++] = '.';
+
+            while (mantissa)
+            {
+                // print mantissa nibble bits 48..51
+                uint64_t nibble = (mantissa >> 48U) & uint64_t{0xF};
+                buf[i++] = hexChars[nibble];
+
+                // zap bits 48-63
+                mantissa = mantissa & uint64_t{0xFFFFFFFFFFFF};
+
+                // shift mantissa left by a nibble
+                mantissa <<= 4U;
+            }
+        }
+
+        buf[i++] = 'p';
+        buf[i++] = (exp >= 0) ? '+' : '-';
+
+        snprintf(&buf[i], (sizeof buf) - i, "%d", std::abs(exp));
+    }
+    else
+    {
+        if (value == std::numeric_limits<double>::infinity())
+            snprintf(&buf[i], (sizeof buf) - i, "%s", "inf");
+        else
+            snprintf(&buf[i], (sizeof buf) - i, "%s", "nan");
+    }
+
+    SLANG_ASSERT(i < sizeof buf);
+
+    return String(buf);
+}
+
+// Shared Levenshtein core. When `caseInsensitive` is set, characters are folded
+// with `CharUtil::toLower` during the comparison, avoiding the need to allocate
+// lowercased copies of the inputs.
+static Index _calcLevenshteinDistance(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b,
+    bool caseInsensitive)
+{
+    const Index lenA = a.getLength();
+    const Index lenB = b.getLength();
+    if (lenA == 0)
+        return lenB;
+    if (lenB == 0)
+        return lenA;
+
+    auto fold = [&](char c) -> char { return caseInsensitive ? CharUtil::toLower(c) : c; };
+
+    // Classic dynamic-programming Levenshtein using two rolling rows so the
+    // working set is O(lenB) rather than O(lenA * lenB).
+    List<Index> prevRow;
+    List<Index> currRow;
+    prevRow.setCount(lenB + 1);
+    currRow.setCount(lenB + 1);
+
+    for (Index j = 0; j <= lenB; ++j)
+        prevRow[j] = j;
+
+    for (Index i = 1; i <= lenA; ++i)
+    {
+        currRow[0] = i;
+        const char ca = fold(a[i - 1]);
+        for (Index j = 1; j <= lenB; ++j)
+        {
+            const Index cost = (ca == fold(b[j - 1])) ? 0 : 1;
+            const Index deletion = prevRow[j] + 1;
+            const Index insertion = currRow[j - 1] + 1;
+            const Index substitution = prevRow[j - 1] + cost;
+            currRow[j] = Math::Min(deletion, insertion, substitution);
+        }
+        prevRow.swapWith(currRow);
+    }
+
+    return prevRow[lenB];
+}
+
+Index StringUtil::calcLevenshteinDistance(const UnownedStringSlice& a, const UnownedStringSlice& b)
+{
+    return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ false);
+}
+
+Index StringUtil::calcLevenshteinDistanceCaseInsensitive(
+    const UnownedStringSlice& a,
+    const UnownedStringSlice& b)
+{
+    return _calcLevenshteinDistance(a, b, /*caseInsensitive:*/ true);
 }
 
 } // namespace Slang

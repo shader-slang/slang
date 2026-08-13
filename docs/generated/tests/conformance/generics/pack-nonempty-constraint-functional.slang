@@ -1,26 +1,29 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
-//META: doc_ref=docs/language-reference/generics.md#type-param-packs
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=`where nonempty(T)` constraint is accepted and a function using it compiles and executes correctly when the pack is non-empty; the pack-expansion processes all elements.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#pack-queries
+//META: doc_section_digest=c04a621bcf00069773d305dfdf4582e5e2e0ce23042884e2675ec84c546547fe
+//META: purpose=A `where nonempty(T)` constraint is accepted and a function using it compiles and runs when called with a non-empty pack.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that `where nonempty(T)` is accepted by the compiler and that pack expansion
-// works correctly when the pack is non-empty. Calls `sumIntsNonempty(10, 20, 30)`;
-// CHECK asserts 60, confirming all three elements were processed.
-// NOTE: `__first` crashes the compiler (see finding: pack-query-first-last-compiler-crash).
+// Verifies the non-emptiness guard: `sumNonempty<each T>(...) where nonempty(T)`
+// declares that the pack must be non-empty at specialization time. Called with
+// three arguments, the constraint is satisfied and the expansion runs. CHECK
+// asserts 60, proving the constraint admitted a non-empty specialization and
+// the pack expanded over all elements. (The empty-pack rejection of the same
+// constraint is covered by pack-nonempty-empty-negative.slang.)
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-void addHelper(inout int acc, int v) { acc += v; }
+void addHelper(inout int acc, int v)
+{
+    acc += v;
+}
 
-int sumIntsNonempty<each T>(expand each T args)
-    where nonempty(T)
-    where T == int
+int sumNonempty<each T>(expand each T args) where nonempty(T) where T == int
 {
     int acc = 0;
     expand addHelper(acc, each args);
@@ -31,8 +34,8 @@ int sumIntsNonempty<each T>(expand each T args)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 id : SV_DispatchThreadID)
+void computeMain()
 {
-    outputBuffer[0] = sumIntsNonempty(10, 20, 30);
+    outputBuffer[0] = sumNonempty(10, 20, 30);
 }
 // CHECK: 60

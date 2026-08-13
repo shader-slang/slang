@@ -2,7 +2,7 @@
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-assembly -entry main -stage fragment
 //TEST:CROSS_COMPILE:-target dxbc-assembly  -entry main -stage fragment
-//TEST:CROSS_COMPILE:-target dxil-assembly  -entry main -stage fragment -profile sm_6_0
+//TEST:CROSS_COMPILE:-target dxil-assembly  -entry main -stage fragment -profile sm_6_0 -O3
 
 // Test handling of the `precise` keyword
 

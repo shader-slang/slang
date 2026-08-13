@@ -1,22 +1,22 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:19:45+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:07:52+00:00
 target_doc: name-resolution/overload-resolution.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 4b84c7f99f5cc6586a2852af0165acc8c35f69765bd0593a6595e5852f1750ec
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 5debe898d1297b2ebbe9b28df8c551241cfd6ebfb27572d37a7e416953c10a81
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
-  completeness: partial
-  style_consistency: pass
-  source_alignment: partial
-  front_matter_validity: pass
-finding_count: 3
+  completeness: pass
+  style_consistency: partial
+  source_alignment: fail
+  front_matter_validity: fail
+finding_count: 7
 severity_breakdown:
   critical: 0
-  major: 2
+  major: 6
   minor: 1
   nit: 0
 ---
@@ -24,19 +24,29 @@ severity_breakdown:
 # Review report for name-resolution/overload-resolution.md
 
 ## Summary
-The overload-resolution page is mostly source-aligned for candidate filtering, conversion costs, comparator ordering, partial generics, and operator caching. I found three issues: the partial-generic section steps into forbidden IR-lowering behavior, a diagnostic citation uses an unwatched file, and the no-applicable edge-case prose overgeneralizes the resolver's failure path.
+The required sections, links, diagnostic names, and line-number citations are present and current, but seven source-alignment issues remain. Most importantly, the target front matter records a digest that differs from the digest for the resolved watched files, while the candidate-source and partial-generic sections make several claims the recorded source does not support.
 
 ## Items checked
-- Ran `regenerate.py show name-resolution/overload-resolution.md` and checked the manifest entry, prompt, five resolved watched files, and depends-on docs.
-- Verified front matter, required section order, `## Conversion costs`, `## Partial generic application`, `## Operator overloading`, `## Edge cases and failure modes`, and `## See also`.
-- Checked all 56 relative links for resolution, including peer name-resolution, AST reference, pipeline, and glossary links.
-- Verified 44 source line-citation references against source at `52339028a2aa703271533454c6b9528a534bac31`, including `OverloadCandidate`, `OverloadResolveContext`, `TryCheckOverloadCandidate`, conversion-cost constants, `CompareOverloadCandidates`, partial-generic flag sites, and operator-cache sites.
-- Spot-checked more than 10 factual claims about candidate statuses, `JustTrying` / `ForReal`, implicit conversion costs, comparator tie-breaking, partial generic application, and ambiguous-overload reporting.
+- Read the target, `_review.md`, `_common.md`, the per-document prompt, all six resolved watched files, and all five dependency documents.
+- Confirmed the recorded target commit equals current `HEAD`, verified that the watched source files have no working-tree diff, and checked every line-number citation against that source.
+- Spot-checked more than 10 factual areas: candidate flavors/statuses/flags, both pipeline orders, generic diagnostics, constraint solving, conversion-cost values, comparator stages, candidate insertion, partial application, builtin rewrites, visibility, and ambiguity reporting.
+- Resolved all relative links and peer-document references; `regenerate.py lint name-resolution/overload-resolution.md` completed without an error.
+- Recomputed the watched-path digest and compared it with both the target front matter and the freshness ledger.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Partial generic application` | The paragraph about unresolved `PartiallyAppliedGenericExpr` reaching lowering is IR-lowering behavior, which the overload-resolution prompt explicitly excludes. It also cites `slang-lower-to-ir.cpp`, which is not in this doc's watched paths. | `docs/generated/design/_meta/prompts/name-resolution-overload-resolution.md:107-114` forbids IR-level lowering of resolved overloads; `docs/generated/design/_meta/manifest.yaml:455-462` omits `source/slang/slang-lower-to-ir.cpp`; the cited lowerer hook is `source/slang/slang-lower-to-ir.cpp:5757`. | Remove the lowerer/ICE sentence from this page, or replace it with a resolver-side invariant that stays within the watched overload-resolution sources. |
-| F-002 | minor | `## Algorithm`, arity step | The arity step cites `slang-diagnostics.lua` for diagnostics, but that file is not watched for this page. The diagnostic citation can drift without changing this page's watched-path digest. | `docs/generated/design/_meta/manifest.yaml:455-462` lists the watched paths and omits `source/slang/slang-diagnostics.lua`; the doc links to `source/slang/slang-diagnostics.lua` from the arity step. | Add the diagnostics source used for these identifiers to the watched paths, or avoid source-linking diagnostics from this page. |
-| F-003 | major | `## Edge cases and failure modes`, no-candidate bullet | The page says that when no candidate is `Applicable`, the resolver re-runs the single highest-scoring candidate in `ForReal` mode so the user sees a specific diagnostic. The source has a separate path for multiple equally-good non-applicable candidates that emits `NoApplicableOverloadForNameWithArgs` or `NoApplicableWithArgs` directly, without calling `CompleteOverloadCandidate`. | `source/slang/slang-check-overload.cpp:3181` enters the multiple-best-candidates branch; `source/slang/slang-check-overload.cpp:3216` handles non-applicable tied candidates; `source/slang/slang-check-overload.cpp:3223` and `source/slang/slang-check-overload.cpp:3230` emit the no-applicable diagnostics. The `CompleteOverloadCandidate` call is only in the single-best branch at `source/slang/slang-check-overload.cpp:3339` and `source/slang/slang-check-overload.cpp:3397`. | Qualify the edge case to distinguish tied non-applicable candidates from a single best non-applicable candidate, and name the direct no-applicable diagnostics for the tied path. |
+| F-001 | major | Intro, lines 17-19 | The introduction says builtin operators on numeric scalars, vectors, and matrices are rewritten and “never enter overload resolution at all.” The fast path explicitly returns null for several such cases, including GLSL-scope matrix operators/vector equality and mixed-type integer shifts, which then resume normal overload resolution. | `source/slang/slang-check-expr.cpp:4784-4797` and `source/slang/slang-check-expr.cpp:4818-4827`. | Qualify the bypass as applying only to operators and operand shapes accepted by `convertToBuiltinArithmeticOp`, and mention that declined cases use the general path. |
+| F-002 | major | `### Probe phase: where candidates come from`, lines 389-398 | Two candidate-source bullets name the wrong behavior. `AddDeclRefOverloadCandidates` accepts one `LookupResultItem` and dispatches aliases, callables, aggregate types, generics, typedefs, generic type parameters, and function-valued parameters; `AddOverloadCandidates` is what iterates a `LookupResult`. Also, the cited `AddFuncOverloadCandidate(FuncType*)` does not retain an expression, while `AddFuncExprOverloadCandidate` is the helper that stores `exprVal` for an actual function-valued expression. | `source/slang/slang-check-overload.cpp:3098-3164`, `source/slang/slang-check-overload.cpp:3166-3180`, and `source/slang/slang-check-overload.cpp:2612-2638`. | Describe `AddOverloadCandidates` as the result iterator, describe `AddDeclRefOverloadCandidates` as the per-item dispatcher, and cite `AddFuncExprOverloadCandidate` for function-valued expressions. |
+| F-003 | minor | `## Conversion costs`, row for `kConversionCost_RankPromotion` | The table calls this a “rank-preserving numeric promotion,” but the cost represents a lossless promotion to a higher conversion rank within the same conversion kind. | `source/slang/slang-ast-support-types.h:121-124` describes the same-kind lossless category; the cost is consumed as a promotion in `source/slang/slang-check-conversion.cpp:2175-2184`. | Change the meaning to “lossless same-kind rank promotion” or equivalent wording that does not say the rank is preserved. |
+| F-004 | major | `## Partial generic application`, lines 738-743 | The page says an explicit type ascription or a later `GenericAppExpr<...>` can close a `PartiallyAppliedGenericExpr`. In the watched semantic sources, the only resolution path consumes the partial as the callee of a later invocation and infers the remaining arguments from that call; no ascription or second generic-application path is present. | `source/slang/slang-check-overload.cpp:3228-3238` is the only semantic consumer that resumes inference; `source/slang/slang-check-expr.cpp:2345-2348` merely unwraps its base for `GetBaseExpr`. | State the source-backed invocation path only, or add and cite the actual watched implementation if another context can complete a partial generic. |
+| F-005 | major | `## Edge cases and failure modes`, lines 995-1000 | The claimed tie between a first-class function value and a declared callable, supposedly decided because the declaration is closer in scope, is unsupported. A true expression candidate created by `AddFuncExprOverloadCandidate` has no `LookupResultItem`, while the cited lookup and scope comparators operate on candidate decl-refs; the source does not establish the stated outcome. | `source/slang/slang-check-overload.cpp:2625-2638`, `source/slang/slang-check-overload.cpp:1915-1927`, and `source/slang/slang-check-overload.cpp:2428-2436`. | Remove this edge case unless a reachable producer path and test demonstrate the comparison; otherwise document the actual invariant that prevents such unlike candidates from reaching these decl-ref comparators. |
+| F-006 | major | Front matter, line 6 | `watched_paths_digest` is stale. The target records `5debe898…`, but the six files currently resolved by `regenerate.py show` hash to `e6978577…` at the same recorded `source_commit`; the freshness ledger already records the latter value. | `docs/generated/design/name-resolution/overload-resolution.md:6`; `docs/generated/design/_meta/freshness.json:183-187`; `python3 docs/generated/design/_meta/regenerate.py digest name-resolution/overload-resolution.md` returns `e6978577d22d792c1785a623b7574c2f07b5cffd5b1b24e80e17716562f17bec`. | Regenerate the target under the current manifest so its front matter records the resolved watched-set digest, then review that regenerated target. |
+| F-007 | major | `## Conversion costs`, lines 570-588 and 608-615 | The page makes detailed behavioral claims about constructors and `bool` initializers in `core.meta.slang`, but that file is not in this document’s resolved watched paths and its filename is not linked. This violates the family scope rule and means changes to the cited declarations cannot stale this page. | The resolved list from `regenerate.py show` omits `source/slang/core.meta.slang`; the scope rule is `docs/generated/design/_meta/prompts/_common.md:185-188`, and source-file links are required at lines 43-45. | Add `source/slang/core.meta.slang` to `watched_paths` and link the cited declarations, or remove the source-specific constructor/initializer assertions. |
+
+## No-issues notes
+- Every explicit line/range citation points at the named symbol or behavior at the recorded commit.
+- The probe Mermaid flow matches `TryCheckOverloadCandidate`, and the finalize section correctly places the class/`new` check first.
+- The complete conversion-cost constant list matches declaration order and numeric values.
+- Ambiguous, no-applicable, visibility, argument-mismatch, and focused generic-inference diagnostics match `slang-diagnostics.lua`.

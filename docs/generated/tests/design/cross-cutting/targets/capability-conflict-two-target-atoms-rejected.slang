@@ -1,20 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
-//META: doc_ref=docs/generated/design/cross-cutting/targets.md#capability-system
-//META: doc_section_digest=a0d40ede85e7cb31a316466bcfe695e496506c5ca59e269adafbe2b4671c8e81
-//META: purpose=A `[require(hlsl, glsl)]` conjunction populates the `target` keyhole with two different atoms; the doc says such conjunctions are incompatible and the compiler rejects with `E36111: disallowed capability`.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/cross-cutting/targets.md#definition-forms
+//META: doc_section_digest=d6d360ed810fe20f1543f761a89b7a194383364a9db523edf2e823b33ddfb19e
+//META: purpose=A `[require(hlsl, glsl)]` conjunction populates the `target` keyhole with two different atoms, which is an incompatible conjunction, and is rejected with `E36111: disallowed capability`.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Negative probe of the doc's Vocabulary rule: "Two conjunctions are
-// incompatible if they populate the same keyhole with different atoms
-// (e.g. `hlsl + glsl` is incompatible because both populate the
-// `target` keyhole)." The `[require(...)]` attribute with both target
-// atoms must resolve to the Invalid capability and the compiler must
-// reject the require.
+// Verifies that conjoining two atoms that populate the same keyhole
+// is an incompatible conjunction. `hlsl` and `glsl` are both key
+// atoms of the `target` keyhole, so `[require(hlsl, glsl)]` cannot
+// name any reachable configuration; CHECK asserts the require
+// resolves to the `Invalid` capability and is rejected with E36111,
+// which is only reachable if the conjunction is treated as
+// incompatible rather than as a disjunction.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main -stage compute
 

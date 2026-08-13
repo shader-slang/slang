@@ -1,0 +1,51 @@
+---
+gap_intake_report: true
+intake_model: claude-opus-5[1m]
+intake_at: 2026-08-12T06:45:28Z
+target_doc: target-pipelines/wgsl.md
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
+gap_count: 12
+actions:
+  fixed: 12
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated_to_finding: 0
+---
+
+# Gap-intake report for target-pipelines/wgsl.md
+
+## Summary
+
+This is a re-run of the gap-intake stage for a single gap,
+`0a4d2ff77760`, which the previous cycle deferred on the false
+premise that no `slangc` was available. A native macOS-arm64
+`slangc` built from this commit was used to settle it, so its
+verdict changes from `deferred` to `fixed` and the queue is now
+twelve `fixed`, nothing rejected, deferred, or escalated. The
+compiler showed that the array-lowered-matrix arm of
+`legalizeLogicalAndOr` is not reached by any matrix `&&` / `||`
+written in Slang: `legalizeMatrixTypes` runs much earlier and has
+already split the matrix operation into one vector `And` / `Or` per
+row. The section's previous paragraph, which claimed a boolean
+matrix could reach the arm, was replaced with that finding plus the
+emitted per-row `select` shape. The other eleven verdicts and their
+Evidence are carried forward unchanged from the first cycle.
+
+## Actions
+
+| Gap ID | Action | Evidence | Fix summary |
+| --- | --- | --- | --- |
+| 3889ad2105cd | fixed | `source/slang/slang-emit-wgsl.cpp:849` emits the `var` keyword, `:1082` the `i32(N)` literal; `source/slang/slang-emit-c-like.cpp:3702,3714` emit `if(` / `else`. Printed form confirmed by `docs/generated/tests/design/target-pipelines/wgsl/nested-branches-five-deep-phi.slang` (`CHECK: var v_{{[0-9]+}} : i32`) and `eliminate-phis-default-options.slang`. | added a minimal `if`/`else` example under `eliminatePhis with default options` showing the `var v_0 : i32;` declaration and the per-arm assignments |
+| 777a56bb41c0 | fixed | `source/slang/hlsl.meta.slang:13946-13949` declares `NonUniformResourceIndex` with `[require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]`; that alias is `cpp \| cuda \| glsl \| hlsl \| spirv` (`source/slang/slang-capabilities.capdef:330`), excluding `wgsl`. `E36107` text confirmed by `non-uniform-resource-index-rejected.slang`. The existing emit-time claim is still correct (`source/slang/slang-emit-c-like.cpp:2753-2756`). | added a paragraph stating the capability requirement, the `E36107` type-check rejection, and that the emit-time wrapper drop applies only to insts reaching WGSL by another route (`nonuniform(DescriptorHandle<T>)`, `hlsl.meta.slang:27817-27818`) |
+| d27a9f53454e | fixed | `source/slang/slang-emit-wgsl.cpp:74-101` (`emitSwitchCaseSelectorsImpl`) writes `case ` + selectors, or the bare keyword `default `, then `:`. Printed form confirmed by `switch-without-default-gets-synthesized-default.slang` (`CHECK: case i32(0)` / `CHECK: default`). | added a before/after example to the `legalizeSwitch` bullet showing a `default:`-less Slang switch emitting `case i32(0):`, `case i32(1):` and a `default :` arm |
+| da19e305367a | fixed | `source/slang/slang-emit-wgsl.cpp:1494-1525` emits `And` as `select(vecN<bool>(false), rhs, lhs)` and `Or` as `select(rhs, vecN<bool>(true), lhs)`. Printed forms confirmed by `vector-logical-and-becomes-select.slang` and `int-vector-logical-and-casts-operands-to-bool.slang`. | added the emitted `select(...)` forms for `And` and `Or` under `legalizeLogicalAndOr`, with the already-boolean and cast-from-integer operand cases |
+| 0a4d2ff77760 | fixed | Settled by running `build-arm64/Debug/bin/slangc` (2026.14.1-80-g6122d03def) at this commit. Ordering is in a watched path: `source/slang/slang-emit.cpp:1934` calls `legalizeMatrixTypes`, `:2280` calls `legalizeLogicalAndOr`. `slangc -target wgsl -dump-ir-before legalizeLogicalAndOr` on a `bool2x2 && bool2x2` shader shows the operation already split into two `logicalAnd` insts on `Vec(Bool, 2 : Int)` before the pass runs, so the `IRArrayType` arm at `source/slang/slang-ir-legalize-binary-operator.cpp:246-292` never sees an array-typed `And`. An lldb breakpoint on that arm's entry (`legalizeLogicalAndOr(IRInst*, TargetProgram*)+664`, the instruction after the `as<IRArrayType>(dataType)` test) was hit zero times over eleven shader shapes (`bool2x2`, `bool3x4`, `bool1x4`, `bool4x4` in a loop, `int2x2`, `uint4x4`, `float2x2`, matrix-in-struct, matrix-valued function, matrix array indexed by thread id, matrix `&&` scalar-splat) crossed with `-target wgsl` / `spirv` / `metal` and with and without `-O0`; the same probe placed on the vector arm (`+608`) is hit on the first shape, so the probe is sound. Emitted form from `slangc -target wgsl`: one `select(vec2<bool>(false), <rhs row>, <lhs row>)` per matrix row. `operator&&` constrained to `T : ILogical` at `source/slang/core.meta.slang:3724-3730`; the `E30081` operand-conversion warning for `int` and `float` matrix operands is from the same compiler runs. | replaced the section's entry-condition paragraph with the unreachability finding (`legalizeMatrixTypes`, Phase B row 63, splits the matrix `And` / `Or` per row first) plus a three-line `bool2x2 && bool2x2` example and its per-row `select` output |
+| ab792853eacb | fixed | `source/slang/slang-ir-lower-append-consume-structured-buffer.cpp:29-50` name-hints the two generated fields `elements` and `counter`; `:122-138` rewrites `Append` as `AtomicInc` on `counter[0]` (relaxed) then a store into `elements[oldCounter]`. Emitted spellings confirmed by `append-structured-buffer-lowers-to-counter-and-elements.slang` (`array<atomic<i32>>`, `array<u32>`, `atomicAdd`). | extended row 54's Notes with the two generated storage buffers and the `atomicAdd`-then-store rewrite, and stated that `AppendStructuredBuffer<T>` is not front-end-rejected on WGSL |
+| 9b5730e82911 | fixed | `source/slang/slang-emit.cpp:654-690` shows `checkStaticAssert` raising `StaticAssertionFailure` / `StaticAssertionFailureWithoutMessage` / `StaticAssertionConditionNotConstant`; ids 41400 / 41401 / 41402 at `source/slang/slang-diagnostics.lua:5322-5341`, and `array-index-out-of-bounds` = 30029 at `:1295-1300`. `E30029` also confirmed by `array-index-out-of-bounds-rejected.slang`. | added `E41400` / `E41401` / `E41402` to row 72's Notes and `E30029` to row 24's Notes |
+| 700f09296336 | fixed | `source/slang/slang-emit-wgsl.cpp:304-341` (`emitStructFieldAttributes`) writes `@align(N)` per field as GCD(field offset, struct alignment); wrapper naming and the `data : array<vector<T,R>, C>` field at `source/slang/slang-ir-lower-buffer-element-type.cpp:2778-2820` and `:437-450` (`getLayoutName`). Emitted names confirmed by `structured-buffer-of-matrix-wraps-storage.slang`, `constant-buffer-matrix-std140-wrapper.slang`, `matrix-storage-square-2x2.slang`, `vec3-padding-trailing-field.slang`, `constant-buffer-uniform-std140.slang`. | extended Phase C row 21's Notes with the `<Name>_std430` / `<Name>_std140` and `_MatrixStorage_<elem><R>x<C>_ColMajor<rule>` wrapper names, the `data` field shape, and the `@align(N)` field attributes |
+| 0d94aa42f381 | fixed | `source/slang/slang-emit-wgsl.cpp:1053-1145` (integer literals), `:1163-1196` (float/half/NaN/infinity), `:1793` (`emitVectorTypeNameImpl`), `:253-266` and `:580-588` (matrix transpose spelling), `:617-632` (arrays), `:602-615` (pointers), `:716` (`atomic<T>`). Printed forms confirmed by `integer-literal-spelling.slang`, `float-positive-and-negative-zero.slang`, `large-array-1024-elements.slang`, `uint3-becomes-vec3-u32.slang`, `float-nan-via-helper.slang`, `float-vector-with-infinity.slang`. | added a `### Emitted spellings` subsection under Phase D with a Slang-to-WGSL spelling table and a two-line worked example |
+| 794da7170ab0 | fixed | `source/slang/slang-emit-wgsl.cpp:633-714` builds the texture type name piecewise (`texture` / `texture_storage`, `_depth`, `_multisampled`, shape, `_array`); `:703-707` emits the scalar element type; `:393-430` (`getWgslImageFormat`) infers `r32float` / `rg32float` / `rgba32float`; `:590-600` emit `sampler` / `sampler_comparison`. Confirmed by `texture1d-emit.slang`, `texture2d-binding.slang`, `texture3d-emit.slang`, `texturecube-emit.slang`, `texture2darray-emit.slang`, `rwtexture2d-storage-emit.slang`. | added a Slang-type-to-WGSL-type table (texture family, sampler, storage-texture format inference and access mode) in the new `### Texture, sampler, and texture-intrinsic spellings` subsection |
+| 3b04183a771b | fixed | `source/slang/hlsl.meta.slang` `case wgsl:` arms: `:2615` `textureSample`, `:3748` `textureSampleLevel`, `:2830` `textureSampleBias`, `:3503` `textureSampleGrad`, `:2978` / `:3009` compare variants, `:3952` / `:4181` gather, `:4677` `textureLoad`, `:5322-5334` `textureStore`; array-layer split at `:2606-2610`, `:4669` (`i32(...)`) and `:3945` (`u32(...)`); cube `static_assert`s at `:4662` and `:5303`. Confirmed by `texture2d-sample-emit.slang`, `texture2d-load-emit.slang`, `rwtexture2d-storage-emit.slang`, `texture2darray-emit.slang`. | added the intrinsic-to-WGSL-builtin table and the array-layer coordinate-split explanation to the same new Phase D subsection |
+| 3fda9351de83 | fixed | `source/slang/slang-emit-wgsl.cpp:63-73` calls plain `getSink()->diagnose(...)`, not `diagnoseOnce`, so the report is per qualified value; the diagnostic is declared `warning("precise-qualifier-unsupported-on-target", 56005, ...)` at `source/slang/slang-diagnostics.lua:5700-5705`. `E56005` and the message prefix confirmed by `precise-qualifier-dropped-with-diagnostic.slang`. | added `E56005`, its message text, and the "once per `precise`-qualified value (plain `diagnose`, not `diagnoseOnce`)" note to the `precise` paragraph |

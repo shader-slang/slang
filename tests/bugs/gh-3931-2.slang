@@ -1,5 +1,5 @@
-//IGNORE:TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major -xslang -O0
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major -xslang -O0 -xslang -DWORKAROUND
+//IGNORE:TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -matrix-layout-row-major -xslang -DWORKAROUND
 
 // removes from code all uses of pointers, this fixes the code from removal of `PhysicalStorageBuffer64` -- note that the pointer branch is unused regardless of if toggled
 //#define WORKAROUND 

@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#generic-application
-//META: doc_section_digest=8f96c600fb4e9a50947a60ac22318e6fba6c6386abe0fabef983a2b0e0a9b785
+//META: doc_section_digest=43b8b0e49573b6e717cbcb06d2dacc7db2424f57bca3c5a939322ea27bf6a4e6
 //META: purpose=A reference to a generic struct at a concrete type produces a specialize(type, T) type-level value.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `Pair<int>` for `struct Pair<T> { T a; T b; }` produces a
-// `specialize(%Pair, Int)` value in the IR — the doc's
-// `### Generic application` claim that `specialize` applies to
-// "a generic value (function, type, or witness)".
-
+// Verifies that `specialize` applies to a generic *type*, not only to a
+// generic function. A local of type `Pair<int>` forces the generic struct to
+// be instantiated; the CHECK asserts that the type this local carries is
+// spelled `specialize(<Pair>, Int)` in the dump, which is the type-application
+// form of the same opcode.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 uniform int inVal;

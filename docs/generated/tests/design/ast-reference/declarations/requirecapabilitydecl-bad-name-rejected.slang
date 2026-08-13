@@ -1,23 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=27f253003cd15aae74f1aea7cff6d2c4178b22d296301b6ed8e2aa0baf6c9884
-//META: purpose=A RequireCapabilityDecl with a non-existent capability name is diagnosed; the decl carries through to capability resolution.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A `__require_capability` naming a capability that does not exist is diagnosed at the name.
 //META: intent=negative
-//META: pipeline_stage=check
+//META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that a __require_capability with an unknown capability
-// name is rejected. The decl participates in capability resolution
-// and the resolver issues a diagnostic when the named capability is
-// undefined.
+// Verifies that the capability names in a requirement declaration are resolved
+// rather than stored verbatim. An invented name is used; the CHECKs pin the
+// unknown-capability diagnostic spanning the name.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-__require_capability(ThisIsANonExistingCapability);
-//CHECK:            ^ unexpected token
-//CHECK:            ^ unexpected '(', expected ';'
+__require_capability ThisIsANonExistingCapability;
+//CHECK:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unknown capability
+//CHECK:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unknown capability name 'ThisIsANonExistingCapability'.
 
 void main() {}

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T09:40:00+00:00
-//META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#texture-and-image
-//META: doc_section_digest=0b65d4084486d3b0e44a1d4ae82fad284cfe750fe170e9c06ae248dedd65891c
+//META: doc_section_digest=d256dde64890becaf8cd7de87d2e7c15cce6794507c618550a67824d086322d4
 //META: purpose=`rwtex[xyz] = val` assignment on an `RWTexture3D<T>` surfaces in `main` as a `call specialize(..., TextureShape3DType, ...)(%rwtex, %xyz, %val)` — the 3D witness of the doc's `imageStore` opcode in its pre-inline `call` shape.
 //META: intent=expansion
 //META: pipeline_stage=lower

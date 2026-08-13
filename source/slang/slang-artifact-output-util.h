@@ -1,9 +1,9 @@
 #ifndef SLANG_ARTIFACT_OUTPUT_UTIL_H
 #define SLANG_ARTIFACT_OUTPUT_UTIL_H
 
-#include "../compiler-core/slang-artifact.h"
-#include "../compiler-core/slang-diagnostic-sink.h"
-#include "../core/slang-basic.h"
+#include "compiler-core/slang-artifact.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-basic.h"
 #include "slang-com-ptr.h"
 
 namespace Slang

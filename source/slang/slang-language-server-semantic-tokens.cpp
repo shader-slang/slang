@@ -1,6 +1,6 @@
 #include "slang-language-server-semantic-tokens.h"
 
-#include "../core/slang-char-util.h"
+#include "core/slang-char-util.h"
 #include "slang-ast-iterator.h"
 #include "slang-ast-support-types.h"
 #include "slang-visitor.h"

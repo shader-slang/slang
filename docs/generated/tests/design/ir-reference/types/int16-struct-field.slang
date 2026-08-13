@@ -1,16 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#struct-and-class-containers
-//META: doc_section_digest=dd2ec8aef79db3f253a059c2cf01af45d95108a02c8daa3922585ed0db6730ef
+//META: doc_section_digest=0a354de05012835336b3c276acede5bc3e74e766304e49cb482449117371f325
 //META: purpose=Expansion: a struct field of Int16 lowers to a field(...) row whose type operand is Int16.
 //META: intent=expansion
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's struct row says each field carries its IR type. Two
-// `int16_t` fields surface two `field(%key, Int16)` rows.
+// a struct field of Int16 lowers to a field(...) row whose type
+// operand is Int16. Two `int16_t` fields surface two `field(%key,
+// Int16)` rows.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

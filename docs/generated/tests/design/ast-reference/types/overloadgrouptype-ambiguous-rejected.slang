@@ -1,33 +1,33 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
-//META: doc_ref=docs/generated/design/ast-reference/types.md#general-purpose-types
-//META: doc_section_digest=d1ff0a0974c79b15cca66d02e10faaa455cbee26ce299de54d386fa9d4a40656
-//META: purpose=OverloadGroupType is the pseudo-type of an unresolved overload set; when no target type lets the checker collapse the set, the reference is diagnosed as ambiguous.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
+//META: doc_section_digest=c7f55cb42aaa9e03df513fb2e3ff5bbcf380f2c09432d750a2aa9c55dfc56801
+//META: purpose=An unresolved overload set is a pseudo-type that checking must collapse; when no candidate is better the call is rejected and the diagnostic names the candidate set.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names `OverloadGroupType` as "the pseudo-type of an
-// unresolved overload set; collapsed by checking". The visible
-// surface: a bare name referring to multiple overloads, used in a
-// context where no target type forces a pick, is rejected as
-// "ambiguous reference".
+// Verifies the observable surface of the unresolved-overload pseudo-
+// type: both `f` overloads need exactly one int-to-float conversion for
+// the call `f(1, 2)`, so neither wins and the set cannot collapse.
+// CHECK pins the ambiguity diagnostic plus one note per candidate,
+// which shows the set was carried to the point of resolution.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-int convert(int x) { return x * 2; }
+int f(int x, float y) { return 1; }
 /*CHECK:
-    ^^^^^^^ candidate: func convert(int) -> int
+    ^ candidate: func f(int, float) -> int
 */
-float convert(float x) { return x + 1.0; }
+int f(float x, int y) { return 2; }
 /*CHECK:
-      ^^^^^^^ candidate: func convert(float) -> float
+    ^ candidate: func f(float, int) -> int
 */
 
 void main()
 {
-    int x = convert;
-//CHECK:    ^^^^^^^ ambiguous reference to 'convert'
+    int r = f(1, 2);
+//CHECK:     ^ ambiguous call to 'f' with arguments of type (int, int)
 }

@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#member-lookup
-//META: doc_section_digest=68a2d43cee4f2785028c9292caeaac660921efdc95b8ec2b5eface8a8b89a0dc
-//META: purpose=Member lookup walks the inheritance facets to reach a method declared on an interface; the conforming struct's override is callable through the struct receiver directly.
+//META: doc_section_digest=9574aa361d7b18b1da022473e0e53acd215b9af06dae0cb39490ca13610d03bf
+//META: purpose=The facet walk reaches an interface facet of a conforming struct, and the struct's own implementation is what a direct receiver call resolves to.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc anchors member lookup on a DeclRefType to the inheritance
-// walk. Verify that calling a method declared on an interface
-// resolves via the conforming struct's own implementation when the
-// receiver is the concrete struct type. (Companion to the existing
-// 03-semantic-check generic test: this one uses a direct receiver,
-// no generic indirection.)
+// Verifies the interface-facet arm of the walk with a concrete
+// receiver (no generic indirection). `a.marker()` sees both the
+// interface requirement facet and the struct's own member; the call
+// must land on the struct's implementation. CHECK asserts 42, the
+// value only the struct's body produces.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

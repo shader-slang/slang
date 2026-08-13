@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-returns-and-yields
-//META: doc_section_digest=1a8ea4dd951d234f1546377053c93763b39566e322da200fd6da592564bfae1c
+//META: doc_section_digest=010f71e10305e8452b6909c94e2da52806525700f6c78aa6daffe80e8b4ca211
 //META: purpose=A `return expr;` in a value-returning function terminates the block with return_val(val) where val is the returned IR value.
 //META: intent=functional
 //META: pipeline_stage=lower

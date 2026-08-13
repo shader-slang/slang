@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
-//META: doc_ref=docs/generated/design/ast-reference/statements.md#declstmt-and-expressionstmt
-//META: doc_section_digest=5421163f30d37859ccbac142213ea7e98961f1ad0e8a11d41b9da2055e015242
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/statements.md#declstmt-expressionstmt-and-emptystmt
+//META: doc_section_digest=e05101999cc6555f3e7214b2fb06744dbaf16788905b25807e20594acfdd10d6
 //META: purpose=An ExpressionStmt holds an arbitrary `Expr` used for its side effects; the value of the expression is computed and discarded, and any side effects (function call, assignment) are observed.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says ExpressionStmt "lets an arbitrary Expr be used for its
-// side effects". A non-void function call whose return is unused is
-// the canonical example: the call still runs (printing the side
-// effect), and the program continues past the unused result.
+// Verifies an expression may stand alone as a statement purely for its
+// side effect. A non-void call's result is discarded; the CHECKs assert
+// the call's own print fired and that execution continued past the
+// discarded result.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -450,8 +450,9 @@ void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module)
     validateIRModule(module, sink);
 }
 
-// Returns whether 'dst' is a valid destination for atomic operations, meaning
-// it leads either to 'groupshared' or 'device buffer' memory.
+// Returns whether 'dst' is a valid destination for atomic operations: it leads
+// to 'groupshared' or 'device buffer' memory, or is an image/texel destination
+// (an IRImageSubscript, or the descriptor-heap-lowered texel pointer below).
 static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
 {
     bool isGroupShared = as<IRGroupSharedRate>(dst->getRate());
@@ -461,6 +462,14 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
     if (as<IRRWStructuredBufferGetElementPtr>(dst))
         return true;
     if (as<IRImageSubscript>(dst))
+        return true;
+    // Under spvDescriptorHeapEXT, processImageSubscript (slang-ir-spirv-legalize)
+    // rewrites an image-subscript atomic destination into this heap texel pointer.
+    // Atomic validation runs after that lowering, so we see the lowered form here
+    // rather than the original IRImageSubscript; and this opcode is produced only
+    // on that texture-atomic heap path, so accepting it unconditionally is as safe
+    // as the IRImageSubscript case above.
+    if (as<IRSPIRVLoadTexelPointerFromHeap>(dst))
         return true;
 
     if (auto ptrType = as<IRPtrType>(dst->getDataType()))

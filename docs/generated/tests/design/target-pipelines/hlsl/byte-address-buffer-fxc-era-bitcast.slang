@@ -1,23 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizebyteaddressbufferops-for-hlsl
-//META: doc_section_digest=164828634e9baa99ca092b48a08857187612e7093b4737e812351988e3e9c2b7
+//META: doc_section_digest=b0c266609c4b593b519a7c5f029902d859bb791bb9eb38330bd4917fc6652b4e
 //META: purpose=Selecting a DX_5_0-or-earlier profile (-profile cs_5_0) sets legalizeByteAddressBufferOps useBitCastFromUInt=true; the fxc-era HLSL emission falls back from Load<T> to asuint/asfloat-style bitcast scaffolding rather than the modern templated method.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `### legalizeByteAddressBufferOps for HLSL` section: HLSL
-// uses default options *except* when `profile.getFamily() == DX &&
-// profile.getVersion() <= DX_5_0` — then `useBitCastFromUInt = true`
-// because fxc-era HLSL lacks templated `.Load<T>` on byte-address
-// buffers. The emission must therefore route the typed load through
-// `asfloat(...)` / `asuint(...)` bitcasts. We exercise the flag by
-// pinning the profile to cs_5_0 and check the emit contains either
-// the asfloat/asuint scaffolding or a plain Load(offset) form (no
-// `Load<float>` template). CI runs the full fxc path.
+// Verifies that a DX_5_0-or-earlier profile switches
+// legalizeByteAddressBufferOps into its `useBitCastFromUInt` mode, because
+// fxc-era HLSL has no templated `.Load<T>` on byte-address buffers.
+// The test pins `-profile cs_5_0` and loads a `float` from a
+// ByteAddressBuffer; CHECK asserts the emit spells the load without a
+// `Load<float>` template — either as an `asfloat(...)`/`asuint(...)` bitcast
+// pair or as a plain `Load(offset)` — which is only reachable when the
+// profile predicate turned the flag on.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -profile cs_5_0
 

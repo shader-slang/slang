@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:46:22Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#legalizeirforwgsl
-//META: doc_section_digest=c6e7828b5792f7c9d9714699eb974290e2bfa9588178340fff88c96e64a739e5
+//META: doc_section_digest=33ccb88a3da115be9cff2c913440e47d7a1de3a78d0cd2269b27a0b1b59788c0
 //META: purpose=SV_GroupThreadID becomes @builtin(local_invocation_id) on the WGSL entry-point parameter
 //META: intent=functional
 //META: pipeline_stage=ir-pass

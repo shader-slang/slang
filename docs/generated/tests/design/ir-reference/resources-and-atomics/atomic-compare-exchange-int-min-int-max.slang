@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomiccompareexchange
-//META: doc_section_digest=f64e810eeb8bfcd2dc78872345ca3a0ea2009ac1e4a545333ad63bf1f54ce88c
+//META: doc_section_digest=7df7fb40b43dccb446b1e09fcfd971cee6e54f70b1a4e2cc56f1755c4feb75a3
 //META: purpose=`Atomic<int>::compareExchange(INT_MIN, INT_MAX)` (extreme operand pair) still lowers to the documented `atomicCompareExchange` opcode shape; both literals carry through.
 //META: intent=boundary
 //META: pipeline_stage=lower

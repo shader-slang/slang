@@ -1,17 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomiccompareexchange
-//META: doc_section_digest=f64e810eeb8bfcd2dc78872345ca3a0ea2009ac1e4a545333ad63bf1f54ce88c
-//META: purpose=`Atomic<T>::compareExchange(expected, desired)` lowers to `atomicCompareExchange(%ptr, %expected, %desired, ...)`, the CAS primitive returning the previous value.
+//META: doc_section_digest=7df7fb40b43dccb446b1e09fcfd971cee6e54f70b1a4e2cc56f1755c4feb75a3
+//META: purpose=`Atomic<T>::compareExchange(expected, desired)` lowers to `atomicCompareExchange(%ptr, %expected, %desired, ...)` — the CAS primitive returning the previous value, with the documented trailing memory-order operand(s) left unpinned.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `atomicCompareExchange` notable-opcode note describes
-// the CAS primitive: pointer + expected + desired, returning the
-// value that was previously stored.
+// Verifies the CAS primitive lowers to `atomicCompareExchange` with
+// the documented `ptr, expected, desired` triple up front, returning
+// the previously stored value. The doc's operand column now adds two
+// trailing memory-order operands (matched / unmatched case); the CHECK
+// leaves the trailing operand count unpinned because the declared Lua
+// operand list carries only the triple — see the bundle README's
+// doc-gap row on the memory-order operand encoding.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

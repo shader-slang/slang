@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:46:22Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=75df4a4b0de64a2d8c8bb5d3b1ffc4e891901cbe23b4c746ed79eadf9fccd4e0
+//META: doc_section_digest=74565fb54ff731fe2ef08bf475d3e429cda05a019448ddc31df06c46bbb59bbe
 //META: purpose=lowerEnumType replaces enumerator references with the underlying integer literal in WGSL emit
 //META: intent=functional
 //META: pipeline_stage=ir-pass

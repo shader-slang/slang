@@ -1,9 +1,9 @@
 // slang-serialize-source-loc.cpp
 #include "slang-serialize-source-loc.h"
 
-#include "../core/slang-byte-encode-util.h"
-#include "../core/slang-math.h"
-#include "../core/slang-text-io.h"
+#include "core/slang-byte-encode-util.h"
+#include "core/slang-math.h"
+#include "core/slang-text-io.h"
 
 namespace Slang
 {

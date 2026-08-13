@@ -1,16 +1,15 @@
 #pragma once
 
-#include "../compiler-core/slang-doc-extractor.h"
-#include "../compiler-core/slang-lexer.h"
-#include "../compiler-core/slang-name.h"
-#include "../core/slang-basic.h"
-#include "../core/slang-semantic-version.h"
+#include "compiler-core/slang-doc-extractor.h"
+#include "compiler-core/slang-lexer.h"
+#include "compiler-core/slang-name.h"
+#include "core/slang-basic.h"
+#include "core/slang-semantic-version.h"
 #include "slang-ast-forward-declarations.h"
 #include "slang-profile.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
-#include <assert.h>
 #include <type_traits>
 
 //
@@ -43,6 +42,7 @@ FIDDLE() namespace Slang
     class Val;
 
     class DeclRefBase;
+    struct SubstitutionCache;
     class NodeBase;
     class LookupDeclRef;
     class GenericAppDeclRef;
@@ -248,6 +248,32 @@ FIDDLE() namespace Slang
 
     /// Convert string name to KnownBuiltinDeclName enum
     KnownBuiltinDeclName getKnownBuiltinDeclNameFromString(UnownedStringSlice name);
+
+    /// Returns true if `name` identifies one of the differentiable builtin
+    /// interfaces (`IDifferentiable`, `IDifferentiablePtr`, and the
+    /// function-translation interfaces `IForwardDifferentiable`,
+    /// `IBackwardDifferentiable`, `IBwdCallable`).
+    ///
+    /// This is the authoritative definition of the "differentiable interface
+    /// family": the IR linker defers the witness-table entries of conformances
+    /// to these interfaces when linking a program that does not use auto-diff
+    /// (see `shouldDeepCloneWitnessTable` in slang-ir-link.cpp). A newly added
+    /// differentiable interface must be added here, or its witness tables will
+    /// be deep-cloned into every program regardless of auto-diff use.
+    inline bool isDifferentiableInterfaceBuiltin(KnownBuiltinDeclName name)
+    {
+        switch (name)
+        {
+        case KnownBuiltinDeclName::IDifferentiable:
+        case KnownBuiltinDeclName::IDifferentiablePtr:
+        case KnownBuiltinDeclName::IForwardDifferentiable:
+        case KnownBuiltinDeclName::IBackwardDifferentiable:
+        case KnownBuiltinDeclName::IBwdCallable:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     // TODO(tfoley): We should ditch this enumeration
     // and just use the IR opcodes that represent these
@@ -759,6 +785,9 @@ FIDDLE() namespace Slang
     struct SubstitutionSet
     {
         DeclRefBase* declRef = nullptr;
+
+        // An operation-local cache shared by recursive copies of this substitution set.
+        SubstitutionCache* substitutionCache = nullptr;
 
         // The element index if the substitution is happening inside a pack expansion.
         // For example, if we are substituting the pattern type of `expand each T`, where
@@ -1826,6 +1855,14 @@ FIDDLE() namespace Slang
         BwdCallableRematFunc,   ///< The "remat" built-in associated function
         BwdCallablePropFunc,    ///< The "BwdCallable::operator()" built-in associated function
         LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function
+
+        DifferentialWitness, ///< The `IDifferentiable.Differential : IDifferentiable` conformance
+                             ///< (the witness that the differential type is itself differentiable)
+        DifferentialPtrWitness,    ///< The `IDifferentiablePtrType.Differential :
+                                   ///< IDifferentiablePtrType` conformance
+        BwdCallableContextWitness, ///< The `IBackwardDifferentiable.BwdCallable : IBwdCallable`
+                                   ///< conformance (witness that the backward-callable context type
+                                   ///< conforms to `IBwdCallable`)
     };
 
     enum class FunctionDifferentiableLevel
@@ -1867,5 +1904,62 @@ FIDDLE() namespace Slang
         Public,
         Default = Internal,
     };
+
+    // Identifies a builtin operator recognized by the fast path. Used by `BuiltinOperatorExpr`
+    // (the checked-AST node the fast path produces) and `BuiltinOperationIntVal` (its
+    // compile-time-constant form). These mirror the builtin IR ops (see
+    // `convertToBuiltinArithmeticOp` / `lowerBuiltinOperatorExpr`); their integer values are
+    // part of the serialized/mangled form, so only append, never reorder.
+    enum class BuiltinOperationKind
+    {
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Mod,
+        Neg,
+        Eql,
+        Neq,
+        Less,
+        Greater,
+        Leq,
+        Geq,
+        BitAnd,
+        BitOr,
+        BitXor,
+        BitNot,
+        Lsh,
+        Rsh,
+        Not,
+        // `?:` / `&&` / `||`. These are never produced by the fast-path `BuiltinOperatorExpr`
+        // (`?:` is not an infix operator and `&&`/`||` are short-circuiting), but a *resolved*
+        // operator call on them can still fold to a compile-time-constant `BuiltinOperationIntVal`
+        // (e.g. `cond ? N : M` in an array size). Appended after the real fast-path ops above.
+        Conditional,
+        And,
+        Or,
+        // Sentinel for "not a builtin fast-path operator". Returned by
+        // `getBuiltinOperationKindFromString` for operators the fast path does not rewrite (e.g.
+        // `&&`/`||`/`?:`). Never stored on a node and never serialized, so it is kept last.
+        Unknown,
+    };
+
+    // Whether an operator is being applied to one operand or two; disambiguates the prefix `-`
+    // (Neg) from the binary `-` (Sub) in `getBuiltinOperationKindFromString`.
+    enum class OperatorArity
+    {
+        Unary,
+        Binary,
+    };
+
+    // Operator-name text for a `BuiltinOperationKind` (e.g. `Add` -> "+"); used for `toText`
+    // and mangling so a `BuiltinOperationIntVal` is identified consistently.
+    UnownedStringSlice getBuiltinOperationOpText(BuiltinOperationKind op);
+
+    // Map an operator-name + arity to a `BuiltinOperationKind`, or `Unknown` for operators
+    // that have no builtin fast-path form (e.g. `&&`/`||`).
+    BuiltinOperationKind getBuiltinOperationKindFromString(
+        UnownedStringSlice opText,
+        OperatorArity arity);
 
 } // namespace Slang

@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-c-metal-legalization-lowering-phi-elimination
-//META: doc_section_digest=de6a2b24718ef9344624fa3cfc660b5e13c913b28787d2b06b2db1085587ae5e
-//META: purpose=InterlockedAdd lowers to Metal's atomic_fetch_add_explicit with memory_order_relaxed and an (atomic_uint device*) cast.
+//META: doc_section_digest=2a4c97aeaacd2a9728a83c1944ef99c7efe30fe3fe60ef075d8d47044f03eefc
+//META: purpose=`InterlockedAdd` on a device buffer lowers to `atomic_fetch_add_explicit` through an `(atomic_uint device*)` cast with `memory_order_relaxed`.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `validateAtomicOperations` runs for Metal. The Metal emitter
-// renders HLSL-style `InterlockedAdd(buf[0], 1, prev)` as
-// `atomic_fetch_add_explicit((atomic_uint device*)(buf+0), 1,
-// memory_order_relaxed)`.
+// Verifies the Metal atomic shape that `validateAtomicOperations` admits
+// on this target: MSL has no HLSL-style `InterlockedAdd`, so the operation
+// must be re-expressed as a C++11-style explicit atomic on a pointer that
+// has been cast into MSL's `atomic_uint` view of device memory. CHECK
+// asserts all three parts on the emitted call -- the function name, the
+// pointer cast, and the relaxed ordering argument.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

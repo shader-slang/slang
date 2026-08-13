@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:32+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#generics-and-where-clauses
-//META: doc_section_digest=367c8c8287c8144f80e46f8a9f2f52ead869866080d544fadcb2763d0d63b953
-//META: purpose=`GenericParam` accepts the type-parameter form `IDENT ':' TypeList`.
+//META: doc_section_digest=9fa528801fe0f265a456b36eb8381148d65db73060d29e10a33ff9ce384104ac
+//META: purpose=`GenericParam` accepts the type-parameter form `'typename'? IDENT (':' Type)?` with a single supertype after the colon.
 //META: intent=functional
 //META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

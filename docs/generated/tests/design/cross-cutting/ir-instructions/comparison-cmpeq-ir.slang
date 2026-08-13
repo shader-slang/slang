@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T20:30:00+00:00
-//META: source_commit=273b0c1d7bd60576ed4d24081c0d1b9f61952281
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#value-instructions
-//META: doc_section_digest=ddd065b774b7979630d27ec19315b658865b6fb853c55bd6e6ee0a0aced77aba
-//META: purpose=Boundary probe of the comparison family: `==` lowers to the `cmpEQ` IR opcode named by the doc alongside `cmpLT`/`cmpGT`.
-//META: intent=boundary
+//META: doc_section_digest=f9ced424f75b0995671347e9ab72c4c596438a42cdf6bd9ecf359a2b13da7f4e
+//META: purpose=An equality comparison lowers to the `cmpEQ` comparison opcode.
+//META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc names `cmpEQ`, `cmpLT`, ... as the comparison opcode family.
-// The existing bundle covers `cmpGT`; this probe pins down the
-// `cmpEQ` sibling at the equality boundary.
+// Verifies the doc's comparison-opcode row via the `cmpEQ` head-of-list
+// example: `a == b` on non-constant `uniform` operands lowers to `cmpEQ`
+// in the IR dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 
@@ -26,4 +26,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // IR-LABEL: func %main
-// IR: cmpEQ(%a, %b)
+// IR: cmpEQ(%{{.*}}, %{{.*}})

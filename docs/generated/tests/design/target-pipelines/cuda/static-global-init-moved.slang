@@ -1,20 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:30:46+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#inlineglobalconstantsforlegalization-for-cuda
-//META: doc_section_digest=fa0d5c3ce0756b2f99f26c93a59640e701e9d459ee33289b2cf6e6474ae6405a
-//META: purpose=CUDA always runs inlineGlobalConstantsForLegalization so a static module-scope constant is inlined at its use sites as the literal value because nvrtc rejects dynamic __device__ initialization.
+//META: doc_section_digest=1ae5c9f73b18aba098dabdf605b7649d4106a39cff7093c91f713a17528d350e
+//META: purpose=CUDASource always runs inlineGlobalConstantsForLegalization (a final PTX request runs the pipeline as CUDASource and takes the same short-circuit; only CUDAHeader skips) so a static module-scope constant is inlined at its use sites as the literal value because nvrtc rejects dynamic __device__ initialization.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `inlineGlobalConstantsForLegalization` has an explicit CUDA short
-// circuit (`target == CUDASource ||
-// (isCPUTarget && isKernelTarget) || ...`) at line ~1543 because
-// nvrtc rejects dynamic `__device__` initialization. The static
-// constant value is inlined at the use site rather than emitted
-// as a `__device__` global with an initializer.
+// Verifies the CUDASource short-circuit for
+// `inlineGlobalConstantsForLegalization` (`target == CUDASource ||
+// (isCPUTarget && isKernelTarget) || ...`): because nvrtc rejects
+// dynamic `__device__` initialization, the static constant's value
+// must be inlined at the use site. The CHECKs assert the literal
+// `int(5)` appears in the kernel and that no `__device__ int counter`
+// global with an initializer is emitted. (`-target cuda` is the
+// CUDASource arm the claim is scoped to; only CUDAHeader skips.)
 
 //TEST:SIMPLE(filecheck=CHECK):-target cuda -entry main -stage compute
 

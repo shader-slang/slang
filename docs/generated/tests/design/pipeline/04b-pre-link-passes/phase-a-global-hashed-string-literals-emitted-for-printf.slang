@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=e769492b0e2a17642d0c2176c69b9635c5d888e1e9fd7ee6420efd9df5b09e62
-//META: purpose=Phase A row A8 emits the kIROp_GlobalHashedStringLiterals aggregate that collects every hashed string literal observed during lowering.
+//META: doc_section_digest=fb614297236867ed66d6f59039a45da1643338536446269b4d6c25ebdd0223e4
+//META: purpose=Phase A emits the single kIROp_GlobalHashedStringLiterals aggregate (A8) holding every hashed string literal observed during the declaration walk.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `printf("hello!\n")` routes its format string through the
-// hashed-string-literal table. Phase A row A8 emits a single
-// aggregate inst that holds every observed hashed string; the
-// LOWER-TO-IR dump shows it as `global_hashed_string_literals(...)`.
+// Verifies that when the module contains a hashed string literal, Phase A
+// closes the declaration walk by emitting one module-scope aggregate that
+// collects them. `printf` routes its format string through that table, so
+// the CHECK looks for `global_hashed_string_literals` carrying the literal
+// text in the post-Phase-D snapshot.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

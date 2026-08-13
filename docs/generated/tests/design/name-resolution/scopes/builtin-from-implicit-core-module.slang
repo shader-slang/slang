@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#sibling-scopes
-//META: doc_section_digest=ed7fdf88e5d58ccf747775f1dfc045814145bf33056dcbfb7bd439f00b7e50cb
+//META: doc_section_digest=96a2e50da8ffd87408328147e60387879fb2746edc2bf8fb712d2723d5c3e4db
 //META: purpose=When a module is imported, the checker adds its scope as a sibling so names from it are reachable without explicit qualification; the core module's builtins (e.g. `sin`) are reachable through this mechanism.
 //META: intent=functional
 //META: pipeline_stage=check

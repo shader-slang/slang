@@ -1,16 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=An InterfaceDecl lowers to an `IRInterfaceType` plus per-method `interface_req_entry` instructions.
+//META: doc_section_digest=37a00b76a98a13c2f3cd47117e12f237fbf042ab8ec479231f23490859cc4497
+//META: purpose=An InterfaceDecl lowers to an `IRInterfaceType` whose per-method `interface_req_entry` rows are keyed by requirement-key insts.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's row "InterfaceDecl → IRInterfaceType plus per-method
-// requirement insts". In the dump this appears as an
+// The doc's row: an InterfaceDecl becomes an IRInterfaceType whose
+// requirement entries are keyed by requirement keys (ordinary
+// methods get per-decl IRStructKeys). In the dump this appears as an
 // `interface_req_entry(<key>, Func(...))` line and an
 // `interface(...)` declaration.
 

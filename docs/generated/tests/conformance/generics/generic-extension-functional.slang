@@ -1,17 +1,20 @@
 //META: generated=true
-//META: model=claude-sonnet-4-6
-//META: generated_at=2026-06-02T07:02:43+00:00
-//META: source_commit=9c1a6a00ef413932805da5b813465a7a9d517fb9
-//META: doc_ref=docs/language-reference/generics.md#description
-//META: doc_section_digest=7b3e1c2f4d8a0e9f5b2c6d1e3f7a4b8c0d2e6f9a1b5c3e7f0d4a8b2c6e0f4a
-//META: purpose=A generic extension on a generic struct with a type constraint adds methods only available when the constraint is satisfied; different specializations dispatch to different extensions.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/language-reference/generics.md#generic-extension-for-generic-types
+//META: doc_section_digest=034115795153f5efbf5da1b1002c144506804e86277f5c21d084a065283c9b56
+//META: purpose=Two generic extensions on the same struct with different type constraints each contribute their method only for the matching specialization.
 //META: intent=functional
 //META: pipeline_stage=runtime
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// From the doc Examples section (Generic extension for generic types).
-// Two extensions of `GenericStruct<T>` with different constraints (IFloat vs IInteger).
-// The correct one is selected based on the specialization argument.
+// Verifies the doc's "Generic extension for generic types" example: two
+// `extension<T> GenericStruct<T>` blocks, one gated on `T : IFloat` and one on
+// `T : IInteger`, each add an `isInt()` method returning 0 and 1 respectively.
+// The float specialization dispatches to the IFloat extension and the uint
+// specialization to the IInteger extension; CHECK asserts 0 then 1, proving
+// constraint-selected extension resolution.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
@@ -33,10 +36,10 @@ extension<T> GenericStruct<T> where T : IInteger
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 id : SV_DispatchThreadID)
+void computeMain()
 {
-    GenericStruct<float> floatObj;
-    GenericStruct<uint>  uintObj;
+    GenericStruct<float> floatObj = {};
+    GenericStruct<uint> uintObj = {};
     outputBuffer[0] = floatObj.isInt();
     outputBuffer[1] = uintObj.isInt();
 }

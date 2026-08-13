@@ -1,36 +1,45 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T12:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#specialization-and-existentials
-//META: doc_section_digest=96937cffa7eab5a700d8fe30b96ad6032aaa2693bb26bdc6db27157e8ac98d94
-//META: purpose=Calling an interface method through an existential-typed value projects the value, type, and witness via the documented `extractExistentialValue` / `extractExistentialType` / `extractExistentialWitnessTable` opcodes.
-//META: intent=expansion
+//META: doc_section_digest=561db21a4ad8f3742180c521eb399a01338495f47b8085f196d3a2228c3211cf
+//META: purpose=A function taking an interface-typed parameter projects it with `extractExistentialType`, `extractExistentialValue` and `extractExistentialWitnessTable`.
+//META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `extractExistentialValue`, `extractExistentialType`,
-// and `extractExistentialWitnessTable` as "Existential projections"
-// taking a single `existential` operand. All three appear when a
-// method call goes through an interface-typed local.
+// Verifies the existential-projection row, which lists the three
+// `extractExistential*` opcodes as the inverse of `makeExistential`. A
+// function declared as `float callArea(IShape s)` receives an existential;
+// its body has to recover the concrete type, the payload, and the witness
+// table separately before it can dispatch. The three CHECKs assert all three
+// projections appear on the same existential operand `%s`, which is what
+// shows the existential is a packed triple rather than an opaque value the
+// callee dispatches on directly.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 
-interface IFoo { int getVal(); }
-struct A : IFoo { int x; int getVal() { return x; } }
+interface IShape { float area(); }
+struct Sq : IShape { float s; float area() { return s * s; } }
 
-uniform RWStructuredBuffer<int> buf;
+float callArea(IShape s)
+{
+    return s.area();
+}
+
+uniform float a;
+uniform RWStructuredBuffer<float> outbuf;
 
 [numthreads(1, 1, 1)]
 void main(uint3 tid : SV_DispatchThreadID)
 {
-    A a;
-    a.x = 42;
-    IFoo iface = a;
-    buf[0] = iface.getVal();
+    Sq q;
+    q.s = a;
+    outbuf[0] = callArea(q);
 }
 
-// IR-LABEL: func %main
-// IR: extractExistentialType(%iface)
-// IR: extractExistentialValue(%iface)
-// IR: extractExistentialWitnessTable(%iface)
+// IR-LABEL: func %callArea
+// IR-DAG: = extractExistentialType(%s
+// IR-DAG: = extractExistentialValue(%s
+// IR-DAG: = extractExistentialWitnessTable(%s

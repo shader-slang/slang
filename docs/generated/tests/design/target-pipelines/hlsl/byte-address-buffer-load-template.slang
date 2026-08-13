@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:16:11+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizebyteaddressbufferops-for-hlsl
-//META: doc_section_digest=164828634e9baa99ca092b48a08857187612e7093b4737e812351988e3e9c2b7
+//META: doc_section_digest=b0c266609c4b593b519a7c5f029902d859bb791bb9eb38330bd4917fc6652b4e
 //META: purpose=legalizeByteAddressBufferOps uses default HLSL options so Load<T> survives as a templated method call.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

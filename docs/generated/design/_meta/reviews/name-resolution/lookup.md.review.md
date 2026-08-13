@@ -1,41 +1,49 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:19:45+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:07:26+00:00
 target_doc: name-resolution/lookup.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: f2b871e4496ed32a327e98986317cc4eb48691d204aad2e863ea2eebf51fc801
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 908d68e75b69302955968bbdfcb859a23def6d820df3e4565050f206b89519c1
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
   completeness: pass
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: pass
-finding_count: 2
+  front_matter_validity: partial
+finding_count: 4
 severity_breakdown:
   critical: 0
   major: 1
-  minor: 1
+  minor: 3
   nit: 0
 ---
 
 # Review report for name-resolution/lookup.md
 
 ## Summary
-The lookup page covers the required concepts, algorithm sections, shadowing rules, and failure modes. I found two issues: one watched-path alignment problem for the namespace-shadowing citation, and one source contradiction where the page says visibility filtering drops duplicate lookup paths.
+The page is comprehensive, all line-number citations are accurate at the recorded source commit, and its required sections and links are present. Four findings remain. Most importantly, the front-matter digest no longer matches the manifest's expanded watched set, so the document metadata does not describe the inputs currently assigned to the page.
 
 ## Items checked
-- Ran `regenerate.py show name-resolution/lookup.md` and checked the manifest entry, prompt, 11 resolved watched files, and depends-on docs.
-- Verified the target front matter fields, required section order, and the lookup prompt's required `## Shadowing rules` section.
-- Checked all 75 relative links for resolution and spot-checked peer links against `scopes.md`, `visibility.md`, `overload-resolution.md`, `ast-reference/values.md`, and `glossary.md`.
-- Verified 55 source line-citation references against source at `52339028a2aa703271533454c6b9528a534bac31`, including `LookupMask`, `LookupOptions`, breadcrumbs, `_lookUpInScopes`, `_lookUpDirectAndTransparentMembers`, `AddToLookupResult`, and block-local shadowing.
-- Spot-checked more than 10 factual claims about scope walking, sibling scopes, transparent members, interface default implementations, and lookup failure behavior.
+- Ran `regenerate.py show name-resolution/lookup.md`; confirmed the per-doc prompt, 64 KiB size cap, three dependency docs, and 15 resolved watched source files.
+- Read the target document including front matter, the per-doc prompt, `_common.md`, `scopes.md`, `ast-reference/values.md`, and `glossary.md`.
+- Confirmed `HEAD` equals the target's recorded source commit and verified all 61 line-number citation expressions across the 15 watched source files.
+- Spot-checked more than 10 factual claims, including entry-point signatures, mask and option bits, request/result invariants, breadcrumb kinds and order, scope traversal, facet filtering, transparent-member recursion, pointer auto-deref, block-local hiding, lookup accelerators, parser keyword lookup, and ambiguity diagnostics.
+- Ran the document lint, confirmed the 40,940-byte page is under its size cap, and recomputed the watched-path digest.
+- Resolved all relative links and checked the cited peer-document anchors and manifest membership.
 
 ## Findings
 
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | minor | `## Shadowing rules`, `### Module and namespace` | The page cites `slang-parser.cpp` for namespace collapse, but `slang-parser.cpp` is not one of this doc's resolved watched files. Because the claim depends on an unwatched source file, changes to `parseNamespaceDecl` would not affect this page's watched-path digest. | `docs/generated/design/_meta/manifest.yaml:417-430` lists the watched paths and omits `source/slang/slang-parser.cpp`; the cited implementation is `source/slang/slang-parser.cpp:4086`. | Add `source/slang/slang-parser.cpp` to `name-resolution/lookup.md` watched paths, or replace this source citation with a link to `scopes.md` where parser scope construction is already in scope. |
-| F-002 | major | `## Shadowing rules`, `#### Deduplication: there isn't any at the LookupResult level` | The page says visibility filtering in `TryCheckOverloadCandidateVisibility` drops duplicates that point at identical visible declarations. The cited function only checks whether the candidate is visible from the source scope and returns false for invisible candidates; it does not compare declarations or deduplicate lookup paths. | `source/slang/slang-check-overload.cpp:265` defines `TryCheckOverloadCandidateVisibility`; `source/slang/slang-check-overload.cpp:275` calls `isDeclVisibleFromScope`, and `source/slang/slang-check-overload.cpp:283` returns false only for an invisible candidate. | Remove the visibility-filtering duplicate claim, or replace it with a source-backed description of where duplicate or tied candidates are ranked after lookup. |
+| F-001 | major | Front matter, line 6 | The recorded `watched_paths_digest` is stale after the manifest's watched set was expanded. The page records `908d68e75b69302955968bbdfcb859a23def6d820df3e4565050f206b89519c1`, while `regenerate.py digest name-resolution/lookup.md` now returns `4824386ae8ea099d1c1c5fce3ad1de39a629e6fdc82526541b91ba7a41ee5cea`; the mandatory metadata therefore does not identify the current input set. | `docs/generated/design/name-resolution/lookup.md:6` contains the old digest. `docs/generated/design/_meta/manifest.yaml:481-498` defines the current 15-file watched set. | Regenerate or refresh the page against the current manifest so line 6 records `4824386ae8ea099d1c1c5fce3ad1de39a629e6fdc82526541b91ba7a41ee5cea`. |
+| F-002 | minor | `## Source`, lines 55-68 | The page says four cited files “live outside this page's watched paths,” but all four are now watched. This leaves the source inventory inconsistent with the manifest and incorrectly tells maintainers that these claims are not tracked for drift. | `docs/generated/design/_meta/manifest.yaml:494-497` includes `slang-check-impl.h`, `slang-check-expr.cpp`, `slang-check-overload.cpp`, and `slang-parser.cpp`. | Remove the assertion that these files are outside the watched paths and present them as part of the normal source inventory. |
+| F-003 | minor | `### Unqualified lookup`, lines 255-264 | The `AggTypeDeclBase` dispatch is described as “i.e.” lookup inside a `struct`, `interface`, `enum`, or `extension`, but that list is not exhaustive: `ClassDecl` and other `AggTypeDecl` subclasses also take this branch. | `source/slang/slang-ast-decl.h:360-386` makes both `ExtensionDecl` and `AggTypeDecl` derive from `AggTypeDeclBase`; `source/slang/slang-ast-decl.h:428-431` declares `ClassDecl : AggTypeDecl`. | Replace “i.e.” with “for example,” or explicitly include classes and state that all `AggTypeDeclBase` subclasses take the branch. |
+| F-004 | minor | `#### Deduplication`, lines 599-603 | The sentence says the “same `DeclRef`” can appear both as an interface requirement and as the concrete member satisfying it. Those are distinct declaration candidates; the comparator explicitly distinguishes the interface requirement from the concrete function and prefers the latter. The no-deduplication conclusion is correct, but this example conflates duplicate paths to one decl-ref with competing decl-refs for different declarations. | `source/slang/slang-check-overload.cpp:1944-1958` describes lookup returning “both an interface requirement and the concrete function” and tests the two declarations separately with `isInterfaceRequirement`. | Split the examples: retain direct-versus-transparent lookup as the same-decl-ref case, and describe interface requirement versus concrete implementation as distinct candidates resolved later by `CompareLookupResultItems`. |
+
+## No-issues notes
+- The `cbuffer` breadcrumb order is correctly documented as `Member -> Deref`, matching construction and checker consumption.
+- The named `LookupMask`, `LookupOptions`, and breadcrumb `Kind` values match `slang-ast-support-types.h` at the target source commit.
+- The required algorithm, shadowing, edge-case, and see-also sections are present in the prescribed order.

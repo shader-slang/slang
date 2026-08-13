@@ -1,40 +1,51 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T15:05:51+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:12:06+00:00
 target_doc: ir-reference/misc.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 5ac7df35674b391db414495e8be54b9c8c58690cd2b324a3a4c6804a1748f586
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 64be22b621bde4e26ac349ba999894219b13a0f0d103c6e61d02970a8258d1bc
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
-  factual_accuracy: partial
+  factual_accuracy: fail
   cross_references: pass
-  completeness: partial
+  completeness: fail
   style_consistency: pass
-  source_alignment: partial
-  front_matter_validity: pass
-finding_count: 1
+  source_alignment: fail
+  front_matter_validity: partial
+finding_count: 7
 severity_breakdown:
-  critical: 0
-  major: 1
-  minor: 0
+  critical: 2
+  major: 2
+  minor: 3
   nit: 0
 ---
 
 # Review report for ir-reference/misc.md
 
 ## Summary
-The page has valid front matter and all relative links resolve. The sampled opcode rows mostly match the recorded Lua declarations, but the catch-all coverage misses concrete opcodes under a grouping parent that the misc prompt explicitly calls out as a typical inhabitant.
+The page has strong coverage and every numeric citation resolves to the stated source location, but two behavioral explanations contradict the recorded source. Most importantly, the type-predicate table misstates the implemented vector behavior, while the barrier callout incorrectly says the IR preserves symbolic flags and that cross-language numeric drift is caught at compile time. The tables also retain the explicitly retired `(synthesized)` producer label in 16 rows and do not mark their 12 hand-written wrappers.
 
 ## Items checked
-- Ran `python3 docs/generated/design/_meta/regenerate.py show ir-reference/misc.md`.
-- Read `_common.md`, `ir-reference-misc.md`, the target document, dependency docs, and watched source files at `52339028a2aa703271533454c6b9528a534bac31`.
-- Resolved all 25 relative Markdown links at the target source commit.
-- Verified front matter keys and checked the target source commit and watched-path digest values against the document front matter.
-- Spot-checked more than 10 factual claims across pack helpers, type queries, storage casts, liveness markers, string hashing, and kernel-launch rows.
+- Reviewed the target, `_common.md`, the per-document prompt, both dependency documents, and all 13 files resolved by `regenerate.py show` at source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Verified every line-number citation in the body against that source snapshot, including lowering, builder, pass, emitter, core-module, type-system, and work-graph citations.
+- Spot-checked more than 10 behavioral claims, including pack lowering, type predicates, storage/logical casts, annotations, liveness, string hashing, CUDA launch, barrier emission, untyped handles, and compiler dictionaries.
+- Checked all 65 opcode rows for the required column shape, exact-producer terminology, wrapper naming, hand-written-wrapper marking, and duplicate ownership.
+- Resolved all relative links with `regenerate.py lint ir-reference/misc.md` and checked generated peer pages against the manifest.
+- Recomputed the digest for the currently resolved watched set; it is `68307fb210079951c7475f2a90085649cb5551132e6648106e00c80d147882d8`, not the digest recorded in the target front matter.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Opcodes` | The catch-all table omits the concrete `ForceVarIntoStructTemporarily` and `ForceVarIntoRayPayloadStructTemporarily` opcodes even though the misc prompt names their grouping parent as a typical inhabitant and no sibling page lists the children. | `docs/generated/design/_meta/prompts/ir-reference-misc.md:14-18` names `ForceVarIntoStructTemporarilyBase`; `source/slang/slang-ir-insts.lua:1541-1548` declares the two concrete child opcodes. | Add rows for `ForceVarIntoStructTemporarily` and `ForceVarIntoRayPayloadStructTemporarily`, or move them to a better owning family page and cross-link from misc. |
+| F-001 | critical | `### Type queries and predicates`, rows `IsInt` through `IsVector` (lines 217-224) | The summaries do not describe the implemented predicate behavior. Before evaluating `IsInt`, `IsFloat`, `IsHalf`, signedness, `IsBool`, or `IsVector`, peephole unwraps a vector or matrix to its element type. Consequently the scalar predicates can return true for vector/matrix operands, while `IsVector` returns false for a concrete vector because the value tested by `as<IRVectorType>` has already been replaced with its element type. The row's claim that `IsVector` is “True for a vector” is directly contradicted by the source. | `source/slang/slang-ir-peephole.cpp:1878-1912` unwraps vector/matrix types at lines 1879-1882 and only then evaluates `IsVector` at lines 1910-1912. | Rewrite these summaries to state the actual element-type folding behavior at this commit, explicitly noting the implemented `IsVector` result rather than documenting the apparent intended semantics. |
+| F-002 | critical | `### getEnumBarrierMemoryTypeFlags and getEnumBarrierSemanticFlags`, lines 564-600 | The callout says the IR carries a “symbolic flag value” and that divergence between the C++ and Slang numeric definitions is a compile error. In fact, HLSL emission requires the operand to be an `IRIntLit`, converts it to `uint32_t`, and reconstructs names from numeric bits. The `static_assert`s compare C++ enum members with literals in the same C++ header; they do not reference `workgraph.slang`, so changing only the Slang values does not trigger those assertions. | `source/slang/slang-emit-hlsl.cpp:1177-1193` consumes `IRIntLit`; `source/slang/slang-emit-hlsl-prelude.cpp:553-616` maps numeric bits to names; `source/slang/slang-type-system-shared.h:12-63` contains only same-file literal assertions; `source/standard-modules/experimental/workgraph.slang:274-307` separately hard-codes the Slang values. | State that the IR carries a folded numeric bitmask and the emitter maps known bit values back to HLSL names. Replace the compile-error claim with the actual manual synchronization requirement, and clarify that the C++ assertions pin only the C++ side. |
+| F-003 | major | `AST origin` cells at lines 134, 150-151, 167, 169, 200, 264-266, 315-316, 330, and 364-367 | Sixteen rows still use the retired catch-all `(synthesized)`, despite both the source prose and the prompt saying every row must name the actual producer or say **no producer at HEAD**. These rows hide materially different origins: `getCapabilityValue`, the PyTorch binding pass, lowering visitors, buffer-element legalization, liveness/phi passes, dispatch lowering, and `initializeTranslationDictionary`; `nop` appears to have no instruction producer. | Producer-column contract at `docs/generated/design/_meta/prompts/_common.md:240` and `docs/generated/design/_meta/prompts/ir-reference-misc.md:25-34`; representative producers at `source/slang/slang-ir.cpp:2669-2707`, `source/slang/slang-ir-pytorch-cpp-binding.cpp:460-472`, `source/slang/slang-lower-to-ir.cpp:2056-2069`, `source/slang/slang-ir-lower-buffer-element-type.cpp:1174-1180`, and `source/slang/slang-ir-translate.cpp:16-27`. | Trace and replace all 16 `(synthesized)` cells with the specific producing function/pass. Mark `nop` **no producer at HEAD** if a complete source sweep confirms it is only used as an opcode sentinel, and mention no-producer status in its Summary cell as required. |
+| F-004 | major | All `C++ wrapper` cells; hand-written-wrapper prose at lines 63-77 | The page correctly states that 12 wrappers are hand-written, but none of those rows is marked in the C++ wrapper column. The family contract explicitly requires each hand-written wrapper to be marked, not merely listed in separate prose. | `docs/generated/design/_meta/prompts/_common.md:237`; representative hand-written definitions include `IRAnnotation` and `IRDispatchKernel` at `source/slang/slang-ir-insts.h:740-758`, `IRExpand`/`IREach` at `source/slang/slang-ir-insts.h:2378-2393`, and the compiler-dictionary wrappers at `source/slang/slang-ir-insts.h:3084-3109`. | Add a consistent marker such as `‡` to all 12 applicable wrapper cells and define it immediately below the tables or in the existing wrapper explanation. |
+| F-005 | minor | Operand cells for `makeTensorView` (line 167), `liveRangeStart` (line 315), and `DispatchKernel` (line 330) | These cells mix builder-produced operands into a column whose contract is the Lua schema. `makeTensorView` has no named Lua operands, `liveRangeStart` declares only `min_operands = 2`, and `DispatchKernel` names exactly three Lua operands without `args...`. The builder discrepancies are useful, but belong in summaries/callouts rather than changing the schema column. | Column contract at `docs/generated/design/_meta/prompts/_common.md:238`; Lua entries at `source/slang/slang-ir-insts.lua:1687`, `2961`, and `2856`; actual builder shapes at `source/slang/slang-ir.cpp:3682-3690`, `3758-3775`, and `4961-4964`. | Make the three operand cells report only the Lua-declared schema, and retain the actual one-operand/trailing-argument discrepancies in the nearby prose. |
+| F-006 | minor | `### Coverage gaps against sibling pages`, lines 370-382 | The first “gap” is stale: the paragraph says sibling pages do not yet list the named work-graph/handle types, `imageGatherOffset`, work-graph decorations, or `TypeAlignment`, but those opcodes are now present in the sibling tables. | Examples are present at `docs/generated/design/ir-reference/types.md:283-292,370,376-377`, `docs/generated/design/ir-reference/resources-and-atomics.md:169`, `docs/generated/design/ir-reference/decorations.md:129,169,254-258`, and `docs/generated/design/ir-reference/metadata.md:167`. | Delete the obsolete first-gap paragraph or replace it with a current ownership statement that does not claim those sibling rows are missing. |
+| F-007 | minor | Front matter, line 6 | The recorded `watched_paths_digest` no longer matches the watched set resolved by the required `regenerate.py show` invocation. With the 13 paths currently declared in the manifest, `regenerate.py digest ir-reference/misc.md` returns `68307fb210079951c7475f2a90085649cb5551132e6648106e00c80d147882d8`, not `64be22...d1bc`. | Current watched paths are declared at `docs/generated/design/_meta/manifest.yaml:739-752`; target front matter records the old digest at `docs/generated/design/ir-reference/misc.md:6`. | Regenerate the page metadata against the current resolved watched set so the front-matter digest equals the driver output; do not merely hand-edit the hash without rerunning the generation workflow. |
+
+## No-issues notes
+- All required front-matter keys are present and syntactically well formed.
+- The required notable callouts for `Each`, `PackBranch`, `MakeWitnessPack`, `getStringHash`, and `CudaKernelLaunch` are present.
+- All relative links resolve, and every numeric source citation is at the claimed symbol or range.

@@ -1,21 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeirformetal
-//META: doc_section_digest=ae7166b4e043d6e1a4435c167ea8bdc675ca3080f5f01a62c716172c61bce000
-//META: purpose=legalizeSubpassInputsForMetal (inside legalizeIRForMetal) rewrites each `IRGlobalParam` of type `SubpassInput<T>` into a fragment entry-point parameter with a `[[color(N)]]` system-value decoration sourced from the `InputAttachmentIndex` layout decoration; every `kIROp_SubpassLoad` use is rewritten into a direct reference to that new parameter. No `SubpassInput` opcode survives into the Metal emit.
-//META: intent=expansion
+//META: doc_section_digest=1b40e6975a461c5c97ead4202c2a70e579c2e6e882749ceb49d57be34bac586c
+//META: purpose=`legalizeSubpassInputsForMetal` turns each `SubpassInput<T>` global into a fragment parameter carrying `[[color(N)]]` taken from its input-attachment index, and rewrites every `SubpassLoad` into a reference to it.
+//META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Metal does not have a native subpassLoad intrinsic; instead
-// Slang maps the construct onto Metal's frame-buffer-fetch feature
-// (the per-fragment `[[color(N)]]` input). `[[vk::input_attachment_index(N)]]`
-// supplies the N. Surviving `SubpassLoad` calls trigger
-// `SLANG_DIAGNOSE_UNEXPECTED` at emit time, so observing the
-// `[[color(N)]]` annotation in the MSL is equivalent to observing
-// that the legalization ran.
+// Verifies the frame-buffer-fetch mapping. Metal has no `subpassLoad`
+// intrinsic, so the construct is mapped onto the per-fragment `[[color(N)]]`
+// input instead, and any `SubpassLoad` that survived would abort the Metal
+// emitter outright. Two attachments with different indices are read so the
+// index really comes from the layout decoration rather than declaration
+// order; CHECK asserts both `color(0)` and `color(3)` appear and that no
+// `SubpassInput` / `SubpassLoad` token is left in the MSL.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage fragment
 

@@ -10,13 +10,22 @@ class TargetRequest;
 class ArtifactPostEmitMetadata;
 enum class ProfileVersion;
 
+// Default per-slot byte width for the synthesized `__slang_coverage`
+// buffer when the user does not opt down via
+// `-trace-coverage-counter-width` (CLI) or
+// `CompilerOptionName::TraceCoverageCounterByteWidth` (API). `8` =
+// `uint64_t`, which effectively cannot wrap within any practical run.
+static constexpr int kDefaultCoverageCounterByteWidth = 8;
+
 // Shader coverage instrumentation pass.
 //
 // When `enabled` is true, the pass synthesizes a fresh
-// `RWStructuredBuffer<uint> __slang_coverage` `IRGlobalParam` directly
-// in the linked IR module, attaches a target-appropriate layout
-// decoration (UAV register for D3D, descriptor binding for Khronos),
-// extends the program-scope var layout so the buffer participates in
+// `RWStructuredBuffer<uint64_t> __slang_coverage` `IRGlobalParam`
+// (or `RWStructuredBuffer<uint>` if the caller opts down via
+// `counterByteWidth`; see below) directly in the linked IR module,
+// attaches a target-appropriate layout decoration (UAV register for
+// D3D, descriptor binding for Khronos), extends the program-scope var
+// layout so the buffer participates in
 // `collectGlobalUniformParameters` packaging on targets that need it
 // (CPU, CUDA), and rewrites coverage marker ops into atomic adds. The
 // current line/function/branch producers assign one direct counter slot
@@ -41,10 +50,27 @@ enum class ProfileVersion;
 // updates the caller's pointer so the subsequent
 // `collectGlobalUniformParameters` pass sees the extended layout.
 //
+// `counterByteWidth` selects the per-slot element width of the
+// synthesized buffer: `8` for `RWStructuredBuffer<uint64_t>` (the
+// default; effectively immune to counter wrap), or `4` for
+// `RWStructuredBuffer<uint>` (wraps at 2^32 hits per slot — only used
+// when the runtime driver lacks 64-bit shader atomic add). Both
+// entry paths (the `-trace-coverage-counter-width` CLI parser and
+// the `TraceCoverageCounterByteWidth` API option) validate the value
+// to `{4, 8}` before calling in, so any other value is a
+// compiler-internal contract violation; the pass asserts rather than
+// silently coercing.
+//
 // When `enabled` is false the pass is a no-op: any stray marker ops
 // from cached modules are dropped so the backend never sees them, no
 // buffer is synthesized, and `outMetadata` and `globalScopeVarLayout`
 // are left untouched.
+//
+// `booleanMode` opts in to boolean recording (`CoverageCounterMode::Boolean`):
+// each counter is written with a plain non-atomic store of `1` instead of
+// an atomic add, so it records whether the entry executed (0 / non-zero)
+// rather than an exact count. This removes all atomic contention. Off by
+// default.
 //
 // `waveAggregationSupported` is the caller-computed result of
 // `isCoverageWaveAggregationSupported` (computed at the call site so the
@@ -52,6 +78,14 @@ enum class ProfileVersion;
 // wave-aggregated increment; when false it emits the per-lane atomic add. The
 // caller and the linker compute it identically so the force-kept wave
 // intrinsics are present iff the pass will call them.
+//
+// `booleanMode` and `waveAggregationSupported` are two answers to the same
+// problem — atomic contention on hot counter slots — and `booleanMode` wins
+// where both apply: it removes the atomic entirely, leaving nothing for wave
+// aggregation to reduce. A boolean-mode compile therefore takes the plain-store
+// path regardless of `waveAggregationSupported`, and the linker applies the
+// same exclusion so no wave intrinsic is force-kept for a pass that will never
+// call it.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -60,6 +94,8 @@ void instrumentCoverage(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
+    bool booleanMode,
     TargetRequest* targetRequest,
     bool waveAggregationSupported,
     IRVarLayout*& globalScopeVarLayout,

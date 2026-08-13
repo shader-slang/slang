@@ -39,6 +39,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+# Default to `-Og` for Debug builds on GNU-style compilers: it enables the
+# optimizations that do not interfere with debugging, producing noticeably
+# faster Debug binaries while keeping a faithful step-through/inspection
+# experience.
+#
+# The `NOT WIN32` guard excludes MSVC and clang-cl, which expect MSVC-style
+# flags and have no `-Og` equivalent. `CMAKE_CXX_COMPILER_ID` is not yet known
+# at this point (it is set by enable_language() below), so the platform is
+# the closest available proxy. A side effect is that MinGW builds do not get
+# `-Og` by default. Those users can pass `-DCMAKE_CXX_FLAGS_DEBUG="-Og -g"`
+# explicitly.
+#
+# Note: We use `string(PREPEND ...)` rather than `set(...)`: a
+# toolchain file is processed by the `project()` call above, and some
+# toolchains seed these same `_INIT` variables. Prepending keeps
+# whatever the toolchain asked for, giving precedence to the toolchain
+# option definitions (e.g., optimization level).
+if(NOT WIN32)
+    string(PREPEND CMAKE_C_FLAGS_DEBUG_INIT "-Og ")
+    string(PREPEND CMAKE_CXX_FLAGS_DEBUG_INIT "-Og ")
+endif()
+
 #
 # CMake-supplied modules and our utils
 #
@@ -165,6 +187,11 @@ option(
     ON
 )
 option(
+    SLANG_ENABLE_SLANG_PROXY
+    "Build the legacy slang.dll proxy and libslang symlink backward-compatibility outputs for slang-compiler"
+    ON
+)
+option(
     SLANG_ENABLE_TESTS
     "Enable test targets, some tests may require SLANG_ENABLE_SLANG_RHI, SLANG_ENABLE_SLANGD or SLANG_ENABLE_SLANGRT"
     ON
@@ -213,17 +240,6 @@ advanced_option(
     SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
     "Enable mimalloc for SPIRV-Tools to improve compilation performance"
     ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
-)
-
-# TODO: Remove this option once SPIRV-Tools fixes the MergeReturnPass UAF:
-# https://github.com/KhronosGroup/SPIRV-Tools/issues/6711
-# Slang tracking issue: https://github.com/shader-slang/slang/issues/11146
-# Keep the source-build default ON to preserve existing SPIR-V output. Builds that need the
-# temporary workaround can set this OFF explicitly until the upstream fix lands.
-advanced_option(
-    SLANG_ENABLE_SPIRV_OPT_MERGE_RETURN
-    "Register SPIRV-Tools MergeReturnPass + InlineExhaustivePass in the slang-glslang optimizer pipeline; set OFF to opt into the temporary SPIRV-Tools#6711 workaround"
-    ON
 )
 
 option(
@@ -309,6 +325,11 @@ advanced_option(
     "Build using user defined path for cmark"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_FAST_FLOAT_PATH
+    "Build using user defined path for fast_float"
+    OFF
+)
 
 set(SLANG_EXCLUDE_DAWN_DEFAULT ON)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -341,6 +362,27 @@ enum_option(
     STATIC
     "Build slang-compiler as a static library"
 )
+
+set(SLANG_ENABLE_MIMALLOC_DEFAULT OFF)
+if(
+    WIN32
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
+    AND SLANG_LIB_TYPE STREQUAL "SHARED"
+    AND NOT SLANG_ENABLE_ASAN
+)
+    set(SLANG_ENABLE_MIMALLOC_DEFAULT ON)
+endif()
+advanced_option(
+    SLANG_ENABLE_MIMALLOC
+    "Use mimalloc for Slang-owned allocations"
+    ${SLANG_ENABLE_MIMALLOC_DEFAULT}
+)
+if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
+    message(
+        WARNING
+        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
+    )
+endif()
 
 option(
     SLANG_ENABLE_RELEASE_DEBUG_INFO
@@ -626,6 +668,13 @@ install(
     EXCLUDE_FROM_ALL
 )
 install(
+    DIRECTORY "${slang_SOURCE_DIR}/LICENSES"
+    DESTINATION .
+    COMPONENT metadata
+    EXCLUDE_FROM_ALL
+    PATTERN ".*" EXCLUDE
+)
+install(
     DIRECTORY "${slang_SOURCE_DIR}/docs/"
     DESTINATION share/doc/slang
     PATTERN ".*" EXCLUDE
@@ -663,29 +712,47 @@ configure_package_config_file(
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets.
+#
+# A STATIC build used to be excluded here because slang's internal link
+# dependencies (core, prelude, compiler-core, slang-capability-*,
+# slang-lookup-tables, SPIRV-Headers, ...) leaked onto its public link
+# interface and weren't in any export set, which made install(EXPORT ...) fail
+# (see issue #5821 / PR #6158). slang_add_target now wraps private link deps in
+# $<BUILD_LOCAL_INTERFACE:...> / $<BUILD_INTERFACE:...> (cmake/SlangTarget.cmake),
+# so those targets no longer appear in the install/export interface and a static
+# install exports cleanly. Exporting also for STATIC keeps SlangConfig.cmake's
+# unconditional include() of slangTargets.cmake (cmake/SlangConfig.cmake.in)
+# satisfied, so find_package(slang) works for static installs too.
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
-        install(
-            EXPORT SlangTargets
-            FILE ${PROJECT_NAME}Targets.cmake
-            NAMESPACE ${PROJECT_NAME}::
-            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    install(
+        EXPORT SlangTargets
+        FILE ${PROJECT_NAME}Targets.cmake
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
+    )
+
+    # The pkgconfig file stays gated on non-STATIC builds. Unlike the CMake
+    # export above, extras/pkgconfig/slang-compiler.pc.in cannot describe a
+    # static link: it lists only `-lslang-compiler` and leaves Libs.private
+    # empty (it explicitly documents that `pkg-config --static` is unsupported).
+    # Installing it for a STATIC build would hand downstream users a link line
+    # that omits every transitive internal archive (core, compiler-core,
+    # slang-capability-*, slang-lookup-tables, bundled miniz/lz4, ...), causing
+    # unresolved-symbol errors at link time. Static consumers should use
+    # find_package(slang) instead, which the export above now supports.
+    if(UNIX AND NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
+        configure_file(
+            "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+            "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            @ONLY
         )
 
-        if(UNIX)
-            configure_file(
-                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
-                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                @ONLY
-            )
-
-            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
-            # update this destination.
-            install(
-                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
-                DESTINATION "lib/pkgconfig"
-            )
-        endif()
+        # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+        # update this destination.
+        install(
+            FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+            DESTINATION "lib/pkgconfig"
+        )
     endif()
 endif()
 

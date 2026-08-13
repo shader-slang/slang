@@ -1,21 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#unqualified-lookup
-//META: doc_section_digest=3b394bf839041f0d86487cb14f22d3c9442c777b87a2bbf98421edb81222a98a
-//META: purpose=Step 5 of the unqualified-lookup walk updates ThisParameterMode based on the enclosing function's modifiers; [mutating] yields a mutable This breadcrumb so unqualified writes to a field in the method body update the receiver.
+//META: doc_section_digest=32b5d6cdc50501bef4e7ef2a5cc9d61e93145ad0a37a1049859831fc766c24f1
+//META: purpose=Stepping out of a mutating-qualified method sets the This parameter mode to a mutable value, so an unqualified write to a field inside that method updates the receiver.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Step 5 of unqualified-lookup: "the loop updates
-// `thisParameterMode` based on the container's modifiers —
-// `[mutating]`, `[ref]`, `static`, and `__init` change the kind of
-// `this` that any breadcrumb recorded in an outer scope must use".
-// A `[mutating]` method's unqualified write to `count` must mutate
-// the receiver — proving the This breadcrumb is recorded with the
-// mutable mode.
+// Verifies the this-parameter-mode update the scope walk performs when
+// it leaves a callable: a [mutating] method must produce a mutable
+// `this` breadcrumb. The method assigns to `count` by unqualified
+// name; if the breadcrumb recorded an immutable `this` the write would
+// land on a copy. CHECK asserts the receiver observed both increments.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#function-and-module-structure
-//META: doc_section_digest=3cd430fe84a5b7025d059358578317eab126613a22446f8d9d7f776e96724317
-//META: purpose=A type that conforms to an interface produces a `witness_table` with `witness_table_entry` children mapping interface requirements to satisfying values.
+//META: doc_section_digest=d6d21d15e8b14ba2b57495447b3188f156d4c4168b8574097962151b591b1497
+//META: purpose=A type that conforms to an interface produces a `witness_table` with `witness_table_entry` children mapping requirements to satisfying values.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// A `struct A : IFoo { ... }` conformance produces a witness table
-// (the doc's "Witness table machinery" entry). The table is a top-
-// level `witness_table` whose children are `witness_table_entry`
-// rows mapping each `interface_req_entry` key to the satisfying
-// method.
+// Verifies the doc's `witness_table`/`witness_table_entry` structure row
+// ("Witness table machinery") and the `interface`/`InterfaceType` type
+// row. A `struct A : IFoo` conformance emits a top-level `witness_table`
+// whose `witness_table_entry` rows map each requirement key to its
+// satisfying method.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

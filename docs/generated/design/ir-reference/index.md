@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-05T10:25:25+00:00
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: 9221d4167460d8aa57ead3a905a1ce4b763de1371a68088ad1f20133ed887720
+model: claude-opus-5
+generated_at: 2026-08-03T16:21:53Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: b01105947bb6bdcf6a24a6d12b46521c4b6bfb52a24e7ee5da31dceb7f981082
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -13,25 +13,12 @@ This subtree of `docs/generated/design/` is a per-family reference for the
 Slang Intermediate Representation. Every concrete opcode declared in
 [../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua)
 appears in a family page below, tabulated with its C++ wrapper
-struct (from [../../../../source/slang/slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h)),
-its operand shape, its op-flags (`H` hoistable, `P` parent, `G` global),
-the AST node(s) that lower into it (sourced from
-[../../../../source/slang/slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)),
-and a one-line summary. Notable opcodes that carry semantics a table row
-cannot convey have short call-outs further down each page.
-
-Most opcodes appear in exactly one family page. A small number of
-opcodes that play two distinct roles (e.g. `struct` / `class` /
-`interface` as both types and parent containers, `param` as both a
-block parameter and a function parameter, `global_var` as both a
-module-scope structural slot and a value-producing op) appear in two
-pages — once as the primary listing and once as a cross-link row
-that points back to the canonical page. Abstract / grouping-only
-Lua entries (`Type`, `Constant`, `TerminatorInst`, `BasicType`,
-`MakeDifferentialPairBase`, `CastStorageToLogicalBase`,
-`LiveRangeMarker`, `SemanticAttr`, `LayoutResourceInfoAttr`,
-`SPIRVAsmOperand`, `Undefined`, `BindingQuery`, ...) appear only in
-hierarchy diagrams, never in opcode tables.
+struct, its operand shape, its op-flags (`H` hoistable, `P` parent,
+`G` global), the producer that constructs it, and a one-line summary.
+Notable opcodes that carry semantics a table row cannot convey have
+short call-outs further down each page. The intended reader is a
+compiler developer who already knows roughly what they are looking for
+and needs to find the opcode, its shape, and where it comes from.
 
 The family pages are intentionally narrow: they describe *shape and
 provenance*, not *behaviour of the passes that consume the IR*. For
@@ -47,69 +34,89 @@ IR passes do afterwards, see
 
 ```mermaid
 flowchart TD
-  IRInst --> Types["Types"]
-  IRInst --> Values["Values"]
-  IRInst --> Structure["Structure"]
-  IRInst --> ControlFlow["Control flow"]
-  IRInst --> GenericsExistentials["Generics &amp; existentials"]
-  IRInst --> ResourcesAtomics["Resources &amp; atomics"]
-  IRInst --> Differentiation["Differentiation"]
-  IRInst --> Decoration["Decoration"]
-  IRInst --> Metadata["Metadata"]
-  IRInst --> Misc["Misc"]
-  Types --> types_md["types.md"]
-  Values --> values_md["values.md"]
-  Structure --> structure_md["structure.md"]
-  ControlFlow --> controlflow_md["control-flow.md"]
-  GenericsExistentials --> generics_md["generics-and-existentials.md"]
-  ResourcesAtomics --> resources_md["resources-and-atomics.md"]
-  Differentiation --> differentiation_md["differentiation.md"]
-  Decoration --> decorations_md["decorations.md"]
-  Metadata --> metadata_md["metadata.md"]
-  Misc --> misc_md["misc.md"]
+  IRInst --> TypesAndValues["Types and values"]
+  IRInst --> ProgramStructure["Program structure"]
+  IRInst --> Abstraction["Abstraction and transformation"]
+  IRInst --> Operations["Operations"]
+  IRInst --> Annotations["Annotations and layout"]
+  TypesAndValues --> types_md["types.md"]
+  TypesAndValues --> values_md["values.md"]
+  ProgramStructure --> structure_md["structure.md"]
+  ProgramStructure --> controlflow_md["control-flow.md"]
+  Abstraction --> generics_md["generics-and-existentials.md"]
+  Abstraction --> differentiation_md["differentiation.md"]
+  Operations --> resources_md["resources-and-atomics.md"]
+  Operations --> misc_md["misc.md"]
+  Annotations --> decorations_md["decorations.md"]
+  Annotations --> metadata_md["metadata.md"]
 ```
 
 ## Pages
 
 | Page | Family | Lua entry root | Approx. opcodes |
 | --- | --- | --- | --- |
-| [types.md](types.md) | Type instructions | `Type` (line ~20) | ~160 |
-| [values.md](values.md) | Constants, arithmetic, conversions, memory, aggregate constructors, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line ~838) and top-level value opcodes; constexpr arithmetic cluster ~line 3142 | ~150 |
-| [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line ~787), `module` (line ~827) | ~20 |
-| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `TerminatorInst` (line ~1294) + `block` / `Param` at top level | ~25 |
-| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | Top-level (e.g. `specialize` ~line 932, `lookupWitness` ~line 933); type-flow cluster ~line 2880 | ~55 |
-| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing | `AtomicOperation` (line ~1071) + top-level resource opcodes | ~85 |
-| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff temporaries, `DiffTypeInfo` | `MakeDifferentialPairBase` (line ~901) + top-level autodiff opcodes | ~35 |
-| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line ~1594) | ~180 |
-| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line ~2619), `Attr` (line ~2652), `Debug*` (line ~2716), `SPIRVAsmOperand` (line ~2756) | ~55 |
-| [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, size/alignment, storage casts, liveness markers, descriptor heaps, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes | ~55 |
+| [types.md](types.md) | Type instructions | `Type` (line 20), with the nested `BasicType` (22), `TranslatedTypeBase` (168), and `WorkGraphRecordTypeBase` (232) groups | ~170 |
+| [values.md](values.md) | Constants, arithmetic, conversions (including the `DescriptorHandle<T>` conversions), memory, aggregate constructors, reshape/pack helpers, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line 953) plus top-level value opcodes; the `constexpr*` cluster starts at line 3408 | ~150 |
+| [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line 885), `module` (line 942) | ~20 |
+| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `block` (line 944), `param` (line 1170), `TerminatorInst` (lines 1450-1535), the backend-hint group (1537-1547) | ~30 |
+| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | `specialize` (line 1047), `lookupWitness` (1048); the type-flow `SetBase` group at line 3125 | ~50 |
+| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing, descriptor-heap loads, and the natural-layout `getNaturalStride` / `getNaturalAlignment` pair | `AtomicOperation` (line 1186) plus top-level resource opcodes | ~90 |
+| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff placeholders, `DiffTypeInfo` | `MakeDifferentialPairBase` (lines 1016-1046), `DiffTypeInfo` (1124), `TranslateBase` (2816-2855) | ~40 |
+| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line 1752) | ~200 |
+| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line 2876), `Attr` (2909), the `Debug*` cluster (2974-3009), `SPIRVAsmOperand` (3016) | ~60 |
+| [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, compile-time size/align/count queries, storage casts, untyped descriptor-heap handle casts, liveness markers, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes, plus the `Undefined` (972), `BindingQuery` (1736), `CastStorageToLogicalBase` (2763), and `LiveRangeMarker` (2961) groups | ~70 |
 
-Counts are approximate, rounded to the nearest ten at the
-`source_commit` recorded in this file's front-matter. They count
-`struct_name = "..."` entries plus bare opcode entries that fall into
-the family in
-[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua).
-The exact count drifts as opcodes are added, removed, or moved between
-families; the regeneration pipeline surfaces mismatches as staleness.
+The **Approx. opcodes** column is rounded to the nearest ten. It is
+approximate for a second reason as well: a few rows on each page are
+cross-links to an opcode's canonical listing on another page, so the
+underlying row counts double-count those dual-role opcodes.
+
+Two ownership splits are worth knowing before you pick a page, because
+the obvious guess is wrong in both cases. The `DescriptorHandle<T>`
+conversions live on [values.md](values.md), the *untyped*
+descriptor-heap handle casts on
+[misc.md](misc.md#untyped-descriptor-heap-handle-casts), and the
+descriptor-heap loads on
+[resources-and-atomics.md](resources-and-atomics.md). `getNaturalStride`
+and `getNaturalAlignment` are documented on
+[resources-and-atomics.md](resources-and-atomics.md#getnaturalstride-and-getnaturalalignment)
+with the rest of the alignment/stride family, not with the
+compile-time `sizeOf` / `alignOf` queries on [misc.md](misc.md).
+
+Line numbers in the **Lua entry root** column refer to
+[../../../../source/slang/slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua),
+which is 3609 lines at this commit; both the counts and the line
+numbers drift as opcodes are added, removed, or moved between
+families.
 
 ## How AST nodes lower to IR
 
-The "AST origin" column on every family page identifies which AST node
-classes lower into a given opcode. Those mappings come from the ~165
-`visit*` member functions in
+The AST-origin column on every family page names the *producer* that
+constructs a given opcode: where that producer is AST lowering, the
+citation is one of the roughly 230 `visit*` member functions in
 [../../../../source/slang/slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-(for example, `visitVarDecl` emits `Var`, `visitInfixExpr` dispatches
-to arithmetic opcodes such as `Add`, `Sub`, `Mul`). For the AST side
-of that mapping see the [../ast-reference/](../ast-reference) subtree,
-in particular [../ast-reference/expressions.md](../ast-reference/expressions.md),
+(for example, `visitVarDecl` at line 11927 emits `var`), and the AST
+side of that mapping is documented in the
+[../ast-reference/](../ast-reference) subtree — chiefly
+[../ast-reference/expressions.md](../ast-reference/expressions.md),
 [../ast-reference/statements.md](../ast-reference/statements.md), and
 [../ast-reference/declarations.md](../ast-reference/declarations.md).
-
-Many opcodes have no direct AST source: they are produced by IR
-passes (specialization, autodiff, generics legalization, address-space
-inference, SPIR-V emit fix-ups) and may even be retired before code
-emission. Such opcodes carry `(synthesized)` or `—` in the AST-origin
-column on each family page.
+Do not assume a visitor exists just because a parse-level AST class
+does: there is no `visitInfixExpr`, because the `InfixExpr` the parser
+builds for `a + b` is resolved during semantic checking into either a
+`BuiltinOperatorExpr` (`visitBuiltinOperatorExpr`, line 7180) or an
+ordinary `InvokeExpr` of a core-module function declared with
+`__intrinsic_op` (`visitInvokeExpr`, line 7172). An opcode with no
+direct AST source names its producing pass or function instead — an
+`__intrinsic_op` declaration in
+[../../../../source/slang/core.meta.slang](../../../../source/slang/core.meta.slang),
+[../../../../source/slang/hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang),
+or [../../../../source/slang/diff.meta.slang](../../../../source/slang/diff.meta.slang),
+or a named IR pass cited with the file and line that builds the
+instruction — while an opcode that nothing in `source/` constructs is
+marked **no producer at HEAD**. The old catch-alls `(synthesized)` and
+a bare `—` are retired; see the column contract in
+[../_meta/prompts/_common.md](../_meta/prompts/_common.md).
 
 ## Cross-cutting topics
 
@@ -140,26 +147,14 @@ column on each family page.
 ## How to navigate
 
 Start at [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md)
-if you are new to the IR: it covers schema, op-flag bits, and module
-versioning that every family page below assumes. Then jump straight
-to the family page for the opcode you care about. Each family page
-opens with a `## Source` paragraph that links to the relevant Lua
-entry range and to the `slang-lower-to-ir.cpp` visitors that produce
-opcodes in that family.
-
-Within a family page, the `## Opcodes` table is the canonical index.
-Abstract / grouping intermediate Lua entries (such as `BasicType`,
-`MakeDifferentialPairBase`, `TerminatorInst`, the abstract `Decoration`
-root, plus the smaller parents `Undefined`, `BindingQuery`,
-`CastStorageToLogicalBase`, `LiveRangeMarker`, `SemanticAttr`,
-`LayoutResourceInfoAttr`, `SPIRVAsmOperand`) only appear in the
-`## Family hierarchy` diagrams and short prose notes; they do not
-appear as table rows. Notable opcodes whose semantics cannot fit in a
-row of the table have a short `## Notable opcodes` call-out further
-down the page.
-
-The `AST origin` column is sourced from
-[../../../../source/slang/slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp);
-when it shows `(synthesized)` the opcode is produced by an IR pass
-rather than by lowering, and when it shows `—` no AST mapping was
-located in the watched paths.
+if you are new to the IR: it covers the schema, op-flag bits, and
+module versioning that every family page below assumes. Otherwise jump
+straight to the family page for the opcode you care about; each one
+opens with a `## Source` paragraph that links its Lua entry range and
+states that page's own table conventions. Read the **AST origin** cell
+as the name of the producer that actually constructs the opcode — a
+`slang-lower-to-ir.cpp` visitor, a core-module `__intrinsic_op`
+declaration, or a named IR pass — or as **no producer at HEAD** when
+nothing in `source/` builds it. Abstract, grouping-only Lua entries
+never appear as `## Opcodes` rows; they show up only in each page's
+`## Family hierarchy` diagram.

@@ -1,16 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#stage-specific-entry-point-attributes
-//META: doc_section_digest=5332741d22bd1f66cc006924c76c4414130d880c08abe1915fb243255799a71b
-//META: purpose=`[numthreads(x,y,z)]` lowers to GLSL `layout(local_size_x=..., local_size_y=..., local_size_z=...)`.
+//META: doc_section_digest=9976dfbcc03a512351f63ab9251ef58411b90efdfa2f7539d1c820164c50911b
+//META: purpose=`[numthreads(x,y,z)]` workgroup dimensions appear in the emitted entry point.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `NumThreadsAttribute` lowers to a GLSL `layout(local_size_*)`
-// declaration. The emitted GLSL must mention the chosen dimensions.
+// Fan-out of the workgroup-size claim onto GLSL, where the same attribute is
+// spelled as a `layout(local_size_*)` qualifier on the input layout. CHECK
+// asserts the x extent reaches the emitted GLSL, showing the attribute is
+// translated per-target rather than simply copied through.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry main -stage compute
 

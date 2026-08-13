@@ -1,26 +1,39 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=273b0c1d7bd60576ed4d24081c0d1b9f61952281
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#files-and-responsibilities
-//META: doc_section_digest=a3ca128124f08a4f3b66630a5a4d456463e6427c89255506f4853b27f329677e
-//META: purpose=Type resolution follows a chain of `typealias` declarations and resolves all the way to the underlying primitive type.
-//META: intent=boundary
+//META: doc_section_digest=b5f523113b24470cb3eee4f9c8ae76906f41333e955cb7bb7bac14ed1e5d3a05
+//META: purpose=Type resolution follows a chain of `typealias` declarations all the way to the underlying primitive type.
+//META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary on typedef-resolves-to-base-type: a 3-step alias chain
-// still resolves correctly to the underlying `int`.
+// Verifies that alias resolution is transitive rather than one level deep. A
+// value declared through the third link of an alias chain is passed to a pair
+// of overloads that differ only in parameter type; picking the `int` overload
+// is only possible if all three aliases collapsed to `int`. CHECK asserts
+// that selection.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
-typealias A = int;
-typealias B = A;
-typealias C = B;
+typealias L1 = int;
+typealias L2 = L1;
+typealias L3 = L2;
+
+int probe(float v)
+{
+    return 1;
+}
+
+int probe(int v)
+{
+    return 2;
+}
 
 void main()
 {
-    C x = 7;
-    // CHECK: x=7
-    printf("x=%d\n", x);
+    L3 x = 4;
+    // CHECK: p=2
+    printf("p=%d\n", probe(x));
 }

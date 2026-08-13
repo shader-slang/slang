@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers
-//META: doc_section_digest=649151368fdbf5799c5b5465837a522d66af4e2a0ea43703031b86df41af5fcc
+//META: doc_section_digest=96a720a22bcbf95fd50a791728387696a93f2171d6c726d180d1b7d56de54df4
 //META: purpose=An `inout` parameter both reads the caller's value and writes back to it.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `InOutModifier` refines `OutModifier`: an `inout` argument behaves
-// as both an input (the callee sees the caller's value) and an output
-// (assignment propagates back).
+// Verifies that `inout` is both directions at once: the callee sees the
+// caller's value and its assignment propagates back. `doubleIt` computes
+// `x * 2`, so the printed 42 proves both halves -- the callee read 21 (in) and
+// the caller saw the product (out). Either half missing gives a different number.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

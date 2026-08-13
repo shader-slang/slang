@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T15:25:00Z
 target_doc: architecture/overview.md
 review_report: ../../reviews/architecture/overview.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 1
+  fixed: 5
   rejected_bogus: 0
-  rejected_out_of_scope: 0
+  rejected_out_of_scope: 1
   deferred: 0
   escalated: 0
 ---
@@ -18,15 +18,15 @@ actions:
 
 ## Summary
 
-The single major finding was fixed (fixed=1; no rejections, deferrals,
-or escalations). F-001 reported that the lifecycle section listed a
-non-existent `BackEndCompileRequest` class and falsely clustered all
-request declarations into `slang-*-request.h` / `slang-module.h`. Both
-the bullet and the intro sentence were corrected against the source at
-the target commit.
+Six findings were reviewed. Five were verified against source commit `53b76e6d3009b8e6434d41573524c7ce5c499d23` and fixed: the global-session lifetime claim, the seven subsystem bullets that had a watched representative file available, the `slang-rt` consumer list, the split opening paragraph, and the `The In this codebase` artifact. The front-matter digest finding was rejected as out of scope. The document was edited and is now 15,958 bytes against its 16,384-byte cap, leaving little headroom for further growth.
 
 ## Actions
 
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | fixed | No `class BackEndCompileRequest` exists at the target commit (only prose at `source/slang/slang-compile-request.h:35` and `slang-end-to-end-request.h:57`); the back-end driver is `struct CodeGenContext` (`source/slang/slang-code-gen.h:84`), and lifecycle types live in `slang-translation-unit.h:22`, `slang-session.h`, `slang-target.h:112`, etc., not only `slang-*-request.h`/`slang-module.h`. | Replaced the `BackEndCompileRequest` bullet with `CodeGenContext` (citing `slang-code-gen.h`, noting it supersedes the historical name) and reworded the intro to list the actual headers the lifecycle types are declared in. |
+| F-001 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md` lines 97-100 reserve `generated_at`, `source_commit`, and `watched_paths_digest` for the operator's `regenerate.py mark-fresh` run: "Do not edit those three fields yourself." The digest is refreshed when the operator marks this page fresh after the edits below. | — |
+| F-002 | fixed | `include/slang.h:4065-4074` says an application "may create and re-use a single global session" and that "Distinct global sessions may be used from different threads in parallel", so it is not a process singleton. Consolidated with F-006, which touches the same sentence. | `## Compilation request lifecycle`: `Session` bullet now reads "global-session-scoped compiler state", and the two-meanings sentence describes reuse-for-startup-cost with coexisting global sessions permitted (see also F-006). |
+| F-003 | fixed | `docs/generated/design/_meta/prompts/architecture-overview.md` lines 46-47 and 71-72 require each subsystem bullet to cite a concrete watched file. The manifest already watches representatives for the three shims, `slang-rt`, record/replay, WebAssembly, and `slangc`, and those are now cited. Residual follow-up for a later cycle: the GLSL module, `source/standard-modules/`, and the `tools/`/`tests/`/`extras/`/`external/` trees still have no watched representative, and adding one requires a manifest edit that remediation may not make. | `### Downstream-compiler shims`, `### Runtime and bindings`, and `### Driver and tooling`: added `slang-llvm.cpp`, `slang-glslang.cpp`, `slang-dispatcher/main.cpp`, `slang-rt/CMakeLists.txt`, `replay-context.cpp`, `slang-wasm-bindings.cpp`, and `slangc/main.cpp` links (see also F-004). |
+| F-004 | fixed | `_isCPUHostTarget` in `source/slang/slang-code-gen.cpp:354-358` gates the `slang-rt` library artifact (added at `:768-778`) on `ArtifactStyle::Host`; `source/compiler-core/slang-artifact-desc-util.cpp:306-309` classifies CUDA source as `Style::Kernel`, while the PyTorch binding target is host-style. | `### Runtime and bindings`: `slang-rt` bullet now says host-style CPU outputs including PyTorch bindings, and states CUDA is kernel-style (consolidated with F-003). |
+| F-005 | fixed | `docs/generated/design/_meta/prompts/_common.md` lines 65-66 require the first paragraph to state both coverage and intended reader. | Opening: the standalone intended-reader sentence was folded into the first paragraph. |
+| F-006 | fixed | The stray `The` before "In this codebase" was present in the target document. | Removed as part of the F-002 sentence rewrite. |

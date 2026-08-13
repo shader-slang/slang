@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-05T09:24:37Z
-source_commit: 52339028a2aa703271533454c6b9528a534bac31
-watched_paths_digest: e5d3ec001daa5764cbb9fd0fabb552621df4ce64926121102bf19a375fa9d517
+model: claude-opus-5
+generated_at: 2026-08-03T13:08:24Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: 696515884e297ba8af6c8c7765c2f7fdc0119fd11e6bc325c1982bfa8a8062d2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -15,10 +15,8 @@ codebase: the public artefacts it produces, the major subsystems that
 make up the source tree, and the central data objects that flow through
 a compilation. After reading it you should know which subdirectory under
 [source/](../../../../source) implements any given concern, and where to
-go next for detail.
-
-The intended reader is a competent C++ engineer who has not yet opened
-the Slang source tree.
+go next for detail. It is written for a competent C++ engineer who has
+not yet opened the Slang source tree.
 
 ## Purpose
 
@@ -28,14 +26,20 @@ compute toolchain — DXIL, SPIR-V, GLSL, Metal Shading Language, WGSL,
 C++, CUDA, or PyTorch glue — together with reflection / layout
 information about the shader parameters.
 
-The build produces three primary public artefacts:
+The build produces four primary public artefacts:
 
 - `slangc`: the command-line compiler driver, built from
   [source/slangc/](../../../../source/slangc).
-- `libslang` (a shared library): the embeddable compiler; its public C
-  API and COM-style interfaces are declared in
-  [include/slang.h](../../../../include/slang.h).
-- `slang-rt`: a small runtime library used by code emitted to non-GPU
+- `slang-compiler` (a shared library): the embeddable compiler; its
+  public C API and COM-style interfaces are declared in
+  [include/slang.h](../../../../include/slang.h). Under
+  `SLANG_ENABLE_SLANG_PROXY` the historical names are still produced as
+  backward-compatibility aliases: a `libslang` symlink on Unix and a
+  forwarding `slang.dll` on Windows.
+- the WebAssembly bindings built from
+  [source/slang-wasm/](../../../../source/slang-wasm), which expose the
+  compiler to JavaScript together with a generated `interface.d.ts`.
+- `slang-rt`: optional runtime support used by code emitted to non-GPU
   targets, built from [source/slang-rt/](../../../../source/slang-rt).
 
 The compiler is built with CMake. The full build configuration for the
@@ -56,7 +60,12 @@ everything else as an immutable boundary.
   utilities: containers, strings, smart pointers, file-system
   abstractions, hashing, allocation. Nothing else in the project would
   link without it. Representative file:
-  [slang-basic.h](../../../../source/core/slang-basic.h).
+  [slang-basic.h](../../../../source/core/slang-basic.h). The allocator
+  can optionally be backed by mimalloc: setting `SLANG_ENABLE_MIMALLOC`
+  makes
+  [source/core/CMakeLists.txt](../../../../source/core/CMakeLists.txt)
+  link `mimalloc-static` into `core` and define
+  `SLANG_ENABLE_MIMALLOC=1` for every dependent target.
 - [source/compiler-core/](../../../../source/compiler-core) — language-
   agnostic compiler infrastructure that could in principle be reused by
   another language: lexer
@@ -93,36 +102,56 @@ everything else as an immutable boundary.
   [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang),
   [diff.meta.slang](../../../../source/slang/diff.meta.slang)) —
   the core module that defines built-in types, intrinsics, and operator
-  mappings. Embedded into `libslang` at build time.
+  mappings. Embedded into `slang-compiler` at build time. When
+  `SLANG_EMBED_CORE_MODULE` is off and `slang-compiler` is built as a shared
+  library,
+  [source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt)
+  instead adds a `generate_core_module_cache` target that writes a
+  `slang-core-module.bin` cache next to the library, so the first
+  global-session request loads that archive rather than compiling the
+  core module from source.
 - [source/slang-glsl-module/](../../../../source/slang-glsl-module) and
   [source/slang/glsl.meta.slang](../../../../source/slang/glsl.meta.slang)
   — analogous module for GLSL-flavoured intrinsics.
 - [source/standard-modules/](../../../../source/standard-modules) —
   standard-module sources that are shipped but not embedded in the
-  same way (currently includes the `neural` module).
+  same way. Each subdirectory builds a separate `.slang-module`
+  artifact: `neural`
+  ([source/standard-modules/neural/](../../../../source/standard-modules/neural))
+  and `experimental`
+  ([source/standard-modules/experimental/](../../../../source/standard-modules/experimental)),
+  which currently holds the work-graph module.
 
 ### Downstream-compiler shims
 
 - [source/slang-llvm/](../../../../source/slang-llvm) — LLVM-based JIT /
-  static compilation glue.
+  static compilation glue
+  ([slang-llvm.cpp](../../../../source/slang-llvm/slang-llvm.cpp)).
 - [source/slang-glslang/](../../../../source/slang-glslang) — bridge to
-  Khronos `glslang` for SPIR-V generation via GLSL.
+  Khronos `glslang` for SPIR-V generation via GLSL
+  ([slang-glslang.cpp](../../../../source/slang-glslang/slang-glslang.cpp)).
 - [source/slang-dispatcher/](../../../../source/slang-dispatcher) —
-  shared support for dispatching to downstream tools.
+  shared support for dispatching to downstream tools
+  ([main.cpp](../../../../source/slang-dispatcher/main.cpp)).
 
 ### Runtime and bindings
 
-- [source/slang-rt/](../../../../source/slang-rt) — runtime library used
-  by emitted CPU / Torch / CUDA targets.
+- [source/slang-rt/](../../../../source/slang-rt)
+  ([CMakeLists.txt](../../../../source/slang-rt/CMakeLists.txt)) —
+  runtime library linked into host-style CPU outputs, including the
+  PyTorch binding output; CUDA source is kernel-style and does not
+  take this dependency.
 - [source/slang-record-replay/](../../../../source/slang-record-replay)
-  — recorder/replayer for the public Slang API.
+  — recorder/replayer for the public Slang API
+  ([replay-context.cpp](../../../../source/slang-record-replay/replay-context.cpp)).
 - [source/slang-wasm/](../../../../source/slang-wasm) — WebAssembly
-  bindings.
+  bindings
+  ([slang-wasm-bindings.cpp](../../../../source/slang-wasm/slang-wasm-bindings.cpp)).
 
 ### Driver and tooling
 
 - [source/slangc/](../../../../source/slangc) — the `slangc` command-line
-  driver.
+  driver ([main.cpp](../../../../source/slangc/main.cpp)).
 - [tools/](../../../../tools) — auxiliary developer tools (testing,
   reflection, code generation, fiddle, embed, profiling).
 
@@ -167,7 +196,7 @@ declarations are spread across
 `slang-compile-request.h`, `slang-end-to-end-request.h`, and
 `slang-module.h`.
 
-- `Session` — process-wide compiler state. Owns built-in modules, the
+- `Session` — global-session-scoped compiler state. Owns built-in modules, the
   AST builder, and the global type-checking environment. The COM-style
   public interface is `slang::IGlobalSession`
   ([include/slang.h](../../../../include/slang.h)); the implementation
@@ -179,15 +208,19 @@ declarations are spread across
   other consistently. `Linkage` is what the public `slang::ISession`
   interface ([include/slang.h](../../../../include/slang.h)) actually
   implements — see
-  [slang-session.h](../../../../source/slang/slang-session.h). The
-  unfortunate consequence is that "session" means *two different
-  things*: `IGlobalSession` is the process-wide singleton and
-  `ISession` is what most callers think of as a "compile session".
+  [slang-session.h](../../../../source/slang/slang-session.h). In this
+  codebase "session" therefore means *two different things*:
+  `IGlobalSession` holds the global-session-scoped state that
+  applications usually create once and reuse to amortize startup cost
+  (though distinct global sessions may coexist), and `ISession` is what
+  most callers think of as a "compile session".
 - `TranslationUnitRequest` — a collection of source files that share a
   namespace. By default, all Slang source files passed to `slangc` go
   into a single `TranslationUnitRequest`; HLSL inputs go one-per-unit.
-- `EntryPointRequest` — a function name plus a pipeline stage to
-  compile (e.g. `main` as `compute`).
+- `FrontEndEntryPointRequest` — a function name plus the profile whose
+  stage the entry point is compiled for (e.g. `main` as `compute`).
+  Declared in
+  [slang-compile-request.h](../../../../source/slang/slang-compile-request.h).
 - `TargetRequest` — an output format combined with a profile
   (e.g. SPIR-V at `glsl_450`).
 - `FrontEndCompileRequest` — drives the front-end (parse, check, lower
@@ -214,8 +247,13 @@ declarations are spread across
 
 The objects above explain why concepts like "translation unit" and
 "target" are first-class: Slang's pipeline is parameterized so that
-front-end work (which must not depend on the chosen target) is cleanly
-separated from back-end work (which does).
+front-end work is cleanly separated from back-end work. Parsing and
+reusable module checking are largely target-independent, but
+entry-point validation does consult the requested targets — it compares
+inferred capability requirements and profile stages against every
+`TargetRequest` in
+[slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)
+— while all code generation happens in the back end.
 
 ## Where the public API lives
 
@@ -231,7 +269,24 @@ Anything under [source/](../../../../source) is implementation. The
 public-header rules in [CLAUDE.md](../../../../CLAUDE.md) (no enum
 re-ordering, no virtual-method changes mid-vtable, no removal) reflect
 the fact that this surface must keep ABI compatibility with older
-callers.
+callers. New API is therefore added by *appending*: methods are
+appended to the end of an interface (e.g.
+`IGlobalSession::getDownstreamCompilerVersion`), new capabilities arrive
+as fresh UUID'd interfaces obtained via `castAs` /
+`queryInterface` (e.g. `IBindlessResourceMetadata`), and new
+`CompilerOptionName` enumerators are appended with an explicit integer
+value before the `CountOf` sentinel, which is the one enumerator that
+deliberately has no explicit value — all visible in
+[include/slang.h](../../../../include/slang.h).
+
+Superseded entry points are deprecated rather than deleted. When a
+replacement lands, the old declaration stays at its original vtable /
+overload position and is annotated `SLANG_DEPRECATED`, so existing
+callers keep compiling and linking. `VariableReflection` shows the
+pattern: `getDefaultValueBlob` returns a variable's default initializer
+as a packed byte blob, while the narrower `hasDefaultValue`,
+`getDefaultValueInt`, and `getDefaultValueFloat` it replaces remain
+declared and marked deprecated.
 
 ## Reading guide
 

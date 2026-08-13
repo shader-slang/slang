@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:30:00+00:00
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/keywords-and-builtins.md#statement-keywords
-//META: doc_section_digest=d6e74209f0cfcbd939127caa9bf2791387db9155c2d0b2f0a561349e2e185456
-//META: purpose=Boundary: `defer` is documented in the statement-keywords table (line 6406) but uncovered by the smoke tests; the body of the deferred statement runs after the enclosing function body completes.
+//META: doc_section_digest=1fb3516e49ddbb5d4259751275e6b594d9d69aa0b1266c092e549ec5de2b449a
+//META: purpose=Boundary: `defer` is a statement keyword whose body is held back to scope exit, so its output lands after the statements that textually follow it.
 //META: intent=boundary
 //META: pipeline_stage=parse
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Probes the `defer` statement keyword listed alongside `if`/`for`/
-// `return`. The expected order ("before after") confirms the
-// deferred body runs at scope exit, not at the point of declaration.
+// Verifies `defer` is parsed as its own statement keyword and that
+// its body is deferred rather than executed in place. The deferred
+// `printf` is written first but must print last; CHECK asserts the
+// single line "before after", which is only produced if the body ran
+// at scope exit.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

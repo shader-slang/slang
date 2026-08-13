@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
-//META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization
-//META: doc_section_digest=5defec5bd482a82bdf1c8601f2d3ae1514d0fd25fa9d73a9ad98b6c32be3f36c
-//META: purpose=Phase D's final eliminateDeadCode (D12) keeps exports and layouts alive so the post-link linkIR has the mangled-name index built by D15 to resolve against.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#module-buildmanglednametoglobalinstmap
+//META: doc_section_digest=9006d18e1baf5069dbdaf1226df8248667af728e1054dbc9f8a6112fc04fca14
+//META: purpose=The mangled-name export decorations that the final Phase D index is built from survive the Phase D stripping and dead-code steps.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// D10 strips front-end-only decorations but D12's eliminateDeadCode
-// runs with `keepExportsAlive` set. The `[export(...)]` decoration
-// on `main` survives into the LOWER-TO-IR dump (it is the index
-// key for the post-link buildMangledNameToGlobalInstMap at D15).
+// Verifies the precondition for the very last Phase D step. The index that
+// the post-link resolver consumes is keyed by mangled name, so the
+// `export` decorations must still be on the global instructions once the
+// stripping and dead-code steps are done. The CHECKs read the
+// post-Phase-D snapshot for the entry point's export decoration sitting
+// directly above its function.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

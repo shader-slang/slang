@@ -17,7 +17,7 @@ reviews:
   suggested_labels: false
   auto_label: false
   suggested_reviewers: true
-  auto_assign_reviewers: true
+  auto_assign_reviewers: false
 
   path_filters:
     - "!build/**"

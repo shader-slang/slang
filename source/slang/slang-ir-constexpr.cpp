@@ -86,28 +86,50 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_BoolLit:
     case kIROp_Param:
     case kIROp_Add:
+    case kIROp_ConstexprAdd:
     case kIROp_Sub:
+    case kIROp_ConstexprSub:
     case kIROp_Mul:
+    case kIROp_ConstexprMul:
     case kIROp_Div:
+    case kIROp_ConstexprDiv:
     case kIROp_IRem:
+    case kIROp_ConstexprIRem:
     case kIROp_FRem:
     case kIROp_Neg:
+    case kIROp_ConstexprNeg:
     case kIROp_Geq:
+    case kIROp_ConstexprGeq:
     case kIROp_Leq:
+    case kIROp_ConstexprLeq:
     case kIROp_Greater:
+    case kIROp_ConstexprGreater:
     case kIROp_Less:
+    case kIROp_ConstexprLess:
     case kIROp_Neq:
+    case kIROp_ConstexprNeq:
     case kIROp_Eql:
+    case kIROp_ConstexprEql:
     case kIROp_And:
+    case kIROp_ConstexprAnd:
     case kIROp_Or:
+    case kIROp_ConstexprOr:
     case kIROp_BitAnd:
+    case kIROp_ConstexprBitAnd:
     case kIROp_BitOr:
+    case kIROp_ConstexprBitOr:
     case kIROp_BitXor:
+    case kIROp_ConstexprBitXor:
     case kIROp_BitNot:
+    case kIROp_ConstexprBitNot:
     case kIROp_Not:
+    case kIROp_ConstexprNot:
     case kIROp_Lsh:
+    case kIROp_ConstexprShl:
     case kIROp_Rsh:
+    case kIROp_ConstexprShr:
     case kIROp_Select:
+    case kIROp_ConstexprSelect:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
@@ -116,9 +138,19 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_MakeCoopVector:
     case kIROp_VectorReshape:
     case kIROp_CastFloatToInt:
+    case kIROp_ConstexprCastFloatToInt:
     case kIROp_CastIntToFloat:
+    case kIROp_ConstexprCastIntToFloat:
     case kIROp_IntCast:
+    case kIROp_ConstexprIntCast:
     case kIROp_FloatCast:
+    case kIROp_ConstexprFloatCast:
+    case kIROp_CastIntToEnum:
+    case kIROp_ConstexprCastIntToEnum:
+    case kIROp_CastEnumToInt:
+    case kIROp_ConstexprCastEnumToInt:
+    case kIROp_EnumCast:
+    case kIROp_ConstexprEnumCast:
     case kIROp_CastIntToPtr:
     case kIROp_CastPtrToInt:
     case kIROp_CastPtrToBool:

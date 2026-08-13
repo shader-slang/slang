@@ -135,7 +135,7 @@ struct ConditionalTypeLoweringContext
             if (operand->getDataType() == inst->getDataType())
                 inst->replaceUsesWith(operand);
             else
-                inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
+                inst->replaceUsesWith(builder.getPoison(inst->getDataType()));
             inst->removeAndDeallocate();
             return;
         }
@@ -152,7 +152,7 @@ struct ConditionalTypeLoweringContext
         }
         else
         {
-            auto poisonVal = builder.emitPoison(inst->getDataType());
+            auto poisonVal = builder.getPoison(inst->getDataType());
             inst->replaceUsesWith(poisonVal);
         }
         inst->removeAndDeallocate();

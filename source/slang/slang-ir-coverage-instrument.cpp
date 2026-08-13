@@ -553,6 +553,29 @@ static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFun
     }
 }
 
+// Maps the per-slot byte-width selector (`counterByteWidth`, in bytes)
+// to the counter buffer's element `IRType`: `8` -> `uint64_t`, `4` ->
+// `uint`. Both entry paths (the `-trace-coverage-counter-width` CLI
+// parser and the `TraceCoverageCounterByteWidth` API option) validate
+// the value to `{4, 8}` before reaching this helper, so any other
+// width indicates a compiler-internal bug rather than a user input
+// error — assert rather than coerce, so the bug surfaces at the
+// broken caller. For the uint32-vs-uint64 tradeoff and why the choice
+// is the caller's, see the `-trace-coverage-counter-width` flag docs
+// and `docs/design/shader-coverage.md`.
+static IRType* getCoverageCounterElementType(IRBuilder& builder, int counterByteWidth)
+{
+    switch (counterByteWidth)
+    {
+    case 4:
+        return builder.getUIntType();
+    case 8:
+        return builder.getUInt64Type();
+    default:
+        SLANG_UNEXPECTED("coverage counter byte width must be 4 or 8");
+    }
+}
+
 static void addReservedCoverageSpaces(
     List<UsedBindingRange>& ranges,
     const int* reservedSpaces,
@@ -669,7 +692,10 @@ static IRVarLayout* createCoverageBufferVarLayout(
     // are unaffected.
     if (isCPUTarget(targetRequest) || isCUDATarget(targetRequest))
     {
+        // The field is a pointer. On the CPU/CUDA targets this path serves, it is
+        // laid out at its own size and aligned to that same size.
         typeLayoutBuilder.addResourceUsage(LayoutResourceKind::Uniform, sizeof(void*));
+        typeLayoutBuilder.addAlignment(LayoutResourceKind::Uniform, sizeof(void*));
     }
     auto typeLayout = typeLayoutBuilder.build();
 
@@ -692,6 +718,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
     int& outSpace,
     int& outBinding)
 {
@@ -723,8 +750,12 @@ static IRGlobalParam* synthesizeCoverageBuffer(
             return nullptr;
     }
 
-    IRType* uintType = builder.getUIntType();
-    IRInst* typeOperands[2] = {uintType, builder.getType(kIROp_DefaultBufferLayoutType)};
+    // Counter element width is a caller choice (`-trace-coverage-counter-width`),
+    // not derived from the target — the compiler can't see the runtime
+    // driver that ultimately runs the SPIR-V/PTX, and that's the only
+    // thing that decides whether 64-bit shader atomics are usable.
+    IRType* counterElementType = getCoverageCounterElementType(builder, counterByteWidth);
+    IRInst* typeOperands[2] = {counterElementType, builder.getType(kIROp_DefaultBufferLayoutType)};
     auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
 
     auto param = builder.createGlobalParam(bufferType);
@@ -953,15 +984,30 @@ struct CoverageInstrumenter
     IRGlobalParam* coverageBuffer;
     SourceManager* sourceManager;
     ArtifactPostEmitMetadata& outMetadata;
-    IRType* uintType;
-    IRType* uintPtrType;
+    // The counter element type comes from the synthesized buffer's
+    // own element type rather than re-querying the target, so the
+    // atomic op's operand width can never drift out of sync with the
+    // buffer's storage width even if a future change moves the type
+    // decision elsewhere. `intType` is the IR scalar type used for
+    // small integer literals threaded into the atomic op (slot
+    // index, memory-order constant) and is independent of the
+    // counter slot's storage width.
+    IRType* counterElementType;
+    IRType* counterElementPtrType;
     IRType* intType;
     IRType* boolType;
+    IRType* uintType;
+    // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
+    // counter is written with a plain non-atomic store of 1 instead of an
+    // atomic add, recording whether the entry executed (0 / non-zero) rather
+    // than an exact count.
+    bool booleanMode = false;
     // Invariant (established in the ctor, read in `lowerMarkerOp`): the three
     // wave members move together. `waveAggregate` is true iff this target
-    // aggregates AND the linker force-kept both `[KnownBuiltin]` intrinsics, in
-    // which case `waveCountBitsFunc`/`waveIsFirstLaneFunc` are the resolved
-    // callees `lowerMarkerOp` invokes; when false, both funcs stay null and the
+    // aggregates, boolean mode is off, AND the linker force-kept both
+    // `[KnownBuiltin]` intrinsics, in which case
+    // `waveCountBitsFunc`/`waveIsFirstLaneFunc` are the resolved callees
+    // `lowerMarkerOp` invokes; when false, both funcs stay null and the
     // per-lane path is taken.
     bool waveAggregate = false;
     IRFunc* waveCountBitsFunc = nullptr;
@@ -973,17 +1019,33 @@ struct CoverageInstrumenter
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
-        bool waveAggregationSupported,
-        ArtifactPostEmitMetadata& md)
-        : module(m), coverageBuffer(buf), sourceManager(sm), outMetadata(md)
+        ArtifactPostEmitMetadata& md,
+        bool booleanMode,
+        bool waveAggregationSupported)
+        : module(m)
+        , coverageBuffer(buf)
+        , sourceManager(sm)
+        , outMetadata(md)
+        , booleanMode(booleanMode)
     {
         IRBuilder tmpBuilder(module);
-        uintType = tmpBuilder.getUIntType();
-        uintPtrType = tmpBuilder.getPtrType(uintType);
+        // The unchecked `cast` is safe: this instrumenter only ever runs
+        // on the buffer synthesized by `synthesizeCoverageBuffer`, which
+        // creates it as a structured-buffer type. We never construct a
+        // `CoverageInstrumenter` over a caller-provided buffer.
+        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(coverageBuffer->getDataType());
+        counterElementType = bufferType->getElementType();
+        counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
         boolType = tmpBuilder.getBoolType();
+        uintType = tmpBuilder.getUIntType();
 
-        waveAggregate = waveAggregationSupported;
+        // Boolean mode already removes the atomic entirely, so there is nothing
+        // for wave aggregation to reduce; the plain-store path wins where both
+        // apply. `slang-ir-link.cpp` excludes boolean mode from the force-keep
+        // on the same reasoning, so in that configuration the intrinsics are not
+        // linked in and would not be findable here anyway.
+        waveAggregate = waveAggregationSupported && !booleanMode;
         if (waveAggregate)
         {
             findCoverageWaveFuncs(module, waveCountBitsFunc, waveIsFirstLaneFunc);
@@ -1046,7 +1108,8 @@ struct CoverageInstrumenter
     void populateEntryForMarker(IRInst* markerOp, UInt slot, CoverageTracingEntry& entry)
     {
         entry.counterIndex = (uint32_t)slot;
-        entry.counterMode = slang::CoverageCounterMode::Count;
+        entry.counterMode =
+            booleanMode ? slang::CoverageCounterMode::Boolean : slang::CoverageCounterMode::Count;
         resolveHumaneLoc(sourceManager, markerOp, entry.file, entry.line, entry.startColumn);
 
         switch (markerOp->getOp())
@@ -1097,14 +1160,42 @@ struct CoverageInstrumenter
             builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
-            uintPtrType,
+            counterElementPtrType,
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             getElemArgs);
 
         IRInst* memoryOrder = builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed);
 
-        if (waveAggregate)
+        if (booleanMode)
+        {
+            // Hit/miss recording: a plain, non-atomic store of `1`. Every
+            // lane that reaches this marker writes the same value, so
+            // concurrent same-value writes are a benign race for 32-bit
+            // counters — 32-bit StorageBuffer stores are single-copy atomic
+            // under the Vulkan memory model, so a reader always observes a
+            // complete 0 or 1 and the slot is 1 iff the entry executed.
+            //
+            // For 64-bit counters: a 64-bit StorageBuffer store is not
+            // guaranteed single-copy atomic unless shaderBufferInt64Atomics
+            // is enabled. In practice the host already requires that feature
+            // for 64-bit coverage, which implies single-copy atomic plain
+            // stores on all known drivers. If exact boolean semantics under
+            // 64-bit are required, prefer 32-bit counters
+            // (`-trace-coverage-counter-width 32`).
+            //
+            // Non-atomic is the whole point: a relaxed atomic store still
+            // serializes on the hot counter address (measured ~15x slower),
+            // defeating the purpose. Trade-off: no exact execution count
+            // (`CoverageCounterMode::Boolean`, not `Count`).
+            //
+            // Wave aggregation does not apply here and the constructor has
+            // already forced `waveAggregate` off: there is no atomic left to
+            // contend on, and electing one lane to store `1` would record the
+            // same 0/non-zero result at the cost of a branch.
+            builder.emitStore(slotPtr, builder.getIntValue(counterElementType, 1));
+        }
+        else if (waveAggregate)
         {
             // Wave-aggregated counter increment (issue #11509). Instead of
             // every active lane issuing `atomicAdd(slot, 1)` — which serializes
@@ -1133,6 +1224,15 @@ struct CoverageInstrumenter
             IRInst* laneCount = builder.emitCallInst(uintType, waveCountBitsFunc, 1, &trueVal);
             IRInst* isFirstLane = builder.emitCallInst(boolType, waveIsFirstLaneFunc, 0, nullptr);
 
+            // `WaveActiveCountBits` returns a 32-bit lane count, but the atomic
+            // addend must match the counter's element type, which is `uint64_t`
+            // at the default `-trace-coverage-counter-width 64`. Widen rather
+            // than narrow the counter: a wave is at most 128 lanes, so the value
+            // always fits and the cast is lossless.
+            IRInst* addend = laneCount;
+            if (counterElementType->getOp() == kIROp_UInt64Type)
+                addend = builder.emitCast(counterElementType, laneCount);
+
             IRBlock* headBlock = as<IRBlock>(markerOp->getParent());
             IRBlock* afterBlock = splitBlockAtInst(markerOp);
 
@@ -1146,8 +1246,8 @@ struct CoverageInstrumenter
             builder.emitIfElse(isFirstLane, thenBlock, afterBlock, afterBlock);
 
             builder.setInsertInto(thenBlock);
-            IRInst* atomicArgs[] = {slotPtr, laneCount, memoryOrder};
-            builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+            IRInst* atomicArgs[] = {slotPtr, addend, memoryOrder};
+            builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
             builder.emitBranch(afterBlock);
         }
         else
@@ -1155,13 +1255,16 @@ struct CoverageInstrumenter
             // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
             // backend emitter to its native atomic-increment idiom
             // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-            // SPIR-V, etc.). Correct under GPU concurrency.
+            // SPIR-V, etc.). Correct under GPU concurrency. The immediate and
+            // the result type are typed against `counterElementType` (uint or
+            // uint64), so the same lowering path produces a 64-bit
+            // `OpAtomicIAdd` / `atomicAdd(ulonglong*)` when the buffer is wide.
             IRInst* atomicArgs[] = {
                 slotPtr,
-                builder.getIntValue(uintType, 1),
+                builder.getIntValue(counterElementType, 1),
                 memoryOrder,
             };
-            builder.emitIntrinsicInst(uintType, kIROp_AtomicAdd, 3, atomicArgs);
+            builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
         }
 
         // The marker op has void return type and, by construction, no uses.
@@ -1174,13 +1277,40 @@ struct CoverageInstrumenter
     void run(List<IRInst*> const& markerOps)
     {
         const auto counterCount = markerOps.getCount();
-        // Public coverage metadata stores counter indices as uint32_t
-        // because the runtime buffer is indexed by 32-bit elements in
-        // the generated shader code.
+        // This concerns the counter *index* type, which is independent of
+        // the per-slot storage width recorded just below: the public
+        // metadata stores counter indices as uint32_t because the
+        // generated shader code indexes the buffer with a 32-bit index,
+        // regardless of whether each slot is a uint (4 bytes) or uint64_t
+        // (8 bytes).
         SLANG_RELEASE_ASSERT(counterCount >= 0);
         SLANG_RELEASE_ASSERT(
             uint64_t(counterCount) <= uint64_t(std::numeric_limits<uint32_t>::max()));
         outMetadata.m_coverageCounterCount = (uint32_t)counterCount;
+        // Record the per-slot byte width so the manifest writer and
+        // every host that reads back the buffer can pick the right
+        // element type without re-deriving it from the target. The
+        // value is sourced from the IR type of the synthesized buffer
+        // (rather than from the original `counterByteWidth` selector
+        // passed in) so the recorded width cannot drift from the
+        // actually-emitted storage if a future change moves the type
+        // decision elsewhere. `getCoverageCounterElementType`
+        // produces exactly `uint` or `uint64_t`; the release-mode
+        // assertion below enforces that invariant even when debug
+        // assertions are compiled out, so an unexpected element type
+        // in release surfaces as a crash at the broken producer
+        // instead of silently writing `4` into the manifest.
+        switch (counterElementType->getOp())
+        {
+        case kIROp_UIntType:
+            outMetadata.m_coverageCounterByteWidth = 4;
+            break;
+        case kIROp_UInt64Type:
+            outMetadata.m_coverageCounterByteWidth = 8;
+            break;
+        default:
+            SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
+        }
         outMetadata.m_coverageEntries.reserve(counterCount);
         // Each marker op gets its own slot: the op's identity IS the
         // UID, and we assign a consecutive index in traversal order.
@@ -1378,6 +1508,8 @@ void instrumentCoverage(
     int explicitSpace,
     const int* reservedSpaces,
     int reservedSpaceCount,
+    int counterByteWidth,
+    bool booleanMode,
     TargetRequest* targetRequest,
     bool waveAggregationSupported,
     IRVarLayout*& globalScopeVarLayout,
@@ -1479,6 +1611,7 @@ void instrumentCoverage(
         explicitSpace,
         reservedSpaces,
         reservedSpaceCount,
+        counterByteWidth,
         chosenSpace,
         chosenBinding);
 
@@ -1533,8 +1666,9 @@ void instrumentCoverage(
         module,
         buffer,
         sink ? sink->getSourceManager() : nullptr,
-        waveAggregationSupported,
-        outMetadata);
+        outMetadata,
+        booleanMode,
+        waveAggregationSupported);
     instrumenter.run(markerOps);
 }
 

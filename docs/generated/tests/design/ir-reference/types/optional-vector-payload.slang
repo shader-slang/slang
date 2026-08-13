@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vectors-matrices-and-composite
-//META: doc_section_digest=a2958c27179f43de9a6c91173654a84b9300b21241a75525e0ed05ed4d9bc705
+//META: doc_section_digest=54f732694185a0ac0e3a99ea776a2df81f46ad04014e1f6987caf714e9e03dcc
 //META: purpose=Boundary: Optional<T> composes with a Vec<T> payload; the Optional operand is the Vec(...) IR type.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `Optional(valueType)` has the value type as its
-// single operand. A function returning `Optional<float3>`
+// Optional<T> composes with a Vec<T> payload; the Optional operand is
+// the Vec(...) IR type. A function returning `Optional<float3>`
 // surfaces `Optional(Vec(Float, 3 : Int))` in the Func result-type
 // slot.
 

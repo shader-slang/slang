@@ -1,19 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#makeexistential
-//META: doc_section_digest=3a7462a86fc4c15dc7bc9c9156d37eabae3d8e2c13a7f3bce50ff7cff1572439
+//META: doc_section_digest=3daf40cb35b02e6a2100ffd8b47cd886d07ea61a0d83fed32606bc5b122234d2
 //META: purpose=Casting a concrete value to an interface variable lowers to makeExistential(value, witness) with that two-operand shape.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### makeExistential`: "Packs `value` plus the witness that its
-// concrete type conforms to the target interface". The natural
-// surface is an `IFoo i = a;` initialization where `a : A` and
-// `A : IFoo` — the IR is `makeExistential(%a, %witnessA_IFoo)`.
-
+// Verifies the widening cast to an interface type packs exactly two things.
+// Initialising an `IFoo` local from an `A` value is the cast; the CHECK pins
+// the resulting `makeExistential` and its two operands, the value and the
+// conformance witness.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };

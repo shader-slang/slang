@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#basicexpressiontype-vectorexpressiontype-matrixexpressiontype
-//META: doc_section_digest=d7566fda8bc9eff74409576c78889c2b13b22cd59e2676d755123b9475f668d4
-//META: purpose=A MatrixExpressionType is parameterised by element-type, row count, and column count; a floatRxC value's R*C elements are independently readable via [row][col] indexing.
+//META: doc_section_digest=5f41283b162e626d8a46ba0564c2bfa3960821954aadd78336372f0416cb5f48
+//META: purpose=A MatrixExpressionType carries an element type, a row count and a column count; a float2x3 value's six elements are reachable by [row][col] indexing.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `MatrixExpressionType` carries `(element-type, rows, cols, layout)`
-// in its operand list. The user-facing consequence: a `float2x3`
-// value has 2*3=6 elements addressable via the [row][col] subscript.
+// Verifies the (element-type, rows, cols) shape of the matrix
+// arithmetic leaf: a float2x3 has 2*3 independently addressable slots.
+// All six are printed in row-major order; CHECK asserts each index pair
+// reaches its own element, which pins both counts.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

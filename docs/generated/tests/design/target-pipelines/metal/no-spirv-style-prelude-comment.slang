@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=15e31694fd5ee22d184f1b99f92912686150441a720712b25e415c394b7ce97f
-//META: purpose=The Metal source emitter does not begin with a `; SPIR-V` style identification comment; the prelude is purely the `#include` block followed by `using namespace metal;`.
+//META: doc_section_digest=0c4ba248635633393b51ae889f226e3b5f86a549ad5be4af6f827414819fb357
+//META: purpose=Negative: the Metal source emitter writes no target-identification header comment; the first emitted text is the `#include` block.
 //META: intent=negative
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Structural negative observation: the Metal prelude does not
-// include a target-identification comment like the SPIR-V
-// emitter's `; SPIR-V` header. The first non-blank line is the
-// `#include <metal_stdlib>` directive.
+// Structural negative observation about the Metal prelude: unlike the
+// SPIR-V assembly writer, `MetalSourceEmitter` prepends no `; SPIR-V` /
+// `; Version` style banner, so tests and downstream tools can rely on the
+// first non-blank line being a preprocessor directive. CHECK anchors on
+// the first include and then asserts neither banner token appears anywhere
+// in the output.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#namespacedecl-moduledecl-filedecl
-//META: doc_section_digest=081eefb5df95b1052109f01da319f6c20dfdae3022986c491d04ad23688d1558
+//META: doc_section_digest=c5234f45139405663f0d08b212b0f8f44c973502776fde1ad540f5109d04cabb
 //META: purpose=Multiple textual namespace declarations with the same name in one module are collapsed into one NamespaceDecl during parsing.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented collapsing of same-named namespace blocks.
-// `namespace N` is opened twice; members declared across both blocks
-// are visible under a single `N::` qualifier — confirming the two
-// blocks are collapsed into one NamespaceDecl.
+// Verifies that reopening a namespace adds to the existing one rather than
+// creating a second, shadowing scope. Two blocks named `N` each declare one
+// function; the CHECK asserts a sum computed from both under a single `N::`
+// qualifier, which requires the two blocks to have been merged.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

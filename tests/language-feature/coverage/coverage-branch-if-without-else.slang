@@ -20,6 +20,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // No function or line coverage is enabled, so the synthetic else path
 // should account for exactly the second branch-arm counter.
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(0\)}}
-//CHECK-DAG: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(1\)}}
-//CHECK-NOT: _slang_atomic_add_u32{{.*}}_slang_coverage{{.*int\(2\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(0\)}}
+//CHECK-DAG: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(1\)}}
+//CHECK-NOT: _slang_atomic_add_u64{{.*}}_slang_coverage{{.*int\(2\)}}

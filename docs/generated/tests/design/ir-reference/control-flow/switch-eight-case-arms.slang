@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-switches
-//META: doc_section_digest=cc1b75a0316908fad8da474d769a60fbe3fbf9298cbe56506c4cd716ae3d4b7f
+//META: doc_section_digest=4820552ad726706a9ebecdf715453f85eb93c80c7a2decca221f929866c46c78
 //META: purpose=Stress: a switch with eight case-arms emits all eight `(caseVal, caseBlock)` pairs as trailing operands on the single switch terminator.
 //META: intent=stress
 //META: pipeline_stage=lower

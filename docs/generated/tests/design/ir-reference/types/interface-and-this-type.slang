@@ -1,20 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#existentials-and-interfaces
-//META: doc_section_digest=800658786fedd724e8701bdd884b7b544eb1f49b077825d714cdc85a8ffa17d8
+//META: doc_section_digest=d6aa2ad08a8344e3bd68b237d9a741b8665965d6824d64775fb6992ab9c8a5d0
 //META: purpose=An interface declaration produces interface_req_entry instructions whose method-types use this_type.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's "Existentials and interfaces" table lists `interface`
-// (as a parent container containing `interface_req_entry` children)
-// and `this_type` (the "self" type of an interface). A simple
-// `interface IShape { float area(); }` declaration plus a
-// conforming type surfaces `interface_req_entry(...)` whose Func
-// type uses `this_type(%IShape)`.
+// Verifies an interface declaration lowers to an `interface` type inst
+// whose requirements are `interface_req_entry` insts (operand-encoded
+// on the interface, not children) with method signatures typed against
+// the interface's `this_type`. The CHECK finds the requirement entry
+// for `area` carrying Func(Float, this_type(%IShape)), which only
+// exists if InterfaceDecl lowering produced the entry and the self
+// type.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

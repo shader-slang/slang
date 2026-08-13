@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#interface-internals
-//META: doc_section_digest=881ba3684ff6d20a2e1a262e82de634f0b857cc0f62fb483fbb5984cc6845bdf
+//META: doc_section_digest=ea89e6f41cb0b27896567604f40c35e8dfe6d5bce27e8dd06de9c29f73a18b9b
 //META: purpose=An interface declaration lowers to an interface opcode whose operands are interface_req_entry rows pairing a requirement key with the requirement's type.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `interface IComputable { int compute(int x); }` should emit an
-// `interface_req_entry(%IComputablex5Fcompute, Func(Int, this_type(%IComputable), Int))`
-// followed by `let %IComputable : Type = interface(%1)`. The
-// requirement-entry pair (key, requirement-type) is the structural
-// row inside an interface's parent.
+// Verifies that requirements are operands of the `interface` inst, not children
+// of it. CHECK first requires the standalone `interface_req_entry` definition
+// naming the requirement's key and its `Func(...)` type (with `this_type(...)`
+// standing in for the conforming type), then requires the `interface(...)` line
+// to reference a numbered entry value.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -23,12 +23,12 @@ uniform RWStructuredBuffer<int> buf;
 interface IComputable
 {
     int compute(int x);
-};
+}
 
 struct Doubler : IComputable
 {
     int compute(int x) { return x + x; }
-};
+}
 
 [numthreads(1, 1, 1)]
 void main()

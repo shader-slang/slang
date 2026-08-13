@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#extensiondecl
-//META: doc_section_digest=0cda32200a5996680b579cdf7db2b997f7ed67ad17396bc603809449a7bab1db
+//META: doc_section_digest=ad88a19c43c96571c45e942725f5abaf6372424eba2bc248fca5d077dd824f5c
 //META: purpose=An ExtensionDecl attaches new members to an existing type; the added member is callable on values of that type.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of ExtensionDecl: the member declared
-// inside an `extension T { ... }` block is reachable through normal
-// member-access on a value of type `T`. If the extension were not
-// attached, `doubled()` would not resolve.
+// Verifies that members written inside `extension T { ... }` become members of
+// `T` after name lookup resolves the extension's target type. The struct
+// itself declares no method; the CHECK asserts the extension method's result,
+// which is only reachable if the attachment happened.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

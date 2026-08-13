@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#arithmetic-and-bitwise
-//META: doc_section_digest=300bbe3c39d84a3dd7997f5a048fb4bd6e896b95057fa5fb8b7116c32840a6b7
+//META: doc_section_digest=19b077f47f71a1feb81adb9dea6ff4919edb188c235b3634dce08c45cf359e3c
 //META: purpose=Boundary: shift by 32 (`a << 32`) on a 32-bit `uint` still lowers to `shl(%a, 32 : Int)` (one past the documented valid range) — the opcode appears in IR even though semantic-check emits a left-shift-overflow warning. Verifies that lowering proceeds past the warning, leaving the literal payload intact.
 //META: intent=boundary
 //META: pipeline_stage=lower

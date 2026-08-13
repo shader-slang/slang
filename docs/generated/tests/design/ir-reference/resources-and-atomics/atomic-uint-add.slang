@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#atomic-operations
-//META: doc_section_digest=f394bf1461f5876676bdb5fa5c51feaa920cf5ef0986df9fe1bbf0db976d5a30
+//META: doc_section_digest=534618adad82acb65da181567998c07a77381ecf27996abdf7535de5b49ec7b3
 //META: purpose=`Atomic<uint>::add(v)` lowers to `atomicAdd` exactly as for `int`, with the value typed as `UInt` in the operand position.
 //META: intent=functional
 //META: pipeline_stage=lower
@@ -12,7 +12,9 @@
 // The atomic family is documented in terms of a pointer operand;
 // the element type is whatever the `Atomic<T>` is parameterized on.
 // Exercise the `uint` element type to confirm the opcode is the
-// same name, with the value carrying `UInt` typing.
+// same name, with the value carrying `UInt` typing. The CHECK pins a
+// single trailing memory-order operand per the documented
+// `ptr, val, memoryOrder` shape.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 
@@ -28,4 +30,4 @@ void main(uint3 tid : SV_DispatchThreadID)
 }
 
 // IR-LABEL: func %main
-// IR: atomicAdd(%{{[^,]+}}, 1 : UInt, {{.*}})
+// IR: atomicAdd(%{{[^,]+}}, 1 : UInt, {{[^,)]+}})

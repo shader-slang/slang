@@ -4,6 +4,7 @@
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-util.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-blob.h"
 #include "core/slang-castable.h"
 #include "core/slang-math.h"
 #include "core/slang-stream.h"
@@ -774,13 +775,25 @@ struct LoadContext
                 pathInfo.uniqueIdentity = m_base->asRaw(file->uniqueIdentity)->getSlice();
             }
 
-            dstFile = new SourceFile(m_sourceManager, pathInfo, blob->getBufferSize());
-            dstFile->setContents(blob);
+            // Every load path runs the state through `isReproStateValid`
+            // first, and the validator rejects any source-file entry whose
+            // file has no serialized contents (see `validateSourceFileState`
+            // in slang-repro-validator.cpp), so by the time we get here the
+            // blob always exists. Assert that producer-side invariant rather
+            // than silently tolerating a shape the validator forbids.
+            SLANG_RELEASE_ASSERT(blob);
+
+            // Create through the manager's factory so the file is registered in
+            // its owned-files list and freed with the manager. A bare
+            // `new SourceFile` paired with only `addSourceFile` below would be
+            // indexed for lookup but never deleted, since the manager's
+            // destructor only frees the files it created.
+            dstFile = m_sourceManager->createSourceFileWithBlob(pathInfo, blob);
 
             // Add to map
             m_sourceFileMap.add(sourceFile, dstFile);
 
-            // Add to manager
+            // Add to manager's unique-identity lookup
             m_sourceManager->addSourceFile(pathInfo.uniqueIdentity, dstFile);
         }
         return dstFile;
@@ -1204,7 +1217,14 @@ struct LoadContext
     return saveState(request, stream);
 }
 
-/* static */ SlangResult ReproUtil::loadState(
+static SlangResult _loadStateToList(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer);
+static SlangResult _loadStateToList(
+    const uint8_t* data,
+    size_t dataSize,
+    DiagnosticSink* sink,
+    List<uint8_t>& outBuffer);
+
+static SlangResult _loadStateToList(
     const String& filename,
     DiagnosticSink* sink,
     List<uint8_t>& outBuffer)
@@ -1212,13 +1232,10 @@ struct LoadContext
     RefPtr<FileStream> stream = new FileStream;
     SLANG_RETURN_ON_FAIL(
         stream->init(filename, FileMode::Open, FileAccess::Read, FileShare::ReadWrite));
-    return loadState(stream, sink, outBuffer);
+    return _loadStateToList(stream, sink, outBuffer);
 }
 
-/* static */ SlangResult ReproUtil::loadState(
-    Stream* stream,
-    DiagnosticSink* sink,
-    List<uint8_t>& outBuffer)
+static SlangResult _loadStateToList(Stream* stream, DiagnosticSink* sink, List<uint8_t>& outBuffer)
 {
     List<Byte> streamData;
     {
@@ -1230,10 +1247,10 @@ struct LoadContext
         }
     }
 
-    return loadState(streamData.getBuffer(), streamData.getCount(), sink, outBuffer);
+    return _loadStateToList(streamData.getBuffer(), streamData.getCount(), sink, outBuffer);
 }
 
-/* static */ SlangResult ReproUtil::loadState(
+static SlangResult _loadStateToList(
     const uint8_t* data,
     size_t dataSize,
     DiagnosticSink* sink,
@@ -1245,13 +1262,13 @@ struct LoadContext
         sink->diagnose(Diagnostics::UnableToReadRiff{});
         return SLANG_FAIL;
     }
-    if (rootChunk->getType() != kSlangStateFileFourCC)
+    if (rootChunk->getType() != ReproUtil::kSlangStateFileFourCC)
     {
         sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
         return SLANG_FAIL;
     }
 
-    auto dataChunk = rootChunk->findDataChunk(kSlangStateDataFourCC);
+    auto dataChunk = rootChunk->findDataChunk(ReproUtil::kSlangStateDataFourCC);
     if (!dataChunk)
     {
         sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
@@ -1260,7 +1277,7 @@ struct LoadContext
 
     MemoryReader reader(dataChunk->getPayload(), dataChunk->getPayloadSize());
 
-    Header header;
+    ReproUtil::Header header;
     {
         auto result = reader.read(header);
         if (SLANG_FAILED(result))
@@ -1270,11 +1287,11 @@ struct LoadContext
         }
     }
 
-    if (!g_semanticVersion.isBackwardsCompatibleWith(header.m_semanticVersion))
+    if (!ReproUtil::g_semanticVersion.isBackwardsCompatibleWith(header.m_semanticVersion))
     {
         StringBuilder headerBuf, currentBuf;
         header.m_semanticVersion.append(headerBuf);
-        g_semanticVersion.append(currentBuf);
+        ReproUtil::g_semanticVersion.append(currentBuf);
 
         sink->diagnose(Diagnostics::IncompatibleRiffSemanticVersion{
             .actualVersion = headerBuf,
@@ -1282,7 +1299,7 @@ struct LoadContext
         return SLANG_FAIL;
     }
 
-    if (header.m_typeHash != getTypeHash())
+    if (header.m_typeHash != ReproUtil::getTypeHash())
     {
         sink->diagnose(Diagnostics::RiffHashMismatch{});
         return SLANG_FAIL;
@@ -1312,14 +1329,47 @@ struct LoadContext
     return SLANG_OK;
 }
 
-/* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
+static SlangResult _loadStateToBlob(
+    const uint8_t* data,
+    size_t dataSize,
+    DiagnosticSink* sink,
+    ISlangBlob** outBlob)
 {
-    if (size_t(buffer.getCount()) < kStartOffset + sizeof(ReproUtil::RequestState))
+    if (!outBlob)
+        return SLANG_FAIL;
+
+    *outBlob = nullptr;
+
+    List<uint8_t> buffer;
+    SLANG_RETURN_ON_FAIL(_loadStateToList(data, dataSize, sink, buffer));
+
+    *outBlob = ListBlob::moveCreate(buffer).detach();
+    return SLANG_OK;
+}
+
+/* static */ SlangResult ReproUtil::loadState(
+    const uint8_t* data,
+    size_t dataSize,
+    DiagnosticSink* sink,
+    ISlangBlob** outBlob)
+{
+    return _loadStateToBlob(data, dataSize, sink, outBlob);
+}
+
+static bool _hasRequestStateRoot(const void* data, size_t size)
+{
+    return data && size >= kStartOffset && size - kStartOffset >= sizeof(ReproUtil::RequestState);
+}
+
+/* static */ const ReproUtil::RequestState* ReproUtil::getRequest(const void* data, size_t size)
+{
+    if (!_hasRequestStateRoot(data, size))
     {
         return nullptr;
     }
 
-    return (ReproUtil::RequestState*)(buffer.getBuffer() + kStartOffset);
+    return reinterpret_cast<const ReproUtil::RequestState*>(
+        static_cast<const uint8_t*>(data) + kStartOffset);
 }
 
 /* static */ SlangResult ReproUtil::calcDirectoryPathFromFilename(
@@ -1350,12 +1400,13 @@ struct LoadContext
     DiagnosticSink* sink)
 {
     List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(filename, sink, buffer));
+    SLANG_RETURN_ON_FAIL(_loadStateToList(filename, sink, buffer));
 
     MemoryOffsetBase base;
     base.set(buffer.getBuffer(), buffer.getCount());
 
-    RequestState* requestState = ReproUtil::getRequest(buffer);
+    RequestState* requestState =
+        const_cast<RequestState*>(ReproUtil::getRequest(buffer.getBuffer(), buffer.getCount()));
 
     String dirPath;
     SLANG_RETURN_ON_FAIL(ReproUtil::calcDirectoryPathFromFilename(filename, dirPath));

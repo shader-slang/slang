@@ -1,25 +1,27 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#breadcrumbs
-//META: doc_section_digest=d65add87a553b75b168020a969cb739b5014e573c8568f2ebfe82d91d3709072
-//META: purpose=When an unqualified name inside a method resolves to a field of the enclosing struct, lookup records a `This` breadcrumb so the synthesized expression reads `this.field`.
+//META: doc_section_digest=48d49844973ad09b45a6acd124d2e1aaf5f16e02ec5ca18dda08dfb5f469bf11
+//META: purpose=An unqualified name inside a method that names a field of the enclosing type records a This navigation step, so the expression behaves as if it were written this.field.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's breadcrumb section: "For an unqualified `g` defined on
-// `Self` inside a method, the breadcrumb is just `This`, marking
-// that the rewritten expression needs an implicit `this.g`." Verify
-// by reading a field by unqualified name in the method body.
+// Verifies the simplest navigation chain the doc describes: a lone
+// This step. The method reads `g` with no receiver written, so the
+// value can only come from the caller's object if lookup recorded the
+// implicit receiver. CHECK asserts the caller's 33 is what the method
+// returns, which distinguishes a real receiver read from a
+// default-initialized copy.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
 struct S
 {
     int g;
-    int read() { return g; }   // unqualified `g` rewritten to this.g
+    int read() { return g; }
 }
 
 void main()

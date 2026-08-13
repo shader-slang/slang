@@ -42,7 +42,7 @@ echo "Draining and stopping services, replacing binary, restarting..."
 # scaler-linux-sm80plus was added in PR #10967 (2026-04-29) but was missing from
 # this script, so deployments silently left the SM80Plus tier on the old binary
 # until manually restarted.
-SCALER_SERVICES="scaler-windows scaler-linux scaler-linux-sm80plus scaler-windows-build"
+SCALER_SERVICES="scaler-windows scaler-linux scaler-linux-sm80plus scaler-windows-build scaler-linux-build scaler-linux-analytics"
 
 # Drain-then-stop sequence (#11067):
 #   1. systemctl reload sends SIGUSR1 -> scaler enters drain mode, stops

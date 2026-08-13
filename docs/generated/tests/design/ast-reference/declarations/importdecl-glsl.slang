@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=27f253003cd15aae74f1aea7cff6d2c4178b22d296301b6ed8e2aa0baf6c9884
-//META: purpose=An ImportDecl makes the declarations of another module visible in the current scope; importing glsl makes its names usable.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=An ImportDecl (`import M;`) makes another module's declarations visible in the current file.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of ImportDecl. `import glsl;` is the
-// surface form that produces an ImportDecl referencing the `glsl`
-// core module; the import succeeds and the program compiles to GLSL.
+// Verifies that `import` resolves and links a real module. The `glsl` module
+// ships with the compiler, so the import must succeed for compilation to
+// continue; the CHECK asserts the entry point was emitted, which only happens
+// after the import resolved.
 
 //TEST:SIMPLE(filecheck=CHECK):-target glsl -entry main -stage compute
 

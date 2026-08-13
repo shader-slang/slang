@@ -1,19 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=27f253003cd15aae74f1aea7cff6d2c4178b22d296301b6ed8e2aa0baf6c9884
-//META: purpose=A ParamDecl is a function parameter; in/out/inout direction qualifiers govern whether the callee's mutation is visible at the caller.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A ParamDecl carries a direction; an `inout` parameter propagates the callee's mutation back to the caller while `in` does not.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of ParamDecl: function parameters
-// carry direction. An `inout` parameter sees the caller's value
-// passed in and propagates the callee's mutation back to the caller's
-// argument. If ParamDecl could not carry direction the caller would
-// not observe the change.
+// Verifies that a function parameter's direction qualifier is part of the
+// parameter declaration and governs copy-back. Two calls mutate their
+// parameter identically; the CHECK asserts the caller sees the change only
+// for the `inout` parameter, which is what distinguishes the two directions.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -3,6 +3,7 @@
 // This tests that writing to individual components of the output struct works
 
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-assembly -entry main -stage mesh -profile glsl_450+spirv_1_4
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry main -stage mesh -profile sm_6_6
 
 // DXC is stricter than we are about passing references to individual mesh shader outputs
 // We could get around this by doing what we do for GLSL, i.e. use a temporary
@@ -11,6 +12,9 @@
 //TEST_DISABLED:CROSS_COMPILE:-target dxil-assembly  -entry main -stage mesh -profile sm_6_6
 
 // SPIRV: OpEntryPoint MeshEXT %main
+// HLSL-NOT: void everything_0(out vertices
+// HLSL: void main(
+// HLSL: out vertices
 
 const static uint MAX_VERTS = 3;
 const static uint MAX_PRIMS = 1;
@@ -113,4 +117,3 @@ void main(
         triangles[tig] = uint3(0,1,2);
     }
 }
-

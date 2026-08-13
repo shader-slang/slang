@@ -1,16 +1,15 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#getelementptr-vs-getelement
-//META: doc_section_digest=fe2ba8ba0ec9c96c4e3299305eb8c8e97cd80661da22fe64d61863c713e5b8ba
+//META: doc_section_digest=195ebbd1505e90ba20d1d703df4fc5fb9fbbe285f99ce7b130014f9706b3cbf6
 //META: purpose=Array indexing in lvalue position lowers to `getElementPtr`; indexing into a struct-field array value lowers to `getElement`.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `GetElementPtr` vs `GetElement` notable-opcode note
-// distinguishes the address-returning (`getElementPtr`) and
+// Verifies the distinction between `GetElementPtr` and `GetElement`, which separates the address-returning (`getElementPtr`) and
 // value-returning (`getElement`) forms. A local array indexed by a
 // dynamic index produces both opcodes: the writes use `getElementPtr`
 // + `store`, while indexing the struct-field array value uses

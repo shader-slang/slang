@@ -1,11 +1,11 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:56:42+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T08:20:32+00:00
 target_doc: name-resolution/scopes.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: fd3d948ba51668efc2bdab940c9ced97bfd743835e43a3a4ae3b6a3a358cd405
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 2d1b0424ee67205473f3a56c4db750bce6b7847387448b1952bed261cc3cca46
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
@@ -13,30 +13,35 @@ checklist:
   style_consistency: pass
   source_alignment: partial
   front_matter_validity: pass
-finding_count: 3
+finding_count: 4
 severity_breakdown:
   critical: 0
   major: 1
-  minor: 2
+  minor: 3
   nit: 0
 ---
 
 # Review report for name-resolution/scopes.md
 
 ## Summary
-The scopes page has the required top-level structure, valid front matter, and resolving links. The main issue is that it says `WhileStmt` and `DoWhileStmt` do not own scopes even though both inherit through `LoopStmt` and `BreakableStmt` from `ScopeStmt`, so the page omits required scope-bearing statement classes.
+The page is broadly source-aligned, mostly contract-conformant, and well linked, but its representative parser call-chain explanation misidentifies the helper used by nearly every scope in that chain. Three smaller issues concern an omitted concrete scope-carrying class and two unsupported descriptions of scope behavior.
 
 ## Items checked
-- Ran `regenerate.py show name-resolution/scopes.md` and checked the manifest entry, prompt, nine resolved watched files, and depends-on docs.
-- Verified front matter, required section order, `## Source`, `## Concepts`, `## Rules`, `## Edge cases and failure modes`, and `## See also`.
-- Checked all 64 relative links for resolution, including peer name-resolution links, AST reference links, parser/checker source links, pipeline links, and glossary links.
-- Verified 45 source line-citation references against source at `52339028a2aa703271533454c6b9528a534bac31`, including `Scope`, `ScopeDecl`, `ScopeStmt`, parser scope helpers, sibling-scope construction, namespace collapse, HLSL `UnscopedForStmt`, and `UsingDecl` capture.
-- Spot-checked more than 10 factual claims about scope-bearing AST nodes, parser push/pop behavior, implicit generic/interface scopes, sibling scopes, and lookup walking order.
+- Read the target, `_common.md`, the per-document prompt, all nine resolved watched files, and the three dependency documents at the recorded source commit.
+- Verified all 90 explicit line-number citation phrases and more than ten behavioral claims against commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Resolved all 17 unique relative links at the recorded commit and confirmed every linked generated peer is present in the manifest.
+- Swept 152 unique backticked terms and all nine source-like file names; qualified-member spellings accounted for the terms without exact whole-string matches.
+- Checked the mandatory section order, required concepts/rules/edge cases, front-matter keys, 64-character digest, size cap, and lint result.
 
 ## Findings
-
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `### Scope-bearing AST nodes` | The page says `WhileStmt` and `DoWhileStmt` do not own a scope and omits them from the scope-bearing node table, but both are concrete `LoopStmt` subclasses and `LoopStmt` inherits from `BreakableStmt`, which inherits from `ScopeStmt`. | `source/slang/slang-ast-stmt.h:100` declares `BreakableStmt : public ScopeStmt`, `source/slang/slang-ast-stmt.h:209` declares `LoopStmt : public BreakableStmt`, and `source/slang/slang-ast-stmt.h:234` plus `source/slang/slang-ast-stmt.h:242` declare `WhileStmt` and `DoWhileStmt` as `LoopStmt` subclasses. | Add `WhileStmt` and `DoWhileStmt` to the scope-bearing statement coverage and remove the claim that they do not own a scope. |
-| F-002 | minor | `## Source` | The source paragraph says `addSiblingScopeForContainerDecl` is "used by both the parser and the checker", but the recorded source snapshot has no parser call site. The helper is declared and defined, then called from checker and session setup code. | `source/slang/slang-ast-decl.h:1116` declares the helper, `source/slang/slang-check-expr.cpp:315` defines it, and call sites at `source/slang/slang-check-decl.cpp:16027` and `source/slang/slang-session.cpp:2239` are not parser code. | Change the sentence to say the helper is used by semantic-checking and session or module setup code, not by the parser. |
-| F-003 | minor | `### Scope walking order during lookup` | The page links to `slang-lookup.h` for lookup entry points, but that header is not in this doc's watched paths, so changes there would not affect freshness for `scopes.md`. | `regenerate.py show name-resolution/scopes.md` lists watched paths and omits `source/slang/slang-lookup.h`; the page cites `source/slang/slang-lookup.h` in this section. | Add `source/slang/slang-lookup.h` to watched paths, or replace the direct source citation with a link to `lookup.md`. |
+| F-001 | major | `### Parser scope construction`, lines 167-172 | The claim that every function in the representative chain calls `pushScopeAndSetParent` is false. Most declaration scopes use `PushScope`; only the block scope in this chain uses `pushScopeAndSetParent`. This misstates the central construction mechanism a maintainer would need to modify. | `source/slang/slang-parser.cpp:1787-1797` (`parseOptGenericDecl`) and `:5088-5123` (`parseFuncDecl`) call `PushScope`; `:6284-6292` (`parseDeclBody`) also calls `PushScope`; `:7139-7142` (`parseBlockStatement`) calls `pushScopeAndSetParent`. | Replace the final sentence with a step-by-step distinction: declaration parsers use `PushScope` and establish declaration parents through their surrounding construction paths, while statement-created `ScopeDecl`s such as blocks use `pushScopeAndSetParent`; all paths pair the push with `PopScope`. |
+| F-002 | minor | `### Scope-bearing AST nodes`, lines 84-104 | The required concrete-class inventory omits `ThisTypeDecl`, a concrete `AggTypeDecl` descendant and therefore a `ContainerDecl` carrying `ownedScope`. The prompt requires every concrete class in the watched headers that carries `ownedScope` or `ScopeStmt::scopeDecl` to be named. | `source/slang/slang-ast-decl.h:478-481` declares `ThisTypeDecl : AggTypeDecl`; `AggTypeDeclBase : ContainerDecl` is at `:359-363`, and `ContainerDecl::ownedScope` is at `:132-141`. | Add `ThisTypeDecl` to the aggregate row, identify it as the synthesized interface `This` container, and state whether its `ownedScope` is populated on the construction paths covered by the watched files. |
+| F-003 | minor | `UsingDecl` edge case, lines 357-359 | The statement that the parse-time scope and eventual injection scope “may differ” is unsupported and contradicted by the shown implementation: checking always passes the same captured `decl->scope` pointer as the destination. Scope wiring may mutate that scope's sibling chain, but it does not substitute a different destination scope. | `source/slang/slang-parser.cpp:4548-4552` stores `parser->currentScope` in `decl->scope`; `source/slang/slang-check-decl.cpp:17348-17376` passes `decl->scope` unchanged to `addAllSiblingScopesFromDecl`. | Delete the “may differ” sentence. If the intended point is later wiring, say that checking augments the captured scope's `nextSibling` chain after namespace resolution. |
+| F-004 | minor | `Empty block scope`, lines 297-306 | The cited `hiddenFromLookup` mechanism does not explain why an empty block's fresh scope matters: an empty block receives an `EmptyStmt`, and `visitBlockStmt` only sets `hiddenFromLookup` on declaration statements in a `SeqStmt`. No per-declaration flag exists in the stated empty-block case. | `source/slang/slang-parser.cpp:7217-7223` creates an `EmptyStmt` when the block has no body; `source/slang/slang-check-stmt.cpp:82-118` sets `hiddenFromLookup` only while iterating `DeclStmt`s in a `SeqStmt`. | Separate the two facts: state that the parser creates a scope uniformly even for an empty block, then explain `hiddenFromLookup` only for blocks that actually contain declaration statements. |
+
+## No-issues notes
+- Every recorded line-number citation points to the stated declaration, helper, diagnostic call, or behavior.
+- Sibling-scope wiring for files, imports, namespaces, and `using` declarations matches the four cited call-site families.
+- The front-matter digest recomputes to the recorded value, and all relative links resolve at the target source commit.

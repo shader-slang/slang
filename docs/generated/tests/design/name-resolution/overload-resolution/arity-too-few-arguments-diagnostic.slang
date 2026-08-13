@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:48:41Z
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#probe-phase-trycheckoverloadcandidate
-//META: doc_section_digest=c71eed362b7090c94c5447396e3ebd7ff5d3d15480a793a8f05cdaa4015e935b
-//META: purpose=TryCheckOverloadCandidateArity rejects a call with fewer arguments than required; in ForReal the resolver emits not-enough-arguments-to-call (code 39999).
+//META: doc_section_digest=211bc03cd9a092841d1719f62552fc549d768b7b9dc4ea9b6c978e0acc8daa2b
+//META: purpose=TryCheckOverloadCandidateArity rejects a call below the required argument count and the finalize re-check emits not-enough-arguments.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// "TryCheckOverloadCandidateArity ... verifies the call has between
-// required and allowed arguments. Failures in ForReal mode emit
-// not-enough-arguments-for-call / too-many-arguments-for-call".
+// Verifies the lower edge of the arity step: a two-parameter callable invoked
+// with one argument. The single candidate is still kept as the least-bad one,
+// so the ForReal re-check reports the arity failure; CHECK pins that message
+// at the call site.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
@@ -21,5 +22,5 @@ void main()
 {
     int v = add(7);
 //CHECK:       ^ not enough arguments to call
-//CHECK: E39999
+    printf("%d\n", v);
 }

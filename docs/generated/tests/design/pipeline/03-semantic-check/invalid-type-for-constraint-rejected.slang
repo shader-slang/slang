@@ -1,21 +1,32 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=273b0c1d7bd60576ed4d24081c0d1b9f61952281
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#generic-specialization-and-constraints
-//META: doc_section_digest=719124392380f70c62a7eaec5d0be085dfe259bd4bd8b5283c9602a901f256ee
-//META: purpose=Constraint solving rejects a non-interface type used as a generic constraint (E30401).
+//META: doc_section_digest=57d9f151be60063d08c61244f7768487d8eaebc83717628353b6150f280dd55a
+//META: purpose=Constraint checking rejects a non-interface type used as a generic constraint (E30401).
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Generic-constraint boundary: `T : int` is not a valid constraint
-// (concrete value types are not constraints); E30401 fires.
+// Verifies that the constraint solver only admits interfaces as bounds. A
+// struct has no requirement set to witness, so naming it after `:` in a
+// generic parameter list cannot produce a solvable constraint. CHECK pins
+// E30401 on the offending bound.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-void f<T : int>(T x) {}
-//CHECK:   ^^^ type 'int' cannot be used as a constraint
-// CHECK: E30401
+struct NotAnInterface
+{
+    int x;
+}
 
-void main() {}
+int f<T : NotAnInterface>(T v)
+{
+    return 1;
+}
+//CHECK: E30401
+
+void main()
+{
+}

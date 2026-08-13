@@ -1,18 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:09:57Z
-//META: source_commit=3250005059a2746ebc504a9d3f71ed112f1f2b94
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#nodes
-//META: doc_section_digest=27f253003cd15aae74f1aea7cff6d2c4178b22d296301b6ed8e2aa0baf6c9884
-//META: purpose=A LetDecl is a let variable; immutable. Assignment through a let-bound name is rejected.
+//META: doc_section_digest=2b1e19c46f66c272b88b6086898b21a84533837b5f2bf1884cde7b0ab677590a
+//META: purpose=A LetDecl is a `let` variable and is immutable; assignment through a let-bound name is rejected.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented role of LetDecl ("immutable"). Trying to
-// assign through a let-bound local must produce a diagnostic; the
-// documented immutability of `let` is the user-observable consequence
-// of the LetDecl class.
+// Verifies that a `let` binding is immutable. The test assigns through a
+// let-bound local; the CHECK pins the l-value diagnostic (E30011) at the
+// name, which is the only user-visible way immutability manifests.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

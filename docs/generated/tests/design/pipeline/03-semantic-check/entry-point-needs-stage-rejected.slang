@@ -1,22 +1,23 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#shader-specific-checks
-//META: doc_section_digest=6ed31708085f4823fd353a550243a17316068330fb97dc1ed367bc25d6471443
-//META: purpose=Entry-point checks require a stage attribute on the function or a -stage command-line option; without either the checker emits diagnostic 38007.
+//META: doc_section_digest=c00647cfad21101d2bd2d831fcc3ac751988a6256cea5bd14c17a5aeb428a89e
+//META: purpose=Entry-point validation requires a stage, so a function compiled as an entry point with neither a `[shader(...)]` attribute nor `-stage` is rejected with E38007.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The Shader-specific checks section says
-// slang-check-shader.cpp validates "the function's stage attribute".
-// Without one, compilation of the entry point is rejected.
+// Verifies the "the function's stage attribute" part of entry-point
+// validation. The command line names the entry point but supplies no stage,
+// and the function carries no stage attribute, so the checker has nothing to
+// validate the signature against. CHECK pins E38007 on the function name.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -entry myEntry
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry main
 
-void myEntry() {}
-/*CHECK:
-     ^^^^^^^ no stage specified for entry point
-*/
-// CHECK: E38007
+[numthreads(1, 1, 1)]
+void main()
+{
+}
+//CHECK: E38007

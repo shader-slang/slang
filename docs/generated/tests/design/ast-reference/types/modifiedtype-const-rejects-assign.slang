@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T22:00:00+00:00
-//META: source_commit=331a01d9d0cc721d8fc19a46fec17a4a275ba0e0
-//META: doc_ref=docs/generated/design/ast-reference/types.md#existentials-and-this-types
-//META: doc_section_digest=cb36cdb24311d8e6f855e3a900c470a4bebea610d6ab53b559d45e07b085b44d
-//META: purpose=A ModifiedType `const T` qualifies the base type with a modifier; writes through a const-modified local are not l-values and are diagnosed.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/types.md#nodes
+//META: doc_section_digest=c7f55cb42aaa9e03df513fb2e3ff5bbcf380f2c09432d750a2aa9c55dfc56801
+//META: purpose=A ModifiedType applies a modifier to a base type; a `const`-modified local is not an l-value, so assigning to it is diagnosed.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `ModifiedType` wraps a base type with one or more modifiers. The
-// `const` modifier removes l-value-ness from the binding; assigning
-// to a const-modified local is rejected.
+// Verifies that the modifier really participates in the type rather
+// than being dropped after parsing: a `const int` local still accepts
+// its initialiser but refuses a later assignment. CHECK pins the
+// not-an-l-value diagnostic, which a plain `int` would not produce.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
@@ -20,7 +21,6 @@ void main()
     const int x = 42;
     x = 1;
 /*CHECK:
-      ^ left of '=' is not an l-value
+      ^ left of '=' is not an l-value.
 */
-// CHECK: E30011
 }

@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=ef4af96c0996402dfe65ab0fdd347e4ae7e1a742
-//META: doc_ref=docs/generated/design/ast-reference/base.md#declrefbase-val
-//META: doc_section_digest=d2291ebf5df30d73489e8195c80420773e2998c18564f925e18ba7477ef08a77
-//META: purpose=A DeclRefBase references a declaration possibly with generic substitutions; a single generic function declaration can be referenced at two different substitutions and each reference resolves to the appropriate specialization.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/base.md#val-nodebase
+//META: doc_section_digest=17754b4ad55bb3bbeb3b934dd617e4a3120a865a281a81848bf3fc5ab03948d7
+//META: purpose=A DeclRefBase names a declaration together with optional generic substitutions, so one generic declaration referenced at two different substitutions yields two different specializations.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies that one generic FuncDecl is referenced as two distinct
-// DeclRefs — `id<int>` and `id<float>` — and each picks up the
-// substitution for its type parameter, producing the appropriate
-// return value. If DeclRefBase could not carry substitutions, the
-// generic could not be specialized differently at the two call sites
-// and the program would not type-check.
+// Verifies that a reference to a declaration carries its generic
+// arguments with it. The single generic `id` is referenced twice, at
+// `int` and at `float`; CHECK asserts each call returns a value of the
+// substituted type. If a reference could only name the declaration and
+// not its substitution, the two call sites could not disagree about T.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

@@ -1,15 +1,15 @@
 ---
 remediation_report: true
-remediator_model: claude-opus-4.8
-remediated_at: 2026-06-05T15:45:00Z
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:58:00Z
 target_doc: ir-reference/values.md
 review_report: ../../reviews/ir-reference/values.md.review.md
-target_doc_source_commit_before: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_source_commit_after: 52339028a2aa703271533454c6b9528a534bac31
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 actions:
-  fixed: 1
+  fixed: 5
   rejected_bogus: 0
-  rejected_out_of_scope: 1
+  rejected_out_of_scope: 0
   deferred: 0
   escalated: 0
 ---
@@ -17,17 +17,19 @@ actions:
 # Remediation report for ir-reference/values.md
 
 ## Summary
-
-Of two findings, one was fixed and one was rejected as out-of-scope.
-The `logicalAnd` / `logicalOr` short-circuit wording was corrected to
-describe ordinary two-operand boolean ops. The missing-opcodes finding
-was rejected because all four opcodes are already owned by
-more-specific sibling pages; duplicating them here would violate the
-coverage rule.
+All five findings were fixed. The missing `Reshape and pack helpers` subsection
+now exists, the false `ReinterpretOptional` producer claim is replaced by a
+"no producer at HEAD" classification that also records the stale source comment
+behind it, four aggregate-constructor origin cells gained their real AST
+producers, the descriptor-handle conversion count was corrected from four to
+six, and the IR-pass mechanics in that callout were trimmed to a producer
+classification plus a link. The document was edited, so `mark-fresh` is needed.
 
 ## Actions
-
 | Finding ID | Action | Rationale | Fix summary |
 | --- | --- | --- | --- |
-| F-001 | rejected-out-of-scope | `_common.md:259-264` coverage rule lists a straddling opcode in the more-specific family only. `packAnyValue`/`unpackAnyValue` are owned by `ir-reference/generics-and-existentials.md` (and already cross-linked from values.md `## See also`), `makeValuePack` by `ir-reference/misc.md`, and `makeCombinedTextureSampler` by `ir-reference/resources-and-atomics.md`. Adding rows here would duplicate; the alternative (prompt/manifest revision) is outside the editable target doc. | — |
-| F-002 | fixed | `source/slang/slang-ir-insts.lua:1465-1471` defines `logicalAnd`/`logicalOr` as two-operand (`left, right`) ops; `source/slang/slang-ir.cpp:6730-6739` emits `kIROp_And`/`kIROp_Or` from already-supplied operands. IR has no short-circuit. | Rewrote both row summaries to describe boolean AND/OR over already-evaluated operands and removed "Short-circuit". |
+| F-001 | fixed | `docs/generated/design/_meta/prompts/ir-reference-values.md:48-49` names `Reshape and pack helpers` as its own table and the page had none. The arithmetic/logical split was left alone: `_common.md:230-232` explicitly encourages sub-tables for large groups, so two tables covering the prompt's `Arithmetic and logic` group is not a contract violation, whereas an absent group is. | Moved `matrixReshape`, `vectorReshape`, `getTupleElement`, and `getTargetTupleElement` out of `Aggregate constructors` into a new `### Reshape and pack helpers` table; rows unchanged apart from F-003. |
+| F-002 | fixed | Confirmed. `source/slang/slang-ir-typeflow-set.cpp:266-274` carries a comment claiming it emits the opcode but returns `openOptional(...)`, which builds the if-else itself; there is no `emitReinterpretOptional` and no `kIROp_ReinterpretOptional` construction anywhere in `source/`, and `source/slang/slang-ir-lower-reinterpret.cpp:228-260` only consumes existing instances. The stale comment is a real (harmless) source bug. | Conversions row origin changed to "no producer at HEAD" with the stale-comment explanation; live-but-unproduced count raised from four to five and a paragraph added for the opcode. |
+| F-003 | fixed | Verified each producer in `source/slang/slang-lower-to-ir.cpp`: `visitPackExpr` at 6542 calls `emitMakeValuePack` at 6550, `visitEachExpr` at 6554 calls `emitGetTupleElement` at 6558, `visitMakeArrayFromElementExpr` at 6757 calls `emitMakeArrayFromElement` at 6765, and the initializer-list path calls `emitMakeMatrix` at 6887 and `emitMakeTuple` at 6965. `makeValuePack` was wrongly listed as purely synthesized. | Added the AST classes and visitor line numbers to the `makeMatrix`, `makeArrayFromElement`, `makeTuple`, `makeValuePack`, and `getTupleElement` origin cells. |
+| F-004 | fixed | Confirmed: the conversions table at lines 297-302 holds six descriptor-handle conversion opcodes, matching the six Lua entries in `source/slang/slang-ir-insts.lua` at 2756-2757 and 2773-2778, but the callout counted four by skipping the `uint2` pair. | Callout now says six opcodes in three pairs, names the `uint2` pair explicitly, and the closing contrast reads "These six". |
+| F-005 | fixed | `ir-reference-values.md:72-75` forbids IR-pass behaviour. The peephole fold was pure optimization behaviour with no bearing on opcode shape or origin; the buffer-element-type detail was reduced to the producer identification the `AST origin` classification needs, as the reviewer allows. | Deleted the peephole-fold sentence; replaced the `convertOriginalToLowered` / `convertLoweredToOriginal` mechanics with a named producing pass plus a link to `../pipeline/05-ir-passes.md`. |

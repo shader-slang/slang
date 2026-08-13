@@ -8,7 +8,7 @@
 # any classification step.
 #
 # Crash-mode skips therefore live elsewhere: as workflow-level filters in
-# `.github/workflows/ci-slang-coverage.yml`. As of writing:
+# `.github/workflows/ci-slang-coverage-test.yml`. As of writing:
 #   - slang-unit-test-tool/RecordReplayApiTypeOperations  (Windows / OCC)
 #   - tests/autodiff/global-param-hoisting                (Windows / OCC,
 #                                                          intermittent crash)

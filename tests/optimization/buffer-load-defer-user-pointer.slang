@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPV): -target spirv -O0
+//TEST:SIMPLE(filecheck=SPV): -target spirv
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry compute_main -stage compute
 //TEST:SIMPLE(filecheck=PTX): -target ptx -entry compute_main -stage compute
 

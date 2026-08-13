@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:02:55+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#per-global-parameter-steps
-//META: doc_section_digest=ceb5a8d78703ef1bd82fb8e6b05d1b3d966794012fcf0910b1c8110ed0f27829
-//META: purpose=The per-global-parameter loop runs for each varLayout in globalStructLayout.fields; with two globals, the IRStructTypeLayout records two structFieldLayout entries and both stubs carry [layout(...)] decorations.
-//META: intent=functional
+//META: doc_section_digest=71acd681692af8dc698e27f4202784a0fdd9ad10068cb56ebbb1ea587605026a
+//META: purpose=The per-global-parameter loop runs once per field of the global struct layout, so two distinct global parameters produce two distinct structFieldLayout entries.
+//META: intent=boundary
 //META: pipeline_stage=layout
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says: "Record in the global type-layout builder via
-// globalStructTypeLayoutBuilder.addField(irVar, irLayout) ...
-// feeds the module-level IRStructTypeLayout built right after
-// the loop via _lowerTypeLayoutCommon." Two distinct globals
-// produce two distinct structFieldLayout(...) entries.
+// Verifies the loop nature of the per-global-parameter step by moving from
+// one global to two. CHECK matches two separate `structFieldLayout(%bufX`
+// entries, so the layout module recorded a field per global rather than
+// collapsing them; a single-global test cannot distinguish "loop" from
+// "one-shot".
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

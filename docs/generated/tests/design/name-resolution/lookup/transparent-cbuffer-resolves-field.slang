@@ -1,22 +1,21 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:48:38Z
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/lookup.md#transparent-members
-//META: doc_section_digest=ac9ff1bb7fdc57f330cb4aab07ddae7ce2c0b3db8c51e76a2dcc91b672f6a7a9
-//META: purpose=An HLSL cbuffer is lowered to a __transparent ConstantBuffer; an unqualified reference to its inner field resolves through the transparent (Member) + deref breadcrumb chain.
+//META: doc_section_digest=dddcdfd9d858195607b0dc7266537adae0ba480ba73ab92f277d485dcdf4511b
+//META: purpose=An HLSL cbuffer lowers to a transparent ConstantBuffer of an anonymous struct, so an unqualified reference to its inner field resolves through the transparent-member plus dereference navigation chain.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's canonical transparent-member example is
-// `cbuffer C { float4 f; }` lowered to `__transparent
-// ConstantBuffer<Anon0> anon1`. Unqualified `f` must resolve via a
-// Deref + Member breadcrumb chain through `anon1`. We observe that
-// resolution by writing emitted HLSL: the unqualified `f.x` reads
-// through the lowered cbuffer's field. INTERPRET cannot host
-// `cbuffer` (it asks for VM bytecode for unsupported globals), so
-// use a text-emit target.
+// Verifies the canonical transparent-member example. `f` is written
+// unqualified even though it lives inside the anonymous struct behind
+// the lowered constant buffer, so resolving it requires the transparent
+// injection step followed by the pointer dereference. INTERPRET cannot
+// host a cbuffer global, so the observation is the emitted HLSL: CHECK
+// asserts the access is rendered as buffer, then field, then swizzle —
+// exactly the two-step navigation lookup recorded.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry main
 
@@ -27,8 +26,6 @@ RWStructuredBuffer<float> outBuf;
 [numthreads(1,1,1)]
 void main()
 {
-    // The resolved access must surface the transparent field;
-    // mangling decorates the name but the field identifier survives.
-    // CHECK: f_{{[0-9]+}}.x
+    // CHECK: C_{{[0-9]+}}.f_{{[0-9]+}}.x
     outBuf[0] = f.x;
 }

@@ -5,8 +5,14 @@
 // by coverage-wgsl-skip.slang because it is an unsupported target for
 // coverage instrumentation today.
 
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_5_0
-//TEST:SIMPLE(filecheck=HLSL6):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_6_0
+// Both HLSL runs pin `-trace-coverage-counter-width 32`. cs_5_0 has no
+// `uint64_t` type at all, and the 64-bit `InterlockedAdd(uint64_t*, ...)`
+// overload only arrives in SM 6.6, so cs_6_0 cannot take the default uint64
+// path either. Counter width is orthogonal to what these two runs pin — the
+// per-lane vs wave-aggregated boundary at SM 6.0 — so fixing it at 32 keeps
+// both profiles on a lowering their shader model can actually express.
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_5_0 -trace-coverage-counter-width 32
+//TEST:SIMPLE(filecheck=HLSL6):-target hlsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile cs_6_0 -trace-coverage-counter-width 32
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage -profile glsl_450
 //TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry computeMain -trace-function-coverage -trace-branch-coverage
 

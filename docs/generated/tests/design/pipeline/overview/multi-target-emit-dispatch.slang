@@ -1,40 +1,57 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:30:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/overview.md#emit
-//META: doc_section_digest=d7c5155aced5a19f1303c1d313c7cf3b21da58b38cefd801d92e52039ee02528
-//META: purpose=The emit dispatcher selects a backend per TargetRequest and produces target text for HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA, and C++.
+//META: doc_section_digest=244236b868f771e25853f0063ebf0ce241c2c1af2fde156ad5b70a5ed4f242f6
+//META: purpose=Emit selects a dispatch path per target request, so one source produces HLSL, GLSL, SPIR-V, Metal, WGSL, CUDA, and C++ artefacts, each in that back-end's own idiom.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the overview claim that emitEntryPointsSourceFromIR routes a
-// compile to a per-target backend. The same trivial shader is compiled
-// to each of the seven text-emit backends supported in the no-GPU
-// runner; each //TEST directive FileChecks for a target-distinctive
-// marker that only that backend would emit. If the dispatcher were
-// missing a path for any backend, the corresponding sub-test would
-// fail.
+// Verifies that the per-target dispatch really picks a different emitter
+// for each target request rather than post-processing one shared text.
+// The same shader is compiled seven times, and each CHECK pins a header /
+// declaration idiom that only that back-end can produce -- an HLSL
+// `register(u0)` binding, a GLSL `#version` line, a SPIR-V memory model,
+// the Metal and CUDA/C++ prelude includes, and the WGSL storage-address-
+// space declaration. A missing dispatch path would leave the
+// corresponding directive with nothing to match.
 
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry main -stage compute
-//TEST:SIMPLE(filecheck=METAL):-target metal -entry main -stage compute
-//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry main -stage compute
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry main -stage compute
-//TEST:SIMPLE(filecheck=CPP):-target cpp -entry main -stage compute
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=GLSL):-target glsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=WGSL):-target wgsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CPP):-target cpp -entry computeMain -stage compute
+
+RWStructuredBuffer<int> gOut;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main()
+void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    // HLSL: numthreads
-    // GLSL: local_size_x
-    // SPIRV: OpEntryPoint
-    // METAL: kernel
-    // WGSL: @compute
-    // CUDA: __global__
-    // CPP: SLANG_PRELUDE_NAMESPACE
-    return;
+    gOut[0] = int(tid.x) + 1;
 }
+
+// HLSL-DAG: RWStructuredBuffer<int
+// HLSL-DAG: register(u0)
+
+// GLSL-DAG: #version
+// GLSL-DAG: layout(std430, binding = 0) buffer
+
+// SPIRV-DAG: OpMemoryModel Logical GLSL450
+// SPIRV-DAG: OpCapability Shader
+
+// METAL-DAG: #include <metal_stdlib>
+// METAL-DAG: using namespace metal;
+
+// WGSL-DAG: var<storage, read_write>
+// WGSL-DAG: @binding(0) @group(0)
+
+// CUDA-DAG: slang-cuda-prelude.h
+// CUDA-DAG: extern "C" __constant__
+
+// CPP-DAG: slang-cpp-prelude.h
+// CPP-DAG: SLANG_PRELUDE_NAMESPACE

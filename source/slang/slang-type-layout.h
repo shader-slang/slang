@@ -1,7 +1,7 @@
 #ifndef SLANG_TYPE_LAYOUT_H
 #define SLANG_TYPE_LAYOUT_H
 
-#include "../core/slang-basic.h"
+#include "core/slang-basic.h"
 #include "slang-compiler.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
@@ -1264,10 +1264,10 @@ public:
     /// Holds all of the string literals that have been hashed
     StringSlicePool hashedStringLiteralPool;
 
-    /// The descriptor set/space index allocated for the bindless resource heap.
+    /// The descriptor set/space index reserved for descriptor-handle-capable targets.
     ///
-    /// Return: -1 means Bindless resources not used
-    /// Return: >= 0 means Allocated space index for the bindless resource heap
+    /// -1 means no bindless space was reserved for this program and target.
+    /// >= 0 means a stable space was allocated; it does not by itself prove post-lowering heap use.
     Int bindlessSpaceIndex = -1;
 };
 

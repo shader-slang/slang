@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/05-ir-passes.md#entry-point-and-parameter-handling
-//META: doc_section_digest=7d2dd721ab3c1d33497a937e79d182339817290b8e4a173ec5ce69d40d28ae8d
+//META: doc_section_digest=53d52927e511301064adeecd90563a0571f0588af4d96406f90dc4612a87a935
 //META: purpose=The entry-point-decorations pass attaches `[numthreads(...)]` to the entry-point IR function and the marker surfaces in every text target's emit.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

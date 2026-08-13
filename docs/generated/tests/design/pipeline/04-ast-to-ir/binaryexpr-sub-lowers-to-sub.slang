@@ -1,10 +1,10 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T18:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=7d43267959b0c547516266beea43e6e96622d37270bfab810d9819a48f90812b
-//META: purpose=A BinaryExpr `a - b` lowers to a `sub` IR opcode in the doc's "BinaryExpr, arithmetic / comparison Expr -> pure value insts" row; the IRSub mirror of IRAdd.
+//META: doc_section_digest=37a00b76a98a13c2f3cd47117e12f237fbf042ab8ec479231f23490859cc4497
+//META: purpose=A builtin `a - b` (a checker fast-path BuiltinOperatorExpr) lowers to a `sub` IR opcode in the doc's "BuiltinOperatorExpr -> a single pure value inst" row; the IRSub mirror of IRAdd.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.

@@ -278,6 +278,20 @@ class OperatorExpr : public InvokeExpr
     FIDDLE(...)
 };
 
+// A builtin arithmetic / comparison / bitwise / shift / unary operator on builtin
+// integer/floating-point/bool scalar, vector, or matrix operands, recognized by the fast
+// path during checking (see `convertToBuiltinArithmeticOp`). Unlike a generic `operator OP`
+// call, it carries the resolved `BuiltinOperationKind` directly, so the operator-name ->
+// kind mapping happens exactly once (at creation) and every consumer (constant folding via
+// `BuiltinOperationIntVal`, IR lowering, for-loop trip-count inference) reads the kind rather
+// than re-parsing an operator name. `arguments` holds 1 (unary) or 2 operands.
+FIDDLE()
+class BuiltinOperatorExpr : public ExprWithArgsBase
+{
+    FIDDLE(...)
+    FIDDLE() BuiltinOperationKind op;
+};
+
 FIDDLE()
 class InfixExpr : public OperatorExpr
 {
@@ -626,6 +640,29 @@ class MakeOptionalExpr : public Expr
     // If `value` is null, this constructs an `Optional<T>` that doesn't have a value.
     FIDDLE() Expr* value = nullptr;
     FIDDLE() Expr* typeExpr = nullptr;
+};
+
+/// Represents an implicit coercion from Optional<T> to Optional<U>
+/// where T is implicitly coercible to U.
+///
+/// During IR lowering, this emits an if-else guarded by optionalHasValue:
+///   - true branch:  getOptionalValue(valueArg) -> coerce to U -> makeOptionalValue
+///   - false branch: makeOptionalNone
+///
+/// `innerVarDecl` is a synthetic VarDecl of type T. During IR lowering,
+/// `context->setValue(innerVarDecl, extractedInnerValue)` is called before
+/// lowering `innerCoercedExpr`, so that VarExpr references to innerVarDecl
+/// resolve to the extracted inner value.
+FIDDLE()
+class CastOptionalExpr : public Expr
+{
+    FIDDLE(...)
+    /// The source Optional<T> expression.
+    FIDDLE() Expr* valueArg = nullptr;
+    /// Synthetic placeholder VarDecl of type T (inner type of source Optional).
+    FIDDLE() VarDecl* innerVarDecl = nullptr;
+    /// Coercion expression from T to U, built referencing innerVarDecl.
+    FIDDLE() Expr* innerCoercedExpr = nullptr;
 };
 
 /// A cast of a value to the same type, with different modifiers.

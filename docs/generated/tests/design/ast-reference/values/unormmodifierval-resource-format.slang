@@ -1,26 +1,34 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:03:13Z
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#modifier-values
-//META: doc_section_digest=4364bf363a9056edbfcf69ad936b2e8f4e1ebe8e3f8cb1be0e64a5bc9da138b1
-//META: purpose=UNormModifierVal is the type-level ModifierVal for an unorm resource-format modifier; a `Texture2D<unorm float4>` declaration preserves the unorm modifier through to the emitted HLSL surface.
+//META: doc_section_digest=4536635b38a6466b02bda12ed26c1d3f85e08898f1c387eaf21ba05a06ce719f
+//META: purpose=A resource-format modifier written on a texture element type is converted into a value stored on the modified type, and that stored modifier survives to code generation, spelled back in the HLSL element position and rendered as the SPIR-V image format.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `UNormModifierVal` under `ResourceFormatModifierVal`
-// as "`unorm` resource format". The observable consequence is
-// that the modifier is carried into the emitted HLSL spelling
-// `Texture2D<unorm float4>` — i.e. the `unorm` keyword appears
-// in the lowered text.
+// Verifies that the `unorm` written inside the texture's type argument
+// is not discarded once the type expression is checked: it becomes part
+// of the texture's element type and travels with it all the way to
+// codegen. HLSL asserts the emitted declaration still spells `unorm` in
+// the element position, which it can only do if the modifier was
+// carried on the type rather than on the declaration syntax.
+//
+// SPIR-V observes the same stored modifier through the other syntax an
+// image type has for a format: without the `unorm` the image's format
+// operand is `Unknown`, and the modifier is the only thing in this file
+// that can turn it into `Rgba8`. That makes SPIR-V a real second
+// observation of the claim rather than a restatement of the HLSL one.
+//
+// GLSL, Metal and WGSL cannot express the claim; see the bundle
+// README's `## Untested claims` rows for this claim.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry main
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry main
 
-[[vk::binding(0, 0)]]
 Texture2D<unorm float4> tex;
-
-[[vk::binding(1, 0)]]
 RWStructuredBuffer<float4> outBuf;
 
 [numthreads(1, 1, 1)]
@@ -29,4 +37,5 @@ void main(uint3 tid : SV_DispatchThreadID)
     outBuf[0] = tex.Load(int3(0, 0, 0));
 }
 
-// CHECK: unorm
+// CHECK: Texture2D<unorm float4
+//SPIRV: OpTypeImage %float 2D {{[0-9 ]+}}Rgba8

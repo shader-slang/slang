@@ -1,39 +1,52 @@
 ---
 review_report: true
-reviewer_model: gpt-5.5
-reviewed_at: 2026-06-05T14:56:27+00:00
+reviewer_model: gpt-5.6-sol
+reviewed_at: 2026-08-04T12:07:46+00:00
 target_doc: pipeline/04b-pre-link-passes.md
-target_doc_source_commit: 52339028a2aa703271533454c6b9528a534bac31
-target_doc_watched_paths_digest: 18c422c7671f2e36b802b77eaab4617e384c7719e835466116d64fcc7c9bd423
-source_commit: fb192be9f5b3b58555e034599e072158e5c48dfd
+target_doc_source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_watched_paths_digest: 0a827687878ad7390b1acdda49546f652c2eaf5da2d820809834f1faa2ed69cb
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 checklist:
   factual_accuracy: partial
   cross_references: pass
-  completeness: partial
+  completeness: pass
   style_consistency: pass
   source_alignment: partial
-  front_matter_validity: pass
-finding_count: 2
+  front_matter_validity: partial
+finding_count: 3
 severity_breakdown:
   critical: 0
   major: 1
-  minor: 1
+  minor: 2
   nit: 0
 ---
 
 # Review report for pipeline/04b-pre-link-passes.md
 
 ## Summary
-The page covers the required pre-link pipeline and most phase-table claims match `generateIRForTranslationUnit`. The most important issue is the mandatory early-inlining loop description: it implies the `performMandatoryEarlyInlining` result is preserved through the iteration, while the source overwrites `changed` with the global peephole result before the final break test. The phase tables also use a non-contract column name.
+
+The document substantially matches the recorded source and satisfies the required four-phase contract. Three issues remain: it names a nonexistent `Module::compile` caller, overstates the contents of the layout IR module, and records a watched-path digest that does not match the watched files at its own `source_commit`. The fabricated caller is the most important finding because it directs readers to an API that is not present in the source tree.
 
 ## Items checked
-- Ran `regenerate.py show pipeline/04b-pre-link-passes.md` and reviewed the manifest entry, prompt, resolved watched files, and dependencies on `pipeline/03-semantic-check.md`, `pipeline/04-ast-to-ir.md`, `pipeline/05-ir-passes.md`, and `ir-reference/index.md`.
-- Verified front matter fields and resolved all 75 relative links.
-- Checked the required sections and table shape against `pipeline-04b-pre-link-passes.md` and the pre-link mandatory-pass contract in `_common.md`.
-- Spot-checked 32 source-alignment claims, including Phase A-D source ranges, all phase table calls, debug/minimum-optimization/non-essential-validation/obfuscation/language-version gates, adjacent constructs, line-number citations for `generateIRForTranslationUnit`, `SpecializedComponentTypeIRGenContext::process`, `TargetProgram::createIRModuleForLayout`, the per-function DCE sweep, and the mandatory early-inlining loop.
+
+- Read the target document, `_common.md`, the per-doc prompt, and all four dependency documents.
+- Resolved all five watched files with `regenerate.py show` and verified source against commit `53b76e6d3009b8e6434d41573524c7ce5c499d23`.
+- Spot-checked more than 30 factual claims covering all four phases, pass ordering and gates, the early-inlining loop, prelink cloning, stripping, obfuscation, linker caches, and adjacent module constructors.
+- Verified every line-number citation across 65 citation-bearing lines; the cited definitions and ranges match the recorded commit.
+- Resolved all 49 distinct linked source, generated-document, and directory paths at the recorded commit; the two local heading anchors also exist.
+- Checked the mandatory sections, tables, diagrams, gate groups, notable-pass callouts, three adjacent constructs, size cap, front-matter keys, and review style rules.
 
 ## Findings
+
 | ID | Severity | Location | Description | Evidence | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| F-001 | major | `## Loops in the pipeline`, lines 341-349 | The page says the outer loop continues as long as any inner pass reports progress and terminates only when `performMandatoryEarlyInlining` is false and the inner cluster makes no changes. In source, the `performMandatoryEarlyInlining` result is immediately overwritten by the `peepholeOptimizeGlobalScope` result when inlining reports true, and the final break test uses that overwritten value plus any later OR-assignment updates. | `source/slang/slang-lower-to-ir.cpp:14957` assigns `changed` from `performMandatoryEarlyInlining`; `source/slang/slang-lower-to-ir.cpp:14960` overwrites `changed` from `peepholeOptimizeGlobalScope`; `source/slang/slang-lower-to-ir.cpp:14977-14978` breaks when the final `changed` value is false. | Revise the loop diagram and prose to describe the actual `changed` variable flow, including that the inlining result is overwritten before the termination check. |
-| F-002 | minor | Phase A through Phase D tables, lines 121, 159, 197, and 258 | The phase tables use `Call` as the second column header, but the contract requires the ordered table columns to be `#`, `Pass`, `File`, `Gate`, and `Notes`. | `docs/generated/design/_meta/prompts/_common.md:444-445` requires one ordered table per phase with `# / Pass / File / Gate / Notes`; `docs/generated/design/pipeline/04b-pre-link-passes.md:121` shows the first phase table header as `#`, `Call`, `File`, `Gate`, and `Notes`. | Rename the second column header from `Call` to `Pass` in all four phase tables. |
+| F-001 | major | `## Source`, lines 31-35 | The document says `generateIRForTranslationUnit` is invoked from `Module::compile`, but no `Module::compile` symbol exists. The normal translation-unit driver is `FrontEndCompileRequest::generateIR`; imported modules use a separate linkage loading path. | `source/slang/slang-compile-request.cpp:526-570` defines `FrontEndCompileRequest::generateIR`, calls `generateIRForTranslationUnit` at line 552, and caches the result at line 570. `source/slang/slang-session.cpp:1123-1131` shows the imported-module call path. | Replace “from `Module::compile` and friends” with the two real callers: `FrontEndCompileRequest::generateIR` for request translation units and the imported-module generation path in `slang-session.cpp`. |
+| F-002 | minor | `### TargetProgram::createIRModuleForLayout`, lines 627-635 | The claim that the layout module's “only contents are `IRLayoutDecoration`s on stub globals and entry points” is too strong. The constructor also attaches a layout decoration to the module instruction, emits layout/type instructions, adds import linkage to entry-point stubs, and forwards SPIR-V/Metal capability decorations. | `source/slang/slang-lower-to-ir.cpp:16412-16450` builds variable and module-level layouts; lines 16470-16498 add import, capability, and layout decorations to entry-point stubs. | Say that the separate module carries target layout metadata on import stubs and the module instruction, with capability decorations on applicable entry points; retain that it contains no executable bodies and does not run the mandatory pass sequence. |
+| F-003 | minor | YAML front-matter, lines 1-7 | `watched_paths_digest` is valid hexadecimal but does not match the digest of the five resolved watched files at the recorded `source_commit`. The document records `0a827687...ed69cb`; recomputation from that commit yields `6b4337c0...1603b1`. | `docs/generated/design/_meta/regenerate.py:441-457` defines the digest over path, size, and contents. Running `regenerate.py digest pipeline/04b-pre-link-passes.md` at HEAD, which equals the recorded source commit, and independently hashing the five commit blobs both yield `6b4337c01022716f64c1f958ec59f2ab400c9c07e4d2646c5bea3a771e1603b1`. | Refresh the generated document's `watched_paths_digest` through the regeneration/remediation workflow so it records `6b4337c01022716f64c1f958ec59f2ab400c9c07e4d2646c5bea3a771e1603b1`; do not hand-edit the ledger. |
+
+## No-issues notes
+
+- The direct pre-link calls and all conditional gates match `generateIRForTranslationUnit`.
+- The loop section accurately captures the subtle overwrite of `changed` by `peepholeOptimizeGlobalScope`.
+- The revised `obfuscateModuleLocs` text correctly states that locations remain unchanged when obfuscation is enabled without a source map.
+- The `prelinkIR` cloning, auto-diff pruning, and stable-input linking-cache descriptions align with `slang-ir-link.cpp`.

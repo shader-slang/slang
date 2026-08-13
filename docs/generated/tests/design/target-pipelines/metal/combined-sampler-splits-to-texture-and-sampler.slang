@@ -1,18 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=a4ae0c2435c0e77be2b2eff75eb235733a799b1c91b73d70aa184d15c167c6d0
-//META: purpose=Sampler2D (combined texture+sampler) lowers to separate texture2d<T,sample>/sampler parameter pair with [[texture(N)]] and [[sampler(N)]].
+//META: doc_section_digest=7ad88f18e708a0667a9afb539fc85293a139970c3197b087b618fd0216e6e53e
+//META: purpose=`lowerCombinedTextureSamplers` fires on the Metal arm, splitting a `Sampler2D` into separate `combined_texture_<N>` and `combined_sampler_<N>` kernel parameters.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Metal is in the lowerCombinedTextureSamplers arm. A Slang
-// `Sampler2D` splits into a `texture2d<float, access::sample>`
-// param and a separate `sampler` param, named
-// `combined_texture_<N>` and `combined_sampler_<N>`.
+// Verifies Metal is in the HLSL/Metal/WGSL arm of
+// `lowerCombinedTextureSamplers`: MSL has no combined texture+sampler
+// object, so a Slang `Sampler2D` must arrive at emit as two independent
+// parameters. The kernel samples through the combined object so both
+// halves stay live, and CHECK asserts the kernel signature carries a
+// `texture2d<float, access::sample>` with a `[[texture(N)]]` slot and a
+// `sampler` with a `[[sampler(N)]]` slot, named with the pass's
+// `combined_texture_` / `combined_sampler_` prefixes.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 
