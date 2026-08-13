@@ -1171,8 +1171,28 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
         // Checks the spans themselves rather than the chunk, because these are the exact
         // pointers a deferred body dereferences later. An owned array is not a view and
         // depends on nothing, so it is skipped.
+        // Compared as integers, not as pointers. A span that fails this check points into
+        // a *different* allocation than the blob, and for such pointers `<`/`>=` is
+        // unspecified per [expr.rel] while forming `data + sizeInBytes` past the end of
+        // its own object is undefined per [expr.add] -- so the pointer spelling of this
+        // guard is reasoning the optimizer is entitled to discard, in exactly the case the
+        // guard exists for.
+        //
+        // The subtraction is arranged so nothing can overflow: `p <= hi` is established
+        // before `hi - p` is evaluated, and the size is compared against that difference
+        // rather than added to `p`. On a 32-bit build the pointer form could wrap --
+        // `getCount()` derives from a `uint32_t` and the element size is up to 8, so the
+        // product reaches ~34 GB -- and a wrapped pointer can compare in range, letting a
+        // corrupt count through to be dereferenced later.
+        const uintptr_t blobLow = (uintptr_t)blobBegin;
+        const uintptr_t blobHigh = (uintptr_t)blobEnd;
         auto spanIsInsideBlob = [&](const Byte* data, Count sizeInBytes)
-        { return data >= blobBegin && data + sizeInBytes <= blobEnd; };
+        {
+            const uintptr_t p = (uintptr_t)data;
+            if (sizeInBytes < 0 || p < blobLow || p > blobHigh)
+                return false;
+            return (uintptr_t)sizeInBytes <= blobHigh - p;
+        };
 
         // Every view-capable array, not a sample of them. Which ones actually end up as
         // views depends on the backend and on what the module contains -- one with no
