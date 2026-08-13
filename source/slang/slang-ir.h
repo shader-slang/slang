@@ -686,8 +686,22 @@ struct IRInst
 
     /// True while this instruction's children are still encoded rather than
     /// materialized. Only ever set on global values of a lazily deserialized
-    /// module, and cleared once the body is decoded. Placed next to `operandCount`
-    /// so it occupies existing padding rather than growing `IRInst`.
+    /// module, and cleared once the body is decoded.
+    ///
+    /// Placed next to `operandCount` so it lands in padding rather than growing
+    /// `IRInst`, which matters because these are allocated in enormous numbers.
+    /// Measured on x86-64 clang-18: `sizeof(IRInst)` is 104 either way. With this
+    /// field, `m_op` and `operandCount` fill [0,8), the flag takes [8,9), and
+    /// `sourceLoc` (4 bytes) sits at [12,16); without it `sourceLoc` would sit at
+    /// [8,12) and the same 4 bytes would be padding, because the next member is
+    /// pointer-aligned and starts at 16 regardless.
+    ///
+    /// Deliberately not pinned by a `static_assert` on `sizeof(IRInst)`. The value
+    /// is toolchain- and pointer-size-dependent, so the assert would need a table
+    /// of per-platform literals, and it would fire on any unrelated field addition
+    /// -- turning a documentation question into a build break for someone who has
+    /// not grown the type at all. If the layout ever does need enforcing, the thing
+    /// to assert is this field's offset relative to `sourceLoc`, not the total.
     ///
     /// Atomic because a global session is shared across threads: the flag is
     /// cleared with release ordering after the body has been linked, and read with
@@ -813,8 +827,8 @@ struct IRInst
     // global value's children sees an empty body and reports success. That failure
     // is silent and surfaces far from its cause -- two such sites were found during
     // the deferred-loading work, and only by running the whole test suite in both
-    // modes. The accessors below all materialize; the sole exception is named
-    // `...WithoutMaterializing` and documents when it is legitimate.
+    // modes. Every accessor below materializes, so going through them is always
+    // correct; there is deliberately no non-materializing variant to reach for.
     //
     IRInstListBase m_decorationsAndChildren;
 
