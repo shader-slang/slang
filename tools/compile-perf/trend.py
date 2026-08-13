@@ -3,11 +3,15 @@
 
 Reads the tracking series (track.py's tracking/tracking.json) and compares the
 latest point — tonight's tip-of-tree (ToT) sweep — against the trailing median of
-the previous N points, per (workload, primary-timer). A metric that rises beyond
-both a relative and an absolute threshold is flagged: printed, emitted as a
-GitHub Actions ::error:: annotation + step-summary row, and (unless --no-fail)
-the process exits non-zero so the nightly job goes red. This catches the gradual
-drift a per-PR step gate structurally misses.
+the previous N points, per (workload, counter). "Counter" rather than "timer"
+throughout: the series is mixed-unit, carrying kb memory counters alongside the
+ms phase timers, and which one a value is decides both its formatting and its
+absolute floor.
+
+A metric that rises beyond both a relative and an absolute threshold is flagged:
+printed, emitted as a GitHub Actions ::error:: annotation + step-summary row,
+and (unless --no-fail) the process exits non-zero so the nightly job goes red.
+This catches the gradual drift a per-PR step gate structurally misses.
 
 Absolute compile times are runner-specific, so comparisons are restricted to
 points sharing the current point's runner fingerprint. If the latest point ran on
@@ -31,12 +35,33 @@ from lib import analyze, manifest
 
 
 def timers_for(workload):
-    """The timers worth alerting on for a workload: its manifest primary timers,
-    always including compileInner (the holistic signal)."""
+    """The ms timers worth alerting on for a workload: its manifest primary
+    timers, always including compileInner (the holistic signal).
+
+    Deliberately timers only, despite the mixed-unit series — memory counters
+    are declared nowhere per workload, so judged() is the single place the two
+    kinds are unioned."""
     spec = manifest.BY_NAME.get(workload)
     timers = set(spec.primary_timers) if spec else set()
     timers.add("compileInner")
     return timers
+
+
+def abs_floor_for(counter, ms_floor):
+    """The absolute-delta gate for a counter: `ms_floor` (the --abs argument)
+    for time, a fixed 1 MiB for the kb-unit memory counters — a few-KB wobble
+    on a ~200 MB value must not page anyone (the ratio gate is the primary
+    filter for both units)."""
+    return 1024.0 if analyze.unit_of(counter) == "kb" else ms_floor
+
+
+def judged(workload, counter):
+    """Whether the trend check judges this (workload, counter) series: the
+    workload's alert timers, plus EVERY kb-unit memory counter — memory
+    counters are not in any primary_timers list (they are synthesized by
+    canonical_runs, not declared per workload), and without this the memory
+    alert path would be unreachable."""
+    return counter in timers_for(workload) or analyze.unit_of(counter) == "kb"
 
 
 def emit_gha_command(line):
@@ -214,8 +239,8 @@ def main():
     regressions = []
     warnings = []
     for key, cur in sorted(current.get("metrics", {}).items()):
-        wl, _, timer = key.partition("|")
-        if timer not in timers_for(wl):
+        wl, _, counter = key.partition("|")
+        if not judged(wl, counter):
             continue
         baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
         if len(baseline) < args.min_baseline:
@@ -225,22 +250,31 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        # args.abs is passed as the floor rather than read inside
-        # classify_metric so a per-counter floor can be substituted here
-        # without touching the classifier or its self-checks — the memory
-        # counters landing in this series want a 1 MiB floor, not 2 ms.
-        verdict = classify_metric(ratio, delta, args.rel, args.warn_rel, args.abs)
+        # The floor is PER COUNTER, not the flat --abs: this series carries
+        # kb-unit memory counters alongside ms timers, and a few-KB wobble on
+        # a ~200 MB value must not page anyone. classify_metric takes the
+        # floor as a parameter precisely so it can be substituted here, which
+        # is what keeps the two-tier gate and the unit-aware floor composable
+        # rather than one overwriting the other.
+        verdict = classify_metric(ratio, delta, args.rel, args.warn_rel,
+                                  abs_floor_for(counter, args.abs))
         if verdict == "error":
-            regressions.append((wl, timer, med, cur, ratio, delta))
+            regressions.append((wl, counter, med, cur, ratio, delta))
         elif verdict == "warning":
-            warnings.append((wl, timer, med, cur, ratio, delta))
+            warnings.append((wl, counter, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
 
+    # The absolute floor is quoted per unit, and read back out of
+    # abs_floor_for rather than restated: the memory floor is not --abs, so a
+    # single "{args.abs} ms" would misreport the gate every memory counter is
+    # actually judged against.
+    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", args.abs))
     print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
           f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
-          f">= {args.warn_rel}, both gated on >= {args.abs} ms\n")
+          f">= {args.warn_rel}, both gated on an absolute delta of "
+          f">= {args.abs} ms for timers / {mem_floor} for memory counters\n")
 
     # `warnings` is the ONLY key the workflow reads, and the only one it
     # needs: the Slack step distinguishes a warnings-only night from a clean
@@ -267,21 +301,34 @@ def main():
                 f"(`{base_labels}`).")
         return
 
-    print(f"{'workload':20s}{'timer':26s}{'median':>10}{'current':>10}{'ratio':>8}{'Δms':>9}")
+    # Two tables (error tier then warning tier) with the header reflecting the
+    # worse of the two — from the two-tier gate; every VALUE rendered through
+    # analyze.fmt_qty — from memory tracking. Both halves are needed: this
+    # series now carries kb counters as well as ms timers, so the hard-coded
+    # "ms" formatting the two-tier tables originally used would print a
+    # 200 MB peak as "204800.0 ms". The column headers say "median"/"Δ"
+    # without a unit for the same reason — fmt_qty puts the unit on each value.
+    print(f"{'workload':20s}{'counter':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
     rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
 
     def table(items, kind, gha):
         rows.append(f"\n**{kind}** ({len(items)}):\n")
-        rows.append("| workload | timer | median (ms) | current (ms) | ratio | Δ ms |")
+        rows.append("| workload | counter | median | current | ratio | Δ |")
         rows.append("|---|---|--:|--:|--:|--:|")
-        for wl, timer, med, cur, ratio, delta in items:
-            print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
-            emit_gha_command(f"::{gha} title=Perf {kind.lower()} {wl}/{timer}::"
-               f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
-            rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
-                        f"{ratio:.2f}× | +{delta:.1f} |")
+        for wl, counter, med, cur, ratio, delta in items:
+            print(f"{wl:20s}{counter:26s}{analyze.fmt_qty(counter, med):>12s}"
+                  f"{analyze.fmt_qty(counter, cur):>12s}{ratio:7.2f}x"
+                  f"{analyze.fmt_qty(counter, delta, signed=True):>12s}")
+            emit_gha_command(
+                f"::{gha} title=Perf {kind.lower()} {wl}/{counter}::"
+                f"{ratio:.2f}x ({analyze.fmt_qty(counter, med)} -> "
+                f"{analyze.fmt_qty(counter, cur)}, "
+                f"{analyze.fmt_qty(counter, delta, signed=True)}) vs trailing median")
+            rows.append(f"| {wl} | {counter} | {analyze.fmt_qty(counter, med)} | "
+                        f"{analyze.fmt_qty(counter, cur)} | {ratio:.2f}× | "
+                        f"{analyze.fmt_qty(counter, delta, signed=True)} |")
 
     if regressions:
         table(regressions, "Regressions", "error")
@@ -292,6 +339,34 @@ def main():
     print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
     if regressions and not args.no_fail:
         raise SystemExit(1)
+
+
+# Import-time self-checks (the directory idiom): judged() and the per-unit
+# absolute floor ARE the memory alert path — if either regressed, memory
+# alerting would silently never fire.
+assert judged("minimal", "peakRssKb"), "kb counters must always be judged"
+assert judged("minimal", "compileInner"), "compileInner is always judged"
+assert not judged("minimal", "emitEntryPointsSourceFromIR"), \
+    "non-primary ms timers are not judged for workloads that do not list them"
+assert abs_floor_for("peakRssKb", 2.0) == 1024.0, "memory floor is 1 MiB"
+assert abs_floor_for("compileInner", 2.0) == 2.0, "time floor is --abs"
+
+# The two gates compose, and that composition is what the merge of the
+# two-tier gate and the unit-aware floor had to get right: a kb counter must
+# clear 1 MiB before EITHER tier fires, so a few-KB wobble is neither an error
+# nor a warning, while the same numeric delta in ms clears the 2 ms floor.
+assert classify_metric(1.20, 500.0, 1.10, 1.05,
+                       abs_floor_for("peakRssKb", 2.0)) is None, \
+    "a 500 KB move must not alert: it is below the 1 MiB memory floor"
+assert classify_metric(1.20, 2048.0, 1.10, 1.05,
+                       abs_floor_for("peakRssKb", 2.0)) == "error", \
+    "a 2 MiB move at 1.20x is over both the memory floor and the error ratio"
+assert classify_metric(1.07, 2048.0, 1.10, 1.05,
+                       abs_floor_for("peakRssKb", 2.0)) == "warning", \
+    "a 2 MiB move at 1.07x lands in the warning tier, not silence"
+assert classify_metric(1.20, 500.0, 1.10, 1.05,
+                       abs_floor_for("compileInner", 2.0)) == "error", \
+    "the SAME delta in ms is far over the 2 ms time floor — unit picks the gate"
 
 
 # Import-time self-checks over classify_metric, matching the directory idiom

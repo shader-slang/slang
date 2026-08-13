@@ -7,6 +7,27 @@ observed_at: "2026-06-06T13:35:16+00:00"
 scope: cpp
 evidence:
   command: "build/RelWithDebInfo/bin/slang-test <tmp>/dc.slang  (//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type)"
+  repro_source: |
+    //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+    enum MyError { Bad }
+
+    float risky(float x) throws MyError
+    {
+        if (x < 0.0) throw MyError.Bad;
+        return x * 2.0;
+    }
+
+    RWStructuredBuffer<float> outputBuffer;
+
+    [numthreads(1, 1, 1)]
+    void computeMain()
+    {
+        float v = 0.0;
+        do { v = try risky(3.0); }
+        catch (MyError e) { v = -1.0; }
+        outputBuffer[0] = v;
+    }
+    // CHECK: 6.0
   source_slang: docs/generated/tests/design/syntax-reference/grammar/stmt-do-catch-emit.slang
   observed_summary: |
     A compute kernel using the documented DoCatchStmt control flow

@@ -110,6 +110,14 @@ REVIEWS_DIR = META_DIR / "reviews"
 REMEDIATIONS_DIR = META_DIR / "remediations"
 FINDINGS_DIR = META_DIR / "findings"
 FINDINGS_FILED_DIR = FINDINGS_DIR / "filed"
+
+# Findings that stopped reproducing before anyone filed them. Kept apart
+# from findings/filed/ because that directory means "an issue exists for
+# this"; these have no issue and never will. Without somewhere to put
+# them they stay in the pending queue forever and every triage pass
+# re-tests them from scratch -- five findings were in exactly that state
+# when this was added.
+FINDINGS_RESOLVED_DIR = FINDINGS_DIR / "resolved"
 FINDINGS_STATE_PATH = META_DIR / "findings-state.json"
 
 # Required META keys on every generated .slang test file. The block lives
@@ -571,6 +579,15 @@ _REQUIRED_FINDING_KEYS = (
     "provenance",
 )
 _REQUIRED_EVIDENCE_KEYS = ("command", "source_slang", "observed_summary")
+
+# A path in `evidence.command` that will not exist after the session ends. A
+# finding whose command names one of these cannot be re-run later, so it cannot
+# be confirmed still-reproducing before filing -- which is the one thing triage
+# has to do. Seventeen sigsegv findings were triaged in one pass and seven were
+# untestable for exactly this reason; two of those produced convincing false
+# "already fixed" results, because substituting the committed `source_slang`
+# silently fed slangc a different program.
+_SCRATCH_PATH_RE = re.compile(r"(?:^|[\s=])(?:/tmp/|/var/folders/)\S*|<file>|<tmp>")
 _REQUIRED_EXPECTED_KEYS = ("claim", "citation_kind", "citation")
 _REQUIRED_PROVENANCE_KEYS = ("agent_model", "source_commit", "doc_anchor")
 _SUSPECTED_KINDS = {
@@ -600,25 +617,101 @@ def save_findings_state(state: dict) -> None:
     )
 
 
-def list_finding_paths(include_filed: bool = False) -> list[Path]:
+def list_finding_paths(
+    include_filed: bool = False, include_resolved: bool = False
+) -> list[Path]:
     """Return sorted list of finding YAML paths under _meta/findings/.
 
-    Pending findings live directly under findings/; filed ones move to
-    findings/filed/ and are excluded by default.
+    Pending findings live directly under findings/. Ones with an issue
+    move to findings/filed/, ones that stopped reproducing before anyone
+    filed them move to findings/resolved/; both are excluded by default,
+    because the bare list is the work queue.
     """
     if not FINDINGS_DIR.exists():
         return []
-    out: list[Path] = []
-    for p in sorted(FINDINGS_DIR.glob("*.yaml")):
-        out.append(p)
+    out: list[Path] = [p for p in sorted(FINDINGS_DIR.glob("*.yaml"))]
     if include_filed and FINDINGS_FILED_DIR.exists():
-        for p in sorted(FINDINGS_FILED_DIR.glob("*.yaml")):
-            out.append(p)
+        out.extend(sorted(FINDINGS_FILED_DIR.glob("*.yaml")))
+    if include_resolved and FINDINGS_RESOLVED_DIR.exists():
+        out.extend(sorted(FINDINGS_RESOLVED_DIR.glob("*.yaml")))
     return out
 
 
 def load_finding(path: Path) -> dict:
-    return _load_yaml(path.read_text(encoding="utf-8")) or {}
+    """Load a finding, normalizing `observed_at` to the ISO string the
+    schema declares.
+
+    An unquoted ISO timestamp is a *date* in YAML, not a string, so
+    `observed_at: 2026-08-04T00:00:00+00:00` loads as a `datetime` while
+    the quoted spelling next to it loads as `str`. Both are the same
+    instant and both look identical in the file, so the difference is
+    invisible until something does string work on the value -- which is
+    how `findings list` came to abort partway through the queue with
+    `'datetime.datetime' object is not subscriptable`. 21 of the 83
+    committed findings use the unquoted spelling.
+
+    Normalizing here rather than at the call site keeps one in-memory
+    contract for every consumer, and matches what the schema already
+    says the field is. The files are left alone: 10 of the 21 are under
+    findings/filed/, which is immutable history.
+    """
+    finding = _load_yaml(path.read_text(encoding="utf-8")) or {}
+    observed = finding.get("observed_at")
+    if isinstance(observed, (_dt.datetime, _dt.date)):
+        finding["observed_at"] = observed.isoformat()
+    return finding
+
+
+def _lint_finding_reproducibility(where: str, ev: dict) -> list[LintIssue]:
+    """Check that a finding can still be re-run after the session that filed it.
+
+    Triage has exactly one job before filing: confirm the failure still
+    happens. That is impossible if the recorded `command` points at a
+    scratch path -- `/tmp/foo.slang`, `<file>` -- because the input is
+    gone. Substituting `evidence.source_slang` is not a fix: when the
+    failing input was a *variant* of the committed test, the substitution
+    silently compiles a different program. In one triage pass that turned
+    two live bugs into apparent "already fixed" results, which is worse
+    than having no result at all.
+
+    So: name a scratch path in the command, and the real input must be
+    inlined in `evidence.repro_source`. This is a warning rather than an
+    error because 28 of the 82 findings committed before the rule predate
+    it; the fix is a sweep, not a gate.
+    """
+    issues: list[LintIssue] = []
+    cmd = str(ev.get("command") or "")
+    scratch = _SCRATCH_PATH_RE.search(cmd)
+    has_inline = bool(str(ev.get("repro_source") or "").strip()) or bool(
+        str(ev.get("minimized_repro") or "").strip()
+    )
+    if scratch and not has_inline:
+        issues.append(
+            LintIssue(
+                where,
+                "warning",
+                f"evidence.command names a scratch path ({scratch.group(0).strip()!r})"
+                " that will not exist later, and no evidence.repro_source is"
+                " given, so this finding cannot be re-run to confirm it still"
+                " reproduces before filing",
+            )
+        )
+    src = str(ev.get("source_slang") or "")
+    if (
+        src.endswith(".slang")
+        and not src.startswith(("/tmp", "<"))
+        and not (REPO_ROOT / src).exists()
+        and not has_inline
+    ):
+        issues.append(
+            LintIssue(
+                where,
+                "warning",
+                f"evidence.source_slang {src!r} does not exist and no"
+                " evidence.repro_source is given; the finding has no runnable input",
+            )
+        )
+    return issues
 
 
 def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
@@ -660,6 +753,8 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
             LintIssue(where, "error", f"title exceeds 80 chars ({len(title)})")
         )
     ev = finding.get("evidence")
+    if isinstance(ev, dict):
+        issues.extend(_lint_finding_reproducibility(where, ev))
     if isinstance(ev, dict):
         for k in _REQUIRED_EVIDENCE_KEYS:
             if k not in ev:
@@ -716,11 +811,35 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
 def lint_findings() -> list[LintIssue]:
     """Validate every pending finding YAML.
 
-    Filed findings (under findings/filed/) are immutable history and are
-    not re-validated — their citations or referenced paths may have
-    rotted since filing, and that is acceptable for a historical record.
+    Retired findings — filed ones under findings/filed/, ones that
+    stopped reproducing under findings/resolved/ — are immutable history
+    and are not re-validated. Their citations or referenced paths may
+    have rotted since, and that is acceptable for a historical record.
+
+    They are still checked for *parseability*, though, which is a
+    different thing from rot. A retired finding that no longer loads is
+    not stale history, it is unreadable history: every tool that walks
+    the whole corpus trips over it, and the record it was meant to
+    preserve is effectively gone. One shipped that way in the bootstrap
+    commit — an unquoted `observed_summary` containing
+    `spirv-emit: castToVoid`, where the colon-space turned the scalar
+    into a mapping — and went unnoticed because this function skipped
+    the directory entirely.
     """
     issues: list[LintIssue] = []
+    pending = set(list_finding_paths(include_filed=False))
+    retired = set(list_finding_paths(include_filed=True, include_resolved=True)) - pending
+    for p in sorted(retired):
+        try:
+            load_finding(p)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    str(p.relative_to(REPO_ROOT)),
+                    "error",
+                    f"retired finding no longer parses as YAML: {exc}",
+                )
+            )
     seen_bundles_in_manifest = set(load_manifest().bundles.keys())
     for p in list_finding_paths(include_filed=False):
         try:
@@ -923,12 +1042,23 @@ def compute_finding_labels(finding: dict, state: dict) -> list[str]:
 def _repro_body(finding: dict) -> str:
     """Return the .slang source block for the issue body.
 
-    Prefers evidence.minimized_repro when present; otherwise reads
-    evidence.source_slang from disk.
+    Prefers the operator's `minimized_repro`, then the agent's inlined
+    `repro_source`, and only then reads `source_slang` from disk.
+
+    The `repro_source` step is not optional politeness: the reproducibility
+    rule tells an agent whose failing input was a scratch file to inline it
+    there, precisely because `source_slang` then names a *different*
+    program -- the committed test the scratch input was derived from.
+    Falling through to disk in that case pairs the recorded command with a
+    shader that does not reproduce the bug, which is the exact confusion
+    the rule exists to prevent. This function honoured `minimized_repro`
+    but not `repro_source`, so until now it did just that.
     """
     ev = finding.get("evidence") or {}
     if ev.get("minimized_repro"):
         return str(ev["minimized_repro"]).rstrip() + "\n"
+    if ev.get("repro_source"):
+        return str(ev["repro_source"]).rstrip() + "\n"
     src = ev.get("source_slang")
     if not src:
         return "(no source_slang on finding)\n"
@@ -1170,9 +1300,102 @@ class GapRow:
     suggested_addition: str
     bundle: str  # bundle key that reported this row
     source_doc: str  # bundle's source_doc, for aggregation
+    # Workspace-relative path of the document the Anchor cell points at, or
+    # "" when the cell carries no resolvable link. This -- not the reporting
+    # bundle's `source_doc` -- is the document a gap is a gap *in*, and it is
+    # what `doc-gaps` groups by. See `_resolve_gap_target`.
+    anchor_target: str = ""
+    # Stable identity of this gap, for the consuming ledger. See
+    # `compute_gap_id`.
+    gap_id: str = ""
 
 
 _GAP_ANCHOR_FRAG_RE = re.compile(r"(#[A-Za-z0-9][A-Za-z0-9_-]*)")
+_GAP_ANCHOR_LINK_RE = re.compile(r"\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+
+
+def _resolve_gap_target(bundle_dir: str, anchor_cell: str) -> str:
+    """Return the workspace-relative document an Anchor cell points at.
+
+    A gap is reported by a test bundle but is a defect *in a document*, and
+    the two are not the same thing: a `coverage/` bundle has no `source_doc`
+    at all, yet every gap it reports names a design page in its Anchor cell.
+    Grouping such a row under the bundle leaves it unaddressable by the doc
+    that has to fix it, so the link target is resolved here instead.
+
+    The cell reads `[#some-heading](../../../design/pipeline/06-emit.md#some-heading)`;
+    the link is relative to the bundle directory, so it is resolved against
+    that and made repo-relative. Returns "" if the cell has no link, links
+    to a bare fragment, or points outside the repository -- all of which
+    `lint_bundle` reports, because a row that names no document cannot be
+    routed to one.
+    """
+    m = _GAP_ANCHOR_LINK_RE.search(anchor_cell)
+    if not m:
+        return ""
+    path, _, _frag = m.group("url").partition("#")
+    if not path:
+        return ""
+    try:
+        target = (REPO_ROOT / bundle_dir / unquote(path)).resolve()
+        return str(target.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except (ValueError, OSError):
+        return ""
+
+
+def _normalize_gap_prose(text: str) -> str:
+    """Reduce a gap's prose to the form its identity is computed from.
+
+    Two agents describing the same gap, or one agent re-describing it on a
+    later regeneration, will not reproduce the sentence verbatim -- they
+    reflow it, add a code span, or repunctuate. Identity has to survive
+    that, or a gap already marked fixed comes back as a new one on the next
+    bundle regeneration, which is exactly the churn the ledger exists to
+    stop. So markup is unwrapped, punctuation is dropped, whitespace is
+    collapsed, and the result is lowercased, leaving the words alone to
+    carry the identity.
+    """
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"[*_~]", "", text)
+    # No un-escaping of `\|` here: the punctuation strip below maps both the
+    # backslash and the pipe to spaces and the final collapse erases the
+    # difference, so doing it first changes nothing. This is the identity
+    # function for `gap_id`, so it is worth keeping free of steps that only
+    # look like they matter.
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+_GAP_ID_LEN = 12
+
+
+def compute_gap_id(
+    anchor_target: str, anchor_fragment: str, kind: str, gap: str
+) -> str:
+    """Return the stable id a consumer tracks this gap's resolution under.
+
+    Gap rows live in bundle READMEs, which are rewritten wholesale every
+    time a bundle is regenerated, so a row has no natural key -- there is
+    nothing for a ledger to say "this one is fixed" about. The id supplies
+    one, derived from what makes a gap the gap it is: the document section
+    it is against, its kind, and its prose (normalized, see
+    `_normalize_gap_prose`).
+
+    Deriving the id rather than writing it into the README is deliberate:
+    every existing bundle gets an id without being regenerated, and a
+    generating agent cannot mint a colliding or malformed one.
+
+    The trade-off is that renaming the anchored heading, or rewriting the
+    gap prose to say something materially different, mints a new id and
+    retires the old one. That is the intended behaviour for a rewrite; for
+    a heading rename it means one stale ledger entry, which `gap-status`
+    reports as resolved-but-unseen rather than silently dropping.
+    """
+    payload = "\n".join(
+        [anchor_target, anchor_fragment, kind, _normalize_gap_prose(gap)]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:_GAP_ID_LEN]
 
 
 def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
@@ -1222,6 +1445,7 @@ def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
         anchor_cell, kind_cell, gap_cell, suggested_cell = cells[:4]
         frag_match = _GAP_ANCHOR_FRAG_RE.search(anchor_cell)
         anchor_fragment = frag_match.group(1) if frag_match else ""
+        anchor_target = _resolve_gap_target(bundle_key, anchor_cell)
         rows.append(
             GapRow(
                 anchor=anchor_cell,
@@ -1231,6 +1455,10 @@ def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
                 suggested_addition=suggested_cell,
                 bundle=bundle_key,
                 source_doc=source_doc,
+                anchor_target=anchor_target,
+                gap_id=compute_gap_id(
+                    anchor_target, anchor_fragment, kind_cell, gap_cell
+                ),
             )
         )
         i += 1
@@ -2036,6 +2264,23 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f"{spec.dir}/README.md",
                         "warning",
                         f"doc-gap row Anchor cell has no #fragment:"
+                        f" {row.anchor!r}",
+                    )
+                )
+            # An Anchor cell that names no document is the one gap defect
+            # that costs the row its whole purpose: `doc-gaps` groups by
+            # the anchored document, so a row without one is filed under
+            # the reporting bundle and never reaches a doc author. The
+            # link's *path* is checked here; `lint_markdown_links` already
+            # covers whether the path and its fragment resolve, so this
+            # does not restate that.
+            if not row.anchor_target:
+                issues.append(
+                    LintIssue(
+                        f"{spec.dir}/README.md",
+                        "error",
+                        f"doc-gap row Anchor cell has no link to a document,"
+                        f" so the gap cannot be routed to one:"
                         f" {row.anchor!r}",
                     )
                 )
@@ -3419,13 +3664,77 @@ def cmd_findings_dup(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_findings_fixed(args: argparse.Namespace) -> int:
+    """Record that a pending finding no longer reproduces, and retire it.
+
+    Triage keeps turning up findings that were real when observed and are
+    fixed by the time anyone looks. Before this existed there was nowhere
+    to put that result: the finding stayed pending, so the next pass
+    re-tested it from scratch. Five were in that state when this landed --
+    four from the sigsegv sweep plus one that only got cleared because it
+    happened to also duplicate an open issue.
+
+    The command deliberately demands evidence. `--verified-at` is required
+    and must name the compiler commit the re-test ran against, because
+    "fixed" without a commit is unfalsifiable: a later regression cannot
+    be distinguished from a triage that was wrong, and this whole channel
+    exists because unverified claims produced false results before. The
+    finding YAML is kept -- retiring is not deleting, and a fixed finding
+    is the seed of the regression test nobody has written yet.
+    """
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    findings_map = state.setdefault("findings", {})
+    existing = findings_map.get(args.id, {})
+    if existing.get("issue"):
+        print(
+            f"error: {args.id} is filed as #{existing['issue']}; close the issue"
+            " instead of retiring the finding",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("dup_of"):
+        print(
+            f"error: {args.id} is already marked dup-of #{existing['dup_of']}",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("fixed_at"):
+        print(
+            f"error: {args.id} already retired as fixed at {existing['fixed_at']}",
+            file=sys.stderr,
+        )
+        return 1
+    findings_map[args.id] = {
+        "fixed_at": args.verified_at,
+        "title": compute_finding_title(finding),
+    }
+    if args.note:
+        findings_map[args.id]["note"] = args.note
+    save_findings_state(state)
+    _move_to_resolved(p)
+    print(f"  retired {args.id} as fixed at {args.verified_at}")
+    try:
+        where = FINDINGS_RESOLVED_DIR.relative_to(REPO_ROOT)
+    except ValueError:
+        where = FINDINGS_RESOLVED_DIR
+    print(f"  moved finding to {where}/")
+    return 0
+
+
 def _resolve_finding_path(fid: str) -> Path | None:
-    candidate = FINDINGS_DIR / f"{fid}.yaml"
-    if candidate.exists():
-        return candidate
-    filed = FINDINGS_FILED_DIR / f"{fid}.yaml"
-    if filed.exists():
-        return filed
+    for base in (FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR):
+        candidate = base / f"{fid}.yaml"
+        if candidate.exists():
+            return candidate
     return None
 
 
@@ -3437,6 +3746,12 @@ def _issue_number_from_url(url: str) -> int | None:
 def _move_to_filed(p: Path) -> None:
     FINDINGS_FILED_DIR.mkdir(parents=True, exist_ok=True)
     dest = FINDINGS_FILED_DIR / p.name
+    p.rename(dest)
+
+
+def _move_to_resolved(p: Path) -> None:
+    FINDINGS_RESOLVED_DIR.mkdir(parents=True, exist_ok=True)
+    dest = FINDINGS_RESOLVED_DIR / p.name
     p.rename(dest)
 
 
@@ -3580,25 +3895,38 @@ def cmd_coverage_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
+# The design driver's `load_gap_queue` matches on this text to tell "no gaps
+# for this document" (benign) from a real failure. Named on both sides and
+# pinned by `selftest` so a reword cannot silently break that.
+_NO_GAPS_FOR_DOC = "no gap rows are anchored to {doc!r}"
+
+_GAP_TREES = {
+    "design": "docs/generated/design/",
+    "language-reference": "docs/language-reference/",
+}
+
+
 def cmd_doc_gaps(args: argparse.Namespace) -> int:
-    """Aggregate ## Doc gaps observed rows across bundles, grouped by source_doc.
+    """Aggregate ## Doc gaps observed rows across bundles, grouped by the
+    document each gap is against.
 
     The output is the feedback artifact the doc-regeneration workflow
     consumes: for each docs/generated/design/<doc>.md, the list of gaps
     that bundles testing against it have reported. Rows reported by
     multiple bundles against the same Anchor + Kind are merged into
     a single row with a `Reported by` cell.
+
+    Grouping follows each row's Anchor cell, not the reporting bundle's
+    `source_doc`. The two agree for a doc-anchored bundle, but a
+    `coverage/` bundle has no `source_doc` while still reporting gaps
+    against design pages; grouping those under the bundle put them
+    somewhere `--source-doc` could not reach, so they were invisible to
+    the only workflow that can act on them.
     """
     manifest = load_manifest()
     specs = list(manifest.bundles.values())
-    if args.source_doc:
-        specs = [s for s in specs if s.source_doc == args.source_doc]
-        if not specs:
-            raise SystemExit(
-                f"no bundle has source_doc={args.source_doc!r}"
-            )
 
-    # source_doc -> list[GapRow]
+    # anchor target doc -> list[GapRow]
     by_doc: dict[str, list[GapRow]] = {}
     for spec in specs:
         bdir = REPO_ROOT / spec.dir
@@ -3606,82 +3934,94 @@ def cmd_doc_gaps(args: argparse.Namespace) -> int:
         if not readme.exists():
             continue
         text = readme.read_text(encoding="utf-8")
-        rows = parse_gap_rows(text, spec.dir, spec.gap_group)
-        if rows:
-            by_doc.setdefault(spec.gap_group, []).extend(rows)
+        for row in parse_gap_rows(text, spec.dir, spec.gap_group):
+            # A row whose Anchor names no document still has to go
+            # somewhere or it would vanish from the report entirely; it
+            # falls back to the reporting bundle, and `lint` errors on it.
+            by_doc.setdefault(row.anchor_target or spec.gap_group, []).append(row)
+
+    if args.tree != "all":
+        prefix = _GAP_TREES[args.tree]
+        by_doc = {d: rows for d, rows in by_doc.items() if d.startswith(prefix)}
+    if args.source_doc:
+        by_doc = {d: rows for d, rows in by_doc.items() if d == args.source_doc}
+        if not by_doc:
+            raise SystemExit(_NO_GAPS_FOR_DOC.format(doc=args.source_doc))
+
+    merged_by_doc = {
+        doc: _merge_gap_rows(rows) for doc, rows in sorted(by_doc.items())
+    }
 
     if args.format == "json":
         import json
 
-        payload = {
-            doc: [
-                {
-                    "anchor": r.anchor,
-                    "anchor_fragment": r.anchor_fragment,
-                    "kind": r.kind,
-                    "gap": r.gap,
-                    "suggested_addition": r.suggested_addition,
-                    "reported_by": r.bundle,
-                }
-                for r in rows
-            ]
-            for doc, rows in sorted(by_doc.items())
-        }
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(merged_by_doc, indent=2))
         return 0
 
-    for doc in sorted(by_doc):
-        rows = by_doc[doc]
-        # Merge rows by (anchor_fragment, kind, gap-prose), tracking
-        # which bundles reported them.
-        merged: dict[tuple[str, str, str], dict] = {}
-        for r in rows:
-            key = (r.anchor_fragment, r.kind, r.gap)
-            slot = merged.setdefault(
-                key,
-                {
-                    "anchor": r.anchor,
-                    "kind": r.kind,
-                    "gap": r.gap,
-                    "suggested_addition": r.suggested_addition,
-                    "reported_by": [],
-                },
-            )
-            if r.bundle not in slot["reported_by"]:
-                slot["reported_by"].append(r.bundle)
-            # If multiple bundles offer Suggested-addition text,
-            # concatenate distinct contributions.
-            if (
-                r.suggested_addition
-                and r.suggested_addition != slot["suggested_addition"]
-                and r.suggested_addition not in slot["suggested_addition"]
-            ):
-                slot["suggested_addition"] = (
-                    slot["suggested_addition"] + " // " + r.suggested_addition
-                ).strip(" /")
-
+    for doc, merged in merged_by_doc.items():
+        reporters = sorted({b for m in merged for b in m["reported_by"]})
         print(f"# Gaps reported against {doc}")
         print()
-        print(f"Bundle reports: {', '.join(sorted({r.bundle for r in rows}))}")
+        print(f"Bundle reports: {', '.join(reporters)}")
         print()
         print(
-            "| Anchor | Kind | Gap | Suggested addition | Reported by |"
+            "| Gap id | Anchor | Kind | Gap | Suggested addition | Reported by |"
         )
-        print("| --- | --- | --- | --- | --- |")
-        # Sort by anchor fragment, then kind.
-        sorted_rows = sorted(
-            merged.values(), key=lambda m: (m["anchor"], m["kind"])
-        )
-        for m in sorted_rows:
+        print("| --- | --- | --- | --- | --- | --- |")
+        for m in merged:
             reported = ", ".join(m["reported_by"])
             print(
-                f"| {m['anchor']} | {m['kind']} | {m['gap']}"
+                f"| {m['gap_id']} | {m['anchor']} | {m['kind']} | {m['gap']}"
                 f" | {m['suggested_addition']} | {reported} |"
             )
         print()
-    if not by_doc:
+    if not merged_by_doc:
         print("# No doc-gap rows recorded across the selected bundles.")
     return 0
+
+
+def _merge_gap_rows(rows: list[GapRow]) -> list[dict]:
+    """Collapse one document's gap rows to one entry per distinct gap.
+
+    Sibling bundles routinely observe the same hole in a shared page --
+    three bundles anchored to the diagnostics doc all notice the same
+    missing subsection -- and the consumer wants one work item, not three.
+    Rows collapse on `gap_id`, so a re-wording that survives
+    `_normalize_gap_prose` merges too, which the old key (the raw prose)
+    did not. Distinct `Suggested addition` texts are kept and joined,
+    since each reporter saw the gap from its own test and the proposals
+    are usually complementary rather than redundant.
+
+    Sorted by the raw Anchor-cell text then kind. That is *not* document
+    order -- the cell is a markdown link, so this is lexicographic on the
+    link text -- but it is stable and groups rows sharing an anchor, which
+    is what a reader working through one document's gaps wants.
+    """
+    merged: dict[str, dict] = {}
+    for r in rows:
+        slot = merged.setdefault(
+            r.gap_id,
+            {
+                "gap_id": r.gap_id,
+                "anchor": r.anchor,
+                "anchor_fragment": r.anchor_fragment,
+                "kind": r.kind,
+                "gap": r.gap,
+                "suggested_addition": r.suggested_addition,
+                "reported_by": [],
+            },
+        )
+        if r.bundle not in slot["reported_by"]:
+            slot["reported_by"].append(r.bundle)
+        if (
+            r.suggested_addition
+            and r.suggested_addition != slot["suggested_addition"]
+            and r.suggested_addition not in slot["suggested_addition"]
+        ):
+            slot["suggested_addition"] = (
+                slot["suggested_addition"] + " // " + r.suggested_addition
+            ).strip(" /")
+    return sorted(merged.values(), key=lambda m: (m["anchor"], m["kind"]))
 
 
 def cmd_review_status(args: argparse.Namespace) -> int:
@@ -3845,11 +4185,22 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_dg = sub.add_parser(
         "doc-gaps",
-        help="aggregate ## Doc gaps observed rows across bundles, grouped by source_doc",
+        help="aggregate ## Doc gaps observed rows across bundles, grouped by"
+        " the document each gap is anchored to",
     )
     p_dg.add_argument(
         "--source-doc",
-        help="restrict to a single docs/generated/design/<...>.md path",
+        help="restrict to gaps anchored to a single document, by its"
+        " workspace-relative path",
+    )
+    p_dg.add_argument(
+        "--tree",
+        choices=("all", "design", "language-reference"),
+        default="all",
+        help="restrict to gaps against one doc tree. `design` is the queue"
+        " the doc-regeneration workflow can act on; `language-reference`"
+        " is the human-written spec, which no agent may edit, so those"
+        " gaps are a human triage queue (default: all)",
     )
     p_dg.add_argument(
         "--format",
@@ -3947,6 +4298,25 @@ def _build_parser() -> argparse.ArgumentParser:
         help="optional one-line note explaining the dedup decision",
     )
     p_fd.set_defaults(func=cmd_findings_dup)
+
+    p_fx = find_sub.add_parser(
+        "fixed",
+        help="retire a pending finding that no longer reproduces"
+        " (no filing; moves YAML to resolved/)",
+    )
+    p_fx.add_argument("id")
+    p_fx.add_argument(
+        "--verified-at",
+        required=True,
+        metavar="COMMIT",
+        help="compiler commit the re-test ran against; required, because"
+        " 'fixed' without one cannot be told apart from a later regression",
+    )
+    p_fx.add_argument(
+        "--note",
+        help="optional one-line note on what was re-run and what it showed",
+    )
+    p_fx.set_defaults(func=cmd_findings_fixed)
 
     return p
 
@@ -4079,6 +4449,282 @@ def cmd_selftest(args: argparse.Namespace) -> int:
             "nope.md" in errors[0].message if errors else False,
             True,
         )
+
+    # Doc-gap identity. `doc-gaps` groups by the anchored document and the
+    # consuming ledger keys on `gap_id`, so both have to hold still across
+    # the rewording a bundle regeneration produces -- the corpus, being one
+    # snapshot, cannot show that a re-worded row keeps its id.
+    check(
+        "gap prose ignores markup and punctuation",
+        _normalize_gap_prose("The `Decl` node -- see [x](y.md) -- is *not* documented."),
+        "the decl node see x is not documented",
+    )
+    check(
+        "gap id survives rewording that normalizes away",
+        compute_gap_id("d.md", "#s", "missing-example", "The `foo` case, unstated."),
+        compute_gap_id("d.md", "#s", "missing-example", "The foo case unstated"),
+    )
+    check(
+        "gap id separates distinct kinds",
+        compute_gap_id("d.md", "#s", "missing-example", "x")
+        == compute_gap_id("d.md", "#s", "ambiguous-claim", "x"),
+        False,
+    )
+    check(
+        "gap id separates distinct target docs",
+        compute_gap_id("a.md", "#s", "missing-example", "x")
+        == compute_gap_id("b.md", "#s", "missing-example", "x"),
+        False,
+    )
+
+    # Anchor-cell routing: a coverage bundle has no `source_doc`, so the
+    # link in the cell is the only thing that says which document the gap
+    # is in. A cell with no link routes nowhere, which `lint_bundle` errors
+    # on -- the empty string is that signal, not an incidental default.
+    check(
+        "gap target resolves relative to the bundle dir",
+        _resolve_gap_target(
+            "docs/generated/tests/coverage/autodiff",
+            "[#x](../../../design/ir-reference/differentiation.md#x)",
+        ),
+        "docs/generated/design/ir-reference/differentiation.md",
+    )
+    check(
+        "gap target empty for a bare fragment",
+        _resolve_gap_target("docs/generated/tests/coverage/autodiff", "[#x](#x)"),
+        "",
+    )
+    check(
+        "gap target empty for an unlinked cell",
+        _resolve_gap_target("docs/generated/tests/coverage/autodiff", "#x"),
+        "",
+    )
+
+    # Sibling bundles reporting the same gap collapse to one work item,
+    # keeping both suggestions; the corpus has such pairs but nothing
+    # asserts the merge, and a regression would silently triple the queue.
+    def _mk_gap(bundle: str, prose: str, sugg: str) -> GapRow:
+        target = "docs/generated/design/d.md"
+        return GapRow(
+            anchor="[#s](../../../design/d.md#s)",
+            anchor_fragment="#s",
+            kind="missing-surface",
+            gap=prose,
+            suggested_addition=sugg,
+            bundle=bundle,
+            source_doc="",
+            anchor_target=target,
+            gap_id=compute_gap_id(target, "#s", "missing-surface", prose),
+        )
+
+    merged = _merge_gap_rows(
+        [
+            _mk_gap("b/one", "The rule is unstated.", "Add the rule."),
+            _mk_gap("b/two", "The rule is unstated", "Add an example too."),
+            _mk_gap("b/three", "A different hole entirely.", "Add that."),
+        ]
+    )
+    check("gap merge collapses re-worded duplicates", len(merged), 2)
+    dup = [m for m in merged if len(m["reported_by"]) > 1]
+    check("gap merge records both reporters", len(dup), 1)
+    check(
+        "gap merge keeps both suggestions",
+        dup[0]["suggested_addition"] if dup else "",
+        "Add the rule. // Add an example too.",
+    )
+
+    # Finding reproducibility. A finding whose command names a scratch path
+    # cannot be re-run at triage time; the committed corpus has both shapes,
+    # but only the negative cases prove the check fires.
+    def repro_warns(ev):
+        return [i.message for i in _lint_finding_reproducibility("f", ev)]
+
+    check(
+        "scratch command without inline repro warns",
+        len(repro_warns({"command": "slangc /tmp/x.slang -target hlsl"})),
+        1,
+    )
+    check(
+        "placeholder command without inline repro warns",
+        len(repro_warns({"command": "slangc <file> -target hlsl"})),
+        1,
+    )
+    check(
+        "scratch command with inline repro is accepted",
+        repro_warns({"command": "slangc /tmp/x.slang", "repro_source": "void main(){}"}),
+        [],
+    )
+    check(
+        "operator-minimized repro also satisfies it",
+        repro_warns({"command": "slangc <file>", "minimized_repro": "void main(){}"}),
+        [],
+    )
+    check(
+        "committed input with a clean command is silent",
+        repro_warns({
+            "command": "slangc docs/generated/tests/x.slang -target hlsl",
+            "source_slang": "docs/generated/tests/_meta/regenerate.py",
+        }),
+        [],
+    )
+    check(
+        "missing source_slang with no inline repro warns",
+        len(repro_warns({"command": "slangc a.slang", "source_slang": "docs/nope.slang"})),
+        1,
+    )
+
+    # The lint rule and the issue renderer have to agree on what counts as
+    # the repro, or the rule accepts a finding that then files an issue
+    # showing a different program. `_repro_body` honoured `minimized_repro`
+    # but not `repro_source`, so a finding that satisfied the rule the
+    # intended way still rendered `source_slang` from disk.
+    # `source_slang` here points at a real committed file so the fallback
+    # path is exercised; the comparisons are truncated so that a
+    # regression -- which returns that whole file -- reports a short
+    # prefix instead of dumping it into the selftest output.
+    inline_only = {
+        "command": "slangc /tmp/x.slang -target hlsl",
+        "source_slang": "docs/generated/tests/_meta/schema/finding.schema.json",
+        "repro_source": "void main() { /* the scratch variant */ }",
+    }
+    check(
+        "issue body prefers the inlined repro over source_slang on disk",
+        _repro_body({"evidence": inline_only}).strip()[:41],
+        "void main() { /* the scratch variant */ }",
+    )
+    check(
+        "operator minimization still outranks the agent's inline repro",
+        _repro_body({"evidence": dict(inline_only, minimized_repro="void main() {}")}).strip()[:14],
+        "void main() {}",
+    )
+    check(
+        "committed source_slang is still read when nothing is inlined",
+        _repro_body({"evidence": {k: v for k, v in inline_only.items() if k != "repro_source"}})[:1],
+        "{",
+    )
+
+    # `findings fixed` retires a finding that stopped reproducing. The
+    # guards are the point: a finding that is filed, already deduped, or
+    # already retired must not be retired again, or the state entry that
+    # records where it went is silently overwritten. Exercised through
+    # the real command against a temporary state file rather than by
+    # re-implementing the checks here.
+    with tempfile.TemporaryDirectory() as td:
+        import argparse as _ap
+
+        real_state, real_dir, real_filed, real_res = (
+            FINDINGS_STATE_PATH, FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR,
+        )
+        g = globals()
+        try:
+            root = Path(td)
+            g["FINDINGS_STATE_PATH"] = root / "state.json"
+            g["FINDINGS_DIR"] = root / "findings"
+            g["FINDINGS_FILED_DIR"] = root / "findings" / "filed"
+            g["FINDINGS_RESOLVED_DIR"] = root / "findings" / "resolved"
+            g["FINDINGS_DIR"].mkdir(parents=True)
+            (g["FINDINGS_DIR"] / "x.yaml").write_text(
+                'id: x\ntitle: a finding\nobserved_at: "2026-01-01T00:00:00+00:00"\n',
+                encoding="utf-8",
+            )
+
+            def run(fid, commit="abc123"):
+                return cmd_findings_fixed(
+                    _ap.Namespace(id=fid, verified_at=commit, note=None)
+                )
+
+            check("fixed: unknown id rejected", run("nope"), 1)
+            check("fixed: retires a pending finding", run("x"), 0)
+            check(
+                "fixed: YAML moved to resolved/, not deleted",
+                (g["FINDINGS_RESOLVED_DIR"] / "x.yaml").exists(),
+                True,
+            )
+            entry = json.loads(g["FINDINGS_STATE_PATH"].read_text())["findings"]["x"]
+            check("fixed: records the verifying commit", entry.get("fixed_at"), "abc123")
+            check("fixed: retiring twice is refused", run("x"), 1)
+
+            # A filed finding must not be retirable -- the issue is the
+            # record, and closing it is a different action.
+            st = json.loads(g["FINDINGS_STATE_PATH"].read_text())
+            st["findings"]["y"] = {"issue": 999}
+            g["FINDINGS_STATE_PATH"].write_text(json.dumps(st), encoding="utf-8")
+            (g["FINDINGS_DIR"] / "y.yaml").write_text("id: y\n", encoding="utf-8")
+            check("fixed: refuses a finding that is already filed", run("y"), 1)
+            check(
+                "fixed: refused finding stays put",
+                (g["FINDINGS_DIR"] / "y.yaml").exists(),
+                True,
+            )
+        finally:
+            g["FINDINGS_STATE_PATH"] = real_state
+            g["FINDINGS_DIR"] = real_dir
+            g["FINDINGS_FILED_DIR"] = real_filed
+            g["FINDINGS_RESOLVED_DIR"] = real_res
+
+    # An unquoted ISO timestamp is a YAML date, not a string, and the two
+    # spellings are indistinguishable in the file. `findings list` used to
+    # abort partway through the queue on the unquoted ones; `load_finding`
+    # now normalizes, so consumers see one type regardless of spelling.
+    with tempfile.TemporaryDirectory() as td:
+        both = Path(td) / "f.yaml"
+        for spelling in ("2026-08-04T00:00:00+00:00", '"2026-08-04T00:00:00+00:00"'):
+            both.write_text(f"id: x\nobserved_at: {spelling}\n", encoding="utf-8")
+            loaded = load_finding(both)["observed_at"]
+            # Compare the type before slicing: a regression here returns a
+            # datetime, and slicing that raises rather than reporting,
+            # which would abort the rest of the selftest.
+            check(
+                f"observed_at loads as str for spelling {spelling}",
+                type(loaded).__name__,
+                "str",
+            )
+            check(
+                f"observed_at keeps its date for spelling {spelling}",
+                str(loaded)[:10],
+                "2026-08-04",
+            )
+
+    # `--tree` routing: two production callers depend on this prefix split
+    # (the workflow passes `language-reference`, the design driver always
+    # passes `design`), and a mis-partition would silently send a page's
+    # gaps to the wrong queue.
+    check(
+        "tree prefixes are the two doc trees",
+        sorted(_GAP_TREES),
+        ["design", "language-reference"],
+    )
+    check(
+        "design tree prefix",
+        _GAP_TREES["design"],
+        "docs/generated/design/",
+    )
+    check(
+        "language-reference tree prefix",
+        _GAP_TREES["language-reference"],
+        "docs/language-reference/",
+    )
+    _rows = {
+        "docs/generated/design/a.md": [1],
+        "docs/language-reference/b.md": [1],
+        "coverage/orphan (no source doc)": [1],
+    }
+    for tree, want in (("design", 1), ("language-reference", 1)):
+        pref = _GAP_TREES[tree]
+        check(
+            f"--tree {tree} partitions by prefix",
+            len({d: r for d, r in _rows.items() if d.startswith(pref)}),
+            want,
+        )
+
+    # The design driver recognizes "this document has no gaps" by matching
+    # this exact substring on our stderr. Pin it here so a reword fails
+    # loudly rather than making every gap-status run raise.
+    check(
+        "cross-driver no-gaps message is stable",
+        "no gap rows are anchored to" in _NO_GAPS_FOR_DOC,
+        True,
+    )
 
     # The catalog snapshot parser and the digest rule it feeds. The committed
     # corpus only shows entries that already agree, so the drift and

@@ -7,6 +7,23 @@ observed_at: "2026-08-05T00:00:00+00:00"
 scope: spirv
 evidence:
   command: "build/RelWithDebInfo/bin/slangc /tmp/emitcov/opt4.slang -target spirv-asm -entry computeMain -stage compute"
+  repro_source: |
+    RWStructuredBuffer<int> outputBuffer;
+    struct Node { int value; }
+    Optional<Node*> pick(Node* p, bool cond)
+    {
+        if (cond)
+            return p;
+        return none;
+    }
+    [numthreads(1,1,1)]
+    void computeMain(uint3 tid : SV_DispatchThreadID)
+    {
+        Node n;
+        n.value = int(tid.x);
+        Optional<Node*> maybe = pick(&n, tid.x > 0);
+        outputBuffer[0] = maybe.hasValue ? 1 : -1;
+    }
   source_slang: tests/language-feature/nested-optional.slang
   observed_summary: |
     A helper that returns `Optional<Node*>` and can return `none` makes `slangc` spin
