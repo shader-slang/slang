@@ -1642,6 +1642,12 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Must run before the getStringHash check below. `performTypeInlining` inlines a call into its
+    // caller but leaves the original callee behind, and that leftover body still holds a
+    // getStringHash on its own unfolded parameter. Checking first would reject legal code on the
+    // strength of a function that is about to be deleted here.
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
@@ -1649,8 +1655,6 @@ Result linkAndOptimizeIR(
         // is not a string literal
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
-
-    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
 
     SLANG_PASS(lowerTuples, sink);
     if (sink->getErrorCount() != 0)

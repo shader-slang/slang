@@ -5,31 +5,43 @@ intake_at: 2026-08-12T06:47:15Z
 target_doc: ir-reference/misc.md
 target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
 target_doc_source_commit_after: 67149d1e03ebf1d4645ddd224ff4647a8ea5db53
-gap_count: 7
+gap_count: 6
 actions:
   fixed: 4
   rejected_bogus: 0
   rejected_out_of_scope: 0
   deferred: 0
-  escalated_to_finding: 3
+  escalated_to_finding: 2
 ---
 
 # Gap-intake report for ir-reference/misc.md
 
 ## Summary
 
-This is a re-run of the intake for this page; the three escalations
-below are unchanged and are carried forward verbatim, each already
-covered by an existing finding: the `getStringHash` non-literal
-SIGSEGV, the `countof`-on-array fold, and `asDynamicUniform` reaching
-emit. The one change is gap `352bf73e9bfd`, which the previous cycle
-deferred on the false premise that no `slangc` was available: a native
-arm64 `slangc` built from HEAD settled it, so the verdict moves from
-`deferred` to `fixed`. The final breakdown is four `fixed`, three
+This is a re-run of the intake for this page; the escalations below are
+unchanged and are carried forward verbatim, each already covered by an
+existing finding: the `countof`-on-array fold and `asDynamicUniform`
+reaching emit. The one change is gap `352bf73e9bfd`, which the previous
+cycle deferred on the false premise that no `slangc` was available: a
+native arm64 `slangc` built from HEAD settled it, so the verdict moves
+from `deferred` to `fixed`. The final breakdown is four `fixed`, two
 `escalated-to-finding`, and no `rejected-bogus`,
 `rejected-out-of-scope`, or `deferred`. The other three `fixed`
 verdicts (`287d78f2e773`, `35bd0499af6c`, `03a328b5c0e3`) and their
 edits stand from the previous cycle and were not revisited.
+
+This intake originally carried a third escalation, `a6197cfe99b6` — the
+`getStringHash` non-literal SIGSEGV, escalated to the finding
+`getstringhash-nonliteral-argument-sigsegv`. That escalation has been
+discharged: shader-slang/slang#12440 is fixed, the bundle row was
+rewritten to drop the crash and ask only that the document name the
+user-visible error code, and rewriting the row gave it a new id. The
+old id is retired (it is in the ledger but no longer in the queue,
+which `gap-status` counts separately), and its row is dropped from the
+Actions table below because a report may only name gaps the suite still
+reports — re-applying a row for a gap that no longer exists would write
+a decision about nothing. The successor gap `a9496fc2bc93` is open and
+awaits the next intake pass for this page.
 
 The `allocateOpaqueHandle` question turned out not to need an example
 at all: the inst is emitted by AST lowering for every `RayQuery` /
@@ -41,19 +53,6 @@ the example the gap asked for.
 
 ## Escalated gaps
 
-- **`a6197cfe99b6`** — `getStringHash` on a non-literal `String`.
-  The document's claim is verbatim in the source:
-  `checkGetStringHashInsts`
-  (`source/slang/slang-ir-string-hash.cpp:105-118`) tests
-  `inst->getStringLit() == nullptr` and raises
-  `Diagnostics::GetStringHashMustBeOnStringLiteral`. The guard cannot
-  fire, because the Lua entry types the operand `IRStringLit`
-  (`source/slang/slang-ir-insts.lua:1627-1629`) so the generated
-  `getStringLit()` is an unchecked `cast<IRStringLit>` of operand 0,
-  which returns a non-null mis-typed pointer for a non-literal operand;
-  the process then dies before any diagnostic is printed. Existing
-  finding:
-  `docs/generated/tests/_meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml`.
 - **`4eca2b39600e`** — `countof` of a fixed-size array. The checker
   deliberately admits array operands
   (`_isTypeOrValValidForCountOf`,
@@ -92,7 +91,6 @@ the example the gap asked for.
 | Gap ID | Action | Evidence | Fix summary |
 | --- | --- | --- | --- |
 | 287d78f2e773 | fixed | The observation is right and the row was not: `source/slang/slang-lower-to-ir.cpp:6560-6569` (`visitEachExpr`) emits `getTupleElement(pack, index)` against the `int` parameter `visitExpandExpr` adds to the `Expand` region's block (`6571-6600`), so a value-level `each` never reaches `Each`. The three `emitEachInst` callers are all `Val`-level: `visitEachIntVal` (`2198-2204`), `visitEachType` (`2206-2211`), `visitEachSubtypeWitness` (`2316-2325`) — matching the row's existing AST-origin cell. | narrowed the `Each` row's summary and added a paragraph to the `Expand` / `Each` callout naming the three `Val`-level producers and the `getTupleElement` form a dump of an expansion body actually shows |
-| a6197cfe99b6 | escalated-to-finding | `source/slang/slang-ir-string-hash.cpp:105-118` contains exactly the diagnostic the document describes, so the document is backed by the source; the unchecked `cast` behind `getStringLit()` (operand typed `IRStringLit` at `source/slang/slang-ir-insts.lua:1627-1629`) means the null test never fires and the compiler dies first. Compiler defect, not a documentation defect. Existing finding: `docs/generated/tests/_meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml`. | — |
 | 4eca2b39600e | escalated-to-finding | `source/slang/slang-check-expr.cpp:6329-6357` admits array operands on purpose, so the row's "element count of a fixed-size array" is what the source intends; `source/slang/slang-lower-to-ir.cpp:6007` and `6053` return `size.alignment` for a `CountOfExpr` that folds, which is the observed element-type-sized answer. Existing finding: `docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml`. The row's `vector` operand is separately inaccurate (`_isTypeOrValValidForCountOf` never admits a vector); left unedited under the escalation rule and noted below. | — |
 | 35bd0499af6c | fixed | `source/slang/slang-check-expr.cpp:6652` fills an omitted layout with `getScalarLayoutType()`, and `source/slang/slang-lower-to-ir.cpp:6007-6013` treats a null layout and `ScalarDataLayoutType` identically, which is why the one-argument form still folds. The accepted spellings are the six `IBufferDataLayout` implementations in `source/slang/hlsl.meta.slang:28-71`, each `__intrinsic_type`d to a layout opcode in `source/slang/slang-ir-insts.lua:472-477`. Dumped tokens pinned by the bundle's `sizeof-alignof-generic.slang` (`ScalarLayout`) and `sizeof-explicit-data-layout.slang` (`Std140Layout` / `Std430Layout`). | added a paragraph under Size, alignment, count naming `ScalarDataLayout` as the default operand and listing the six layout spellings with their dumped opcode names |
 | 6527e8b0b50a | escalated-to-finding | The marker's only remover is `eliminateAsDynamicUniformInst` (`source/slang/slang-ir-uniformity.cpp:472-494`), reached only from `validateUniformity`, gated on `CompilerOptionName::ValidateUniformity` at `source/slang/slang-emit.cpp:1358-1360`; `source/slang/core.meta.slang:4034-4035` shows `asDynamicUniform<T>` carries no capability or visibility gate, so a legal call reaches emit and aborts. Documenting that as the opcode's lifetime would bless the abort. Existing finding: `docs/generated/tests/_meta/findings/as-dynamic-uniform-reaches-emit-ice.yaml`. | — |
