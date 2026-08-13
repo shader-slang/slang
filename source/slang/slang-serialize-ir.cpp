@@ -551,7 +551,7 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
 /// environment lookup is not safe against a concurrent write. Uses
 /// `PlatformUtil::getEnvironmentVariable` rather than `getenv`, which MSVC
 /// deprecates and this build treats as an error.
-static bool isOnDemandIRLoadEnabled()
+bool isOnDemandIRLoadEnabled()
 {
     static const bool enabled = []
     {

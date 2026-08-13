@@ -1,6 +1,7 @@
 #include "core/slang-platform.h"
 #include "slang-com-ptr.h"
 #include "slang/slang-compiler-api.h"
+#include "slang/slang-serialize-ir.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <atomic>
@@ -8,24 +9,6 @@
 
 using namespace Slang;
 
-namespace
-{
-
-/// True unless `SLANG_ONDEMAND_IR` is explicitly "0". Mirrors `isOnDemandIRLoadEnabled()`
-/// in slang-serialize-ir.cpp, which is file-local there.
-bool _onDemandLoadingExpected()
-{
-    StringBuilder value;
-    if (SLANG_FAILED(
-            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ONDEMAND_IR"), value)))
-    {
-        return true;
-    }
-    const String text = value.produceString();
-    return text.getLength() == 0 || text[0] != '0';
-}
-
-} // namespace
 
 // Checks that a decoration's own children survive on-demand loading.
 //
@@ -64,7 +47,7 @@ SLANG_UNIT_TEST(irDeferredBodyKeepsDecorationChildren)
     SLANG_CHECK_ABORT(expectedChildren == 2);
 
     // Likewise: an eager load keeps everything, so it says nothing about the rule.
-    if (_onDemandLoadingExpected())
+    if (isOnDemandIRLoadEnabled())
         SLANG_CHECK(bodyWasDeferred);
 
     // The assertion the rule is about. Under the bug this replaces, the decoration comes
@@ -104,7 +87,7 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
     _testConcurrentBodyMaterialization(globalSession, deferredCount, mismatches);
 
     // An eager load races nothing, so it would make the assertion below meaningless.
-    if (_onDemandLoadingExpected())
+    if (isOnDemandIRLoadEnabled())
         SLANG_CHECK(deferredCount > 0);
 
     // Every thread must have seen a complete body every time. A body published before its
@@ -130,7 +113,7 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
 // flag before any had finished.
 SLANG_UNIT_TEST(irDeferredBodyMaterializesOnTheSupportedConcurrentPath)
 {
-    if (!_onDemandLoadingExpected())
+    if (!isOnDemandIRLoadEnabled())
         return; // Nothing is deferred, so there is nothing to observe.
 
     ComPtr<slang::IGlobalSession> globalSession;

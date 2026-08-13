@@ -38,6 +38,14 @@ void writeSerializedModuleIR(
     ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule);
 
+/// True if instruction bodies are left encoded until something reads them.
+///
+/// On by default; `SLANG_ONDEMAND_IR=0` forces the eager load. Exported so that tests
+/// can ask the same question the loader asks instead of reimplementing the rule — three
+/// copies of "on unless explicitly 0" had already appeared, and a test whose copy drifts
+/// from this one stops testing the mode it believes it is testing.
+SLANG_API bool isOnDemandIRLoadEnabled();
+
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     String& compilerVersion,

@@ -26,6 +26,7 @@ struct RunResult
 SlangResult _compileWith(
     UnitTestContext* unitTestContext,
     const String& sourcePath,
+    const String& irSinkPath,
     bool onDemand,
     bool dumpIR,
     RunResult& out)
@@ -57,9 +58,15 @@ SlangResult _compileWith(
     {
         // Dumps the linked IR, builtin modules included -- which is where deferral
         // acts, and where a divergence shows up even when it never reaches codegen.
+        //
+        // `-o` goes to a real file rather than a null device. `/dev/null` was hardcoded
+        // here, which is not a path on Windows: `-o` would fail, both runs would fail
+        // identically, and the comparison below would pass having compared two error
+        // messages. A temp file sidesteps the platform question entirely -- the file is
+        // never read, only the IR dump on stdout is.
         cmdLine.addArg("-dump-ir");
         cmdLine.addArg("-o");
-        cmdLine.addArg("/dev/null");
+        cmdLine.addArg(irSinkPath);
     }
 
     ExecuteResult exeRes;
@@ -117,15 +124,23 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(sourcePath, source)));
     }
 
+    const String irSinkPath = Path::combine(
+        Path::getParentDirectory(unitTestContext->executableDirectory),
+        "ir-load-equivalence-dump-sink.hlsl");
+
     RunResult onDemand;
     RunResult eager;
     RunResult onDemandIR;
     RunResult eagerIR;
     const bool ranBoth =
-        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, true, false, onDemand)) &&
-        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, false, false, eager)) &&
-        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, true, true, onDemandIR)) &&
-        SLANG_SUCCEEDED(_compileWith(unitTestContext, sourcePath, false, true, eagerIR));
+        SLANG_SUCCEEDED(
+            _compileWith(unitTestContext, sourcePath, irSinkPath, true, false, onDemand)) &&
+        SLANG_SUCCEEDED(
+            _compileWith(unitTestContext, sourcePath, irSinkPath, false, false, eager)) &&
+        SLANG_SUCCEEDED(
+            _compileWith(unitTestContext, sourcePath, irSinkPath, true, true, onDemandIR)) &&
+        SLANG_SUCCEEDED(
+            _compileWith(unitTestContext, sourcePath, irSinkPath, false, true, eagerIR));
 
     // Restore before asserting, so a failure does not also corrupt later tests.
     if (hadPrevious)
@@ -141,6 +156,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
         PlatformUtil::setEnvironmentVariable(UnownedStringSlice("SLANG_ONDEMAND_IR"), nullptr);
     }
     File::remove(sourcePath);
+    File::remove(irSinkPath);
 
     SLANG_CHECK_ABORT(ranBoth);
 
@@ -156,10 +172,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // dump includes the linked builtin modules, which is where deferral acts.
     //
     // Measured limit, so nobody over-trusts this: reintroducing the decoration-subtree
-    // bug this change fixed does *not* fail this test. Either no decoration in the
-    // builtin modules currently has children -- which was never established when that
-    // fix was made -- or this shader does not reach one. Breadth is what would find
-    // that; see extras/check-load-mode-equivalence.py.
+    // bug this change fixed does *not* fail this test -- no decoration in the builtin
+    // modules has children, so there is nothing here to lose. That case is covered
+    // directly by `irDeferredBodyKeepsDecorationChildren`, which builds the shape rather
+    // than hoping to find it; breadth comes from extras/check-load-mode-equivalence.py.
+    //
+    // Compares stderr, because that is where `-dump-ir` writes. This arm previously
+    // compared stdout, which `-dump-ir` leaves *empty* -- so it was asserting that two
+    // empty strings match, and had never compared any IR at all. Nothing about the run
+    // looked wrong; the check simply had no content.
+    //
+    // Hence the length and exit-status assertions alongside it. They are what stops the
+    // arm from silently emptying out again, whether by the dump moving stream, an `-o`
+    // path that fails on some platform, or any other change that makes both runs produce
+    // nothing identical.
+    SLANG_CHECK(onDemandIR.exitCode == 0);
     SLANG_CHECK(onDemandIR.exitCode == eagerIR.exitCode);
-    SLANG_CHECK(onDemandIR.out == eagerIR.out);
+    SLANG_CHECK(onDemandIR.err.getLength() > 0);
+    SLANG_CHECK(onDemandIR.err == eagerIR.err);
 }

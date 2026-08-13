@@ -4,6 +4,7 @@
 // getLiveIRModuleCount.
 #include "core/slang-platform.h"
 #include "slang/slang-compiler-api.h"
+#include "slang/slang-serialize-ir.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -29,16 +30,9 @@ SLANG_UNIT_TEST(irModuleReleasedWithSession)
     const Index before = getLiveIRModuleCount();
     const Index deferredLoadersBefore = getDeferredBodyLoaderInstallCount();
 
-    // Deferred loading is on unless SLANG_ONDEMAND_IR is explicitly "0".
-    StringBuilder onDemandEnv;
-    bool onDemandExpected = true;
-    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-            UnownedStringSlice("SLANG_ONDEMAND_IR"),
-            onDemandEnv)))
-    {
-        const String text = onDemandEnv.produceString();
-        onDemandExpected = text.getLength() == 0 || text[0] != '0';
-    }
+    // Asks the loader's own predicate rather than reimplementing it, so this cannot
+    // drift into testing the wrong mode.
+    const bool onDemandExpected = isOnDemandIRLoadEnabled();
 
     {
         ComPtr<slang::IGlobalSession> globalSession;
