@@ -17,7 +17,19 @@
 // This is a STRUCTURAL FileCheck over `spirv-asm` text; it does not invoke
 // spirv-val, so it pins the aggregated shape, not SPIR-V validity. Validity is
 // exercised separately (SLANG_RUN_SPIRV_VALIDATION / the -target spirv path).
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage
+//
+// The run pins `-trace-coverage-counter-width 32` so the counter element type
+// is `uint`. That keeps the addend assertion below exact: at the default 64-bit
+// width the lane count (always 32-bit, from `WaveActiveCountBits`) is widened
+// with an `OpUConvert` before the atomic, so the ballot-count result id is no
+// longer the atomic's value operand directly and `OpAtomicIAdd` is typed
+// `%ulong`. Counter width is orthogonal to the aggregation structure this file
+// exists to pin, so it is fixed here rather than woven into the checks.
+//
+// NOTE: the 64-bit-width x wave-aggregation combination is therefore NOT
+// covered here, and wants its own run once the widened shape has been confirmed
+// against real emitted output.
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -trace-coverage -trace-coverage-counter-width 32
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0], stride=4)
 RWStructuredBuffer<uint> outputBuffer;
