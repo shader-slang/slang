@@ -1124,7 +1124,47 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     // table spans point into them, and a body is decoded long after this returns. A
     // caller that reads out of its own buffer supplies no blob, and gets an eager load.
     decoder->blobHoldingSerializedData = readContext.getBlobHoldingSerializedData();
-    const bool onDemandIRLoad = isOnDemandIRLoadEnabled() && decoder->blobHoldingSerializedData;
+    bool onDemandIRLoad = isOnDemandIRLoadEnabled() && decoder->blobHoldingSerializedData;
+
+    // The blob must be the storage the data was actually parsed out of, not merely a blob
+    // the caller happened to have. If it is not, the spans below point somewhere the blob
+    // does not keep alive, and a deferred body is decoded out of freed memory -- silently,
+    // and long after the call that would be blamed for it.
+    //
+    // This is not hypothetical: `addLibraryReference` passed a *copy* of the caller's bytes
+    // as the blob while parsing from the caller's own pointer, which was harmless while
+    // everything was materialized eagerly and a use-after-free once it was not. Checked
+    // rather than trusted, because the cost is one range comparison per module load and the
+    // failure it prevents is unattributable.
+    if (onDemandIRLoad)
+    {
+        const Byte* const blobBegin =
+            (const Byte*)decoder->blobHoldingSerializedData->getBufferPointer();
+        const Byte* const blobEnd = blobBegin + decoder->blobHoldingSerializedData->getBufferSize();
+
+        // Checks the spans themselves rather than the chunk, because these are the exact
+        // pointers a deferred body dereferences later. An owned array is not a view and
+        // depends on nothing, so it is skipped.
+        auto spanIsInsideBlob = [&](const Byte* data, Count sizeInBytes)
+        { return data >= blobBegin && data + sizeInBytes <= blobEnd; };
+        const bool spansAreOwnedByTheBlob =
+            (!flat.operandIndices.isView() ||
+             spanIsInsideBlob(
+                 (const Byte*)flat.operandIndices.getBuffer(),
+                 flat.operandIndices.getCount() * Count(sizeof(Int64)))) &&
+            (!flat.stringChars.isView() || spanIsInsideBlob(
+                                               (const Byte*)flat.stringChars.getBuffer(),
+                                               flat.stringChars.getCount()));
+
+        if (!spansAreOwnedByTheBlob)
+        {
+            // Fall back to an eager load rather than asserting. A caller that supplies an
+            // unrelated blob then gets correct behaviour at the old cost, which is a better
+            // failure mode than aborting a compile -- and eager loading is exactly what this
+            // path did before deferral existed.
+            onDemandIRLoad = false;
+        }
+    }
     /// Per-instruction predicate: is instruction `i` part of the eager *skeleton*?
     ///
     /// The skeleton is the set of instructions materialized at load time -- the module
