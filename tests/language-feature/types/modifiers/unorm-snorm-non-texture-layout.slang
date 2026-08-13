@@ -10,16 +10,20 @@
 
 // `Norms` and `Plain` differ only in the modifiers, so laying a modified type
 // out as its base means the two must produce identical layouts.
+// `no_diff` is the third type modifier and takes the same path, so it belongs
+// in the same comparison rather than being assumed to work.
 struct Norms
 {
     unorm float u;
     snorm float s;
+    no_diff float d;
 }
 
 struct Plain
 {
     float u;
     float s;
+    float d;
 }
 
 // A vector carrier too: under std140 a float4 has 16-byte alignment, so this
@@ -48,10 +52,13 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void main()
 {
-    outputBuffer[0] = n.u + n.s + p.u + p.s + nv.v.x + pv.v.x + unormBuf[0] + snormBuf[0];
+    outputBuffer[0] = n.u + n.s + n.d + p.u + p.s + p.d + nv.v.x + pv.v.x + unormBuf[0] +
+                      snormBuf[0];
 }
 
-// HLSL keeps the modifier in the emitted spelling, for DXC compatibility.
+// The HLSL half only checks that the modifier survives into the emitted
+// spelling, for DXC compatibility. The layout-equality claim is checked on the
+// SPIR-V side below, which is where layout is observable.
 
 // HLSL-DAG: RWStructuredBuffer<unorm float
 // HLSL-DAG: RWStructuredBuffer<snorm float
@@ -77,10 +84,15 @@ void main()
 
 // SPIRV-DAG: OpDecorate %_runtimearr_float ArrayStride 4
 
-// SPIRV-DAG: %Norms_std140 = OpTypeStruct %float %float
-// SPIRV-DAG: %Plain_std140 = OpTypeStruct %float %float
+// The unorm / snorm / no_diff triple lays out as three bare floats, at the same
+// offsets its unmodified twin gets.
+
+// SPIRV-DAG: %Norms_std140 = OpTypeStruct %float %float %float{{$}}
+// SPIRV-DAG: %Plain_std140 = OpTypeStruct %float %float %float{{$}}
 // SPIRV-DAG: OpMemberDecorate %Norms_std140 0 Offset 0
 // SPIRV-DAG: OpMemberDecorate %Norms_std140 1 Offset 4
+// SPIRV-DAG: OpMemberDecorate %Norms_std140 2 Offset 8
 // SPIRV-DAG: OpMemberDecorate %Plain_std140 0 Offset 0
 // SPIRV-DAG: OpMemberDecorate %Plain_std140 1 Offset 4
+// SPIRV-DAG: OpMemberDecorate %Plain_std140 2 Offset 8
 // SPIRV-DAG: %RWStructuredBuffer = OpTypeStruct %_runtimearr_float

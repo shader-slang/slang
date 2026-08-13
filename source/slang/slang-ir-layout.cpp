@@ -490,15 +490,24 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             // wave-uniform. None of them change size or alignment, so we measure
             // the base type. Name the set rather than trusting it, so a future
             // attribute that *does* affect layout has to come here first.
-            switch (attributedType->getAttr()->getOp())
+            //
+            // A single `IRAttributedType` carries a list, not one attribute:
+            // `visitModifiedType` lowers every modifier on the AST type into one
+            // `getAttributedType(base, attrs)` call, so `unorm no_diff float` is
+            // one type with two attrs. Check all of them.
+            //
+            for (auto attr : attributedType->getAllAttrs())
             {
-            case kIROp_NoDiffAttr:
-            case kIROp_UNormAttr:
-            case kIROp_SNormAttr:
-            case kIROp_NonUniformAttr:
-                break;
-            default:
-                SLANG_UNEXPECTED("unhandled attribute on IRAttributedType in layout");
+                switch (attr->getOp())
+                {
+                case kIROp_NoDiffAttr:
+                case kIROp_UNormAttr:
+                case kIROp_SNormAttr:
+                case kIROp_NonUniformAttr:
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unhandled attribute on IRAttributedType in layout");
+                }
             }
             return getSizeAndAlignment(
                 targetReq,
