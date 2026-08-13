@@ -3499,6 +3499,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case IRInterpolationMode::Linear:
             return true;
         case IRInterpolationMode::Sample:
+            requireSPIRVCapability(SpvCapabilitySampleRateShading);
             emitOpDecorate(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,

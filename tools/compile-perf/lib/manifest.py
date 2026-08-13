@@ -40,6 +40,19 @@ class WorkloadSpec:
     # bench.py --sweep). default_size must be a member so a swept run also
     # yields the canonical point used for cross-release comparison.
     sweep_sizes: list = field(default_factory=list)
+    # Promote this workload's memory measurements (peak RSS, api-driver RSS
+    # deltas) into the tracked counter series, trend alerts, and memory
+    # pages. Raw rss_kb is RECORDED for every workload regardless (free, and
+    # preserved in results.json for deep dives); tracking is curated because
+    # most workloads' peaks are floor-bound and just re-draw the session
+    # floor. The tracked set is the realistic end-to-end workloads (mdl_dxr
+    # and the rt renderers, whose api-driver runs also carry the
+    # createGlobalSession RSS delta) plus one floor per execution mode:
+    # minimal for slangc (the shader-slang/slang#9817 headline) and
+    # api_session_create for the api-driver. Both floors are required —
+    # report.py subtracts a workload's own-mode floor from its peak, and a
+    # peak is only comparable against a baseline from the same binary.
+    track_memory: bool = False
     # emit reflection JSON (bench.py supplies a writable per-run path). Exercises
     # the reflection serializer in addition to the layout engine.
     reflection_json: bool = False
@@ -92,6 +105,7 @@ WORKLOADS = [
     # ---- real-shader corpus ----------------------------------------------
     WorkloadSpec(
         name="mdl_dxr",
+        track_memory=True,
         bucket="real_world",
         gen=workloads.gen_mdl_dxr,
         default_size=0,  # fixed corpus; size ignored
@@ -128,6 +142,7 @@ WORKLOADS = [
     # program pays the whole library's import cost. n = material count.
     WorkloadSpec(
         name="rt_renderer",
+        track_memory=True,
         bucket="rt_renderer",
         gen=workloads.gen_rt_renderer,
         default_size=24,
@@ -140,6 +155,7 @@ WORKLOADS = [
     # link-time specialization against interface-heavy cross-module code.
     WorkloadSpec(
         name="rt_renderer_specialize",
+        track_memory=True,
         bucket="rt_renderer",
         gen=workloads.gen_rt_renderer,
         default_size=24,
@@ -149,8 +165,17 @@ WORKLOADS = [
         api_flags=["--impl-prefix", "Material_"],
         primary_timers=["apiTotal", "apiGetCode", "apiSpecialize"],
     ),
+    # The api-mode floor, and the reason it is track_memory: peak RSS is only
+    # comparable within one executable, and api-mode workloads run the separate
+    # api-driver binary rather than slangc. Each iteration creates and destroys
+    # a global session and a session and does nothing else, so its peak is the
+    # driver's startup plus one session — the api-side counterpart of what
+    # `minimal` measures for slangc. report.py subtracts it from the api-mode
+    # workloads' peaks; without it their own-memory curves would carry the
+    # difference between two binaries' baselines.
     WorkloadSpec(
         name="api_session_create",
+        track_memory=True,
         bucket="api_overhead",
         gen=workloads.gen_api_none,
         default_size=10,  # createGlobalSession+createSession iterations
@@ -220,6 +245,7 @@ WORKLOADS = [
     # ---- per-compile floor (core-module load + link) ---------------------
     WorkloadSpec(
         name="minimal",
+        track_memory=True,
         bucket="core_link",
         gen=workloads.gen_minimal,
         default_size=0,  # fixed; near-empty shader

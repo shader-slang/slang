@@ -64,10 +64,38 @@ consumes one and records `ScrubbingNeeded`).
 | TokenKind | Lexer source range | Notes |
 | --- | --- | --- |
 | `Identifier` | identifier rule in `slang-lexer.cpp` | Includes every keyword; classification deferred to the parser via syntax-decl lookup |
-| `IntegerLiteral` | integer-literal rule in `slang-lexer.cpp` | Suffixes (`u`, `l`, `ul`, ...) are part of the token's raw text |
-| `FloatingPointLiteral` | float-literal rule in `slang-lexer.cpp` | Suffixes (`f`, `lf`, ...) are part of the token's raw text |
+| `IntegerLiteral` | integer-literal rule in `slang-lexer.cpp` | Decimal, `0x`/`0X` hex, `0b`/`0B` binary, or a leading-zero octal run. Any trailing suffix is part of the token's raw text; see below |
+| `FloatingPointLiteral` | float-literal rule in `slang-lexer.cpp` | Accepted shapes: `1.5`, `1.` (trailing dot), `.5` (leading dot), `1e10` / `0e-3` (decimal exponent), `0x1.8p3` (hex significand with a binary `p` exponent), and the legacy `1#INF` / `0#INF` infinity form. A dot followed by `x` or `r` does *not* start a fraction — that spelling is reserved for swizzling a scalar literal, so `1.xxx` lexes as `IntegerLiteral`, `Dot`, `Identifier`. Any trailing suffix is part of the token's raw text; see below |
 | `StringLiteral` | `_lexStringLiteralBody(lexer, '"')` (line 2172) / `_lexRawStringLiteralBody` (line 2166) in `slang-lexer.cpp` | Raw token text includes the opening / closing quotes; escape sequences are decoded and validated later by `getStringLiteralTokenValue` |
 | `CharLiteral` | `_lexStringLiteralBody(lexer, '\'')` in `slang-lexer.cpp` (line 2177) | Single-quoted character literal. The lexer only finds the closing quote; the one-character rule is enforced at decode time by `getCharLiteralValue` (lines 1660-1725) |
+
+Neither numeric rule validates its suffix, so there is no fixed suffix
+set at lex time: `_maybeLexNumberSuffix`
+([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
+lines 561-583) folds *any* run of ASCII letters, digits, and
+underscores after the numeric body into the token's raw text, and
+leaves the meaning to the consumer. The accepted sets and the
+diagnostics for a rejected one therefore belong to the decode helpers,
+not to the lexer proper:
+
+- `getIntegerLiteralValue` (lines 789-838) reads the base prefix and
+  digit run and hands the unconsumed tail back to its caller as the
+  suffix. It diagnoses only overflow, as
+  `LexerDiagnostics::integerLiteralTooLargeForAnyType` (E10012), when
+  the digits do not fit in 64 bits. Its caller
+  `parseIntegerLiteralExpr` in
+  [slang-parser.cpp](../../../../source/slang/slang-parser.cpp)
+  (lines 8608-8688) is what accepts `u`/`U`, `l`/`L`, `ll`/`LL`, and
+  `z`/`Z` in any order — the two letters of `ll` must match in case —
+  and reports `Diagnostics::InvalidIntegerLiteralSuffix` (*invalid
+  suffix '...' on integer literal*) for anything else.
+- `getFloatingPointLiteralValue` (lines 1137-1391) accepts an empty
+  suffix or `f`/`F` for `float`, `h`/`H`/`hf`/`HF`/`fh`/`FH` for
+  `half`, and `l`/`L`/`lf`/`LF`/`fl`/`FL` for `double`, and reports
+  anything else as `FloatingPointLiteralType::BadSuffix` (lines
+  1273-1287). A one-letter suffix is case-insensitive; a two-letter
+  one must have both letters in the same case, so `hf` and `HF` are
+  accepted while `Hf` is not.
 
 ### Trivia (whitespace and comments)
 
@@ -113,13 +141,27 @@ Listed by spelling; the lexer routes each through the per-character
 | `QuestionMark` | `?` punctuation | Conditional / optional |
 | `RightArrow` | `->` punctuation | Function return type, member access through pointer |
 | `DoubleRightArrow` | `=>` punctuation | Lambda syntax (its only parser consumer) |
-| `At` | `@` punctuation | |
-| `Dollar` | `$` punctuation | |
-| `DollarDollar` | `$$` punctuation | |
+| `At` | `@` punctuation (`slang-lexer.cpp` lines 2418-2420) | Lexed as a distinct kind; no parser consumer at this commit |
+| `Dollar` | `$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang value operand inside a `spirv_asm` block (`$this`, `$location` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1215); also introduces the compile-time `$for` statement |
+| `DollarDollar` | `$$` punctuation (`slang-lexer.cpp` lines 2421-2430) | Prefixes a Slang *type* operand inside a `spirv_asm` block (`result:$$float2` in [hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 1215) |
 
 ### Operators
 
 Assignment, arithmetic, comparison, logical, and bitwise operators.
+
+The lexer takes the longest spelling that matches, and implements the
+rule as nested lookahead rather than a table: an arm of the outer
+per-character `switch` consumes its character and then switches again
+on `_peek`, returning the shorter kind only from a `default:` arm. The
+`>`-prefixed family is the worked example
+([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
+lines 2292-2311) — a second `>` is consumed, and a following `=` then
+yields `OpShrAssign`, so `>>=` is a single token; without the `=` the
+inner arm falls back to `OpRsh`, an `=` directly after the first `>`
+gives `OpGeq`, and anything else gives `OpGreater`. The `<`, `=`, `+`,
+`-`, `|`, `&`, `!`, `%`, `*`, `^`, `/`, `.`, `:`, and `#` arms are
+resolved the same way. The choice is made with no parse context; the
+`OpLess` row below names the one case the parser has to revisit.
 
 | TokenKind | Lexer source range | Notes |
 | --- | --- | --- |
@@ -198,6 +240,24 @@ bitmask that records lexical properties:
 | `ScrubbingNeeded` | A line continuation was folded while lexing this token; `Lexer::lexToken` uses the flag to scrub the continuation out of the stored content |
 | `Name` | Discriminates the `chars` / `name` union |
 
+The reader-facing consequence of the `AtStartOfLine` carve-out is that
+a preprocessor directive body may be continued onto the next physical
+line. A directive body runs to the next `NewLine` *token* (`IsEndOfLine`
+in
+[slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+lines 2700-2712), and a folded continuation emits none, so this is one
+macro whose body is `((x) + 1)`:
+
+```slang
+#define BUMP(x) \
+    ((x) + 1)
+```
+
+Directive *recognition* is the reader of the flag itself: a `Pound`
+token starts a directive only when it carries `AtStartOfLine`
+([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+line 4833).
+
 ## Special-case lexing rules
 
 The lexer in
@@ -209,6 +269,17 @@ implements several context-sensitive rules:
   source location still refers to the original physical line. The
   `ScrubbingNeeded` flag is set so that `Lexer::lexToken` strips the
   continuation from the content it stores on the token.
+
+  Folding sits *below* comment recognition: `_lexLineComment`
+  (`slang-lexer.cpp` lines 405-421) ends the comment when `_peek`
+  reports a newline, and `_peek` (lines 226-305) has already looked
+  past any continuation. A `//` comment whose line ends in `\`
+  therefore swallows the next physical line as well:
+
+  ```slang
+  // this comment continues with a backslash \
+  int swallowed = 0;
+  ```
 - **`<...>` after `#include`.** The lexer has no include-header mode:
   it emits ordinary `OpLess`, path, and `OpGreater` tokens.
   `HandleIncludeDirective` in
@@ -261,7 +332,18 @@ implements several context-sensitive rules:
   swallowed as an integer suffix. The sibling arms of the same branch
   handle the other bases (`0x`/`0X` hex, `0b`/`0B` binary, and a leading
   digit run that is lexed base-8 after a `LexerDiagnostics::octalLiteral`
-  diagnostic).
+  diagnostic). That octal diagnostic is a *warning* — W10002, `'0'
+  prefix indicates octal literal`, declared in
+  [slang-lexer-diagnostic-defs.h](../../../../source/compiler-core/slang-lexer-diagnostic-defs.h)
+  line 27 — so lexing is not gated on it: the literal is still lexed
+  and decoded base-8, and an octal literal compiles.
+
+  `#INF` is matched by `_maybeLexNumberExponent` ahead of any base
+  check, and `getFloatingPointLiteralValue` sets the value to
+  `std::numeric_limits<double>::infinity()` as soon as the text
+  remaining after the digits starts with `#INF` (`slang-lexer.cpp`
+  lines 1262-1267). The digits before the `#` are discarded, so
+  `0#INF` and `1#INF` both decode to positive infinity.
 - **Block-comment handling.** `BlockComment` tokens cover the entire
   `/* ... */` range; nested block comments are not supported.
 - **Identifier / keyword classification.** Every keyword arrives at
@@ -282,6 +364,16 @@ the interpretation is chosen by the `SourceLocType` argument
 ignores source maps). Where a macro-expanded or otherwise derived
 view came from is recorded separately, on the `SourceView` itself, and
 retrieved with `getInitiatingSourceLoc`.
+
+`__LINE__` is the user-level surface that reads the decoded location:
+the preprocessor expands it by calling `SourceManager::getHumaneLoc`
+on the invocation's initiating location
+([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)
+lines 2318-2348), and that method's `SourceLocType` parameter defaults
+to `Nominal`. A `#line` directive — recorded by `HandleLineDirective`
+through `SourceView::addLineDirective` (line 4233) — is therefore the
+user-visible way to change what a token reports, both through
+`__LINE__` and in diagnostic line numbers.
 
 ## What this catalog does not cover
 

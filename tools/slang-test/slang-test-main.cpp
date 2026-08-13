@@ -14,6 +14,7 @@
 #include "core/slang-std-writers.h"
 #include "core/slang-string-escape-util.h"
 #include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "core/slang-token-reader.h"
 #include "core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -4983,28 +4984,6 @@ static String insertSubtestIndex(const String& testName, int index)
 
 // Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
 // Returns the subtest index if found, or -1 if not a subtest prefix.
-static int getSubtestIndex(const String& prefix, const String& filePath)
-{
-    if (prefix.getLength() <= filePath.getLength() || !prefix.startsWith(filePath))
-        return -1;
-
-    auto suffix = prefix.getUnownedSlice().tail(filePath.getLength());
-    if (suffix.getLength() < 2 || suffix[0] != '.')
-        return -1;
-
-    // Check all remaining chars are digits
-    int index = 0;
-    for (Index i = 1; i < suffix.getLength(); i++)
-    {
-        char c = suffix[i];
-        if (c < '0' || c > '9')
-            return -1;
-        index = index * 10 + (c - '0');
-    }
-
-    return index;
-}
-
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 {
     // Gather a list of tests to run
@@ -5105,20 +5084,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             for (Index i = 0; i < prefixes.getCount(); i++)
             {
                 // Check if prefix matches this specific subtest
-                int prefixSubtest = getSubtestIndex(prefixes[i], filePath);
-                if (prefixSubtest >= 0)
-                {
-                    // Prefix specifies a subtest - check for exact match
-                    if (prefixSubtest == 0 && testIdx == 0)
-                        return i;
-                    if (outputStem == prefixes[i])
-                        return i;
-                }
-                else if (filePath.startsWith(prefixes[i]))
-                {
-                    // Non-specific prefix - matches all subtests in file
+                if (TestToolUtil::entryMatchesSubtest(prefixes[i], filePath, outputStem, testIdx))
                     return i;
-                }
             }
             return prefixes.getCount();
         };
@@ -5204,6 +5171,29 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             testName << ")";
         }
 
+        // Per-subtest exclusion, and it has to happen HERE rather than in
+        // shouldRunTest(): that runs before subtests are expanded, so it can
+        // only see the source path. A synthesized variant such as
+        // `tests/compute/parameter-block.slang.6 syn (llvm)` can crash the
+        // worker outright, which also rules out -expected-failure-list —
+        // that reclassifies a result only after the test returns, and this
+        // one never does. The skip must be pre-dispatch, so it is.
+        if (TestToolUtil::isSubtestExcluded(
+                context->options.excludePrefixes,
+                context->options.skipList,
+                filePath,
+                outputStem,
+                subTestIndex))
+        {
+            if (context->options.verbosity >= VerbosityLevel::Info)
+            {
+                StringBuilder msg;
+                msg << "skipping excluded subtest: " << testName;
+                context->getTestReporter()->message(TestMessageType::Info, msg.produceString());
+            }
+            continue;
+        }
+
         // Check if any prefix is more specific than the file path (has subtest index).
         // If so, filter to only run tests whose outputStem matches the prefix.
         if (context->options.testPrefixes.getCount() > 0)
@@ -5213,32 +5203,15 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
             for (auto& p : context->options.testPrefixes)
             {
-                int prefixSubtestIndex = getSubtestIndex(p, filePath);
-                if (prefixSubtestIndex >= 0)
+                // Two separate questions, and only the second is the shared
+                // matching rule: whether the entry NAMES a subtest at all
+                // (which arms the filter), and whether it matches THIS one.
+                if (TestToolUtil::getSubtestIndex(p, filePath) >= 0)
                 {
                     hasSpecificPrefix = true;
-                    // Handle .0 specially - it refers to the first test (no suffix in outputStem)
-                    if (prefixSubtestIndex == 0)
-                    {
-                        if (outputStem == filePath)
-                        {
-                            matchesSpecificPrefix = true;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        // outputStem must match exactly (e.g., .10 shouldn't match .100)
-                        if (outputStem == p)
-                        {
-                            matchesSpecificPrefix = true;
-                            break;
-                        }
-                    }
                 }
-                else if (filePath.startsWith(p))
+                if (TestToolUtil::entryMatchesSubtest(p, filePath, outputStem, subTestIndex))
                 {
-                    // Non-specific prefix that matches the file - always run
                     matchesSpecificPrefix = true;
                     break;
                 }
@@ -5282,7 +5255,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
                 if (testResult == TestResult::Fail && !context->options.disableRetries &&
-                    !context->getTestReporter()->m_expectedFailureList.contains(testName))
+                    !context->getTestReporter()->isExpectedFailure(testName))
                 {
                     RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
                     fileTestInfo->filePath = filePath;
@@ -5383,7 +5356,7 @@ static bool shouldRunTest(TestContext* context, String filePath)
         }
         // Also match if the prefix specifies a subtest index
         // (e.g., prefix "foo.slang.1" should include file "foo.slang")
-        if (getSubtestIndex(p, filePath) >= 0)
+        if (TestToolUtil::getSubtestIndex(p, filePath) >= 0)
         {
             return true;
         }
@@ -5507,7 +5480,7 @@ void runTestsInDirectory(TestContext* context)
                     return i;
                 }
                 // Also match subtest prefixes (e.g., "foo.slang.1" matches file "foo.slang")
-                if (getSubtestIndex(prefixes[i], filePath) >= 0)
+                if (TestToolUtil::getSubtestIndex(prefixes[i], filePath) >= 0)
                 {
                     return i;
                 }
@@ -5661,9 +5634,8 @@ static SlangResult runUnitTestModule(
         auto testFunc = testModule->getTestFunc(i);
         auto testName = testModule->getTestName(i);
 
-        StringBuilder filePath;
-        filePath << moduleName << "/" << testName << ".internal";
-        auto command = filePath.produceString();
+        auto command =
+            makeUnitTestKey(UnownedStringSlice(moduleName), UnownedStringSlice(testName));
 
         if (shouldRunTest(context, command))
         {
@@ -5715,8 +5687,12 @@ static SlangResult runUnitTestModule(
                 // If the rpc failed, output an error message
                 if (SLANG_FAILED(rpcRes))
                 {
+                    // The call never reached the test, so this is not a verdict about it. Tell the
+                    // reporter, which needs to know a retry that skips the test is a real answer
+                    // here rather than a skipped failure.
                     testResult = TestResult::Fail;
                     reporter->message(TestMessageType::RunError, "rpc failed");
+                    reporter->noteDispatchFailure(options.command);
                 }
 
                 // Check for VVL errors in unit tests
@@ -5736,8 +5712,14 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
+                // The expected-failure list is keyed by the reporter key, not the bare test
+                // name, so the key is built by makeUnitTestKey() rather than chosen here. That
+                // matters because choosing wrong has no visible symptom -- the lookup just never
+                // matches, and the only cost is the pointless retry this gate exists to avoid.
                 if (isFailed && !context->isRetry && !context->options.disableRetries &&
-                    !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
+                    !context->getTestReporter()->isExpectedFailure(makeUnitTestKey(
+                        UnownedStringSlice(moduleName),
+                        test.testName.getUnownedSlice())))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
@@ -5816,7 +5798,18 @@ static SlangResult runUnitTestModule(
             runUnitTest(t);
     }
 
-    testModule->destroy();
+    // Note `testModule->destroy()` is deliberately not called here. The registry it would empty has
+    // process lifetime and is filled in once, by the module's load-time static constructors, so
+    // this function must leave it intact for the retry pass to enumerate. (The test server, which
+    // holds the same kind of module, releases its own copy from its destructor at shutdown.)
+    //
+    // No unit test guards this: the cross-pass dlopen / static-constructor path it turns on cannot
+    // be driven from an in-process SLANG_UNIT_TEST, so a real two-pass run under CI is the only
+    // positive check. What does exist is a backstop -- reinstating the call would leave every
+    // unit-test deferral unredeemed, and `TestReporter::reconcilePendingRetries()` would then count
+    // them as failures. So the regression surfaces as red CI rather than as the silent green it
+    // used to be, but only because that safety net is there. Do not "tidy up" the missing
+    // destroy() on the assumption the unit tests cover it.
     return SLANG_OK;
 }
 
@@ -6196,6 +6189,15 @@ SlangResult innerMain(int argc, char** argv)
                 }
             }
         }
+
+        // Every retry pass has now run, so any test whose result is still deferred is never going
+        // to get one. Turn those into failures before they reach the summary.
+        //
+        // The position matters and no unit test can hold it: the reporter tests call
+        // reconcilePendingRetries() directly, so moving this above the retry loop -- where it would
+        // count deferrals the retry was about to redeem -- or dropping it entirely would not fail
+        // any of them. It has to run after the last retry and before outputSummary().
+        reporter.reconcilePendingRetries();
 
         reporter.outputSummary();
 
