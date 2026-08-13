@@ -2208,6 +2208,29 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     for tf in test_files:
         for issue in _lint_test_file(spec, tf):
             issues.append(issue)
+    # Claim enumeration: `prompts/_claims.md` §4 makes `## Claims` the bundle's
+    # ground-truth list, and §6 defines completeness as "every claim there is
+    # either covered or classified". Without it a bundle has no way to show a
+    # claim as *missing*: `## Functional coverage` only lists claims that
+    # already have tests, so when the source doc gains new normative prose
+    # nothing reports the shortfall. That is how the doc-gap fill (#12477) added
+    # ~12k lines of newly checkable statements without a single bundle showing a
+    # coverage gap.
+    #
+    # Warning rather than error: most bundles predate the requirement, and an
+    # error would block every unrelated change until all of them are
+    # re-enumerated.
+    if "## Claims" not in text:
+        issues.append(
+            LintIssue(
+                f"{spec.dir}/README.md",
+                "warning",
+                "no ## Claims section; the bundle has no ground-truth claim"
+                " enumeration, so new normative prose in its source doc cannot"
+                " surface as missing coverage (prompts/_claims.md §1, §4)",
+            )
+        )
+
     # Untested-claims table: optional section, but if present must be a
     # table with the controlled Reason vocabulary.
     heading = "## Untested claims"

@@ -630,7 +630,7 @@ bundles:
       - design/pipeline/04-ast-to-ir
     coverage_targets:
       - source/slang/slang-lower-to-ir.cpp
-    size_cap_files: 50
+    size_cap_files: 70
 
   design/ir-reference/misc:
     source_doc: docs/generated/design/ir-reference/misc.md
@@ -686,7 +686,7 @@ bundles:
       - source/slang/slang-emit-hlsl.cpp
       - source/slang/slang-ir-hlsl-legalize.cpp
       - source/slang/slang-emit-c-like.cpp
-    size_cap_files: 150
+    size_cap_files: 170
 
   design/target-pipelines/metal:
     source_doc: docs/generated/design/target-pipelines/metal.md
