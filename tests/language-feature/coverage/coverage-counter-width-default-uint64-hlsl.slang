@@ -19,11 +19,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 }
 
 // HLSL: the buffer's element type is `uint64_t`, and the marker ops
-// lower to `InterlockedAdd` calls with a `1ULL` value-operand. The
-// emitter renames `__slang_coverage` (two leading underscores in IR)
-// to `_slang_coverage_0` (one leading underscore plus index suffix)
-// in generated source. The three CHECK-DAGs together pin the
-// default-uint64 emission for HLSL.
+// lower to `InterlockedAdd` calls. The wave-aggregated value-operand is
+// the active-lane count; because `WaveActiveCountBits` returns 32 bits
+// it is widened to the counter's element type with a `uint64_t(...)`
+// cast before the add. The emitter renames `__slang_coverage` (two
+// leading underscores in IR) to `_slang_coverage_0` (one leading
+// underscore plus index suffix) in generated source.
 //CHECK-DAG: RWStructuredBuffer<uint64_t {{[^>]*}}> _slang_coverage
 //CHECK-DAG: InterlockedAdd
-//CHECK-DAG: 1ULL
+//CHECK-DAG: uint64_t({{_S[0-9]+}})

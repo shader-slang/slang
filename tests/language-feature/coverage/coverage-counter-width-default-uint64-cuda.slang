@@ -24,10 +24,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: _slang_coverage
 
 // CUDA `atomicAdd` overload selection follows the operand types: a
-// 64-bit unsigned slot uses the `unsigned long long` overload. The
-// emitted buffer's element type is `ulonglong` (CUDA's name for
-// `uint64_t`) and the call-site value-operand is `1ULL`. Together
-// these pin the default-uint64 path on CUDA.
+// 64-bit unsigned slot uses the `unsigned long long` overload, so the
+// buffer's element type is `ulonglong` (CUDA's name for `uint64_t`).
+// The wave-aggregated addend is the active-lane count; because
+// `WaveActiveCountBits` returns 32 bits it is widened to the counter's
+// element type with a `ulonglong(...)` cast before the add. That
+// widening cast is unique to the 64-bit path, so it pins the width.
 //CHECK-DAG: RWStructuredBuffer<ulonglong>
 //CHECK-DAG: atomicAdd
-//CHECK-DAG: 1ULL
+//CHECK-DAG: ulonglong({{_S[0-9]+}})

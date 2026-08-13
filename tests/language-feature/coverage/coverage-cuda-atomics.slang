@@ -40,16 +40,20 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // function name), then bind each guarded `atomicAdd` to BOTH its coverage-slot
 // pointer and the active-lane-count result so the test proves the atomic targets
 // the slot and adds the lane count, not a literal 1.
+//
+// At the default 64-bit counter width the atomic addend must be `ulonglong`, so
+// the 32-bit `WaveActiveCountBits` result is widened with a `ulonglong(...)`
+// cast; each slot binds that widened value as the atomic's addend.
 //CHECK: __popc(__ballot_sync
-// slot 0: capture the slot pointer and the lane count, then bind the atomic.
 //CHECK: [[SLOT0:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(0)
 //CHECK: [[CNT0:_S[0-9]+]] = WaveActiveCountBits
-//CHECK: atomicAdd([[SLOT0]], [[CNT0]])
-// slot 1
+//CHECK: ulonglong [[CNT0W:_S[0-9]+]] = ulonglong([[CNT0]])
+//CHECK: atomicAdd([[SLOT0]], [[CNT0W]])
 //CHECK: [[SLOT1:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(1)
 //CHECK: [[CNT1:_S[0-9]+]] = WaveActiveCountBits
-//CHECK: atomicAdd([[SLOT1]], [[CNT1]])
-// slot 2
+//CHECK: ulonglong [[CNT1W:_S[0-9]+]] = ulonglong([[CNT1]])
+//CHECK: atomicAdd([[SLOT1]], [[CNT1W]])
 //CHECK: [[SLOT2:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(2)
 //CHECK: [[CNT2:_S[0-9]+]] = WaveActiveCountBits
-//CHECK: atomicAdd([[SLOT2]], [[CNT2]])
+//CHECK: ulonglong [[CNT2W:_S[0-9]+]] = ulonglong([[CNT2]])
+//CHECK: atomicAdd([[SLOT2]], [[CNT2W]])
