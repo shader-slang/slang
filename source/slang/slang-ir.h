@@ -35,14 +35,7 @@ class Type;
 class Session;
 class Name;
 class TargetRequest;
-/// Supplies instruction bodies that were not materialized when a module was
-/// deserialized.
-///
-/// A serialized builtin module is mostly bodies that a given compile never looks
-/// at, so deserialization can stop at each global value's decorations and leave
-/// the rest encoded. Whoever deserialized the module installs one of these on the
-/// `IRModule`, and the first access to a global value's children asks it to decode
-/// that one body.
+
 //
 // Publication of a deferred body, and the one link it attaches to.
 //
@@ -108,6 +101,52 @@ SLANG_API Index getLiveIRModuleCount();
 /// could pass while checking nothing.
 SLANG_API Index getDeferredBodyLoaderInstallCount();
 
+/// Test-only: round-trips a module whose decoration has children of its own through the
+/// serialized form, and reports what came back.
+///
+/// `outExpectedChildren` is how many children the decoration had before serializing and
+/// `outActualChildren` how many it has after; a deferred load that dropped a decoration's
+/// subtree shows up as the second being smaller. `outBodyWasDeferred` says whether the
+/// function's body was actually left encoded, so a caller can tell an eager load — which
+/// proves nothing about the rule — from a real exercise of it.
+///
+/// Exported for the same reason as the counters above, and absent from `slang.h` for the
+/// same reason: the shape it needs does not occur in any module the compiler produces, so
+/// it has to be built directly, and the IR builders and serialization entry points that
+/// takes are not exported. Exporting all of those to test one rule would be a far larger
+/// surface than this one function.
+SLANG_API void _testRoundTripDecorationWithChildren(
+    slang::IGlobalSession* globalSession,
+    Index& outExpectedChildren,
+    Index& outActualChildren,
+    bool& outBodyWasDeferred);
+
+/// Test-only: has many threads race to be the first to touch the same deferred bodies,
+/// and reports whether every one of them saw a complete body.
+///
+/// `outDeferredCount` is how many bodies were actually left encoded, so a caller can tell
+/// an eager load — which races nothing — from a real exercise of the protocol.
+/// `outMismatches` counts observations where a thread saw a body with the wrong number of
+/// instructions, which is what a torn or partially published body looks like.
+///
+/// Scoped to materialization on purpose. Running whole compiles concurrently on a shared
+/// global session crashes on `master` today, with on-demand loading on or off, so a test
+/// written that way would report a pre-existing limitation rather than anything about this
+/// mechanism. What this exercises is exactly what the loader's mutex and the
+/// acquire/release publication of a body claim to make safe, and nothing more.
+SLANG_API void _testConcurrentBodyMaterialization(
+    slang::IGlobalSession* globalSession,
+    Index& outDeferredCount,
+    Index& outMismatches);
+
+/// Supplies instruction bodies that were not materialized when a module was
+/// deserialized.
+///
+/// A serialized builtin module is mostly bodies that a given compile never looks
+/// at, so deserialization can stop at each global value's decorations and leave
+/// the rest encoded. Whoever deserialized the module installs one of these on the
+/// `IRModule`, and the first access to a global value's children asks it to decode
+/// that one body.
 struct IRDeferredBodyLoader : RefObject
 {
     virtual ~IRDeferredBodyLoader() = default;
