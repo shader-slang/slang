@@ -28,7 +28,28 @@ public:
             /// Honoured on Windows AND Unix. It was Windows-only, which made it a silent
             /// no-op on Linux: the child's stderr went to a pipe regardless, and a caller
             /// that did not drain that pipe discarded everything written to it.
-            DisableStdErrRedirection = 0x02
+            DisableStdErrRedirection = 0x02,
+
+            /// Give the child a stdin it cannot read from, instead of a pipe. Honored on all
+            /// platforms. Contract: a read of the child's stdin reports an *error* rather than
+            /// reaching end-of-file (an EOF read would instead succeed with empty input, which is a
+            /// different outcome this flag does not provide), and `getStream(In)` is null. A null
+            /// input stream is an established shape, not a new hazard: `DisableStdErrRedirection`
+            /// already leaves `getStream(ErrorOut)` null and `ProcessUtil::readUntilTermination`
+            /// already tolerates it.
+            ///
+            /// Implemented by opening the child's fd 0 write-only on the null device. It is left
+            /// open on an unreadable target rather than closed, because a closed fd 0 is taken by
+            /// the next file the child opens, and the child's `stdin` would then silently read that
+            /// file instead of failing.
+            ///
+            /// The error-not-EOF guarantee is directly established only on POSIX (write-only
+            /// `/dev/null`). On Windows it is inferred from the equivalent in-process precedent
+            /// (write-only `NUL` on fd 0) rather than measured for the inherited-handle path, and
+            /// the child may reach the read-failure via `_setmode` failing rather than a read
+            /// error. It is exercised end-to-end by the `SlangcReadFromStdin` unit test, which runs
+            /// on Windows CI and asserts the read-failure diagnostic.
+            UnreadableStdin = 0x04
         };
     };
 

@@ -401,6 +401,7 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     Process::Flags flags,
     RefPtr<Process>& outProcess)
 {
+    const bool unreadableStdin = (flags & Process::Flag::UnreadableStdin) != 0;
     const char* whatFailed = nullptr;
     int spawnResult = 0;
     pid_t childPid;
@@ -429,15 +430,24 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     int stdoutPipe[2] = {-1, -1};
     int stderrPipe[2] = {-1, -1};
 
-    // Honour DisableStdErrRedirection here as the Windows implementation does. Previously it
-    // was Windows-only, so on Unix a caller asking for the child's stderr to be left alone
+    // UnreadableStdin has no parent-side stdin pipe; the child's stdin is opened on the null device
+    // instead (below), so stdinPipe stays {-1, -1}.
+    //
+    // DisableStdErrRedirection is the same shape one stream over, and honouring it here is new.
+    // It was Windows-only, so on Unix a caller asking for the child's stderr to be left alone
     // still got it piped -- and a caller that then did not drain that pipe silently discarded
     // everything the child wrote there. slang-test is exactly that caller, which is why
     // test-server diagnostics never reached a Linux CI log.
     const bool redirectStdError = (flags & Process::Flag::DisableStdErrRedirection) == 0;
 
-    if (pipe(stdinPipe) == -1 || pipe(stdoutPipe) == -1 ||
-        (redirectStdError && pipe(stderrPipe) == -1))
+    bool pipeFailed = false;
+    if (!unreadableStdin)
+        pipeFailed = pipe(stdinPipe) == -1;
+    pipeFailed = pipeFailed || pipe(stdoutPipe) == -1;
+    if (redirectStdError)
+        pipeFailed = pipeFailed || pipe(stderrPipe) == -1;
+
+    if (pipeFailed)
     {
         whatFailed = "pipe";
     }
@@ -465,17 +475,20 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
             sigaddset(&sigdefault, SIGPIPE);
             posix_spawnattr_setsigdefault(&attr, &sigdefault);
 
-            short flags = 0;
-            posix_spawnattr_getflags(&attr, &flags);
-            flags |= POSIX_SPAWN_SETSIGDEF;
-            posix_spawnattr_setflags(&attr, flags);
+            short spawnFlags = 0;
+            posix_spawnattr_getflags(&attr, &spawnFlags);
+            spawnFlags |= POSIX_SPAWN_SETSIGDEF;
+            posix_spawnattr_setflags(&attr, spawnFlags);
 
             //
             // Stdio redirections
             //
-            posix_spawn_file_actions_adddup2(&file_actions, stdinPipe[0], STDIN_FILENO);
-            posix_spawn_file_actions_addclose(&file_actions, stdinPipe[0]);
-            posix_spawn_file_actions_addclose(&file_actions, stdinPipe[1]);
+            if (!unreadableStdin)
+            {
+                posix_spawn_file_actions_adddup2(&file_actions, stdinPipe[0], STDIN_FILENO);
+                posix_spawn_file_actions_addclose(&file_actions, stdinPipe[0]);
+                posix_spawn_file_actions_addclose(&file_actions, stdinPipe[1]);
+            }
 
             posix_spawn_file_actions_adddup2(&file_actions, stdoutPipe[1], STDOUT_FILENO);
             posix_spawn_file_actions_addclose(&file_actions, stdoutPipe[0]);
@@ -489,6 +502,18 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
                 posix_spawn_file_actions_addclose(&file_actions, stderrPipe[0]);
                 posix_spawn_file_actions_addclose(&file_actions, stderrPipe[1]);
             }
+
+            // Open the unreadable stdin LAST: file actions run in order, so this must follow the
+            // stdout/stderr close actions above. If the parent's fd 0 was closed, one of the
+            // pipe() calls can hand back fd 0, and closing that pipe end afterwards would undo the
+            // open and leave the child with a closed (not unreadable) stdin.
+            if (unreadableStdin)
+                posix_spawn_file_actions_addopen(
+                    &file_actions,
+                    STDIN_FILENO,
+                    "/dev/null",
+                    O_WRONLY,
+                    0);
 
             //
             // Set up environment - inherit parent but override LC_ALL=C
@@ -574,16 +599,18 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
                 streams[Index(StdStreamType::Out)] =
                     new UnixPipeStream(stdoutPipe[0], FileAccess::Read, true);
                 // Left null when redirection is disabled: there is no parent-side pipe to
-                // read, because the child is writing to this process's own stderr. Matches
-                // what the Windows implementation leaves behind in the same case.
+                // read, because the child is writing to this process's own stderr. The same
+                // shape UnreadableStdin gives StdStreamType::In just below, and what the
+                // Windows implementation already leaves behind in this case.
                 if (redirectStdError)
                 {
                     streams[Index(StdStreamType::ErrorOut)] =
                         new UnixPipeStream(stderrPipe[0], FileAccess::Read, true);
                     stderrPipe[0] = -1;
                 }
-                streams[Index(StdStreamType::In)] =
-                    new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
+                if (!unreadableStdin)
+                    streams[Index(StdStreamType::In)] =
+                        new UnixPipeStream(stdinPipe[1], FileAccess::Write, true);
 
                 // Mark as owned by streams so cleanup doesn't close them
                 stdoutPipe[0] = stdinPipe[1] = -1;

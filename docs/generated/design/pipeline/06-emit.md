@@ -67,7 +67,9 @@ pass-through compilation) or calls
 
 1. Resolves `LineDirectiveMode` (GLSL targets default to
    `LineDirectiveMode::GLSL`; WGSL targets to `None`, because WGSL has
-   no line directives) and constructs a `SourceWriter`
+   no line directives; see
+   [Source-writer abstraction](#source-writer-abstraction) for what
+   each mode prints) and constructs a `SourceWriter`
    ([slang-emit-source-writer.h](../../../../source/slang/slang-emit-source-writer.h))
    to buffer the emitted text, optionally with a `SourceMap`.
 2. Selects the `CLikeSourceEmitter` subclass. `CodeGenTarget::PyTorchCppBinding`
@@ -218,12 +220,43 @@ and
 The runtime support that emitted C++ links against lives in
 [source/slang-rt/](../../../../source/slang-rt).
 
+A compute entry point is not emitted as one function. The `IRFunc`
+itself becomes an internal workhorse emitted under a `_`-prefixed name
+(`_main_N`), because its signature cannot service a general-purpose
+call
+([slang-emit-cpp.cpp](../../../../source/slang/slang-emit-cpp.cpp)
+line 1004). After the module body, three `SLANG_PRELUDE_EXPORT` shims
+are emitted around it (line 2416), all sharing the signature
+`(varyingInput, void* entryPointParams, void* globalParams)`:
+`main_N_Thread` runs one thread, `main_N_Group` runs one thread group,
+and `main_N` runs a whole dispatch range. That triple is the surface a
+host runtime calls. Only compute-stage entry points get it, and in
+header-only mode the three are emitted as prototypes rather than
+definitions, since the workhorse they call is not in the header.
+
 ### CUDA
 
 [slang-emit-cuda.h](../../../../source/slang/slang-emit-cuda.h) /
 [slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp).
 Emits CUDA source. Prelude:
 [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h).
+
+Module-scope shader parameters do not survive as CUDA globals. On the
+targets that pack ordinary uniforms — CPU and CUDA — they are
+collected into a single `GlobalParams` struct before emission
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 1101;
+the pass is `collectGlobalUniformParameters`, see
+[05-ir-passes.md](05-ir-passes.md)), and
+`CUDASourceEmitter::emitParameterGroupImpl` writes that struct out as
+`extern "C" __constant__ GlobalParams_N SLANG_globalParams;` followed
+by a `#define` redirecting the original parameter name to
+`(&SLANG_globalParams)`
+([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp)
+line 414). A `RWStructuredBuffer` global therefore appears in the
+emitted CUDA as a field of `SLANG_globalParams`, not as a variable of
+its own. `emitFunctionPreambleImpl` (line 432) qualifies an entry
+point `extern "C" __global__` and every ordinary function
+`__device__`.
 
 ### Torch
 
@@ -260,6 +293,20 @@ as a load of it) and reports
 `Diagnostics::GlobalParamNotSupportedByInterpreter` once per parameter;
 `emitVMByteCodeForEntryPoints` then returns `SLANG_FAIL` rather than
 handing back malformed bytecode.
+
+Both command-line surfaces reach that check the same way:
+`-target slangvm` maps to `CodeGenTarget::HostVM`, whose arm of
+`CodeGenContext::_emitEntryPoints` calls `emitHostVMCode`
+([slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)
+line 1216), and `slangi` compiles through that same target. What
+differs is the entry point reaching the emitter:
+`ByteCodeEmitter::emitEntryPoints` emits only entry points whose stage
+is `Stage::Dispatch` — the host stage `slangi` asks for — and skips
+every other stage
+([slang-emit-vm.cpp](../../../../source/slang/slang-emit-vm.cpp) line
+1255). A shader-stage entry point compiled with `-target slangvm`
+therefore contributes no functions, nothing references the global
+parameter, and the diagnostic never fires.
 
 ### Slang round-trip
 
@@ -301,8 +348,10 @@ purely syntactic go through small virtual predicates rather than
 target checks in shared code — for example `supportsSwitchFallThrough`,
 `shouldEmitSwitchCaseTerminatingBreak` (both overridden by WGSL),
 `shouldFoldInstIntoUseSites`, and `emitTempModifiers` (overridden by
-C++, Metal, and WGSL; the latter two diagnose
-`Diagnostics::PreciseQualifierUnsupportedOnTarget`).
+C++, Metal, and WGSL — each of the three drops `precise` and
+diagnoses `Diagnostics::PreciseQualifierUnsupportedOnTarget`; CUDA
+overrides it too, inheriting the C++ body and adding `__device__` for
+a module-scope temporary).
 
 ## Source-writer abstraction
 
@@ -315,8 +364,16 @@ into. Its features (visible in the header):
 - `advanceToSourceLocation(SourceLoc)` to emit `#line` (or GLSL
   `#line`-equivalent) directives so that downstream compilers report
   errors at the user's original source position.
-- `LineDirectiveMode` configures the directive style (C / GLSL /
-  none).
+- `LineDirectiveMode` configures the directive style. Every mode that
+  prints anything opens with `#line <line>`, and appends the file part
+  only when the path changed since the previous directive: the C-style
+  modes (`Default` / `Standard`) append a quoted path, giving
+  `#line 12 "foo.slang"`, while `GLSL` appends a per-path integer id
+  allocated on first use, giving `#line 12 0`, because GLSL has no
+  file-name form of the directive. `None` and `SourceMap` emit no
+  directive at all
+  ([slang-emit-source-writer.cpp](../../../../source/slang/slang-emit-source-writer.cpp)
+  lines 419 and 467).
 - A `SourceMap` companion for source-mapping debug information.
 
 ## Operator precedence and parenthesization
@@ -332,6 +389,22 @@ combinations — even where the language's own precedence already
 preserves semantics — because downstream compilers warn about those
 combinations. Each backend asks the precedence helper before printing a
 binary or unary operator.
+
+The forcing looks at both sides of the pair
+([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
+line 760): an operand whose own operator is in that set is
+parenthesized whenever the outer context binds tighter than
+assignment, and *every* operand of an outer operator in that set is
+parenthesized whatever its own precedence. Combinations outside the
+set are left minimally parenthesized:
+
+| Source | Emitted |
+| --- | --- |
+| `a + b * c` | `a + b * c` |
+| `(a + b) * c` | `(a + b) * c` |
+| `a \| b & c` | `a \| (b & c)` |
+| `a << b + c` | `a << (b + c)` |
+| `a < b == c < d` | `(a < b) == (c < d)` |
 
 ## Preludes
 
@@ -361,6 +434,23 @@ headers.
 | C++ host | [slang-cpp-host-prelude.h](../../../../prelude/slang-cpp-host-prelude.h) |
 | Torch | [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h) |
 | LLVM | [slang-llvm.h](../../../../prelude/slang-llvm.h) |
+
+What is registered for a `SourceLanguage` is a *string*, not
+necessarily an `#include`, and the default is the embedded text of the
+header itself — for CUDA, C++, and HLSL only
+([slang-global-session.cpp](../../../../source/slang/slang-global-session.cpp)
+line 126). `slangc` and the test tools then replace the C++ and CUDA
+preludes with a one-line `#include` of the deployed header, which is
+why emitted CUDA and C++ open with an absolute
+`#include ".../slang-cuda-prelude.h"`. HLSL is not replaced, so its
+prelude arrives as text, and that text is only an
+`#ifdef SLANG_HLSL_ENABLE_NVAPI` guard around
+`#include "nvHLSLExtns.h"` plus a warning `#pragma`: no
+`slang-hlsl-prelude.h` include ever appears in emitted HLSL, and the
+`#pragma pack_matrix(...)` a reader sees at the top of it comes from
+`HLSLSourceEmitter::emitFrontMatterImpl`
+([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)
+line 2534), not from the prelude.
 
 GLSL, Metal, WGSL, and SPIR-V have no `prelude/` header; the built-in
 vocabulary they rely on is emitted from their own backend files, as with
@@ -423,10 +513,17 @@ build systems to track header / module dependencies.
 This page's manifest entry watches `source/slang/slang-emit.cpp`,
 `source/slang/slang-emit-*.{h,cpp}`,
 `source/slang/slang-code-gen.cpp`, and
-`source/slang/slang-global-session.cpp`. One fact above still comes
-from outside that set, so drift in it will not mark this page stale:
+`source/slang/slang-global-session.cpp`. Two facts above still come
+from outside that set, so drift in them will not mark this page stale:
 
 - The prelude header contents themselves live under
   [prelude/](../../../../prelude); only their registration on the
   global session is watched. Adding `prelude/*.h` to `watched_paths`
   would cover the prelude table.
+- The `#include`-form C++ and CUDA preludes are installed over the
+  defaults by `TestToolUtil::setSessionDefaultPreludeFromExePath`
+  ([source/core/slang-test-tool-util.cpp](../../../../source/core/slang-test-tool-util.cpp)),
+  called from
+  [source/slangc/main.cpp](../../../../source/slangc/main.cpp) and
+  from the test tools. Only the default registration in
+  `slang-global-session.cpp` is watched.

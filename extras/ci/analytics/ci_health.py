@@ -338,6 +338,8 @@ def fetch_pending_approvals(repo):
             )
         except ValueError:
             waited_min = 0
+        prs = run.get("pull_requests") or []
+        pr_number = prs[0].get("number") if prs else None
         pending.append(
             {
                 "run_id": run.get("id"),
@@ -347,6 +349,7 @@ def fetch_pending_approvals(repo):
                 "branch": run.get("head_branch", ""),
                 "title": run.get("display_title", ""),
                 "waited_min": waited_min,
+                "pr_number": pr_number,
             }
         )
     pending.sort(key=lambda p: p["waited_min"], reverse=True)
@@ -1235,7 +1238,7 @@ def render_pending_approvals(data):
 
     html += """
 <table>
-  <tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
+  <tr><th>Waiting</th><th>Run</th><th>PR</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
 """
     for p in pending:
         # A merge-queue run holds up the whole queue, not just its own PR.
@@ -1243,10 +1246,13 @@ def render_pending_approvals(data):
         event_cell = (
             f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
         )
+        pr_number = p.get("pr_number")
+        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}", f"#{pr_number}") if pr_number else ""
         html += (
             "  <tr>"
             f"<td>{p['waited_min']} min</td>"
             f"<td>{_link(p['url'], p['title'] or str(p['run_id']))}</td>"
+            f"<td>{pr_cell}</td>"
             f"<td>{_esc(p['actor'])}</td>"
             f"<td>{event_cell}</td>"
             f"<td>{_esc(p['branch'])}</td>"
@@ -1363,6 +1369,7 @@ PENDING_APPROVALS_JS = """
       var now = Date.now();
       var pending = runs.map(function (r) {
         var waited = Math.floor((now - new Date(r.created_at).getTime()) / 60000);
+        var prs = r.pull_requests || [];
         return {
           run_id: r.id,
           url: r.html_url,
@@ -1371,6 +1378,7 @@ PENDING_APPROVALS_JS = """
           branch: r.head_branch || "",
           title: r.display_title || String(r.id),
           waited: waited,
+          pr_number: prs.length ? prs[0].number : null,
         };
       }).sort(function (a, b) { return b.waited - a.waited; });
 
@@ -1396,13 +1404,17 @@ PENDING_APPROVALS_JS = """
         label + '</span><strong style="margin-left:8px">' + esc(summary) + '</strong></div>';
 
       if (pending.length) {
-        html += '<table><tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
+        html += '<table><tr><th>Waiting</th><th>Run</th><th>PR</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
         pending.forEach(function (p) {
           var event = p.event === "merge_group"
             ? "<strong>merge_group</strong>" : esc(p.event);
+          var pr = p.pr_number
+            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '">#' + p.pr_number + '</a>'
+            : '';
           html += '<tr>' +
             '<td>' + p.waited + ' min</td>' +
             '<td><a href="' + esc(p.url) + '">' + esc(p.title) + '</a></td>' +
+            '<td>' + pr + '</td>' +
             '<td>' + esc(p.actor) + '</td>' +
             '<td>' + event + '</td>' +
             '<td>' + esc(p.branch) + '</td>' +
