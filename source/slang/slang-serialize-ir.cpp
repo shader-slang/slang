@@ -755,7 +755,7 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     IRInst* decodeInst(IRInst* parent, Int64 depth);
 
     /// Allocates the instruction for a given index; see the definition.
-    IRInst* allocateInstAt(Int64 instIndexToAlloc, Int64& stringLengthCursor);
+    IRInst* allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor);
 
     /// `IRDeferredBodyLoader`.
     void materializeDeferredBody(IRInst* inst) override;
@@ -912,7 +912,7 @@ static size_t _readInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64&
 /// cursor, which is the opposite of what it does; anyone who believed it and added a
 /// second read, or removed this one as redundant, would have shifted every subsequent
 /// string constant by one entry.
-IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringLengthCursor)
+IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor)
 {
     const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
     IROp op = allocInfo.op;
@@ -925,7 +925,7 @@ IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& stringL
         foundUnrecognizedInstructions = true;
     }
 
-    const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, stringLengthCursor);
+    const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, inStringLengthCursor);
     return module->_allocateInst(op, allocInfo.operandCount, minSizeInBytes);
 }
 
