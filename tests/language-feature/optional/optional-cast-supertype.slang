@@ -1,7 +1,12 @@
 //TEST:INTERPRET(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=IR): -target hlsl -entry main -stage compute -dump-ir
 
 // An Optional initialized from a `derived as Base` upcast must hold the base value,
 // not the address of the base sub-object, so `.value` reads fields of a struct.
+//
+// The IR check pins that property directly: the base sub-object address from
+// `get_field_addr` is `load`ed to a value, and the payload field read uses that
+// loaded value — not the pointer the buggy lowering (#12495) left in place.
 
 struct A
 {
@@ -21,6 +26,11 @@ void main()
     b.y = 6;
     Optional<A> o = b as A;
     // CHECK: 5
+    // The upcast payload is the loaded base value, and `.value.x` reads a field
+    // of that value — not of the `get_field_addr` pointer (the #12495 bug).
+    // IR: func %main
+    // IR: [[BASE:%[0-9]+]] : %A = load
+    // IR: get_field([[BASE]], %x)
     if (o.hasValue)
         printf("%d\n", o.value.x);
 
