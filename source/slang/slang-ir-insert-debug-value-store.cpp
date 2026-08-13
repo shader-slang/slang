@@ -114,19 +114,40 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     if (!funcDebugLoc)
         return;
 
-    // Pre-populate mapVarToDebugVar with params that were already processed in a previous
-    // invocation of this function. A param has already been processed if there is an
-    // IRDebugValue instruction in the entry block that uses the param as its value operand.
-    // This allows this function to be called again after the specialization pass has run to
-    // instrument variables that were of unresolved IRSpecialize type during the first pass.
-    HashSet<IRInst*> alreadyProcessedParams;
+    // Build idempotency markers for params that were already instrumented in a prior pass.
+    // insertDebugValueStore is called twice: once early in slang-lower-to-ir.cpp (before
+    // specialization) and once after specializeModule (to pick up variables whose types were
+    // unresolved IRSpecialize the first time). The second call must not create duplicate
+    // IRDebugVar records for params already instrumented by the first call.
+    //
+    // Two complementary signals cover all param kinds:
+    //
+    //  1. In-params: the first pass emits IRDebugValue(debugVar, paramValue) immediately after
+    //     the param list, so scanning for IRDebugValue whose value-operand is an IRParam gives
+    //     a direct set of already-processed in-params.
+    //
+    //  2. Out-params (e.g. `this` in an initializer): the first pass does NOT emit an initial
+    //     IRDebugValue (the param is uninitialized), so signal (1) misses them. However,
+    //     copyNameHintAndDebugDecorations always copies the IRNameHintDecoration from the param
+    //     to its IRDebugVar, and IRDebugVar records for params carry a non-null argIndex operand.
+    //     Scanning for such IRDebugVar records and collecting their name hints covers out-params.
+    HashSet<IRInst*> alreadyProcessedInParams;
+    HashSet<UnownedStringSlice> existingParamDebugVarNames;
     for (auto inst = firstBlock->getFirstInst(); inst; inst = inst->getNextInst())
     {
         if (auto debugValue = as<IRDebugValue>(inst))
         {
             auto val = debugValue->getValue();
             if (as<IRParam>(val))
-                alreadyProcessedParams.add(val);
+                alreadyProcessedInParams.add(val);
+        }
+        else if (auto debugVar = as<IRDebugVar>(inst))
+        {
+            if (debugVar->getArgIndex())
+            {
+                if (auto nameHint = debugVar->findDecoration<IRNameHintDecoration>())
+                    existingParamDebugVarNames.add(nameHint->getName());
+            }
         }
     }
 
@@ -154,12 +175,21 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         if (!isDebuggableType(paramType))
             continue;
 
-        // Skip params that were already instrumented in a previous pass. Increment paramIndex
-        // so that unprocessed params following this one get the correct argument index.
-        if (alreadyProcessedParams.contains(param))
+        // Skip params already instrumented in a previous pass (see comment above).
+        // Check both signals: direct IRDebugValue reference (in-params) and name-hint match
+        // against an existing argIndex-bearing IRDebugVar (out-params such as `this`).
+        if (alreadyProcessedInParams.contains(param))
         {
             paramIndex++;
             continue;
+        }
+        if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
+        {
+            if (existingParamDebugVarNames.contains(nameHint->getName()))
+            {
+                paramIndex++;
+                continue;
+            }
         }
 
         auto debugVar = builder.emitDebugVar(

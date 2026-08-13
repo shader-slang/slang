@@ -1458,10 +1458,13 @@ Result linkAndOptimizeIR(
     // variable of a generic struct type) were skipped by the first insertDebugValueStore pass
     // in slang-lower-to-ir.cpp because their types were not yet concrete. Now that
     // specializeModule has run, those types are concrete and insertDebugValueStore can emit
-    // IRDebugVar + IRDebugValue for them. The function is idempotent: it skips params that
-    // already have IRDebugValue stores and IRVar instances already preceded by an IRDebugVar.
-    // This call must be before eliminateDeadCode so the new debug value stores protect the
-    // newly instrumented variables from being eliminated.
+    // IRDebugVar + IRDebugValue for them. The function is idempotent via two complementary
+    // skip signals: IRVar locals skip if immediately preceded by an IRDebugVar (the invariant
+    // insertion point); params skip if a name-matched IRDebugVar with an argIndex already
+    // exists in the entry block, or if an IRDebugValue referencing the param directly exists
+    // (covering in-params whose name hints are absent). This call must be before
+    // eliminateDeadCode so the new debug stores protect the newly instrumented variables from
+    // being eliminated.
     if (targetCompilerOptions.getDebugInfoLevel() >= DebugInfoLevel::Standard)
     {
         DebugValueStoreContext debugValueContext;
