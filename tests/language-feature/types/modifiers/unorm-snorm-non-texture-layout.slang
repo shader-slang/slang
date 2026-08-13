@@ -25,20 +25,24 @@ struct Plain
 uniform Norms n;
 uniform Plain p;
 
-RWStructuredBuffer<unorm float> inBuf;
+// Both modifiers on both carriers: as a buffer element here, as a struct field
+// above.
+RWStructuredBuffer<unorm float> unormBuf;
+RWStructuredBuffer<snorm float> snormBuf;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void main()
 {
-    outputBuffer[0] = n.u + n.s + p.u + p.s + inBuf[0];
+    outputBuffer[0] = n.u + n.s + p.u + p.s + unormBuf[0] + snormBuf[0];
 }
 
 // HLSL keeps the modifier in the emitted spelling, for DXC compatibility.
 
-// HLSL: RWStructuredBuffer<unorm float
-// HLSL: unorm float{{.*}}u_0
-// HLSL: snorm float{{.*}}s_0
+// HLSL-DAG: RWStructuredBuffer<unorm float
+// HLSL-DAG: RWStructuredBuffer<snorm float
+// HLSL-DAG: unorm float{{.*}}u_0
+// HLSL-DAG: snorm float{{.*}}s_0
 
 // SPIR-V has no such spelling, so it shows the layout directly. Both structs
 // lower to the same member types and the same offsets, which is the property
