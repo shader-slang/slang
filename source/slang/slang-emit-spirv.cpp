@@ -2402,16 +2402,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto debugGlobalConst = as<IRDebugGlobalConstant>(inst);
                 auto varType = as<IRType>(debugGlobalConst->getDebugType());
-                auto debugType = emitDebugType(varType, false);
-                if (!debugType)
-                {
-                    *emittedSpvInst = nullptr;
-                    return true;
-                }
 
-                // Ensure DebugCompilationUnit is processed so findDebugScope can find the scope.
-                // emitSPIRVFromIR defers DebugGlobalConstant to after the CU pre-ensure pass,
-                // but processDebugGlobalInst may also be triggered transitively via ensureInst.
+                // Ensure DebugCompilationUnit is processed before emitDebugType and
+                // findDebugScope: both call findDebugScope internally, which needs the
+                // module-inst → scope mapping registered by the CU emit.
                 for (auto globalInst : inst->getModule()->getGlobalInsts())
                 {
                     if (globalInst->getOp() == kIROp_DebugCompilationUnit)
@@ -2420,6 +2414,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     }
                 }
+
+                auto debugType = emitDebugType(varType, false);
+                // emitDebugTypeImpl returns m_voidType (OpTypeVoid) if findDebugScope fails
+                // (e.g., varType lives in the session rather than the current module).
+                // An OpTypeVoid debug type is not a valid DebugType operand, so skip.
+                if (!debugType || debugType->opcode == SpvOpTypeVoid)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
                 auto scope = findDebugScope(inst->getModule()->getModuleInst());
                 if (!scope)
                 {
