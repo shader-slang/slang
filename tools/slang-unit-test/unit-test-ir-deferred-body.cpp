@@ -212,3 +212,63 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // lock is guarding a path that is really taken.
     SLANG_CHECK(duringBackend > 0);
 }
+
+// Checks the two paths that decline deferral, and that declining changes nothing but cost.
+//
+// Deferral is skipped when the caller supplies no blob, and when the blob it supplies does
+// not back the flat table's spans. Neither was exercised by anything that asserted the
+// outcome, and the second is the one that matters: it is what stands between a caller
+// passing the wrong buffer and a use-after-free surfacing somewhere unrelated. It is also
+// invisible from outside, so `getDeferralDeclinedForSpanMismatchCount()` exists to make the
+// decision observable — a check that silently stopped rejecting would otherwise look
+// exactly like one that had nothing to reject.
+SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    struct Case
+    {
+        int blobMode;
+        const char* what;
+        bool expectDeferral;
+        bool expectMismatchCounted;
+    };
+    // 0 = the blob the bytes came from, 1 = no blob, 2 = an identical copy elsewhere.
+    const Case cases[] = {
+        {0, "matching blob", true, false},
+        {1, "no blob", false, false},
+        {2, "mismatched blob", false, true},
+    };
+
+    Index referenceInstCount = 0;
+    for (const Case& testCase : cases)
+    {
+        bool deferred = false;
+        Index instCount = 0;
+        Index mismatchDelta = 0;
+        _testDeferralFallback(globalSession, testCase.blobMode, deferred, instCount, mismatchDelta);
+
+        SLANG_CHECK_ABORT(instCount > 0);
+        if (testCase.blobMode == 0)
+        {
+            referenceInstCount = instCount;
+            // Guards the premise: if deferral stopped happening for the matching blob, the
+            // other two cases would agree with it trivially and prove nothing.
+            if (isOnDemandIRLoadEnabled())
+                SLANG_CHECK(deferred == testCase.expectDeferral);
+        }
+        else
+        {
+            SLANG_CHECK(!deferred);
+            // The whole point of the fallback: declining costs time, never contents.
+            SLANG_CHECK(instCount == referenceInstCount);
+        }
+
+        // Only the mismatched case should trip the containment check. A null blob is
+        // refused earlier, before there is anything to compare.
+        if (isOnDemandIRLoadEnabled())
+            SLANG_CHECK((mismatchDelta > 0) == testCase.expectMismatchCounted);
+    }
+}

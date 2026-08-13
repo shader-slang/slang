@@ -1192,6 +1192,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
 
         if (!spansAreOwnedByTheBlob)
         {
+            _noteDeferralDeclinedForSpanMismatch();
             // Fall back to an eager load rather than asserting. A caller that supplies an
             // unrelated blob then gets correct behaviour at the old cost, which is a better
             // failure mode than aborting a compile -- and eager loading is exactly what this
@@ -1582,11 +1583,24 @@ void _testRoundTripDecorationWithChildren(
 
 /// Serializes `module` and reads it back out of a blob, which is the condition that lets
 /// bodies stay encoded. Shared by the two test hooks below.
+/// How `_testRoundTrip` should hand the serialized bytes to the reader.
+enum class TestBlobMode
+{
+    /// The blob the bytes were parsed out of. The only shape that permits deferral.
+    Matching,
+    /// No blob at all, which is what a caller reading from its own buffer supplies.
+    Null,
+    /// A blob holding an identical *copy* at a different address -- the shape that
+    /// `addLibraryReference` had, and the one the containment check exists to catch.
+    Mismatched,
+};
+
 static SlangResult _testRoundTrip(
     IRModule* module,
     Session* session,
     ComPtr<ISlangBlob>& outBlob,
-    RefPtr<IRModule>& outModule)
+    RefPtr<IRModule>& outModule,
+    TestBlobMode blobMode = TestBlobMode::Matching)
 {
     OwnedMemoryStream stream(FileAccess::ReadWrite);
     {
@@ -1613,7 +1627,25 @@ static SlangResult _testRoundTrip(
     if (!irChunk)
         return SLANG_FAIL;
 
-    return readSerializedModuleIR(irChunk, session, nullptr, outBlob, outModule);
+    ISlangBlob* blobForReader = outBlob;
+    ComPtr<ISlangBlob> decoyBlob;
+    switch (blobMode)
+    {
+    case TestBlobMode::Null:
+        blobForReader = nullptr;
+        break;
+    case TestBlobMode::Mismatched:
+        // Same bytes, different allocation. Deferral must decline: the chunk pointers and
+        // spans refer into `outBlob`, so retaining this one would keep the wrong memory
+        // alive and leave the views dangling the moment `outBlob` went away.
+        decoyBlob = ListBlob::create(bytes);
+        blobForReader = decoyBlob;
+        break;
+    case TestBlobMode::Matching:
+        break;
+    }
+
+    return readSerializedModuleIR(irChunk, session, nullptr, blobForReader, outModule);
 }
 
 void _testConcurrentBodyMaterialization(
@@ -1639,6 +1671,11 @@ void _testConcurrentBodyMaterialization(
         for (Index f = 0; f < kFuncCount; ++f)
         {
             IRInst* func = builder.createFunc();
+            // Decorations are required for this to test what it claims. A deferred body is
+            // published into the link *after the last decoration*, so with none the body
+            // attaches at `first`, the decoration walk starts at null and ends immediately,
+            // and the acquire on that link is never exercised.
+            builder.addNameHintDecoration(func, UnownedStringSlice("concurrentProbe"));
             builder.setInsertInto(func);
             builder.emitBlock();
             for (Index i = 0; i < kBodyInstCount - 2; ++i)
@@ -1696,17 +1733,49 @@ void _testConcurrentBodyMaterialization(
     for (int t = 0; t < kThreadCount; ++t)
     {
         threads.add(std::thread(
-            [&]()
+            [&, threadIndex = t]()
             {
                 while (!go.load(std::memory_order_acquire))
                     std::this_thread::yield();
+                // Half the threads publish, half walk decorations. Materializing from
+                // every thread exercises the mutex but not the barrier that matters most:
+                // the decoration walk is the one reader allowed to observe the publication
+                // link *without* going through `ensureBodyMaterialized`, which is why
+                // `getFirstDecoration`, `getNextDecoration` and
+                // `IRDecorationList::Iterator::operator++` load it with acquire. Unless
+                // some thread is walking decorations while another publishes into
+                // `lastDecoration->next`, that race is never run and dropping those
+                // acquires passes every test.
+                const bool walksDecorations = (threadIndex % 2) == 1;
                 for (Index i = 0; i < funcs.getCount(); ++i)
                 {
-                    // The first touch of each body: this is what takes the loader's mutex
-                    // and, on the winning thread, publishes the chain with a release store.
-                    funcs[i]->ensureBodyMaterialized();
-                    if (_countChildrenOf(funcs[i]) != expected[i])
-                        mismatches.fetch_add(1);
+                    if (walksDecorations)
+                    {
+                        // Must never run past the decorations into a body that another
+                        // thread is publishing. Counting is enough to catch it: a walk
+                        // that continues into the body returns more than there are
+                        // decorations.
+                        Index decorationCount = 0;
+                        for (IRDecoration* decoration : funcs[i]->getDecorations())
+                        {
+                            SLANG_UNUSED(decoration);
+                            decorationCount++;
+                        }
+                        // Exactly the one decoration added above. More than that means the
+                        // walk followed a link into a body another thread was publishing
+                        // and kept going, counting body instructions as decorations.
+                        if (decorationCount != 1)
+                            mismatches.fetch_add(1);
+                    }
+                    else
+                    {
+                        // The first touch of each body: this is what takes the loader's
+                        // mutex and, on the winning thread, publishes the chain with a
+                        // release store.
+                        funcs[i]->ensureBodyMaterialized();
+                        if (_countChildrenOf(funcs[i]) != expected[i])
+                            mismatches.fetch_add(1);
+                    }
                 }
             }));
     }
@@ -1715,6 +1784,76 @@ void _testConcurrentBodyMaterialization(
         thread.join();
 
     outMismatches = mismatches.load();
+}
+
+
+void _testDeferralFallback(
+    slang::IGlobalSession* globalSession,
+    int blobMode,
+    bool& outDeferredLoaderInstalled,
+    Index& outInstCount,
+    Index& outSpanMismatchDelta)
+{
+    outDeferredLoaderInstalled = false;
+    outInstCount = 0;
+    outSpanMismatchDelta = 0;
+
+    Session* session = static_cast<Session*>(globalSession);
+
+    // A module with several bodies, so a deferred load has something to defer and an
+    // eager one has something to get wrong.
+    RefPtr<IRModule> original = IRModule::create(session);
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        for (Index f = 0; f < 8; ++f)
+        {
+            IRInst* func = builder.createFunc();
+            builder.setInsertInto(func);
+            builder.emitBlock();
+            IRType* floatType = builder.getFloatType();
+            for (Index i = 0; i < 6; ++i)
+            {
+                builder.emitAdd(
+                    floatType,
+                    builder.getFloatValue(floatType, IRFloatingPointValue(i)),
+                    builder.getFloatValue(floatType, IRFloatingPointValue(1)));
+            }
+            builder.emitReturn();
+            builder.setInsertInto(original->getModuleInst());
+        }
+    }
+
+    const Index mismatchBefore = getDeferralDeclinedForSpanMismatchCount();
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    const TestBlobMode mode = TestBlobMode(blobMode);
+    if (SLANG_FAILED(_testRoundTrip(original, session, blob, reloaded, mode)))
+        return;
+
+    outSpanMismatchDelta = getDeferralDeclinedForSpanMismatchCount() - mismatchBefore;
+    outDeferredLoaderInstalled = (reloaded->getDeferredBodyLoader() != nullptr);
+
+    // Counting every instruction forces every body to materialize if it was deferred, and
+    // reads every body if it was not -- so the same number must come back either way. That
+    // is the property the fallbacks exist to preserve: declining deferral may cost time,
+    // but it must never change what was loaded.
+    Index count = 0;
+    for (IRInst* global : reloaded->getModuleInst()->getChildren())
+    {
+        count++;
+        for (IRInst* child : global->getChildren())
+        {
+            count++;
+            for (IRInst* grandchild : child->getChildren())
+            {
+                SLANG_UNUSED(grandchild);
+                count++;
+            }
+        }
+    }
+    outInstCount = count;
 }
 
 } // namespace Slang

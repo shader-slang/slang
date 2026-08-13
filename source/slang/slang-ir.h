@@ -115,6 +115,30 @@ SLANG_API Index getDeferredBodyLoaderInstallCount();
 /// Exists to answer whether a given phase actually reaches still-deferred bodies.
 SLANG_API Index getDeferredBodyMaterializationCount();
 
+void _noteDeferralDeclinedForSpanMismatch();
+
+/// Number of module loads that declined deferral because the supplied blob did not back
+/// the flat table's spans.
+///
+/// Makes an otherwise invisible decision observable. If the containment check regressed to
+/// wrongly saying "safe", nothing would catch it until a use-after-free surfaced far away;
+/// if it wrongly said "unsafe", callers would silently pay the eager cost with no signal.
+/// A counter turns both into something a test can assert.
+SLANG_API Index getDeferralDeclinedForSpanMismatchCount();
+
+/// Test-only: round-trips a module while controlling what blob the reader is given, and
+/// reports whether deferral was taken and what was loaded.
+///
+/// `blobMode` is `TestBlobMode`: 0 the matching blob, 1 no blob, 2 a same-bytes copy at a
+/// different address. Only the first permits deferral; the other two must fall back to an
+/// eager load and still produce exactly the same module.
+SLANG_API void _testDeferralFallback(
+    slang::IGlobalSession* globalSession,
+    int blobMode,
+    bool& outDeferredLoaderInstalled,
+    Index& outInstCount,
+    Index& outSpanMismatchDelta);
+
 /// Test-only: round-trips a module whose decoration has children of its own through the
 /// serialized form, and reports what came back.
 ///

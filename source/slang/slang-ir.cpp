@@ -8887,6 +8887,21 @@ namespace
 std::atomic<Index> g_deferredBodyMaterializationCount{0};
 }
 
+namespace
+{
+std::atomic<Index> g_deferralDeclinedForSpanMismatchCount{0};
+}
+
+void _noteDeferralDeclinedForSpanMismatch()
+{
+    g_deferralDeclinedForSpanMismatchCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+Index getDeferralDeclinedForSpanMismatchCount()
+{
+    return g_deferralDeclinedForSpanMismatchCount.load(std::memory_order_relaxed);
+}
+
 Index getDeferredBodyMaterializationCount()
 {
     return g_deferredBodyMaterializationCount.load(std::memory_order_relaxed);
