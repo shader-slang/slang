@@ -392,3 +392,136 @@ perf runner; only pursue if Phases 1–2 prove insufficient.
 ladder as the internal benchmark's data (2026.5.2, 2026.12, 2026.12.2,
 `f4975a7`) and confirm they reproduce both signals (the release-boundary jump
 and the 2026-07-03 step). If they do, the dimension is captured.
+
+## Memory footprint — the measurement options and what each one can see (2026-08-13)
+
+`README.md` documents the memory metrics that exist. This section is the menu they
+were chosen from, so a future addition starts from the trade-offs rather than
+rediscovering them.
+
+**The axis that governs everything: outside the process, or inside it.** A metric
+measured from outside a `slangc`/`libslang` binary works on binaries that were
+built before the metric existed, so it can be backfilled across the whole release
+history by re-sweeping. A metric that requires the binary to report on itself can
+only ever go forward from the build that first carries the instrumentation. That
+is not a detail of the current implementation — it is a permanent property, and it
+should decide which side any new metric is built on whenever there is a choice.
+
+| Metric | Measured by | Backfillable |
+| --- | --- | --- |
+| `peakRssKb` | OS, read from the exited child | yes |
+| `apiCreateGlobalSessionRssDeltaKb` | api-driver, built fresh, `dlopen`s old libslang | yes |
+| AST / IR / source components, `endOfCompileRssKb` | the compiler itself | **no** |
+
+**Peaks do not subtract.** The tempting cheap trick — run `slangc -h` for a
+"session only" baseline, subtract it from a workload run, call the difference the
+compile's cost — is wrong, and was tried and rejected. `peak(A+B) − peak(A)` is a
+difference of two lifetime high-water marks from two processes; it reports how much
+higher the mark got, not what B allocated. A phase that allocates 60 MiB after
+startup scratch is released moves the mark by nothing. Direct readings survive this
+objection and differences do not, which is why the api-driver brackets RSS
+immediately before and after a call **within one process** rather than comparing
+process peaks. Prefer in-process bracketing for any new phase metric.
+
+**Options not yet taken, roughly by value per effort.**
+
+1. **Per-phase api brackets.** The driver already reads RSS around
+   `createGlobalSession`; the same bracket around `loadModule`, `specialize`,
+   `getEntryPointCode`, and `getLayout` is a few lines, uses the proven technique,
+   and backfills to every release in the ladder.
+2. **RSS sampled over time.** A curve rather than a maximum: shows *when* the peak
+   lands and how much of it is transient. External, so it backfills, and it is the
+   honest version of what peak-subtraction was badly approximating.
+3. **Core-module cost, as two direct readings.** `-load-core-module` routes slangc
+   through `createGlobalSessionWithoutCoreModule`, so the same binary can be
+   measured with and without the core module. Report both readings; do not publish
+   their difference as a "cost" series (see above).
+4. **Resident breakdown by region** (Linux `smaps`, macOS `vmmap`, Windows working
+   set). Splits RSS into heap, binary/text, and mapped files with no compiler
+   changes. Platform-specific and more work, but it is how the current
+   `unattributedKb` was first explained.
+5. **Allocator interposition** (malloc hooks, `MallocStackLogging`). The most
+   powerful — it names allocation sites — and the most effort. Awkward on the
+   Windows perf runner. Best used as an ad-hoc investigation tool rather than a
+   tracked series; see the reproduction recipe below.
+
+**Ad-hoc investigation recipe.** For "what is in the unattributed remainder", the
+tracked series will not answer it and does not need to. On macOS:
+`MallocStackLogging=1 slangc <a workload long enough to sample> &` then
+`malloc_history <pid> -callTree -invert` for allocation sites by live bytes, and
+`vmmap -summary <pid>` for the region-type split. This identified the retained
+core-module container (#12530) and the ~30 MB of freed-but-unreturned allocator
+slack that no component will ever explain.
+
+**Why an unattributed line is published rather than driven to zero.** Allocator
+slack is real resident memory belonging to no component, and the process also
+carries heap that the walk does not reach. Publishing components without their
+remainder would imply the parts tile the total; they do not, and on a minimal
+compile the remainder is the majority of the footprint. The remainder is also what
+makes the report self-checking: it was the number that falsified two plausible
+hypotheses about where the memory had gone.
+
+### The tracked set, and what is only stored
+
+Following the suite's existing rule — everything is stored in `results.json`, only
+the meaningful set is promoted to charts and trend alerts — the memory series to
+publish per `track_memory` workload are:
+
+| Series | Why it is charted |
+| --- | --- |
+| `peakRssKb` | the alarm: complete, OS-measured, cannot be distorted by instrumentation |
+| `irArenaReservedKb` | the dominant component (63.7 MiB on `minimal`, 11× the AST) and what on-demand IR loading moves |
+| `astArenaReservedKb` | the other half of the AST-vs-IR question |
+| `sourceContentKb` | exact, cheap, and scales with the real-shader corpora |
+| `unattributedKb` | the honesty term; currently the majority of the footprint |
+| `endOfCompileRssKb` | the same-instant anchor that makes the remainder well defined |
+
+`Reserved` rather than `Used` is charted because reserved is what is resident and
+therefore what sums toward RSS; `Used` is stored, and the gap between them is a
+drill-down (it is real memory — AST arenas carry ~29% block slack against IR's
+0.02%). `sourceArenaUsed/Reserved` is stored but **not** charted: that arena's only
+client in the tree is `SourceManager::allocateStringSlice`, called from the parser
+for scoped identifiers, so it reads ~0 by construction. Downstream compiler DLLs
+stay a documented constant inside the remainder rather than a series — release
+sweeps never load them.
+
+### Ordered next steps
+
+1. ~~`endOfCompileRssKb`~~ and ~~`irSideTablesKb`~~ — done; the side tables measured
+   2.1 MiB, refuting the expectation that they were a major owner.
+2. **Close the walk's gap.** `malloc_history` attributes 122 M to `MemoryArena`
+   block allocation while the report accounts for 91.7 MiB of arenas; ~25 MiB of
+   arena blocks are never reached. `tryLoadBuiltinModuleFromDLL` contributes 8.83 M
+   of IR through a path that does not appear to land in `coreModules` or any walked
+   linkage.
+3. **A retained-serialized-image counter.** The single largest known unattributed
+   item, 41.5 MB (#12530). Also the counterweight to on-demand IR loading: that work
+   shrinks the deserialized IR while *requiring* the container to stay reachable, so
+   tracking only the arena would show a win that the process does not see.
+4. **Per-phase api brackets**, so the api-mode workloads gain phase attribution.
+
+**Scope limit worth knowing before designing the page.** Component attribution is
+target-mode only: it comes from `slangc`, and the api-mode workloads
+(`rt_renderer`, `rt_renderer_specialize`, `api_session_create`) run through the
+api-driver, which has no route to an internal walker. Those keep contributing
+`peakRssKb` and the session delta until the report is exposed through the public
+API. This is ironic in a useful way: `api_session_create` most directly measures
+the session creation that dominates the footprint, and is the workload that cannot
+yet say what that memory is made of.
+
+### What the history says (2026-08-13 backfill)
+
+The full release ladder now carries `peakRssKb` and the session delta back to
+v2025.12. Both are backfillable, so re-sweeping produced them for binaries built
+long before memory was tracked; the components never can be.
+
+The two move in lockstep across all 28 points, which is the strongest evidence that
+this is a `createGlobalSession` story rather than a compile story — as is the
+observation that an empty-shader compile reaches ~212 MiB before reading any
+source, and adds ~7 MiB to the high-water mark to compile it.
+
+The pre-regression baseline was not flat. `minimal` peak RSS ran 293 MiB
+(v2025.12) → ~125 MiB (v2025.15) → ~95 MiB (v2025.22), stable through v2026.5, then
+190 MiB at v2026.7 (#12113), 242 MiB at v2026.10, and ~205 MiB by v2026.14.1. The
+2026.7 regression gave back the whole v2025.22 improvement; today's footprint is
+close to where the project stood at v2025.13.
