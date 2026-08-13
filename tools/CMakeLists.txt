@@ -409,6 +409,10 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         INCLUDE_DIRECTORIES_PRIVATE ${slang_SOURCE_DIR}/source
         PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
+        REQUIRES
+            # Dlopened by unit-test-render-test-session-prelude.cpp, which checks that render-test
+            # restores the preludes it borrows from the caller's session.
+            render-test
         FOLDER test/tools
     )
     # slang-repro-validator.cpp is part of the slang DLL's normal source set, but
