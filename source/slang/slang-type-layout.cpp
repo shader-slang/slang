@@ -6154,6 +6154,21 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         return createSimpleTypeLayout(SimpleLayoutInfo(), errorType, rules);
     }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        // We lay out a modified type as the type it modifies. `unorm` and
+        // `snorm` say how a texel is interpreted, not how storage for it is
+        // reserved, so `unorm float` lays out exactly as `float`.
+        //
+        // Reachable for any non-texture carrier, e.g. the element type of
+        // `RWStructuredBuffer<unorm float>`, which `createStructuredBufferTypeLayout`
+        // recurses into. Without this case that recursion falls through to the
+        // catch-all below, which is UB in a release build (issue #12535).
+        // Whether the modifier belongs there at all is issue #8870; layout has
+        // to be total over types either way.
+        //
+        return _createTypeLayout(context, modifiedType->getBase());
+    }
     else if (auto existentialSpecializedType = as<ExistentialSpecializedType>(type))
     {
         ExpandedSpecializationArgs args;
