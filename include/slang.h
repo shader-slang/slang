@@ -1307,6 +1307,12 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
+        ReportMemoryUsage =
+            158, // bool: report how much memory the compiler is holding when the compile
+                 //   finishes, broken down by component (AST, IR, source). This is an
+                 //   instantaneous account of what is still live, not a high-water mark, so it is
+                 //   a lower bound on the process peak.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,

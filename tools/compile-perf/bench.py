@@ -142,6 +142,52 @@ def stats(values):
 # window; the detailed flag was added mid-window and only adds finer sub-timers.
 PERF_FLAG = "-report-perf-benchmark"
 
+# Memory attribution is probed per binary rather than folded into PERF_FLAG,
+# because unlike the timers it CANNOT be measured across the release window. A
+# prebuilt slangc from before the flag landed rejects it outright
+# ("error[E00017]: unknown command-line option"), which real_error() would score
+# as a failed sample for every workload on every historical release — the whole
+# release history would go red. Peak RSS was backfillable because the OS records
+# it for any binary from the outside; component attribution needs instrumentation
+# INSIDE the binary, so this series can only ever grow forward from the build
+# that first carries the flag.
+MEM_FLAG = "-report-memory-usage"
+
+_flag_support = {}
+
+
+def supports_flag(slangc, flag):
+    """Return whether `slangc` advertises `flag` in its help output.
+
+    Probed rather than gated on a version or release tag: bench runs prebuilt
+    releases, nightly tip-of-tree builds, and arbitrary local branches, and only
+    the binary itself knows what it accepts. Cached per (binary, flag), so the
+    probe costs one extra process per binary per bench run rather than one per
+    sample.
+    """
+    key = (slangc, flag)
+    if key not in _flag_support:
+        try:
+            proc = subprocess.run([slangc, "-h"], stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, timeout=60)
+            _flag_support[key] = flag in proc.stdout.decode("utf-8", "replace")
+        except (OSError, subprocess.SubprocessError):
+            # A binary that cannot print its own help will fail the real run too,
+            # and that failure carries the workload's diagnostics. Treating the
+            # capability as absent here keeps the useful error as the one that
+            # surfaces, instead of masking it with a probe traceback.
+            _flag_support[key] = False
+    return _flag_support[key]
+
+
+def report_flags(slangc):
+    """The reporting flags for `slangc`: timers always, memory when supported."""
+    flags = [PERF_FLAG]
+    if supports_flag(slangc, MEM_FLAG):
+        flags.append(MEM_FLAG)
+    return flags
+
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -279,7 +325,7 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
         out = os.path.join(gen_dir, "out.slang-module")
         return {
             "setup": [],
-            "timed": [slangc, PERF_FLAG, os.path.join(gen_dir, f),
+            "timed": [slangc, *report_flags(slangc), os.path.join(gen_dir, f),
                       *spec.extra_flags, "-o", out],
         }
     if spec.mode == "link":
@@ -290,7 +336,7 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
             setup.append([slangc, os.path.join(gen_dir, f), "-o",
                           os.path.join(gen_dir, f.replace(".slang", ".slang-module"))])
         out = os.path.join(gen_dir, "out.spv")
-        timed = [slangc, PERF_FLAG, "-I", gen_dir,
+        timed = [slangc, *report_flags(slangc), "-I", gen_dir,
                  os.path.join(gen_dir, main), *spec.extra_flags, "-o", out]
         return {"setup": setup, "timed": timed}
     # "target" mode: single or multi-file compile to a GPU target. For single-file
@@ -308,8 +354,8 @@ def build_commands(slangc, spec, gen_dir, files, size=None, api=None):
     # -I gen_dir lets multi-file corpora resolve imports; harmless for single files
     return {
         "setup": [],
-        "timed": [slangc, PERF_FLAG, "-I", gen_dir, os.path.join(gen_dir, f),
-                  *extra, "-o", out],
+        "timed": [slangc, *report_flags(slangc), "-I", gen_dir,
+                  os.path.join(gen_dir, f), *extra, "-o", out],
     }
 
 
@@ -837,6 +883,20 @@ if os.path.exists(_DRIVER_SRC):
         ("api-driver.cpp's [MEM] printf format no longer matches what parse_mem "
          "parses; memory collection would silently degrade to 'no data'")
 del _DRIVER_SRC
+
+# Same reasoning for the slangc-side producer, and the failure here is quieter
+# still: supports_flag() probes for MEM_FLAG by name, so a rename on the compiler
+# side does not error — every probe simply returns False and the component
+# counters vanish from the ToT series with every run still green. Pin the name to
+# the option table that defines it. Guarded on existence because the suite is
+# usable against a slangc binary with no compiler source tree beside it.
+_OPTIONS_SRC = os.path.join(HERE, "..", "..", "source", "slang", "slang-options.cpp")
+if os.path.exists(_OPTIONS_SRC):
+    assert f'"{MEM_FLAG}"' in analyze.read_text(_OPTIONS_SRC), \
+        (f"slang-options.cpp no longer defines {MEM_FLAG}; supports_flag would "
+         "return False forever and component memory would silently stop being "
+         "collected")
+del _OPTIONS_SRC
 
 
 # Import-time self-check for the ru_maxrss unit rule. Pure and platform-free

@@ -614,6 +614,11 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reports compiler performance benchmark results for each intermediate pass (implies "
          "-report-perf-benchmark)."},
+        {OptionKind::ReportMemoryUsage,
+         "-report-memory-usage",
+         nullptr,
+         "Reports how much memory the compiler is holding when the compile finishes, broken down "
+         "by component (AST, IR, source)."},
         {OptionKind::ReportCheckpointIntermediates,
          "-report-checkpoint-intermediates",
          nullptr,
@@ -2778,6 +2783,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::DumpReproOnError:
         case OptionKind::ReportDownstreamTime:
         case OptionKind::ReportPerfBenchmark:
+        case OptionKind::ReportMemoryUsage:
         case OptionKind::ReportCheckpointIntermediates:
         case OptionKind::ReportDynamicDispatchSites:
         case OptionKind::TraceCoverage:

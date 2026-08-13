@@ -7,6 +7,7 @@
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
+#include "slang-memory-report.h"
 #include "slang-module-library.h"
 #include "slang-options.h"
 #include "slang-reflection-json.h"
@@ -1982,6 +1983,17 @@ SlangResult EndToEndCompileRequest::compile()
         perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(
             Diagnostics::PerformanceBenchmarkResult{.benchmarkOutput = perfResult.produceString()});
+    }
+    if (getOptionSet().getBoolOption(CompilerOptionName::ReportMemoryUsage))
+    {
+        // Taken here, after `executeActions` has returned, so the account covers a completed
+        // compile: every module the compile loaded is still live and reachable from the linkage.
+        // Anything allocated and released during the compile is already gone, which is why this is
+        // a lower bound on the peak rather than an explanation of it.
+        StringBuilder memoryResult;
+        appendMemoryReportLines(captureMemoryReport(getLinkage()), memoryResult);
+        getSink()->diagnose(
+            Diagnostics::MemoryUsageReport{.memoryReportOutput = memoryResult.produceString()});
     }
 
     // Repro dump handling
