@@ -19,6 +19,10 @@
 //CHECK:^^^^^^^^^^^^^^^ unknown pragma ignored
 //CHECK:^^^^^^^^^^^^^^^ ignoring unknown directive '#pragma totally_unknown'
 // CHECK: W15601
-// CHECK: E15101
+// Deliberately NOT asserting E15101 here. `#pragma <unknown>` reaches
+// findPragmaDirective, which falls back to kUnknownPragmaDirective; its
+// callback emits only UnknownPragmaDirectiveIgnored (W15601) and then
+// SkipToEndOfLine. E15101 (unknown preprocessor directive) is raised for an
+// unrecognized `#`-directive name and is unreachable from pragma handling.
 
 void main() {}

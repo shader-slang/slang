@@ -7,6 +7,16 @@ observed_at: "2026-08-05T00:00:00+00:00"
 scope: ir
 evidence:
   command: "build/RelWithDebInfo/bin/slangi <file>"
+  repro_source: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    struct A { int x; }
+    struct B : A { int y; }
+    void main()
+    {
+        B b; b.x = 5; b.y = 6;
+        Optional<A> o = b as A;
+        if (o.hasValue) printf("%d\n", o.value.x);
+    }
   source_slang: docs/generated/tests/coverage/check-expr/tuple-swizzle-out-of-range-diag.slang
   observed_summary: |
     Using the `as` operator to upcast a struct value to its base struct segfaults slangi.
