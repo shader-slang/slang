@@ -22,8 +22,22 @@ struct Plain
     float s;
 }
 
+// A vector carrier too: under std140 a float4 has 16-byte alignment, so this
+// catches a size/alignment mistake the scalar case would not.
+struct NormsVec
+{
+    unorm float4 v;
+}
+
+struct PlainVec
+{
+    float4 v;
+}
+
 uniform Norms n;
 uniform Plain p;
+uniform NormsVec nv;
+uniform PlainVec pv;
 
 // Both modifiers on both carriers: as a buffer element here, as a struct field
 // above.
@@ -34,7 +48,7 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void main()
 {
-    outputBuffer[0] = n.u + n.s + p.u + p.s + unormBuf[0] + snormBuf[0];
+    outputBuffer[0] = n.u + n.s + p.u + p.s + nv.v.x + pv.v.x + unormBuf[0] + snormBuf[0];
 }
 
 // HLSL keeps the modifier in the emitted spelling, for DXC compatibility.
@@ -44,9 +58,24 @@ void main()
 // HLSL-DAG: unorm float{{.*}}u_0
 // HLSL-DAG: snorm float{{.*}}s_0
 
-// SPIR-V has no such spelling, so it shows the layout directly. Both structs
-// lower to the same member types and the same offsets, which is the property
-// this fix establishes; the buffer element is a plain float array.
+// SPIR-V has no such spelling, so it shows the layout directly. Each modified
+// struct lowers to the same member types at the same offsets as its plain twin,
+// which is the property this fix establishes.
+
+// SPIRV-DAG: %NormsVec_std140 = OpTypeStruct %v4float
+// SPIRV-DAG: %PlainVec_std140 = OpTypeStruct %v4float
+
+// The four uniform structs sit at 0/16/32/48, so `NormsVec` occupies the same
+// 16 bytes `PlainVec` does -- the alignment-sensitive half of the claim.
+
+// SPIRV-DAG: OpMemberDecorate %GlobalParams_std140 2 Offset 32
+// SPIRV-DAG: OpMemberDecorate %GlobalParams_std140 3 Offset 48
+
+// `calcSizeAndAlignment` is the IR-side half of this fix, and its result is the
+// runtime-array stride, so pin that directly rather than only the element type
+// (which comes from emit unwrapping the attribute, not from the layout code).
+
+// SPIRV-DAG: OpDecorate %_runtimearr_float ArrayStride 4
 
 // SPIRV-DAG: %Norms_std140 = OpTypeStruct %float %float
 // SPIRV-DAG: %Plain_std140 = OpTypeStruct %float %float
