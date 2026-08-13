@@ -1140,7 +1140,7 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     }
 
     decoder->deferBodies = onDemandIRLoad;
-    const auto moduleInst = decoder->decodeInst(nullptr, 0);
+    const auto moduleInst = decoder->decodeInst(nullptr, kModuleInstDepth);
 
     // Keep the decoder alive so the bodies it skipped can still be decoded. It
     // holds the flat table and the instruction array, which a body needs: its
