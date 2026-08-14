@@ -441,7 +441,33 @@ def main():
             "call. Panels are line charts, not stacked areas, because these "
             "are separate memory <i>peaks</i> — maxima do not add up to a "
             "total the way the time pages' phase buckets sum to "
-            "compileInner.</p>")
+            "compileInner.</p>"
+            # The unattributed share is the majority of the footprint, so
+            # "what is in it?" is the first question anyone asks of these
+            # numbers. Answering it here, with measured categories and the
+            # part that is structurally unattributable, is cheaper than
+            # answering it repeatedly — and stops a large remainder reading
+            # as missing instrumentation when most of it is not.
+            "<p class='small'><b>Component attribution and "
+            "<code>unattributedKb</code></b> — builds carrying "
+            "<code>-report-memory-usage</code> also record what the compiler "
+            "is holding by component (AST and IR arenas, split by builtin vs "
+            "user modules; IR lookup tables; source text) against "
+            "<code>endOfCompileRssKb</code>, the process total at the same "
+            "instant. The remainder is <code>unattributedKb</code>, and it is "
+            "expected to stay large: on a 6000-function compile it is ~166 of "
+            "290 MiB. Measured composition, via <code>vmmap</code> and "
+            "<code>malloc_history</code> on a live process: ~41 MB of "
+            "retained serialized core-module containers, ~30 MB of allocator "
+            "slack (freed but not returned to the OS), ~23 MB of resident "
+            "binary code, and a long tail of several hundred thousand small "
+            "heap objects. The middle two — about 53 MB — belong to no "
+            "component and never will, so the meaningful signal is whether "
+            "this line <i>grows</i>, not whether it approaches zero. To "
+            "investigate a change in it, see the recipe in "
+            "<code>tools/compile-perf/DESIGN.md</code>; the tracked series "
+            "deliberately does not attempt per-call-site attribution, which "
+            "costs a 2.8x slowdown and cannot run alongside the timers.</p>")
         grid_page(os.path.join(outdir, fname),
                   f"Memory — {cad_title}",
                   "peak resident memory per workload and api-driver "
