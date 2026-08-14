@@ -7,6 +7,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
 #include "slang-target.h"
 
 #include <limits>
@@ -522,9 +523,10 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
 // force-keep, which copies exactly one decorated definition per name; the
 // `SLANG_ASSERT`s below are a DEBUG-BUILD tripwire on that invariant, not a
 // release-build guard (in release `SLANG_ASSERT` expands to `SLANG_ASSUME`).
-// In a release build the loop simply binds that sole definition. Either
-// out-param is left null when its intrinsic is absent (the caller falls back to
-// the per-lane path), so absence is not an error here.
+// In a release build the loop simply binds that sole definition. An out-param
+// left null means the force-keep did not preserve its intrinsic; the sole
+// caller asserts on that, since under the shared force-keep predicate the
+// intrinsics are present whenever the caller reaches this function.
 static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFunc*& outFirstLane)
 {
     outCountBits = nullptr;
@@ -1049,27 +1051,27 @@ struct CoverageInstrumenter
         if (waveAggregate)
         {
             findCoverageWaveFuncs(module, waveCountBitsFunc, waveIsFirstLaneFunc);
-            // If the force-keep did not preserve the intrinsics (e.g. a future
-            // change to the link root set), fall back to the per-lane path
-            // rather than emitting a call to a missing callee.
-            if (!waveCountBitsFunc || !waveIsFirstLaneFunc)
-                waveAggregate = false;
+            // The linker force-keeps both intrinsics under the same predicate
+            // that set `waveAggregationSupported`, so they are present here iff
+            // this branch runs; a null means that pairing has broken.
+            SLANG_ASSERT(waveCountBitsFunc && waveIsFirstLaneFunc);
         }
     }
 
     // Move `inst` and every following inst in its block into a fresh block,
     // leaving the original block open (no terminator) so the caller can
-    // append control flow.
-    //
-    // Preconditions (true at the sole call site — a marker op sits mid-block):
-    // `inst` is an ordinary body instruction, not an `IRParam` (block params are
-    // intentionally left on the original block, never moved), and `inst`'s block
-    // has a terminator. The loop carries that terminator into the new block, so
-    // the new block is well-formed while the original is deliberately left open
-    // for the caller to terminate. Not a general-purpose utility — used only by
-    // `lowerMarkerOp`.
+    // append control flow. The loop carries the original terminator into the
+    // new block, so the new block is well-formed while the original is
+    // deliberately left open for the caller to terminate. Not a general-purpose
+    // utility — used only by `lowerMarkerOp`.
     IRBlock* splitBlockAtInst(IRInst* inst)
     {
+        SLANG_ASSERT(inst);
+        SLANG_ASSERT(!as<IRParam>(inst));
+        IRBlock* originalBlock = as<IRBlock>(inst->getParent());
+        SLANG_ASSERT(originalBlock);
+        SLANG_ASSERT(originalBlock->getTerminator());
+
         IRBuilder builder(module);
         builder.setInsertBefore(inst);
         IRBlock* newBlock = builder.emitBlock();
@@ -1479,12 +1481,9 @@ static bool tryGetCoverageUniformBindingInfo(
 // also include GLSL, but enabling it needs separate validation that a bare
 // `glsl_450` profile auto-declares the subgroup extension rather than
 // erroring, so we gate on SPIR-V only via `isSPIRV`.
-//
-// `profileVersion` must be the MERGED `TargetProgram` profile — see the
-// `isCoverageWaveAggregationSupported` declaration in
-// slang-ir-coverage-instrument.h for the canonical rationale.
-bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest, ProfileVersion profileVersion)
+bool isCoverageWaveAggregationSupported(TargetProgram* targetProgram)
 {
+    TargetRequest* targetRequest = targetProgram->getTargetReq();
     if (!isCoverageInstrumentationTargetSupported(targetRequest)) // excludes WGSL + CPU-via-LLVM
         return false;
     if (isCPUTarget(targetRequest)) // cpp-source CPU has no wave/SIMD-group concept
@@ -1496,7 +1495,7 @@ bool isCoverageWaveAggregationSupported(TargetRequest* targetRequest, ProfileVer
     if (isSPIRV(targetRequest->getTarget())) // SPIR-V / Vulkan
         return true;
     if (isD3DTarget(targetRequest)) // HLSL: wave intrinsics require shader model 6.0+
-        return profileVersion >= ProfileVersion::DX_6_0;
+        return targetProgram->getOptionSet().getProfileVersion() >= ProfileVersion::DX_6_0;
     return false;
 }
 

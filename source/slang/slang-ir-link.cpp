@@ -2353,9 +2353,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // `shouldTraceAnyCoverage()` is the same "any coverage mode on" predicate
     // the coverage pass keys off, so reusing it keeps the force-keep in lockstep
     // with whether the pass runs (rather than re-spelling the three-flag
-    // disjunction here). The force-keep-iff-the-pass-calls-them invariant and
-    // the merged-profile gate rationale live canonically on the
-    // `isCoverageWaveAggregationSupported` declaration in
+    // disjunction here). The force-keep-iff-the-pass-calls-them invariant lives
+    // canonically on the `isCoverageWaveAggregationSupported` declaration in
     // slang-ir-coverage-instrument.h.
     //
     // Boolean mode (`-trace-coverage-boolean`) is excluded for the same reason
@@ -2366,9 +2365,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     const bool keepCoverageWaveFuncs =
         codeGenContext->shouldTraceAnyCoverage() &&
         !targetProgram->getOptionSet().getBoolOption(CompilerOptionName::TraceCoverageBoolean) &&
-        isCoverageWaveAggregationSupported(
-            targetReq,
-            targetProgram->getOptionSet().getProfileVersion());
+        isCoverageWaveAggregationSupported(targetProgram);
 
     HashSet<IRInst*> extraInstsToClone;
     auto cloneAndKeepAlive = [&](IRInst* inst)

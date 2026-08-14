@@ -2660,3 +2660,94 @@ SLANG_UNIT_TEST(coverageTracingBooleanCounterMode)
     SLANG_CHECK(manifestText.indexOf(toSlice("\"boolean\"")) != -1);
     SLANG_CHECK(manifestText.indexOf(toSlice("\"unknown\"")) == -1);
 }
+
+// The coverage pass (emitter) and the linker's wave-intrinsic force-keep must
+// read `-trace-coverage-boolean` from the same option-set scope, or a compile
+// that enables boolean mode only at component scope aggregates in the emitter
+// while the linker withholds the wave intrinsics, leaving the pass with no
+// callee (issue #11509). `linkWithOptions` sets the flag on the linked
+// component's option set, which reaches the merged `TargetProgram` set but not
+// the per-target `TargetRequest` set that session options inherit into; a
+// per-target read in the emitter would miss it. Wave-capable SPIR-V target so
+// aggregation would otherwise be selected; codegen must succeed and record
+// Boolean mode.
+SLANG_UNIT_TEST(coverageTracingBooleanComponentScopeDisablesAggregation)
+{
+    const char* shaderSource = R"(
+        RWStructuredBuffer<uint> outputBuffer;
+
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid : SV_DispatchThreadID)
+        {
+            if (tid.x > 0)
+                outputBuffer[0] = tid.x;
+            else
+                outputBuffer[0] = 0;
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+    // Coverage at session scope so the pass runs; boolean mode is applied later
+    // via `linkWithOptions` so it lands only on the merged component set.
+    slang::CompilerOptionEntry sessionOption = {};
+    sessionOption.name = slang::CompilerOptionName::TraceCoverage;
+    sessionOption.value.kind = slang::CompilerOptionValueKind::Int;
+    sessionOption.value.intValue0 = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntries = &sessionOption;
+    sessionDesc.compilerOptionEntryCount = 1;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(session->loadModuleFromSourceString(
+        "booleanComponentScopeTest",
+        "booleanComponentScopeTest.slang",
+        shaderSource,
+        diagnostics.writeRef()));
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    SLANG_CHECK(module->findEntryPointByName("computeMain", entryPoint.writeRef()) == SLANG_OK);
+
+    slang::IComponentType* parts[] = {module, entryPoint};
+    ComPtr<slang::IComponentType> composed;
+    SLANG_CHECK(
+        session->createCompositeComponentType(parts, 2, composed.writeRef(), nullptr) == SLANG_OK);
+
+    slang::CompilerOptionEntry linkOption = {};
+    linkOption.name = slang::CompilerOptionName::TraceCoverageBoolean;
+    linkOption.value.kind = slang::CompilerOptionValueKind::Int;
+    linkOption.value.intValue0 = 1;
+
+    ComPtr<slang::IComponentType> linked;
+    SLANG_CHECK(composed->linkWithOptions(linked.writeRef(), 1, &linkOption, nullptr) == SLANG_OK);
+
+    ComPtr<slang::IBlob> code;
+    SLANG_CHECK(linked->getEntryPointCode(0, 0, code.writeRef(), nullptr) == SLANG_OK);
+
+    ComPtr<slang::IMetadata> metadata;
+    SLANG_CHECK(linked->getEntryPointMetadata(0, 0, metadata.writeRef(), nullptr) == SLANG_OK);
+    auto* coverage = (slang::ICoverageTracingMetadata*)metadata->castAs(
+        slang::ICoverageTracingMetadata::getTypeGuid());
+    SLANG_CHECK(coverage != nullptr);
+    uint32_t count = coverage->getEntryCount();
+    SLANG_CHECK(count > 0);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        slang::CoverageEntryInfo entry = {};
+        SLANG_CHECK(coverage->getEntryInfo(i, &entry) == SLANG_OK);
+        SLANG_CHECK(entry.counterMode == slang::CoverageCounterMode::Boolean);
+    }
+}
