@@ -72,7 +72,7 @@ resource parameter. They currently do not, so the test is listed in
 CHECK patterns follow the Metal-specific hygiene the doc's surface
 forces: `[[kernel]]`, `[[buffer(N)]]` and friends are matched as bare
 substrings because FileCheck reads a literal `[[...]]` as a variable
-reference; mangled identifiers use `{{[0-9]+}}` wildcards; and the entry
+reference; mangled identifiers use <code>&#123;&#123;[0-9]+&#125;&#125;</code> wildcards; and the entry
 function is matched as `main_0`, since Slang renames user entry points
 on this target.
 
