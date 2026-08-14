@@ -483,8 +483,10 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
     case kIROp_AttributedType:
         {
+            // An `IRAttributedType` attribute records a semantic property, never a
+            // change to storage (a storage-changing property is a distinct IR
+            // type), so it lays out as its base type regardless of the attribute.
             auto attributedType = cast<IRAttributedType>(type);
-            SLANG_ASSERT(attributedType->getAttr()->getOp() == kIROp_NoDiffAttr);
             return getSizeAndAlignment(
                 targetReq,
                 this,

@@ -140,13 +140,6 @@ docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-i
 # after human triage.)
 docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-boundary.slang
 
-# Pending: docs/generated/tests/_meta/findings/ir-types-unorm-snorm-struct-field-sigsegv.yaml
-# A struct with a `unorm float` / `snorm float` field used as a module-scope
-# `uniform` segfaults slangc (exit 139) on every target tried (hlsl, glsl,
-# spirv-asm, metal, cpp), with and without `-dump-ir`. (Will become a
-# tracking issue after human triage.)
-docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
-
 # Pending: docs/generated/tests/_meta/findings/metal-append-buffer-params-missing-binding-slot.yaml
 # On `-target metal` the element and counter pointers that
 # `lowerAppendConsumeStructuredBuffers` synthesizes for an
@@ -155,15 +148,6 @@ docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
 # beside them gets `[[buffer(3)]]`. MSL requires an attribute on every
 # kernel argument. (Will become a tracking issue after human triage.)
 docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-buffer-slots.slang
-
-# Pending: docs/generated/tests/_meta/findings/metadata-unorm-structured-buffer-element-sigsegv.yaml
-# `RWStructuredBuffer<unorm float>` (and the `snorm` spelling) segfaults
-# slangc (exit 139) on `-target hlsl` and `-target spirv-asm`, with and
-# without `-dump-ir`, while the same modifier on `RWTexture2D<unorm float4>`
-# compiles and emits the attribute. Probably the same root cause as
-# ir-types-unorm-snorm-struct-field-sigsegv. (Will become a tracking issue
-# after human triage.)
-docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
 
 # Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
 # Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
