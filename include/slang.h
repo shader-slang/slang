@@ -4746,9 +4746,14 @@ struct ISession : public ISlangUnknown
 
     /** Register a callback to receive structured diagnostics from operations on this session.
 
-        The callback fires once per diagnostic (after severity overrides are applied),
-        with fully structured data including spans and notes.  All `const char*` pointers
-        inside `SlangStructuredDiagnostic` are valid only for the duration of the callback.
+        The callback fires once per rich diagnostic (after severity overrides are applied),
+        carrying the severity, numeric code, human-readable message, and primary/secondary
+        source spans.  All `const char*` pointers inside `SlangStructuredDiagnostic` are
+        valid only for the duration of the callback.
+
+        Note: diagnostics emitted through the legacy `diagnose()` / `diagnoseRaw()` paths
+        (e.g. from downstream compilers such as DXC or glslang) are not delivered through
+        this callback; they appear only in the `outDiagnostics` blob as before.
 
         Pass `nullptr` for `callback` to remove a previously registered callback.
 

@@ -935,6 +935,8 @@ void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* 
 
     // Resolve secondary spans.  Keep HumaneSourceLoc objects alive so that
     // pathInfo.foundPath.getBuffer() pointers remain valid while we build the array.
+    // reserve() ensures no reallocation occurs during the loop, which would invalidate
+    // the getBuffer() pointers taken from earlier elements of secBeginLocs.
     List<HumaneSourceLoc> secBeginLocs;
     List<SlangDiagnosticSpan> secSpans;
     secBeginLocs.reserve(diag.secondarySpans.getCount());

@@ -1704,6 +1704,8 @@ SLANG_UNIT_TEST(vtableISession)
     SLANG_CHECK(p.lastSlot == 17); // getLoadedModuleCount
     callSlot(&p, 23);
     SLANG_CHECK(p.lastSlot == 23); // getDeclSourceLocation
+    callSlot(&p, 24);
+    SLANG_CHECK(p.lastSlot == 24); // setDiagnosticCallback
 }
 
 // ---------------------------------------------------------------------------
