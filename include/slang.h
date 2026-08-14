@@ -823,15 +823,18 @@ typedef uint32_t SlangSizeT;
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
     // Requires internal linkage: `static`, never `inline`. An `inline constexpr`
-    // variable has external linkage and emits one shared global; an application
-    // built with AddressSanitizer wraps its copy in a redzone, so it records a
-    // different size for that symbol than the non-instrumented libslang it links,
-    // and ASan's ODR checker then flags a violation that breaks mixed ASan builds.
-    // `static` gives the constant internal, per-translation-unit linkage with no
-    // emitted global to compare; it stays a compile-time constant because it is
-    // `constexpr`. Inside `extern "C"`, `static` is what forces internal linkage
-    // (not merely dropping `inline`), since the linkage-specification otherwise
-    // treats the declaration as `extern`. See issue #11927.
+    // variable has external linkage, so wherever it is odr-used the definition is
+    // emitted under one shared external symbol name. AddressSanitizer wraps the
+    // copy in an instrumented module with a redzone, which changes the size it
+    // records for that symbol; the copy in a non-instrumented libslang has none,
+    // the sizes disagree, and ASan's ODR checker reports a violation that breaks
+    // mixed ASan builds. `static` does not prevent a definition from being
+    // emitted; it removes the external name, so each translation unit gets its own
+    // internal copy and no shared symbol remains for the checker to compare. The
+    // value is still folded at compile time because it is `constexpr`. Inside
+    // `extern "C"`, `static` is what forces internal linkage (not merely dropping
+    // `inline`), since the linkage-specification otherwise treats the declaration
+    // as `extern`. See issue #11927.
     static constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
@@ -4858,12 +4861,14 @@ enum class CoverageBranchArmKind : uint32_t
     DefaultArm = 4,
 };
 
-// Uses `static` for internal linkage, matching `kDefaultTargetFlags`, so no
-// shared global is emitted for AddressSanitizer to wrap in a redzone (the size
-// mismatch that breaks mixed ASan builds; see the note there). At this
-// namespace scope a bare `constexpr` would already have internal linkage, so
-// here `static` is for consistency rather than strictly required as it is inside
-// `extern "C"`. See issue #11927.
+// Uses `static` for internal linkage, matching `kDefaultTargetFlags`: the
+// definition carries no external symbol name, so ASan has nothing to match
+// against the copy inside a non-instrumented libslang and the ODR violation that
+// breaks mixed ASan builds cannot arise. See the note on `kDefaultTargetFlags`
+// for the full rationale. `static` is not strictly required at this site: the
+// declaration is at namespace scope, where a bare `constexpr` already has
+// internal linkage. It is required at `kDefaultTargetFlags`, which sits inside
+// `extern "C"`. Spelling both the same way keeps the rule uniform. See issue #11927.
 static constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// Per-coverage-entry attribution returned by
