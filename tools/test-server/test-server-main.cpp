@@ -665,14 +665,145 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     return m_connection->sendResult(&result, id);
 }
 
-SlangResult TestServer::execute()
+/// Hidden integration-test hook, in the same spirit as -parent-monitor-ready-event above.
+///
+/// SLANG_TEST_SERVER_DIE_ON_REQUEST=N makes the server vanish when the Nth request arrives,
+/// leaving that request unanswered. That is the exact shape of the failure slang-test's
+/// lost-server handling exists for -- a client blocked on a pipe that will never deliver --
+/// and it is otherwise reproducible only by waiting for a server to die on its own, which is
+/// the one thing nobody can schedule.
+///
+/// Returns 0 (disabled) for anything unset or unparseable, so a typo in the variable name
+/// leaves the server behaving normally rather than dying on request one. Shared by the
+/// exit-on-request and kill-on-request hooks.
+static int _requestOrdinalFromEnv(const char* name)
 {
-    while (m_connection->isActive() && !m_quit)
+    StringBuilder value;
+    if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice(name), value)))
     {
-        // Failure doesn't make the execution terminate
-        [[maybe_unused]] const SlangResult res = _executeSingle();
+        return 0;
+    }
+    Int64 ordinal = 0;
+    if (SLANG_FAILED(StringUtil::parseInt64(value.getUnownedSlice(), ordinal)) || ordinal <= 0)
+    {
+        return 0;
+    }
+    return int(ordinal);
+}
+
+static const char* _readStateName(HTTPPacketConnection::ReadState state)
+{
+    switch (state)
+    {
+    case HTTPPacketConnection::ReadState::Header:
+        return "Header";
+    case HTTPPacketConnection::ReadState::Content:
+        return "Content";
+    case HTTPPacketConnection::ReadState::Done:
+        return "Done";
+    case HTTPPacketConnection::ReadState::Closed:
+        return "Closed";
+    case HTTPPacketConnection::ReadState::Error:
+        return "Error";
+    default:
+        return "?";
+    }
+}
+
+/// Say why the server stopped serving, on the way out.
+///
+/// Leaving the serve loop means exiting 0 -- a clean, deliberate shutdown -- and from the
+/// client's side that is indistinguishable from a crash: the pipe closes while it is waiting.
+/// Seen in CI: a server exited with status 0 after answering 989 requests while slang-test
+/// was still waiting on the 990th. An exit status alone cannot explain that, because there
+/// is nothing wrong with the status.
+///
+/// The loop's own condition IS the explanation, so print it. `-quit` is an orderly shutdown
+/// the client asked for; a Closed or Error read state is the server deciding unilaterally
+/// that the session is over, which is the case worth catching -- the client is still there.
+///
+/// stderr, never stdout: stdout is the JSON-RPC channel, and a stray write to it would
+/// corrupt the very protocol this is trying to explain.
+static void _reportExitReason(JSONRPCConnection* connection, bool quitRequested, int servedCount)
+{
+    if (quitRequested)
+    {
+        // The client asked. Nothing to explain, and the common case -- stay quiet so the
+        // interesting lines are not buried under one of these per server per run.
+        return;
     }
 
+    const char* stateName = "no-transport";
+    if (auto* packetConnection = connection ? connection->getUnderlyingConnection() : nullptr)
+    {
+        stateName = _readStateName(packetConnection->getReadState());
+    }
+
+    fprintf(
+        stderr,
+        "test-server: leaving the serve loop after answering %d request(s) without being asked "
+        "to quit; read state is %s. The client sees this as the server vanishing "
+        "mid-request.\n",
+        servedCount,
+        stateName);
+    fflush(stderr);
+}
+
+SlangResult TestServer::execute()
+{
+    const int dieOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_DIE_ON_REQUEST");
+
+    // Companion to the above that dies by SIGNAL rather than by exiting. The two are not
+    // interchangeable: an exit is reported through getReturnValue(), a signal through
+    // getTerminationSignal(), and those are separate paths on the client side -- the one
+    // that turns "the server vanished" into "the OOM killer took it" is reachable ONLY this
+    // way. Without it the headline diagnostic of this change has no test driving it, and a
+    // regression in the WTERMSIG recording would pass CI in silence.
+    const int killOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_KILL_ON_REQUEST");
+    int servedCount = 0;
+
+    while (m_connection->isActive() && !m_quit)
+    {
+        // Before _executeSingle, so the request is left unread and unanswered. The client has
+        // already written it, so it sees EOF on a call it is waiting for -- a mid-request
+        // loss, not a tidy shutdown.
+        //
+        // _Exit, not exit or return: running atexit handlers or unwinding would close the
+        // connection in an orderly way, which is the case that is NOT interesting here.
+        if (dieOnRequest && servedCount == dieOnRequest - 1)
+        {
+            _Exit(1);
+        }
+
+        // SIGKILL specifically: uncatchable, so no handler can soften it, and it is what the
+        // OOM killer actually sends -- the case the client-side gloss names.
+        //
+        // Unix only, and that costs nothing: Windows has no signal deaths for the client to
+        // report, since WinProcess reports every termination as an exit code. The variable is
+        // simply inert there rather than conditionally compiled away at its read, so a
+        // Windows run of the same test still exercises the ordinary exit path.
+        if (killOnRequest && servedCount == killOnRequest - 1)
+        {
+#if SLANG_UNIX_FAMILY
+            ::raise(SIGKILL);
+#else
+            _Exit(1);
+#endif
+        }
+
+        // Failure doesn't make the execution terminate
+        const SlangResult res = _executeSingle();
+        if (SLANG_SUCCEEDED(res))
+        {
+            // Counted on success only, so it lines up with slang-test's own request ordinal
+            // and means what it says. The iteration that discovers a dead connection has not
+            // answered anything, and counting it would report "1 request" for a server that
+            // served none -- which is exactly the confusion this number exists to resolve.
+            servedCount++;
+        }
+    }
+
+    _reportExitReason(m_connection, m_quit, servedCount);
     return SLANG_OK;
 }
 
