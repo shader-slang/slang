@@ -16142,7 +16142,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         {
             // The only caller that builds this context sets targetReq immediately after,
             // so a null here means a new one did not.
-            SLANG_ASSERT(context->targetReq);
+            SLANG_RELEASE_ASSERT(context->targetReq);
 
             auto byteTypeLayout = context->targetReq->getTypeLayout(
                 elementTypeLayout->type,
@@ -16482,6 +16482,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     IRTypeLayout* irGlobalScopeTypeLayout = irGlobalStructTypeLayout;
     if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(globalScopeTypeLayout))
     {
+        // The global scope element is measured in bytes, unlike a parameter block element, so
+        // it needs no second layout to carry byte offsets.
         IRParameterGroupTypeLayout::Builder globalParameterGroupTypeLayoutBuilder(builder);
 
         auto irElementTypeLayout = irGlobalStructTypeLayout;
