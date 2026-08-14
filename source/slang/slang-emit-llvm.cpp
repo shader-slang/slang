@@ -273,6 +273,18 @@ public:
             llvmType = getValueType(as<IRRateQualifiedType>(type)->getValueType());
             break;
 
+        case kIROp_AttributedType:
+            // An attribute records a semantic property of the type (`unorm`,
+            // `snorm`, `no_diff`) and never a change to its representation, so
+            // the value is emitted as its base type. A `unorm float` loaded
+            // from a texture or read out of a structured buffer reaches here
+            // with the attribute still attached; every other backend unwraps it
+            // the same way (see the `kIROp_AttributedType` cases in
+            // slang-emit-spirv.cpp, slang-emit-c-like.cpp and
+            // slang-emit-wgsl.cpp).
+            llvmType = getValueType(as<IRAttributedType>(type)->getBaseType());
+            break;
+
         case kIROp_PtrType:
         case kIROp_NativePtrType:
         case kIROp_StringType:
