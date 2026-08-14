@@ -5608,7 +5608,7 @@ err(
 
 -- 55204 above is "this operation has no lowering for the target at all"; 55215 below is
 -- "the operation exists but this operand type (e.g. a matrix, or a vector of an element type
--- with only scalar helpers) is unsupported". Pick 55215 when the type is the reason.
+-- with no prelude helper to decompose to) is unsupported". Pick 55215 when the type is the reason.
 err(
     "unsupported-type-for-target-intrinsic",
     55215,

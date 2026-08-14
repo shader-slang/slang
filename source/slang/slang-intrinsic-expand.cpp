@@ -784,16 +784,20 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 argType = vectorType->getElementType();
 
             const char* str = "";
-            // Whether the element prefix selected below has a vector-arity `<prefix>_min`/`_max`
-            // (and the other element-wise `$P` helpers) in the preludes. Only these may back a
-            // vector operand; the rest (I8/I16/U8/U16, IPTR/UPTR) have scalar helpers only.
-            bool hasVectorHelper = false;
+            // Whether the element prefix selected below has vector-arity `<prefix>_min`/`_max`
+            // helpers in the preludes. The narrow ints (I8/I16/U8/U16) have no scalar helper to
+            // build such a vector helper on, so they remain `false`; every other prefix has one.
+            // The `true` rows must stay in sync with the `SLANG_PRELUDE_VECTOR_MIN_MAX` /
+            // `SLANG_CUDA_VECTOR_MIN_MAX` instantiations in `slang-cpp-scalar-intrinsics.h` and
+            // `slang-cuda-prelude.h`; a prefix marked `true` here with no prelude helper would emit
+            // an undeclared call, and one marked `false` with a helper would over-diagnose.
+            bool elementHasVectorMinMax = false;
             switch (argType->getOp())
             {
-#define CASE(OP, STR, HAS_VEC)     \
-    case kIROp_##OP:               \
-        str = #STR;                \
-        hasVectorHelper = HAS_VEC; \
+#define CASE(OP, STR, HAS_VEC)            \
+    case kIROp_##OP:                      \
+        str = #STR;                       \
+        elementHasVectorMinMax = HAS_VEC; \
         break
 
                 CASE(Int8Type, I8, false);
@@ -804,8 +808,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 CASE(UInt16Type, U16, false);
                 CASE(UIntType, U32, true);
                 CASE(UInt64Type, U64, true);
-                CASE(IntPtrType, IPTR, false);
-                CASE(UIntPtrType, UPTR, false);
+                CASE(IntPtrType, IPTR, true);
+                CASE(UIntPtrType, UPTR, true);
                 CASE(HalfType, F16, true);
                 CASE(FloatType, F32, true);
                 CASE(DoubleType, F64, true);
@@ -816,11 +820,26 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 break;
             }
 
+            // The only vector-arity `$P` helpers in the preludes are `<prefix>_min`/`<prefix>_max`;
+            // every other `$P` operation has only a scalar `<prefix>_<op>` helper, so a
+            // whole-vector operand resolves iff the operation is `min`/`max` AND the element prefix
+            // has the vector helper. `cursor` points just past the `P`, at the `_<op>(...)` suffix.
+            // The operation name is always immediately followed by `(` (e.g. `$P_min($0, $1)`), so
+            // match the full
+            // `_min(`/`_max(` token rather than a bare `_min` prefix — otherwise a hypothetical
+            // `$P_minfoo(...)` would be misread as `min`. (`opIsMinOrMax` is used only for a vector
+            // operand.)
+            const UnownedStringSlice suffix(cursor, end);
+            const bool opIsMinOrMax = suffix.startsWith(UnownedStringSlice("_min(")) ||
+                                      suffix.startsWith(UnownedStringSlice("_max("));
+            const bool hasVectorHelper = elementHasVectorMinMax && opIsMinOrMax;
+
             // Diagnose the two cases that would otherwise emit unresolvable target code: an operand
             // whose (element) type has no `$P` prefix at all (`str` empty — e.g. a matrix), and a
-            // vector operand whose element prefix has only scalar helpers (`IPTR`/`UPTR`, narrow
-            // int). Leaving `str` unemitted is harmless because raising an error makes the emit
-            // pipeline discard the generated source on its non-zero error count.
+            // vector operand for which no vector-arity helper exists (any `$P` operation other than
+            // `min`/`max`, or a narrow-int `min`/`max`). Leaving `str` unemitted is harmless
+            // because raising an error makes the emit pipeline discard the generated source on its
+            // non-zero error count.
             if (str[0] == '\0' || (argIsVector && !hasVectorHelper))
             {
                 m_emitter->getSink()->diagnose(Diagnostics::UnsupportedTypeForTargetIntrinsic{

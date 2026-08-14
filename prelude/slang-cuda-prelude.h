@@ -2618,10 +2618,20 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_max(uintptr_t a, uintptr_t b)
 // a helper to resolve to. Element access reuses the `_slang_vector_get_element`/`_ptr` overloads
 // defined above.
 //
-// The supported element prefixes are exactly {F16,F32,F64,I32,I64,U32,U64} (mirrors the CPU prelude
-// set) — the fixed-width float and 32/64-bit integer types. Other reachable element types
-// (`intptr_t`/`uintptr_t`, narrow ints `int8/16`,`uint8/16`) are intentionally unsupported here and
-// diagnosed (E55215) by the `$P` expander instead.
+// The supported element prefixes are {F16,F32,F64,I32,I64,U32,U64} plus the pointer-sized integers
+// {IPTR,UPTR} (mirrors the CPU prelude set): the element types that reach the generic path and have
+// a scalar `<prefix>_min`/`<prefix>_max` to apply element-wise. The narrow ints
+// `int8/16`,`uint8/16` have no such scalar helper, so a narrow-int vector (and a matrix, which has
+// no `$P` prefix) is diagnosed (E55215) by the `$P` expander instead.
+//
+// `IPTR`/`UPTR` are defined over both vector base names `CUDASourceEmitter::getVectorPrefix`
+// (`slang-emit-cuda.cpp`) can spell a pointer-sized vector with: `longlong`/`ulonglong` when
+// pointers are 64-bit and `int`/`uint` when they are 32-bit (the width follows the `slangc` host).
+// Defining both keeps the emitted `IPTR_min`/`UPTR_min` resolvable regardless of host width. The
+// `int`/`uint` overloads are only *used* when `intptr_t`/`uintptr_t` are themselves 32-bit, so
+// their scalar helper operates at the same width losslessly; on a 64-bit host they are present but
+// unused and compile cleanly. These share base names with the `I32/I64`/`U32/U64` helpers but are
+// distinct overloads by function name (`IPTR_min` vs `I64_min`), so there is no collision.
 #define SLANG_CUDA_VECTOR_MIN_MAX_N(PREFIX, VECBASE, N)                                         \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL VECBASE##N PREFIX##_min(VECBASE##N a, VECBASE##N b)      \
     {                                                                                           \
@@ -2651,6 +2661,10 @@ SLANG_CUDA_VECTOR_MIN_MAX(I32, int)
 SLANG_CUDA_VECTOR_MIN_MAX(I64, longlong)
 SLANG_CUDA_VECTOR_MIN_MAX(U32, uint)
 SLANG_CUDA_VECTOR_MIN_MAX(U64, ulonglong)
+SLANG_CUDA_VECTOR_MIN_MAX(IPTR, longlong)
+SLANG_CUDA_VECTOR_MIN_MAX(UPTR, ulonglong)
+SLANG_CUDA_VECTOR_MIN_MAX(IPTR, int)
+SLANG_CUDA_VECTOR_MIN_MAX(UPTR, uint)
 
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_CUDA_VECTOR_MIN_MAX(F16, __half)

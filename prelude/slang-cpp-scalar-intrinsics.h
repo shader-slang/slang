@@ -1374,24 +1374,38 @@ SLANG_FORCE_INLINE double _slang_fmod(double x, double y)
     return F64_fmod(x, y);
 }
 
+#ifdef SLANG_PRELUDE_NAMESPACE
+}
+#endif
+
 // ----------------------- vector min/max -------------------------
 // Vector-arity overloads of the `<prefix>_min`/`<prefix>_max` scalar intrinsics, applied
 // element-wise, so a `$P_min`/`$P_max` whose argument is a vector has a helper to resolve to.
 //
-// The supported element prefixes are exactly {F16,F32,F64,I32,I64,U32,U64} — the fixed-width float
-// and 32/64-bit integer types that reach the generic `IComparable`/`IFloat` `min`/`max` path. Other
-// reachable element types are intentionally unsupported here and diagnosed (E55215) by the `$P`
-// expander instead: `intptr_t`/`uintptr_t` (pointer-sized) and the narrow ints
-// `int8/16`,`uint8/16`. A `$P_min`/`$P_max` over a whole vector only arises from that generic path;
-// the concrete `vector<T,N>` overloads decompose element-wise via `VECTOR_MAP_*` and emit scalar
-// calls, so these vector helpers are not redundant with the scalar ones.
+// The supported element prefixes are {F16,F32,F64,I32,I64,U32,U64} plus the pointer-sized integers
+// {IPTR,UPTR}: exactly the element types that reach the generic `IComparable`/`IFloat` `min`/`max`
+// path and have a scalar `<prefix>_min`/`<prefix>_max` to apply element-wise. The narrow ints
+// `int8/16`,`uint8/16` have no such scalar helper, so no element-wise vector helper can be built
+// for them; a narrow-int vector (and a matrix, which has no `$P` prefix) is diagnosed (E55215) by
+// the
+// `$P` expander instead. A whole-vector `$P_min`/`$P_max` only arises from the generic path -- the
+// concrete `vector<T,N>` overloads decompose element-wise via `VECTOR_MAP_*` and call the scalar
+// helpers -- so these vector helpers are not redundant with the scalar ones.
 //
-// `Vector` is only forward-declared because this header can be included before
+// These live outside the `SLANG_PRELUDE_NAMESPACE` block, at the same (global) scope as `Vector`.
+// `Vector` is always defined at global scope by `slang-cpp-types-core.h` (it is not wrapped in
+// `SLANG_PRELUDE_NAMESPACE`), whereas the scalar helpers above are wrapped when that macro is
+// defined empty (the torch prelude), which places them in an anonymous namespace. Declaring these
+// overloads at global scope keeps their `Vector` parameter type identical to that real `Vector`
+// (declaring them inside the block would forward-declare a *second*, anonymous-namespace `Vector`,
+// making the name ambiguous for torch C++ output); the scalar `<prefix>_min`/`_max` they call are
+// still found by ordinary unqualified lookup, which reaches anonymous-namespace members.
+//
+// `Vector` is forward-declared here because this header can be included before
 // `slang-cpp-types-core.h` (the device prelude includes scalar intrinsics first); the member access
-// below is dependent on the template parameters and so binds at instantiation, where the full
-// definition is visible. This declaration must stay signature-identical to the primary template in
-// `slang-cpp-types-core.h` (`template<typename T, int COUNT> struct Vector;`) — a divergence is an
-// ODR/redeclaration error, not the deferred-binding behavior described above.
+// in the bodies is dependent on the template parameters and so binds at instantiation, where the
+// full definition is visible. The declaration must stay signature-identical to the primary template
+// in `slang-cpp-types-core.h` (`template<typename T, int COUNT> struct Vector;`).
 template<typename T, int COUNT>
 struct Vector;
 
@@ -1420,11 +1434,9 @@ SLANG_PRELUDE_VECTOR_MIN_MAX(I32, int32_t)
 SLANG_PRELUDE_VECTOR_MIN_MAX(I64, int64_t)
 SLANG_PRELUDE_VECTOR_MIN_MAX(U32, uint32_t)
 SLANG_PRELUDE_VECTOR_MIN_MAX(U64, uint64_t)
+SLANG_PRELUDE_VECTOR_MIN_MAX(IPTR, intptr_t)
+SLANG_PRELUDE_VECTOR_MIN_MAX(UPTR, uintptr_t)
 
 #undef SLANG_PRELUDE_VECTOR_MIN_MAX
-
-#ifdef SLANG_PRELUDE_NAMESPACE
-}
-#endif
 
 #endif

@@ -42,7 +42,7 @@ void computeMain()
     float4 mn4 = genMin(a4, b4);
     float4 mx4 = genMax(a4, b4);
 
-    // Exercise the remaining element prefixes so a defect in an untested prelude row
+    // Exercise additional element prefixes so a defect in one of these prelude rows
     // (wrong CUDA base name / accessor / missing helper) fails here, not only in the field:
     // F64 (double vector), U32 (unsigned prefix), U64 (uint64 prefix), through both paths.
     double2 ad = double2(1.5, 9.0), bd = double2(4.0, 2.5);
