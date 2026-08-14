@@ -1,0 +1,58 @@
+---
+gap_intake_report: true
+intake_model: claude-opus-5[1m]
+intake_at: 2026-08-11T16:19:01Z
+target_doc: pipeline/05-ir-passes.md
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: ec47ea72b6aa5fefc3b36f8a780dbd3ecf5b1f6e
+gap_count: 15
+actions:
+  fixed: 14
+  rejected_bogus: 1
+  rejected_out_of_scope: 0
+  deferred: 0
+  escalated_to_finding: 0
+---
+
+# Gap-intake report for pipeline/05-ir-passes.md
+
+## Summary
+
+Nothing was escalated: every observation in this queue was confirmed in
+the document's watched paths, and none of them contradicted what the
+source says the compiler should do. Fourteen gaps were fixed and one
+was rejected as bogus. Seven of the fourteen are the same underlying
+observation — "this row states an internal action and names no
+observable surface" — and are answered primarily by one generalized
+paragraph opening `## Pass categories`, which states the rule that
+analyses and consumed-by-a-later-pass normalizations have no
+independent footprint and that the rows name a surface where one
+exists; targeted row edits then supply the concrete surface wherever
+the source actually names one. Two suggested additions turned out to
+be wrong about the source and were fixed with what the code says
+instead: `Lower CUDA builtin types` does not map
+`RaytracingAccelerationStructure` to `OptixTraversableHandle` (it
+flattens matrix / vector / array kernel parameters into
+`_MatrixStorage_*` / `_VectorStorage_*` structs), and `Defer buffer
+load` does not move a load past a branch (it narrows a whole-element
+load into an address chain plus a leaf load).
+
+## Actions
+
+| Gap ID | Action | Evidence | Fix summary |
+| --- | --- | --- | --- |
+| 23b25bb02b69 | fixed | `source/slang/slang-ir-autodiff-fwd.cpp:2271` (`"s_fwd_" << originalName`), `source/slang/slang-ir-autodiff-rev.cpp:165-173,405,726-727` (`generateName` with `s_bwdProp_` / `s_bwdCallableCtx_`), `source/slang/slang-ir-autodiff-primal-hoist.cpp:513-528` (store vs recompute sets), `source/slang/slang-ir-autodiff-unzip.cpp:858-869,994` (`ReportCheckpointStore` under `ReportCheckpointIntermediates`), `source/slang/slang-emit.cpp:225-393,1727-1731` (the report it produces) | added a paragraph after the autodiff table naming the three generated names a reader can look for, the checkpoint report, and which of the nine passes leave no separately identifiable token |
+| 642fcb8b6989 | fixed | `source/slang/slang-lower-to-ir.cpp:14471` (`addNumThreadsDecoration`), `source/slang/slang-emit-spirv.cpp:6390-6420` (`OpExecutionMode LocalSize` straight from the decoration), `source/slang/slang-ir-spirv-legalize.cpp:2037-2044` (default `(1,1,1)` for a compute entry point with none), plus the verified printed forms in `docs/generated/tests/design/pipeline/05-ir-passes/entry-point-decorations-emit-numthreads-marker.slang` | added a paragraph after the entry-point table stating that no pass lowers `[numthreads]` — it is carried as `IRNumThreadsDecoration` to emit, where each backend writes its own marker — and naming the one pass that adds a default |
+| 44c688035185 | fixed | `source/slang/slang-ir-glsl-legalize.cpp:1229-1365` (`invokePathConstantFuncInHullShader`: `kIROp_ControlBarrier` at 1259, `SV_OutputControlPointID == 0` guard at 1260-1262, `materializeValue` for the OutputPatch arg at 1263, entry-point `IRHLSLInputPatchType` param for the InputPatch arg at 1279-1291, `UnknownPatchConstantParameter` diagnostics), call site at `:4912-4917`; `docs/generated/tests/coverage/legalize/hull-patch-constant-func-spirv.slang` | added a hull-stage paragraph after the entry-point table describing the barrier, the single-invocation guard, and the two patch-argument sources |
+| 589dc69074ce | fixed | `source/slang/slang-ir-glsl-legalize.cpp:3118-3150` (consolidation only when `outParams.getCount() > 1`), `:3040-3072` (anonymous struct, `AddressSpace::IncomingRayPayload`, `addVulkanRayPayloadDecoration(var, 0)`), `:4563-4634` (three independent counters skipping explicitly used locations), call sites at `:4928` and `:5092`; `docs/generated/tests/coverage/legalize/raytracing-multi-payload-consolidation-spirv.slang` | added a ray-tracing paragraph covering when consolidation fires, the location-0 payload struct, and the per-kind location numbering |
+| 5f39457e37f9 | fixed | `source/slang/slang-emit-spirv.cpp:12131` (direct call to `legalizeIRForSPIRV`, with the surrounding `dumpIR` calls at `:12119-12128` behind `#if 0`), `source/slang/slang-emit.cpp:978-983` (`SLANG_PASS` is local to `linkAndOptimizeIR` and is what routes a pass through `wrapPass`) | added a paragraph stating that the SPIR-V legalization is not a `SLANG_PASS` and so emits no `-dump-ir` header, generalized to every pass called outside `linkAndOptimizeIR` |
+| 0633d4c632b1 | fixed | `source/slang/slang-ir-defer-buffer-load.h:6-19` (the before/after in the header comment), `source/slang/slang-ir-defer-buffer-load.cpp:14-33` (size thresholds), `source/slang/slang-ir-call-graph.h:9-16` and `source/slang/slang-ir-reachability.h:9-23` (analyses that build a side structure), `source/slang/slang-ir-propagate-func-properties.cpp:152` (`ReadNone` decoration), `source/slang/slang-ir-marshal-native-call.h:18-40` plus its three includers | rewrote the `Defer buffer load` row around what actually changes (the width of the read, not the position of a statement), annotated `Propagate func properties` and `Marshal native call`, and covered the pure analyses by the new `## Pass categories` paragraph (shared with afaf3d62577c, 0c516c3ff1c2, 6b60f4a3392e, ff72ee845d48) |
+| 5c5979ea827b | fixed | `source/slang/slang-emit.cpp:598-601` (the three marker opcodes that set `coverageTracing`), `:1108` (the gate), `:1223` (`codeGenContext->shouldTraceAnyCoverage()` passed as `enabled`), `:1173-1180` (CLI validates a bit width and stores 4 or 8), `source/slang/slang-ir-coverage-instrument.h:13-16,52-62` (`-trace-coverage-counter-width` / `TraceCoverageCounterByteWidth`) | extended the coverage row with the two conditions that enable the pass and with the named surface that selects `counterByteWidth`, including the bits-vs-bytes difference between CLI and API |
+| ff72ee845d48 | fixed | `source/slang/slang-ir-user-type-hint.cpp:10-33` (the `-fspv-reflect` rationale in-comment) and `source/slang/slang-emit-spirv.cpp:6843-6857` (`UserTypeGOOGLE` / `SPV_GOOGLE_user_type`), `source/slang/slang-ir-explicit-global-init.h:9` (initialization moved onto each entry point), `source/slang/slang-emit.cpp:1018,2739,2875` (metadata reaches the host as `IArtifactPostEmitMetadata`, never the emitted source) | named the surface for all three rows: the SPIR-V `UserTypeGOOGLE` decoration, the entry-point prologue, and the artifact metadata interface |
+| 4fd9329675d8 | fixed | `source/slang/slang-ir-validate.h:13-29` (the invariant list), `source/slang/slang-ir-validate.cpp:56-71` (`IrValidationFailed`), `:435-450` (`validateIRModuleIfEnabled` runs it only when validation is switched on) | extended the `Validate` row to say `validateIRModule` checks compiler-internal invariants only, runs only when IR validation is enabled, and cannot be provoked from valid Slang source |
+| 0c516c3ff1c2 | fixed | `source/slang/slang-ir-loop-inversion.cpp:43-52` and `source/slang/slang-lower-to-ir.cpp:15643-15646` (gate + pre-link call site), `source/slang/slang-ir-fuse-satcoop.cpp:26-36` and `source/slang/hlsl.meta.slang:26292-26301`, `source/slang/slang-ir-restructure.h:236-273`, `source/slang/slang-ir-restructure-scoping.h:11-24`, `source/slang/slang-ir-synthesize-active-mask.h:10-21`, `source/slang/slang-ir-uniformity.cpp:473-503` and `source/slang/slang-emit.cpp:1358-1362` | gave each of the six rows its consequence: the guarded do-while, the fused `saturated_cooperation` call, the region tree that mutates nothing, the inserted temporary, the extra active-mask argument, and the diagnostic-plus-abort of uniformity validation |
+| e4d38c712409 | rejected-bogus | The document already de-emphasises what the gap asks it to de-emphasise: "The authoritative ordering is the body of the function. The table below is a navigation aid: one row per contiguous region, with the line range at `source_commit`", and the paragraph below the table already enumerates the passes that appear more than once — which the gap itself concedes. Line-number citations are required by the generation contract (`docs/generated/design/_meta/prompts/_common.md`, "Every line-number citation re-derived with `rg -n` in this pass"), not discouraged, and the page's audience — a developer adding a pass or debugging a miscompile — navigates `slang-emit.cpp` by them. Checkability against compiler output is not this table's job | — |
+| a3a6e809f1d3 | fixed | `source/slang/slang-ir-defunctionalization.cpp:15-19` (the pass fires on a parameter whose type is `IRFuncType`), `source/slang/hlsl.meta.slang:26297-26301` and `:26327-26333` (`functype (A, B) -> C` parameters on `saturated_cooperation`), `source/slang/core.meta.slang:2037` (`IFunc` is an `interface`, hence an existential) | added a three-line `functype` example after the specialization table plus a sentence on why `IFunc<...>` takes the existential path instead |
+| afaf3d62577c | fixed | `source/slang/slang-ir-any-value-marshalling.cpp:734,1153` (`packAnyValue<N>` / `unpackAnyValue<N>` name hints), `source/slang/slang-ir-typeflow-specialize.h:10-25` and `slang-ir-typeflow-specialize.cpp:6761` with `slang-emit.cpp:1420` (the dynamic-dispatch-site report), `source/slang/slang-ir-any-value-inference.h:12-20` (`diagnoseCircularConformances`) | named the emitted `packAnyValue<N>` / `unpackAnyValue<N>` functions and the dynamic-dispatch-site report; the remaining rows (typeflow set, both deduplication passes, unused-generic-param removal) are covered by the new `## Pass categories` paragraph |
+| afa88432a80f | fixed | `source/slang/slang-ir-lower-cuda-builtin-types.cpp:140-200` (`_MatrixStorage_`, `_ColMajor`, `_VectorStorage_`, the `data` struct key, the generated pack / unpack funcs), `source/slang/slang-ir-pytorch-cpp-binding.cpp:1102-1150` (`[CudaKernel]` parameter rewriting), `source/slang/slang-emit.cpp:1523-1533` (CUDA source / header and PyTorch binding targets) | replaced "CUDA builtin type adjustments" with the actual transformation and the two struct names it produces; the gap's suggested `RaytracingAccelerationStructure` → `OptixTraversableHandle` example is not what this file does |
+| 6b60f4a3392e | fixed | `source/slang/slang-ir-legalize-global-values.h:47-51` and `.cpp:9-30`, `source/slang/slang-ir-lower-copy-logical.cpp:24-42` with its only caller `source/slang/slang-ir-spirv-legalize.cpp:2979`, `source/slang/slang-ir-bit-field-accessors.cpp:8-50` with `source/slang/slang-lower-to-ir.cpp:15584`, `source/slang/slang-ir-addr-inst-elimination.cpp:11-16` with its only caller `source/slang/slang-ir-autodiff-fwd.cpp:2433`, `source/slang/slang-ir-extract-value-from-type.h:10-19` with its only users in `source/slang/slang-ir-lower-bit-cast.cpp:177-223`, `source/slang/slang-ir-resolve-varying-input-ref.cpp:8-40` with `source/slang/slang-emit.cpp:582-583,2193-2194` | rewrote all six rows with what each actually does and where it runs — two of them turned out not to be module passes at all (`extractValueAtOffset` is a bit-cast-lowering helper; `eliminateAddressInsts` runs only on the forward-mode autodiff path) |
