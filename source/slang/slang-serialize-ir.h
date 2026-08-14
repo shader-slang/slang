@@ -3,13 +3,7 @@
 #include "core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang-ir.h"
-
-namespace slang
-{
-// Named by the test-only entry points below. Forward-declared rather than relied on
-// through a transitive include, so this header stands on its own.
-struct IGlobalSession;
-} // namespace slang
+#include "slang.h" // `slang::IGlobalSession`, named by the test entry points below
 
 namespace Slang
 {

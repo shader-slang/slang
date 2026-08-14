@@ -164,28 +164,20 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // below pass while proving nothing.
     SLANG_CHECK(onDemand.exitCode == 0);
     SLANG_CHECK(onDemand.exitCode == eager.exitCode);
+    // Non-empty as well as equal: a compile that succeeded while emitting nothing would
+    // otherwise compare two empty strings, which is how the IR arm below sat vacuous.
+    SLANG_CHECK(onDemand.out.getLength() > 0);
     SLANG_CHECK(onDemand.out == eager.out);
     SLANG_CHECK(onDemand.err == eager.err);
 
-    // Compare the IR as well as the target code, because a decode divergence need not
-    // reach codegen: a global value that lost children can emit identical output. The
-    // dump includes the linked builtin modules, which is where deferral acts.
+    // Compares the IR too, because a decode divergence need not reach codegen: a global
+    // value that lost children can emit identical target code. `-dump-ir` writes to
+    // *stderr*, which is what is compared -- this arm previously compared stdout and so
+    // matched two empty strings, which is why the length assertion is here.
     //
-    // Measured limit, so nobody over-trusts this: reintroducing the decoration-subtree
-    // bug this change fixed does *not* fail this test -- no decoration in the builtin
-    // modules has children, so there is nothing here to lose. That case is covered
-    // directly by `irDeferredBodyKeepsDecorationChildren`, which builds the shape rather
-    // than hoping to find it; breadth comes from extras/check-load-mode-equivalence.py.
-    //
-    // Compares stderr, because that is where `-dump-ir` writes. This arm previously
-    // compared stdout, which `-dump-ir` leaves *empty* -- so it was asserting that two
-    // empty strings match, and had never compared any IR at all. Nothing about the run
-    // looked wrong; the check simply had no content.
-    //
-    // Hence the length and exit-status assertions alongside it. They are what stops the
-    // arm from silently emptying out again, whether by the dump moving stream, an `-o`
-    // path that fails on some platform, or any other change that makes both runs produce
-    // nothing identical.
+    // Known limit: this cannot catch the decoration-subtree bug, since no decoration in
+    // the builtin modules has children. `irDeferredBodyKeepsDecorationChildren` covers
+    // that by building the shape; breadth comes from extras/check-load-mode-equivalence.py.
     SLANG_CHECK(onDemandIR.exitCode == 0);
     SLANG_CHECK(onDemandIR.exitCode == eagerIR.exitCode);
     SLANG_CHECK(onDemandIR.err.getLength() > 0);

@@ -125,9 +125,7 @@ struct IRSpecContextBase
         for (auto m : irModules)
         {
             for (auto inst : m->findSymbolByMangledName(hashedName))
-            {
                 insertGlobalValueSymbol(shared, inst);
-            }
         }
         if (shared->symbols.tryGetValue(hashedName, symbol))
             return symbol;
