@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=fb614297236867ed66d6f59039a45da1643338536446269b4d6c25ebdd0223e4
+//META: doc_section_digest=66b9b0ad1e435e5d64e2372e5eedf6745238e43195f17a70dd348156a613b908
 //META: purpose=Phase A's emitDebugSource (A4) runs whenever the debug-info level is above None, while emitDebugCompilationUnit (A5) additionally requires the Standard level or higher.
 //META: intent=boundary
 //META: pipeline_stage=lower

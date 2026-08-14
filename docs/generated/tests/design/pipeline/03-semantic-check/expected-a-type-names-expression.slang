@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#failure-modes
-//META: doc_section_digest=4c9f71a256907b7a79759ca00a313ad651ac24d85015af4f3fe1673fd66d9dde
+//META: doc_section_digest=1690bc07bc351f6d57ef0cbfbdf90dd7a3a711d8e434d872c178e166712d1f85
 //META: purpose=When an expression in type position does not denote a type, the diagnostic is built from the expression's actual type and the referenced name (E30060).
 //META: intent=negative
 //META: pipeline_stage=check

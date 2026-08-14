@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04c-layout-ir.md#when-it-is-built
-//META: doc_section_digest=381856c71f9fd133b724f7a9b239f0c3bfdf4c610e95e1f00876cf62258fa7b9
+//META: doc_section_digest=25e99ccbf617cd9d84684ad01c0587f61ae6261d821b4f8dc158b862abdd9cb1
 //META: purpose=When parameter binding fails with an error no layout IR module is built, so the dump contains no layout instructions after the pre-link block.
 //META: intent=negative
 //META: pipeline_stage=layout
