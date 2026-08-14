@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/diagnostics.md#source-locations-and-message-rendering
-//META: doc_section_digest=c0e97396ea139ceab54212053b6d443692d19f0faf2847c4dc505373ae8c4861
+//META: doc_section_digest=f952036c11ff9b8c1d73b32cb9eb2592525bdd2e44c5b243e4cfdec0a9352108
 //META: purpose=A diagnostic raised inside a macro expansion still decodes to a source location and renders the expanded identifier in its message.
 //META: intent=functional
 //META: pipeline_stage=check
