@@ -16034,6 +16034,10 @@ struct IRLayoutGenContext : IRGenContext
 
     /// Cache for custom key instructions used for entry-point parameter layout information.
     Dictionary<ParamDecl*, IRInst*> mapEntryPointParamToKey;
+
+    // Metal argument buffer elements need a second layout of the same type under
+    // different rules, and only the target can compute one.
+    TargetRequest* targetReq = nullptr;
     UInt layoutLoweringRecursionDepth = 0;
 };
 
@@ -16123,6 +16127,22 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             lowerVarLayout(context, paramGroupTypeLayout->elementVarLayout));
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
+
+        auto elementTypeLayout = paramGroupTypeLayout->elementVarLayout
+                                     ? paramGroupTypeLayout->elementVarLayout->typeLayout
+                                     : nullptr;
+        // An element that already reports a byte size has its offsets, so only one
+        // measured purely in argument buffer element slots needs the tier 2 layout.
+        if (elementTypeLayout && elementTypeLayout->type && context->targetReq &&
+            elementTypeLayout->FindResourceInfo(LayoutResourceKind::MetalArgumentBufferElement) &&
+            !elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+        {
+            auto byteTypeLayout = context->targetReq->getTypeLayout(
+                elementTypeLayout->type,
+                slang::LayoutRules::MetalArgumentBufferTier2);
+            builder.setMetalArgumentBufferTier2ElementTypeLayout(
+                lowerTypeLayout(context, byteTypeLayout));
+        }
 
         return _lowerTypeLayoutCommon(&builder, paramGroupTypeLayout);
     }
@@ -16408,6 +16428,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     ASTBuilder* astBuilder = linkage->getASTBuilder();
 
     IRLayoutGenContext contextStorage(sharedContext, astBuilder);
+    contextStorage.targetReq = getTargetReq();
     auto context = &contextStorage;
 
     RefPtr<IRModule> irModule = IRModule::create(session);
