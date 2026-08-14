@@ -16131,12 +16131,19 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         auto elementTypeLayout = paramGroupTypeLayout->elementVarLayout
                                      ? paramGroupTypeLayout->elementVarLayout->typeLayout
                                      : nullptr;
-        // An element that already reports a byte size has its offsets, so only one
-        // measured purely in argument buffer element slots needs the tier 2 layout.
-        if (elementTypeLayout && elementTypeLayout->type && context->targetReq &&
-            elementTypeLayout->FindResourceInfo(LayoutResourceKind::MetalArgumentBufferElement) &&
-            !elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform))
+        // An element measured in argument buffer element slots carries no byte offsets, so
+        // a consumer wanting them needs a second layout computed under tier 2 rules.
+        //
+        // Nothing here checks the device's argument buffer tier. Nothing in the compiler
+        // selects one, since the ruleset is always named by the caller. Reflection decides
+        // this on the category alone too, in maybeChangeTypeLayoutToAgumentBufferTier2.
+        if (elementTypeLayout && elementTypeLayout->type &&
+            elementTypeLayout->FindResourceInfo(LayoutResourceKind::MetalArgumentBufferElement))
         {
+            // The only caller that builds this context sets targetReq immediately after,
+            // so a null here means a new one did not.
+            SLANG_ASSERT(context->targetReq);
+
             auto byteTypeLayout = context->targetReq->getTypeLayout(
                 elementTypeLayout->type,
                 slang::LayoutRules::MetalArgumentBufferTier2);

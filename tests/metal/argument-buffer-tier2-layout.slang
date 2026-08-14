@@ -27,7 +27,7 @@ void main()
 }
 
 // METAL: parameterGroupTypeLayout
-// METAL: metalArgumentBufferTier2Layout(
-// METAL-NEXT: structTypeLayout(
+// METAL: metalArgumentBufferTier2Layout([[BYTELAYOUT:%[0-9]+]])
+// METAL-DAG: [[BYTELAYOUT]]{{.*}}= structTypeLayout(
 
 // HLSL-NOT: metalArgumentBufferTier2Layout

@@ -1254,8 +1254,8 @@ public:
     //
     IRTypeLayout* getOffsetElementTypeLayout() { return cast<IRTypeLayout>(getOperand(2)); }
 
-    // Populated only where the element's own layout counts argument buffer
-    // element slots rather than bytes.
+    // Returns the element's type layout measured in bytes, or null where the element's
+    // own layout already counts bytes.
     IRTypeLayout* findMetalArgumentBufferTier2ElementTypeLayout();
 
     /// Specialized builder for parameter group type layouts.
