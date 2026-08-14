@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/syntax-reference/grammar.md#generics-and-where-clauses
-//META: doc_section_digest=9fa528801fe0f265a456b36eb8381148d65db73060d29e10a33ff9ce384104ac
+//META: doc_section_digest=9ec28a7f9972204cb231849951463cd51e25e934f85ba429e611a1a16838b4e2
 //META: purpose=`GenericParam` accepts the type-parameter form `'typename'? IDENT (':' Type)?` with a single supertype after the colon.
 //META: intent=functional
 //META: pipeline_stage=parse
