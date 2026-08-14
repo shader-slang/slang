@@ -604,14 +604,11 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// decoded later.
     ///
     /// Recorded here rather than on the `IRSerialReadContext`, which this must not
-    /// reference: the context holds a `RefPtr` to the `IRModule`, the module holds
-    /// this decoder, and a strong reference from here would close that loop and leak
-    /// the module, this decoder's flat table and instruction array, and the retained
-    /// blob -- for every module loaded, for the life of the process. A raw pointer
-    /// would instead dangle, since the context is owned by a `RefPtr` local to the
-    /// load. The load propagates this into the context while that context is still
-    /// alive; a deferred decode has no reader for it, and records it here so the
-    /// information is at least not written into freed memory.
+    /// reference: that would close the cycle `IRModule -> decoder -> context -> IRModule`
+    /// and leak every module for the life of the process, while a raw pointer would
+    /// dangle. The load propagates this into the context while it is alive; a deferred
+    /// decode has no reader, and writes here so the information is not lost into freed
+    /// memory.
     bool foundUnrecognizedInstructions = false;
 
     /// Where each deferred body's encoding begins.
@@ -655,19 +652,15 @@ struct FlatModuleDecoder : IRDeferredBodyLoader
     /// rather than per instruction. Contention is limited to the first touch of
     /// each body.
     ///
-    /// The concurrency this guards against is the one Slang actually supports.
-    /// Running whole compiles against a shared global session is *not* supported --
-    /// `include/slang.h` says a global session is not thread-safe and that
-    /// front-end work must be externally synchronized -- so that is not the
-    /// justification. What is supported, per the serial-frontend/parallel-backend
-    /// workflow in docs/user-guide/08-compiling.md, is calling `getEntryPointCode`
-    /// and friends concurrently on a linked component type. Those run target
-    /// passes and emit over IR that can still reference a builtin module, so a
-    /// body can be first touched from several backend threads at once.
+    /// The concurrency guarded against is the supported one: the
+    /// serial-frontend/parallel-backend workflow in docs/user-guide/08-compiling.md, where
+    /// `getEntryPointCode` and friends may run concurrently on a linked component type.
+    /// Those run target passes and emit over IR that can still reference a builtin module.
+    /// (Concurrent whole *compiles* on a shared global session are documented as
+    /// unsupported, so they are not the justification.)
     ///
-    /// That path is where the materializing actually happens, measured rather than
-    /// assumed. Counting calls into the loader's slow path across the two phases of
-    /// that workflow, for one compute entry point:
+    /// That is where materializing actually happens, measured rather than assumed --
+    /// first touches across the two phases, for one compute entry point:
     ///
     ///     threads   during serial front end   during parallel backend
     ///        1                 0                        38
@@ -905,13 +898,10 @@ static size_t _readInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64&
 /// Needed because a deferred body's instructions were never allocated: the load
 /// pass left their slots empty. String and blob constants carry their characters
 /// inline, so their size depends on a length that is read from the payload stream;
-/// the cursor is positioned at that length here, and reading it *advances* the cursor
-/// past it -- `flat.stringLengths[stringLengthCursor++]`. That is why the caller passes
-/// its own cursor by reference and why the payload switch below does not read the length
-/// again. An earlier version of this comment claimed the read "does not disturb" the
-/// cursor, which is the opposite of what it does; anyone who believed it and added a
-/// second read, or removed this one as redundant, would have shifted every subsequent
-/// string constant by one entry.
+/// the cursor is positioned at that length here, and reading it **advances** the cursor
+/// past it. That is why the caller passes its own cursor by reference and why the payload
+/// switch below does not read the length again -- a second read, or removing this one as
+/// redundant, shifts every subsequent string constant by one entry.
 IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor)
 {
     const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
@@ -1152,58 +1142,51 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     decoder->blobHoldingSerializedData = readContext.getBlobHoldingSerializedData();
     bool onDemandIRLoad = isOnDemandIRLoadEnabled() && decoder->blobHoldingSerializedData;
 
-    // The blob must be the storage the data was actually parsed out of, not merely a blob
-    // the caller happened to have. If it is not, the spans below point somewhere the blob
-    // does not keep alive, and a deferred body is decoded out of freed memory -- silently,
-    // and long after the call that would be blamed for it.
-    //
-    // This is not hypothetical: `addLibraryReference` passed a *copy* of the caller's bytes
-    // as the blob while parsing from the caller's own pointer, which was harmless while
-    // everything was materialized eagerly and a use-after-free once it was not. Checked
-    // rather than trusted, because the cost is one range comparison per module load and the
-    // failure it prevents is unattributable.
+    // Deferral is only safe if the blob is the storage these spans were parsed out of, not
+    // merely a blob the caller happened to have. Otherwise a body is decoded out of freed
+    // memory, silently and long after the call that would be blamed for it. That is not
+    // hypothetical: `addLibraryReference` retained a copy while parsing the caller's
+    // pointer, which was harmless until bodies stopped being materialized eagerly.
     if (onDemandIRLoad)
     {
         const Byte* const blobBegin =
             (const Byte*)decoder->blobHoldingSerializedData->getBufferPointer();
         const Byte* const blobEnd = blobBegin + decoder->blobHoldingSerializedData->getBufferSize();
-
-        // Checks the spans themselves rather than the chunk, because these are the exact
-        // pointers a deferred body dereferences later. An owned array is not a view and
-        // depends on nothing, so it is skipped.
-        // Compared as integers, not as pointers. A span that fails this check points into
-        // a *different* allocation than the blob, and for such pointers `<`/`>=` is
-        // unspecified per [expr.rel] while forming `data + sizeInBytes` past the end of
-        // its own object is undefined per [expr.add] -- so the pointer spelling of this
-        // guard is reasoning the optimizer is entitled to discard, in exactly the case the
-        // guard exists for.
-        //
-        // The subtraction is arranged so nothing can overflow: `p <= hi` is established
-        // before `hi - p` is evaluated, and the size is compared against that difference
-        // rather than added to `p`. On a 32-bit build the pointer form could wrap --
-        // `getCount()` derives from a `uint32_t` and the element size is up to 8, so the
-        // product reaches ~34 GB -- and a wrapped pointer can compare in range, letting a
-        // corrupt count through to be dereferenced later.
         const uintptr_t blobLow = (uintptr_t)blobBegin;
         const uintptr_t blobHigh = (uintptr_t)blobEnd;
-        auto spanIsInsideBlob = [&](const Byte* data, Count sizeInBytes)
+
+        // Integer comparison, not pointer comparison. This runs precisely when a span may
+        // point into a *different* allocation, and there `<`/`>=` is unspecified
+        // ([expr.rel]) and forming `data + size` is undefined ([expr.add]) -- so the
+        // pointer spelling would be reasoning the optimizer may discard, in the one case
+        // the guard exists for. `p <= hi` is established before `hi - p` is evaluated, and
+        // the size is compared against that difference rather than added to `p`, so
+        // nothing overflows.
+        auto spanIsInsideBlob = [&](const Byte* data, uintptr_t sizeInBytes)
         {
             const uintptr_t p = (uintptr_t)data;
-            if (sizeInBytes < 0 || p < blobLow || p > blobHigh)
+            if (p < blobLow || p > blobHigh)
                 return false;
-            return (uintptr_t)sizeInBytes <= blobHigh - p;
+            return sizeInBytes <= blobHigh - p;
         };
 
-        // Every view-capable array, not a sample of them. Which ones actually end up as
-        // views depends on the backend and on what the module contains -- one with no
-        // string constants leaves `stringChars` empty and owned -- so checking a subset
-        // would pass whenever the arrays it happened to pick were the owned ones.
-        auto arrayIsSafe = [&](auto const& array, size_t elementSize)
+        // The element count is widened before it is multiplied, so the byte size cannot
+        // wrap on the way in -- a corrupt count that wrapped to a small positive would
+        // otherwise pass a check computed from it. Counts are non-negative by construction;
+        // a negative one means the table is corrupt, and is refused rather than multiplied.
+        auto arrayIsSafe = [&](auto const& array, uintptr_t elementSize)
         {
-            return !array.isView() || spanIsInsideBlob(
-                                          (const Byte*)array.getBuffer(),
-                                          array.getCount() * Count(elementSize));
+            if (!array.isView())
+                return true;
+            const Count count = array.getCount();
+            if (count < 0)
+                return false;
+            return spanIsInsideBlob((const Byte*)array.getBuffer(), (uintptr_t)count * elementSize);
         };
+
+        // Every view-capable array, not a sample: which ones are views depends on the
+        // backend and on what the module contains, so a subset check passes whenever the
+        // arrays it named happened to be the owned ones.
         const bool spansAreOwnedByTheBlob = arrayIsSafe(flat.childCounts, sizeof(Int64)) &&
                                             arrayIsSafe(flat.operandIndices, sizeof(Int64)) &&
                                             arrayIsSafe(flat.stringLengths, sizeof(Int64)) &&
@@ -1603,18 +1586,6 @@ void _testRoundTripDecorationWithChildren(
 
 /// Serializes `module` and reads it back out of a blob, which is the condition that lets
 /// bodies stay encoded. Shared by the two test hooks below.
-/// How `_testRoundTrip` should hand the serialized bytes to the reader.
-enum class TestBlobMode
-{
-    /// The blob the bytes were parsed out of. The only shape that permits deferral.
-    Matching,
-    /// No blob at all, which is what a caller reading from its own buffer supplies.
-    Null,
-    /// A blob holding an identical *copy* at a different address -- the shape that
-    /// `addLibraryReference` had, and the one the containment check exists to catch.
-    Mismatched,
-};
-
 static SlangResult _testRoundTrip(
     IRModule* module,
     Session* session,
@@ -1809,7 +1780,7 @@ void _testConcurrentBodyMaterialization(
 
 void _testDeferralFallback(
     slang::IGlobalSession* globalSession,
-    int blobMode,
+    TestBlobMode blobMode,
     bool& outDeferredLoaderInstalled,
     Index& outInstCount,
     Index& outSpanMismatchDelta)
@@ -1848,8 +1819,7 @@ void _testDeferralFallback(
 
     ComPtr<ISlangBlob> blob;
     RefPtr<IRModule> reloaded;
-    const TestBlobMode mode = TestBlobMode(blobMode);
-    if (SLANG_FAILED(_testRoundTrip(original, session, blob, reloaded, mode)))
+    if (SLANG_FAILED(_testRoundTrip(original, session, blob, reloaded, blobMode)))
         return;
 
     outSpanMismatchDelta = getDeferralDeclinedForSpanMismatchCount() - mismatchBefore;

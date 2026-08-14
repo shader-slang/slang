@@ -66,18 +66,14 @@ SLANG_FORCE_INLINE void irPublishInstLink(IRInst*& slot, IRInst* value)
 
 /// Acquire-load a `next`/`first` link of an instruction list.
 ///
-/// Applied to the traversals that can run *without* materializing first, which is where
-/// a concurrent publication can be observed. `findDecoration` iterates through
-/// `IRInstListBase::Iterator`, whose `operator++` and `end()` read these links directly,
-/// so putting the barrier only on the named decoration accessors left the path that
-/// actually walks the list unsynchronized. `IRInstList<T>::end()` needs it for the same
-/// reason and is easy to miss, because it *shadows* the base rather than inheriting it --
-/// and `getDecorations()` returns exactly that type.
+/// Needed by the traversals that run *without* materializing first, since those are the
+/// only ones that can observe a concurrent publication: the decoration walk, reached via
+/// `IRInstListBase::Iterator` and `IRInstList<T>::end()`. The latter is easy to miss --
+/// it *shadows* the base rather than inheriting it, and `getDecorations()` returns it.
 ///
-/// Lists reached only through materializing accessors -- `IRFilteredInstList`,
-/// `IRModifiableInstList`, both built from `getChildren()`/`getFirstChild()` -- do not
-/// need it: the caller has already synchronized on the deferred flag, whose release/acquire
-/// pair orders everything the materializing thread wrote.
+/// Lists reached only through materializing accessors (`IRFilteredInstList`,
+/// `IRModifiableInstList`) do not need it: the caller has already synchronized on the
+/// deferred flag, whose release/acquire pair orders everything the writer wrote.
 SLANG_FORCE_INLINE IRInst* irLoadInstLink(IRInst* const& slot)
 {
     return std::atomic_ref<IRInst*>(const_cast<IRInst*&>(slot)).load(std::memory_order_acquire);
@@ -95,89 +91,24 @@ void _noteIRModuleCreated();
 void _noteIRModuleDestroyed();
 void _noteDeferredBodyLoaderInstalled();
 
-/// Number of `IRModule`s currently alive in this process.
-///
-/// Exported so a separately linked unit-test tool can observe it; deliberately absent
-/// from the public `slang.h` API.
+/// Number of `IRModule`s currently alive in this process. Test-only; `SLANG_API` so the
+/// separately linked unit-test tool can see it, and absent from `slang.h` on purpose.
 SLANG_API Index getLiveIRModuleCount();
 
-/// Number of modules that have had a deferred-body loader installed on them.
-///
-/// Exists so the release test can tell that it exercised the deferred path at all. The
-/// cycle that test guards against is only reachable when a loader is installed, so
-/// without this the test passes just as happily on an eager load -- which is to say it
-/// could pass while checking nothing.
+/// Number of modules that have had a deferred-body loader installed. Lets a test assert it
+/// exercised the deferred path at all, rather than passing on an eager load.
 SLANG_API Index getDeferredBodyLoaderInstallCount();
 
-/// Number of times a deferred body has been asked to materialize, process-wide.
-///
-/// Counts calls into the loader's slow path, so it rises only on a genuine first touch.
-/// Exists to answer whether a given phase actually reaches still-deferred bodies.
+/// Number of first touches of a deferred body, process-wide. Counts entries to the
+/// loader's slow path, so it answers whether a phase reaches still-deferred bodies.
 SLANG_API Index getDeferredBodyMaterializationCount();
 
 void _noteDeferralDeclinedForSpanMismatch();
 
-/// Number of module loads that declined deferral because the supplied blob did not back
-/// the flat table's spans.
-///
-/// Makes an otherwise invisible decision observable. If the containment check regressed to
-/// wrongly saying "safe", nothing would catch it until a use-after-free surfaced far away;
-/// if it wrongly said "unsafe", callers would silently pay the eager cost with no signal.
-/// A counter turns both into something a test can assert.
+/// Number of module loads that declined deferral because the blob did not back the flat
+/// table's spans. Makes that decision observable: wrongly saying "safe" surfaces only as a
+/// use-after-free far away, and wrongly saying "unsafe" costs performance with no signal.
 SLANG_API Index getDeferralDeclinedForSpanMismatchCount();
-
-/// Test-only: round-trips a module while controlling what blob the reader is given, and
-/// reports whether deferral was taken and what was loaded.
-///
-/// `blobMode` is `TestBlobMode`: 0 the matching blob, 1 no blob, 2 a same-bytes copy at a
-/// different address. Only the first permits deferral; the other two must fall back to an
-/// eager load and still produce exactly the same module.
-SLANG_API void _testDeferralFallback(
-    slang::IGlobalSession* globalSession,
-    int blobMode,
-    bool& outDeferredLoaderInstalled,
-    Index& outInstCount,
-    Index& outSpanMismatchDelta);
-
-/// Test-only: round-trips a module whose decoration has children of its own through the
-/// serialized form, and reports what came back.
-///
-/// `outExpectedChildren` is how many children the decoration had before serializing and
-/// `outActualChildren` how many it has after; a deferred load that dropped a decoration's
-/// subtree shows up as the second being smaller. `outBodyWasDeferred` says whether the
-/// function's body was actually left encoded, so a caller can tell an eager load — which
-/// proves nothing about the rule — from a real exercise of it.
-///
-/// Exported for the same reason as the counters above, and absent from `slang.h` for the
-/// same reason: the shape it needs does not occur in any module the compiler produces, so
-/// it has to be built directly, and the IR builders and serialization entry points that
-/// takes are not exported. Exporting all of those to test one rule would be a far larger
-/// surface than this one function.
-SLANG_API void _testRoundTripDecorationWithChildren(
-    slang::IGlobalSession* globalSession,
-    Index& outExpectedChildren,
-    Index& outActualChildren,
-    bool& outBodyWasDeferred);
-
-/// Test-only: has many threads race to be the first to touch the same deferred bodies,
-/// and reports whether every one of them saw a complete body.
-///
-/// `outDeferredCount` is how many bodies were actually left encoded, so a caller can tell
-/// an eager load — which races nothing — from a real exercise of the protocol.
-/// `outMismatches` counts observations where a thread saw a body with the wrong number of
-/// instructions, which is what a torn or partially published body looks like.
-///
-/// Scoped to materialization on purpose. Running whole compiles concurrently against one
-/// shared global session is documented as unsupported -- `include/slang.h` states a global
-/// session is not thread-safe and front-end work needs external synchronization -- and it
-/// does indeed crash, with on-demand loading on or off alike. A test written that way would
-/// be exercising unsupported usage rather than this mechanism. What this drives instead is
-/// exactly what the loader's mutex and the acquire/release publication of a body claim to
-/// make safe, and nothing more.
-SLANG_API void _testConcurrentBodyMaterialization(
-    slang::IGlobalSession* globalSession,
-    Index& outDeferredCount,
-    Index& outMismatches);
 
 /// Supplies instruction bodies that were not materialized when a module was
 /// deserialized.

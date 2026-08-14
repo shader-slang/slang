@@ -230,16 +230,15 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
 
     struct Case
     {
-        int blobMode;
+        TestBlobMode blobMode;
         const char* what;
         bool expectDeferral;
         bool expectMismatchCounted;
     };
-    // 0 = the blob the bytes came from, 1 = no blob, 2 = an identical copy elsewhere.
     const Case cases[] = {
-        {0, "matching blob", true, false},
-        {1, "no blob", false, false},
-        {2, "mismatched blob", false, true},
+        {TestBlobMode::Matching, "matching blob", true, false},
+        {TestBlobMode::Null, "no blob", false, false},
+        {TestBlobMode::Mismatched, "mismatched blob", false, true},
     };
 
     Index referenceInstCount = 0;
@@ -251,7 +250,7 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
         _testDeferralFallback(globalSession, testCase.blobMode, deferred, instCount, mismatchDelta);
 
         SLANG_CHECK_ABORT(instCount > 0);
-        if (testCase.blobMode == 0)
+        if (testCase.blobMode == TestBlobMode::Matching)
         {
             referenceInstCount = instCount;
             // Guards the premise: if deferral stopped happening for the matching blob, the

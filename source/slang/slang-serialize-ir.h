@@ -46,6 +46,60 @@ void writeSerializedModuleIR(
 /// from this one stops testing the mode it believes it is testing.
 SLANG_API bool isOnDemandIRLoadEnabled();
 
+//
+// Test-only entry points.
+//
+// These live here rather than in `slang-ir.h` because they are about serialization, and
+// they exist at all because the shapes they exercise cannot be reached from the unit-test
+// tool: the IR builders and the serialization entry points are not exported, and two of
+// these shapes do not occur in any module the compiler produces. Exporting all of that to
+// test three rules would be a far larger surface than three functions.
+//
+
+/// What blob `_testDeferralFallback` hands the reader. Only `Matching` permits deferral;
+/// the other two must fall back to an eager load and produce an identical module.
+enum class TestBlobMode
+{
+    /// The blob the bytes were parsed out of.
+    Matching,
+    /// No blob, which is what a caller reading from its own buffer supplies.
+    Null,
+    /// An identical copy at a different address -- the shape `addLibraryReference` had.
+    Mismatched,
+};
+
+/// Round-trips a module with a chosen blob mode, reporting whether deferral was taken
+/// (`outDeferredLoaderInstalled`), what was loaded (`outInstCount`, which must match across
+/// modes), and whether the containment check fired (`outSpanMismatchDelta`).
+SLANG_API void _testDeferralFallback(
+    slang::IGlobalSession* globalSession,
+    TestBlobMode blobMode,
+    bool& outDeferredLoaderInstalled,
+    Index& outInstCount,
+    Index& outSpanMismatchDelta);
+
+/// Round-trips a module whose decoration has children of its own. A deferred load that
+/// dropped the decoration's subtree shows up as `outActualChildren < outExpectedChildren`.
+/// `outBodyWasDeferred` distinguishes a real exercise of the rule from an eager load.
+SLANG_API void _testRoundTripDecorationWithChildren(
+    slang::IGlobalSession* globalSession,
+    Index& outExpectedChildren,
+    Index& outActualChildren,
+    bool& outBodyWasDeferred);
+
+/// Races many threads to first-touch the same deferred bodies. `outMismatches` counts
+/// threads that saw a body with the wrong instruction count -- what a torn or partially
+/// published body looks like. `outDeferredCount` distinguishes a real race from an eager
+/// load, which races nothing.
+///
+/// Scoped to materialization deliberately: running whole compiles concurrently on a shared
+/// global session is documented as unsupported and crashes either way, so a test shaped
+/// that way would exercise unsupported usage rather than this mechanism.
+SLANG_API void _testConcurrentBodyMaterialization(
+    slang::IGlobalSession* globalSession,
+    Index& outDeferredCount,
+    Index& outMismatches);
+
 [[nodiscard]] Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     String& compilerVersion,
