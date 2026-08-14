@@ -853,7 +853,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
-    DiagnosticSink sink;
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
     installDiagnosticCallback(sink);
 

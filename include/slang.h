@@ -2076,7 +2076,7 @@ public:                                                              \
 
         @param diagnostic  Pointer to the diagnostic data; valid only during the call.
         @param userData    The opaque pointer passed to setDiagnosticCallback.
-        @return            Reserved for future use; return true.
+        @return            Reserved for future use; currently ignored by the implementation.
     */
     typedef bool (
         *SlangRichDiagnosticCallback)(const SlangStructuredDiagnostic* diagnostic, void* userData);
