@@ -1140,14 +1140,19 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // register path). Used to skip the redundant output-direction readback for
     // exactly that payload, without affecting other payloads on the same entry
     // point that used the pointer-packing fallback (#12532).
+    //
+    // Note: the registration site (`m_payloadWritebacks.getCount() == 0`) records
+    // at most one register payload per entry point, so this list holds <= 1 entry
+    // under the current rule. The per-type match therefore only distinguishes that
+    // single registered payload from pointer-packed payloads; it does not (yet)
+    // support multiple register payloads on one entry point -- that configuration
+    // is already unsupported (register indices reset per parameter, so two register
+    // payloads would collide) and is not standard OptiX usage.
     bool hasRegisteredPayloadWriteback(IRType* payloadType) const
     {
-        for (const auto& writeback : m_payloadWritebacks)
-        {
-            if (writeback.payloadType == payloadType)
-                return true;
-        }
-        return false;
+        return m_payloadWritebacks.findFirstIndex(
+                   [&](const PayloadWritebackInfo& writeback)
+                   { return writeback.payloadType == payloadType; }) != -1;
     }
 
     // Get C++ size and alignment of a type using CUDA layout rules.
