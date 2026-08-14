@@ -11,9 +11,9 @@
 // directions in separate files is what makes each one fail on its own when only
 // one of the two conversion sites is fixed.
 //
-// For the same reason, do not add any use of `Size(...)` -- or any other
-// compile-time-constant use of `Size` in a declaration's signature -- to this
-// file ahead of the bound below.
+// For the same reason, do not add any compile-time-constant use of an enum in a
+// declaration's signature ahead of that enum's bound below. Each enum here is
+// cold when its bound is checked, and that is what makes the bound non-vacuous.
 
 enum Size
 {
@@ -31,9 +31,31 @@ int sumEnumParam<let S : Size>(int a[int(S)])
     return total;
 }
 
+// Same conversion for an enum with an explicit tag type. The tag type is
+// assigned by a different branch of `visitEnumDecl` (`tagType = baseType`) than
+// the implicit-`int` case above, but both are only populated at
+// `ReadyForLookup`, so this exercises the fix through that separate branch.
+enum USize : uint
+{
+    A = 2,
+    B = 6,
+}
+
+uint sumUEnumParam<let S : USize>(uint a[uint(S)])
+{
+    uint total = 0;
+    for (uint i = 0; i < uint(S); ++i)
+        total += a[i];
+    return total;
+}
+
 void main()
 {
     int six[6] = { 1, 2, 3, 4, 5, 6 };
     // CHECK: enumParam=21
     printf("enumParam=%d\n", sumEnumParam<Size.Large>(six));
+
+    uint usix[6] = { 1, 2, 3, 4, 5, 6 };
+    // CHECK: uenumParam=21
+    printf("uenumParam=%u\n", sumUEnumParam<USize.B>(usix));
 }
