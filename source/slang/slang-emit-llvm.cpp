@@ -1635,10 +1635,13 @@ struct LLVMEmitter
                 for (UInt c = 0; c < switchInst->getCaseCount(); c++)
                 {
                     auto value = switchInst->getCaseValue(c);
-                    auto intLit = as<IRIntLit>(value);
-                    SLANG_ASSERT(intLit);
+                    // A case label is an integer constant, or -- for a `bool` selector, e.g. a
+                    // `switch` on an `enum : bool` after `lowerEnumType` canonicalizes its
+                    // labels -- a `bool` constant. `maybeEmitConstant` lowers either to an LLVM
+                    // integer constant matching the (i1) selector.
+                    SLANG_ASSERT(as<IRIntLit>(value) || as<IRBoolLit>(value));
 
-                    values.add(maybeEmitConstant(intLit));
+                    values.add(maybeEmitConstant(value));
                     blocks.add(findValue(switchInst->getCaseLabel(c)));
                 }
                 llvmInst = builder->emitSwitch(
@@ -2172,7 +2175,10 @@ struct LLVMEmitter
         case kIROp_GetStringHash:
             {
                 auto getStringHashInst = cast<IRGetStringHash>(inst);
-                auto stringLit = getStringHashInst->getStringLit();
+                // Checked, unlike `getStringLit()`. CPU-like targets skip
+                // `checkGetStringHashInsts` altogether, so this test is the only thing between a
+                // non-literal operand and reading another instruction's storage as string data.
+                auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
                 if (stringLit)
                 {

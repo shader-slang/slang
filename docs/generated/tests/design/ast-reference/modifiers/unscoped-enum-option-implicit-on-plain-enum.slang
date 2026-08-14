@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:00:51+00:00
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops-branches-opt-levels
-//META: doc_section_digest=5c5a0f355c34a9303ec2cc1c18ffbb9a6f1d4bcd8bac23383e808da27fa7169c
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels
+//META: doc_section_digest=d7075765bda80113ade59214eaa103fee6ef8daf55af7cdaae950e1bb4aec52e
 //META: purpose=Compiling a non-generic plain `enum` with `-unscoped-enum` implicitly applies `[UnscopedEnum]`, so unqualified case names resolve.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `UnscopedEnumAttribute` is also attached implicitly when a non-generic
-// plain `enum` (no `[UnscopedEnum]` attribute, not `enum class`) is compiled
-// with `-unscoped-enum`. If the implicit attachment happened, the bare case
-// name `Alpha` resolves and its value reaches the emitted HLSL through the
-// buffer store; without it the compile would fail on the unqualified name.
+// Verifies the second route to the same attribute: the compiler adds it
+// implicitly to a plain, non-generic enum when `-unscoped-enum` is on the command
+// line. Nothing in the source names the attribute, so the bare `Alpha` resolves
+// only if the implicit attachment happened; CHECK asserts its value reaches the
+// emitted HLSL through the buffer store.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -unscoped-enum
 

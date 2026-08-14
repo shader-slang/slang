@@ -1,17 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00+00:00
-//META: source_commit=690f6a3084801386b77186394e0f6e8c120824a4
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vec-and-mat
-//META: doc_section_digest=3375fc96f25274ba6b5f61268aab7b799044240063cd3b64ac3928c13a5702fc
+//META: doc_section_digest=5a7818957c25646b5df9f0a0213f5663d921d65b0099abf4ef8c860d93e0d5ae
 //META: purpose=Expansion: Vec composes with UInt8 to form Vec(UInt8, 4 : Int) as a global_param.
 //META: intent=expansion
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Vec row pairs any scalar with an element count.
-// `vector<uint8_t, 4>` exercises the narrow unsigned scalar in a
-// vector and surfaces `Vec(UInt8, 4 : Int)`.
+// Vec composes with UInt8 to form Vec(UInt8, 4 : Int) as a
+// global_param. `vector<uint8_t, 4>` exercises the narrow unsigned
+// scalar in a vector and surfaces `Vec(UInt8, 4 : Int)`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

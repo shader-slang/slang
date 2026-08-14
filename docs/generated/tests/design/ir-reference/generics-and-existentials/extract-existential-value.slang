@@ -1,19 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#existential-destructuring
-//META: doc_section_digest=02ff34102848a32784b08786fff8eb6145699715106f91aa1145c3476f2f96f7
+//META: doc_section_digest=bfaba91cd7aecc07abcd6aed864d007e29538d6fe91106d3d1dd5e36f206a91a
 //META: purpose=Dispatching through an interface-typed value produces extractExistentialValue(%i) reading the packed concrete-typed value.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### Existential destructuring` lists `extractExistentialValue`
-// as "Reads the packed concrete-typed value from an existential".
-// The dump shows it appearing alongside `extractExistentialType`
-// at any interface-dispatch site.
-
+// Verifies the value projection. Calling a method through an interface-typed
+// local requires recovering the packed receiver first; the CHECK pins the
+// single-operand `extractExistentialValue` naming that local.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };

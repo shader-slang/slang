@@ -37,9 +37,11 @@ Subcommands
                                --commit / --model to override.
     lint [<bundle>...]         Structural linter (README.md front-matter
                                present + valid, every .slang file has a
-                               //META block, doc_ref resolves, size cap
-                               respected) on the given bundles (default:
-                               all).
+                               //META block, doc_ref resolves, README
+                               links resolve and their anchors name real
+                               headings, README tables are well-formed,
+                               size cap respected) on the given bundles
+                               (default: all).
     expansion-candidates [--from <report.json>]
                                Rank bundles by how lightly their
                                coverage_targets are exercised by the
@@ -78,16 +80,20 @@ Exit codes
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as _dt
 import hashlib
+import io
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import unquote
 
 # --------------------------------------------------------------------------
 # Repo + path helpers
@@ -104,6 +110,14 @@ REVIEWS_DIR = META_DIR / "reviews"
 REMEDIATIONS_DIR = META_DIR / "remediations"
 FINDINGS_DIR = META_DIR / "findings"
 FINDINGS_FILED_DIR = FINDINGS_DIR / "filed"
+
+# Findings that stopped reproducing before anyone filed them. Kept apart
+# from findings/filed/ because that directory means "an issue exists for
+# this"; these have no issue and never will. Without somewhere to put
+# them they stay in the pending queue forever and every triage pass
+# re-tests them from scratch -- five findings were in exactly that state
+# when this was added.
+FINDINGS_RESOLVED_DIR = FINDINGS_DIR / "resolved"
 FINDINGS_STATE_PATH = META_DIR / "findings-state.json"
 
 # Required META keys on every generated .slang test file. The block lives
@@ -129,6 +143,9 @@ _ALLOWED_INTENTS = (
     "negative",  # documented diagnostic / "is rejected" probe
     "expansion",  # added during a Phase E expansion pass
     "regression",  # anchored to a fixed compiler issue
+    "characterization",  # asserts observed current behaviour of gap-selected
+    # code rather than a documented claim; only valid in a `coverage` bundle
+    # (see docs/generated/tests/coverage/METHODOLOGY.md)
 )
 
 _ALLOWED_GAP_KINDS = (
@@ -160,6 +177,7 @@ _ALLOWED_OOS_REASONS = (
     "gpu-vulkan-extension",
     "gpu-cross-api-flag",
     "gpu-other",
+    "unsupported-on-target",  # this text-emit target cannot express the claim
     # Truly terminal — no harness or runner upgrade unblocks
     "link-stage-only",
     "out-of-bundle",
@@ -174,7 +192,16 @@ _ALLOWED_OOS_REASONS = (
 
 
 def _rel_to_repo(path: Path) -> str:
-    return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    """Return `path` relative to the repo root, for use in messages.
+
+    A path outside the repo is returned unchanged rather than raising:
+    this only labels diagnostics, so a caller reporting on a file
+    elsewhere should still get a readable message.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except ValueError:
+        return str(path)
 
 
 # --------------------------------------------------------------------------
@@ -388,8 +415,12 @@ class _MiniYaml:
 @dataclass
 class BundleSpec:
     key: str
-    source_doc: str  # workspace-relative
+    # Workspace-relative path to the doc this bundle's claims come from, or
+    # None for `coverage` bundles, which are selected by coverage gap rather
+    # than anchored to a document. See `role`.
+    source_doc: str | None
     watched_paths: list[str]
+    role: str = "design"
     depends_on: list[str] = field(default_factory=list)
     coverage_targets: list[str] = field(default_factory=list)
     size_cap_files: int = 30
@@ -398,6 +429,45 @@ class BundleSpec:
     def dir(self) -> str:
         """Workspace-relative bundle directory."""
         return f"docs/generated/tests/{self.key}"
+
+    @property
+    def gap_group(self) -> str:
+        """Label this bundle's doc-gap rows are aggregated under.
+
+        `doc-gaps` groups rows by the document they were observed against; a
+        coverage bundle has no such document, so it groups under its own key.
+        """
+        return self.source_doc or f"{self.key} (no source doc)"
+
+    @property
+    def is_doc_anchored(self) -> bool:
+        """Whether this bundle derives its claims from a `source_doc`.
+
+        True for `conformance/` bundles (anchored to the human-written
+        language reference) and `design/` bundles (anchored to the generated
+        design docs). False for `coverage/` bundles, whose tests are chosen by
+        uncovered compiler code and assert observed current behaviour, so
+        there is no document whose edit should invalidate them — only their
+        `watched_paths` can. See `coverage/METHODOLOGY.md`.
+        """
+        return self.role != "coverage"
+
+    @property
+    def is_diagnostics_catalog(self) -> bool:
+        """Whether this is the diagnostics catalog, the one doc-anchored
+        bundle whose `doc_ref` names a source definition instead of prose.
+
+        Its tests cite the `err()` call in `slang-diagnostics.lua` or the
+        `DIAGNOSTIC()` macro in a `*-diagnostic-defs.h`, so their `doc_ref`
+        carries no `#anchor` and `lint_doc_section_digests` cannot check them.
+        `lint_catalog_entry_digests` checks them instead, against the catalog
+        entry rather than a doc section.
+
+        Matched by key rather than by testing `dir` for a substring, so a
+        future bundle that merely has "diagnostics-catalog" in its path does
+        not silently inherit catalog-only lint rules.
+        """
+        return self.key == "design/cross-cutting/diagnostics-catalog"
 
     @property
     def prompt(self) -> str:
@@ -430,12 +500,30 @@ def load_manifest() -> Manifest:
         watched = entry.get("watched_paths") or []
         if not watched:
             raise SystemExit(f"bundle {key!r} has no watched_paths")
+        role = str(entry.get("role") or key.split("/", 1)[0])
+        if role not in ("conformance", "design", "coverage"):
+            raise SystemExit(f"bundle {key!r} has unknown role {role!r}")
+        if not key.startswith(f"{role}/"):
+            raise SystemExit(
+                f"bundle {key!r} has role {role!r} that does not match its key prefix"
+            )
         source_doc = entry.get("source_doc")
-        if not source_doc:
+        # `coverage` bundles are gap-selected, not doc-anchored, so a
+        # source_doc would be meaningless for them; every other role requires
+        # one, because its tests must cite a claim in that document.
+        if role == "coverage":
+            if source_doc:
+                raise SystemExit(
+                    f"bundle {key!r} has role 'coverage' but declares a source_doc;"
+                    " coverage bundles are selected by coverage gap, not anchored"
+                    " to a document"
+                )
+        elif not source_doc:
             raise SystemExit(f"bundle {key!r} has no source_doc")
         spec = BundleSpec(
             key=key,
-            source_doc=str(source_doc),
+            source_doc=str(source_doc) if source_doc else None,
+            role=role,
             watched_paths=[str(p) for p in watched],
             depends_on=[str(d) for d in entry.get("depends_on") or []],
             coverage_targets=[
@@ -491,6 +579,15 @@ _REQUIRED_FINDING_KEYS = (
     "provenance",
 )
 _REQUIRED_EVIDENCE_KEYS = ("command", "source_slang", "observed_summary")
+
+# A path in `evidence.command` that will not exist after the session ends. A
+# finding whose command names one of these cannot be re-run later, so it cannot
+# be confirmed still-reproducing before filing -- which is the one thing triage
+# has to do. Seventeen sigsegv findings were triaged in one pass and seven were
+# untestable for exactly this reason; two of those produced convincing false
+# "already fixed" results, because substituting the committed `source_slang`
+# silently fed slangc a different program.
+_SCRATCH_PATH_RE = re.compile(r"(?:^|[\s=])(?:/tmp/|/var/folders/)\S*|<file>|<tmp>")
 _REQUIRED_EXPECTED_KEYS = ("claim", "citation_kind", "citation")
 _REQUIRED_PROVENANCE_KEYS = ("agent_model", "source_commit", "doc_anchor")
 _SUSPECTED_KINDS = {
@@ -520,25 +617,101 @@ def save_findings_state(state: dict) -> None:
     )
 
 
-def list_finding_paths(include_filed: bool = False) -> list[Path]:
+def list_finding_paths(
+    include_filed: bool = False, include_resolved: bool = False
+) -> list[Path]:
     """Return sorted list of finding YAML paths under _meta/findings/.
 
-    Pending findings live directly under findings/; filed ones move to
-    findings/filed/ and are excluded by default.
+    Pending findings live directly under findings/. Ones with an issue
+    move to findings/filed/, ones that stopped reproducing before anyone
+    filed them move to findings/resolved/; both are excluded by default,
+    because the bare list is the work queue.
     """
     if not FINDINGS_DIR.exists():
         return []
-    out: list[Path] = []
-    for p in sorted(FINDINGS_DIR.glob("*.yaml")):
-        out.append(p)
+    out: list[Path] = [p for p in sorted(FINDINGS_DIR.glob("*.yaml"))]
     if include_filed and FINDINGS_FILED_DIR.exists():
-        for p in sorted(FINDINGS_FILED_DIR.glob("*.yaml")):
-            out.append(p)
+        out.extend(sorted(FINDINGS_FILED_DIR.glob("*.yaml")))
+    if include_resolved and FINDINGS_RESOLVED_DIR.exists():
+        out.extend(sorted(FINDINGS_RESOLVED_DIR.glob("*.yaml")))
     return out
 
 
 def load_finding(path: Path) -> dict:
-    return _load_yaml(path.read_text(encoding="utf-8")) or {}
+    """Load a finding, normalizing `observed_at` to the ISO string the
+    schema declares.
+
+    An unquoted ISO timestamp is a *date* in YAML, not a string, so
+    `observed_at: 2026-08-04T00:00:00+00:00` loads as a `datetime` while
+    the quoted spelling next to it loads as `str`. Both are the same
+    instant and both look identical in the file, so the difference is
+    invisible until something does string work on the value -- which is
+    how `findings list` came to abort partway through the queue with
+    `'datetime.datetime' object is not subscriptable`. 21 of the 83
+    committed findings use the unquoted spelling.
+
+    Normalizing here rather than at the call site keeps one in-memory
+    contract for every consumer, and matches what the schema already
+    says the field is. The files are left alone: 10 of the 21 are under
+    findings/filed/, which is immutable history.
+    """
+    finding = _load_yaml(path.read_text(encoding="utf-8")) or {}
+    observed = finding.get("observed_at")
+    if isinstance(observed, (_dt.datetime, _dt.date)):
+        finding["observed_at"] = observed.isoformat()
+    return finding
+
+
+def _lint_finding_reproducibility(where: str, ev: dict) -> list[LintIssue]:
+    """Check that a finding can still be re-run after the session that filed it.
+
+    Triage has exactly one job before filing: confirm the failure still
+    happens. That is impossible if the recorded `command` points at a
+    scratch path -- `/tmp/foo.slang`, `<file>` -- because the input is
+    gone. Substituting `evidence.source_slang` is not a fix: when the
+    failing input was a *variant* of the committed test, the substitution
+    silently compiles a different program. In one triage pass that turned
+    two live bugs into apparent "already fixed" results, which is worse
+    than having no result at all.
+
+    So: name a scratch path in the command, and the real input must be
+    inlined in `evidence.repro_source`. This is a warning rather than an
+    error because 28 of the 82 findings committed before the rule predate
+    it; the fix is a sweep, not a gate.
+    """
+    issues: list[LintIssue] = []
+    cmd = str(ev.get("command") or "")
+    scratch = _SCRATCH_PATH_RE.search(cmd)
+    has_inline = bool(str(ev.get("repro_source") or "").strip()) or bool(
+        str(ev.get("minimized_repro") or "").strip()
+    )
+    if scratch and not has_inline:
+        issues.append(
+            LintIssue(
+                where,
+                "warning",
+                f"evidence.command names a scratch path ({scratch.group(0).strip()!r})"
+                " that will not exist later, and no evidence.repro_source is"
+                " given, so this finding cannot be re-run to confirm it still"
+                " reproduces before filing",
+            )
+        )
+    src = str(ev.get("source_slang") or "")
+    if (
+        src.endswith(".slang")
+        and not src.startswith(("/tmp", "<"))
+        and not (REPO_ROOT / src).exists()
+        and not has_inline
+    ):
+        issues.append(
+            LintIssue(
+                where,
+                "warning",
+                f"evidence.source_slang {src!r} does not exist and no"
+                " evidence.repro_source is given; the finding has no runnable input",
+            )
+        )
+    return issues
 
 
 def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
@@ -580,6 +753,8 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
             LintIssue(where, "error", f"title exceeds 80 chars ({len(title)})")
         )
     ev = finding.get("evidence")
+    if isinstance(ev, dict):
+        issues.extend(_lint_finding_reproducibility(where, ev))
     if isinstance(ev, dict):
         for k in _REQUIRED_EVIDENCE_KEYS:
             if k not in ev:
@@ -636,11 +811,35 @@ def validate_finding(path: Path, finding: dict) -> list[LintIssue]:
 def lint_findings() -> list[LintIssue]:
     """Validate every pending finding YAML.
 
-    Filed findings (under findings/filed/) are immutable history and are
-    not re-validated — their citations or referenced paths may have
-    rotted since filing, and that is acceptable for a historical record.
+    Retired findings — filed ones under findings/filed/, ones that
+    stopped reproducing under findings/resolved/ — are immutable history
+    and are not re-validated. Their citations or referenced paths may
+    have rotted since, and that is acceptable for a historical record.
+
+    They are still checked for *parseability*, though, which is a
+    different thing from rot. A retired finding that no longer loads is
+    not stale history, it is unreadable history: every tool that walks
+    the whole corpus trips over it, and the record it was meant to
+    preserve is effectively gone. One shipped that way in the bootstrap
+    commit — an unquoted `observed_summary` containing
+    `spirv-emit: castToVoid`, where the colon-space turned the scalar
+    into a mapping — and went unnoticed because this function skipped
+    the directory entirely.
     """
     issues: list[LintIssue] = []
+    pending = set(list_finding_paths(include_filed=False))
+    retired = set(list_finding_paths(include_filed=True, include_resolved=True)) - pending
+    for p in sorted(retired):
+        try:
+            load_finding(p)
+        except Exception as exc:  # noqa: BLE001
+            issues.append(
+                LintIssue(
+                    str(p.relative_to(REPO_ROOT)),
+                    "error",
+                    f"retired finding no longer parses as YAML: {exc}",
+                )
+            )
     seen_bundles_in_manifest = set(load_manifest().bundles.keys())
     for p in list_finding_paths(include_filed=False):
         try:
@@ -717,6 +916,13 @@ def lint_expected_failures() -> list[LintIssue]:
         # multi-config tests carries a trailing " (config)" suffix (e.g.
         # "foo.slang (cpu)"); strip it before resolving the file path.
         path_part = re.sub(r" \([a-z0-9-]+\)$", "", s)
+        # slang-test names the Nth //TEST directive in a file
+        # "<file>.slang.N" (the first directive keeps the bare file name), so
+        # an entry may legitimately target one directive rather than the whole
+        # file — which is what emission fan-out produces, where only one
+        # target of several is known-failing. Strip that index before
+        # resolving; "foo.slang.2" is the file "foo.slang".
+        path_part = re.sub(r"(?<=\.slang)\.\d+$", "", path_part)
         candidate = REPO_ROOT / path_part
         if not candidate.exists():
             issues.append(
@@ -736,6 +942,61 @@ def lint_expected_failures() -> list[LintIssue]:
                     f" '# https://github.com/shader-slang/slang/issues/NNNN'"
                     f" above the entry (or above the group it belongs to)"
                     f" so the entry is removable when the bug is fixed.",
+                )
+            )
+    return issues
+
+
+def lint_agentic_coverage_excludes() -> list[LintIssue]:
+    """Validate that every path in `_meta/agentic-coverage-excludes.txt` still exists.
+
+    `tools/coverage/run-coverage.sh` turns each entry into a slang-test
+    `-exclude-prefix` flag for the coverage agentic pass, which runs
+    in-process (`-server-count 1`), so a test that segfaults the compiler
+    segfaults the orchestrator and the rest of the suite never runs. The
+    entries here are what keep that from happening.
+
+    `-exclude-prefix` silently matches nothing when its path is wrong, so an
+    entry orphaned by a regeneration round that renames or moves its test
+    stops excluding anything and the crash comes back. That has happened
+    twice: PR #11421's directory reorg, and the 2026-08-04 round that renamed
+    `metadata/unorm-attr-on-buffer-element.slang` (coverage run 31235323797).
+    Resolving each entry as a path on disk turns both into a lint error.
+
+    Directory prefixes are legal — `-exclude-prefix` is a prefix filter, so
+    `.../design/pipeline/` excludes everything under it — and resolve as
+    directories, which is why this checks `exists()` rather than `is_file()`.
+
+    The file is optional; absence is fine.
+    """
+    issues: list[LintIssue] = []
+    path = (
+        REPO_ROOT
+        / "docs"
+        / "generated"
+        / "tests"
+        / "_meta"
+        / "agentic-coverage-excludes.txt"
+    )
+    if not path.is_file():
+        return issues
+    rel = str(path.relative_to(REPO_ROOT))
+
+    for lineno, raw in enumerate(path.read_text().splitlines(), start=1):
+        # Mirror run-coverage.sh's parse: strip a trailing comment, then trim.
+        s = raw.split("#", 1)[0].strip()
+        if not s:
+            continue
+        if not (REPO_ROOT / s).exists():
+            issues.append(
+                LintIssue(
+                    f"{rel}:{lineno}",
+                    "error",
+                    f"agentic-coverage-exclude path does not resolve: {s}."
+                    f" A stale entry excludes nothing, so the crash it was"
+                    f" added for will kill the coverage agentic pass again."
+                    f" Point it at the test's current path, or drop it if the"
+                    f" test is gone.",
                 )
             )
     return issues
@@ -781,12 +1042,23 @@ def compute_finding_labels(finding: dict, state: dict) -> list[str]:
 def _repro_body(finding: dict) -> str:
     """Return the .slang source block for the issue body.
 
-    Prefers evidence.minimized_repro when present; otherwise reads
-    evidence.source_slang from disk.
+    Prefers the operator's `minimized_repro`, then the agent's inlined
+    `repro_source`, and only then reads `source_slang` from disk.
+
+    The `repro_source` step is not optional politeness: the reproducibility
+    rule tells an agent whose failing input was a scratch file to inline it
+    there, precisely because `source_slang` then names a *different*
+    program -- the committed test the scratch input was derived from.
+    Falling through to disk in that case pairs the recorded command with a
+    shader that does not reproduce the bug, which is the exact confusion
+    the rule exists to prevent. This function honoured `minimized_repro`
+    but not `repro_source`, so until now it did just that.
     """
     ev = finding.get("evidence") or {}
     if ev.get("minimized_repro"):
         return str(ev["minimized_repro"]).rstrip() + "\n"
+    if ev.get("repro_source"):
+        return str(ev["repro_source"]).rstrip() + "\n"
     src = ev.get("source_slang")
     if not src:
         return "(no source_slang on finding)\n"
@@ -972,6 +1244,8 @@ def compute_watched_digest(spec: BundleSpec) -> str:
 
 
 def compute_source_doc_digest(spec: BundleSpec) -> str | None:
+    if spec.source_doc is None:
+        return None
     p = REPO_ROOT / spec.source_doc
     if not p.exists():
         return None
@@ -1026,9 +1300,102 @@ class GapRow:
     suggested_addition: str
     bundle: str  # bundle key that reported this row
     source_doc: str  # bundle's source_doc, for aggregation
+    # Workspace-relative path of the document the Anchor cell points at, or
+    # "" when the cell carries no resolvable link. This -- not the reporting
+    # bundle's `source_doc` -- is the document a gap is a gap *in*, and it is
+    # what `doc-gaps` groups by. See `_resolve_gap_target`.
+    anchor_target: str = ""
+    # Stable identity of this gap, for the consuming ledger. See
+    # `compute_gap_id`.
+    gap_id: str = ""
 
 
 _GAP_ANCHOR_FRAG_RE = re.compile(r"(#[A-Za-z0-9][A-Za-z0-9_-]*)")
+_GAP_ANCHOR_LINK_RE = re.compile(r"\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+
+
+def _resolve_gap_target(bundle_dir: str, anchor_cell: str) -> str:
+    """Return the workspace-relative document an Anchor cell points at.
+
+    A gap is reported by a test bundle but is a defect *in a document*, and
+    the two are not the same thing: a `coverage/` bundle has no `source_doc`
+    at all, yet every gap it reports names a design page in its Anchor cell.
+    Grouping such a row under the bundle leaves it unaddressable by the doc
+    that has to fix it, so the link target is resolved here instead.
+
+    The cell reads `[#some-heading](../../../design/pipeline/06-emit.md#some-heading)`;
+    the link is relative to the bundle directory, so it is resolved against
+    that and made repo-relative. Returns "" if the cell has no link, links
+    to a bare fragment, or points outside the repository -- all of which
+    `lint_bundle` reports, because a row that names no document cannot be
+    routed to one.
+    """
+    m = _GAP_ANCHOR_LINK_RE.search(anchor_cell)
+    if not m:
+        return ""
+    path, _, _frag = m.group("url").partition("#")
+    if not path:
+        return ""
+    try:
+        target = (REPO_ROOT / bundle_dir / unquote(path)).resolve()
+        return str(target.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except (ValueError, OSError):
+        return ""
+
+
+def _normalize_gap_prose(text: str) -> str:
+    """Reduce a gap's prose to the form its identity is computed from.
+
+    Two agents describing the same gap, or one agent re-describing it on a
+    later regeneration, will not reproduce the sentence verbatim -- they
+    reflow it, add a code span, or repunctuate. Identity has to survive
+    that, or a gap already marked fixed comes back as a new one on the next
+    bundle regeneration, which is exactly the churn the ledger exists to
+    stop. So markup is unwrapped, punctuation is dropped, whitespace is
+    collapsed, and the result is lowercased, leaving the words alone to
+    carry the identity.
+    """
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    text = re.sub(r"[*_~]", "", text)
+    # No un-escaping of `\|` here: the punctuation strip below maps both the
+    # backslash and the pipe to spaces and the final collapse erases the
+    # difference, so doing it first changes nothing. This is the identity
+    # function for `gap_id`, so it is worth keeping free of steps that only
+    # look like they matter.
+    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+_GAP_ID_LEN = 12
+
+
+def compute_gap_id(
+    anchor_target: str, anchor_fragment: str, kind: str, gap: str
+) -> str:
+    """Return the stable id a consumer tracks this gap's resolution under.
+
+    Gap rows live in bundle READMEs, which are rewritten wholesale every
+    time a bundle is regenerated, so a row has no natural key -- there is
+    nothing for a ledger to say "this one is fixed" about. The id supplies
+    one, derived from what makes a gap the gap it is: the document section
+    it is against, its kind, and its prose (normalized, see
+    `_normalize_gap_prose`).
+
+    Deriving the id rather than writing it into the README is deliberate:
+    every existing bundle gets an id without being regenerated, and a
+    generating agent cannot mint a colliding or malformed one.
+
+    The trade-off is that renaming the anchored heading, or rewriting the
+    gap prose to say something materially different, mints a new id and
+    retires the old one. That is the intended behaviour for a rewrite; for
+    a heading rename it means one stale ledger entry, which `gap-status`
+    reports as resolved-but-unseen rather than silently dropping.
+    """
+    payload = "\n".join(
+        [anchor_target, anchor_fragment, kind, _normalize_gap_prose(gap)]
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:_GAP_ID_LEN]
 
 
 def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
@@ -1078,6 +1445,7 @@ def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
         anchor_cell, kind_cell, gap_cell, suggested_cell = cells[:4]
         frag_match = _GAP_ANCHOR_FRAG_RE.search(anchor_cell)
         anchor_fragment = frag_match.group(1) if frag_match else ""
+        anchor_target = _resolve_gap_target(bundle_key, anchor_cell)
         rows.append(
             GapRow(
                 anchor=anchor_cell,
@@ -1087,6 +1455,10 @@ def parse_gap_rows(text: str, bundle_key: str, source_doc: str) -> list[GapRow]:
                 suggested_addition=suggested_cell,
                 bundle=bundle_key,
                 source_doc=source_doc,
+                anchor_target=anchor_target,
+                gap_id=compute_gap_id(
+                    anchor_target, anchor_fragment, kind_cell, gap_cell
+                ),
             )
         )
         i += 1
@@ -1132,6 +1504,556 @@ class LintIssue:
     message: str
 
 
+# --------------------------------------------------------------------------
+# Markdown link / anchor resolution
+#
+# Bundle READMEs and //META doc_ref fields both cite documentation as
+# `<path>#<anchor>`. Both halves have to hold up on GitHub: the path has
+# to resolve relative to the file that spells it (a bundle nested one
+# level deeper than the prompt template's example otherwise silently
+# loses a `../`), and the anchor has to match a heading slug in the
+# target document.
+# --------------------------------------------------------------------------
+
+_MD_LINK_RE = re.compile(r"\[[^\]]*\]\((?P<url>[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+_ATX_HEADING_RE = re.compile(r"^#{1,6}\s+(?P<title>.*?)\s*#*\s*$")
+_SETEXT_UNDERLINE_RE = re.compile(r"^(?:=+|-+)\s*$")
+
+
+def _github_slug(title: str) -> str:
+    """Return the fragment GitHub generates for a markdown heading.
+
+    GitHub lowercases the text, drops everything that is neither a word
+    character, a hyphen, nor a space, and then turns each remaining space
+    into a hyphen. Note that the punctuation is dropped rather than
+    replaced, so `A / B` becomes `a--b` (two hyphens, one per space) --
+    the most common way a hand-written anchor ends up not resolving.
+    """
+    title = re.sub(r"`([^`]*)`", r"\1", title)
+    title = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", title)
+    title = re.sub(r"[*_~]", "", title)
+    slug = re.sub(r"[^\w\- ]", "", title.strip().lower(), flags=re.UNICODE)
+    return slug.replace(" ", "-")
+
+
+_DOC_SECTION_DIGEST_MOD = None
+
+
+def _doc_section_digest_module():
+    """Return `_meta/doc-section-digest.py` loaded as a module, or None.
+
+    That script is the canonical implementation of the `doc_section_digest`
+    rule and is what agents run to produce the value, so the lint has to use
+    it rather than re-deriving the rule. The two are not interchangeable:
+    the script's `slug` keeps backticks and link syntax, while `_github_slug`
+    here strips them for link checking, so a heading like ``## `Foo` bar``
+    hashes under a different anchor in each. Importing the one that generated
+    the value is what makes the comparison meaningful.
+
+    Returns None when the script is missing, so the lint degrades to skipping
+    the check rather than erroring on every test.
+    """
+    global _DOC_SECTION_DIGEST_MOD
+    if _DOC_SECTION_DIGEST_MOD is None:
+        path = REPO_ROOT / "docs/generated/tests/_meta/doc-section-digest.py"
+        if not path.is_file():
+            _DOC_SECTION_DIGEST_MOD = False
+        else:
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location("_doc_section_digest", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            _DOC_SECTION_DIGEST_MOD = mod
+    return _DOC_SECTION_DIGEST_MOD or None
+
+
+def lint_doc_section_digests(specs: list) -> list[LintIssue]:
+    """Report doc sections whose text has drifted from the tests anchored to them.
+
+    `doc_section_digest` is the sha256 of the cited section's body, so editing a
+    section invalidates every test that cites it. Nothing notices today:
+    `_REQUIRED_TEST_META_KEYS` only asserts the key is *present*, never that it
+    matches, so a doc edit silently leaves those tests claiming to have been
+    written against text that no longer exists. All 16 tests anchored to
+    `grammar.md#statements` went stale that way when the `ThrowStmt` production
+    was corrected, and nothing flagged it.
+
+    Reported per doc section rather than per test, because the section is the
+    unit of work: one edit invalidates a whole group, and 386 individual lines
+    would bury the ~40 sections that actually drifted.
+
+    Warning, not error. A stale digest does not mean the test is wrong -- it
+    means nobody has re-read the claim since the prose moved, which is a review
+    task, not a build failure. Note that refreshing the digest without re-reading
+    is worse than leaving it stale: it launders the drift and destroys the only
+    record that the claim and the prose were ever checked against each other.
+    """
+    mod = _doc_section_digest_module()
+    if mod is None:
+        return []
+    # (doc target, anchor) -> [test paths]
+    stale: dict[tuple[str, str], list[str]] = {}
+    for spec in specs:
+        if not spec.is_doc_anchored:
+            continue
+        for tf in sorted((REPO_ROOT / spec.dir).glob("*.slang")):
+            meta = parse_test_meta(tf.read_text(encoding="utf-8", errors="replace"))
+            recorded = (meta.get("doc_section_digest") or "").strip()
+            doc_ref = (meta.get("doc_ref") or "").strip()
+            if not recorded or "#" not in doc_ref:
+                continue
+            target, _, anchor = doc_ref.partition("#")
+            doc = REPO_ROOT / target
+            if not doc.is_file():
+                continue
+            try:
+                body = mod.section_text(str(doc), anchor)
+            except SystemExit:
+                # Unresolvable anchor; already reported by the per-file lint.
+                continue
+            if hashlib.sha256(body.encode("utf-8")).hexdigest() != recorded:
+                stale.setdefault((target, anchor), []).append(
+                    str(tf.relative_to(REPO_ROOT))
+                )
+    issues: list[LintIssue] = []
+    for (target, anchor), tests in sorted(stale.items()):
+        sample = ", ".join(Path(t).name for t in tests[:3])
+        more = f", +{len(tests) - 3} more" if len(tests) > 3 else ""
+        issues.append(
+            LintIssue(
+                f"{target}#{anchor}",
+                "warning",
+                f"section changed since {len(tests)} test(s) were anchored to it"
+                f" ({sample}{more}). Re-read those claims against the current"
+                f" text, then refresh their //META doc_section_digest with"
+                f" `_meta/doc-section-digest.py {target} {anchor}`.",
+            )
+        )
+    return issues
+
+
+CATALOG_SNAPSHOT_PATH = META_DIR / "diagnostics-catalog/catalog.txt"
+
+
+def parse_catalog_snapshot(path: Path | None = None) -> dict[str, tuple[str, str, str]]:
+    """Return the catalog snapshot as `code -> (severity, name, message)`.
+
+    `catalog.txt` is the committed, tab-separated extraction of every
+    diagnostic the compiler defines, with the columns named in its own header:
+    `code, covered, severity, name, source, message`. The message is the
+    remainder of the line rather than one field, because a message may itself
+    contain a tab.
+
+    Rows are keyed by code because that is the identity a catalog test records
+    (`//META: catalog_code`) and the one that survives a rename.
+    """
+    rows: dict[str, tuple[str, str, str]] = {}
+    src = path or CATALOG_SNAPSHOT_PATH
+    if not src.is_file():
+        return rows
+    for line in src.read_text(encoding="utf-8").splitlines():
+        if line.startswith("#") or not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) < 6:
+            continue
+        code, _covered, severity, name = parts[0], parts[1], parts[2], parts[3]
+        message = "\t".join(parts[5:])
+        rows[code] = (severity, name, message)
+    return rows
+
+
+def catalog_entry_digest(code: str, severity: str, name: str, message: str) -> str:
+    """Return the `doc_section_digest` for one catalog entry.
+
+    The catalog bundle's tests cite a diagnostic definition rather than a doc
+    section, so the digest pins the entry's rendered identity -- code,
+    severity, name and message joined by tabs -- instead of a section body.
+    Editing a diagnostic's message or renaming it changes the digest, which is
+    what lets `lint_catalog_entry_digests` tell that a test was written against
+    text that has since moved.
+
+    This is the rule stated in the bundle's README; it lives here so that lint
+    and the generation prompt share one implementation rather than each
+    re-deriving it. `regenerate.py catalog-digest <code>` prints it.
+    """
+    return hashlib.sha256(
+        f"{code}\t{severity}\t{name}\t{message}".encode("utf-8")
+    ).hexdigest()
+
+
+def lint_catalog_entry_digests(
+    specs: list,
+    root: Path | None = None,
+    snapshot: Path | None = None,
+) -> list[LintIssue]:
+    """Report catalog tests whose cited diagnostic has drifted from them.
+
+    The counterpart to `lint_doc_section_digests` for the one bundle that
+    cites source definitions instead of anchored prose. That function requires
+    a `#anchor` to locate a section body, and a catalog `doc_ref` has none, so
+    until now every catalog digest went unchecked -- which is what #11410
+    observed, first as all-zero placeholders and then, after the corpus was
+    regenerated, as well-formed values nothing recomputed.
+
+    Warning, not error, for the same reason as the doc-section check: a
+    mismatch means nobody has re-read the claim since the diagnostic moved,
+    which is a review task, not a build failure. Refreshing the digest without
+    re-reading launders the drift and destroys the only record that the test
+    and the diagnostic were ever checked against each other.
+
+    A code that is missing from the snapshot entirely is reported once for the
+    whole group rather than per test, because the cause is shared: either the
+    snapshot predates those diagnostics or they have been removed, and the
+    answer in both cases is to re-extract `catalog.txt`.
+
+    `root` and `snapshot` default to the real tree and are parameters only so
+    that `selftest` can run the drift and unknown-code branches against a
+    fixture, which the committed corpus cannot produce.
+    """
+    root = root or REPO_ROOT
+    snapshot = snapshot or CATALOG_SNAPSHOT_PATH
+    catalog = parse_catalog_snapshot(snapshot)
+    if not catalog:
+        # An absent or empty snapshot must not read as "nothing to report". Every
+        # digest is checked by looking its code up in here, so returning silently
+        # would leave the whole bundle unverified while lint claims success --
+        # the same unnoticed-unverified state #11410 was filed about, reached by
+        # deleting a file instead of by skipping a code path. The unknown-code
+        # warning below cannot cover this: with no rows there are no lookups, so
+        # it never fires.
+        unchecked = [spec for spec in specs if spec.is_diagnostics_catalog]
+        if not unchecked:
+            return []
+        count = sum(len(list((root / spec.dir).glob("*.slang"))) for spec in unchecked)
+        return [
+            LintIssue(
+                _rel_to_repo(snapshot),
+                "warning",
+                f"catalog snapshot is missing or empty, so the doc_section_digest"
+                f" of {count} catalog test(s) went unchecked. Re-extract it:"
+                f" without it this lint passes whatever those tests record",
+            )
+        ]
+    issues: list[LintIssue] = []
+    unknown: list[tuple[str, str]] = []
+    for spec in specs:
+        if not spec.is_diagnostics_catalog:
+            continue
+        for tf in sorted((root / spec.dir).glob("*.slang")):
+            meta = parse_test_meta(tf.read_text(encoding="utf-8", errors="replace"))
+            recorded = (meta.get("doc_section_digest") or "").strip()
+            code = (meta.get("catalog_code") or "").strip()
+            if not recorded or not code:
+                continue
+            rel = str(tf.relative_to(root))
+            entry = catalog.get(code)
+            if entry is None:
+                unknown.append((code, rel))
+                continue
+            if catalog_entry_digest(code, *entry) != recorded:
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "warning",
+                        f"catalog entry {code} changed since this test was"
+                        " anchored to it. Re-read the claim against the"
+                        " current entry, then refresh //META"
+                        " doc_section_digest with `_meta/regenerate.py"
+                        f" catalog-digest {code}`",
+                    )
+                )
+    if unknown:
+        codes = ", ".join(sorted({c for c, _ in unknown}, key=_code_sort_key))
+        issues.append(
+            LintIssue(
+                _rel_to_repo(snapshot),
+                "warning",
+                f"{len(unknown)} test(s) cite catalog code(s) the snapshot does"
+                f" not contain ({codes}). Either the snapshot predates those"
+                " diagnostics and needs re-extracting, or the codes were"
+                " removed and their tests are now testing nothing",
+            )
+        )
+    return issues
+
+
+def _code_sort_key(code: str):
+    """Sort diagnostic codes numerically when they are numeric."""
+    return (0, int(code)) if code.isdigit() else (1, code)
+
+
+_HEADING_SLUG_CACHE: dict[Path, set[str]] = {}
+
+
+def heading_slugs(doc: Path) -> set[str]:
+    """Return every anchor GitHub would generate for `doc`'s headings.
+
+    Handles both ATX (`## Title`) and setext (`Title` over `-----`)
+    headings, skips fenced code blocks, and appends `-1`, `-2`, ... to
+    repeated slugs the way GitHub disambiguates them.
+    """
+    cached = _HEADING_SLUG_CACHE.get(doc)
+    if cached is not None:
+        return cached
+    slugs: set[str] = set()
+    counts: dict[str, int] = {}
+    try:
+        lines = doc.read_text(encoding="utf-8").split("\n")
+    except OSError:
+        _HEADING_SLUG_CACHE[doc] = slugs
+        return slugs
+    in_fence = False
+    for i, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        m = _ATX_HEADING_RE.match(line)
+        if m:
+            title = m.group("title")
+        elif (
+            _SETEXT_UNDERLINE_RE.match(line)
+            and i > 0
+            and lines[i - 1].strip()
+            and lines[i - 1].lstrip()[:1] not in ("|", ">", "#", "-", "=")
+        ):
+            title = lines[i - 1].strip()
+        else:
+            continue
+        slug = _github_slug(title)
+        if not slug:
+            continue
+        n = counts.get(slug, 0)
+        counts[slug] = n + 1
+        slugs.add(slug if n == 0 else f"{slug}-{n}")
+    _HEADING_SLUG_CACHE[doc] = slugs
+    return slugs
+
+
+def lint_markdown_links(md_path: Path) -> list[LintIssue]:
+    """Check that every relative link in `md_path` resolves.
+
+    A link whose path does not exist is an error: it renders as a dead
+    link on GitHub, and the usual cause is a `../` miscount, which no
+    other check catches. A link whose path resolves but whose `#anchor`
+    matches no heading in the target is a warning -- it lands the reader
+    on the right document but the wrong place, and repairing it needs a
+    judgement call about which section was meant.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    # A coverage table cites the same anchor once per claim row, so report
+    # each distinct problem once rather than once per citation.
+    reported: set[str] = set()
+    for m in _MD_LINK_RE.finditer(text):
+        url = m.group("url")
+        if url.startswith(("http://", "https://", "mailto:", "#", "<")):
+            continue
+        path, _, fragment = url.partition("#")
+        if not path:
+            continue
+        if url in reported:
+            continue
+        target = (md_path.parent / unquote(path)).resolve()
+        if not target.exists():
+            reported.add(url)
+            issues.append(
+                LintIssue(rel, "error", f"link path does not resolve: {url}")
+            )
+            continue
+        if fragment and target.suffix == ".md":
+            if unquote(fragment) not in heading_slugs(target):
+                reported.add(url)
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "warning",
+                        f"link anchor matches no heading in {path}: #{fragment}",
+                    )
+                )
+    return issues
+
+
+# --------------------------------------------------------------------------
+# Markdown table shape
+#
+# A bundle README is almost entirely tables, and a claim is free text that
+# can contain a `|` -- an operator (`isKhronosTarget || HLSL`), a union
+# type, a shell pipe. Unescaped, it opens a new cell. GitHub only renders
+# a table at all when its delimiter row has exactly as many cells as its
+# header, so one stray `|` in a claim can drop a 30-row coverage table on
+# the floor and render it as a wall of pipe characters.
+# --------------------------------------------------------------------------
+
+_UNESCAPED_PIPE_RE = re.compile(r"(?<!\\)\|")
+_DELIM_CELL_RE = re.compile(r"^:?-+:?$")
+
+
+def _is_delimiter_row(line: str) -> bool:
+    """Return whether `line` is a table's delimiter row.
+
+    GFM accepts a single dash per cell (`| - | - |`) and a one-column
+    table, so this tests each cell rather than matching the row against
+    one pattern -- a stricter pattern would skip such a table entirely
+    and quietly leave it unvalidated.
+    """
+    cells = _row_cells(line)
+    return bool(cells) and all(_DELIM_CELL_RE.match(c.strip()) for c in cells)
+
+
+def _row_cells(line: str) -> list[str]:
+    """Split one markdown table row into cells on its unescaped pipes.
+
+    A `\\|` is content rather than a cell boundary, which is how a claim
+    spells a literal pipe, so only bare `|` separates. The leading and
+    trailing pipes that delimit the row are not separators and are
+    dropped.
+    """
+    parts = _UNESCAPED_PIPE_RE.split(line.strip())
+    if parts and not parts[0].strip():
+        parts = parts[1:]
+    if parts and not parts[-1].strip():
+        parts = parts[:-1]
+    return parts
+
+
+def lint_markdown_tables(md_path: Path) -> list[LintIssue]:
+    """Check that every markdown table in `md_path` renders on GitHub.
+
+    A delimiter row whose cell count differs from its header's is an
+    error, because GitHub then does not recognize the block as a table
+    at all and renders the raw pipes. A body row that disagrees with the
+    header is also an error: GitHub pads or truncates it, so a claim
+    containing an unescaped `|` silently loses its trailing columns --
+    which is how a coverage row can end up with no Tests link.
+
+    Fenced code blocks are skipped, the same way `heading_slugs` skips
+    them: a bundle README quotes example tables inside ``` fences, and
+    those are illustrations rather than tables GitHub will render.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        lines = md_path.read_text(encoding="utf-8").split("\n")
+    except OSError:
+        return issues
+    i = 0
+    in_fence = False
+    while i < len(lines):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("```") or stripped.startswith("~~~"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        header = lines[i]
+        if in_fence or not header.lstrip().startswith("|") or i + 1 >= len(lines):
+            i += 1
+            continue
+        if not _is_delimiter_row(lines[i + 1]):
+            i += 1
+            continue
+        width = len(_row_cells(header))
+        delim_width = len(_row_cells(lines[i + 1]))
+        if delim_width != width:
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"table at line {i + 1} does not render: header has"
+                    f" {width} cells but its delimiter row has {delim_width}",
+                )
+            )
+        i += 2
+        while i < len(lines) and lines[i].lstrip().startswith("|"):
+            cells = _row_cells(lines[i])
+            if len(cells) != width:
+                # An extra cell that carries text came from a `|` inside
+                # the content; an extra empty one is just a stray
+                # delimiter. Naming the right cause saves the reader a
+                # hunt through a 400-character claim.
+                hint = ""
+                if len(cells) > width:
+                    hint = (
+                        " (escape a literal pipe in cell text as `\\|`)"
+                        if any(c.strip() for c in cells[width:])
+                        else " (stray trailing delimiter)"
+                    )
+                issues.append(
+                    LintIssue(
+                        rel,
+                        "error",
+                        f"table row at line {i + 1} has {len(cells)} cells,"
+                        f" expected {width}{hint}",
+                    )
+                )
+            i += 1
+    return issues
+
+
+_LIQUID_OPENER_RE = re.compile(r"\{\{|\{%")
+
+
+def lint_liquid_safe(md_path: Path) -> list[LintIssue]:
+    """Check that a bundle README carries no raw Liquid opener (`{{` or `{%`).
+
+    These READMEs have YAML front-matter, so the GitHub Pages Jekyll build
+    treats each as a page and runs Liquid over its body -- before Markdown
+    conversion, so a `{{` inside a code span or fence is still seen as a
+    Liquid output tag. The failure mode depends on what follows the `{{`.
+    In `float2x2 m = {{1,2},{3,4}}`, Liquid's non-greedy scan for the closing
+    `}}` stops at the first single `}` (after `1,2`), so the tag is never
+    terminated -- Liquid raises "Variable ... was not properly terminated"
+    and the whole site build aborts. A properly terminated `{{...}}` (e.g. a
+    FileCheck `{{.*}}` wildcard) parses instead and is evaluated as a
+    template expression -- usually rendering empty -- so the literal text
+    does not survive to the published page. Either way the sequence must not
+    reach Liquid.
+
+    The README is also read on github.com, where Liquid is not processed, so
+    the fix cannot be a `{% raw %}` wrapper or an HTML entity inside a
+    backtick span (both show literally there). Two dual-safe spellings pass:
+    space the braces where whitespace is semantically irrelevant
+    (`{ {1,2},{3,4} }`), or show an exact token with numeric entities inside
+    a raw `<code>` element (`<code>&#123;&#123;.*&#125;&#125;</code>`), which
+    renders as `{{.*}}` on both surfaces while never presenting a literal
+    `{{` to Liquid.
+
+    Front-matter is excluded: Jekyll strips it before Liquid runs, so its
+    contents never reach the Liquid renderer.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    fm = _FM_RE.match(text)
+    fm_end_line = text.count("\n", 0, fm.end()) if fm else 0
+    for lineno, line in enumerate(text.split("\n"), start=1):
+        if lineno <= fm_end_line:
+            continue
+        if _LIQUID_OPENER_RE.search(line):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"line {lineno} has a raw Liquid opener (`{{{{` or `{{%`)"
+                    f" that breaks the GitHub Pages build; space the braces"
+                    f" (`{{ {{1,2}} }}`) or show the exact token as"
+                    f" `<code>&#123;&#123;...&#125;&#125;</code>`",
+                )
+            )
+    return issues
+
+
 _REQUIRED_BUNDLE_FM_KEYS = (
     "generated",
     "model",
@@ -1142,6 +2064,120 @@ _REQUIRED_BUNDLE_FM_KEYS = (
     "source_doc_digest",
     "warning",
 )
+
+
+# --------------------------------------------------------------------------
+# Emission fan-out gate
+#
+# Enforcement of `_claims.md §2` "Meaningful back-ends": a target-dependent
+# (emission) claim must be exercised on every feasible text-emit target, or
+# account for each absent target with an Untested row. The rule existed only
+# as prose when the 2026-06 doc-scope regen silently dropped it, deleting
+# ~985 emission tests and dropping coverage 53.10% -> 51.77% undetected.
+# Making it a lint check is what turns the rule from advisory into a gate.
+#
+# NOTE: rolled out as "warning" first. Flip _FANOUT_SEVERITY to "error" once
+# the existing suite's violations are fixed or opted out — that flip is the
+# moment the regression becomes impossible to reland.
+# --------------------------------------------------------------------------
+_FANOUT_SEVERITY = "warning"
+
+# All text-emit targets (used to detect which targets a test exercises and
+# which an Untested opt-out row names).
+_EMIT_TEXT_TARGETS = frozenset(
+    {"hlsl", "glsl", "spirv-asm", "metal", "wgsl", "cuda", "cpp"}
+)
+# Shader text targets. The fan-out gate enforces these as a *set*: a claim
+# emitted to any one of them must cover them all (or opt out per target) —
+# this is the regression class (shader emission breadth). cpp/cuda are
+# general-purpose backends with different semantics and are NOT force-
+# required; a claim emitted only to cpp/cuda is backend-specific (e.g. the
+# C++ prelude/host-shim) and is not subject to the shader fan-out rule.
+_SHADER_TEXT_TARGETS = frozenset({"hlsl", "glsl", "spirv-asm", "metal", "wgsl"})
+# Untested-claims reasons that legitimately account for an absent target.
+_FANOUT_OPTOUT_REASONS = frozenset(
+    {"unsupported-on-target", "out-of-bundle"}
+    | {r for r in _ALLOWED_OOS_REASONS if r.startswith("gpu-")}
+)
+_SIMPLE_TARGET_RE = re.compile(r"//TEST:SIMPLE\([^)]*\):([^\n]*)")
+_TARGET_FLAG_RE = re.compile(r"-target\s+(\S+)")
+
+
+def _norm_target(t: str) -> str:
+    """Normalize a -target token to its text-emit spelling."""
+    return {"spirv": "spirv-asm", "dxil": "dxil-asm"}.get(t, t)
+
+
+def _emission_targets(text: str) -> set[str]:
+    """Text-emit targets named across a test file's //TEST:SIMPLE directives."""
+    out: set[str] = set()
+    for line in _SIMPLE_TARGET_RE.findall(text):
+        for t in _TARGET_FLAG_RE.findall(line):
+            t = _norm_target(t)
+            if t in _EMIT_TEXT_TARGETS:
+                out.add(t)
+    return out
+
+
+def _lint_emission_fanout(
+    spec: "BundleSpec", readme_text: str, test_files: list[Path]
+) -> list[LintIssue]:
+    """An emission claim must cover every feasible text-emit target, or
+    account for each absent target with an Untested `unsupported-on-target`
+    (or gpu-*/out-of-bundle) row whose Claim cell matches the claim.
+    """
+    issues: list[LintIssue] = []
+    # target-pipelines/* bundles are single-target *by design* — exempt.
+    if spec.dir.startswith("docs/generated/tests/design/target-pipelines/"):
+        return issues
+
+    # Group tests by claim (//META: purpose, which the README Claim cell
+    # must match verbatim); collect each claim's covered emit targets.
+    claim_targets: dict[str, set[str]] = {}
+    claim_is_emission: dict[str, bool] = {}
+    for tf in test_files:
+        t = tf.read_text(encoding="utf-8")
+        meta = parse_test_meta(t)
+        purpose = meta.get("purpose", "").strip()
+        if not purpose:
+            continue
+        tgts = _emission_targets(t)
+        claim_targets.setdefault(purpose, set()).update(tgts)
+        # Emission/target-dependent iff stamped emit AND it emits to a target.
+        if meta.get("pipeline_stage") == "emit" and tgts:
+            claim_is_emission[purpose] = True
+
+    # Opt-out targets declared per claim in the Untested-claims table.
+    optout: dict[str, set[str]] = {}
+    if "## Untested claims" in readme_text:
+        for row in _parse_tagged_table(readme_text, "## Untested claims"):
+            claim_cell, reason, _anchor, why = row
+            if reason not in _FANOUT_OPTOUT_REASONS:
+                continue
+            blob = claim_cell + " " + why
+            named = {_norm_target(m) for m in _TARGET_FLAG_RE.findall(blob)}
+            named |= {w for w in blob.split() if w in _EMIT_TEXT_TARGETS}
+            optout.setdefault(claim_cell.strip(), set()).update(named)
+
+    for purpose, covered in claim_targets.items():
+        if not claim_is_emission.get(purpose):
+            continue  # not an emission claim — fan-out rule does not apply
+        if not (covered & _SHADER_TEXT_TARGETS):
+            continue  # cpp/cuda-only: backend-specific, shader rule N/A
+        missing = _SHADER_TEXT_TARGETS - covered - optout.get(purpose, set())
+        if missing:
+            issues.append(
+                LintIssue(
+                    spec.dir,
+                    _FANOUT_SEVERITY,
+                    f"emission claim {purpose!r} covers shader targets"
+                    f" {sorted(covered & _SHADER_TEXT_TARGETS)} but is missing"
+                    f" {sorted(missing)}; add an emission test per target or an"
+                    f" Untested 'unsupported-on-target' row naming each absent"
+                    f" target (_claims.md §2 Meaningful back-ends)",
+                )
+            )
+    return issues
 
 
 def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
@@ -1166,7 +2202,16 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
             )
         )
     else:
-        for k in _REQUIRED_BUNDLE_FM_KEYS:
+        required_fm_keys = _REQUIRED_BUNDLE_FM_KEYS
+        if not spec.is_doc_anchored:
+            # A coverage bundle has no source_doc, so its README must not
+            # claim one; provenance rests on watched_paths_digest alone.
+            required_fm_keys = tuple(
+                k
+                for k in required_fm_keys
+                if k not in ("source_doc", "source_doc_digest")
+            )
+        for k in required_fm_keys:
             if k not in fm:
                 issues.append(
                     LintIssue(
@@ -1175,6 +2220,15 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f"front-matter missing key: {k}",
                     )
                 )
+        if not spec.is_doc_anchored and "source_doc" in fm:
+            issues.append(
+                LintIssue(
+                    f"{spec.dir}/README.md",
+                    "error",
+                    "front-matter declares source_doc, but this is a"
+                    " gap-selected coverage bundle with no source document",
+                )
+            )
         if fm.get("generated", "").lower() != "true":
             issues.append(
                 LintIssue(
@@ -1194,6 +2248,10 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                 )
             )
 
+    issues.extend(lint_markdown_links(bundle_md))
+    issues.extend(lint_markdown_tables(bundle_md))
+    issues.extend(lint_liquid_safe(bundle_md))
+
     test_files = sorted(bdir.glob("*.slang"))
     if len(test_files) > spec.size_cap_files:
         issues.append(
@@ -1207,6 +2265,29 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     for tf in test_files:
         for issue in _lint_test_file(spec, tf):
             issues.append(issue)
+    # Claim enumeration: `prompts/_claims.md` §4 makes `## Claims` the bundle's
+    # ground-truth list, and §6 defines completeness as "every claim there is
+    # either covered or classified". Without it a bundle has no way to show a
+    # claim as *missing*: `## Functional coverage` only lists claims that
+    # already have tests, so when the source doc gains new normative prose
+    # nothing reports the shortfall. That is how the doc-gap fill (#12477) added
+    # ~12k lines of newly checkable statements without a single bundle showing a
+    # coverage gap.
+    #
+    # Warning rather than error: most bundles predate the requirement, and an
+    # error would block every unrelated change until all of them are
+    # re-enumerated.
+    if "## Claims" not in text:
+        issues.append(
+            LintIssue(
+                f"{spec.dir}/README.md",
+                "warning",
+                "no ## Claims section; the bundle has no ground-truth claim"
+                " enumeration, so new normative prose in its source doc cannot"
+                " surface as missing coverage (prompts/_claims.md §1, §4)",
+            )
+        )
+
     # Untested-claims table: optional section, but if present must be a
     # table with the controlled Reason vocabulary.
     heading = "## Untested claims"
@@ -1236,7 +2317,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     # with the controlled Kind vocabulary. Free-form bullets are no
     # longer accepted; the migration to the table format is one-shot.
     if "## Doc gaps observed" in text:
-        gap_rows = parse_gap_rows(text, spec.dir, spec.source_doc)
+        gap_rows = parse_gap_rows(text, spec.dir, spec.gap_group)
         if not gap_rows and not _gap_section_explicitly_empty(text):
             issues.append(
                 LintIssue(
@@ -1266,6 +2347,26 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
                         f" {row.anchor!r}",
                     )
                 )
+            # An Anchor cell that names no document is the one gap defect
+            # that costs the row its whole purpose: `doc-gaps` groups by
+            # the anchored document, so a row without one is filed under
+            # the reporting bundle and never reaches a doc author. The
+            # link's *path* is checked here; `lint_markdown_links` already
+            # covers whether the path and its fragment resolve, so this
+            # does not restate that.
+            if not row.anchor_target:
+                issues.append(
+                    LintIssue(
+                        f"{spec.dir}/README.md",
+                        "error",
+                        f"doc-gap row Anchor cell has no link to a document,"
+                        f" so the gap cannot be routed to one:"
+                        f" {row.anchor!r}",
+                    )
+                )
+
+    # Emission fan-out gate (enforces _claims.md §2 "Meaningful back-ends").
+    issues.extend(_lint_emission_fanout(spec, text, test_files))
     return issues
 
 
@@ -1361,9 +2462,32 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
     if not meta:
         issues.append(LintIssue(rel, "error", "missing //META block"))
         return issues
-    for k in _REQUIRED_TEST_META_KEYS:
+    required_meta_keys = _REQUIRED_TEST_META_KEYS
+    if not spec.is_doc_anchored:
+        # A coverage test is chosen by uncovered code, not by a documented
+        # claim, so it cannot be required to cite one. Most still carry a
+        # doc_ref pointing at the nearest related design section for
+        # orientation, and when they do it is validated below like any other.
+        required_meta_keys = tuple(
+            k
+            for k in required_meta_keys
+            if k not in ("doc_ref", "doc_section_digest")
+        )
+    for k in required_meta_keys:
         if k not in meta:
             issues.append(LintIssue(rel, "error", f"//META missing key: {k}"))
+    # coverage/METHODOLOGY.md § Per-test contract: a coverage test names the
+    # source area it characterizes in place of the doc_ref it does not have,
+    # so `covers=` is what makes it traceable at all.
+    if not spec.is_doc_anchored and not meta.get("covers", "").strip():
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                "//META missing key: covers (required for coverage bundles —"
+                " see coverage/METHODOLOGY.md § Per-test contract)",
+            )
+        )
     if meta.get("generated", "").lower() != "true":
         issues.append(LintIssue(rel, "error", "//META generated must be true"))
     intent = meta.get("intent", "")
@@ -1373,6 +2497,19 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                 rel,
                 "error",
                 f"//META intent={intent!r} not in {list(_ALLOWED_INTENTS)}",
+            )
+        )
+    # `characterization` asserts what the compiler currently does rather than
+    # what a document claims, so it is only answerable inside the gap-selected
+    # coverage tree. Allowing it in a doc-anchored bundle would let a test
+    # escape the requirement that it cite a documented claim.
+    if intent == "characterization" and spec.is_doc_anchored:
+        issues.append(
+            LintIssue(
+                rel,
+                "error",
+                "//META intent='characterization' is only valid in a"
+                f" coverage bundle, but {spec.key!r} is doc-anchored",
             )
         )
     requires_tool = meta.get("requires-tool", "").strip()
@@ -1390,7 +2527,7 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             )
     doc_ref = meta.get("doc_ref", "")
     if doc_ref:
-        target = doc_ref.split("#", 1)[0]
+        target, _, anchor = doc_ref.partition("#")
         if not target:
             issues.append(LintIssue(rel, "error", "//META doc_ref has empty path"))
         else:
@@ -1403,6 +2540,16 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
                         f"//META doc_ref path does not resolve: {target}",
                     )
                 )
+            elif anchor and candidate.suffix == ".md":
+                if anchor not in heading_slugs(candidate):
+                    issues.append(
+                        LintIssue(
+                            rel,
+                            "warning",
+                            f"//META doc_ref anchor matches no heading in"
+                            f" {target}: #{anchor}",
+                        )
+                    )
     # Every test file must contain at least one //TEST or //DIAGNOSTIC_TEST
     # directive — otherwise slang-test will silently skip it.
     if "//TEST" not in text and "//DIAGNOSTIC_TEST" not in text:
@@ -1449,8 +2596,7 @@ def _lint_test_file(spec: BundleSpec, tf: Path) -> list[LintIssue]:
             re.search(r"/\*\s*CHECK[^:]*:.*?\^.*?\*/", text, re.DOTALL)
         )
         # Catalog bundle tests use bare numeric for some codes.
-        is_catalog = "diagnostics-catalog" in spec.dir
-        has_bare_numeric = is_catalog and bool(
+        has_bare_numeric = spec.is_diagnostics_catalog and bool(
             re.search(r"CHECK[^:]*:\s*\d{4,}\b", text)
         )
         if not (
@@ -1540,10 +2686,14 @@ def _classify(
     bdir = REPO_ROOT / spec.dir
     if entry is None or not (bdir / "README.md").exists():
         return "missing", "no freshness entry or README.md", cur_watched, cur_doc
-    if cur_doc is None:
-        return "stale", "source_doc missing on disk", cur_watched, cur_doc
-    if entry.get("source_doc_digest") != cur_doc:
-        return "stale", "source_doc changed since last regen", cur_watched, cur_doc
+    # A coverage bundle has no source_doc, so only its watched paths can
+    # invalidate it; skip the document checks rather than reading the absent
+    # doc as "missing on disk".
+    if spec.is_doc_anchored:
+        if cur_doc is None:
+            return "stale", "source_doc missing on disk", cur_watched, cur_doc
+        if entry.get("source_doc_digest") != cur_doc:
+            return "stale", "source_doc changed since last regen", cur_watched, cur_doc
     if entry.get("watched_paths_digest") != cur_watched:
         return "stale", "watched paths changed since last regen", cur_watched, cur_doc
     return "fresh", "", cur_watched, cur_doc
@@ -1584,11 +2734,15 @@ def cmd_show(args: argparse.Namespace) -> int:
     print(f"bundle:          {spec.key}")
     print(f"dir:             {spec.dir}")
     print(f"prompt:          {spec.prompt}")
-    print(f"source_doc:      {spec.source_doc}")
-    doc_path = REPO_ROOT / spec.source_doc
-    print(
-        f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
-    )
+    print(f"role:            {spec.role}")
+    if spec.source_doc is None:
+        print("source_doc:      (none — gap-selected coverage bundle)")
+    else:
+        print(f"source_doc:      {spec.source_doc}")
+        doc_path = REPO_ROOT / spec.source_doc
+        print(
+            f"source_doc on disk: {'present' if doc_path.exists() else 'MISSING'}"
+        )
     print(f"size_cap_files:  {spec.size_cap_files}")
     print(f"depends_on:")
     for d in spec.depends_on:
@@ -1610,7 +2764,7 @@ def cmd_mark_fresh(args: argparse.Namespace) -> int:
         raise SystemExit(f"unknown bundle: {args.bundle}")
     cur_watched = compute_watched_digest(spec)
     cur_doc = compute_source_doc_digest(spec)
-    if cur_doc is None:
+    if spec.is_doc_anchored and cur_doc is None:
         raise SystemExit(
             f"cannot mark fresh: source_doc {spec.source_doc} not on disk"
         )
@@ -1670,6 +2824,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         "design/name-resolution/": "Name resolution",
         "design/ir-reference/": "IR reference",
         "design/target-pipelines/": "Target pipelines",
+        "coverage/": "Coverage (white-box characterization)",
     }
     section_order = [
         "Conformance (language reference)",
@@ -1680,6 +2835,7 @@ def cmd_index(args: argparse.Namespace) -> int:
         "Name resolution",
         "IR reference",
         "Target pipelines",
+        "Coverage (white-box characterization)",
         "Top-level",
     ]
 
@@ -1730,14 +2886,22 @@ def cmd_index(args: argparse.Namespace) -> int:
         out.append("| --- | ---: | --- |")
         for spec in grouped[section]:
             count = bundle_counts.get(spec.key, 0)
-            # Relative link from INDEX.md (in docs/generated/tests/) to the
-            # source_doc (workspace-relative). Handles both source roots:
-            #   docs/generated/design/<...>  -> ../design/<...>
-            #   docs/language-reference/<...> -> ../../language-reference/<...>
-            doc_link = os.path.relpath(spec.source_doc, "docs/generated/tests")
+            if spec.source_doc is None:
+                # A coverage bundle is gap-selected, so there is no anchoring
+                # document to link; point at the methodology that governs the
+                # whole tree instead.
+                anchor = "[`coverage/METHODOLOGY.md`](coverage/METHODOLOGY.md)"
+            else:
+                # Relative link from INDEX.md (in docs/generated/tests/) to the
+                # source_doc (workspace-relative). Handles both source roots:
+                #   docs/generated/design/<...>  -> ../design/<...>
+                #   docs/language-reference/<...> -> ../../language-reference/<...>
+                doc_link = os.path.relpath(
+                    spec.source_doc, "docs/generated/tests"
+                )
+                anchor = f"[`{spec.source_doc}`]({doc_link})"
             out.append(
-                f"| [`{spec.key}`]({spec.key}/README.md) | {count} |"
-                f" [`{spec.source_doc}`]({doc_link}) |"
+                f"| [`{spec.key}`]({spec.key}/README.md) | {count} | {anchor} |"
             )
         out.append("")
     out.append("## Catalog snapshot")
@@ -1791,6 +2955,9 @@ def cmd_lint(args: argparse.Namespace) -> int:
     if not args.bundles:
         issues.extend(lint_findings())
         issues.extend(lint_expected_failures())
+        issues.extend(lint_agentic_coverage_excludes())
+        issues.extend(lint_doc_section_digests(specs))
+        issues.extend(lint_catalog_entry_digests(specs))
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
     for i in issues:
@@ -2116,24 +3283,6 @@ def cmd_verify(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------
 
 
-def _gh_slug(heading_text: str) -> str:
-    """Compute a GitHub-flavored markdown heading anchor.
-
-    Approximation of the algorithm GitHub uses to render `## Foo Bar`
-    as `#foo-bar`:
-    - lowercase
-    - replace runs of whitespace with `-`
-    - strip characters outside [a-z0-9-_]
-    - leading hyphens kept, but consecutive hyphens collapsed
-    """
-    s = heading_text.strip().lower()
-    s = re.sub(r"[`*_~]", "", s)  # strip markdown emphasis
-    s = re.sub(r"\s+", "-", s)
-    s = re.sub(r"[^a-z0-9\-_]", "", s)
-    s = re.sub(r"-+", "-", s)
-    return s
-
-
 def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
     """Walk docs/language-reference/*.md. For each file, return a list
     of (lineno, level, anchor_id) tuples — one per heading.
@@ -2164,18 +3313,18 @@ def _enumerate_lang_ref_anchors() -> dict[str, list[tuple[int, str, str]]]:
                     aid = m2.group(1).lower()
                     txt = re.sub(r"\s*\{#[\w\-]+\}\s*$", "", txt)
                 else:
-                    aid = _gh_slug(txt)
+                    aid = _github_slug(txt)
                 anchors.append((i + 1, level, aid))
             else:
                 # Setext-style: a non-blank line followed by ==== or ----
                 if i + 1 < len(lines):
                     nxt = lines[i + 1]
                     if ln.strip() and re.match(r"^=+\s*$", nxt):
-                        anchors.append((i + 1, "#", _gh_slug(ln)))
+                        anchors.append((i + 1, "#", _github_slug(ln)))
                         i += 2
                         continue
                     if ln.strip() and re.match(r"^-+\s*$", nxt) and not ln.startswith("-"):
-                        anchors.append((i + 1, "##", _gh_slug(ln)))
+                        anchors.append((i + 1, "##", _github_slug(ln)))
                         i += 2
                         continue
             i += 1
@@ -2296,7 +3445,7 @@ def cmd_lang_ref_coverage(args: argparse.Namespace) -> int:
                 if spec is None:
                     continue
                 bundle_doc = spec.source_doc
-                if bundle_doc.startswith("docs/generated/design/"):
+                if bundle_doc and bundle_doc.startswith("docs/generated/design/"):
                     edge = (ref, bundle_doc)
                     edges[edge] = edges.get(edge, 0) + 1
 
@@ -2595,13 +3744,77 @@ def cmd_findings_dup(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_findings_fixed(args: argparse.Namespace) -> int:
+    """Record that a pending finding no longer reproduces, and retire it.
+
+    Triage keeps turning up findings that were real when observed and are
+    fixed by the time anyone looks. Before this existed there was nowhere
+    to put that result: the finding stayed pending, so the next pass
+    re-tested it from scratch. Five were in that state when this landed --
+    four from the sigsegv sweep plus one that only got cleared because it
+    happened to also duplicate an open issue.
+
+    The command deliberately demands evidence. `--verified-at` is required
+    and must name the compiler commit the re-test ran against, because
+    "fixed" without a commit is unfalsifiable: a later regression cannot
+    be distinguished from a triage that was wrong, and this whole channel
+    exists because unverified claims produced false results before. The
+    finding YAML is kept -- retiring is not deleting, and a fixed finding
+    is the seed of the regression test nobody has written yet.
+    """
+    state = load_findings_state()
+    p = _resolve_finding_path(args.id)
+    if p is None:
+        print(f"error: no finding with id {args.id!r}", file=sys.stderr)
+        return 1
+    try:
+        finding = load_finding(p)
+    except Exception as exc:  # noqa: BLE001
+        print(f"error: failed to parse {p}: {exc}", file=sys.stderr)
+        return 1
+    findings_map = state.setdefault("findings", {})
+    existing = findings_map.get(args.id, {})
+    if existing.get("issue"):
+        print(
+            f"error: {args.id} is filed as #{existing['issue']}; close the issue"
+            " instead of retiring the finding",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("dup_of"):
+        print(
+            f"error: {args.id} is already marked dup-of #{existing['dup_of']}",
+            file=sys.stderr,
+        )
+        return 1
+    if existing.get("fixed_at"):
+        print(
+            f"error: {args.id} already retired as fixed at {existing['fixed_at']}",
+            file=sys.stderr,
+        )
+        return 1
+    findings_map[args.id] = {
+        "fixed_at": args.verified_at,
+        "title": compute_finding_title(finding),
+    }
+    if args.note:
+        findings_map[args.id]["note"] = args.note
+    save_findings_state(state)
+    _move_to_resolved(p)
+    print(f"  retired {args.id} as fixed at {args.verified_at}")
+    try:
+        where = FINDINGS_RESOLVED_DIR.relative_to(REPO_ROOT)
+    except ValueError:
+        where = FINDINGS_RESOLVED_DIR
+    print(f"  moved finding to {where}/")
+    return 0
+
+
 def _resolve_finding_path(fid: str) -> Path | None:
-    candidate = FINDINGS_DIR / f"{fid}.yaml"
-    if candidate.exists():
-        return candidate
-    filed = FINDINGS_FILED_DIR / f"{fid}.yaml"
-    if filed.exists():
-        return filed
+    for base in (FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR):
+        candidate = base / f"{fid}.yaml"
+        if candidate.exists():
+            return candidate
     return None
 
 
@@ -2613,6 +3826,12 @@ def _issue_number_from_url(url: str) -> int | None:
 def _move_to_filed(p: Path) -> None:
     FINDINGS_FILED_DIR.mkdir(parents=True, exist_ok=True)
     dest = FINDINGS_FILED_DIR / p.name
+    p.rename(dest)
+
+
+def _move_to_resolved(p: Path) -> None:
+    FINDINGS_RESOLVED_DIR.mkdir(parents=True, exist_ok=True)
+    dest = FINDINGS_RESOLVED_DIR / p.name
     p.rename(dest)
 
 
@@ -2756,25 +3975,38 @@ def cmd_coverage_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
+# The design driver's `load_gap_queue` matches on this text to tell "no gaps
+# for this document" (benign) from a real failure. Named on both sides and
+# pinned by `selftest` so a reword cannot silently break that.
+_NO_GAPS_FOR_DOC = "no gap rows are anchored to {doc!r}"
+
+_GAP_TREES = {
+    "design": "docs/generated/design/",
+    "language-reference": "docs/language-reference/",
+}
+
+
 def cmd_doc_gaps(args: argparse.Namespace) -> int:
-    """Aggregate ## Doc gaps observed rows across bundles, grouped by source_doc.
+    """Aggregate ## Doc gaps observed rows across bundles, grouped by the
+    document each gap is against.
 
     The output is the feedback artifact the doc-regeneration workflow
     consumes: for each docs/generated/design/<doc>.md, the list of gaps
     that bundles testing against it have reported. Rows reported by
     multiple bundles against the same Anchor + Kind are merged into
     a single row with a `Reported by` cell.
+
+    Grouping follows each row's Anchor cell, not the reporting bundle's
+    `source_doc`. The two agree for a doc-anchored bundle, but a
+    `coverage/` bundle has no `source_doc` while still reporting gaps
+    against design pages; grouping those under the bundle put them
+    somewhere `--source-doc` could not reach, so they were invisible to
+    the only workflow that can act on them.
     """
     manifest = load_manifest()
     specs = list(manifest.bundles.values())
-    if args.source_doc:
-        specs = [s for s in specs if s.source_doc == args.source_doc]
-        if not specs:
-            raise SystemExit(
-                f"no bundle has source_doc={args.source_doc!r}"
-            )
 
-    # source_doc -> list[GapRow]
+    # anchor target doc -> list[GapRow]
     by_doc: dict[str, list[GapRow]] = {}
     for spec in specs:
         bdir = REPO_ROOT / spec.dir
@@ -2782,82 +4014,94 @@ def cmd_doc_gaps(args: argparse.Namespace) -> int:
         if not readme.exists():
             continue
         text = readme.read_text(encoding="utf-8")
-        rows = parse_gap_rows(text, spec.dir, spec.source_doc)
-        if rows:
-            by_doc.setdefault(spec.source_doc, []).extend(rows)
+        for row in parse_gap_rows(text, spec.dir, spec.gap_group):
+            # A row whose Anchor names no document still has to go
+            # somewhere or it would vanish from the report entirely; it
+            # falls back to the reporting bundle, and `lint` errors on it.
+            by_doc.setdefault(row.anchor_target or spec.gap_group, []).append(row)
+
+    if args.tree != "all":
+        prefix = _GAP_TREES[args.tree]
+        by_doc = {d: rows for d, rows in by_doc.items() if d.startswith(prefix)}
+    if args.source_doc:
+        by_doc = {d: rows for d, rows in by_doc.items() if d == args.source_doc}
+        if not by_doc:
+            raise SystemExit(_NO_GAPS_FOR_DOC.format(doc=args.source_doc))
+
+    merged_by_doc = {
+        doc: _merge_gap_rows(rows) for doc, rows in sorted(by_doc.items())
+    }
 
     if args.format == "json":
         import json
 
-        payload = {
-            doc: [
-                {
-                    "anchor": r.anchor,
-                    "anchor_fragment": r.anchor_fragment,
-                    "kind": r.kind,
-                    "gap": r.gap,
-                    "suggested_addition": r.suggested_addition,
-                    "reported_by": r.bundle,
-                }
-                for r in rows
-            ]
-            for doc, rows in sorted(by_doc.items())
-        }
-        print(json.dumps(payload, indent=2))
+        print(json.dumps(merged_by_doc, indent=2))
         return 0
 
-    for doc in sorted(by_doc):
-        rows = by_doc[doc]
-        # Merge rows by (anchor_fragment, kind, gap-prose), tracking
-        # which bundles reported them.
-        merged: dict[tuple[str, str, str], dict] = {}
-        for r in rows:
-            key = (r.anchor_fragment, r.kind, r.gap)
-            slot = merged.setdefault(
-                key,
-                {
-                    "anchor": r.anchor,
-                    "kind": r.kind,
-                    "gap": r.gap,
-                    "suggested_addition": r.suggested_addition,
-                    "reported_by": [],
-                },
-            )
-            if r.bundle not in slot["reported_by"]:
-                slot["reported_by"].append(r.bundle)
-            # If multiple bundles offer Suggested-addition text,
-            # concatenate distinct contributions.
-            if (
-                r.suggested_addition
-                and r.suggested_addition != slot["suggested_addition"]
-                and r.suggested_addition not in slot["suggested_addition"]
-            ):
-                slot["suggested_addition"] = (
-                    slot["suggested_addition"] + " // " + r.suggested_addition
-                ).strip(" /")
-
+    for doc, merged in merged_by_doc.items():
+        reporters = sorted({b for m in merged for b in m["reported_by"]})
         print(f"# Gaps reported against {doc}")
         print()
-        print(f"Bundle reports: {', '.join(sorted({r.bundle for r in rows}))}")
+        print(f"Bundle reports: {', '.join(reporters)}")
         print()
         print(
-            "| Anchor | Kind | Gap | Suggested addition | Reported by |"
+            "| Gap id | Anchor | Kind | Gap | Suggested addition | Reported by |"
         )
-        print("| --- | --- | --- | --- | --- |")
-        # Sort by anchor fragment, then kind.
-        sorted_rows = sorted(
-            merged.values(), key=lambda m: (m["anchor"], m["kind"])
-        )
-        for m in sorted_rows:
+        print("| --- | --- | --- | --- | --- | --- |")
+        for m in merged:
             reported = ", ".join(m["reported_by"])
             print(
-                f"| {m['anchor']} | {m['kind']} | {m['gap']}"
+                f"| {m['gap_id']} | {m['anchor']} | {m['kind']} | {m['gap']}"
                 f" | {m['suggested_addition']} | {reported} |"
             )
         print()
-    if not by_doc:
+    if not merged_by_doc:
         print("# No doc-gap rows recorded across the selected bundles.")
     return 0
+
+
+def _merge_gap_rows(rows: list[GapRow]) -> list[dict]:
+    """Collapse one document's gap rows to one entry per distinct gap.
+
+    Sibling bundles routinely observe the same hole in a shared page --
+    three bundles anchored to the diagnostics doc all notice the same
+    missing subsection -- and the consumer wants one work item, not three.
+    Rows collapse on `gap_id`, so a re-wording that survives
+    `_normalize_gap_prose` merges too, which the old key (the raw prose)
+    did not. Distinct `Suggested addition` texts are kept and joined,
+    since each reporter saw the gap from its own test and the proposals
+    are usually complementary rather than redundant.
+
+    Sorted by the raw Anchor-cell text then kind. That is *not* document
+    order -- the cell is a markdown link, so this is lexicographic on the
+    link text -- but it is stable and groups rows sharing an anchor, which
+    is what a reader working through one document's gaps wants.
+    """
+    merged: dict[str, dict] = {}
+    for r in rows:
+        slot = merged.setdefault(
+            r.gap_id,
+            {
+                "gap_id": r.gap_id,
+                "anchor": r.anchor,
+                "anchor_fragment": r.anchor_fragment,
+                "kind": r.kind,
+                "gap": r.gap,
+                "suggested_addition": r.suggested_addition,
+                "reported_by": [],
+            },
+        )
+        if r.bundle not in slot["reported_by"]:
+            slot["reported_by"].append(r.bundle)
+        if (
+            r.suggested_addition
+            and r.suggested_addition != slot["suggested_addition"]
+            and r.suggested_addition not in slot["suggested_addition"]
+        ):
+            slot["suggested_addition"] = (
+                slot["suggested_addition"] + " // " + r.suggested_addition
+            ).strip(" /")
+    return sorted(merged.values(), key=lambda m: (m["anchor"], m["kind"]))
 
 
 def cmd_review_status(args: argparse.Namespace) -> int:
@@ -3021,11 +4265,22 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_dg = sub.add_parser(
         "doc-gaps",
-        help="aggregate ## Doc gaps observed rows across bundles, grouped by source_doc",
+        help="aggregate ## Doc gaps observed rows across bundles, grouped by"
+        " the document each gap is anchored to",
     )
     p_dg.add_argument(
         "--source-doc",
-        help="restrict to a single docs/generated/design/<...>.md path",
+        help="restrict to gaps anchored to a single document, by its"
+        " workspace-relative path",
+    )
+    p_dg.add_argument(
+        "--tree",
+        choices=("all", "design", "language-reference"),
+        default="all",
+        help="restrict to gaps against one doc tree. `design` is the queue"
+        " the doc-regeneration workflow can act on; `language-reference`"
+        " is the human-written spec, which no agent may edit, so those"
+        " gaps are a human triage queue (default: all)",
     )
     p_dg.add_argument(
         "--format",
@@ -3034,6 +4289,19 @@ def _build_parser() -> argparse.ArgumentParser:
         help="output format (default: md)",
     )
     p_dg.set_defaults(func=cmd_doc_gaps)
+
+    p_cd = sub.add_parser(
+        "catalog-digest",
+        help="print the doc_section_digest for a diagnostics-catalog code",
+    )
+    p_cd.add_argument("code", help="diagnostic code, e.g. 30019")
+    p_cd.set_defaults(func=cmd_catalog_digest)
+
+    p_st = sub.add_parser(
+        "selftest",
+        help="unit-check the slug / link / table helpers used by lint",
+    )
+    p_st.set_defaults(func=cmd_selftest)
 
     p_rs = sub.add_parser(
         "review-status",
@@ -3111,7 +4379,621 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_fd.set_defaults(func=cmd_findings_dup)
 
+    p_fx = find_sub.add_parser(
+        "fixed",
+        help="retire a pending finding that no longer reproduces"
+        " (no filing; moves YAML to resolved/)",
+    )
+    p_fx.add_argument("id")
+    p_fx.add_argument(
+        "--verified-at",
+        required=True,
+        metavar="COMMIT",
+        help="compiler commit the re-test ran against; required, because"
+        " 'fixed' without one cannot be told apart from a later regression",
+    )
+    p_fx.add_argument(
+        "--note",
+        help="optional one-line note on what was re-run and what it showed",
+    )
+    p_fx.set_defaults(func=cmd_findings_fixed)
+
     return p
+
+
+def cmd_catalog_digest(args: argparse.Namespace, snapshot: Path | None = None) -> int:
+    """Print the `doc_section_digest` a diagnostics-catalog test should carry.
+
+    Exists so that the generation prompt can name one command instead of
+    describing a hashing rule an agent then re-implements by hand -- which is
+    how the corpus ended up with values nothing could reproduce (#11410).
+
+    `snapshot` defaults to the real one and is a parameter only so that
+    `selftest` can drive the missing-snapshot and success paths against a
+    fixture; the argparse entry point never passes it.
+    """
+    snapshot = snapshot or CATALOG_SNAPSHOT_PATH
+    catalog = parse_catalog_snapshot(snapshot)
+    if not catalog:
+        print(f"error: no catalog snapshot at {_rel_to_repo(snapshot)}")
+        return 1
+    entry = catalog.get(args.code)
+    if entry is None:
+        print(f"error: code {args.code} is not in the catalog snapshot")
+        return 1
+    print(catalog_entry_digest(args.code, *entry))
+    return 0
+
+
+def cmd_selftest(args: argparse.Namespace) -> int:
+    """Unit-check the helpers `lint` depends on, on inputs the corpus does
+    not contain.
+
+    `lint` itself only ever exercises these against the committed corpus,
+    which is kept clean -- so it proves the happy path and nothing else.
+    The cases below are the edge ones: the punctuation rule that made
+    every anchor in this corpus wrong, the escaped pipe that decides
+    whether a row is well-formed, the GFM spellings (single-dash
+    delimiter, one-column table) that a stricter reader would skip
+    without reporting anything, and the link/anchor resolution that is
+    the headline of this change -- its error, warning, and dedup
+    branches, which the clean corpus never triggers.
+    """
+    failures: list[str] = []
+
+    def check(what: str, got, want) -> None:
+        if got != want:
+            failures.append(f"{what}: got {got!r}, want {want!r}")
+
+    # Punctuation is deleted, not replaced, so each surrounding space
+    # still yields a hyphen. This is the rule the old `_gh_slug`
+    # collapsed away, and collapsing it is what made the corpus's
+    # anchors miss.
+    check("slug plain", _github_slug("Basic scalar types"), "basic-scalar-types")
+    check(
+        "slug slashes",
+        _github_slug("CUDA / Python / FFI attributes"),
+        "cuda--python--ffi-attributes",
+    )
+    check("slug code span", _github_slug("The `IRFunc` type"), "the-irfunc-type")
+    check("slug trailing punct", _github_slug("What now?"), "what-now")
+
+    # Repeated headings get -1, -2; fenced `# comment` lines are not
+    # headings.
+    with tempfile.TemporaryDirectory() as td:
+        doc = Path(td) / "d.md"
+        doc.write_text(
+            "# Title\n## Dup\n## Dup\nSetext\n------\n"
+            "```sh\n# not a heading\n```\n",
+            encoding="utf-8",
+        )
+        check(
+            "heading slugs",
+            heading_slugs(doc),
+            {"title", "dup", "dup-1", "setext"},
+        )
+
+    # Only a bare pipe separates cells.
+    check("row plain", _row_cells("| a | b | c |"), [" a ", " b ", " c "])
+    check("row escaped", len(_row_cells(r"| a | `x \|\| y` | c |")), 3)
+    check("row extra", len(_row_cells("| a | b | c | d |")), 4)
+
+    # GFM spellings a stricter delimiter test would silently skip.
+    check("delim single dash", _is_delimiter_row("| - | - |"), True)
+    check("delim one column", _is_delimiter_row("| --- |"), True)
+    check("delim aligned", _is_delimiter_row("| :--- | ---: | :---: |"), True)
+    check("delim not a delim", _is_delimiter_row("| a | b |"), False)
+
+    # A malformed row is reported, and a table inside a fence is not.
+    with tempfile.TemporaryDirectory() as td:
+        md = Path(td) / "README.md"
+        md.write_text(
+            "| h1 | h2 |\n| --- | --- |\n| a | b | c |\n\n"
+            "```markdown\n| bad |\n| --- | --- |\n```\n",
+            encoding="utf-8",
+        )
+        found = [i.message for i in lint_markdown_tables(md)]
+        check("table one issue", len(found), 1)
+        check("table names the row", "line 3" in found[0] if found else False, True)
+        check(
+            "table blames the pipe",
+            "escape a literal pipe" in found[0] if found else False,
+            True,
+        )
+
+    # lint_markdown_links -- the function this PR is named for. A dead
+    # path is an error (the `../` miscount this PR set out to fix), a
+    # resolved path whose `#anchor` hits no heading is a warning, a
+    # citation that resolves in both halves is silent, and the same
+    # broken citation repeated across rows is reported once (a coverage
+    # table cites the same anchor per claim).
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "target.md").write_text("# Real Heading\n", encoding="utf-8")
+        src = root / "README.md"
+        src.write_text(
+            "[ok](target.md#real-heading)\n"
+            "[stale anchor](target.md#missing)\n"
+            "[dead](nope.md#x)\n"
+            "[dead again](nope.md#x)\n",
+            encoding="utf-8",
+        )
+        issues = lint_markdown_links(src)
+        errors = [i for i in issues if i.severity == "error"]
+        warnings = [i for i in issues if i.severity == "warning"]
+        check("links dead path is error", len(errors), 1)
+        check("links stale anchor is warning", len(warnings), 1)
+        check("links dedups repeated citation", len(issues), 2)
+        check(
+            "links error names the path",
+            "nope.md" in errors[0].message if errors else False,
+            True,
+        )
+
+    # lint_liquid_safe -- the Pages-build guard. A raw `{{` or `{%` in the
+    # body is an error either way it fails Liquid (an unterminated tag aborts
+    # the build, a terminated one is evaluated and drops the literal text);
+    # the two dual-safe spellings -- spaced braces and numeric entities in a
+    # `<code>` element -- pass; and a `{{` inside the front-matter is not
+    # counted, since Jekyll strips front-matter before Liquid runs.
+    with tempfile.TemporaryDirectory() as td:
+        fm = '---\ngenerated: true\nwarning: "x"\n---\n'
+        bad = Path(td) / "bad.md"
+        bad.write_text(fm + "probed with `float2x2 m = {{1,2},{3,4}}`.\n", encoding="utf-8")
+        tag = Path(td) / "tag.md"
+        tag.write_text(fm + "a {% raw %} block.\n", encoding="utf-8")
+        ok = Path(td) / "ok.md"
+        ok.write_text(
+            fm
+            + "spaced `float2x2 m = { {1,2},{3,4} }` and"
+            + " <code>&#123;&#123;.*&#125;&#125;</code> both render.\n",
+            encoding="utf-8",
+        )
+        fm_only = Path(td) / "fm.md"
+        fm_only.write_text('---\nwarning: "see {{x}}"\n---\nclean body.\n', encoding="utf-8")
+        check("liquid rejects raw output tag", len(lint_liquid_safe(bad)), 1)
+        check("liquid rejects raw statement tag", len(lint_liquid_safe(tag)), 1)
+        check("liquid accepts spaced braces and entities", len(lint_liquid_safe(ok)), 0)
+        check("liquid ignores front-matter", len(lint_liquid_safe(fm_only)), 0)
+        bad_issues = lint_liquid_safe(bad)
+        check(
+            "liquid error names the line",
+            "line 5" in bad_issues[0].message if bad_issues else False,
+            True,
+        )
+
+    # Doc-gap identity. `doc-gaps` groups by the anchored document and the
+    # consuming ledger keys on `gap_id`, so both have to hold still across
+    # the rewording a bundle regeneration produces -- the corpus, being one
+    # snapshot, cannot show that a re-worded row keeps its id.
+    check(
+        "gap prose ignores markup and punctuation",
+        _normalize_gap_prose("The `Decl` node -- see [x](y.md) -- is *not* documented."),
+        "the decl node see x is not documented",
+    )
+    check(
+        "gap id survives rewording that normalizes away",
+        compute_gap_id("d.md", "#s", "missing-example", "The `foo` case, unstated."),
+        compute_gap_id("d.md", "#s", "missing-example", "The foo case unstated"),
+    )
+    check(
+        "gap id separates distinct kinds",
+        compute_gap_id("d.md", "#s", "missing-example", "x")
+        == compute_gap_id("d.md", "#s", "ambiguous-claim", "x"),
+        False,
+    )
+    check(
+        "gap id separates distinct target docs",
+        compute_gap_id("a.md", "#s", "missing-example", "x")
+        == compute_gap_id("b.md", "#s", "missing-example", "x"),
+        False,
+    )
+
+    # Anchor-cell routing: a coverage bundle has no `source_doc`, so the
+    # link in the cell is the only thing that says which document the gap
+    # is in. A cell with no link routes nowhere, which `lint_bundle` errors
+    # on -- the empty string is that signal, not an incidental default.
+    check(
+        "gap target resolves relative to the bundle dir",
+        _resolve_gap_target(
+            "docs/generated/tests/coverage/autodiff",
+            "[#x](../../../design/ir-reference/differentiation.md#x)",
+        ),
+        "docs/generated/design/ir-reference/differentiation.md",
+    )
+    check(
+        "gap target empty for a bare fragment",
+        _resolve_gap_target("docs/generated/tests/coverage/autodiff", "[#x](#x)"),
+        "",
+    )
+    check(
+        "gap target empty for an unlinked cell",
+        _resolve_gap_target("docs/generated/tests/coverage/autodiff", "#x"),
+        "",
+    )
+
+    # Sibling bundles reporting the same gap collapse to one work item,
+    # keeping both suggestions; the corpus has such pairs but nothing
+    # asserts the merge, and a regression would silently triple the queue.
+    def _mk_gap(bundle: str, prose: str, sugg: str) -> GapRow:
+        target = "docs/generated/design/d.md"
+        return GapRow(
+            anchor="[#s](../../../design/d.md#s)",
+            anchor_fragment="#s",
+            kind="missing-surface",
+            gap=prose,
+            suggested_addition=sugg,
+            bundle=bundle,
+            source_doc="",
+            anchor_target=target,
+            gap_id=compute_gap_id(target, "#s", "missing-surface", prose),
+        )
+
+    merged = _merge_gap_rows(
+        [
+            _mk_gap("b/one", "The rule is unstated.", "Add the rule."),
+            _mk_gap("b/two", "The rule is unstated", "Add an example too."),
+            _mk_gap("b/three", "A different hole entirely.", "Add that."),
+        ]
+    )
+    check("gap merge collapses re-worded duplicates", len(merged), 2)
+    dup = [m for m in merged if len(m["reported_by"]) > 1]
+    check("gap merge records both reporters", len(dup), 1)
+    check(
+        "gap merge keeps both suggestions",
+        dup[0]["suggested_addition"] if dup else "",
+        "Add the rule. // Add an example too.",
+    )
+
+    # Finding reproducibility. A finding whose command names a scratch path
+    # cannot be re-run at triage time; the committed corpus has both shapes,
+    # but only the negative cases prove the check fires.
+    def repro_warns(ev):
+        return [i.message for i in _lint_finding_reproducibility("f", ev)]
+
+    check(
+        "scratch command without inline repro warns",
+        len(repro_warns({"command": "slangc /tmp/x.slang -target hlsl"})),
+        1,
+    )
+    check(
+        "placeholder command without inline repro warns",
+        len(repro_warns({"command": "slangc <file> -target hlsl"})),
+        1,
+    )
+    check(
+        "scratch command with inline repro is accepted",
+        repro_warns({"command": "slangc /tmp/x.slang", "repro_source": "void main(){}"}),
+        [],
+    )
+    check(
+        "operator-minimized repro also satisfies it",
+        repro_warns({"command": "slangc <file>", "minimized_repro": "void main(){}"}),
+        [],
+    )
+    check(
+        "committed input with a clean command is silent",
+        repro_warns({
+            "command": "slangc docs/generated/tests/x.slang -target hlsl",
+            "source_slang": "docs/generated/tests/_meta/regenerate.py",
+        }),
+        [],
+    )
+    check(
+        "missing source_slang with no inline repro warns",
+        len(repro_warns({"command": "slangc a.slang", "source_slang": "docs/nope.slang"})),
+        1,
+    )
+
+    # The lint rule and the issue renderer have to agree on what counts as
+    # the repro, or the rule accepts a finding that then files an issue
+    # showing a different program. `_repro_body` honoured `minimized_repro`
+    # but not `repro_source`, so a finding that satisfied the rule the
+    # intended way still rendered `source_slang` from disk.
+    # `source_slang` here points at a real committed file so the fallback
+    # path is exercised; the comparisons are truncated so that a
+    # regression -- which returns that whole file -- reports a short
+    # prefix instead of dumping it into the selftest output.
+    inline_only = {
+        "command": "slangc /tmp/x.slang -target hlsl",
+        "source_slang": "docs/generated/tests/_meta/schema/finding.schema.json",
+        "repro_source": "void main() { /* the scratch variant */ }",
+    }
+    check(
+        "issue body prefers the inlined repro over source_slang on disk",
+        _repro_body({"evidence": inline_only}).strip()[:41],
+        "void main() { /* the scratch variant */ }",
+    )
+    check(
+        "operator minimization still outranks the agent's inline repro",
+        _repro_body({"evidence": dict(inline_only, minimized_repro="void main() {}")}).strip()[:14],
+        "void main() {}",
+    )
+    check(
+        "committed source_slang is still read when nothing is inlined",
+        _repro_body({"evidence": {k: v for k, v in inline_only.items() if k != "repro_source"}})[:1],
+        "{",
+    )
+
+    # `findings fixed` retires a finding that stopped reproducing. The
+    # guards are the point: a finding that is filed, already deduped, or
+    # already retired must not be retired again, or the state entry that
+    # records where it went is silently overwritten. Exercised through
+    # the real command against a temporary state file rather than by
+    # re-implementing the checks here.
+    with tempfile.TemporaryDirectory() as td:
+        import argparse as _ap
+
+        real_state, real_dir, real_filed, real_res = (
+            FINDINGS_STATE_PATH, FINDINGS_DIR, FINDINGS_FILED_DIR, FINDINGS_RESOLVED_DIR,
+        )
+        g = globals()
+        try:
+            root = Path(td)
+            g["FINDINGS_STATE_PATH"] = root / "state.json"
+            g["FINDINGS_DIR"] = root / "findings"
+            g["FINDINGS_FILED_DIR"] = root / "findings" / "filed"
+            g["FINDINGS_RESOLVED_DIR"] = root / "findings" / "resolved"
+            g["FINDINGS_DIR"].mkdir(parents=True)
+            (g["FINDINGS_DIR"] / "x.yaml").write_text(
+                'id: x\ntitle: a finding\nobserved_at: "2026-01-01T00:00:00+00:00"\n',
+                encoding="utf-8",
+            )
+
+            def run(fid, commit="abc123"):
+                return cmd_findings_fixed(
+                    _ap.Namespace(id=fid, verified_at=commit, note=None)
+                )
+
+            check("fixed: unknown id rejected", run("nope"), 1)
+            check("fixed: retires a pending finding", run("x"), 0)
+            check(
+                "fixed: YAML moved to resolved/, not deleted",
+                (g["FINDINGS_RESOLVED_DIR"] / "x.yaml").exists(),
+                True,
+            )
+            entry = json.loads(g["FINDINGS_STATE_PATH"].read_text())["findings"]["x"]
+            check("fixed: records the verifying commit", entry.get("fixed_at"), "abc123")
+            check("fixed: retiring twice is refused", run("x"), 1)
+
+            # A filed finding must not be retirable -- the issue is the
+            # record, and closing it is a different action.
+            st = json.loads(g["FINDINGS_STATE_PATH"].read_text())
+            st["findings"]["y"] = {"issue": 999}
+            g["FINDINGS_STATE_PATH"].write_text(json.dumps(st), encoding="utf-8")
+            (g["FINDINGS_DIR"] / "y.yaml").write_text("id: y\n", encoding="utf-8")
+            check("fixed: refuses a finding that is already filed", run("y"), 1)
+            check(
+                "fixed: refused finding stays put",
+                (g["FINDINGS_DIR"] / "y.yaml").exists(),
+                True,
+            )
+        finally:
+            g["FINDINGS_STATE_PATH"] = real_state
+            g["FINDINGS_DIR"] = real_dir
+            g["FINDINGS_FILED_DIR"] = real_filed
+            g["FINDINGS_RESOLVED_DIR"] = real_res
+
+    # An unquoted ISO timestamp is a YAML date, not a string, and the two
+    # spellings are indistinguishable in the file. `findings list` used to
+    # abort partway through the queue on the unquoted ones; `load_finding`
+    # now normalizes, so consumers see one type regardless of spelling.
+    with tempfile.TemporaryDirectory() as td:
+        both = Path(td) / "f.yaml"
+        for spelling in ("2026-08-04T00:00:00+00:00", '"2026-08-04T00:00:00+00:00"'):
+            both.write_text(f"id: x\nobserved_at: {spelling}\n", encoding="utf-8")
+            loaded = load_finding(both)["observed_at"]
+            # Compare the type before slicing: a regression here returns a
+            # datetime, and slicing that raises rather than reporting,
+            # which would abort the rest of the selftest.
+            check(
+                f"observed_at loads as str for spelling {spelling}",
+                type(loaded).__name__,
+                "str",
+            )
+            check(
+                f"observed_at keeps its date for spelling {spelling}",
+                str(loaded)[:10],
+                "2026-08-04",
+            )
+
+    # `--tree` routing: two production callers depend on this prefix split
+    # (the workflow passes `language-reference`, the design driver always
+    # passes `design`), and a mis-partition would silently send a page's
+    # gaps to the wrong queue.
+    check(
+        "tree prefixes are the two doc trees",
+        sorted(_GAP_TREES),
+        ["design", "language-reference"],
+    )
+    check(
+        "design tree prefix",
+        _GAP_TREES["design"],
+        "docs/generated/design/",
+    )
+    check(
+        "language-reference tree prefix",
+        _GAP_TREES["language-reference"],
+        "docs/language-reference/",
+    )
+    _rows = {
+        "docs/generated/design/a.md": [1],
+        "docs/language-reference/b.md": [1],
+        "coverage/orphan (no source doc)": [1],
+    }
+    for tree, want in (("design", 1), ("language-reference", 1)):
+        pref = _GAP_TREES[tree]
+        check(
+            f"--tree {tree} partitions by prefix",
+            len({d: r for d, r in _rows.items() if d.startswith(pref)}),
+            want,
+        )
+
+    # The design driver recognizes "this document has no gaps" by matching
+    # this exact substring on our stderr. Pin it here so a reword fails
+    # loudly rather than making every gap-status run raise.
+    check(
+        "cross-driver no-gaps message is stable",
+        "no gap rows are anchored to" in _NO_GAPS_FOR_DOC,
+        True,
+    )
+
+    # The catalog snapshot parser and the digest rule it feeds. The committed
+    # corpus only shows entries that already agree, so the drift and
+    # unknown-code branches below are the ones `lint` cannot reach on its own.
+    with tempfile.TemporaryDirectory() as td:
+        snap = Path(td) / "catalog.txt"
+        snap.write_text(
+            "# header line, ignored\n"
+            "\n"
+            "1\tUNCOVERED\terr\tcannot-open-file\tslang-diagnostics.lua"
+            "\tcannot open file '~path'\n"
+            # A message containing a tab: everything past the source column is
+            # the message, so this must not be truncated at the tab.
+            "2\tCOVERED\twarning\ttabbed\tslang-diagnostics.lua\tone\ttwo\n"
+            # Too few columns to be an entry.
+            "junk\trow\n",
+            encoding="utf-8",
+        )
+        rows = parse_catalog_snapshot(snap)
+        check("catalog rows parsed", sorted(rows), ["1", "2"])
+        check(
+            "catalog message keeps embedded tab",
+            rows["2"],
+            ("warning", "tabbed", "one\ttwo"),
+        )
+        check(
+            "catalog digest matches the documented rule",
+            catalog_entry_digest("1", *rows["1"]),
+            hashlib.sha256(
+                b"1\terr\tcannot-open-file\tcannot open file '~path'"
+            ).hexdigest(),
+        )
+
+    # lint_catalog_entry_digests over a fixture holding an agreeing test, a
+    # drifted test, and one citing an unknown code. Drift and unknown-code are
+    # the branches the kept-clean corpus never reaches, so the check that they
+    # each warn (and that the agreeing test stays silent) lives only here. The
+    # count of exactly two issues is what keeps the agreeing test out.
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        bundle = root / "docs/generated/tests/design/cross-cutting/diagnostics-catalog"
+        bundle.mkdir(parents=True)
+        snap_dir = root / "docs/generated/tests/_meta/diagnostics-catalog"
+        snap_dir.mkdir(parents=True)
+        (snap_dir / "catalog.txt").write_text(
+            "1\tUNCOVERED\terr\tcannot-open-file\tsrc\tcannot open file\n",
+            encoding="utf-8",
+        )
+
+        def _write(name: str, code: str, digest: str) -> None:
+            (bundle / name).write_text(
+                f"//META: catalog_code={code}\n"
+                f"//META: doc_section_digest={digest}\n",
+                encoding="utf-8",
+            )
+
+        good = catalog_entry_digest("1", "err", "cannot-open-file", "cannot open file")
+        _write("agree.slang", "1", good)
+        _write("drifted.slang", "1", "cd" * 32)
+        _write("gone.slang", "9999", "ef" * 32)
+        # A test mid-generation that has a code but no digest yet is skipped
+        # rather than counted, which is what keeps the count below at two.
+        (bundle / "partial.slang").write_text("//META: catalog_code=1\n", encoding="utf-8")
+
+        # The non-catalog bundle gets a populated directory holding a test that
+        # *would* be flagged, so "skips non-catalog bundles" fails when the
+        # guard is dropped instead of passing on an empty glob.
+        sibling = root / "docs/generated/tests/design/cross-cutting/diagnostics"
+        sibling.mkdir(parents=True)
+        (sibling / "drifted.slang").write_text(
+            "//META: catalog_code=1\n//META: doc_section_digest=" + "cd" * 32 + "\n",
+            encoding="utf-8",
+        )
+
+        spec = BundleSpec(
+            key="design/cross-cutting/diagnostics-catalog",
+            source_doc=None,
+            watched_paths=[],
+        )
+        other = BundleSpec(
+            key="design/cross-cutting/diagnostics",
+            source_doc=None,
+            watched_paths=[],
+        )
+        snap = snap_dir / "catalog.txt"
+        found = lint_catalog_entry_digests([spec], root=root, snapshot=snap)
+
+        # Two warnings -- the drifted test and the unknown code -- and neither
+        # the agreeing test nor the digest-less one contributes.
+        check("catalog lint reports two issues", len(found), 2)
+        check(
+            "catalog lint is warn-only",
+            {i.severity for i in found},
+            {"warning"},
+        )
+        drift = [i for i in found if i.where.endswith("drifted.slang")]
+        check("catalog lint flags the drifted test", len(drift), 1)
+        unknown = [i for i in found if "9999" in i.message]
+        check("catalog lint groups the unknown code", len(unknown), 1)
+        check(
+            "catalog lint skips non-catalog bundles",
+            lint_catalog_entry_digests([other], root=root, snapshot=snap),
+            [],
+        )
+
+        # An absent snapshot must be reported, not silently treated as "nothing
+        # to check" -- that would leave the bundle unverified while lint passes.
+        missing = snap_dir / "does-not-exist.txt"
+        absent = lint_catalog_entry_digests([spec], root=root, snapshot=missing)
+        check("missing snapshot warns", len(absent), 1)
+        check(
+            "missing snapshot names the count",
+            "4 catalog test(s) went unchecked" in absent[0].message if absent else False,
+            True,
+        )
+        check(
+            "missing snapshot is silent without a catalog bundle",
+            lint_catalog_entry_digests([other], root=root, snapshot=missing),
+            [],
+        )
+
+        # The catalog-digest subcommand is what the prompt and README tell an
+        # agent to run, so its exit status and output are part of the contract.
+        def _run_catalog_digest(code: str, snapshot_path: Path):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_catalog_digest(argparse.Namespace(code=code), snapshot=snapshot_path)
+            return rc, buf.getvalue().strip()
+
+        rc, out = _run_catalog_digest("1", snap)
+        check("catalog-digest succeeds for a known code", rc, 0)
+        check("catalog-digest prints the digest", out, good)
+        rc, out = _run_catalog_digest("999999", snap)
+        check("catalog-digest fails for an unknown code", rc, 1)
+        check("catalog-digest names the unknown code", "999999" in out, True)
+        rc, out = _run_catalog_digest("1", missing)
+        check("catalog-digest fails without a snapshot", rc, 1)
+        check("catalog-digest names the missing snapshot", "no catalog snapshot" in out, True)
+
+    # The catalog bundle is matched by exact manifest key, so a bundle whose path
+    # merely contains "diagnostics-catalog" does not inherit catalog-only rules.
+    def _is_catalog(key: str) -> bool:
+        return BundleSpec(key=key, source_doc=None, watched_paths=[]).is_diagnostics_catalog
+
+    check("catalog matched by exact key", _is_catalog("design/cross-cutting/diagnostics-catalog"), True)
+    check("lookalike suffix is not the catalog", _is_catalog("design/cross-cutting/diagnostics-catalog-extra"), False)
+    check("prefix is not the catalog", _is_catalog("design/cross-cutting/diagnostics"), False)
+
+    # _code_sort_key exists to order codes numerically; plain string sort would
+    # put "100" before "99".
+    check("code sort key orders numerically", sorted(["100", "99", "3001"], key=_code_sort_key), ["99", "100", "3001"])
+    check("code sort key puts non-numeric last", sorted(["W123", "42"], key=_code_sort_key), ["42", "W123"])
+
+    for f in failures:
+        print(f"FAIL {f}")
+    print(f"selftest: {len(failures)} failure(s)")
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -358,9 +358,11 @@ SlangResult GlslangDownstreamCompiler::compile(
 
 SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int contentsSize)
 {
+    // `init` accepts a library that exports no validator, so "could not validate" and "the module
+    // is invalid" must stay distinguishable to the caller.
     if (m_validate == nullptr)
     {
-        return SLANG_FAIL;
+        return SLANG_E_NOT_AVAILABLE;
     }
 
     if (m_validate(contents, contentsSize))
@@ -416,6 +418,14 @@ SlangResult GlslangDownstreamCompiler::link(
     const uint32_t moduleCount,
     IArtifact** outArtifact)
 {
+    // `init` accepts a library that exports no linker, so "cannot link" is reachable input rather
+    // than an internal error, and must stay distinguishable from a link that ran and rejected the
+    // modules.
+    if (m_link == nullptr)
+    {
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
     glslang_LinkRequest request;
     memset(&request, 0, sizeof(request));
 

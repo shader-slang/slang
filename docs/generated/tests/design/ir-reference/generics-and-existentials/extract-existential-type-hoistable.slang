@@ -1,23 +1,18 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:08:34Z
-//META: source_commit=8ac9e49a5b7020af6a8040544b9f76f0fbf40898
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#extractexistentialvalue-extractexistentialtype-extractexistentialwitnesstable
-//META: doc_section_digest=16045cc2106f4346cc8dfb52e07857b9a6e4297569798ffd3bcd3f5258a250c1
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#extractexistentialvalue--extractexistentialtype--extractexistentialwitnesstable
+//META: doc_section_digest=2831394637fc16470e6426b0ef26aa0c691647c1fa7ec6c0ecb2e6e5d269f621
 //META: purpose=Two dispatches through the same existential share a single hoistable extractExistentialType inst, while each dispatch keeps its own non-hoistable extractExistentialValue.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Verifies the hoistability asymmetry of the projection trio: the type
-// projection's result is determined purely by its existential operand,
-// so two dispatch sites on the same existential resolve to one
-// extractExistentialType inst, whereas the value projection is created
-// per site. The CHECK captures the single %T definition and then
-// requires *two* separate extractExistentialValue lines whose result
-// type is that same captured %T — only a deduplicated type projection
-// can be the result type of both value projections.
-
+// Boundary that separates the hoistable projections from the non-hoistable
+// one. Two method calls on the same existential are made; the CHECK captures
+// the type projection once and then asserts that *both* value projections are
+// typed by that same captured value — one shared type projection, two distinct
+// value projections.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); int walk(int x); };

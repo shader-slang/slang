@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-d-non-essential-validation-stripping-and-finalization
-//META: doc_section_digest=ad77551965f16f59589941dbe50f81bd8509b595aa5ee08277212d611c118e05
-//META: purpose=Phase D's checkForMissingReturns (D5) warns when a non-void function lacks a return on every control-flow path (target=None, target-agnostic pre-link).
+//META: doc_section_digest=de3af7e62fdf97582267b3c674b87776ce5d49cf79a3d54ae3a770a3c679cad0
+//META: purpose=Phase D's checkForMissingReturns (D5) warns when a non-void function has a control-flow path that reaches the end of the body without returning.
 //META: intent=negative
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// D5 runs with `target=None` (target-agnostic) and emits the
-// missing-return warning for a non-void function whose body
-// has a path that reaches end-of-function without a return.
+// Verifies the target-agnostic missing-return validator. `helper` returns
+// only on the taken side of the `if`, leaving one path to the closing
+// brace. The annotation is anchored on the function's declaration line
+// because that is where the diagnostic is reported, and the code CHECK
+// pins the warning identity.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry main
 

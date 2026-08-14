@@ -1,19 +1,22 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:14:10Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#what-is-serialized
-//META: doc_section_digest=8bfabdd75a7732fc1c25f95a75f88e48e5e707f7a5d47924d3ce8e76fc6f67ce
-//META: purpose=AST-serialization preserves the checked AST that backs an import-able module; the public symbol's export name and type signature survive the write/read cycle.
+//META: doc_section_digest=456bd69b24e5d578fa07710e00330f51f0dfdbb20bd9dc1ce60597ce05acfea7
+//META: purpose=A .slang-module written by slangc carries the checked AST/IR of its public symbol, and re-reading the container with -dump-module recovers the export name, name hint and function type.
 //META: intent=functional
 //META: pipeline_stage=link
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says serialized AST modules preserve "the checked AST that
-// backs an import-able module". The user-facing consequence: a public
-// function declared in one compile is recoverable from the serialized
-// container with its mangled export name and parameter / return type
-// signature intact.
+// Verifies the AST/IR/container round-trip: a module compiled with `-o
+// foo.slang-module` is a container the same compiler can load back.
+// The test writes a module holding one public function and then reads
+// the container with `-dump-module`; the CHECKs require the reloaded IR
+// to still carry the [public] qualifier, the mangled [export(...)] name,
+// the [nameHint("lerp01")] decoration and the four-operand Func type.
+// None of those survive unless the write and read paths agree on the
+// serialized form.
 
 //TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang -o docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
 //TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
@@ -25,8 +28,8 @@ public float lerp01(float t, float a, float b)
     return a + (b - a) * t;
 }
 
-// CHECK: [public]
-// CHECK: [export("{{.*lerp01.*}}")]
-// CHECK: [nameHint("lerp01")]
-// CHECK: func %lerp01
-// CHECK: Func(Float, Float, Float, Float)
+// CHECK-DAG: [public]
+// CHECK-DAG: [export("{{.*lerp01.*}}")]
+// CHECK-DAG: [nameHint("lerp01")]
+// CHECK-DAG: func %lerp01
+// CHECK-DAG: Func(Float, Float, Float, Float)

@@ -814,6 +814,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvOp _arithmeticOpCodeConvert(IROp irOpCode, IRType* basicType)
     {
+        // A texel loaded from a normalized-format texture, such as
+        // `RWTexture2D<unorm float>`, has an AttributedType wrapping the underlying
+        // scalar. The attributes do not change which arithmetic opcode applies, so
+        // classify the type they wrap.
+        basicType = as<IRType>(unwrapAttributedType(basicType));
+
         bool isFloatingPoint = false;
         bool isBool = false;
         switch (basicType->getOp())
@@ -3499,6 +3505,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case IRInterpolationMode::Linear:
             return true;
         case IRInterpolationMode::Sample:
+            requireSPIRVCapability(SpvCapabilitySampleRateShading);
             emitOpDecorate(
                 getSection(SpvLogicalSectionID::Annotations),
                 nullptr,
@@ -5972,7 +5979,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitGetStringHash(IRInst* inst)
     {
         auto getStringHashInst = as<IRGetStringHash>(inst);
-        auto stringLit = getStringHashInst->getStringLit();
+        // Checked, unlike `getStringLit()`, so a non-literal operand reaches the unhandled-inst
+        // path below instead of being read as string data.
+        auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
         if (stringLit)
         {

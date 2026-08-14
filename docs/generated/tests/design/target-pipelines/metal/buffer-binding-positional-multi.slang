@@ -1,18 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-d-metal-emit-and-downstream-tools
-//META: doc_section_digest=3b19519e792b092406320b661c62d171b0f8cdff6f282ae48cf30ac091136ae8
-//META: purpose=With multiple StructuredBuffer params Metal emits sequential positional [[buffer(N)]] indices (0, 1, 2 ...), not driven by HLSL register() or vk::binding().
+//META: doc_section_digest=f18a62d46309fae1d33b5fed992f19c2eff74d722d039dfeeeccc0dfdbf5b824
+//META: purpose=Metal `[[buffer(N)]]` indices are assigned positionally in declaration order rather than from HLSL `register()` or Vulkan `vk::binding`.
 //META: intent=functional
 //META: pipeline_stage=emit
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Metal [[buffer(N)]] indices are assigned positionally by the
-// emitter. With three buffer parameters we expect 0, 1, 2 in
-// declaration order; no register() / vk::binding() drives the
-// numbering on Metal.
+// Verifies the positional binding rule with three buffers. The emitted
+// parameter order is not the declaration order -- the read-write buffer is
+// listed first -- so this also pins that the *index* follows declaration
+// order while the *parameter position* does not. CHECK matches the kernel
+// signature and then, on the same line, the slot markers in the order they
+// are emitted: 2, 0, 1.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 
@@ -27,9 +29,6 @@ void main(uint3 tid : SV_DispatchThreadID)
     c[tid.x] = a[tid.x] + b[tid.x];
 }
 
-// Bindings are positional in declaration order: a→0, b→1, c→2.
-// The output emits c (the RW buffer) first in the parameter list,
-// so the marker order in the kernel signature is 2, 0, 1.
 // CHECK: kernel{{.*}} void main_0
 // CHECK-SAME: buffer(2)
 // CHECK-SAME: buffer(0)

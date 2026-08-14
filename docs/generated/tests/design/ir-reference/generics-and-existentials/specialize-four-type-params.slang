@@ -1,18 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
-//META: purpose=A call to a 4-type-param generic produces specialize(%base, T1, T2, T3, T4) — operand list scales with arity per `### specialize`.
+//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
+//META: purpose=A call to a 4-type-param generic produces specialize(%base, T1, T2, T3, T4).
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on generic arity: 4 type parameters. Per the doc's
-// `### specialize` operand layout `base, arg, ...`, the call
-// lowers to `call specialize(%base, T1, T2, T3, T4)(...)`.
-
+// Boundary at a wider arity than the two-parameter case, with a repeated type
+// (`Int` in both first and last position) so the CHECK also confirms that the
+// argument tail is positional rather than de-duplicated by value.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 uniform int a;

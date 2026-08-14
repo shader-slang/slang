@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
-//META: purpose=A 0-constraint generic call lowers to specialize(%base, T) without any trailing witness operand — pairs with the constrained form's extra witness arg.
+//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
+//META: purpose=A 0-constraint generic call lowers to specialize(%base, T) without any trailing witness operand.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on generic-constraints axis: a generic without any
-// interface constraint produces `specialize(%base, T)` — no
-// trailing witness operand. The constrained form
-// `specialize(%base, T, %witness)` is exercised by
-// `specialize-with-witness-arg.slang`.
-
+// Boundary on the witness half of the argument list: with no conformance
+// constraint there is nothing to witness, so the argument list is exactly one
+// type. The CHECK closes the `specialize(...)` list right after `Int` and then
+// opens the call's own argument list, which fails if a witness operand were
+// appended.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 uniform int a;

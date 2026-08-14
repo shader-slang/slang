@@ -1,22 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
-//META: purpose=A generic taking an interface-typed parameter has its specialize call composed alongside a makeExistential argument — the dispatch site interleaves the two opcodes.
+//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
+//META: purpose=A generic taking an interface-typed parameter composes a specialize call site with a makeExistential argument.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Stress on combined-opcode interaction: when a constrained
-// generic takes an interface-typed parameter, the dispatch site
-// composes `makeExistential` (from the cast) with
-// `specialize(...)` (the generic call). Per `### specialize` and
-// `### makeExistential` both opcodes appear in the same basic
-// block, with the existential value flowing into the
-// specialized call's argument list.
-
+// Stresses generic application and existential construction meeting at one
+// call site: the argument is widened to `IFoo` by `makeExistential` while the
+// callee is built by `specialize`. The CHECKs assert both opcodes appear, in
+// the order the argument is prepared before the call.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };

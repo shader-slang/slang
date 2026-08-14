@@ -1,16 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
-//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability-autodiff-annotations
-//META: doc_section_digest=3959c707a386e75c3eea38b819f320935508e4d38543a0a9aeb0a01aca4d3471
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ast-reference/modifiers.md#mutability--autodiff-annotations
+//META: doc_section_digest=b0c3a7d91822154a961b319d70bc835f44d68d38eef2d49365b0588620bb973e
 //META: purpose=`[mutating]` on a method allows assigning to fields through `this`; the mutation is visible after the call.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `MutatingAttribute` marks a method as allowed to write through
-// `this`. After the call, the caller observes the modified field.
+// Verifies `[mutating]` does two things at once: it lets the body write a
+// field of `this`, and it makes the receiver an l-value at the call site so the
+// write is not lost on a copy. `bump()` is called twice on a struct initialised
+// to 10 and CHECK asserts 12, which requires both calls' writes to have stuck.
 
 //TEST:INTERPRET(filecheck=CHECK):
 

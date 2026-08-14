@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#stripfrontendonlyinstructions
-//META: doc_section_digest=0338c482f31db9ec609b7d197159c0d41972d319a43bd46ec46d511b5e5dc326
-//META: purpose=Phase D's stripFrontEndOnlyInstructions (D10) removes IRHighLevelDeclDecoration before the LOWER-TO-IR dump.
+//META: doc_section_digest=6d9c3e171509715bc06e848e926d607a7687b1fec0c44f072b66721b314e4dc1
+//META: purpose=Phase D's stripFrontEndOnlyInstructions (D10) always removes the front-end-only IRHighLevelDeclDecoration before the module is handed on for code generation.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The notable-passes "stripFrontEndOnlyInstructions" section
-// documents that `IRHighLevelDeclDecoration` is among the
-// front-end-only decorations removed before backend processing.
-// Verify by writing a module with normal user decls and asserting
-// the decoration's printed form does not appear in the IR dump.
+// Verifies the unconditional half of the stripping list. The mandatory
+// passes use the high-level-decl decoration to point diagnostics back at
+// AST-level code, but it must not reach code generation. The module
+// declares an ordinary struct and entry point, and the CHECK-NOT asserts
+// the decoration's printed form is absent from the post-Phase-D snapshot.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

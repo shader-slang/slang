@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#entry-point-and-stage
-//META: doc_section_digest=a78fa1c65d9e97005484d3326f0e07d9af56a6dadaad4955b0d779effe950727
+//META: doc_section_digest=babb40e44ba0eb7addfafeddc37185c8c3bbed4c27b3b7fc8a2469d95b33aca1
 //META: purpose=A WaveSize attribute on a compute entry point lowers to a waveSize decoration carrying the requested lane count.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc records `waveSize` with operand `numLanes : IRIntLit` and
-// AST origin `[WaveSize(...)]` attribute. Confirm the requested
-// integer flows through unchanged.
+// Verifies the single integer operand of `waveSize`. The CHECK pins
+// `[waveSize(32 : Int)]` and then `func %main`, showing the requested lane
+// count is recorded on the entry-point function where an execution-mode
+// request has to live.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

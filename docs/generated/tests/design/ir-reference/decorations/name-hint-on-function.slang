@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/decorations.md#namehint-namehintdecoration
-//META: doc_section_digest=883eb56d4459110d6c60afc98e0feca78b8411f8e7783e41110d89c26b5c6c56
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/decorations.md#namehint--namehintdecoration
+//META: doc_section_digest=398fede0e4de09435e2c385a07c84980390fc7f07aeaeb82a28ad54acb9e5215
 //META: purpose=A user-named function carries a nameHint decoration with the source identifier as a string literal operand.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says nameHint "Carries a human-readable name across IR
-// passes". The dump shows it on the line immediately preceding the
-// declared func opcode, with the source identifier as the string
-// operand.
+// Verifies that `nameHint` carries the human-readable source identifier as
+// a string operand. The CHECK pins `[nameHint("doubleIt")]` and then the
+// `func %doubleIt` line it precedes, so the string is shown to be attached
+// to the function it names rather than merely present in the module.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

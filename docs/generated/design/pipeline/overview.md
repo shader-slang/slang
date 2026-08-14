@@ -1,9 +1,9 @@
 ---
 generated: true
-model: claude-opus-4.8
-generated_at: 2026-06-29T13:35:55Z
-source_commit: c21ead2690b5b9fa4a582f6b51a4cd5fb34d29d8
-watched_paths_digest: 2854d32691b21394b5c128e6ff961825c7bcc6f4a9a204e7f97ca918b148ec26
+model: claude-opus-5
+generated_at: 2026-08-03T13:27:10Z
+source_commit: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+watched_paths_digest: c244a6019beee1148173c93511a0ee3629fcfc32ea9a4177931dcbaec0efa2d2
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -57,10 +57,11 @@ Detail: [01-lex-preprocess.md](01-lex-preprocess.md).
 ### Parse to AST
 
 Recursive-descent parsing produces a strongly-typed AST. Slang uses a
-two-stage strategy: at the decl-parsing stage function bodies are
-captured as raw token lists; at the body-parsing stage they are
-re-parsed lazily under the supervision of the semantic checker so that
-generic / comparison disambiguation has type information to lean on.
+two-stage strategy, selected by `ParsingStage` (`Decl` or `Body`): at
+the decl-parsing stage a function body is captured as raw tokens in an
+`UnparsedStmt`; at the body-parsing stage that token list is re-parsed
+lazily under the supervision of the semantic checker so that generic /
+comparison disambiguation has type information to lean on.
 
 Driven by:
 
@@ -92,8 +93,25 @@ Detail: [03-semantic-check.md](03-semantic-check.md).
 
 The checked AST is walked by the lowering visitor, which emits Slang
 IR via `IRBuilder`. Decls become `IRGlobalVar` / `IRFunc` /
-`IRStructType` / `IRGeneric`; statements become basic blocks with
-parameters; expressions become SSA value instructions.
+`IRStructType` / `IRGeneric`; control-flow statements create basic
+blocks and branches while ordinary statements emit instructions into
+the current block; expressions become SSA value instructions, with
+block parameters carrying values across control-flow edges.
+
+Block parameters are the IR's phi form. Lowering emits them directly
+where an expression itself forks control flow — `?:` and the
+short-circuiting `&&` / `||` branch into a join block that takes the
+result as a parameter — while an ordinary local variable becomes a
+`var` with stores that the `constructSSA` call at the end of
+`generateIRForTranslationUnit` promotes into the same form; that call
+sits in the mandatory pass block and runs at every optimization level.
+The form does not reach a back-end, though: `eliminatePhis` in
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) moves the IR
+back out of SSA form, replacing block parameters with explicit
+temporaries, so an `OpPhi` in emitted SPIR-V is the work of the
+downstream SPIR-V optimizer — which runs only when the optimization
+level is above `None` — and not a block parameter carried through to
+emit.
 
 Driven by:
 
@@ -106,12 +124,26 @@ Detail: [04-ast-to-ir.md](04-ast-to-ir.md).
 ### IR passes
 
 The `linkAndOptimizeIR` function in
-[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 896 at
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (line 970 at
 `source_commit`) drives a long, target-sensitive sequence of IR
 transformations between lowering and emit. The
 [source/slang/](../../../../source/slang) directory contains roughly
 160 `slang-ir-*.cpp` files implementing analyses, validations,
 specializations, legalizations, and target-specific lowerings.
+
+*Target-sensitive* means the pass list itself branches, not merely
+that emit spells one neutral shape differently: whole passes are
+guarded by target predicates inside `linkAndOptimizeIR` — a Khronos
+target routed through GLSL text runs
+`legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL`, the
+direct-SPIR-V path runs a set no other target sees, and the PyTorch
+binding target runs `generatePyTorchCppBinding`. Differences that are
+only a matter of spelling are settled later, in the emitter: one
+`[numthreads(16, 1, 1)]` entry point reaches HLSL as
+`numthreads(16, 1, 1)`, GLSL as `local_size_x = 16, ...`, SPIR-V as
+`OpExecutionMode ... LocalSize 16 1 1`, and WGSL as
+`@workgroup_size(16, 1, 1)`, while Metal and CUDA print no group size
+at all.
 
 Driven by:
 
@@ -122,15 +154,26 @@ Detail: [05-ir-passes.md](05-ir-passes.md).
 
 ### Emit
 
-`emitEntryPointsSourceFromIR`
-([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2540 at
-`source_commit`) selects the right backend for each `TargetRequest`
-and produces a target artefact: HLSL, GLSL, SPIR-V, Metal, WGSL, C++,
-CUDA, Torch glue, LLVM IR / native via `slang-llvm`, or VM bytecode.
+`CodeGenContext::emitEntryPoints` selects a dispatch path per
+`TargetRequest`. Textual targets go to `emitEntryPointsSourceFromIR`
+([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2746 at
+`source_commit`), which picks a C-like source emitter — HLSL, GLSL,
+Metal, WGSL, C++, CUDA, or Torch glue. Torch glue is the exception in
+that list: the PyTorch binding target generates C++ wrappers only for
+functions marked `[TorchEntryPoint]` (or synthesized from
+`[AutoPyBindCUDA]`), so `-target torch` on an ordinary compute entry
+point has nothing to bind. Binary and non-source targets
+(direct SPIR-V, downstream-compiled DXIL/DXBC/metallib/PTX, LLVM IR /
+native via `slang-llvm`, and VM bytecode) are dispatched separately.
 
 Driven by:
 
-- [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (dispatcher)
+- [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp)
+  (per-target dispatcher; defines `CodeGenContext::emitEntryPoints`
+  and `_emitEntryPoints`)
+- [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (linked-IR
+  and pass orchestration, plus the C-like source-emitter selection in
+  `emitEntryPointsSourceFromIR`)
 - one `slang-emit-<target>.cpp` per backend
   ([source/slang/](../../../../source/slang))
 
@@ -142,12 +185,21 @@ The high-level objects that orchestrate the stages above live in
 [source/slang/](../../../../source/slang):
 
 - [slang-compile-request.h](../../../../source/slang/slang-compile-request.h)
-  declares `FrontEndCompileRequest` / `CompileRequestBase`;
+  declares `FrontEndCompileRequest` / `CompileRequestBase`.
+  `CompileRequestBase` holds the `Linkage` that owns the session and
+  supplies the source manager, name pool, and file system used
+  throughout parse and check;
   [slang-compile-request.cpp](../../../../source/slang/slang-compile-request.cpp)
   implements them and orchestrates the per-translation-unit front-
-  end work, including the `checkAllTranslationUnits` /
-  `checkTranslationUnit` loop (around line 513) that drives semantic
-  checking before lowering.
+  end work. Its `checkAllTranslationUnits` (line 498 at
+  `source_commit`) calls `checkTranslationUnit` once per unchecked
+  translation unit, adding each checked module to the
+  `LoadedModuleDictionary` so that later `import` decls can find it,
+  and finishes with `checkEntryPoints()` before lowering. A unit is
+  registered only once it has been checked, so an `import` resolves
+  against a sibling translation unit of the same request only when
+  that unit precedes it; a unit added afterwards is not visible to
+  it.
 - [slang-end-to-end-request.h](../../../../source/slang/slang-end-to-end-request.h)
   declares `EndToEndCompileRequest`, which is what a single `slangc`
   invocation (or `slang::ICompileRequest`) becomes. Its
@@ -157,9 +209,13 @@ The high-level objects that orchestrate the stages above live in
   `Module`, the result object the front-end produces (AST + IR) and
   the implementation of `IModule` from
   [include/slang.h](../../../../include/slang.h).
-- [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) is the
-  back-end dispatcher invoked once the front-end has produced a
-  composite `IComponentType` for the targets to be generated.
+- [slang-code-gen.cpp](../../../../source/slang/slang-code-gen.cpp) is
+  the back-end target dispatcher invoked once the front-end has
+  produced a composite `IComponentType` for the targets to be
+  generated;
+  [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) is the
+  linked-IR and IR-pass orchestrator it calls into, and also selects
+  the C-like source emitter for textual targets.
 
 The architecture-level introduction of these objects is in
 [../architecture/overview.md](../architecture/overview.md).

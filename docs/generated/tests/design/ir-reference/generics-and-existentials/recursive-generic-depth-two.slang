@@ -1,21 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#generic-application
-//META: doc_section_digest=f47c8552e4262e5413d4d3940bfd71f81dd53d798d76b0d93a435054717b9e60
+//META: doc_section_digest=e7e100a63c866d0df80fc71ebcb3d885933673afb6bac3a23c94ac816f7b50b1
 //META: purpose=Doubly-nested instantiation Box<Box<int>> lowers to a nested specialize(%Box, specialize(%Box, Int)) type-level value.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on recursive generic instantiation: depth 2. The
-// doc's `### Generic application` row's "Applies generic
-// arguments to a generic value" claim allows the argument
-// itself to be a `specialize` value — nesting therefore
-// produces nested `specialize(%Box, specialize(%Box, Int))`
-// type-level applications.
-
+// Boundary on argument *composition*: a generic argument may itself be a
+// `specialize` result, because the opcode is a value like any other. The CHECK
+// pins one `specialize` textually inside another's argument list.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 struct Box<T> { T val; };

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-no-continuation
-//META: doc_section_digest=d6429801087e19d2dcf039c0f032b312e1c65a39be1d3ce805c2351b2a2c8208
+//META: doc_section_digest=78e0bf7576551f8ff9e811edd1abd135d18634ae25bb0afa4cf3437830164ba1
 //META: purpose=A switch in which every arm returns leaves the synthesized post-switch merge block terminated by `unreachable`.
 //META: intent=functional
 //META: pipeline_stage=lower

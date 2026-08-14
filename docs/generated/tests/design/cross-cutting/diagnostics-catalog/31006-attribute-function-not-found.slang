@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=fdd590cd68b5461dae40c566b8e0d5a22f0ec1614037758d1bf966b66fc61695
+//META: doc_section_digest=e8965581afe8d85cc901f2b6b33fd31d7f1240ed5423425d9be87c62f27c27c2
 //META: purpose=Fires diagnostic E31006 (attribute-function-not-found) -- function not found for attribute
 //META: intent=negative
 //META: pipeline_stage=check
@@ -21,4 +21,4 @@
 void main() {}
 
 
-// CHECK: E31006
+//CHECK: E31006

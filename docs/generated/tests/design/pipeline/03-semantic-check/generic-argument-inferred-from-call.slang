@@ -1,24 +1,29 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/03-semantic-check.md#generic-specialization-and-constraints
-//META: doc_section_digest=22b10979ab5083a9c6d0c577210f37f6bb50a1e746c34c05d24d799e574a16a3
-//META: purpose=Generic functions are specialized at the call site; the constraint solver infers the type argument from the actual argument.
+//META: doc_section_digest=9f957015017e5369dca04b3ddeac3c5f9b0cfdeca3888bbec30602504004bdac
+//META: purpose=The constraint solver infers a generic function's type argument from the actual argument at the call site.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says the checker solves type/value/witness constraints
-// to specialize generics. Verify the user-visible consequence:
-// calling `id` with an int returns an int.
+// Verifies the basic inference path the solver's fixpoint provides. No
+// explicit generic argument is written, so `T` can only come from unifying the
+// parameter type with the argument type at each call. Two different argument
+// types go through the same declaration; CHECK asserts each returned its own
+// value, which requires two distinct successful inferences.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
-T id<T>(T x) { return x; }
+T identity<T>(T v)
+{
+    return v;
+}
 
 void main()
 {
-    // CHECK: id_int=5
-    printf("id_int=%d\n", id(5));
+    // CHECK: i=6 f=1.5
+    printf("i=%d f=%.1f\n", identity(6), identity(1.5f));
 }

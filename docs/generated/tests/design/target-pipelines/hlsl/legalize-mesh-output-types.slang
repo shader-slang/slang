@@ -1,20 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#legalizemeshoutputtypes
-//META: doc_section_digest=e8f525c4f3b39107c481bf03414c7c2ad6a1c96a430e84aae54c4f8e6a580692
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-c-hlsl-legalization-lowering-phi-elimination
+//META: doc_section_digest=53a2379796e273cdb95b30642542c77045c0b9200b2085bfda75a33dd67487c6
 //META: purpose=legalizeMeshOutputTypes is gated on reqSet.meshOutput and runs in Phase C for a mesh-stage entry point; the HLSL emission preserves the explicit per-vertex and per-primitive output declarations and the SetMeshOutputCounts call.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's Phase C row 12 lists `legalizeMeshOutputTypes` gated on
-// `reqSet.meshOutput`. A `[shader("mesh")]` entry point with
-// per-vertex/per-primitive outputs and `SetMeshOutputCounts(...)`
-// triggers the pass. We pin the canonical HLSL mesh attributes plus
-// the `out indices` / `out vertices` declarations and the call to
-// `SetMeshOutputCounts(...)` in the emit.
+// Verifies that `legalizeMeshOutputTypes` fires on the HLSL path when the
+// module actually contains mesh-output types (the `reqSet.meshOutput` gate).
+// The test declares a mesh entry point with `out vertices` / `out indices`
+// parameters and a `SetMeshOutputCounts(...)` call; CHECK asserts the HLSL
+// emit keeps the mesh output-topology attribute, both output declarations,
+// and the count call, which is the legalized shape DXC accepts.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage mesh -entry main
 

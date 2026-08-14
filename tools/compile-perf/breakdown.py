@@ -34,148 +34,13 @@ sys.path.insert(0, HERE)  # allow running from any directory
 
 from lib import analyze, manifest
 
-# (timer, [children]) — the nested timer tree. Each parent gets a synthetic
-# "<parent> (self)" residual = parent − Σ children, so buckets tile compileInner.
-TREE = ("compileInner", [
-    ("frontEndExecute", [
-        ("parseTranslationUnit", []),
-        ("SemanticChecking", []),
-        ("generateIR", []),
-    ]),
-    ("generateOutput", [
-        ("linkAndOptimizeIR", [
-            ("specializeModule", []),
-            ("simplifyIR", []),
-            ("linkIR", []),
-            ("unrollLoopsInModule", []),
-            ("legalizeResourceTypes", []),
-            ("legalizeExistentialTypeLayout", []),
-            ("performMandatoryEarlyInlining", []),
-            ("performForceInlining", []),
-        ]),
-        ("emitEntryPointsSourceFromIR", []),
-    ]),
-])
+from lib.buckets import (TREE, BUCKET_ORDER, BUCKET_COLOR, API_TREE,
+                         API_BUCKET_ORDER, buckets, api_buckets, timer_ms)
 
 
-# Canonical bucket order + colors for the stacked view, grouped by stage:
-# front-end = greens, linkAndOptimizeIR subtree = blues/purples, emit = oranges,
-# residual = grey. Keeping order/colors fixed makes bars comparable across
-# workloads at a glance.
-BUCKET_ORDER = [
-    ("parseTranslationUnit", "#c7e9c0"),
-    ("SemanticChecking", "#41ab5d"),
-    ("generateIR", "#006d2c"),
-    ("frontEndExecute (self)", "#74c476"),
-    ("specializeModule", "#6baed6"),
-    ("simplifyIR", "#2171b5"),
-    ("linkIR", "#08306b"),
-    ("unrollLoopsInModule", "#9e9ac8"),
-    ("legalizeResourceTypes", "#807dba"),
-    ("legalizeExistentialTypeLayout", "#6a51a3"),
-    ("performMandatoryEarlyInlining", "#bcbddc"),
-    ("performForceInlining", "#dadaeb"),
-    ("linkAndOptimizeIR (self)", "#4a1486"),
-    ("emitEntryPointsSourceFromIR", "#fd8d3c"),
-    ("generateOutput (self)", "#e6550d"),
-    ("compileInner (self)", "#969696"),
-]
-BUCKET_COLOR = dict(BUCKET_ORDER)
-
-# API-path phase tree: the api-driver's timers nest under apiTotal the same way
-# the compiler timers nest under compileInner, so the same top-down allocator
-# renders api workloads (mode="api") as stacked areas with apiTotal as the top
-# edge. apiLoadModuleSource/apiWriteModule are deliberately absent: they time
-# module-graph-bin's SETUP, which runs outside the apiTotal scope.
-API_TREE = ("apiTotal", [
-    ("apiCreateGlobalSession", []),
-    ("apiCreateSession", []),
-    ("apiLoadModule", []),
-    ("apiFindEntryPoint", []),
-    ("apiComposite", []),
-    ("apiSpecialize", []),
-    ("apiLink", []),
-    ("apiGetCode", []),
-    ("apiReflection", []),
-])
-
-# Session setup = greens, module/entry resolution = blues, per-target work
-# (specialize/link/codegen) = oranges/purples, reflection + residual = greys —
-# fixed like BUCKET_ORDER so api panels stay comparable at a glance.
-API_BUCKET_ORDER = [
-    ("apiCreateGlobalSession", "#c7e9c0"),
-    ("apiCreateSession", "#41ab5d"),
-    ("apiLoadModule", "#2171b5"),
-    ("apiFindEntryPoint", "#6baed6"),
-    ("apiComposite", "#9e9ac8"),
-    ("apiSpecialize", "#807dba"),
-    ("apiLink", "#6a51a3"),
-    ("apiGetCode", "#fd8d3c"),
-    ("apiReflection", "#b5bdc4"),
-    ("apiTotal (self)", "#969696"),
-]
+from lib.render import esc  # noqa: F401 — canonical escaper, re-exported
 
 
-def api_buckets(timers):
-    """buckets() over the API-path tree — {bucket: ms} tiling apiTotal."""
-    return buckets(timers, API_TREE)
-
-
-
-def esc(s):
-    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def _t(timers, name):
-    st = timers.get(name)
-    return st if isinstance(st, (int, float)) else 0.0
-
-
-def buckets(timers, tree=TREE):
-    """Mutually-exclusive {bucket: ms} that sum to the given tree's root total
-    (compileInner for the default compiler-phase TREE, apiTotal for API_TREE),
-    allocated TOP-DOWN from that budget. Each parent places its measured
-    children within its budget; the remainder is '<parent> (self)'.
-
-    Slang's phase timers are not perfectly additive — named sub-timers can sum to
-    MORE than their parent (e.g. specializeModule + simplifyIR + … exceed
-    linkAndOptimizeIR after the v2026.7 specialization/autodiff work). When that
-    happens the children are scaled proportionally to fit the parent's budget.
-    Proportional scaling is preferred over clamping because it preserves the
-    relative child proportions, keeping the visual stacked areas meaningful. It
-    also keeps the overshoot LOCAL: without it, a child-sum exceeding its parent
-    would produce a negative self-residual that propagates up and zeroes out an
-    ancestor's self-time (as happened with generateOutput (self) at v2026.7).
-    Either way the buckets sum exactly to compileInner."""
-    out = {}
-
-    def alloc(node, budget):
-        name, children = node
-        if budget <= 0:
-            return
-        if not children:
-            out[name] = out.get(name, 0.0) + budget
-            return
-        cm = [(c, _t(timers, c[0])) for c in children]
-        csum = sum(v for _, v in cm)
-        if csum > budget and csum > 0:
-            scale = budget / csum  # children overshoot parent -> fit proportionally
-            for c, v in cm:
-                if v > 0:
-                    alloc(c, v * scale)
-        else:
-            for c, v in cm:
-                if v > 0:
-                    alloc(c, v)
-            self_ms = budget - csum
-            # 0.05 ms: suppress rounding-noise residuals. Timers have 4-decimal-
-            # place ms precision; a self-time below ~0.05 ms is within measurement
-            # noise and would clutter the stacked chart with invisible slivers.
-            if self_ms > 0.05:
-                out[f"{name} (self)"] = out.get(f"{name} (self)", 0.0) + self_ms
-
-    alloc(tree, _t(timers, tree[0]))
-    return out
 
 
 def _runs(results_dir, label, metric):
@@ -203,7 +68,7 @@ def aggregate(runs):
     for _, _, timers in runs:
         for b, ms in buckets(timers).items():
             agg[b] = agg.get(b, 0.0) + ms
-        total += _t(timers, "compileInner")
+        total += timer_ms(timers, "compileInner")
     print(f"\n=== Where the benchmark spends time (sum of {len(runs)} workloads, "
           f"total compileInner = {total:,.0f} ms) ===")
     print(f"{'phase bucket':34s}{'ms':>10}{'% total':>9}  share")
@@ -218,9 +83,9 @@ def per_workload(runs):
     print(f"\n=== Per-workload dominant phase ===")
     print(f"{'workload':22s}{'N':>6}{'compileInner':>14}{'dominant bucket':>26}{'%':>7}")
     print("-" * 78)
-    rows = sorted(runs, key=lambda r: -_t(r[2], "compileInner"))
+    rows = sorted(runs, key=lambda r: -timer_ms(r[2], "compileInner"))
     for wl, size, timers in rows:
-        ci = _t(timers, "compileInner")
+        ci = timer_ms(timers, "compileInner")
         bk = buckets(timers)
         if not ci or not bk:
             continue
@@ -234,18 +99,18 @@ def tree_view(runs, workload):
     if not match:
         raise SystemExit(f"workload '{workload}' not in this label")
     _, size, timers = match[0]
-    ci = _t(timers, "compileInner") or 1.0
+    ci = timer_ms(timers, "compileInner") or 1.0
     print(f"\n=== {workload} (N={size}) — compileInner = {ci:.1f} ms ===")
 
     def show(node, depth):
         name, children = node
-        total = _t(timers, name)
+        total = timer_ms(timers, name)
         if total == 0 and name != "compileInner":
             return
         print(f"{'  ' * depth}{name:30s}{total:9.1f} ms  ({100*total/ci:5.1f}%)")
         child_sum = 0.0
         for c in children:
-            child_sum += _t(timers, c[0])
+            child_sum += timer_ms(timers, c[0])
             show(c, depth + 1)
         if children:
             self_ms = max(total, child_sum) - child_sum
@@ -260,9 +125,9 @@ def render_stacked_svg(runs, label, metric):
     """One horizontal stacked bar per workload, segments = phase buckets, bar
     length proportional to compileInner (so composition AND magnitude both read).
     Sorted by compileInner descending."""
-    rows = sorted(((wl, sz, t) for wl, sz, t in runs if _t(t, "compileInner") > 0),
-                  key=lambda r: -_t(r[2], "compileInner"))
-    max_ci = max((_t(t, "compileInner") for _, _, t in rows), default=1.0)
+    rows = sorted(((wl, sz, t) for wl, sz, t in runs if timer_ms(t, "compileInner") > 0),
+                  key=lambda r: -timer_ms(r[2], "compileInner"))
+    max_ci = max((timer_ms(t, "compileInner") for _, _, t in rows), default=1.0)
     ml, mt = 168, 56          # left margin (labels), top margin (title)
     pw = 760                  # max bar pixel width (== max_ci)
     rh, bh = 26, 17           # row pitch, bar height
@@ -280,7 +145,7 @@ def render_stacked_svg(runs, label, metric):
          f'phase; length ∝ time (max {max_ci:,.0f} ms)</text>']
     y = mt
     for wl, sz, t in rows:
-        ci = _t(t, "compileInner")
+        ci = timer_ms(t, "compileInner")
         bk = buckets(t)
         s.append(f'<text x="{ml-6}" y="{y+bh-4}" text-anchor="end" fill="#222" '
                  f'font-weight="600">{esc(wl)}</text>')
@@ -351,9 +216,9 @@ FE_GO_ORDER = [
 def coarse_buckets(timers):
     """Top-level split: frontEndExecute / generateOutput (+ residual), summing to
     compileInner. The high-level view for the per-workload index page."""
-    ci = _t(timers, "compileInner")
-    fe = _t(timers, "frontEndExecute")
-    go = _t(timers, "generateOutput")
+    ci = timer_ms(timers, "compileInner")
+    fe = timer_ms(timers, "frontEndExecute")
+    go = timer_ms(timers, "generateOutput")
     out = {}
     if fe > 0:
         out["frontEndExecute"] = fe
@@ -519,45 +384,114 @@ def render_stacked_multiples(results_dir, index_path, metric, out, bucket_order,
     return out
 
 
-def _workload_source(spec, head=40, tail=40, ctx=40):
-    """Return ``(default_size, [(filename, source_snippet)])`` for display.
+def _workload_source(spec):
+    """Return ``(default_size, [(filename, source)])`` — every generated file
+    for the workload, each one COMPLETE.
 
     ``default_size`` is the workload's ``spec.default_size`` integer (returned
     alongside the source so callers can show it without re-reading the spec).
-    Each ``source_snippet`` is trimmed to three windows: the first ``head`` lines,
-    the ``ctx`` lines before and ``ctx`` lines after ``computeMain`` (2*ctx+1 total), and the last
-    ``tail`` lines, with elided regions marked by a ``// … N lines omitted …``
-    comment. Overlapping windows are merged.
+
+    The source is deliberately not windowed. These files ARE the benchmark, so
+    a reader chasing a regression needs the construct that triggers it, and in
+    a generated corpus that is as likely to sit at line 900 as at line 20 — the
+    previous first-40/around-computeMain/last-40 view hid exactly the middle
+    where the repeated generated bodies live. The rendered block is
+    height-capped and scrollable, so a long file costs scroll depth inside the
+    box rather than page layout.
     """
-    n = spec.default_size
-    out = []
-    for fn, src in spec.gen(n).items():
-        lines = src.splitlines()
-        L = len(lines)
-        if L <= head + tail:
-            out.append((fn, "\n".join(lines)))
-            continue
-        ranges = [(0, head), (L - tail, L)]
-        cm = next((i for i, l in enumerate(lines) if "computeMain" in l), None)
-        if cm is not None:
-            ranges.append((max(0, cm - ctx), min(L, cm + ctx + 1)))
-        ranges.sort()
-        merged = []
-        for lo, hi in ranges:
-            # merge when overlapping or separated by a tiny gap (a 3-line elision
-            # marker to hide ≤4 lines is pointless — just show them)
-            if merged and lo <= merged[-1][1] + 4:
-                merged[-1][1] = max(merged[-1][1], hi)
-            else:
-                merged.append([lo, hi])
-        disp, prev = [], 0
-        for idx, (lo, hi) in enumerate(merged):
-            if idx > 0:
-                disp += ["", f"// … {lo - prev} lines omitted …", ""]
-            disp += lines[lo:hi]
-            prev = hi
-        out.append((fn, "\n".join(disp)))
-    return n, out
+    return spec.default_size, list(spec.gen(spec.default_size).items())
+
+
+# Copy-to-clipboard support for the workload pages' code blocks. Kept as two
+# module constants so the page-assembly f-string below stays readable.
+#
+# The button is absolutely positioned inside a relative wrapper so it floats
+# over the top-right of the block without taking part in its scrolling.
+COPY_CSS = """
+.cbox{position:relative}
+.cbox>button.copy{position:absolute;top:8px;right:8px;z-index:1;
+  font:11px/1 -apple-system,Segoe UI,Roboto,sans-serif;padding:5px 9px;
+  color:#24292f;background:#fff;border:1px solid #d0d7de;border-radius:5px;
+  cursor:pointer;opacity:.75}
+.cbox>button.copy:hover{opacity:1;background:#f3f4f6}
+.cbox>button.copy[data-done]{color:#1a7f37;border-color:#1a7f37}
+"""
+
+# navigator.clipboard needs a secure context, which the published site has but
+# a locally opened file:// page does not — hence the textarea/execCommand
+# fallback, so the buttons still work when someone opens a generated page from
+# disk. Delegated from document so one handler serves every block on the page.
+COPY_JS = """
+document.addEventListener('click', function (ev) {
+  var btn = ev.target.closest && ev.target.closest('button.copy');
+  if (!btn) return;
+  var el = document.getElementById(btn.getAttribute('data-copy'));
+  if (!el) return;
+  var text = el.textContent;
+  function flash(ok) {
+    btn.textContent = ok ? 'Copied' : 'Press Ctrl+C';
+    if (ok) btn.setAttribute('data-done', '1');
+    setTimeout(function () {
+      btn.textContent = 'Copy'; btn.removeAttribute('data-done');
+    }, 1400);
+  }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta); flash(ok);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { flash(true); }, fallback);
+  } else {
+    fallback();
+  }
+});
+"""
+
+
+def _copy_block(block_id, body_html):
+    """Wrap a rendered <pre> so it carries a copy button.
+
+    `body_html` is TRUSTED markup — a complete `<pre id='...'>…</pre>` element
+    — whose untrusted contents the caller has already escaped. It is inserted
+    verbatim, so do not pass `esc(...)` of an element here: that would render
+    the tags as visible text rather than markup.
+
+    `block_id` must be unique on the page and must match the id on the `<pre>`
+    inside `body_html`: the delegated handler resolves its target with
+    getElementById and returns silently when it finds nothing, so a mismatch
+    is a dead button rather than an error."""
+    return (f"<div class='cbox'>"
+            f"<button class='copy' type='button' data-copy='{block_id}'>Copy</button>"
+            f"{body_html}</div>")
+
+
+def _repro_command(spec):
+    """The one-line bench.py invocation that regenerates this workload's
+    sources and re-runs the measurement charted on its page.
+
+    Kept to a single line on purpose: it is rendered next to a copy button, and
+    a backslash-continued form pastes correctly into bash but not into the
+    PowerShell the perf runner uses. ``--gen-dir`` is included because the
+    sources are otherwise written to a tempdir and removed on exit, and
+    inspecting them is usually the reason someone reaches for this. Naming a
+    workload in ``--only`` also opts it in when it is an api-mode workload,
+    which is otherwise excluded from the default set.
+
+    The slangc placeholder is ``/path/to/slangc`` and must NOT be written as
+    ``<path/to/slangc>``: this string exists to be pasted into a shell, where
+    ``<`` and ``>`` are redirections, not punctuation. The angled form fails
+    with "path/to/slangc: No such file or directory" — or worse, if that path
+    happens to exist, silently creates a file named ``--only``, redirects
+    stdout into it, and leaves ``--slangc`` with no value. The self-check at
+    the bottom of this module rejects shell metacharacters for that reason.
+    """
+    return (f"python3 tools/compile-perf/bench.py --slangc /path/to/slangc "
+            f"--only {spec.name} --label repro --gen-dir repro-{spec.name}")
 
 
 def write_workload_pages(results_dir, sections, metric, outdir, back="../index.html",
@@ -646,16 +580,19 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
 
                 contrib_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{d_ms:+.1f} ms</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right>{contrib:+.1f}pp</td></tr>"
                     for t, d_ms, own, contrib in contributors)
+                # d_val, not d_ms: unlike contributors (buckets partitioning
+                # compileInner, always ms), extras also carry the kb memory
+                # counters — hence fmt_qty rather than a hard-coded " ms".
                 extra_rows = "".join(
                     f"<tr><td>{esc(t)}</td>"
-                    f"<td align=right>{d_ms:+.1f}</td>"
+                    f"<td align=right>{esc(analyze.fmt_qty(t, d_val, signed=True))}</td>"
                     f"<td align=right>{own_cell(own)}</td>"
                     f"<td align=right style='color:#aaa'>&ndash;</td></tr>"
-                    for t, d_ms, own in extras)
+                    for t, d_val, own in extras)
                 step_rows = "".join(
                     f"<tr><td>{esc(dp)} &rarr; {esc(d)}</td>"
                     f"<td align=right style='color:{'#1e8449' if spct < 0 else '#c0392b'};"
@@ -680,7 +617,7 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"listed, the rest fold into the remainder row. Below them, every other reported counter "
                     f"(nested/overlapping, e.g. serialized-module reads — own change only):</p>"
                     f"<table style='{tbl}' cellpadding=5>"
-                    f"<tr><th style='text-align:left'>counter</th><th>&Delta; ms</th>"
+                    f"<tr><th style='text-align:left'>counter</th><th>&Delta;</th>"
                     f"<th>own %</th><th>of total</th></tr>{contrib_rows}"
                     f"{extra_rows}</table>"
                     f"<p style='color:#666;font-size:13px;margin:14px 0 4px'>"
@@ -693,18 +630,40 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                     f"{step_rows}</table>")
 
         _, srcfiles = _workload_source(spec) if spec else (0, [])
-        tail_txt = ("show the first 40 lines, the area around computeMain (±40), and the last "
-                    "40 lines (gaps elided)")
-        size_note = ((f"exact compiled source; long files {tail_txt}")
-                     if spec and spec.default_size == 0
-                     else (f"exact compiled source (N = {spec.default_size}); long files {tail_txt}")
+        size_note = (("the complete compiled source, shown in full"
+                      if spec.default_size == 0
+                      else f"the complete compiled source (N = {spec.default_size}), "
+                           f"shown in full")
                      if spec else "")
         code_html = ""
-        for fn, code in srcfiles:
+        for i, (fn, code) in enumerate(srcfiles):
+            nlines = len(code.splitlines())
             code_html += (f"<h3 style='font-size:13px;margin:16px 0 4px;color:#444'>"
-                          f"{esc(fn)}</h3><pre style='{pre}'>{esc(code)}</pre>")
+                          f"{esc(fn)} "
+                          f"<span style='font-weight:400;color:#888'>"
+                          f"({nlines} lines)</span></h3>"
+                          + _copy_block(f"src{i}",
+                                        f"<pre id='src{i}' style='{pre}'>{esc(code)}</pre>"))
+
+        # The repro block sits ABOVE the source: someone who has just read a
+        # regression off the chart wants the command first, and the source
+        # below it is what that command generates.
+        repro_html = ""
+        if spec:
+            repro_html = (
+                f"<h2 style='font-size:17px;margin:26px 0 8px;"
+                f"border-bottom:2px solid #eee;padding-bottom:4px'>Reproduce</h2>"
+                f"<p style='color:#666;font-size:13px;max-width:900px'>Run from the "
+                f"slang repo root. This regenerates the sources below and re-runs "
+                f"this workload's measurement; <code>--gen-dir</code> keeps the "
+                f"generated files (they go to a tempdir and are deleted "
+                f"otherwise).</p>"
+                + _copy_block("repro",
+                              f"<pre id='repro' style='{pre};white-space:pre-wrap'>"
+                              f"{esc(_repro_command(spec))}</pre>"))
 
         html = (f"<!doctype html><meta charset=utf-8><title>{esc(wl)} — phase breakdown</title>"
+                f"<style>{COPY_CSS}</style>"
                 f"<body style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;"
                 f"margin:24px;color:#1a1a1a;max-width:1180px'>"
                 f"<p><a href='{esc(back)}'>&larr; back</a></p>"
@@ -721,9 +680,11 @@ def write_workload_pages(results_dir, sections, metric, outdir, back="../index.h
                 f"<div style='border:1px solid #eee;border-radius:6px;padding:8px;overflow:auto'>"
                 f"{svg}</div>"
                 f"{movers_html}"
+                f"{repro_html}"
                 f"<h2 style='font-size:17px;margin:26px 0 8px;border-bottom:2px solid #eee;"
                 f"padding-bottom:4px'>Compiled Slang source</h2>"
                 f"<p style='color:#666;font-size:13px'>{esc(size_note)}</p>{code_html}"
+                f"<script>{COPY_JS}</script>"
                 f"</body>")
         with analyze.open_output(os.path.join(wdir, f"{wl}.html")) as fh:
             fh.write(html)
@@ -851,29 +812,65 @@ if __name__ == "__main__":
     main()
 
 
-# Import-time self-check for the pp-sum tiling contract between this module's
-# buckets and daily_movers.workload_progress. It lives HERE, not in
-# daily_movers, because this is the only placement safe in both import
-# orders: by this line breakdown's bucket functions exist and daily_movers
-# (imported at the top) is fully initialized, so _partition's lazy
-# `import breakdown` resolves to a complete module.
-# The fixture includes compileInner's DIRECT children (frontEndExecute,
-# generateOutput) so alloc() actually descends: named-leaf buckets, (self)
-# residuals at two levels, and the pp sum are all exercised, not just a
-# single degenerate compileInner (self) bucket.
-_T0 = ("2026-01-01", "aaaaaaaaa",
-       {("w", "compileInner"): 100.0, ("w", "frontEndExecute"): 70.0,
-        ("w", "SemanticChecking"): 40.0, ("w", "generateIR"): 20.0,
-        ("w", "generateOutput"): 25.0})
-_T1 = ("2026-01-02", "bbbbbbbbb",
-       {("w", "compileInner"): 80.0, ("w", "frontEndExecute"): 60.0,
-        ("w", "SemanticChecking"): 30.0, ("w", "generateIR"): 25.0,
-        ("w", "generateOutput"): 15.0})
-_ov, _contrib, _ex, _st = daily_movers.workload_progress([_T0, _T1], "w")
-assert _ov is not None and abs(_ov[6] - (-20.0)) < 1e-9, \
-    "workload_progress fixture: headline 100 -> 80 ms must be -20%"
-assert len(_contrib) >= 4, \
-    "workload_progress fixture must produce a MULTI-bucket partition"
-assert abs(sum(c[3] for c in _contrib) - _ov[6]) < 1e-9, \
-    "workload_progress fixture: contributor pp must sum to the overall %"
-del _T0, _T1, _ov, _contrib, _ex, _st
+# Import-time self-check that the workload pages show the source WHOLE. This
+# used to be windowed (first 40 / around computeMain / last 40) and the page
+# said so, but a truncated shader that no longer says it is truncated reads as
+# the entire benchmark — the failure would be a plausible-looking page, not an
+# error. reflection_layout is the fixture because it is over a thousand lines
+# at its default size, so it would certainly have been elided before; a short
+# workload would pass this even with windowing restored.
+_SPEC = manifest.BY_NAME["reflection_layout"]
+_n, _files = _workload_source(_SPEC)
+_gen = _SPEC.gen(_n)
+assert [fn for fn, _ in _files] == list(_gen), \
+    "_workload_source must list every generated file, in generator order"
+for _fn, _src in _files:
+    assert _src == _gen[_fn], \
+        f"_workload_source must return {_fn} verbatim — no windowing, no elision"
+assert sum(len(s.splitlines()) for _, s in _files) > 500, \
+    "the fixture workload must be long enough that windowing would be visible"
+# The repro command is a single line (it sits beside a copy button, and a
+# continued form does not paste into PowerShell) and names its workload.
+_CMD = _repro_command(_SPEC)
+assert "\n" not in _CMD, "the repro command must stay on one line to paste cleanly"
+assert f"--only {_SPEC.name}" in _CMD, "the repro command must name its workload"
+del _SPEC, _n, _files, _gen, _fn, _src, _CMD
+
+
+# The command's whole purpose is to be pasted into a shell, so it must contain
+# nothing the shell would interpret. This is not hypothetical punctuation
+# policing: the first version used `<path/to/slangc>` as the placeholder, which
+# bash reads as a stdin redirect followed by an stdout redirect — it fails
+# outright, and where that path exists it silently creates a file named
+# `--only` and leaves `--slangc` with no value. Testing the command with the
+# placeholder substituted for a real path (as the original test plan did) hides
+# exactly this, so the published STRING is what gets checked.
+#
+# Checked for EVERY workload, not just one: the command interpolates spec.name
+# twice and a page is rendered per workload, so a single-fixture check would
+# prove the property for one page and claim it for forty. Every current name is
+# an identifier, which is precisely why this is worth pinning — it is an
+# unenforced contract on spec.name that a future workload could quietly break.
+# Redirection, quoting, expansion, separators AND globs: "nothing the shell
+# would interpret" has to mean all of them, not just the redirects that bit.
+SHELL_METACHARACTERS = "<>|&;$`\\\"'*?[]{}~()!#\n\t "
+
+
+def _shell_unsafe(text):
+    """The shell metacharacters present in `text`, in order; empty when it is
+    safe to paste verbatim. Space is included: these commands are published as
+    a single token-separated line, so a name containing one would silently
+    split into two arguments."""
+    return [c for c in SHELL_METACHARACTERS if c in text]
+
+
+for _spec in manifest.BY_NAME.values():
+    _c = _repro_command(_spec)
+    assert not _shell_unsafe(_c.replace(" ", "")), \
+        (f"repro command for {_spec.name!r} contains shell metacharacters "
+         f"{_shell_unsafe(_c.replace(' ', ''))}: it is published to be "
+         f"copy-pasted, so it must survive a shell verbatim — got {_c!r}")
+    assert " " not in _spec.name, \
+        (f"workload name {_spec.name!r} contains a space, which would split "
+         f"its repro command into the wrong arguments")
+del _spec, _c
