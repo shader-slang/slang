@@ -5,6 +5,7 @@ namespace Slang
 struct IRModule;
 class DiagnosticSink;
 
+void diagnoseBodylessKernelEntryPoints(IRModule* module, DiagnosticSink* sink);
 void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink);
 void generateHostFunctionsForAutoBindCuda(IRModule* module, DiagnosticSink* sink);
 void removeTorchKernels(IRModule* module);

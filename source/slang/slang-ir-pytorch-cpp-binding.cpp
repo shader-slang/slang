@@ -1099,6 +1099,21 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
     return hostFunc;
 }
 
+void diagnoseBodylessKernelEntryPoints(IRModule* module, DiagnosticSink* sink)
+{
+    // The pytorch/cuda binding passes read a kernel's parameters from its first block, which is
+    // null for a forward declaration. The front end allows '[CudaKernel]' on a bodyless decl, so
+    // reject it here before those passes run.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func || !func->findDecoration<IRCudaKernelDecoration>())
+            continue;
+        if (!func->isDefinition())
+            sink->diagnose(Diagnostics::KernelEntryPointRequiresBody{.location = func->sourceLoc});
+    }
+}
+
 void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
 {
     List<IRFunc*> cudaKernels;

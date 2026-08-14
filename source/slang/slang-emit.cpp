@@ -1377,6 +1377,11 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PyTorchCppBinding:
         {
+            // The pytorch/cuda binding passes below assume every kernel has a first block.
+            SLANG_PASS(diagnoseBodylessKernelEntryPoints, sink);
+            if (sink->getErrorCount() != 0)
+                return SLANG_FAIL;
+
             // Generate any requested derivative wrappers
             if (requiredLoweringPassSet.derivativePyBindWrapper)
                 SLANG_PASS(generateDerivativeWrappers, sink);
