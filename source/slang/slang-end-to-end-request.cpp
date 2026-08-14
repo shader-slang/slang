@@ -1991,7 +1991,7 @@ SlangResult EndToEndCompileRequest::compile()
         // Anything allocated and released during the compile is already gone, which is why this is
         // a lower bound on the peak rather than an explanation of it.
         StringBuilder memoryResult;
-        appendMemoryReportLines(captureMemoryReport(getLinkage()), memoryResult);
+        appendMemoryReportLines(captureMemoryReport(getLinkage(), getFrontEndReq()), memoryResult);
         getSink()->diagnose(
             Diagnostics::MemoryUsageReport{.memoryReportOutput = memoryResult.produceString()});
     }

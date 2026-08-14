@@ -3,6 +3,7 @@
 
 #include "compiler-core/slang-source-loc.h"
 #include "slang-ast-builder.h"
+#include "slang-compile-request.h"
 #include "slang-global-session.h"
 #include "slang-ir.h"
 #include "slang-module.h"
@@ -97,14 +98,18 @@ struct MemoryWalker
         reserved += arena.calcTotalMemoryAllocated();
     }
 
-    void addASTBuilder(ASTBuilder* astBuilder)
+    void addASTBuilder(ASTBuilder* astBuilder, ModuleCategory category)
     {
         if (!astBuilder)
             return;
+        const size_t before = report.astArenaReserved;
         addArena(astBuilder->getMemoryArena(), report.astArenaUsed, report.astArenaReserved);
+        // Attribute whatever this call actually added, so a repeat visit — which `addArena`
+        // ignores — contributes nothing here either, and the split cannot exceed the total.
+        report.astArenaReservedBy[size_t(category)] += report.astArenaReserved - before;
     }
 
-    void addIRModule(IRModule* irModule)
+    void addIRModule(IRModule* irModule, ModuleCategory category)
     {
         if (!irModule)
             return;
@@ -112,32 +117,35 @@ struct MemoryWalker
         // counted exactly when their module's arena is — one `if` cannot drift from the other.
         if (!firstVisit(&irModule->getMemoryArena()))
             return;
+        const size_t reserved = irModule->getMemoryArena().calcTotalMemoryAllocated();
         report.irArenaUsed += irModule->getMemoryArena().calcTotalMemoryUsed();
-        report.irArenaReserved += irModule->getMemoryArena().calcTotalMemoryAllocated();
+        report.irArenaReserved += reserved;
+        report.irArenaReservedBy[size_t(category)] += reserved;
         report.irSideTables += irModule->calcSideTableMemoryAllocated();
     }
 
-    void addModule(Module* module)
+    void addModule(Module* module, ModuleCategory category)
     {
         if (!module)
             return;
-        addASTBuilder(module->getASTBuilder());
-        addIRModule(module->getIRModule());
+        addASTBuilder(module->getASTBuilder(), category);
+        addIRModule(module->getIRModule(), category);
     }
 
     /// Add everything a linkage owns: its own AST builder, the modules loaded through it, the IR
     /// modules it produced, and its source managers.
-    void addLinkage(Linkage* linkage)
+    void addLinkage(Linkage* linkage, ModuleCategory category)
     {
         if (!linkage)
             return;
-        addASTBuilder(linkage->getASTBuilder());
+        addASTBuilder(linkage->getASTBuilder(), category);
         for (const RefPtr<LoadedModule>& module : linkage->loadedModulesList)
-            addModule(module);
+            addModule(module, category);
         // IR modules produced by this linkage that no `Module` owns — the linked and specialized
-        // clones built during code generation. Counted as IR like any other IR module.
+        // clones built during code generation. Always `Generated`, whichever linkage produced
+        // them: they are an output of compiling, not something that was loaded.
         for (const RefPtr<IRModule>& irModule : linkage->compiledModules)
-            addIRModule(irModule);
+            addIRModule(irModule, ModuleCategory::Generated);
         addSourceManager(linkage->getSourceManager());
     }
 
@@ -167,14 +175,16 @@ struct MemoryWalker
 
 } // namespace
 
-MemoryReport captureMemoryReport(Linkage* linkage)
+MemoryReport captureMemoryReport(Linkage* linkage, FrontEndCompileRequest* frontEndReq)
 {
     MemoryWalker walker;
     if (!linkage)
         return walker.report;
 
-    walker.addLinkage(linkage);
-
+    // Builtins are walked BEFORE the compile's own linkage, and the order is the definition of the
+    // split rather than a detail: a builtin module imported by the compiled source appears in that
+    // linkage's `loadedModulesList` too, so walking the user side first would charge the entire
+    // core module to `User` and report a session cost of nearly nothing.
     if (Session* globalSession = linkage->getSessionImpl())
     {
         // The builtin linkage is walked as a linkage in its own right, not merely as a source of
@@ -182,10 +192,23 @@ MemoryReport captureMemoryReport(Linkage* linkage)
         // `ASTBuilder` rather than into a per-module one, so reaching the core modules alone would
         // report a core-module AST of a few megabytes and silently charge the rest to the
         // unattributed remainder.
-        walker.addLinkage(globalSession->getBuiltinLinkage());
+        walker.addLinkage(globalSession->getBuiltinLinkage(), ModuleCategory::Builtin);
         for (const RefPtr<Module>& coreModule : globalSession->coreModules)
-            walker.addModule(coreModule);
+            walker.addModule(coreModule, ModuleCategory::Builtin);
         walker.addSourceManager(&globalSession->builtinSourceManager);
+    }
+
+    walker.addLinkage(linkage, ModuleCategory::User);
+
+    // The modules under compilation, which no linkage owns: a translation unit's `Module` holds the
+    // IR generated for it (`FrontEndCompileRequest` -> `TranslationUnitRequest` -> `Module`), and
+    // that is the compile's own memory. Without this the report describes only what the compile
+    // LOADED, and `userModuleIrKb` reads zero for a compile that plainly produced IR.
+    if (frontEndReq)
+    {
+        for (const RefPtr<TranslationUnitRequest>& translationUnit : frontEndReq->translationUnits)
+            if (translationUnit)
+                walker.addModule(translationUnit->getModule(), ModuleCategory::User);
     }
 
     // Read last, so the total covers everything the walk itself allocated (the visited set) rather
@@ -211,6 +234,17 @@ void appendMemoryReportLines(const MemoryReport& report, StringBuilder& out)
     emit("irArenaUsedKb", report.irArenaUsed);
     emit("irArenaReservedKb", report.irArenaReserved);
     emit("irSideTablesKb", report.irSideTables);
+
+    // The same reserved bytes as above, split by owner. Emitted next to the aggregates rather than
+    // instead of them: the aggregate is what compares against a release that predates the split.
+    const size_t builtin = size_t(ModuleCategory::Builtin);
+    const size_t user = size_t(ModuleCategory::User);
+    const size_t generated = size_t(ModuleCategory::Generated);
+    emit("builtinModuleAstKb", report.astArenaReservedBy[builtin]);
+    emit("builtinModuleIrKb", report.irArenaReservedBy[builtin]);
+    emit("userModuleAstKb", report.astArenaReservedBy[user]);
+    emit("userModuleIrKb", report.irArenaReservedBy[user]);
+    emit("generatedIrKb", report.irArenaReservedBy[generated]);
     emit("sourceArenaUsedKb", report.sourceArenaUsed);
     emit("sourceArenaReservedKb", report.sourceArenaReserved);
     emit("sourceContentKb", report.sourceContent);

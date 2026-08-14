@@ -6,7 +6,31 @@
 namespace Slang
 {
 
+class FrontEndCompileRequest;
 class Linkage;
+
+/// Which modules a component's memory belongs to.
+///
+/// A module is counted once, under the first category that reaches it, so the traversal order in
+/// `captureMemoryReport` is the definition of these buckets rather than an implementation detail:
+/// builtin modules are walked first, so a builtin imported by the compiled source is charged to
+/// `Builtin` and not to `User`.
+enum class ModuleCategory
+{
+    /// The core module and the other builtin modules (GLSL, autodiff), loaded once per session.
+    /// This is the "what does a session cost" number, and on an empty-shader compile it is
+    /// essentially the whole footprint.
+    Builtin,
+
+    /// Modules loaded from the source being compiled.
+    User,
+
+    /// IR the linkage produced rather than loaded — the linked and specialized clones built during
+    /// code generation. Separated because it grows with the compile, not with what was imported.
+    Generated,
+
+    CountOf,
+};
 
 /// A per-component account, in bytes, of the memory the compiler is holding.
 ///
@@ -25,6 +49,12 @@ struct MemoryReport
     size_t sourceArenaUsed = 0;
     size_t sourceArenaReserved = 0;
 
+    /// `astArenaReserved` and `irArenaReserved` split by which modules own them. Each array sums to
+    /// its aggregate above; the split says whether a change came from the session's fixed cost or
+    /// from the compile.
+    size_t astArenaReservedBy[size_t(ModuleCategory::CountOf)] = {};
+    size_t irArenaReservedBy[size_t(ModuleCategory::CountOf)] = {};
+
     /// Retained text of every loaded source file, which the arenas above do not own.
     size_t sourceContent = 0;
 
@@ -42,12 +72,19 @@ struct MemoryReport
     size_t processRss = 0;
 };
 
-/// Return what `linkage` and its global session are holding at the instant of the call.
+/// Return what `linkage`, its global session, and `frontEndReq` are holding at the instant of the
+/// call.
+///
+/// `frontEndReq` is not optional for a correct report, even though the walk tolerates null. The
+/// module being compiled belongs to a `TranslationUnitRequest`, not to the linkage:
+/// `linkage->loadedModulesList` holds what the source `import`ed, so a linkage-only walk sees the
+/// core module and every dependency but not the code under compilation, and reports the compile's
+/// own IR as zero.
 ///
 /// The result is an instantaneous account, not a high-water mark. Taken after a compile finishes it
 /// describes what is still live, which is a lower bound on the process peak: memory that was
 /// allocated and freed mid-compile shaped the peak but is gone by the time this runs.
-MemoryReport captureMemoryReport(Linkage* linkage);
+MemoryReport captureMemoryReport(Linkage* linkage, FrontEndCompileRequest* frontEndReq);
 
 /// Append `report` as `[MEM] <counter>Kb\t<n>kb` lines.
 ///
