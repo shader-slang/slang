@@ -113,6 +113,14 @@ public:
 
     void consolidateWith(TestReporter* other);
 
+    /// Record that a test server died under a test that then passed on a fresh one.
+    ///
+    /// Counted rather than charged to the test, because the test is demonstrably fine. But
+    /// counted, and named, because the alternative -- absorbing it into the pass -- is how a
+    /// loss rate grows without anyone noticing. Reported by outputSummary as a warning; it
+    /// does not fail the run, since there is not yet a baseline to say what rate is normal.
+    void recordTestServerLoss();
+
     /// True if can write output directly to stderr
     bool canWriteStdError() const;
 
@@ -239,6 +247,19 @@ public:
     int m_expectedFailedTestCount;
 
     int m_maxFailTestResults; ///< Maximum amount of results per test. If 0 it's infinite.
+
+    /// Test-server deaths that a retry on a fresh server proved were not the test's fault.
+    /// Separate from the pass/fail counts on purpose: these tests DID pass, so folding the
+    /// losses into m_failedTestCount would re-introduce the false verdict this exists to
+    /// remove, while folding them into m_passedTestCount alone would erase the signal.
+    /// The COUNT is authoritative: every loss increments it, including one that happens
+    /// outside a test scope and therefore contributes no name. The NAME LIST is best-effort
+    /// and frequency-weighted -- deliberately a List rather than a set, because a test that
+    /// loses several servers is the signal worth seeing, and consolidateWith concatenates
+    /// rather than unions for the same reason. So the two can legitimately disagree: more
+    /// losses than names, and a name repeated. Neither is a bug.
+    int m_testServerLossCount = 0;
+    Slang::List<Slang::String> m_testServerLossTests;
 
     TestOutputMode m_outputMode = TestOutputMode::Default;
     bool m_dumpOutputOnFailure;
