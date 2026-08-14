@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: 38fc7ee5258d92d36d2a1cdb47673d524f27d95d1601db9530c474c554bea2d2
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 1fd02b253f9cc07d74750ea2c25b6f8286574f53da9306d6110c916c2eea83d1
 source_doc: docs/generated/design/cross-cutting/diagnostics.md
-source_doc_digest: cf4549984d77058ce8ae9d000fdff44d4589213159b727d44360500b4f179da6
+source_doc_digest: 36a849c720b2096b99269b3399cb0b5b1faf225f7fe4a666aac539d87e0844ca
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -37,6 +37,108 @@ is used wherever the diagnostic itself has a caret position worth pinning;
 _absence_ (`CHECK-NOT`), where the diagnostic is locationless, or where the claim
 hangs on a command-line option rather than on source text.
 
+Later passes added the rendering details the doc now spells out: the
+`<severity>[E<5-digit id>]` header shape (probed on a sub-10000 id so the
+zero-padding is visible), the ASCII-versus-Unicode frame `-diagnostic-color`
+selects, the `command line` pseudo-path a command-line diagnostic renders, the
+diagnostic-name operand `-Wno-` accepts, and the doc's two worked examples of a
+catalog entry whose name does _not_ predict the code an input actually reports.
+
+## Claims
+
+Flat enumeration of every normative, testable statement the source doc makes,
+grouped by the doc's own headings. A large part of this page is compiler
+structure — a Lua-to-C++ generation chain, two C++ enums, a sink class and its
+accessors — so the list is split: **A. User-observable claims** are the ones a
+`slangc` invocation can witness, and **B. Internal-source and build facts** are
+the rest, each of which carries a row in `## Untested claims`. Every claim below
+appears in exactly one of the two tables.
+
+### A. User-observable claims
+
+**`#diagnosticsink`**
+
+1. Per-id severity overrides can upgrade any diagnostic and can suppress or downgrade notes and warnings. — `warnings-disable-by-numeric-id.slang`, `warnings-as-errors-promotes-warning.slang`
+2. An override may not lower a diagnostic that is already at `Error` or above. — `severity-override-cannot-lower-error.slang`
+3. A bitmask of enabled warning groups gates the opt-in `-Wall` / `-Wextra` / `-Wpedantic` warnings. — see `#warning-groups` below
+4. The sink holds a `SourceManager` reference used to decode `SourceLoc` values. — `source-location-file-line-format.slang`
+5. Per-source warning-state tracking lets pragmas adjust severity enforcement on a token-by-token basis. — `pragma-warning-disable-suppresses.slang`, `diagnostic-fires-without-suppression.slang`
+6. The user surface for that tracking is `#pragma warning`: `(push)` / `(pop)` bracket a region and `(<specifier> : <id-list>)` — `disable` and `suppress` among the specifiers — changes the state for the tokens that follow. — `pragma-warning-disable-multiple-codes.slang`, `pragma-warning-disable-suppresses.slang`
+7. What the directive itself reports is the `pragma-warning-*` block, codes 15611-15616. — `pragma-warning-pop-empty-warns.slang`, `pragma-warning-push-not-popped-warns.slang`, `pragma-warning-unknown-specifier-warns.slang`
+8. Diagnostics accumulate in an output buffer when no writer is set, so a long run of errors is not dropped. — `many-undefined-identifiers-stress.slang`
+
+**`#diagnostic-definitions`**
+
+9. `DiagnosticsLookup` carries the single alias `overlappingBindings` → `parameterBindingsOverlap`. — `diagnostic-name-alias-overlapping-bindings.slang`
+10. An alias is only observable where a user names a diagnostic: `-warnings-disable`, `-warnings-as-errors`, `-W<id>` and `-Wno-<id>` resolve their operand through `findDiagnosticByName`, so `-warnings-disable overlappingBindings` keeps working alongside the canonical name. — `diagnostic-name-alias-overlapping-bindings.slang`, `wno-flag-accepts-diagnostic-name.slang`
+
+**`#anatomy-of-a-diagnostic-entry`**
+
+11. An entry has a kebab-case `name`, an integer `code`, a short title, an optional primary `span`, then further spans, notes and a warning-group sentinel. — `error-code-function-redecl-different-return-type.slang`
+12. The doc's worked entry `function-redeclaration-with-different-return-type` (30202) interpolates `~decl`, `~newReturnType:Type` and `~prevReturnType:Type`. — `error-code-function-redecl-different-return-type.slang`
+13. The primary span is optional; locationless diagnostics such as the command-line `cannot-deduce-source-language` omit it entirely. — _untested: `needs-cli-test`_
+14. A `~name:Type` token is a typed interpolation parameter the call site must supply. — `name-interpolation-in-message.slang`, `type-name-interpolation-in-message.slang`
+15. A `variadic_note` renders one note record per supplied item, not one joined record; `ambiguous-overload-for-name-with-args` uses one for its candidates. — `variadic-note-per-overload-candidate.slang`
+16. A primary `span` followed by a `note` renders both, at their own locations. — `note-multi-span-rendering.slang`, `error-chain-with-companion-note.slang`, `macro-redefinition-warning.slang`
+
+**`#severity-levels`**
+
+17. Five of the six rendered severity names are printed: `note`, `warning`, `error`, `fatal error`, `internal error`. — `severity-name-note.slang`, `severity-name-warning.slang`, `severity-name-error.slang` (the last two also `needs-unit-test`)
+18. `ignored` names a state of the severity machinery, not a form of output: a diagnostic at `Severity::Disable` returns before rendering. — `pragma-warning-disable-suppresses.slang`, `warnings-disable-by-numeric-id.slang`
+19. `getEffectiveMessageSeverity` applies the per-source tracker first, then a per-id override, then group gating, then `TreatWarningsAsErrors`. — `severity-override-beats-warning-group-gating.slang`, `warnings-as-errors-promotes-warning.slang`, `warnings-as-errors-all-promotes-warning.slang`
+20. A per-id override takes precedence over group gating, which is what lets `-W<id>` force-enable a single warning from a group that is off. — `severity-override-beats-warning-group-gating.slang`
+21. The option table spells these `-W<id>` / `-Wno-<id>`, but the operand goes through `overrideDiagnostic`, which accepts an integer id **or** a diagnostic name. — `wno-flag-accepts-diagnostic-name.slang`
+
+**`#warning-groups`**
+
+22. The groups are independent, not nested: a warning is gated on exactly the one group it carries. — `warning-group-wall-does-not-enable-pedantic.slang`
+23. `Default` is the implicit group of every untagged diagnostic and is always emitted. — `warning-group-default-fires-under-wall.slang`
+24. `m_enabledWarningLevels` starts with only the `Extra` bit set, so `Extra` warnings fire out of the box while `All` and `Pedantic` stay silent until enabled. — `warning-group-extra-fires-without-flag.slang`, `warning-group-pedantic-silent-by-default.slang`
+25. Enabling a group lets its warnings fire. — `warning-group-pedantic-enabled-by-wpedantic.slang`
+26. `overrideDiagnosticSeverity` keeps an override that equals the nominal severity for a grouped warning, because that is the meaningful act of force-enabling it. — `severity-override-beats-warning-group-gating.slang`
+
+**`#source-locations-and-message-rendering`**
+
+27. The sink decodes a `SourceLoc` into `file:line:column` and retrieves the original source line for caret rendering. — `source-location-file-line-format.slang`, `caret-points-at-offending-token.slang`, `diagnostic-on-first-line.slang`, `diagnostic-on-final-source-line.slang`, `deeply-nested-error-still-rendered.slang`, `macro-expansion-stack-in-diagnostic.slang`
+28. The caret run spans the reported range, not just its first column. — `source-span-multi-character.slang`
+29. A rich diagnostic inside a `##` paste points only at the pasted text, because the rich path has no token-paste note loop. — `token-paste-location-rendered.slang`
+30. A rendered diagnostic opens with `<severity>[E<5-digit id>]: <message>`, with the id zero-padded and always carrying an `E` prefix whatever the severity. — `diagnostic-header-code-zero-padded-with-e-prefix.slang`, `error-code-warning-comma-operator.slang`
+31. `-diagnostic-color always\|never\|auto` selects the frame glyphs as well as the colour: ASCII (`-->`, `\|`, `^`, `-`) with colour off, Unicode box drawing (`╭╼`, `│`, `━`, `┬`) with colour on. — `diagnostic-color-selects-frame-glyphs.slang`
+32. Diagnostics raised while parsing the command line are attached to a synthetic source, so the renderer prints the path `command line` with no `line:column` and such a diagnostic can only be pinned by its error code. — `command-line-diagnostic-has-no-line-column.slang`
+33. `-enable-machine-readable-diagnostics` switches rendering to the tab-separated record `E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>`. — `machine-readable-diagnostic-record.slang`
+
+**`#error-code-namespace`**
+
+34. Diagnostic ids live in one shared integer namespace rendered as `E<code>`, allocated in per-subsystem ranges. — `error-code-undefined-identifier.slang`, `error-code-type-mismatch.slang`, `error-code-divide-by-zero.slang`, `error-code-no-member-of-type.slang`, `error-code-redeclaration-conflicts.slang`, `error-code-unexpected-eof.slang`, `parser-error-has-code.slang`, `error-code-unknown-preprocessor-directive.slang`, `error-code-cyclic-include.slang`, `error-code-include-failed.slang`, `error-code-end-of-file-in-conditional.slang`, `error-code-user-defined-error.slang`, `error-code-user-defined-warning.slang`, `preprocessor-warning-code.slang`, `error-code-warning-comma-operator.slang`
+35. Names and codes are each unique per entry. — `error-code-function-redefinition.slang`
+36. The `intentional_shared_code_list` exempts deliberately multi-bound codes, `39999` among them. — `shared-code-umbrella-39999.slang`
+37. For a multi-bound code the rendered header carries the id and the message but never the name, so the message text is the only discriminator. — `shared-code-umbrella-39999.slang`
+38. A catalog entry is a diagnostic the compiler _can_ emit; it is not a promise that some input reaches it. — `get-count-on-non-array-reports-no-member.slang`, `smaller-to-larger-array-reports-type-mismatch.slang`
+39. `expected-array-expression` (30020) has no source text that provokes it; `Array::getCount` on a non-array reports `no-member-of-name-in-type` (30027) instead. — `get-count-on-non-array-reports-no-member.slang`
+40. `cannot-convert-array-of-smaller-to-larger-size` (30024) comes from GLSL varying legalization; a plain `float b[4] = a;` with `a` of type `float[2]` reports `type-mismatch` (30019). — `smaller-to-larger-array-reports-type-mismatch.slang`
+41. `overrideDiagnostic` / `overrideDiagnostics` accept a single identifier or a comma-separated list, each either an integer id or a name. — `warnings-disable-by-numeric-id.slang`, `warnings-disable-by-kebab-case-name.slang`, `warnings-disable-comma-separated-list.slang`
+42. An unrecognised name is reported as `UnknownDiagnosticName`, whereas an unrecognised numeric id is silently ignored. — `warnings-disable-unknown-name-diagnosed.slang`, `warnings-disable-unknown-id-ignored.slang`
+43. A severity mismatch is rejected at the option layer and reported as `unknown-diagnostic-name` (31111) naming the requested identifier, and because that entry is an `err` the request fails the compile. — `severity-override-cannot-lower-error.slang`
+44. `findDiagnosticByName` is convention-insensitive: it accepts the kebab-case Lua spelling as well as the lower-camel `DiagnosticInfo::name`. — `warnings-disable-by-kebab-case-name.slang`, `warnings-disable-by-lower-camel-name.slang`
+
+### B. Internal-source and build facts
+
+45. A nested sink built with the parent-sink constructor copies the flags, colour mode, unicode setting, enabled warning groups and severity overrides, which is distinct from `setParentSink` routing diagnostics upward. — _untested: `needs-unit-test`_
+46. The formatted text goes to the sink's `writer` when set and otherwise to `outputBuffer`, from which `getBlobIfNeeded` returns an `ISlangBlob`. — _untested: `needs-unit-test`_
+47. `Diagnostic` is the record `{ Message, loc, ErrorID, severity }` and `DiagnosticInfo` is `{ id, severity, name, messageFormat, level }`, whose `level` defaults so four-element `DIAGNOSTIC(...)` aggregates keep compiling. — _untested: `internal-source-fact`_
+48. Diagnostics are declared in Lua and turned into C++ structs by `slang-fiddle` through the four-step chain, and there is a single catalog in which every entry is rich. — _untested: `internal-source-fact`_
+49. `validate_diagnostic` rejects a non-kebab-case name and a severity outside the five allowed values; `process_diagnostics` fails the build on duplicate names or codes, on a shared code with disagreeing severities, and on a cross-catalog name conflict. — _untested: `internal-source-fact`_
+50. The declaring helper fixes the entry's severity, and `internal` entries — `internal-compiler-error`, `unimplemented`, `unexpected`, all code `99999` — report the compiler's own failure, so input that reaches one is a compiler defect. — _untested: `internal-source-fact`_
+51. `getWarningLevelEnum` maps `"default"` / `"all"` / `"extra"` / `"pedantic"` onto the `WarningLevel::` enumerators. — _untested: `internal-source-fact`_
+52. `source/slang/diagnostics/type-errors.lua` uses a different declarative schema, is loaded by nothing at `source_commit`, and its `flag` key has no consumer. — _untested: `internal-source-fact`_
+53. `Severity` is `{ Disable, Note, Warning, Error, Fatal, Internal }` and a `static_assert` keeps it in step with the `SLANG_SEVERITY_*` constants; the neighbouring block does the same for `WarningLevel` against `SLANG_WARNING_LEVEL_*`. — _untested: `needs-unit-test`_
+54. `fatal error` and `internal error` are printed and then abort the compile through `SLANG_ABORT_COMPILATION`. — _untested: `needs-unit-test`_
+55. `enableWarningLevel` bounds-checks before shifting, and `getEnabledWarningLevels` / `setEnabledWarningLevels` expose the raw mask so it can be copied between sinks. — _untested: `needs-unit-test`_
+56. `getDiagnosticById` returns only the first entry added under a shared id, which is why a tool should prefer the `name`. — _untested: `needs-unit-test`_
+57. `SLANG_INTERNAL_ERROR`, `SLANG_UNIMPLEMENTED` and `SLANG_DIAGNOSE_UNEXPECTED` funnel internal errors through the sink at `Severity::Internal`, and in debug builds the first two emit a `__FILE__`:`__LINE__` companion note. — _untested: `internal-source-fact`_
+58. `SLANG_RELEASE_ASSERT` / `SLANG_ASSERT` / `SLANG_ASSERT_FAILURE` / `SLANG_UNREACHABLE` bypass the sink entirely, and which expansion is in force is a build-time choice. — _untested: `compile-time-toggle`_
+59. The eight-step procedure for adding a new diagnostic. — _untested: `process-doc`_
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                     | Intent     | Anchor                                                                                                                            | Tests                                                                                                              |
@@ -56,6 +158,8 @@ hangs on a command-line option rather than on source text.
 | Stress: the sink's output buffer accumulates every diagnostic of a long run of undefined-identifier errors; none is dropped.                                                              | stress     | [#diagnosticsink](../../../../design/cross-cutting/diagnostics.md#diagnosticsink)                                                 | [`many-undefined-identifiers-stress.slang`](many-undefined-identifiers-stress.slang)                               |
 | The sink's per-source warning-state tracking lets `#pragma warning(disable: 41024)` suppress that warning for the tokens that follow.                                                     | functional | [#diagnosticsink](../../../../design/cross-cutting/diagnostics.md#diagnosticsink)                                                 | [`pragma-warning-disable-suppresses.slang`](pragma-warning-disable-suppresses.slang)                               |
 | With no severity override registered in the sink, the comma-operator warning E41024 reaches the user unchanged.                                                                           | functional | [#diagnosticsink](../../../../design/cross-cutting/diagnostics.md#diagnosticsink)                                                 | [`diagnostic-fires-without-suppression.slang`](diagnostic-fires-without-suppression.slang)                         |
+| A catalog entry is not a promise that some input reaches it: getCount on a non-array reports no-member-of-name-in-type E30027, never the expected-array-expression entry E30020.                                                    | negative   | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                     | [`get-count-on-non-array-reports-no-member.slang`](get-count-on-non-array-reports-no-member.slang)                 |
+| Assigning a float[2] to a float[4] reports type-mismatch E30019, not the similarly-named cannot-convert-array-of-smaller-to-larger-size entry E30024.                                                                                  | negative   | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                     | [`smaller-to-larger-array-reports-type-mismatch.slang`](smaller-to-larger-array-reports-type-mismatch.slang)       |
 | A `#error` directive renders the preprocessor-range code E15900 with the user message interpolated.                                                                                       | functional | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                     | [`error-code-user-defined-error.slang`](error-code-user-defined-error.slang)                                       |
 | A `#warning` directive renders the preprocessor-range code E15901 with the user message interpolated.                                                                                     | functional | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                     | [`error-code-user-defined-warning.slang`](error-code-user-defined-warning.slang)                                   |
 | A checker-range code (E30019) is rendered for a type-mismatch condition.                                                                                                                  | functional | [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                     | [`error-code-type-mismatch.slang`](error-code-type-mismatch.slang)                                                 |
@@ -85,7 +189,11 @@ hangs on a command-line option rather than on source text.
 | A per-id override takes precedence over warning-group gating, so `-W<id>` force-enables a single warning from a group that is off.                                                        | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`severity-override-beats-warning-group-gating.slang`](severity-override-beats-warning-group-gating.slang)         |
 | A per-id severity override may not lower a diagnostic that is already at `Error`: `-warnings-disable` on an error id is rejected with E31111.                                             | negative   | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`severity-override-cannot-lower-error.slang`](severity-override-cannot-lower-error.slang)                         |
 | Boundary: `-warnings-as-errors all` promotes every surviving warning to `error`, not just one selected id.                                                                                | boundary   | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`warnings-as-errors-all-promotes-warning.slang`](warnings-as-errors-all-promotes-warning.slang)                   |
+| The -W<id> / -Wno-<id> option operand goes through overrideDiagnostic, which accepts a diagnostic name as well as an integer id, so -Wno-comma-operator-used-in-expression suppresses E41024.                                        | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`wno-flag-accepts-diagnostic-name.slang`](wno-flag-accepts-diagnostic-name.slang)                                 |
 | The final `TreatWarningsAsErrors` step of `getEffectiveMessageSeverity` promotes warning 41024 to `error` when `-warnings-as-errors 41024` selects it by id.                              | functional | [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | [`warnings-as-errors-promotes-warning.slang`](warnings-as-errors-promotes-warning.slang)                           |
+| -diagnostic-color selects the renderer's frame glyphs as well as its colour, so `never` draws the ASCII frame and `always` draws the Unicode box-drawing frame.                                                                       | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`diagnostic-color-selects-frame-glyphs.slang`](diagnostic-color-selects-frame-glyphs.slang)                       |
+| A diagnostic raised while parsing the command line renders the path `command line` with no line:column, so it can only be pinned by its error code.                                                                                    | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`command-line-diagnostic-has-no-line-column.slang`](command-line-diagnostic-has-no-line-column.slang)             |
+| A rendered diagnostic header is `<severity>[E<5-digit id>]: <message>` with the id zero-padded, so entry 14 prints as error[E00014] rather than error[E14].                                                                            | boundary   | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`diagnostic-header-code-zero-padded-with-e-prefix.slang`](diagnostic-header-code-zero-padded-with-e-prefix.slang) |
 | A diagnostic raised inside a macro expansion still decodes to a source location and renders the expanded identifier in its message.                                                       | functional | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`macro-expansion-stack-in-diagnostic.slang`](macro-expansion-stack-in-diagnostic.slang)                           |
 | A diagnostic whose location falls in a synthesized token-paste view renders that view's name and a line:column inside it.                                                                 | boundary   | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`token-paste-location-rendered.slang`](token-paste-location-rendered.slang)                                       |
 | Boundary: a diagnostic on line 1 (the lower edge of the line-number axis) still renders `:1:` in the decoded triple.                                                                      | boundary   | [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | [`diagnostic-on-first-line.slang`](diagnostic-on-first-line.slang)                                                 |
@@ -125,102 +233,5 @@ hangs on a command-line option rather than on source text.
 
 | Anchor                                                                                                                            | Kind                  | Gap                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Suggested addition                                                                                                                                                                                                                     |
 | --------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | drift-from-source     | The doc says `formatDiagnostic` "loops back through `SourceView::getInitiatingSourceLoc()`, emitting a `MiscDiagnostics::seeTokenPasteLocation` note for each hop, so an error inside a `##` paste points at both the pasted text and the macro that produced it". Compiling `#define CAT(a, b) a##b` with an undeclared pasted name produces only the primary error located in the `token paste` view; no `see token pasted location` note is rendered. The same page states that every catalog entry is now a rich diagnostic, which suggests the loop lives on a rendering path the catalog no longer uses. | State which rendering path the token-paste note loop belongs to and whether it is still reached for catalog (rich) diagnostics; if it is not, say so explicitly instead of describing the two-location rendering as current behaviour. |
-| [#source-locations-and-message-rendering](../../../../design/cross-cutting/diagnostics.md#source-locations-and-message-rendering) | missing-surface       | The doc names `DiagnosticSink::Flag::MachineReadableDiagnostics` and gives the tab-separated record layout, but names no way to turn it on from outside C++. `slangc` does accept `-enable-machine-readable-diagnostics`, which is what makes this claim testable at all.                                                                                                                                                                                                                                                                                                                                      | Name `-enable-machine-readable-diagnostics` as the command-line spelling that sets the flag, next to the record layout.                                                                                                                |
-| [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | missing-example       | The doc lists all six rendered severity names (`ignored`, `note`, `warning`, `error`, `fatal error`, `internal error`) as if they were equally observable, but gives no input that produces the last two, and `ignored` names a severity that is never emitted at all. Several entries declared with the `fatal` helper turned out to be recovered from before rendering.                                                                                                                                                                                                                                      | Add a sentence saying which severities are user-reachable and, for `fatal` and `internal`, name one condition that reliably produces each (or state that they are only reachable via a compiler bug).                                  |
-| [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | undocumented-behavior | The doc explains that an override "may not lower a severity that has already reached `Error`, `Fatal`, or `Internal`", but not what the user sees when they try. Passing `-warnings-disable 30015` (an error id) reports `error[E31111]: unknown diagnostic '30015'` — the same code used for a name that is genuinely absent — and aborts the compile rather than proceeding with the error un-silenced.                                                                                                                                                                                                      | Add a sentence naming the rejection: an override request that would lower an error is reported as `unknown diagnostic` (31111) with the requested identifier, and the compile does not continue.                                       |
-| [#warning-groups](../../../../design/cross-cutting/diagnostics.md#warning-groups)                                                 | missing-surface       | The doc says "A per-id override therefore takes precedence over group gating, which is what lets `-W<name>` force-enable a single warning from a group that is off", but `-W<name>` is not a spelling `slangc` accepts for a diagnostic name; the working forms are `-W<id>` and `-Wno-<id>` with the integer id.                                                                                                                                                                                                                                                                                              | Correct the spelling to `-W<id>` / `-Wno-<id>` and say whether a diagnostic name is accepted there as it is for `-warnings-disable`.                                                                                                   |
-| [#diagnosticsink](../../../../design/cross-cutting/diagnostics.md#diagnosticsink)                                                 | missing-surface       | The doc says the sink keeps "Per-source warning-state tracking (`SourceWarningStateTrackerBase`) so that pragmas / per-file overrides can adjust the severity enforcement on a token-by-token basis" but never names the pragma. The user-facing surface is `#pragma warning(...)`, and its specifier set (`push`, `pop`, `disable`, and the rejections around them) is what the tracker actually enforces.                                                                                                                                                                                                    | Name `#pragma warning(push)` / `(pop)` / `(disable: <id> ...)` as the user surface for the warning-state tracker and list the accepted specifiers.                                                                                     |
-| [#error-code-namespace](../../../../design/cross-cutting/diagnostics.md#error-code-namespace)                                     | missing-example       | The doc names `39999` as "the overload/lookup umbrella" on the `intentional_shared_code_list` but names no pair of diagnostics that actually share it, so a reader cannot construct an input that demonstrates the sharing without reading the Lua catalog.                                                                                                                                                                                                                                                                                                                                                    | Name two entries that share 39999 (for example the no-applicable-overload and ambiguous-overload entries) so the exemption has a concrete illustration.                                                                                |
-| [#anatomy-of-a-diagnostic-entry](../../../../design/cross-cutting/diagnostics.md#anatomy-of-a-diagnostic-entry)                   | missing-example       | `variadic_span` and `variadic_note` appear in the helper list but the section's worked example uses only a plain `span`, so the doc never says what a variadic note renders as — one record per item, or one joined record.                                                                                                                                                                                                                                                                                                                                                                                    | Extend the worked example, or add a second one, with a `variadic_note` entry and a sentence saying it renders one note record per supplied item.                                                                                       |
-| [#diagnostic-definitions](../../../../design/cross-cutting/diagnostics.md#diagnostic-definitions)                                 | missing-surface       | The doc mentions "the single alias `overlappingBindings` → `parameterBindingsOverlap`" without saying where a user would type either name. Both are in fact accepted by `-warnings-disable`, which is the only place the alias matters.                                                                                                                                                                                                                                                                                                                                                                        | Say that the alias exists so `-warnings-disable overlappingBindings` keeps working alongside the canonical name, and point at the option that consumes it.                                                                             |
+| [#severity-levels](../../../../design/cross-cutting/diagnostics.md#severity-levels)                                               | missing-example       | The section now says only five of the six rendered names are ever printed and that `internal` entries mean a compiler defect, but it still gives no input that produces `fatal error`. Several entries declared with the `fatal` helper turned out to be recovered from before rendering, so a reader writing a regression test for that severity has nothing to start from.                                                                                                                                                                                                                                    | Name one condition that reliably renders a `fatal error`, or state that `fatal` entries are recovered from in practice and that the severity is only reachable through the API.                                                        |
 
-## Claim index
-
-Grouped by doc heading; each claim is either covered by the named tests or
-carries a row in `## Untested claims` above.
-
-**DiagnosticSink** — C1 per-id severity overrides can upgrade any diagnostic and
-suppress or downgrade notes/warnings but may not lower one already at `Error`
-(`diagnostic-fires-without-suppression.slang`, `severity-override-cannot-lower-error.slang`);
-C2 an enabled-warning-group bitmask gates the opt-in groups (see _Warning groups_);
-C3 a `SourceManager` reference decodes `SourceLoc` (see _Source locations_);
-C4 output goes to a writer or accumulates in `outputBuffer` (`many-undefined-identifiers-stress.slang`, plus one untested row);
-C5 per-source warning-state tracking lets pragmas adjust enforcement token-by-token
-(`pragma-warning-disable-suppresses.slang`, `pragma-warning-disable-multiple-codes.slang`,
-`pragma-warning-push-not-popped-warns.slang`, `pragma-warning-pop-empty-warns.slang`,
-`pragma-warning-unknown-specifier-warns.slang`); C6 nested-sink inheritance (untested);
-C7 the `Diagnostic` / `DiagnosticInfo` record shapes (untested).
-
-**Diagnostic definitions** — C8 the Lua → `slang-fiddle` generation chain and the
-single all-rich catalog (untested); C9 the lookup is augmented with core entries
-and the `overlappingBindings` alias (`diagnostic-name-alias-overlapping-bindings.slang`).
-
-**Anatomy of a diagnostic entry** — C10 an entry carries a kebab-case name, an
-integer code, a title, an optional primary span, then further spans, notes and a
-group sentinel (`error-code-function-redecl-different-return-type.slang`);
-C11 the worked 30202 example is live (same test); C12 the primary span is optional
-and locationless diagnostics omit it (untested, partially observed by
-`warnings-disable-unknown-name-diagnosed.slang`); C13 `~name` / `~name:Type` are
-typed interpolation parameters (`name-interpolation-in-message.slang`,
-`type-name-interpolation-in-message.slang`); C14 `validate_diagnostic`'s name and
-severity rules (untested); C15 notes and variadic notes render alongside the primary
-span (`note-multi-span-rendering.slang`, `error-chain-with-companion-note.slang`,
-`macro-redefinition-warning.slang`, `variadic-note-per-overload-candidate.slang`);
-C16 `getWarningLevelEnum` string→enum mapping (untested).
-
-**The prototype schema** — C17 nothing loads `diagnostics/type-errors.lua` (untested).
-
-**Severity levels** — C18 the `Severity` enum and its `static_assert` (untested);
-C19 the six rendered names (`severity-name-error.slang`, `severity-name-warning.slang`,
-`severity-name-note.slang`; the other three untested); C20 the effective-severity
-order — pragma state, then per-id override (which may not lower an error and which
-beats group gating), then group gating, then warnings-as-errors
-(`severity-override-cannot-lower-error.slang`, `severity-override-beats-warning-group-gating.slang`,
-`warnings-as-errors-promotes-warning.slang`, `warnings-as-errors-all-promotes-warning.slang`).
-
-**Warning groups** — C21 the `WarningLevel` enum and its `static_assert` (untested);
-C22 the groups are independent, not nested (`warning-group-wall-does-not-enable-pedantic.slang`);
-C23 `Default` is implicit and always emitted (`warning-group-default-fires-under-wall.slang`);
-C24 the mask starts with only `Extra` set (`warning-group-extra-fires-without-flag.slang`,
-`warning-group-pedantic-silent-by-default.slang`, `warning-group-pedantic-enabled-by-wpedantic.slang`);
-C25 `enableWarningLevel` bounds-checking and the raw-mask accessors (untested);
-C26 `overrideDiagnosticSeverity` keeps a no-op override for a grouped warning because
-that is how force-enabling works (`severity-override-beats-warning-group-gating.slang`).
-
-**Source locations and message rendering** — C27 `SourceLoc` decodes to
-`file:line:column` with the source line retrieved for caret rendering
-(`caret-points-at-offending-token.slang`, `source-span-multi-character.slang`,
-`source-location-file-line-format.slang`, `diagnostic-on-first-line.slang`,
-`diagnostic-on-final-source-line.slang`, `deeply-nested-error-still-rendered.slang`,
-`macro-expansion-stack-in-diagnostic.slang`); C28 token-paste locations
-(`token-paste-location-rendered.slang`, with the companion-note half recorded as a
-doc gap); C29 writer vs `outputBuffer` (untested); C30 the machine-readable record
-layout (`machine-readable-diagnostic-record.slang`).
-
-**Error code namespace** — C31 one shared integer namespace rendered as `E<code>`,
-with ids allocated in per-subsystem ranges (`error-code-undefined-identifier.slang`,
-`error-code-function-redefinition.slang`, `error-code-type-mismatch.slang`,
-`error-code-divide-by-zero.slang`, `error-code-no-member-of-type.slang`,
-`error-code-redeclaration-conflicts.slang`, `error-code-unexpected-eof.slang`,
-`parser-error-has-code.slang`, `error-code-unknown-preprocessor-directive.slang`,
-`error-code-cyclic-include.slang`, `error-code-include-failed.slang`,
-`error-code-end-of-file-in-conditional.slang`, `error-code-user-defined-error.slang`,
-`error-code-user-defined-warning.slang`, `preprocessor-warning-code.slang`,
-`error-code-warning-comma-operator.slang`); C32 the uniqueness and cross-catalog
-build-time rules (untested); C33 the `intentional_shared_code_list` exemptions
-(`shared-code-umbrella-39999.slang`); C34 `getDiagnosticById` returns the first
-entry added (untested); C35 `overrideDiagnostic` / `overrideDiagnostics` accept an
-id or a name, singly or comma-separated (`warnings-disable-by-numeric-id.slang`,
-`warnings-disable-by-kebab-case-name.slang`, `warnings-disable-by-lower-camel-name.slang`,
-`warnings-disable-comma-separated-list.slang`); C36 an unknown name is reported while
-an unknown id is silently ignored (`warnings-disable-unknown-name-diagnosed.slang`,
-`warnings-disable-unknown-id-ignored.slang`); C37 an override cannot silence an error
-(`severity-override-cannot-lower-error.slang`); C38 name lookup is
-convention-insensitive (`warnings-disable-by-kebab-case-name.slang`,
-`warnings-disable-by-lower-camel-name.slang`).
-
-**Internal-compiler errors** — C39 the three sink-based ICE macros and their debug
-companion note (untested); C40 the assert/signal macros bypass the sink (untested).
-
-**Adding a new diagnostic** — C41 the eight-step contributor procedure (untested).

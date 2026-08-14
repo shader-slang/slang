@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#sampler-and-buffer-layout-types
-//META: doc_section_digest=7b6ab0d31ef4937c885d6b23daf3cc423fe7061f5d5d1e785aa548725f3287e6
+//META: doc_section_digest=dff5178219bf6c9d69e968d080af5b89c8ed266cacc3131cbee7ff9c13886e9e
 //META: purpose=A uniform SamplerComparisonState declaration lowers to a global_param of the nullary IR type SamplerComparisonState.
 //META: intent=functional
 //META: pipeline_stage=lower

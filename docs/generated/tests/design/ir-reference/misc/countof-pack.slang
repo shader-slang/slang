@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/misc.md#size-alignment-count
-//META: doc_section_digest=4ed61b4663ae3c38a1922694608f7f9ff78573bad2e7eab67a47597d0117ec93
+//META: doc_section_digest=b6a68a06f518f5bd44e3459811096c15e9f474df3116276f35e51d90ca68eef0
 //META: purpose=`countof(pack)` on a variadic value pack lowers to a `countOf` inst whose operand is the pack itself.
 //META: intent=functional
 //META: pipeline_stage=lower
