@@ -36,7 +36,7 @@ SLANG_UNIT_TEST(irDeferredBodyKeepsDecorationChildren)
     Index expectedChildren = 0;
     Index actualChildren = 0;
     bool bodyWasDeferred = false;
-    _testRoundTripDecorationWithChildren(
+    testRoundTripDecorationWithChildren(
         globalSession,
         expectedChildren,
         actualChildren,
@@ -84,7 +84,7 @@ SLANG_UNIT_TEST(irDeferredBodyConcurrentMaterialization)
 
     Index deferredCount = 0;
     Index mismatches = 0;
-    _testConcurrentBodyMaterialization(globalSession, deferredCount, mismatches);
+    testConcurrentBodyMaterialization(globalSession, deferredCount, mismatches);
 
     // An eager load races nothing, so it would make the assertion below meaningless.
     if (isOnDemandIRLoadEnabled())
@@ -247,7 +247,7 @@ SLANG_UNIT_TEST(irDeferralDeclinesWhenTheBlobDoesNotBackTheSpans)
         bool deferred = false;
         Index instCount = 0;
         Index mismatchDelta = 0;
-        _testDeferralFallback(globalSession, testCase.blobMode, deferred, instCount, mismatchDelta);
+        testDeferralFallback(globalSession, testCase.blobMode, deferred, instCount, mismatchDelta);
 
         SLANG_CHECK_ABORT(instCount > 0);
         if (testCase.blobMode == TestBlobMode::Matching)

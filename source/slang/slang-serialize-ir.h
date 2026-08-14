@@ -4,6 +4,13 @@
 #include "slang-com-helper.h"
 #include "slang-ir.h"
 
+namespace slang
+{
+// Named by the test-only entry points below. Forward-declared rather than relied on
+// through a transitive include, so this header stands on its own.
+struct IGlobalSession;
+} // namespace slang
+
 namespace Slang
 {
 
@@ -49,14 +56,19 @@ SLANG_API bool isOnDemandIRLoadEnabled();
 //
 // Test-only entry points.
 //
-// These live here rather than in `slang-ir.h` because they are about serialization, and
-// they exist at all because the shapes they exercise cannot be reached from the unit-test
-// tool: the IR builders and the serialization entry points are not exported, and two of
-// these shapes do not occur in any module the compiler produces. Exporting all of that to
-// test three rules would be a far larger surface than three functions.
+// Exported, which the rest of the codebase avoids -- unit tests normally reach internals by
+// linking a static lib, by using a header-only type, or by recompiling the .cpp into the
+// test tool. None of those work here: `slang-unit-test` is `dlopen`ed and so sees only
+// exported symbols, recompiling this .cpp pulls in ~12,500 lines of transitive closure, and
+// the counters in `slang-ir.h` read atomics that must live in the DLL, so a second compiled
+// copy would sit at zero.
+//
+// shader-slang/slang#12347 adds `slang-internals-test`, which links the compiler statically
+// into one process. That removes the need for all of this: when it lands, these three and
+// the four counters move there and `SLANG_API` comes off. See "What is not ready".
 //
 
-/// What blob `_testDeferralFallback` hands the reader. Only `Matching` permits deferral;
+/// What blob `testDeferralFallback` hands the reader. Only `Matching` permits deferral;
 /// the other two must fall back to an eager load and produce an identical module.
 enum class TestBlobMode
 {
@@ -71,7 +83,7 @@ enum class TestBlobMode
 /// Round-trips a module with a chosen blob mode, reporting whether deferral was taken
 /// (`outDeferredLoaderInstalled`), what was loaded (`outInstCount`, which must match across
 /// modes), and whether the containment check fired (`outSpanMismatchDelta`).
-SLANG_API void _testDeferralFallback(
+SLANG_API void testDeferralFallback(
     slang::IGlobalSession* globalSession,
     TestBlobMode blobMode,
     bool& outDeferredLoaderInstalled,
@@ -81,7 +93,7 @@ SLANG_API void _testDeferralFallback(
 /// Round-trips a module whose decoration has children of its own. A deferred load that
 /// dropped the decoration's subtree shows up as `outActualChildren < outExpectedChildren`.
 /// `outBodyWasDeferred` distinguishes a real exercise of the rule from an eager load.
-SLANG_API void _testRoundTripDecorationWithChildren(
+SLANG_API void testRoundTripDecorationWithChildren(
     slang::IGlobalSession* globalSession,
     Index& outExpectedChildren,
     Index& outActualChildren,
@@ -95,7 +107,7 @@ SLANG_API void _testRoundTripDecorationWithChildren(
 /// Scoped to materialization deliberately: running whole compiles concurrently on a shared
 /// global session is documented as unsupported and crashes either way, so a test shaped
 /// that way would exercise unsupported usage rather than this mechanism.
-SLANG_API void _testConcurrentBodyMaterialization(
+SLANG_API void testConcurrentBodyMaterialization(
     slang::IGlobalSession* globalSession,
     Index& outDeferredCount,
     Index& outMismatches);

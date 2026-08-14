@@ -1481,7 +1481,7 @@ static Index _countChildrenOf(IRInst* inst)
     return count;
 }
 
-void _testRoundTripDecorationWithChildren(
+void testRoundTripDecorationWithChildren(
     slang::IGlobalSession* globalSession,
     Index& outExpectedChildren,
     Index& outActualChildren,
@@ -1639,7 +1639,7 @@ static SlangResult _testRoundTrip(
     return readSerializedModuleIR(irChunk, session, nullptr, blobForReader, outModule);
 }
 
-void _testConcurrentBodyMaterialization(
+void testConcurrentBodyMaterialization(
     slang::IGlobalSession* globalSession,
     Index& outDeferredCount,
     Index& outMismatches)
@@ -1778,7 +1778,7 @@ void _testConcurrentBodyMaterialization(
 }
 
 
-void _testDeferralFallback(
+void testDeferralFallback(
     slang::IGlobalSession* globalSession,
     TestBlobMode blobMode,
     bool& outDeferredLoaderInstalled,
