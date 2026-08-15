@@ -6012,6 +6012,22 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto builder = getBuilder();
         auto resultType = lowerType(context, sizeOfLikeExpr->type);
 
+        // countof(EnumType) is the number of declared enum cases, not a layout property.
+        // An enum type has a valid natural size, so without this the count would flow into
+        // the `size.alignment` path below and be lowered as the enum's alignment (see #12549).
+        // Fold it here through CountOfIntVal::tryFoldOrNull so the case count comes from the
+        // same source of truth as the compile-time constant-fold path, rather than being
+        // recomputed independently.
+        if (as<CountOfExpr>(sizeOfLikeExpr) && isDeclRefTypeOf<EnumDecl>(sizeOfLikeExpr->sizedType))
+        {
+            auto folded = as<ConstantIntVal>(CountOfIntVal::tryFoldOrNull(
+                getASTBuilder(),
+                getASTBuilder()->getIntType(),
+                sizeOfLikeExpr->sizedType));
+            SLANG_ASSERT(folded);
+            return LoweredValInfo::simple(builder->getIntValue(resultType, folded->getValue()));
+        }
+
         if (!size)
         {
             auto sizedType = lowerType(context, sizeOfLikeExpr->sizedType);
