@@ -296,6 +296,31 @@ static bool isArrayDecl(Decl* decl)
     return false;
 }
 
+// Return true if `typeParamRef` carries a *required* interface conformance constraint
+// (`T : IFoo`) among the constraints of `genericDeclRef` — excluding equality constraints and
+// *optional* constraints (`where optional T : IFoo`), neither of which requires conformance.
+// This selects the argument sites where an interface argument is turned into `dyn IFoo`.
+static bool genericTypeParamHasConformanceConstraint(
+    DeclRef<GenericDecl> genericDeclRef,
+    DeclRef<GenericTypeParamDecl> typeParamRef)
+{
+    auto paramDecl = typeParamRef.getDecl();
+    for (auto constraintDecl :
+         genericDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    {
+        if (constraintDecl->isEqualityConstraint)
+            continue;
+        if (constraintDecl->hasModifier<OptionalConstraintModifier>())
+            continue;
+        if (auto subDeclRefType = as<DeclRefType>(constraintDecl->sub.type))
+        {
+            if (subDeclRefType->getDeclRef().getDecl() == paramDecl)
+                return true;
+        }
+    }
+    return false;
+}
+
 bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     OverloadResolveContext& context,
     OverloadCandidate& candidate)
@@ -515,6 +540,14 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 typeArg.type = m_astBuilder->getErrorType();
                 success = false;
             }
+
+            // For a conformance-constrained type parameter (`T : IFoo`), an explicit interface
+            // type argument denotes the existential `dyn IFoo`, which does not conform to the
+            // interface, so the constraint check rejects it. This is only correct for
+            // constrained parameters: an unconstrained parameter used as an existential
+            // container element (`Optional<IFoo>`, `IFoo[]`) must keep the interface itself.
+            if (genericTypeParamHasConformanceConstraint(genericDeclRef, typeParamRef))
+                typeArg.type = maybeFormExistentialType(typeArg.type);
 
             checkedArgs.add(typeArg.type);
         }

@@ -2934,6 +2934,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return getBuilder()->emitExtractExistentialType(existentialVal);
     }
 
+    IRType* visitExistentialType(ExistentialType* type)
+    {
+        // `dyn IFoo` and the interface `IFoo` share one IR representation: the AST-level
+        // distinction only guides checking, and the existing interface IR already models an
+        // existential value.
+        return lowerType(context, type->getInterfaceType());
+    }
+
     LoweredValInfo visitExtractExistentialSubtypeWitness(ExtractExistentialSubtypeWitness* witness)
     {
         auto declRef = witness->getDeclRef();

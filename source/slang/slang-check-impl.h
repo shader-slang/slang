@@ -3161,6 +3161,12 @@ public:
 
     bool isValidGenericConstraintType(Type* type);
 
+    /// If `type` is an interface (or interface conjunction) used in a data-type context, return
+    /// the corresponding existential type `dyn type`; otherwise return `type` unchanged. Used at
+    /// data-type sites (e.g. explicit generic type arguments) to distinguish the interface itself
+    /// from its existential box. See #12430.
+    Type* maybeFormExistentialType(Type* type);
+
     SubtypeWitness* isTypeDifferentiable(Type* type);
 
     bool doesTypeHaveTag(Type* type, TypeTag tag);
