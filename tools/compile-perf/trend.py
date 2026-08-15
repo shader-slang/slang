@@ -32,6 +32,22 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
 from lib import analyze, manifest
+# The exit codes live in slack_status because it is the consumer that must
+# stay stdlib-only, and importing them from there is what keeps the producer
+# and the classifier from drifting apart.
+from slack_status import EXIT_CANNOT_EVALUATE, EXIT_REGRESSION
+
+
+def abort(msg):
+    """Report `msg` and exit with EXIT_CANNOT_EVALUATE.
+
+    Use this for every "cannot judge this run" exit, never `raise
+    SystemExit(msg)`: the string form prints the same text but exits 1, which
+    is the REGRESSION code, and the Slack step then announces a >=10%
+    regression for a run that was never measured.
+    """
+    print(msg, file=sys.stderr)
+    raise SystemExit(EXIT_CANNOT_EVALUATE)
 
 
 def timers_for(workload):
@@ -121,10 +137,10 @@ def check_threshold_order(rel, warn_rel):
     5-10% move fails the nightly, which is the alert fatigue the two-tier gate
     was added to remove."""
     if warn_rel >= rel:
-        raise SystemExit(f"--warn-rel ({warn_rel}) must be < --rel ({rel}): "
-                         f"the warning band sits below the error band, and a "
-                         f"pair that is equal or inverted silently promotes "
-                         f"every warning-level change to an error")
+        abort(f"--warn-rel ({warn_rel}) must be < --rel ({rel}): "
+              f"the warning band sits below the error band, and a "
+              f"pair that is equal or inverted silently promotes "
+              f"every warning-level change to an error")
 
 
 def main():
@@ -181,7 +197,7 @@ def main():
 
     tpath = os.path.join(args.results, "tracking", "tracking.json")
     if not os.path.exists(tpath):
-        raise SystemExit(f"no tracking series at {tpath}; run track.py rebuild first")
+        abort(f"no tracking series at {tpath}; run track.py rebuild first")
     series = analyze.read_json(tpath)
     pts = series.get("points", [])
     if len(pts) < 2:
@@ -192,8 +208,8 @@ def main():
     if args.label:
         cur_idx = next((i for i, p in enumerate(pts) if p.get("label") == args.label), None)
         if cur_idx is None:
-            raise SystemExit(f"--label {args.label}: no such point in the tracking series "
-                             f"(was track.py register run for it?)")
+            abort(f"--label {args.label}: no such point in the tracking series "
+                  f"(was track.py register run for it?)")
     else:
         cur_idx = len(pts) - 1
     current = pts[cur_idx]
@@ -280,11 +296,12 @@ def main():
     # needs: the Slack step distinguishes a warnings-only night from a clean
     # one, which the exit code alone cannot do since warnings deliberately do
     # not fail the job. A regression is already carried by the exit code
-    # (steps.trend.outcome == 'failure'), so an `errors` key would be a second
+    # (EXIT_REGRESSION), so an `errors` key would be a second
     # spelling of the same fact — one that no reader would notice going stale.
     #
     # This write must stay AHEAD of every path that leaves main() below — the
-    # clean-night `return` and the regression `SystemExit(1)`. Both are exits
+    # clean-night `return` and the regression `SystemExit(EXIT_REGRESSION)`.
+    # Both are exits
     # the workflow still reads the output on, and an unwritten key falls back
     # to the step's `|| '0'`, which reports a warnings-only night as clean:
     # the one state this key exists to distinguish. Classify, emit, then
@@ -338,7 +355,7 @@ def main():
 
     print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
     if regressions and not args.no_fail:
-        raise SystemExit(1)
+        raise SystemExit(EXIT_REGRESSION)
 
 
 # Import-time self-checks (the directory idiom): judged() and the per-unit
@@ -412,13 +429,27 @@ assert classify_metric(0.5, -50.0, _REL, _WARN, _ABS) is None, \
 # the one-character regression this block exists to catch.
 check_threshold_order(_REL, _WARN)
 for _bad in ((_REL, _REL), (_WARN, _REL)):
+    # stderr is captured: abort() reports before it raises, and letting the
+    # fixture through would put its message on every run that merely imports
+    # this module. The capture is also the assertion — a silent abort would
+    # leave the operator with a bare exit code and no reason.
+    _buf = __import__("io").StringIO()
     try:
-        check_threshold_order(*_bad)
-    except SystemExit:
-        pass
+        with __import__("contextlib").redirect_stderr(_buf):
+            check_threshold_order(*_bad)
+    except SystemExit as _e:
+        assert _e.code == EXIT_CANNOT_EVALUATE, \
+            (f"check_threshold_order{_bad} must abort with "
+             f"EXIT_CANNOT_EVALUATE, not the regression code: a bad threshold "
+             f"pair is an operator error, and Slack reports the regression "
+             f"code as a >=10% regression")
+        assert "--warn-rel" in _buf.getvalue(), \
+            "an aborted run must say why, not just exit non-zero"
     else:
         raise AssertionError(f"check_threshold_order{_bad} must be rejected")
-del _REL, _WARN, _ABS, _bad
+# `_e` is not in the del list: `except ... as _e` unbinds it at the end of the
+# except block, so naming it here is a NameError, not tidiness.
+del _REL, _WARN, _ABS, _bad, _buf
 
 
 def _warnings_output_selfcheck():
@@ -440,7 +471,8 @@ def _warnings_output_selfcheck():
     The classifier checks above are pure and cannot see this. The write is the
     sole signal separating a warnings-only night from a clean one — warnings
     deliberately do not fail the job — so if a future edit moved it below the
-    clean-night `return` or the regression `SystemExit(1)`, that fallback
+    clean-night `return` or the regression `SystemExit(EXIT_REGRESSION)`,
+    that fallback
     would report a warnings-only night as a green "No regressions detected".
     Nothing else would notice.
 
@@ -475,7 +507,7 @@ def _warnings_output_selfcheck():
         # warning band only: reported, does not fail the job
         ({"minimal|compileInner": BASE * 1.07, "parse|compileInner": BASE},
          0, "warnings=1", "⚠️"),
-        # regression only: the write precedes SystemExit(1)
+        # regression only: the write precedes SystemExit(EXIT_REGRESSION)
         ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE},
          1, "warnings=0", "🔴"),
         # both tiers at once: a regression outranks a warning in the header,

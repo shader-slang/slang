@@ -437,15 +437,26 @@ jobs:
         # succeeded" the way it did when this step lived in the nightly job.
         # Without the gate, a night that fails before the sweep reaches
         # `trend.py --label ""`, which aborts on the empty value; that makes
-        # steps.trend.outcome 'failure', and classify() tests failure BEFORE
-        # job status, so Slack would announce a regression for a night that
-        # never measured anything.
+        # steps.trend.outcome 'failure'.
+        #
+        # The gate covers a MISSING label, not an unusable one. On 2026-08-15
+        # the sweep minted a label and then died before registering a point, so
+        # this step ran, aborted with "no such point in the tracking series",
+        # and Slack announced a >=10% regression. exit_code below is what
+        # closes that gap: outcome collapses every failure to 'failure', while
+        # the code still distinguishes a regression from an abort.
         if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
-          set -euo pipefail
+          # No `set -e`: the exit code has to be published BEFORE it propagates,
+          # and `exit "$code"` at the end is what keeps the job red either way.
+          set -uo pipefail
           cd "$GITHUB_WORKSPACE/tools/compile-perf"
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
+          code=0
+          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" || code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
 
       - name: Notify Slack
         if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
@@ -460,6 +471,11 @@ jobs:
           # so the failed-sweep case still reports as a job failure.
           TREND_OUTCOME: ${{ steps.trend.outcome }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
+          # Empty when the trend step was skipped, or when it died before
+          # publishing a code. classify() reads an absent value as "cannot
+          # rule out a regression" and keeps the red line, so the fallback
+          # errs towards over-reporting rather than towards silence.
+          TREND_EXIT: ${{ steps.trend.outputs.exit_code || '' }}
           # The MEASUREMENT job's result, not this job's: a regression is
           # reported by TREND_OUTCOME, while JOB_STATUS answers "did the
           # sweep itself fail", which now happens in a different job.
