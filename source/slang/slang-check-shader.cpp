@@ -160,30 +160,48 @@ static SemanticDecl* lookUpSemanticDecl(
 
 // A requirement that adds nothing beyond `stage` (e.g. a bare `[require(fragment)]`) is already
 // implied by the profile; propagating it would only make the "profile implicitly upgraded"
-// diagnostic list a redundant stage atom.
-static bool isStageOnlyRequirement(const CapabilitySetVal* capSet, Stage stage)
+// diagnostic list a redundant stage atom. `stageProjectedCaps` must already be the accessor
+// requirement projected onto a single stage (see `collectSemanticAccessorRequirement`).
+//
+// The test is capability-equivalence to the bare stage, i.e. implication in *both* directions,
+// not just `{stage} implies requirement`. One-way `implies` permits the left operand to hold
+// excess target/stage sets, so `{fragment}` would "imply" a target-restricting requirement like
+// `{fragment} & metal` — and we would then wrongly drop the `metal` restriction instead of
+// propagating it. Requiring the projection to also imply `{stage}` keeps only genuinely
+// stage-only requirements out of `outCaps`.
+static bool isStageOnlyRequirement(const CapabilitySet& stageProjectedCaps, Stage stage)
 {
-    if (!capSet)
+    if (stageProjectedCaps.isEmpty() || stageProjectedCaps.isInvalid())
         return true;
     CapabilityAtom stageAtom = getAtomFromStage(stage);
     if (stageAtom == CapabilityAtom::Invalid)
         return false;
-    return CapabilitySet((CapabilityName)stageAtom).implies(CapabilitySet{capSet});
+    CapabilitySet stageCaps((CapabilityName)stageAtom);
+    return stageCaps.implies(stageProjectedCaps) && stageProjectedCaps.implies(stageCaps);
 }
 
 // General capability inference does not traverse from a semantic to the accessor it resolves to,
 // so a requirement like `fragmentshaderbarycentric` on the `SV_Barycentrics` getter would be lost.
-// Join the matched accessor's whole `[require]` set into `*outCaps`, but only when it adds
-// something beyond the entry point's stage (see `isStageOnlyRequirement`).
+// A semantic accessor's `[require]` set can be a multi-stage disjunction — the `SV_Position` getter
+// carries `[require(fragment)] [require(geometry)]`, for example. We must not join that whole OR
+// set, or a fragment entry point would pick up the `geometry` atom it never uses. Project the
+// requirement onto the entry point's stage first (`join` with the stage singleton drops the
+// non-matching branches), then join that projection into `*outCaps` — but only when it adds
+// something beyond the stage itself (see `isStageOnlyRequirement`).
 static void collectSemanticAccessorRequirement(Decl* member, Stage stage, CapabilitySet* outCaps)
 {
     SLANG_ASSERT(outCaps);
     auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
     if (!requireAttr || !requireAttr->capabilitySet)
         return;
-    if (isStageOnlyRequirement(requireAttr->capabilitySet, stage))
+    CapabilityAtom stageAtom = getAtomFromStage(stage);
+    if (stageAtom == CapabilityAtom::Invalid)
         return;
-    outCaps->nonDestructiveJoin(requireAttr->capabilitySet);
+    CapabilitySet stageProjectedCaps{requireAttr->capabilitySet};
+    stageProjectedCaps.join(CapabilitySet((CapabilityName)stageAtom));
+    if (isStageOnlyRequirement(stageProjectedCaps, stage))
+        return;
+    outCaps->nonDestructiveJoin(stageProjectedCaps);
 }
 
 // Validate that type being used for a system value semantic is compatible with the semantic.
@@ -424,10 +442,11 @@ static void validateNoPerPrimitiveSemanticsInType(
 
 
 // Validate `decl`'s SV_ semantics against the SemanticDecl definitions in the core module,
-// recursing through struct fields. When `outInferredCaps` is non-null, also fold each matched
-// accessor's capability requirement into it (non-destructive join), so a caller can enforce a
-// requirement the semantic carries but the general capability inference misses — e.g.
-// `fragmentshaderbarycentric` for `SV_Barycentrics`.
+// recursing through struct fields. Also folds each matched accessor's capability requirement into
+// `outInferredCaps` (non-destructive join), so the entry point enforces a requirement the semantic
+// carries but the general capability inference misses — e.g. `fragmentshaderbarycentric` for
+// `SV_Barycentrics`. `outInferredCaps` is the entry point's accumulating requirement set and is
+// always non-null.
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
