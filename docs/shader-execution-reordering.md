@@ -308,7 +308,7 @@ static void HitObject.Invoke<payload_t>(
     HitObject            HitOrMiss,
     inout payload_t      Payload);
 
-// DXR 1.3 overload (without AccelerationStructure)
+// Native SER overload (without AccelerationStructure): DXR 1.3, Vulkan (NV/EXT), GLSL, CUDA, and SPIR-V; not NVAPI
 static void HitObject.Invoke<payload_t>(
     HitObject            HitOrMiss,
     inout payload_t      Payload);

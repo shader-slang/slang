@@ -5702,6 +5702,22 @@ static __forceinline__ __device__ void optixInvoke(
     // Call OptiX invoke with no payload for empty payload case
     optixInvoke();
 }
+
+// Overloads for the native-DXR 2-argument HitObject::Invoke(hitObject, payload), which omits the
+// AccelerationStructure. The underlying optixInvoke() intrinsic reorders on implicit thread state
+// and reads neither the acceleration-structure nor the hit-object handle, so these forward to the
+// 3-argument forms above with a null traversable handle.
+template<typename T>
+static __forceinline__ __device__ void optixInvoke(OptixTraversableHandle* HitOrMiss, T* Payload)
+{
+    optixInvoke((OptixTraversableHandle)0, HitOrMiss, Payload);
+}
+
+// Empty-payload form (when the payload is eliminated by type legalization).
+static __forceinline__ __device__ void optixInvoke(OptixTraversableHandle* HitOrMiss)
+{
+    optixInvoke((OptixTraversableHandle)0, HitOrMiss);
+}
 #endif
 
 #if (OPTIX_VERSION >= 80100)
