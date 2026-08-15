@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#size-and-offset
-//META: doc_section_digest=43c0f4ec58392bc558dea4e760d5be974187198677d818ffcac504b279a89de3
+//META: doc_section_digest=4c5526c573a01002c5664c82dafecd90b68ec6487726865d6f3eb388eabf2bf3
 //META: purpose=An offset attribute stores kind and offset only, omitting the register-space operand when the space is zero.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass

@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
 watched_paths_digest: 3b23aa8745718c3c9b2740ec584b30f97dee58483ad3f8efe781def69aa1b5d4
 source_doc: docs/generated/design/syntax-reference/tokens.md
-source_doc_digest: 23025b6e1cd31a9e2ae70534f7d2c001730b7a2c1d55eb63ed0987c1ccc562c3
+source_doc_digest: 9d5ada50ee544f1140e8ec2680b782e744150aa0799083a207772d40391d0b73
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -32,6 +32,73 @@ only possible under the documented tokenization — e.g. a compound
 assignment that could not parse if `<<=` lexed as `<<` then `=`, or a
 qualified call that could not resolve if `::` lexed as two `Colon`
 tokens.
+
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md), grouped by
+the document's own headings.
+
+**`#token-kind-taxonomy`**
+
+1. Tokens come in five groups: end markers, content tokens, trivia, preprocessor markers, and punctuation / operators.
+2. Every punctuation kind is both a `TokenType` enumerator and a diagnostic spelling, because `PUNCTUATION(id, text)` expands to `TOKEN(id, "'<text>'")`.
+
+**`#end-markers-and-special`**
+
+3. `Unknown` should not appear in valid input.
+4. `EndOfFile` is returned when the lexer reaches end of input.
+5. A character matching no dispatch arm and not a non-ASCII code point yields `Invalid`; the diagnostic chosen depends on the character's value, and is suppressed entirely under `kLexerFlag_SuppressDiagnostics` while the `Invalid` token is produced either way.
+
+**`#content-tokens`**
+
+6. `Identifier` covers every keyword; classification is deferred to the parser via syntax-decl lookup.
+7. `IntegerLiteral` accepts decimal, `0x`/`0X` hex, `0b`/`0B` binary, and a leading-zero octal run.
+8. `FloatingPointLiteral` accepts `1.5`, `1.`, `.5`, `1e10` / `0e-3`, `0x1.8p3`, and the legacy `1#INF` / `0#INF` form.
+9. A dot followed by `x` or `r` does not start a fraction: `1.xxx` lexes as `IntegerLiteral`, `Dot`, `Identifier`, because that spelling is reserved for swizzling a scalar literal.
+10. `StringLiteral` raw text includes the opening and closing quotes; escapes are decoded and validated later.
+11. `CharLiteral`'s one-character rule is enforced at decode time, not by the lexer, which only finds the closing quote.
+12. Neither numeric rule validates its suffix: any run of ASCII letters, digits and underscores after the numeric body is folded into the token's raw text, so there is no fixed suffix set at lex time.
+13. Integer digits that do not fit in 64 bits are `E10012`, `integerLiteralTooLargeForAnyType`.
+14. The accepted integer suffixes are `u`/`U`, `l`/`L`, `ll`/`LL` and `z`/`Z` in any order, with the two letters of `ll` matching in case; anything else is *invalid suffix '...' on integer literal*.
+15. The accepted float suffixes are empty or `f`/`F` for `float`, `h`/`H`/`hf`/`HF`/`fh`/`FH` for `half`, and `l`/`L`/`lf`/`LF`/`fl`/`FL` for `double`.
+16. A one-letter float suffix is case-insensitive; a two-letter one must have both letters in the same case, so `hf` and `HF` are accepted while `Hf` is not.
+
+**`#trivia-whitespace-and-comments`**
+
+17. The lexer emits whitespace, newlines, line comments and block comments as their own tokens so consumers can choose whether to skip them.
+18. Nested block comments are not supported.
+
+**`#preprocessor-markers`**
+
+19. `Pound`, `PoundPound` and `CompletionRequest` (`#?`, emitted at the cursor position) are distinct kinds.
+
+**`#punctuation-and-structural-symbols`**
+
+20. `DotDot` and `At` are lexed as distinct kinds but have no parser consumer at this commit.
+21. `DoubleRightArrow` (`=>`) has lambda syntax as its only parser consumer.
+22. `Dollar` prefixes a Slang value operand inside a `spirv_asm` block and introduces the compile-time `$for`; `DollarDollar` prefixes a *type* operand.
+23. `Scope` (`::`) is the namespace / qualified-name separator.
+
+**`#operators`**
+
+24. The lexer takes the longest spelling that matches, implemented as nested lookahead rather than a table, with the shorter kind returned only from a `default:` arm.
+25. `>>=` is therefore a single token, `>=` comes from an `=` directly after the first `>`, and a bare `>` gives `OpGreater`.
+26. The choice is made with no parse context; `OpLess` is the one case the parser has to revisit, to disambiguate it from generic application.
+
+**`#token-data-layout` / `#token-flags`**
+
+27. `charsNameUnion` is a tagged union: with the `Name` flag set the text is interned as a `Name*`, otherwise the token holds a raw pointer plus length into the source buffer.
+28. `AtStartOfLine` marks the first token on a *logical* line and is preserved across intervening whitespace and comments, so an escaped newline — which emits no `NewLine` token — does not start a new one.
+29. A preprocessor directive body may therefore be continued onto the next physical line: `#define BUMP(x) \` followed by `((x) + 1)` defines a macro whose body is `((x) + 1)`.
+30. A `Pound` token starts a directive only when it carries `AtStartOfLine`.
+31. `AfterWhitespace` records that a token was preceded by whitespace, and the preprocessor reads it both to preserve spacing when stringizing and to tell a function-like macro definition (`NAME(` with no gap) from an object-like one.
+32. `ScrubbingNeeded` records that a line continuation was folded, so `Lexer::lexToken` can strip it from the stored content.
+
+**`#special-case-lexing-rules`**
+
+33. A `\` immediately before a newline is consumed and folded out, but the resulting token's source location still refers to the original physical line.
+34. Continuation folding sits below comment recognition, so a `//` comment whose line ends in `\` swallows the next physical line as well.
+35. The lexer has no include-header mode: `<...>` after `#include` is emitted as ordinary `OpLess`, path, and `OpGreater` tokens, and the path is reassembled by the preprocessor.
 
 ## Functional coverage
 

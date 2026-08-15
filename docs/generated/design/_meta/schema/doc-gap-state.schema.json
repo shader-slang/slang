@@ -70,8 +70,8 @@
         },
         "finding_id": {
           "type": "string",
-          "description": "Required when status is escalated-to-finding. Always the bare id -- the `<id>` of `docs/generated/tests/_meta/findings/<id>.yaml` -- never a path. Both writers canonicalize to this form and both verify the file exists before recording it.",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          "description": "Required when status is escalated-to-finding. Always the bare id -- the `<id>` of `docs/generated/tests/_meta/findings/<id>.yaml` -- never a path. Both writers canonicalize to this form and both verify the file exists before recording it. The pattern deliberately matches `id` in finding.schema.json, which is where the grammar is fixed; a value that cannot be a finding id should not be storable as one.",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
         "rationale": {
           "type": "string",
