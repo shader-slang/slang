@@ -8,7 +8,6 @@ using namespace linalg;
 
 typealias TileSum = CoopMat<half, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
-//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<half> outputBuffer;
 
 [numthreads(32, 1, 1)]
@@ -23,6 +22,8 @@ void computeMain()
     //CHECK: OpC{{(onstantComposite|ompositeConstruct)}} %[[COOPTY]] %{{[0-9A-Za-z_]+$}}
     //CHECK-NOT: OpConstantComposite %[[COOPTY]]{{$}}
 
+    // Store the elements so the zero-init stays live (otherwise it is dead-code
+    // eliminated and the composite the CHECKs look for is never emitted).
     sums[0].Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, 16);
     sums[1].Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 256, 16);
 }
