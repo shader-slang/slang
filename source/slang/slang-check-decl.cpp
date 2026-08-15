@@ -6789,6 +6789,21 @@ static void populateParams(
             paramDecl->type.type = inType->getValueType();
             addModifier(paramDecl, astBuilder->create<BorrowModifier>());
         }
+        else if (auto refReadOnlyType = as<RefReadOnlyParamType>(paramType))
+        {
+            paramDecl->type.type = refReadOnlyType->getValueType();
+            addModifier(paramDecl, astBuilder->create<RefReadOnlyModifier>());
+        }
+        else if (auto refWriteOnlyType = as<RefWriteOnlyParamType>(paramType))
+        {
+            paramDecl->type.type = refWriteOnlyType->getValueType();
+            addModifier(paramDecl, astBuilder->create<RefWriteOnlyModifier>());
+        }
+        else if (auto consumeType = as<ConsumeParamType>(paramType))
+        {
+            paramDecl->type.type = consumeType->getValueType();
+            addModifier(paramDecl, astBuilder->create<ConsumeModifier>());
+        }
         else
         {
             paramDecl->type.type = paramType;
@@ -6802,7 +6817,9 @@ static void populateParams(
         auto synArg = astBuilder->create<VarExpr>();
         synArg->declRef = makeDeclRef(paramDecl);
         synArg->type.type = paramDecl->type.type;
-        synArg->type.isLeftValue = as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType);
+        synArg->type.isLeftValue = as<OutParamTypeBase>(paramType) || as<RefParamType>(paramType) ||
+                                   as<RefReadOnlyParamType>(paramType) ||
+                                   as<RefWriteOnlyParamType>(paramType);
         synArg->loc = synthesizedLoc;
         synArgs.add(synArg);
     }
@@ -7285,13 +7302,15 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
             }
             else if (
                 as<InOutModifier>(modifier) || as<OutModifier>(modifier) ||
-                as<BorrowModifier>(modifier) || as<RefModifier>(modifier))
+                as<BorrowModifier>(modifier) || as<RefModifier>(modifier) ||
+                as<RefReadOnlyModifier>(modifier) || as<RefWriteOnlyModifier>(modifier) ||
+                as<ConsumeModifier>(modifier))
             {
                 auto clonedModifier =
                     (Modifier*)m_astBuilder->createByNodeType(modifier->astNodeType);
                 clonedModifier->keywordName = modifier->keywordName;
                 addModifier(synParamDecl, clonedModifier);
-                if (as<BorrowModifier>(modifier))
+                if (as<BorrowModifier>(modifier) || as<ConsumeModifier>(modifier))
                     paramType.isLeftValue = false;
             }
         }
@@ -13297,6 +13316,18 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
         if (fstParam.getDecl()->hasModifier<BorrowModifier>() !=
             sndParam.getDecl()->hasModifier<BorrowModifier>())
             return false;
+
+        if (fstParam.getDecl()->hasModifier<RefReadOnlyModifier>() !=
+            sndParam.getDecl()->hasModifier<RefReadOnlyModifier>())
+            return false;
+
+        if (fstParam.getDecl()->hasModifier<RefWriteOnlyModifier>() !=
+            sndParam.getDecl()->hasModifier<RefWriteOnlyModifier>())
+            return false;
+
+        if (fstParam.getDecl()->hasModifier<ConsumeModifier>() !=
+            sndParam.getDecl()->hasModifier<ConsumeModifier>())
+            return false;
     }
 
     // Note(tfoley): return type doesn't enter into it, because we can't take
@@ -14482,6 +14513,15 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         case ParamPassingMode::BorrowIn:
             addModifier(param, m_astBuilder->create<BorrowModifier>());
             break;
+        case ParamPassingMode::RefReadOnly:
+            addModifier(param, m_astBuilder->create<RefReadOnlyModifier>());
+            break;
+        case ParamPassingMode::RefWriteOnly:
+            addModifier(param, m_astBuilder->create<RefWriteOnlyModifier>());
+            break;
+        case ParamPassingMode::Consume:
+            addModifier(param, m_astBuilder->create<ConsumeModifier>());
+            break;
         default:
             break;
         }
@@ -14992,6 +15032,21 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     getSink()->diagnose(Diagnostics::CannotUseBorrowInOnDifferentiableParameter{
                         .modifier = modifier});
                 }
+            }
+            // The internal by-reference / consume modes have no differentiation support
+            // regardless of `no_diff` (a `no_diff __ref_readonly` parameter would still
+            // reach the autodiff transforms as an unhandled direction), so reject them on
+            // any parameter of a differentiable function, before any autodiff IR
+            // transform runs.
+            Modifier* unsupportedMode = paramDecl->findModifier<RefReadOnlyModifier>();
+            if (!unsupportedMode)
+                unsupportedMode = paramDecl->findModifier<RefWriteOnlyModifier>();
+            if (!unsupportedMode)
+                unsupportedMode = paramDecl->findModifier<ConsumeModifier>();
+            if (unsupportedMode)
+            {
+                getSink()->diagnose(Diagnostics::CannotUseParamModeOnDifferentiableParameter{
+                    .modifier = unsupportedMode});
             }
         }
 

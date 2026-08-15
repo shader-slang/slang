@@ -147,6 +147,69 @@ static bool instReferencesStringType(IRInst* inst)
     return false;
 }
 
+// True if `type` is one of the internal `__ref_readonly` / `__ref_writeonly` /
+// `__consume` parameter-mode wrappers. These modes are representable in the IR
+// (so they can be uttered in project-internal code) but do not yet have
+// code-generation support in any backend, so a function that both uses one and
+// survives inlining/DCE to reach emit must be diagnosed rather than emitted
+// (which would otherwise drop the by-reference / ownership contract). See
+// shader-slang/slang#12547.
+static bool isCodegenUnsupportedParamModeType(IRInst* type)
+{
+    return type && (type->getOp() == kIROp_RefReadOnlyParamType ||
+                    type->getOp() == kIROp_RefWriteOnlyParamType ||
+                    type->getOp() == kIROp_ConsumeParamType);
+}
+
+static bool checkFuncForUnsupportedParamModes(IRFunc* func, DiagnosticSink* sink)
+{
+    auto funcType = as<IRFuncType>(func->getDataType());
+    if (!funcType)
+        return false;
+    for (UInt i = 0; i < funcType->getParamCount(); i++)
+    {
+        // Look through any attributed/rate wrapper so a qualified parameter type
+        // cannot hide an unsupported param-mode wrapper.
+        if (isCodegenUnsupportedParamModeType(unwrapAttributedType(funcType->getParamType(i))))
+        {
+            auto loc = func->sourceLoc.isValid() ? func->sourceLoc : findFirstUseLoc(func);
+            sink->diagnose(Diagnostics::ParamPassingModeNotYetSupportedForCodegen{.location = loc});
+            return true;
+        }
+    }
+    return false;
+}
+
+void checkForUnsupportedParamModes(IRModule* module, DiagnosticSink* sink)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(globalInst))
+            checkFuncForUnsupportedParamModes(func, sink);
+        else if (auto generic = as<IRGeneric>(globalInst))
+        {
+            if (auto innerFunc = as<IRFunc>(findGenericReturnVal(generic)))
+                checkFuncForUnsupportedParamModes(innerFunc, sink);
+        }
+    }
+}
+
+void checkForUnsupportedEntryPointParamModes(IRModule* module, DiagnosticSink* sink)
+{
+    // Entry-point uniform parameters are collected/moved to global scope early in
+    // `linkAndOptimizeIR`, which erases their param-mode wrapper before the general
+    // post-inlining check runs. Entry points are never inlined away or eliminated,
+    // so it is safe to reject an unsupported-mode entry-point parameter here, before
+    // that rewriting, without the false positives a whole-module early check would
+    // hit on inlined-away ordinary functions.
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (func && func->findDecoration<IREntryPointDecoration>())
+            checkFuncForUnsupportedParamModes(func, sink);
+    }
+}
+
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
     // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an

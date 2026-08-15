@@ -368,6 +368,39 @@ local insts = {
 						},
 					},
 					{
+						RefReadOnlyParam = {
+							struct_name = "RefReadOnlyParamType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
+						RefWriteOnlyParam = {
+							struct_name = "RefWriteOnlyParamType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
+						ConsumeParam = {
+							struct_name = "ConsumeParamType",
+							operands = {
+								{ "valueType", "IRType" },
+								{ "accessQualifierOperand", "IRIntLit", optional = true },
+								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
+							},
+						},
+					},
+					{
 						PseudoPtr = {
 							-- A `PsuedoPtr<T>` logically represents a pointer to a value of type
 							-- `T` on a platform that cannot support pointers. The expectation

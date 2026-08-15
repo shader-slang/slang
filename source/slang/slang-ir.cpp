@@ -3020,6 +3020,42 @@ IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressS
         getDefaultBufferLayoutType());
 }
 
+IRRefReadOnlyParamType* IRBuilder::getRefReadOnlyParamType(
+    IRType* valueType,
+    AddressSpace addrSpace)
+{
+    return (IRRefReadOnlyParamType*)getPtrType(
+        kIROp_RefReadOnlyParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
+}
+
+IRRefWriteOnlyParamType* IRBuilder::getRefWriteOnlyParamType(
+    IRType* valueType,
+    AddressSpace addrSpace)
+{
+    // There is no `AccessQualifier::WriteOnly`; the write-only distinction is carried
+    // by the opcode itself, so we pass `ReadWrite` here.
+    return (IRRefWriteOnlyParamType*)getPtrType(
+        kIROp_RefWriteOnlyParamType,
+        valueType,
+        AccessQualifier::ReadWrite,
+        addrSpace,
+        getDefaultBufferLayoutType());
+}
+
+IRConsumeParamType* IRBuilder::getConsumeParamType(IRType* valueType, AddressSpace addrSpace)
+{
+    return (IRConsumeParamType*)getPtrType(
+        kIROp_ConsumeParamType,
+        valueType,
+        AccessQualifier::ReadWrite,
+        addrSpace,
+        getDefaultBufferLayoutType());
+}
+
 
 IRGLSLOutputParameterGroupType* IRBuilder::getGLSLOutputParameterGroupType(IRType* elementType)
 {

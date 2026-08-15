@@ -1801,6 +1801,21 @@ __intrinsic_type($(kIROp_BorrowInParamType))
 struct BorrowInParam<T>
 {};
 
+__magic_type(RefReadOnlyParamType)
+__intrinsic_type($(kIROp_RefReadOnlyParamType))
+struct RefReadOnlyParam<T>
+{};
+
+__magic_type(RefWriteOnlyParamType)
+__intrinsic_type($(kIROp_RefWriteOnlyParamType))
+struct RefWriteOnlyParam<T>
+{};
+
+__magic_type(ConsumeParamType)
+__intrinsic_type($(kIROp_ConsumeParamType))
+struct ConsumeParam<T>
+{};
+
 // __Addr<T> is AddressSpace::Generic since Slang will specalize & validate the address-space
 // internally to a concrete address-space.
 typealias __Addr<T> = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Generic)>;

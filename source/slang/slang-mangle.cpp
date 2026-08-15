@@ -847,6 +847,15 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 case ParamPassingMode::BorrowInOut:
                     emitRaw(context, "io_");
                     break;
+                case ParamPassingMode::RefReadOnly:
+                    emitRaw(context, "rr_");
+                    break;
+                case ParamPassingMode::RefWriteOnly:
+                    emitRaw(context, "rw_");
+                    break;
+                case ParamPassingMode::Consume:
+                    emitRaw(context, "cn_");
+                    break;
                 case ParamPassingMode::In:
                     emitRaw(context, "i_");
                     break;

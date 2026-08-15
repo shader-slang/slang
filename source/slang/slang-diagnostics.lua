@@ -4464,6 +4464,13 @@ err(
 )
 
 err(
+    "cannot-use-param-mode-on-differentiable-parameter",
+    38053,
+    "unsupported parameter-passing mode on differentiable parameter",
+    span { loc = "modifier:Modifier", message = "the '__ref_readonly', '__ref_writeonly', and '__consume' parameter modes cannot be used on a differentiable parameter." }
+)
+
+err(
     "cannot-use-constref-on-differentiable-member-method",
     38036,
     "'[constref]' on differentiable member method",
@@ -5713,6 +5720,13 @@ warning(
     56005,
     "'precise' qualifier is not supported on target '~target' and will be ignored; Slang does not currently preserve it in generated code, so the value may be optimized with fused/contracted arithmetic",
     span { loc = "location" }
+)
+
+err(
+    "param-passing-mode-not-yet-supported-for-codegen",
+    56006,
+    "this parameter-passing mode is not yet supported for code generation",
+    span { loc = "location", message = "the '__ref_readonly', '__ref_writeonly', and '__consume' parameter modes are representable internally but do not yet have code-generation support; a function using one cannot be reached by an entry point in this release" }
 )
 
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
