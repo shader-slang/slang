@@ -6022,6 +6022,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto builder = getBuilder();
         auto resultType = lowerType(context, sizeOfLikeExpr->type);
 
+        // countof(EnumType) is the one `countof` we fold here rather than leaving to
+        // `maybeSpecializeCountOf`: the lowered `IREnumType` carries only its tag type, not its
+        // cases, so the case count is only known from the AST (see #12549). We fold through
+        // CountOfIntVal::tryFoldOrNull so this shares one source of truth with the
+        // compile-time constant-fold path.
+        if (as<CountOfExpr>(sizeOfLikeExpr) && isDeclRefTypeOf<EnumDecl>(sizeOfLikeExpr->sizedType))
+        {
+            auto folded = as<ConstantIntVal>(CountOfIntVal::tryFoldOrNull(
+                getASTBuilder(),
+                getASTBuilder()->getIntType(),
+                sizeOfLikeExpr->sizedType));
+            SLANG_ASSERT(folded);
+            return LoweredValInfo::simple(builder->getIntValue(resultType, folded->getValue()));
+        }
+
         if (!size)
         {
             auto sizedType = lowerType(context, sizeOfLikeExpr->sizedType);

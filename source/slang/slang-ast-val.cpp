@@ -2699,6 +2699,15 @@ Val* CountOfIntVal::tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Val* ne
     {
         return astBuilder->getIntVal(intType, valPack->getCount());
     }
+    else if (auto enumDeclRef = isDeclRefTypeOf<EnumDecl>(newVal))
+    {
+        // countof(EnumType) folds to the number of declared enum cases, independent of
+        // their tag values (see #12549). This is the same case count the reflection API
+        // reports for an enum (spReflectionType_GetFieldCount), so the two stay in sync.
+        return astBuilder->getIntVal(
+            intType,
+            enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>().getCount());
+    }
     return nullptr;
 }
 
