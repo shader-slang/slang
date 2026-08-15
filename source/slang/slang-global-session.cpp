@@ -100,11 +100,14 @@ void Session::init()
     coreLanguageScope = rootASTBuilder->create<Scope>();
     coreLanguageScope->nextSibling = baseLanguageScope;
 
+    // The HLSL scope holds syntax that is available only in the HLSL-flavored
+    // dialect. It sits above the shared core scope so HLSL parsing sees both.
     hlslLanguageScope = rootASTBuilder->create<Scope>();
     hlslLanguageScope->nextSibling = coreLanguageScope;
+    populateHLSLLanguageModule(m_builtinLinkage->getASTBuilder(), hlslLanguageScope);
 
     slangLanguageScope = rootASTBuilder->create<Scope>();
-    slangLanguageScope->nextSibling = hlslLanguageScope;
+    slangLanguageScope->nextSibling = coreLanguageScope;
 
     glslLanguageScope = rootASTBuilder->create<Scope>();
     glslLanguageScope->nextSibling = slangLanguageScope;

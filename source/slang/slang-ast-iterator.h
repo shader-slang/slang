@@ -541,9 +541,12 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
         visitExpr(varDecl->type.exp);
         visitExpr(varDecl->initExpr);
     }
-    else if (auto genericDecl = as<GenericDecl>(decl))
+    else if (auto parameterizedDecl = as<ParameterizedDecl>(decl))
     {
-        visitDecl(genericDecl->inner);
+        // A parameterized declaration holds its inner declaration through
+        // `inner` rather than as a direct member, so descend into it explicitly
+        // (the parameters are visited by the ContainerDecl branch below).
+        visitDecl(parameterizedDecl->inner);
     }
     else if (auto typeConstraint = as<TypeConstraintDecl>(decl))
     {

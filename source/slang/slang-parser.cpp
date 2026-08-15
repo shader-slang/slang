@@ -2081,6 +2081,105 @@ static NodeBase* parseGenericDecl(Parser* parser, void*)
     return decl;
 }
 
+// Parse one parameter of a template's `< ... >` list. A template parameter is
+// either a type parameter, spelled `typename Name` or `class Name`, or a value
+// parameter, spelled type-first as `Type Name` (e.g. `int N`); either kind may
+// carry a default after `=` (`typename T = int`, `int N = 4`).
+static Decl* parseTemplateParamDecl(Parser* parser)
+{
+    if (AdvanceIf(parser, "typename") || AdvanceIf(parser, "class"))
+    {
+        auto typeParam = parser->astBuilder->create<GenericTypeParamDecl>();
+        parser->FillPosition(typeParam);
+        typeParam->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+        if (AdvanceIf(parser, TokenType::OpAssign))
+            typeParam->initType = parser->ParseTypeExp();
+        return typeParam;
+    }
+
+    auto valueParam = parser->astBuilder->create<GenericValueParamDecl>();
+    parser->FillPosition(valueParam);
+    valueParam->type = parser->ParseTypeExp();
+    valueParam->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+    if (AdvanceIf(parser, TokenType::OpAssign))
+        valueParam->initExpr = parser->ParseInitExpr();
+    return valueParam;
+}
+
+// Parse the `< ... >` parameter list of a template into `decl`, adding each
+// parsed parameter as a direct member. The opening `<` must be the next token;
+// on return the closing `>` has been consumed.
+static void parseTemplateParamList(Parser* parser, TemplateDecl* decl)
+{
+    parser->ReadToken(TokenType::OpLess);
+    parser->genericDepth++;
+    for (;;)
+    {
+        const TokenType tokenType = parser->tokenReader.peekTokenType();
+        if (tokenType == TokenType::OpGreater || tokenType == TokenType::EndOfFile)
+        {
+            break;
+        }
+
+        auto currentCursor = parser->tokenReader.getCursor();
+
+        auto param = parseTemplateParamDecl(parser);
+        // Several `parseTemplateParamDecl` exits read the parameter name directly
+        // without reaching the other name-diagnosis hook sites, so a parameter
+        // named with a type keyword (e.g. `<typename struct>`) is warned about
+        // here.
+        if (param)
+            maybeDiagnoseKeywordUsedAsName(parser, param->nameAndLoc);
+        AddMember(decl, param);
+
+        // Make sure we make forward progress.
+        if (parser->tokenReader.getCursor() == currentCursor)
+            advanceToken(parser);
+
+        if (parser->LookAheadToken(TokenType::OpGreater))
+            break;
+
+        if (!AdvanceIf(parser, TokenType::Comma))
+            break;
+    }
+    parser->genericDepth--;
+    parser->ReadToken(TokenType::OpGreater);
+}
+
+// Parse an HLSL/C++-style `template< ... >` declaration. The leading `template`
+// keyword has already been consumed by the syntax-decl dispatch that invoked
+// this callback.
+static NodeBase* parseTemplateDecl(Parser* parser, void* /*userData*/)
+{
+    TemplateDecl* decl = parser->astBuilder->create<TemplateDecl>();
+    parser->FillPosition(decl);
+    parser->PushScope(decl);
+
+    parseTemplateParamList(parser, decl);
+    decl->inner = ParseSingleDecl(parser, decl);
+    if (!decl->inner)
+    {
+        // A `ParameterizedDecl` requires a non-null `inner` (see the invariant
+        // documented on that class). `ParseSingleDecl` yields null when the inner
+        // cannot be reduced to a single declaration — for example a
+        // multi-declarator group such as `template<...> int a, b;` — and has
+        // already diagnosed that failure, so when it happens we synthesize an
+        // empty inner declaration to restore the invariant and let parsing
+        // continue rather than emitting a further diagnostic.
+        decl->inner = parser->astBuilder->create<EmptyDecl>();
+        decl->inner->loc = decl->loc;
+    }
+    decl->inner->parentDecl = decl;
+
+    // A template hijacks the name of the declaration it wraps so that lookup can
+    // find it by that name.
+    decl->nameAndLoc = decl->inner->nameAndLoc;
+    decl->loc = decl->inner->loc;
+
+    parser->PopScope();
+    return decl;
+}
+
 static void parseParameterList(Parser* parser, ContainerDecl* decl)
 {
     parser->ReadToken(TokenType::LParent);
@@ -5684,22 +5783,22 @@ static void CompleteDecl(
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
     //
-    // We need to be careful, because if `decl` is a generic declaration,
-    // then we really want the modifiers to apply to the inner declaration.
+    // We need to be careful, because if `decl` is a parameterized declaration
+    // (a generic or a template), then we really want the modifiers to apply to
+    // the inner declaration.
     //
     Decl* declToModify = decl;
-    if (auto genericDecl = as<GenericDecl>(decl))
+    if (auto parameterizedDecl = as<ParameterizedDecl>(decl))
     {
-        // If `decl` is a generic decl, hookup modifierScope to be nested inside
-        // the generic decl's scope, so that generic parameters can be accessible
-        // from the modifiers.
+        // Hook up modifierScope to be nested inside the parameterized decl's
+        // scope, so that its parameters are accessible from the modifiers.
         if (modifierScope)
         {
-            modifierScope->containerDecl = genericDecl;
-            if (genericDecl->ownedScope)
-                modifierScope->parent = genericDecl->ownedScope->parent;
+            modifierScope->containerDecl = parameterizedDecl;
+            if (parameterizedDecl->ownedScope)
+                modifierScope->parent = parameterizedDecl->ownedScope->parent;
         }
-        declToModify = genericDecl->inner;
+        declToModify = parameterizedDecl->inner;
     }
 
     if (as<ModuleDeclarationDecl>(decl))
@@ -5736,8 +5835,8 @@ static void CompleteDecl(
         }
         else
         {
-            // For generic decls, we also need to check if the inner decl type is allowed to be
-            // nested here.
+            // For a parameterized decl, we also need to check if the inner decl
+            // type is allowed to be nested here.
             if (declToModify && declToModify != decl)
             {
                 if (!isDeclAllowed(
@@ -5762,7 +5861,11 @@ static void CompleteDecl(
             return;
         }
 
-        if (!as<GenericDecl>(containerDecl))
+        // A parameterized declaration links its inner declaration through the
+        // `inner` field rather than its member list, so when `containerDecl` is
+        // one, `decl` is that inner declaration and must not be added as a
+        // member.
+        if (!as<ParameterizedDecl>(containerDecl))
         {
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
@@ -10885,6 +10988,13 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };
 
+// Syntax that is available only in the HLSL-flavored dialect. These are
+// registered into the HLSL language scope rather than the shared base scope, so
+// they are recognized only while parsing HLSL-flavored input.
+static const SyntaxParseInfo g_hlslParseSyntaxEntries[] = {
+    _makeParseDecl("template", parseTemplateDecl),
+};
+
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()
 {
     return makeConstArrayView(g_parseSyntaxEntries, SLANG_COUNT_OF(g_parseSyntaxEntries));
@@ -10899,6 +11009,28 @@ ModuleDecl* populateBaseLanguageModule(ASTBuilder* astBuilder, Scope* scope)
 
     // Add syntax for declaration keywords
     for (const auto& info : getSyntaxParseInfos())
+    {
+        addBuiltinSyntaxImpl(
+            session,
+            scope,
+            info.keywordName,
+            info.callback,
+            info.classInfo.getInfo(),
+            info.classInfo);
+    }
+
+    return moduleDecl;
+}
+
+ModuleDecl* populateHLSLLanguageModule(ASTBuilder* astBuilder, Scope* scope)
+{
+    Session* session = astBuilder->getGlobalSession();
+
+    ModuleDecl* moduleDecl = astBuilder->create<ModuleDecl>();
+    scope->containerDecl = moduleDecl;
+
+    for (const auto& info :
+         makeConstArrayView(g_hlslParseSyntaxEntries, SLANG_COUNT_OF(g_hlslParseSyntaxEntries)))
     {
         addBuiltinSyntaxImpl(
             session,
