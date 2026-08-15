@@ -419,7 +419,14 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     .typeExp = typeExp.exp});
                 return false;
             }
-            auto constraintType = CheckProperType(constraintParam->sup);
+            // The supertype of a generic constraint (`T : IFoo`) names an interface *as an
+            // interface*, not as a data type, so it must not be coerced into an existential
+            // type (`dyn IFoo`) — doing so would make the default type argument fail its own
+            // conformance check. The constraint was already resolved (unwrapped) when the
+            // generic's header was checked, so use that type directly rather than re-coercing.
+            auto constraintType = constraintParam->sup.type
+                                      ? constraintParam->sup.type
+                                      : TranslateTypeNode(constraintParam->sup.exp);
             auto witness = tryGetSubtypeWitness(defaultType, constraintType);
             if (!witness)
             {
@@ -445,6 +452,13 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     {
         result = type;
     }
+
+    // In a data-type context, an interface (or interface conjunction) denotes the existential
+    // type `dyn IFoo`, not the interface itself. Contexts where an interface is named *as* an
+    // interface (a generic constraint's supertype, an inheritance clause) do not flow through
+    // here — they are translated via `TranslateTypeNode` without proper-type coercion — so this
+    // forms the existential only for data-type positions. See #12430.
+    result = maybeFormExistentialType(result);
 
     // Check for invalid types.
     // We don't allow pointers to managed types.
