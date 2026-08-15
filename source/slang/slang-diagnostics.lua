@@ -3181,6 +3181,13 @@ warning(
     span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
 )
 
+warning(
+    "constexpr-on-callable-ignored",
+    31228,
+    "constexpr on a function or other callable declaration is not a supported Slang feature and is ignored",
+    span { loc = "modifier:Modifier", message = "constexpr modifier is ignored here" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
