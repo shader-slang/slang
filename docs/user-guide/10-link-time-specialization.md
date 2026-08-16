@@ -238,6 +238,27 @@ from source if it is not up-to-date.
 > compared in that path. Callers who need that validation should keep the original sources reachable via the configured search paths.
 
 
+## Associated types of `extern struct` in varying parameters
+
+Using an `associatedtype` of an `extern struct` directly as an entry-point varying parameter
+(a parameter or return type that carries an HLSL semantic such as `SV_Position`, `POSITION`,
+`SV_Target`, etc.) is supported for GLSL, SPIRV, and HLSL targets.
+
+For example, the following pattern works correctly across all targets:
+
+```csharp
+interface IObject
+{
+    associatedtype VertexInput;
+    associatedtype VertexOutput;
+}
+
+export struct Object : IObject = MyObject;
+
+[shader("vertex")]
+Object.VertexOutput VSMain(Object.VertexInput input) { ... }
+```
+
 ## Additional Remarks
 
 Link-time specialization is Slang's answer to compile-time performance and modularity issues associated with preprocessor
