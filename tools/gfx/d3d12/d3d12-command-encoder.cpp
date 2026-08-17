@@ -31,7 +31,7 @@ int PipelineCommandEncoder::getBindPointIndex(PipelineType type)
     case PipelineType::RayTracing:
         return 2;
     default:
-        assert(!"unknown pipeline type.");
+        SLANG_ASSERT_FAILURE("unknown pipeline type.");
         return -1;
     }
 }
@@ -130,7 +130,7 @@ Result PipelineCommandEncoder::_bindRenderState(
             m_commandBuffer->bindDescriptorHeaps();
             break;
         default:
-            assert(!"shouldn't be here");
+            SLANG_ASSERT_FAILURE("shouldn't be here");
             return SLANG_FAIL;
         }
 
@@ -342,7 +342,7 @@ void ResourceCommandEncoderImpl::uploadTextureData(
             stagingBufferOffset,
             MemoryType::Upload,
             true);
-        assert(stagingBufferOffset == 0);
+        SLANG_ASSERT(stagingBufferOffset == 0);
         BufferResourceImpl* bufferImpl = static_cast<BufferResourceImpl*>(stagingBuffer);
         uint8_t* bufferData = nullptr;
         D3D12_RANGE mapRange = {0, 0};
@@ -576,7 +576,7 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
     ITextureResource::Offset3D srcOffset,
     ITextureResource::Extents extent)
 {
-    assert(srcSubresource.mipLevelCount <= 1);
+    SLANG_ASSERT(srcSubresource.mipLevelCount <= 1);
 
     auto srcTexture = static_cast<TextureResourceImpl*>(src);
     auto dstBuffer = static_cast<BufferResourceImpl*>(dst);
@@ -643,7 +643,7 @@ void ResourceCommandEncoderImpl::copyTextureToBuffer(
             footprint.Footprint.Depth = Math::Max(1, (textureSize.depth >> mipLevel)) - srcOffset.z;
         }
 
-        assert(dstRowStride % D3D12_TEXTURE_DATA_PITCH_ALIGNMENT == 0);
+        SLANG_ASSERT(dstRowStride % D3D12_TEXTURE_DATA_PITCH_ALIGNMENT == 0);
         footprint.Footprint.RowPitch = (UINT)dstRowStride;
 
         auto bufferSize =
@@ -953,7 +953,7 @@ Result RenderCommandEncoderImpl::bindPipelineWithRootObject(
 void RenderCommandEncoderImpl::setViewports(GfxCount count, const Viewport* viewports)
 {
     static const int kMaxViewports = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxViewports && count <= kMaxRTVCount);
+    SLANG_ASSERT(count <= kMaxViewports && count <= kMaxRTVCount);
     for (GfxIndex ii = 0; ii < count; ++ii)
     {
         auto& inViewport = viewports[ii];
@@ -972,7 +972,7 @@ void RenderCommandEncoderImpl::setViewports(GfxCount count, const Viewport* view
 void RenderCommandEncoderImpl::setScissorRects(GfxCount count, const ScissorRect* rects)
 {
     static const int kMaxScissorRects = D3D12_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
-    assert(count <= kMaxScissorRects && count <= kMaxRTVCount);
+    SLANG_ASSERT(count <= kMaxScissorRects && count <= kMaxRTVCount);
 
     for (GfxIndex ii = 0; ii < count; ++ii)
     {
@@ -1282,6 +1282,59 @@ Result ComputeCommandEncoderImpl::bindPipelineWithRootObject(
     IShaderObject* rootObject)
 {
     return bindPipelineWithRootObjectImpl(state, rootObject);
+}
+
+Result ComputeCommandEncoderImpl::bindRootObjectAsCompute(
+    IShaderProgram* program,
+    IShaderObject* rootObject)
+{
+    if (!program || !rootObject)
+        return SLANG_E_INVALID_ARG;
+
+    auto programImpl = static_cast<ShaderProgramImpl*>(program);
+    auto rootObjectImpl = static_cast<RootShaderObjectImpl*>(rootObject);
+    auto rootLayoutImpl = programImpl->m_rootObjectLayout.Ptr();
+    if (!rootLayoutImpl || !rootLayoutImpl->m_rootSignature)
+        return SLANG_FAIL;
+    if (rootObjectImpl->getLayout() != rootLayoutImpl)
+        return SLANG_E_INVALID_ARG;
+
+    ComputeSubmitter submitter(m_d3dCmdList);
+    submitter.setRootSignature(rootLayoutImpl->m_rootSignature);
+
+    BindingContext context = {};
+    context.encoder = this;
+    context.submitter = &submitter;
+    context.device = m_renderer;
+    context.transientHeap = m_transientHeap;
+    context.outOfMemoryHeap = (D3D12_DESCRIPTOR_HEAP_TYPE)(-1);
+
+    m_commandBuffer->bindDescriptorHeaps();
+    if (rootObjectImpl->bindAsRoot(&context, rootLayoutImpl) == SLANG_E_OUT_OF_MEMORY)
+    {
+        if (!m_transientHeap->canResize())
+            return SLANG_E_OUT_OF_MEMORY;
+
+        m_commandBuffer->invalidateDescriptorHeapBinding();
+        switch (context.outOfMemoryHeap)
+        {
+        case D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV:
+            SLANG_RETURN_ON_FAIL(m_transientHeap->allocateNewViewDescriptorHeap(m_renderer));
+            m_commandBuffer->bindDescriptorHeaps();
+            break;
+        case D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER:
+            SLANG_RETURN_ON_FAIL(m_transientHeap->allocateNewSamplerDescriptorHeap(m_renderer));
+            m_commandBuffer->bindDescriptorHeaps();
+            break;
+        default:
+            SLANG_ASSERT_FAILURE("unexpected descriptor heap type");
+            return SLANG_FAIL;
+        }
+
+        SLANG_RETURN_ON_FAIL(rootObjectImpl->bindAsRoot(&context, rootLayoutImpl));
+    }
+
+    return SLANG_OK;
 }
 
 Result ComputeCommandEncoderImpl::dispatchCompute(int x, int y, int z)

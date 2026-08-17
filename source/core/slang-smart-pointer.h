@@ -39,7 +39,15 @@ public:
 
     UInt decreaseReference() { return referenceCount.fetch_sub(1, std::memory_order_acq_rel) - 1; }
 
+    // Marked SLANG_NO_INLINE: GCC 13's IPA inlines the atomic fetch_sub through
+    // ~RefPtr() into callers and then misidentifies the result as a write to
+    // address zero (-Wstringop-overflow). Preventing inlining avoids the false
+    // positive without suppressing the warning globally.
+#if SLANG_GCC
+    SLANG_NO_INLINE UInt releaseReference()
+#else
     UInt releaseReference()
+#endif
     {
         UInt oldCount = referenceCount.fetch_sub(1, std::memory_order_acq_rel);
         SLANG_ASSERT(oldCount != 0);

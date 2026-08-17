@@ -23,6 +23,9 @@ function(slang_add_target dir type)
         NO_SOURCE
         # Don't generate split debug info for this target
         NO_SPLIT_DEBUG_INFO
+        # Don't apply ASAN instrumentation to this target (use when the target
+        # links external libraries that are not ASAN-instrumented)
+        SKIP_ASAN
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -293,9 +296,20 @@ function(slang_add_target dir type)
                 "$<$<CONFIG:${debug_configs}>:Embedded>"
     )
     if(MSVC)
+        # /DEBUG makes MSVC's linker flip the /OPT defaults from REF to NOREF and
+        # from ICF to NOICF, so a Release build that ships PDBs (the default when
+        # SLANG_ENABLE_RELEASE_DEBUG_INFO is ON) would silently lose dead-code
+        # elimination and identical-COMDAT folding. Re-assert /OPT:REF and /OPT:ICF
+        # to keep the optimized link. Scope this to Release only: Release's CMake
+        # default link flags already carry /INCREMENTAL:NO so there is no
+        # incremental/OPT conflict, and Debug/RelWithDebInfo link behavior is left
+        # unchanged.
         target_link_options(
             ${target}
-            PRIVATE "$<$<CONFIG:${debug_configs}>:/DEBUG>"
+            PRIVATE
+                "$<$<CONFIG:${debug_configs}>:/DEBUG>"
+                "$<$<CONFIG:Release>:/OPT:REF>"
+                "$<$<CONFIG:Release>:/OPT:ICF>"
         )
     else()
         target_compile_options(
@@ -307,12 +321,16 @@ function(slang_add_target dir type)
     #
     # Set common compile options and properties
     #
+    set(_asan_opt "")
+    if(ARG_SKIP_ASAN)
+        set(_asan_opt SKIP_ASAN)
+    endif()
     if(ARG_USE_EXTRA_WARNINGS)
-        set_default_compile_options(${target} USE_EXTRA_WARNINGS)
+        set_default_compile_options(${target} USE_EXTRA_WARNINGS ${_asan_opt})
     elseif(ARG_USE_FEWER_WARNINGS)
-        set_default_compile_options(${target} USE_FEWER_WARNINGS)
+        set_default_compile_options(${target} USE_FEWER_WARNINGS ${_asan_opt})
     else()
-        set_default_compile_options(${target})
+        set_default_compile_options(${target} ${_asan_opt})
     endif()
 
     # Set debug info options if not disabled

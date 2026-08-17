@@ -72,12 +72,19 @@ struct RequiredLoweringPassSet
     bool byteAddressBuffer;
     bool dynamicResource;
     bool dynamicResourceHeap;
+    bool untypedResourceHandle;
     bool resolveVaryingInputRef;
     bool specializeStageSwitch;
     bool missingReturn;
     bool nonVectorCompositeSelect;
     bool matrixSwizzleStore;
     bool coverageTracing;
+    bool barrierFlagValidation;
+    bool appendConsumeStructuredBuffer;
+    bool taggedUnion;
+    bool lValueCast;
+    bool sumVectorMatrix;
+    bool lateRequireCapability;
 };
 
 /// A context for code generation in the compiler back-end
@@ -179,6 +186,7 @@ public:
     bool shouldReportCheckpointIntermediates();
     bool shouldReportDynamicDispatchSites();
     bool shouldTraceCoverage();
+    bool shouldTraceAnyCoverage();
 
     bool shouldTrackLiveness();
 

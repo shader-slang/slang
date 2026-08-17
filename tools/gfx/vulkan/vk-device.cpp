@@ -544,6 +544,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.fragmentShadingRateFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.fragmentShadingRateFeatures;
 
+        // fragment shader barycentric features
+        extendedFeatures.fragmentShaderBarycentricFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.fragmentShaderBarycentricFeatures;
+
         // raytracing validation features
         extendedFeatures.rayTracingValidationFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.rayTracingValidationFeatures;
@@ -851,11 +855,29 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceExtensions.add(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
             m_features.add("push-descriptor");
         }
-        if (extensionNames.contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME))
+
+        const bool khrFragmentBarycentrics =
+            extensionNames.contains(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME) &&
+            extendedFeatures.fragmentShaderBarycentricFeatures.fragmentShaderBarycentric == VK_TRUE;
+        const bool nvFragmentBarycentrics =
+            extensionNames.contains(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+        if (khrFragmentBarycentrics || nvFragmentBarycentrics)
         {
-            deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
             m_features.add("barycentrics");
         }
+
+        if (khrFragmentBarycentrics)
+        {
+            deviceExtensions.add(VK_KHR_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+            extendedFeatures.fragmentShaderBarycentricFeatures.pNext =
+                (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.fragmentShaderBarycentricFeatures;
+        }
+        if (nvFragmentBarycentrics)
+        {
+            deviceExtensions.add(VK_NV_FRAGMENT_SHADER_BARYCENTRIC_EXTENSION_NAME);
+        }
+
         if (extensionNames.contains(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME))
         {
             deviceExtensions.add(VK_NV_SHADER_SUBGROUP_PARTITIONED_EXTENSION_NAME);
@@ -931,7 +953,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
     }
 
     m_queueFamilyIndex = m_api.findQueue(VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT);
-    assert(m_queueFamilyIndex >= 0);
+    SLANG_ASSERT(m_queueFamilyIndex >= 0);
 
 #if defined(GFX_NV_AFTERMATH)
     VkDeviceDiagnosticsConfigCreateInfoNV aftermathInfo = {};
@@ -1467,7 +1489,7 @@ Result DeviceImpl::getTextureAllocationInfo(
     const VkFormat format = VulkanUtil::getVkFormat(desc.format);
     if (format == VK_FORMAT_UNDEFINED)
     {
-        assert(!"Unhandled image format");
+        SLANG_ASSERT_FAILURE("Unhandled image format");
         return SLANG_FAIL;
     }
     const int arraySize = calcEffectiveArraySize(desc);
@@ -1499,7 +1521,7 @@ Result DeviceImpl::getTextureAllocationInfo(
     case IResource::Type::Texture3D:
         {
             // Can't have an array and 3d texture
-            assert(desc.arraySize <= 1);
+            SLANG_ASSERT(desc.arraySize <= 1);
 
             imageInfo.imageType = VK_IMAGE_TYPE_3D;
             imageInfo.extent = VkExtent3D{
@@ -1510,7 +1532,7 @@ Result DeviceImpl::getTextureAllocationInfo(
         }
     default:
         {
-            assert(!"Unhandled type");
+            SLANG_ASSERT_FAILURE("Unhandled type");
             return SLANG_FAIL;
         }
     }
@@ -1596,7 +1618,7 @@ Result DeviceImpl::createTextureResource(
     const VkFormat format = VulkanUtil::getVkFormat(desc.format);
     if (format == VK_FORMAT_UNDEFINED)
     {
-        assert(!"Unhandled image format");
+        SLANG_ASSERT_FAILURE("Unhandled image format");
         return SLANG_FAIL;
     }
 
@@ -1633,7 +1655,7 @@ Result DeviceImpl::createTextureResource(
     case IResource::Type::Texture3D:
         {
             // Can't have an array and 3d texture
-            assert(desc.arraySize <= 1);
+            SLANG_ASSERT(desc.arraySize <= 1);
 
             imageInfo.imageType = VK_IMAGE_TYPE_3D;
             imageInfo.extent = VkExtent3D{
@@ -1644,7 +1666,7 @@ Result DeviceImpl::createTextureResource(
         }
     default:
         {
-            assert(!"Unhandled type");
+            SLANG_ASSERT_FAILURE("Unhandled type");
             return SLANG_FAIL;
         }
     }
@@ -1683,7 +1705,7 @@ Result DeviceImpl::createTextureResource(
     VkMemoryPropertyFlags reqMemoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     int memoryTypeIndex =
         m_api.findMemoryTypeIndex(memRequirements.memoryTypeBits, reqMemoryProperties);
-    assert(memoryTypeIndex >= 0);
+    SLANG_ASSERT(memoryTypeIndex >= 0);
 
     VkMemoryPropertyFlags actualMemoryProperites =
         m_api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
@@ -1752,7 +1774,7 @@ Result DeviceImpl::createTextureResource(
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
 
-        assert(mipSizes.getCount() == numMipMaps);
+        SLANG_ASSERT(mipSizes.getCount() == numMipMaps);
 
         // Copy into upload buffer
         {
@@ -2403,7 +2425,7 @@ Result DeviceImpl::createBufferView(
     switch (desc.type)
     {
     default:
-        assert(!"unhandled");
+        SLANG_ASSERT_FAILURE("unhandled");
         return SLANG_FAIL;
 
     case IResourceView::Type::UnorderedAccess:
@@ -2454,7 +2476,7 @@ Result DeviceImpl::createBufferView(
                 }
                 else
                 {
-                    assert(!"unhandled");
+                    SLANG_ASSERT_FAILURE("unhandled");
                 }
 
                 SLANG_VK_RETURN_ON_FAIL(m_api.vkCreateBufferView(m_device, &info, nullptr, &view));

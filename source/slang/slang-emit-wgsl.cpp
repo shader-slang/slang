@@ -1,5 +1,6 @@
 #include "slang-emit-wgsl.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
@@ -57,6 +58,17 @@ WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
     m_extensionTracker =
         dynamicCast<ShaderExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_extensionTracker);
+}
+
+void WGSLSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // WGSL has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
+    }
 }
 
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
@@ -538,10 +550,8 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_writer->emit("u32");
         break;
     case kIROp_UInt64Type:
-        {
-            m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
-            return;
-        }
+        m_writer->emit("u64");
+        return;
     case kIROp_Int16Type:
         diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "int16_t"});
         return;
@@ -810,6 +820,20 @@ static bool isStaticConst(IRInst* inst)
 
 void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
 {
+    // A module-scope `static const` array is emitted as `var<private>`, not `const`: a WGSL
+    // `const` value of array type may only be indexed by a const-expression, so a constant array
+    // indexed by a runtime value (e.g. `positions[SV_VertexID]`) is rejected by the validator. A
+    // `var<private>` takes the same const-expression initializer but, being addressable, is
+    // runtime-indexable. Only arrays are converted -- a scalar/vector/matrix *value* is already
+    // runtime-indexable in WGSL. The type-based conversion is safe because constant-indexed reads
+    // fold away before emit (see the PR description). The `!= kIROp_GlobalParam` guard is
+    // load-bearing: this predicate is reused in the address-space chain below, where a
+    // `GlobalParam` array (e.g. a descriptor array) must keep its own address space, not
+    // `<private>`.
+    const bool emitModuleScopeArrayConstAsPrivateVar = isStaticConst(varDecl) &&
+                                                       varDecl->getOp() != kIROp_GlobalParam &&
+                                                       type->getOp() == kIROp_ArrayType;
+
     switch (varDecl->getOp())
     {
     case kIROp_GlobalParam:
@@ -826,7 +850,12 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         }
         break;
     default:
-        if (isStaticConst(varDecl))
+        // When this emits `var`, the matching `<private>` address space is emitted by the
+        // storage-space chain below (the two must stay in lockstep — a module-scope `var`
+        // without an address space is invalid WGSL).
+        if (emitModuleScopeArrayConstAsPrivateVar)
+            m_writer->emit("var");
+        else if (isStaticConst(varDecl))
             m_writer->emit("const");
         else
             m_writer->emit("var");
@@ -874,9 +903,11 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
         m_writer->emit("storage, read");
         m_writer->emit(">");
     }
-    else if (varDecl->getOp() == kIROp_GlobalVar)
+    else if (varDecl->getOp() == kIROp_GlobalVar || emitModuleScopeArrayConstAsPrivateVar)
     {
-        // Global ("module-scope") non-handle variables need to specify storage space
+        // Global ("module-scope") non-handle variables need to specify storage space. This also
+        // covers an array constant converted to `var<private>` above (which is not a GlobalVar
+        // but is likewise emitted as a module-scope private variable).
 
         // https://www.w3.org/TR/WGSL/#var-decls
         // "
@@ -1388,6 +1419,34 @@ void WGSLSourceEmitter::emitCallArg(IRInst* inst)
 
 bool WGSLSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
+    // WGSL emits MakeArray/MakeStruct as constructor expressions, valid in any expression context
+    // (the base class never folds them because C/HLSL initializer lists are not). Fold a
+    // module-scope aggregate constant inline when it is used only as a constituent of another
+    // aggregate, so a nested `static const` (e.g. `int g[2][3]`) does not emit its inner arrays as
+    // separate named decls that the outermost array's `var<private>` initializer would illegally
+    // reference; the outermost (used directly, e.g. runtime-indexed) one stays a declaration.
+    switch (inst->getOp())
+    {
+    case kIROp_MakeArray:
+    case kIROp_MakeStruct:
+    case kIROp_MakeArrayFromElement:
+        if (inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst)
+        {
+            bool onlyConstituent = inst->firstUse != nullptr;
+            for (auto use = inst->firstUse; onlyConstituent && use; use = use->nextUse)
+            {
+                auto userOp = use->getUser()->getOp();
+                onlyConstituent = userOp == kIROp_MakeArray || userOp == kIROp_MakeStruct ||
+                                  userOp == kIROp_MakeArrayFromElement;
+            }
+            if (onlyConstituent)
+                return true;
+        }
+        break;
+    default:
+        break;
+    }
+
     bool result = CLikeSourceEmitter::shouldFoldInstIntoUseSites(inst);
     if (result)
     {
@@ -1465,6 +1524,27 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             return true;
         }
+
+    case kIROp_IntCast:
+        {
+            // Emit a bool->int cast with `select`, the emitter's idiom for bool-conditioned
+            // values (cf. the `And`/`Or` case); `select(T(0), T(1), cond)` maps false->0, true->1.
+            auto operand = inst->getOperand(0);
+            if (as<IRBoolType>(getVectorElementType(operand->getDataType())))
+            {
+                auto type = inst->getDataType();
+                m_writer->emit("select(");
+                emitType(type);
+                m_writer->emit("(0), ");
+                emitType(type);
+                m_writer->emit("(1), ");
+                emitOperand(operand, getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            return false;
+        }
+        break;
 
     case kIROp_BitCast:
         {
@@ -1628,7 +1708,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetStringHash:
         {
             auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
+            // Checked, unlike `getStringLit()`, so a non-literal operand reaches the
+            // unhandled-inst path below instead of being read as string data.
+            auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
             if (stringLit)
             {

@@ -1,16 +1,18 @@
 // slang-api.cpp
 
-#include "../core/slang-performance-profiler.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-rtti-info.h"
-#include "../core/slang-shared-library.h"
-#include "../core/slang-signal.h"
-#include "../slang-record-replay/proxy/proxy-base.h"
-#include "../slang-record-replay/proxy/proxy-macros.h"
-#include "../slang-record-replay/replay-context.h"
+#include "compiler-core/slang-artifact-associated-impl.h"
+#include "core/slang-builtin-module-cache.h"
+#include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
+#include "core/slang-rtti-info.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-signal.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
+#include "slang-record-replay/proxy/proxy-base.h"
+#include "slang-record-replay/proxy/proxy-macros.h"
+#include "slang-record-replay/replay-context.h"
 #include "slang-repro.h"
 #include "slang-tag-version.h"
 
@@ -52,18 +54,16 @@ SlangResult tryLoadBuiltinModuleFromCache(
         return SLANG_FAIL;
     }
     Slang::ScopedAllocation cacheData;
-    SLANG_RETURN_ON_FAIL(Slang::File::readAllBytes(cacheFileName, cacheData));
-
-    // The first 8 bytes stores the timestamp of the slang dll that created this core module cache.
-    if (cacheData.getSizeInBytes() < sizeof(uint64_t))
-        return SLANG_FAIL;
-    auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
-    if (cacheTimestamp != currentLibTimestamp)
-        return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
-        builtinModuleName,
-        (uint8_t*)cacheData.getData() + sizeof(uint64_t),
-        cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    const void* moduleData = nullptr;
+    size_t moduleSize = 0;
+    SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::read(
+        cacheFileName,
+        currentLibTimestamp,
+        cacheData,
+        moduleData,
+        moduleSize));
+    SLANG_RETURN_ON_FAIL(
+        globalSession->loadBuiltinModule(builtinModuleName, moduleData, moduleSize));
     return SLANG_OK;
 }
 
@@ -143,13 +143,11 @@ SlangResult trySaveBuiltinModuleToCache(
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
 
-        Slang::FileStream fileStream;
-        SLANG_RETURN_ON_FAIL(fileStream.init(cacheFilename, Slang::FileMode::Create));
-
-        SLANG_RETURN_ON_FAIL(fileStream.write(&dllTimestamp, sizeof(dllTimestamp)));
-        SLANG_RETURN_ON_FAIL(fileStream.write(
+        SLANG_RETURN_ON_FAIL(Slang::BuiltinModuleCache::write(
+            cacheFilename,
+            dllTimestamp,
             coreModuleBlobPtr->getBufferPointer(),
-            coreModuleBlobPtr->getBufferSize()))
+            coreModuleBlobPtr->getBufferSize()));
     }
 
     return SLANG_OK;
@@ -1001,16 +999,18 @@ SLANG_API SlangResult spExtractRepro(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    List<uint8_t> buffer;
-    {
-        MemoryStreamBase memoryStream(FileAccess::Read, reproData, reproDataSize);
-        SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&memoryStream, &sink, buffer));
-    }
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
-    ReproUtil::RequestState* requestState = ReproUtil::getRequest(buffer);
+    ReproUtil::RequestState* requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     return ReproUtil::extractFiles(base, requestState, fileSystem);
 }
 
@@ -1028,14 +1028,17 @@ SLANG_API SlangResult spLoadReproAsFileSystem(
     DiagnosticSink sink;
     sink.init(nullptr, nullptr);
 
-    MemoryStreamBase stream(FileAccess::Read, reproData, reproDataSize);
+    ComPtr<ISlangBlob> reproBlob;
+    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(
+        static_cast<const uint8_t*>(reproData),
+        reproDataSize,
+        &sink,
+        reproBlob.writeRef()));
 
-    List<uint8_t> buffer;
-    SLANG_RETURN_ON_FAIL(ReproUtil::loadState(&stream, &sink, buffer));
-
-    auto requestState = ReproUtil::getRequest(buffer);
+    auto requestState = const_cast<ReproUtil::RequestState*>(
+        ReproUtil::getRequest(reproBlob->getBufferPointer(), reproBlob->getBufferSize()));
     MemoryOffsetBase base;
-    base.set(buffer.getBuffer(), buffer.getCount());
+    base.set(const_cast<void*>(reproBlob->getBufferPointer()), reproBlob->getBufferSize());
 
     ComPtr<ISlangFileSystemExt> fileSystem;
     SLANG_RETURN_ON_FAIL(
@@ -1128,6 +1131,66 @@ static void _appendCoverageManifestJsonEscaped(Slang::StringBuilder& out, unsign
     out.appendChar((char)uc);
 }
 
+static void _appendCoverageManifestJsonStringOrNull(Slang::StringBuilder& out, const char* value)
+{
+    if (!value)
+    {
+        out << "null";
+        return;
+    }
+    out << "\"";
+    for (const char* p = value; *p; ++p)
+        _appendCoverageManifestJsonEscaped(out, (unsigned char)*p);
+    out << "\"";
+}
+
+static const char* _getCoverageEntryKindName(slang::CoverageEntryKind kind)
+{
+    switch (kind)
+    {
+    case slang::CoverageEntryKind::Line:
+        return "line";
+    case slang::CoverageEntryKind::Branch:
+        return "branch";
+    case slang::CoverageEntryKind::Function:
+        return "function";
+    case slang::CoverageEntryKind::Region:
+        return "region";
+    default:
+        return "unknown";
+    }
+}
+
+static const char* _getCoverageCounterModeName(slang::CoverageCounterMode mode)
+{
+    switch (mode)
+    {
+    case slang::CoverageCounterMode::Count:
+        return "count";
+    case slang::CoverageCounterMode::Boolean:
+        return "boolean";
+    default:
+        return "unknown";
+    }
+}
+
+static const char* _getCoverageBranchArmKindName(slang::CoverageBranchArmKind kind)
+{
+    switch (kind)
+    {
+    case slang::CoverageBranchArmKind::TrueArm:
+        return "true";
+    case slang::CoverageBranchArmKind::FalseArm:
+        return "false";
+    case slang::CoverageBranchArmKind::CaseArm:
+        return "case";
+    case slang::CoverageBranchArmKind::DefaultArm:
+        return "default";
+    default:
+        return "unknown";
+    }
+}
+
 SLANG_EXTERN_C SLANG_API SlangResult
 slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlangBlob** outBlob)
 {
@@ -1136,55 +1199,128 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
 
     Slang::StringBuilder out;
     out << "{\n";
-    out << "  \"version\": 1,\n";
+    out << "  \"format\": \"slang-coverage\",\n";
+    out << "  \"version\": 2,\n";
     uint32_t counterCount = metadata->getCounterCount();
-    out << "  \"counters\": " << (int64_t)counterCount << ",\n";
+    uint32_t entryCount = metadata->getEntryCount();
+    out << "  \"counter_count\": " << (int64_t)counterCount << ",\n";
+    // Resolve the per-slot byte width from the metadata's
+    // `CoverageBufferInfo`. The IR coverage pass restricts the
+    // synthesized element type to `{4, 8}` and the API path
+    // validates the option with `E45114`, so only those two widths
+    // should ever reach this writer. A `0` would only arise from a
+    // sufficiently old metadata object that pre-dates the field; we
+    // mirror the historical layout (uint32) for that legacy case.
+    // Anything else means an upstream invariant has been broken —
+    // assert rather than ship a malformed manifest.
+    slang::CoverageBufferInfo bufferInfo;
+    if (SLANG_FAILED(metadata->getBufferInfo(&bufferInfo)))
+        return SLANG_FAIL;
+    uint32_t elementByteWidth = bufferInfo.elementByteWidth == 0 ? 4 : bufferInfo.elementByteWidth;
+    const char* elementTypeName = nullptr;
+    switch (elementByteWidth)
+    {
+    case 4:
+        elementTypeName = "uint32";
+        break;
+    case 8:
+        elementTypeName = "uint64";
+        break;
+    default:
+        SLANG_RELEASE_ASSERT(!"coverage manifest writer: unexpected elementByteWidth");
+    }
     out << "  \"buffer\": {\n";
     out << "    \"name\": \"__slang_coverage\",\n";
-    out << "    \"element_type\": \"uint32\",\n";
-    out << "    \"element_stride\": 4";
-    slang::CoverageBufferInfo bufferInfo;
-    // `bufferInfo.structSize` is set by the default constructor; a
-    // failure here is an internal-invariant violation, not a "fields
-    // unavailable" case. Bail rather than silently producing a
-    // manifest without binding info — hosts that rely on the binding
-    // would parse a partial sidecar without realizing it.
-    SLANG_RETURN_ON_FAIL(metadata->getBufferInfo(&bufferInfo));
-    if (bufferInfo.space >= 0)
-        out << ",\n    \"space\": " << (int64_t)bufferInfo.space;
-    if (bufferInfo.binding >= 0)
-        out << ",\n    \"binding\": " << (int64_t)bufferInfo.binding;
+    out << "    \"element_type\": \"" << elementTypeName << "\",\n";
+    out << "    \"element_stride\": " << (int64_t)elementByteWidth;
+    if (auto syntheticResources = (slang::ISyntheticResourceMetadata*)metadata->castAs(
+            slang::ISyntheticResourceMetadata::getTypeGuid()))
+    {
+        uint32_t coverageResourceIndex = 0;
+        if (SLANG_SUCCEEDED(syntheticResources->findResourceIndexByID(
+                uint32_t(Slang::SyntheticResourceKnownID::Coverage),
+                &coverageResourceIndex)))
+        {
+            slang::SyntheticResourceInfo resourceInfo;
+            SLANG_RETURN_ON_FAIL(
+                syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo));
+            if (resourceInfo.space >= 0)
+                out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
+            if (resourceInfo.binding >= 0)
+                out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            if (resourceInfo.uniformOffset >= 0)
+                out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
+            if (resourceInfo.uniformStride > 0)
+                out << ",\n    \"uniform_stride\": " << (int64_t)resourceInfo.uniformStride;
+        }
+    }
     out << "\n  },\n";
     out << "  \"entries\": [";
-    for (uint32_t i = 0; i < counterCount; ++i)
+    for (uint32_t i = 0; i < entryCount; ++i)
     {
         slang::CoverageEntryInfo entry;
-        // Every index in [0, counterCount) is a valid argument to
+        // Every index in [0, entryCount) is a valid argument to
         // `getEntryInfo` by construction; failure here means an
         // internal invariant violation. Bail rather than silently
         // dropping entries — a partial manifest with out-of-order
-        // slot indices would misalign the host's counter array.
+        // counter indices would misalign the host's counter array.
         if (SLANG_FAILED(metadata->getEntryInfo(i, &entry)))
             return SLANG_FAIL;
+        if (entry.counterIndex != slang::kInvalidCoverageCounterIndex &&
+            entry.counterIndex >= counterCount)
+        {
+            return SLANG_FAIL;
+        }
         out << (i == 0 ? "" : ",");
-        out << "\n    {\"index\": " << (int64_t)i << ", \"file\": ";
+        out << "\n    {\"kind\": \"" << _getCoverageEntryKindName(entry.kind) << "\", ";
+        out << "\"counter\": ";
+        if (entry.counterIndex == slang::kInvalidCoverageCounterIndex)
+            out << "null";
+        else
+            out << (int64_t)entry.counterIndex;
+        out << ", \"mode\": \"" << _getCoverageCounterModeName(entry.counterMode) << "\", ";
+        out << "\"file\": ";
         // Mirror the C++ API's nullable contract: `getEntryInfo`
-        // returns `entry.file == nullptr` for unattributable slots,
+        // returns `entry.file == nullptr` for unattributable entries,
         // so the JSON manifest emits `null` (not `""`) for the same
         // case. A strict consumer that distinguishes "missing source"
         // from "empty path" sees the same shape from both channels.
-        if (!entry.file)
+        _appendCoverageManifestJsonStringOrNull(out, entry.file);
+        out << ", \"line\": " << (int64_t)entry.line;
+        if (entry.startColumn != 0)
+            out << ", \"start_column\": " << (int64_t)entry.startColumn;
+        if (entry.endLine != 0)
+            out << ", \"end_line\": " << (int64_t)entry.endLine;
+        if (entry.endColumn != 0)
+            out << ", \"end_column\": " << (int64_t)entry.endColumn;
+        if (entry.kind == slang::CoverageEntryKind::Function)
         {
-            out << "null";
+            if (!entry.functionName && !entry.functionMangledName)
+                return SLANG_FAIL;
+            if (entry.functionName)
+            {
+                out << ", \"function\": ";
+                _appendCoverageManifestJsonStringOrNull(out, entry.functionName);
+            }
+            if (entry.functionMangledName)
+            {
+                out << ", \"function_mangled\": ";
+                _appendCoverageManifestJsonStringOrNull(out, entry.functionMangledName);
+            }
         }
-        else
+        if (entry.kind == slang::CoverageEntryKind::Branch)
         {
-            out << "\"";
-            for (const char* p = entry.file; *p; ++p)
-                _appendCoverageManifestJsonEscaped(out, (unsigned char)*p);
-            out << "\"";
+            if (entry.branchSiteID == 0 || entry.branchArmID == 0 ||
+                entry.branchArmKind == slang::CoverageBranchArmKind::Unknown)
+            {
+                return SLANG_FAIL;
+            }
+            out << ", \"branch_site\": " << (int64_t)entry.branchSiteID;
+            out << ", \"branch_arm\": " << (int64_t)entry.branchArmID;
+            out << ", \"branch_arm_kind\": \"" << _getCoverageBranchArmKindName(entry.branchArmKind)
+                << "\"";
         }
-        out << ", \"line\": " << (int64_t)entry.line << "}";
+        out << "}";
     }
     out << "\n  ]\n";
     out << "}\n";

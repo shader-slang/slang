@@ -11,6 +11,7 @@ public struct IdentityActivation<T> : IActivation<T>
 {
     public __init() {}
 
+    [ForceInline]
     [NoDiffThis]
     [Differentiable]
     public Vector eval<Vector>(Vector input)

@@ -4,7 +4,7 @@
 // Test that a [Differentiable] function imported from another module
 // can be used inside a differentiable function in this module.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 import cross_module_differentiable_lib;
@@ -46,8 +46,19 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     dpv = diffPair(v, float3(0.0, 0.0, 1.0));
     outputBuffer[3] = fwd_diff(scaledLength)(dpv, dps).d;
 
+    // d/dv_x = 2*1 = 2
+    dpv = diffPair(float3(1.0, 2.0, 3.0), float3(1.0, 0.0, 0.0));
+    outputBuffer[4] = fwd_diff(squaredLength)(dpv).d;
+
+    // d/dv_y = 2*2 = 4
+    dpv = diffPair(float3(1.0, 2.0, 3.0), float3(0.0, 0.0, 0.0));
+    bwd_diff(squaredLength)(dpv, 1.0);
+    outputBuffer[5] = dpv.d.y;
+
     // CHECK:      14.0
     // CHECK-NEXT: 4.0
     // CHECK-NEXT: 8.0
     // CHECK-NEXT: 12.0
+    // CHECK-NEXT: 2.0
+    // CHECK-NEXT: 4.0
 }

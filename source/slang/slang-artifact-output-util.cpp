@@ -1,16 +1,16 @@
 #include "slang-artifact-output-util.h"
 
-#include "../core/slang-hex-dump-util.h"
-#include "../core/slang-io.h"
-#include "../core/slang-platform.h"
-#include "../core/slang-string-util.h"
-#include "../core/slang-type-text-util.h"
+#include "core/slang-hex-dump-util.h"
+#include "core/slang-io.h"
+#include "core/slang-platform.h"
+#include "core/slang-string-util.h"
+#include "core/slang-type-text-util.h"
 
 #include <chrono>
 
 // Artifact
-#include "../compiler-core/slang-artifact-desc-util.h"
-#include "../compiler-core/slang-artifact-util.h"
+#include "compiler-core/slang-artifact-desc-util.h"
+#include "compiler-core/slang-artifact-util.h"
 #include "slang-compiler.h"
 #include "slang-rich-diagnostics.h"
 

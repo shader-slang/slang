@@ -1,0 +1,36 @@
+---
+remediation_report: true
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T09:40:18Z
+target_doc: syntax-reference/grammar.md
+review_report: ../../reviews/syntax-reference/grammar.md.review.md
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+actions:
+  fixed: 11
+  rejected_bogus: 0
+  rejected_out_of_scope: 0
+  deferred: 1
+  escalated: 0
+---
+
+# Remediation report for syntax-reference/grammar.md
+
+## Summary
+Eleven of twelve findings were verified against `source/slang/slang-parser.cpp` at the recorded commit and fixed in place; every production shape the reviewer flagged really was narrower or wider than the parser. F-001, a page-wide citation sweep, is deferred because the page sits at 49,121 of its 49,152-byte cap. Edits were confined to single lines or cells, and comment text was kept terse to stay under the cap. The document was edited; lint is clean.
+
+## Actions
+| Finding ID | Action | Rationale | Fix summary |
+| --- | --- | --- | --- |
+| F-001 | deferred | Blocked by the size cap: 31 bytes remain, so ~50 new citations plus definitions for `Operator`/`RegToken` need `size_cap_bytes` raised or sub-pages added, then a regeneration. The `InterfaceConstraintDecl` sub-claim is weak: the page defines it as a non-terminal and already cites `parseInterfaceConstraintDecl`. | — |
+| F-002 | fixed | `parseModuleDeclarationDecl` (line 1380) reads one identifier or one string literal, never dotted; `module` is a plain `g_parseSyntaxEntries[]` entry (line 10724) reached via `parseDecls`. | `SourceFile ::= TopDecl* EOF`; `ModuleHeader` takes one name token; `TopDecl` gains `ModuleHeader` |
+| F-003 | fixed | `parseExtensionDecl` (4220), `parseInterfaceDecl` (4409), `parseTypeAliasDecl` (5162) all use `parseOptGenericDecl` + `maybeParseGenericConstraints`; `ParseClass` (6433) has neither. | Added generic/where slots to extension and where clauses to interface and typealias; dropped `ClassDecl` from the inline-generic list |
+| F-004 | fixed | `parsePropertyDecl` (4873) takes a `ParseType` + `parseDeclarator` branch when `_peekModernStyleVarDecl` fails; C-style vars go through the recursive `parseInitDeclarator`. | Added `property Type Declarator` alternative; `VarDeclarator ::= Declarator Initializer?` |
+| F-005 | fixed | `ParseInitExpr` is `ParseExpression(Precedence::Assignment)` (232); `parseModernVarDeclBaseCommon` makes `=` optional (5000); `parseInitDeclarator` has only the `=` branch (2729). | `Expr` to `ArgExpr` on params and `var`; `let`'s `=` optional; `Initializer ::= '=' ArgExpr`; dangling `InitList` removed |
+| F-006 | fixed | The case loop (6556) tests `}` before parsing a case, so an empty body parses. | Enum body is now `(EnumCase (',' EnumCase)* ','?)?` |
+| F-007 | fixed | `ParseDoCatchStatement` (7482) loops while `catch` follows, nesting each clause as the next `tryBody`. | Catch suffix made one-or-more, with a nesting note |
+| F-008 | fixed | `parsePostfixExpr`: zero-or-more comma-separated index args (9126), `Scope` branch (9173), `Dot`/`RightArrow` branch (9193). | Subscript is `'[' ArgList? ']'`; added dot/arrow member and `'::' NameOrSubscript` suffixes |
+| F-009 | fixed | `parseTryExpr` (8177) and `parseTreatAsDifferentiableExpr` (8186) both call `ParseLeafExpression`, which the page equates with `UnaryExpr`. | Both operands changed to `UnaryExpr` with a leaf-expression note |
+| F-010 | fixed | `parseDispatchKernel` (3209) reads three operands with two mandatory commas. | `ArgList` replaced by three `ArgExpr` operands, roles named |
+| F-011 | fixed | `_parseInfixTypeExprSuffix` builds `AndTypeExpr` on `&` (7693); `_parseSimpleTypeSpec` loops over `<`, `::`, `.` in any order (3494). | `CoreType` interleaves the three suffixes and gains a `CoreType '&' CoreType` alternative |
+| F-012 | fixed | `parseSyntaxDecl` (5213-5262) leaves both clauses optional; the missing-clause diagnostic is a TODO. | "At least one is required" replaced by an unenforced-intent note |

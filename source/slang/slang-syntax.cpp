@@ -4,7 +4,6 @@
 #include "slang-compiler.h"
 #include "slang-visitor.h"
 
-#include <assert.h>
 #include <typeinfo>
 
 namespace Slang
@@ -152,6 +151,38 @@ void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
     if (!decl)
         return;
+    // Unwrap GenericDecl to check for constructors inside.
+    auto innerDecl = maybeGetInner(decl);
+    if (as<ConstructorDecl>(innerDecl))
+    {
+        // Print constructors as "TypeName.init" instead of the internal "$init" name.
+        // Walk up through parent chain, skipping GenericDecl wrappers, to find the
+        // containing type declaration.
+        for (auto parent = decl->parentDecl; parent; parent = parent->parentDecl)
+        {
+            if (as<GenericDecl>(parent))
+                continue;
+            if (parent->getName() && parent->getName()->text.getLength())
+            {
+                sb << getText(parent->getName()) << ".";
+            }
+            else if (auto extDecl = as<ExtensionDecl>(parent))
+            {
+                // ExtensionDecl has no name; recover the type name from targetType.
+                if (auto declRefType = as<DeclRefType>(extDecl->targetType.type))
+                {
+                    auto typeDecl = declRefType->getDeclRef().getDecl();
+                    if (typeDecl && typeDecl->getName() && typeDecl->getName()->text.getLength())
+                    {
+                        sb << getText(typeDecl->getName()) << ".";
+                    }
+                }
+            }
+            break;
+        }
+        sb << "init";
+        return;
+    }
     if (decl->getName() && decl->getName()->text.getLength())
         sb << getText(decl->getName());
     else
@@ -302,6 +333,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         break;
     case ASTNodeType::NonEmptyPackConstraintDecl:
         sb << "NonEmptyPackConstraintDecl";
+        break;
+    case ASTNodeType::GenericVariadicPackCountConstraintDecl:
+        sb << "GenericVariadicPackCountConstraintDecl";
         break;
     case ASTNodeType::HasDiffTypeInfoConstraintDecl:
         sb << "__hasDiffTypeInfo";
@@ -863,16 +897,17 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
     }
     else if (as<ThisTypeDecl>(declRef.getDecl()))
     {
-        if (as<DirectDeclRef>(declRef.declRefBase))
-        {
-            declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
-
-            return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
-        }
-        else if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
+        // A reference to a `ThisTypeDecl` must always be represented as a `ThisType`,
+        // never as a plain `DeclRefType`. Otherwise the same logical `This` type can
+        // exist as two distinct `Type*`s (e.g. a `ThisType` built from a `DirectDeclRef`
+        // vs. a `DeclRefType` built from a `MemberDeclRef` for a substituted interface),
+        // breaking type-identity comparison. See issue #11465.
+        if (auto lookupDeclRef = as<LookupDeclRef>(declRef.declRefBase))
         {
             return lookupDeclRef->getWitness()->getSub();
         }
+        declRef = createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef);
+        return astBuilder->getOrCreate<ThisType>(declRef.declRefBase);
     }
     else if (auto typedefDecl = as<TypeDefDecl>(declRef.getDecl()))
     {
@@ -1041,6 +1076,18 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     }
 }
 
+bool doesTypeHaveNoDiffModifier(Type* type)
+{
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+            return true;
+        return doesTypeHaveNoDiffModifier(modifiedType->getBase());
+    }
+
+    return false;
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
 {
     List<Type*> paramTypes;
@@ -1059,17 +1106,29 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         }
 
         auto paramDecl = paramDeclRef.getDecl();
+        if (paramDecl->findModifier<NoDiffModifier>() &&
+            !doesTypeHaveNoDiffModifier(paramValueType))
+        {
+            paramValueType =
+                astBuilder->getModifiedType(paramValueType, astBuilder->getNoDiffModifierVal());
+        }
         auto paramMode = getParamPassingMode(paramDecl);
         auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
 
         paramTypes.add(paramType);
     };
     auto parent = declRef.getParent();
-    if (as<SubscriptDecl>(parent) || as<PropertyDecl>(parent))
+    // An accessor includes parameters from a callable storage parent before its own parameters.
+    // For example, a subscript setter receives the subscript index before the value being set.
+    // A property is not callable, so it contributes no parameters here.
+    if (declRef.as<AccessorDecl>())
     {
-        for (auto paramDeclRef : getParameters(astBuilder, parent.as<CallableDecl>()))
+        if (auto callableParent = parent.as<CallableDecl>())
         {
-            visitParamDecl(paramDeclRef);
+            for (auto paramDeclRef : getParameters(astBuilder, callableParent))
+            {
+                visitParamDecl(paramDeclRef);
+            }
         }
     }
     for (auto paramDeclRef : getParameters(astBuilder, declRef))
@@ -1077,8 +1136,8 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         visitParamDecl(paramDeclRef);
     }
 
-    FuncType* funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
-    return funcType;
+    auto funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
+    return as<FuncType>(funcType->substitute(astBuilder, SubstitutionSet(declRef))->resolve());
 }
 
 GenericDeclRefType* getGenericDeclRefType(

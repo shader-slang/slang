@@ -20,7 +20,7 @@ jobs:
       should-build: ${{ steps.check.outputs.should-build }}
       last-commit: ${{ steps.check.outputs.last-commit }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 10

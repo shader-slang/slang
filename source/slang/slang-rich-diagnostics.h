@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../compiler-core/slang-diagnostic-sink.h"
-#include "../compiler-core/slang-rich-diagnostics-render.h"
-#include "../core/slang-basic.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-rich-diagnostics-render.h"
+#include "core/slang-basic.h"
 #include "slang-ast-support-types.h"
 #include "slang-target.h"
 
@@ -35,6 +35,7 @@ Index getRichDiagnosticsInfoCount();
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
 %     local class_name = lua_module.toPascalCase(diagnostic.name)
+// $(diagnostic.severity): $(diagnostic.name) ($(diagnostic.code))
 struct $(class_name)
 {
 %     -- Direct parameters (non-variadic or shared)

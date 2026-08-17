@@ -1,0 +1,126 @@
+# Uncovered diagnostic codes — bucket 2 of 5
+# 123 codes in this bucket. Range 30503..31224.
+# code	severity	name	message
+30503	err	primary-module-file-cannot-start-with-implementing-decl	primary module file cannot start with 'implementing'
+30504	warning	primary-module-file-must-start-with-module-decl	primary module file should start with 'module'
+30505	err	implementing-must-reference-primary-module-file	'implementing' must reference primary module file
+30506	warning	module-implementation-has-file-extension	file extension in module name
+30507	warning	for-loop-side-effect-changing-different-var	for loop modifies wrong variable
+30508	warning	for-loop-predicate-checking-different-var	for loop predicate checks wrong variable
+30509	note	use-let-each-for-generic-value-pack-param	use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'
+30510	err	loop-in-diff-func-require-unroll-or-max-iters	loop in differentiable function needs attributes
+30511	warning	for-loop-changing-iteration-variable-in-oppsoite-direction	for loop modifies variable in wrong direction
+30512	warning	for-loop-not-modifying-iteration-variable	for loop step is zero
+30513	err	cannot-use-initializer-list-for-type	cannot use initializer list for type '~type:Type'
+30515	warning	generic-param-shadows-outer-generic	generic parameter '~param:Decl' shadows a generic parameter from an enclosing scope
+30516	note	initializer-list-member-visibility-mismatch	member '~member:Decl' is ~memberVis:DeclVisibility, but '~type:Type' is ~structVis:DeclVisibility; all members must be ~structVis:DeclVisibility to use an initializer list
+30517	err	cannot-use-initializer-list-for-vector-of-unknown-size	cannot use initializer list for vector of statically unknown size '~elementCount:Val'
+30518	err	cannot-use-initializer-list-for-matrix-of-unknown-size	cannot use initializer list for matrix of statically unknown size '~rowCount:Val' rows
+30519	warning	for-loop-terminates-in-fewer-iterations-than-max-iters	MaxIters exceeds actual iterations
+30520	err	cannot-use-initializer-list-for-coop-vector-of-unknown-size	cannot use initializer list for CoopVector of statically unknown size '~elementCount:Val'
+30521	warning	interface-default-initializer	initializing an interface variable with defaults is deprecated and may cause unexpected behavior
+30524	err	interface-default-initializer-error	cannot initialize an interface variable with defaults
+30620	err	var-without-type-must-have-initializer	a variable declaration without an initial-value expression must be given an explicit type
+30621	err	param-without-type-must-have-initializer	a parameter declaration without an initial-value expression must be given an explicit type
+30622	err	ambiguous-default-initializer-for-type	more than one default initializer was found for type '~type:Type'
+30623	err	cannot-have-initializer	'~decl:Decl' cannot have an initializer because it is ~reason
+30625	err	generic-value-parameter-must-have-type	a generic value parameter must be given an explicit type
+30700	err	output-parameter-cannot-have-default-value	an 'out' or 'inout' parameter cannot have a default-value expression
+30701	err	system-value-semantic-invalid-type	type '~type:Type' is not valid for system value semantic '~semantic'; expected '~expectedTypes'
+30702	err	system-value-semantic-invalid-direction	system value semantic '~semantic' cannot be used as ~direction in '~stage' shader stage
+30703	err	per-primitive-semantic-in-vertex-output	per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output
+30704	err	parameter-without-default-after-parameter-with-default	parameter '~param:Decl' does not have a default value, but follows a parameter that does
+30810	err	base-of-interface-must-be-interface	interface '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'
+30811	err	base-of-struct-must-be-interface	struct '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'
+30812	err	base-of-enum-must-be-integer-or-interface	enum '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither an interface not a builtin integer type
+30813	err	base-of-extension-must-be-interface	extension cannot inherit from non-interface type '~baseType:Type'
+30814	err	base-of-class-must-be-class-or-interface	class '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither a class nor an interface
+30815	err	circularity-in-extension	circular extension is not allowed
+30816	warning	inheritance-unstable	support for inheritance is unstable and will be removed in future language versions, consider using composition instead
+30820	err	base-struct-must-be-listed-first	a struct type may only inherit from one other struct type, and that type must appear first in the list of bases
+30821	err	tag-type-must-be-listed-first	an enum type may only have a single tag type, and that type must be listed first in the list of bases
+30822	err	base-class-must-be-listed-first	a class type may only inherit from one other class type, and that type must appear first in the list of bases
+30830	err	cannot-inherit-from-explicitly-sealed-declaration-in-another-module	cannot inherit from type '~baseType:Type' marked 'sealed' in module '~moduleName:Name'
+30831	err	cannot-inherit-from-implicitly-sealed-declaration-in-another-module	cannot inherit from type '~baseType:Type' in module '~moduleName:Name' because it is implicitly 'sealed'
+30832	err	invalid-type-for-inheritance	type '~type:Type' cannot be used for inheritance
+30850	err	invalid-extension-on-type	type '~type:Type' cannot be extended
+30851	err	invalid-member-type-in-extension	~nodeType cannot be a part of an `extension`
+30854	err	override-modifier-not-overriding-base-decl	'~decl:Decl' marked as 'override' is not overriding any base declarations
+30855	err	unreferenced-generic-param-in-extension	generic parameter '~paramName:Name' is not referenced by extension target type '~targetType:Type'
+30856	warning	generic-param-in-extension-not-referenced-by-target-type	the extension is non-standard and may not work as intended because the generic parameter '~paramName:Name' is not referenced by extension target type '~targetType:Type'
+30900	err	multi-dimensional-array-not-supported	multi-dimensional array is not supported
+30901	err	subscript-must-have-return-type	__subscript declaration must have a return type specified after '->'
+30902	err	optional-cannot-wrap-resource-type	'Optional<T>' cannot wrap a resource or opaque type
+31000	warning	unknown-attribute-name	unknown attribute
+31003	err	badly-defined-patch-constant-func	invalid 'patchconstantfunc' attribute
+31004	err	expected-single-int-arg	expected single int argument
+31005	err	expected-single-string-arg	expected single string argument
+31006	err	attribute-function-not-found	function not found for attribute
+31007	err	attribute-expected-int-arg	expected int argument
+31008	err	attribute-expected-string-arg	expected string argument
+31009	err	expected-single-float-arg	expected single float argument
+31010	warning	link-time-constant-array-size	Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+31100	err	unknown-stage-name	unknown stage name
+31101	err	unknown-image-format-name	unknown image format
+31104	warning	explicit-uniform-location	explicit binding of uniform discouraged
+31105	warning	image-format-unsupported-by-backend	Image format '~format' is not explicitly supported by the ~backend backend, using supported format '~replacement' instead.
+31106	warning	special-type-leaks-from-parameter-group	Parameter group type includes some members with types which cannot be included in the same binding. These types will be moved into another parameter binding slot.
+31107	warning	special-type-member-leaks-from-parameter-group	This member cannot be included in the same binding as some other parts of this struct, and will be moved into another parameter binding slot.
+31108	err	set-accessor-may-not-have-more-than-one-param	a 'set' accessor may not have more than one parameter
+31109	err	set-accessor-param-wrong-type	'set' parameter type mismatch
+31110	err	accessor-does-not-satisfy-type-constraint-requirements	accessor does not satisfy type constraint requirements
+31111	err	unknown-diagnostic-name	unknown diagnostic
+31112	err	non-set-accessor-must-not-have-params	accessors other than 'set' must not have parameters
+31120	err	invalid-attribute-target	invalid syntax target for user defined attribute
+31121	err	any-value-size-exceeds-limit	'anyValueSize' exceeds limit
+31122	err	associated-type-not-allowed-in-com-interface	associatedtype not allowed in [COM] interface
+31123	err	invalid-guid	invalid GUID
+31124	err	struct-cannot-implement-com-interface	struct types cannot implement COM interfaces
+31125	err	attribute-usage-attribute-must-be-on-non-generic-struct	[__AttributeUsage] requires non-generic struct
+31126	err	interface-inheriting-com-must-be-com	non-COM interface inheriting from COM interface
+31130	err	derivative-member-attribute-must-name-a-member-in-expected-differential-type	invalid DerivativeMember target
+31131	err	invalid-use-of-derivative-member-attribute-parent-type-is-not-differentiable	DerivativeMember on non-differentiable type
+31132	err	derivative-member-attribute-can-only-be-used-on-members	DerivativeMember on non-member
+31140	err	type-of-extern-decl-mismatches-original-definition	extern decl type mismatch
+31141	err	definition-of-extern-decl-mismatches-original-definition	extern decl definition mismatch
+31142	err	ambiguous-original-defintion-of-extern-decl	ambiguous extern decl target
+31143	err	missing-original-defintion-of-extern-decl	no original definition for extern decl
+31146	err	decl-already-has-attribute	duplicate attribute
+31147	err	cannot-resolve-original-function-for-derivative	cannot resolve original function for derivative
+31148	err	cannot-resolve-derivative-function	cannot resolve derivative function
+31149	err	custom-derivative-signature-mismatch-at-position	custom derivative parameter type mismatch
+31150	err	custom-derivative-signature-mismatch	custom derivative signature mismatch
+31151	err	cannot-resolve-generic-argument-for-derivative-function	cannot deduce generic arguments for derivative
+31152	err	cannot-associate-interface-requirement-with-derivative	interface requirement cannot have derivative
+31153	err	cannot-use-interface-requirement-as-derivative	interface requirement cannot be used as derivative
+31154	err	custom-derivative-signature-this-param-mismatch	custom derivative 'this' type mismatch
+31156	err	custom-derivative-expected-static	expected static custom derivative
+31157	err	overloaded-func-used-with-derivative-of-attributes	overloaded function in derivative-of attribute
+31158	err	primal-substitute-target-must-have-higher-differentiability-level	primal substitute requires differentiable target
+31159	warning	no-derivative-on-non-differentiable-this-type	no derivative for member on non-differentiable struct
+31160	err	invalid-address-of	invalid __getAddress usage
+31161	err	interface-missing-function-interface-attribute	interface missing [__FunctionInterface]
+31162	err	public-custom-derivative-uses-non-exported-import	custom derivative uses non-exported import
+31200	warning	deprecated-usage	use of deprecated declaration
+31201	err	modifier-not-allowed	modifier not allowed
+31203	err	cannot-export-incomplete-type	cannot export incomplete type
+31204	warning	deprecated-bracket-attributes-placement	deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.
+31205	err	invalid-bracket-attributes-placement	invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.
+31206	err	memory-qualifier-not-allowed-on-a-non-image-type-parameter	invalid memory qualifier
+31207	err	removed-usage	use of removed declaration
+31208	err	require-input-decorated-var-for-parameter	shader input required
+31209	err	removed-since-bad-version	'RemovedSince' argument 'version' is outside allowed range
+31210	err	derivative-group-quad-must-be-multiple-2-for-xy-threads	derivative group quad thread count error
+31211	err	derivative-group-linear-must-be-multiple-4-for-total-thread-count	derivative group linear thread count error
+31212	err	only-one-of-derivative-group-linear-or-quad-can-be-set	conflicting derivative group settings
+31213	err	cuda-kernel-must-return-void	CUDA kernel return type error
+31214	err	differentiable-kernel-entry-point-cannot-have-differentiable-params	differentiable kernel param restriction
+31215	err	cannot-use-unsized-type-in-constant-buffer	unsized type in constant buffer
+31216	err	unrecognized-glsl-layout-qualifier	unrecognized GLSL layout qualifier
+31217	err	unrecognized-glsl-layout-qualifier-or-requires-assignment	unrecognized GLSL layout qualifier
+31219	err	push-or-specialization-constant-cannot-be-static	push/specialization constant storage class error
+31220	err	variable-cannot-be-push-and-specialization-constant	conflicting constant qualifiers
+31221	err	invalid-hlsl-register-name	invalid HLSL register name
+31222	err	invalid-hlsl-register-name-for-type	invalid HLSL register name for type
+31223	err	extern-and-export-var-decl-must-be-const	extern/export requires static const
+31224	err	const-global-var-with-init-requires-static	global const requires static

@@ -72,12 +72,14 @@ target_include_directories(
 # level is incompatible with precompiled headers (warning C4653).
 # Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
 # GCC/Clang don't have this issue, so they get size optimization in all configs.
-string(CONCAT RICH_DIAG_SIZE_OPT_FLAGS
+string(
+    CONCAT
+    RICH_DIAG_SIZE_OPT_FLAGS
     "$<$<NOT:"
-        "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
+    "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
     ">:"
-        "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,"
-            "$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>"
+    "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,"
+    "$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>"
     ">"
 )
 set_source_files_properties(
@@ -109,7 +111,7 @@ add_custom_command(
     COMMAND
         slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
         ${SLANG_CAPABILITY_OUTPUT_DIR} --doc
-        "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
+        "${slang_SOURCE_DIR}/docs/user-guide/a4-02-reference-capability-atoms.md"
     DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
@@ -244,9 +246,11 @@ set(slang_build_args
     # a warning is disabled for a memset boundary check.
     # everything looked fine and it is unclear why the checking fails
     $<$<CXX_COMPILER_ID:GNU>:-Wno-error=stringop-overflow>
+    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<BOOL:${SLANG_ENABLE_ASAN}>>:/bigobj>
     INCLUDE_DIRECTORIES_PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/slang-version-header
     ${CMAKE_CURRENT_BINARY_DIR}/../standard-modules/slang-standard-module-config-header
+    ${slang_SOURCE_DIR}/tools
     EXPORT_MACRO_PREFIX
     SLANG
     EXPORT_TYPE_AS
@@ -258,7 +262,10 @@ set(slang_build_args
     generate_standard_module_config_header
     PRECOMPILE_HEADERS
     ${slang_SOURCE_DIR}/source/core/slang-basic.h
-    ${slang_SOURCE_DIR}/source/slang/slang-compiler.h
+    # slang-compiler.h transitively includes generated .fiddle headers whose macros are keyed on
+    # __LINE__. GCC can restore inconsistent FIDDLE macro state from its PCH even in a clean build,
+    # so keep those headers out of the GCC PCH. See #12227.
+    "$<$<NOT:$<CXX_COMPILER_ID:GNU>>:${slang_SOURCE_DIR}/source/slang/slang-compiler.h>"
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
@@ -351,21 +358,76 @@ else()
     )
 endif()
 
-set_target_properties(slang PROPERTIES
-    VERSION 0.${SLANG_VERSION_NUMERIC}
-    SOVERSION 0.${SLANG_VERSION_NUMERIC}
-    MACHO_COMPATIBILITY_VERSION 0.0.0
-    MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
+set_target_properties(
+    slang
+    PROPERTIES
+        VERSION 0.${SLANG_VERSION_NUMERIC}
+        SOVERSION 0.${SLANG_VERSION_NUMERIC}
+        MACHO_COMPATIBILITY_VERSION 0.0.0
+        MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
 )
+
+# A non-embedded shared library normally creates this cache on the first global-session request.
+# Generate it from the build's core archive after the shared library is linked so the first slangc
+# invocation can load the same archive without compiling the core module again.
+if(NOT SLANG_EMBED_CORE_MODULE AND SLANG_LIB_TYPE STREQUAL "SHARED")
+    # Place the cache beside the shared library: DLLs use the runtime directory on Windows, while
+    # shared libraries use the library directory on other platforms.
+    if(WIN32)
+        get_target_property(
+            core_module_cache_dir
+            slang
+            RUNTIME_OUTPUT_DIRECTORY
+        )
+        set(core_module_cache_install_dir ${runtime_subdir})
+    else()
+        get_target_property(
+            core_module_cache_dir
+            slang
+            LIBRARY_OUTPUT_DIRECTORY
+        )
+        set(core_module_cache_install_dir ${library_subdir})
+    endif()
+    set(core_module_cache "${core_module_cache_dir}/slang-core-module.bin")
+
+    add_custom_target(
+        generate_core_module_cache
+        ALL
+        COMMAND
+            "$<TARGET_FILE:slang-core-module-cache>" "$<TARGET_FILE:slang>"
+            "${core_module_archive_without_timestamp}" "${core_module_cache}"
+        BYPRODUCTS "${core_module_cache}"
+        DEPENDS slang-core-module-cache slang
+        COMMENT "Generating timestamped core module cache"
+        VERBATIM
+    )
+    add_dependencies(generate_core_module_cache generate_core_module)
+    set_target_properties(
+        generate_core_module_cache
+        PROPERTIES FOLDER generated
+    )
+
+    # CMake installation preserves the shared library's timestamp, so this cache stays valid.
+    # Other packaging must also preserve it; otherwise the runtime rejects and regenerates the
+    # cache on first use.
+    install(
+        FILES "${core_module_cache}"
+        DESTINATION ${core_module_cache_install_dir}
+        COMPONENT generators
+        EXCLUDE_FROM_ALL
+    )
+endif()
 
 #
 # Windows proxy DLL for backward compatibility
 # Creates slang.dll that forwards all calls to slang-compiler.dll
 #
-if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
+if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
     # Create a minimal C++ source file (some linkers require at least one source)
     set(SLANG_PROXY_STUB_CPP "${CMAKE_CURRENT_BINARY_DIR}/slang-proxy-stub.cpp")
-    file(WRITE "${SLANG_PROXY_STUB_CPP}" 
+    file(
+        WRITE
+        "${SLANG_PROXY_STUB_CPP}"
         "// Minimal stub file for slang.dll proxy\n"
         "// All exports are forwarded to slang-compiler.dll via the .def file\n"
     )
@@ -375,14 +437,21 @@ if(WIN32 AND SLANG_LIB_TYPE STREQUAL "SHARED")
 
     # Create a wrapper script with the actual DLL path (since generator expressions
     # don't work with -P script mode). Use per-config wrapper to avoid file(GENERATE) conflicts.
-    set(DEF_GEN_WRAPPER "${CMAKE_CURRENT_BINARY_DIR}/generate-def-wrapper-$<CONFIG>.cmake")
-    file(GENERATE OUTPUT "${DEF_GEN_WRAPPER}" CONTENT "
+    set(DEF_GEN_WRAPPER
+        "${CMAKE_CURRENT_BINARY_DIR}/generate-def-wrapper-$<CONFIG>.cmake"
+    )
+    file(
+        GENERATE OUTPUT
+        "${DEF_GEN_WRAPPER}"
+        CONTENT
+            "
 set(DLL_PATH \"$<TARGET_FILE:slang>\")
 set(OUTPUT_DEF \"${SLANG_PROXY_DEF}\")
 set(TARGET_DLL_NAME \"slang-compiler\")
 include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
-")
-    
+"
+    )
+
     # Custom command to generate the DEF file from slang-compiler.dll exports
     add_custom_command(
         OUTPUT "${SLANG_PROXY_DEF}"
@@ -391,28 +460,40 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
         COMMENT "Generating slang-proxy.def from slang-compiler.dll exports"
         VERBATIM
     )
-    
+
     # Create the proxy DLL target
-    add_library(slang-proxy SHARED
+    add_library(
+        slang-proxy
+        SHARED
         "${SLANG_PROXY_STUB_CPP}"
         "${SLANG_PROXY_DEF}"
     )
-    
+
     # Link against the slang-compiler import library so symbols can be forwarded
     target_link_libraries(slang-proxy PRIVATE slang)
-    
+
     # Get the output directories from the main slang target to match build locations
     get_target_property(slang_runtime_dir slang RUNTIME_OUTPUT_DIRECTORY)
     get_target_property(slang_archive_dir slang ARCHIVE_OUTPUT_DIRECTORY)
-    
+
     # Set output name to slang (produces slang.dll) and match directories
-    set_target_properties(slang-proxy PROPERTIES
-        OUTPUT_NAME slang
-        PDB_NAME slang-proxy
-        RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
-        ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
+    set_target_properties(
+        slang-proxy
+        PROPERTIES
+            OUTPUT_NAME slang
+            PDB_NAME slang-proxy
+            RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
+            ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
-    target_link_options(slang-proxy PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/INCREMENTAL:NO>")
+    # slang-proxy outputs as "slang.dll", which makes MSVC name its incremental
+    # link file "slang.ilk" — colliding with slang-dispatcher ("slang.exe" →
+    # "slang.ilk") when Ninja links both in parallel. Redirect the .ilk to a
+    # unique filename so both targets can use incremental linking without racing.
+    target_link_options(
+        slang-proxy
+        PRIVATE
+            "$<$<CXX_COMPILER_ID:MSVC>:/ILK:$<TARGET_FILE_DIR:slang-proxy>/slang-proxy.ilk>"
+    )
 
     # Install the proxy DLL alongside slang-compiler.dll
     install(
@@ -421,29 +502,38 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
         ARCHIVE DESTINATION lib
         LIBRARY DESTINATION lib
     )
-    
-    message(STATUS "Windows proxy DLL (slang.dll) will be generated to forward to slang-compiler.dll")
+
+    message(
+        STATUS
+        "Windows proxy DLL (slang.dll) will be generated to forward to slang-compiler.dll"
+    )
 endif()
 
 #
 # Unix backward compatibility symlink (libslang -> libslang-compiler)
 #
-if(UNIX AND SLANG_LIB_TYPE STREQUAL "SHARED")
+if(UNIX AND SLANG_LIB_TYPE STREQUAL "SHARED" AND SLANG_ENABLE_SLANG_PROXY)
     # Create symlink in build directory
     add_custom_command(
-        TARGET slang POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink
-            $<TARGET_FILE_NAME:slang>
+        TARGET slang
+        POST_BUILD
+        COMMAND
+            ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE_NAME:slang>
             $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
-        COMMENT "Creating backward compatibility symlink: libslang -> libslang-compiler"
+        COMMENT
+            "Creating backward compatibility symlink: libslang -> libslang-compiler"
         VERBATIM
     )
 
     # Install the symlink by copying it from the build directory
     install(
-        FILES $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
+        FILES
+            $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
         DESTINATION lib
     )
 
-    message(STATUS "Unix backward compatibility symlink (libslang -> libslang-compiler) will be created during build and installation")
+    message(
+        STATUS
+        "Unix backward compatibility symlink (libslang -> libslang-compiler) will be created during build and installation"
+    )
 endif()

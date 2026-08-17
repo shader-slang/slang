@@ -1,7 +1,5 @@
 #include "proxy-base.h"
 
-#include "../replay-context.h"
-#include "../replay-shared.h"
 #include "proxy-compile-request.h"
 #include "proxy-compile-result.h"
 #include "proxy-component-type.h"
@@ -10,6 +8,8 @@
 #include "proxy-mutable-file-system.h"
 #include "proxy-session.h"
 #include "proxy-shared-library.h"
+#include "slang-record-replay/replay-context.h"
+#include "slang-record-replay/replay-shared.h"
 
 namespace SlangRecord
 {

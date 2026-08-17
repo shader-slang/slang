@@ -1,16 +1,12 @@
 // main.cpp
 
+#include "core/slang-io.h"
+#include "core/slang-test-tool-util.h"
 #include "slang.h"
-
-SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
-
-#include "../core/slang-io.h"
-#include "../core/slang-test-tool-util.h"
-#include "../slang/slang-internal.h"
+#include "slang/slang-internal.h"
 
 using namespace Slang;
 
-#include <assert.h>
 
 #ifdef _WIN32
 #define MAIN slangc_main
@@ -166,7 +162,7 @@ int wmain(int argc, wchar_t** argv)
 
     int memleakDetected = _CrtDumpMemoryLeaks();
     SLANG_UNUSED(memleakDetected);
-    assert(!memleakDetected);
+    SLANG_ASSERT(!memleakDetected);
 #endif
 
     return result;

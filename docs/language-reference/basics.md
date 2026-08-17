@@ -7,3 +7,4 @@ TODO: Add overview
 * [Execution Divergence and Reconvergence](basics-execution-divergence-reconvergence.md)
 * [Memory Model](basics-memory-model.md)
 * [Program Behavior](basics-behavior.md)
+* [Name Lookup](basics-name-lookup.md)

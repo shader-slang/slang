@@ -7,9 +7,9 @@
 // that will yield a single `Module`.
 //
 
-#include "../compiler-core/slang-artifact.h"
-#include "../compiler-core/slang-source-loc.h"
-#include "../core/slang-smart-pointer.h"
+#include "compiler-core/slang-artifact.h"
+#include "compiler-core/slang-source-loc.h"
+#include "core/slang-smart-pointer.h"
 #include "slang-compiler-fwd.h"
 #include "slang-entry-point.h"
 #include "slang-module.h"
@@ -40,7 +40,7 @@ public:
     /// Get the source files.
     /// Since lazily evaluated requires calling requireSourceFiles to know it's in sync
     /// with sourceArtifacts.
-    List<SourceFile*> const& getSourceFiles();
+    List<SourceFile*> const& getSourceFiles() { return m_sourceFiles; }
 
     /// Get the source artifacts associated
     const List<ComPtr<IArtifact>>& getSourceArtifacts() const { return m_sourceArtifacts; }

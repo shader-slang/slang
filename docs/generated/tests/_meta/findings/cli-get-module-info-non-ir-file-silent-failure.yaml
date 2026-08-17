@@ -1,0 +1,41 @@
+schema_version: 1
+id: cli-get-module-info-non-ir-file-silent-failure
+bundle: coverage/cli-options
+suspected_kind: wrong-diagnostic
+title: "-get-module-info on a readable non-IR file exits 1 with no diagnostic"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/coverage/cli-options/_repro/get-module-info-non-ir-file.slang -get-module-info docs/generated/tests/coverage/cli-options/_repro/get-module-info-non-ir-file.slang -target hlsl -entry main -stage compute"
+  source_slang: docs/generated/tests/coverage/cli-options/_repro/get-module-info-non-ir-file.slang
+  exit_code: 1
+  stderr_tail: ""
+  observed_summary: |
+    `-get-module-info` has three interesting inputs and only two of them are
+    reported:
+
+      path does not exist        -> exit 1, "error[E00001]: cannot open file '...'"
+      path is a .slang-module    -> exit 0, "Module Name: ... / Module Version: ... /
+                                    Compiler Version: ..." (see tests/ir/dump-module-info.slang)
+      path is readable but is
+      not a serialized IR blob   -> exit 1, zero bytes on stdout and stderr
+
+    The third case was produced by pointing `-get-module-info` at a plain `.slang`
+    source file. The user gets no indication that the file was opened and read
+    successfully but rejected as a module — only a non-zero exit code.
+expected:
+  claim: |
+    When `-get-module-info` opens its operand successfully but the contents are
+    not a serialized Slang IR module, slangc should report a diagnostic saying so
+    rather than exiting non-zero with no output.
+  citation_kind: sibling-test
+  citation: tests/ir/dump-module-info.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/cross-cutting/serialization.md#versioning-and-backwards-compatibility
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "That the non-zero exit alone is the intended contract for a scripting-oriented query option: possible, but the sibling cannot-open case in the same option arm does emit E00001, so the option is not silent by design."
+    - "That a diagnostic was written to a channel slang-test does not capture: ruled out by running slangc directly and redirecting stdout and stderr to separate files, both zero bytes."

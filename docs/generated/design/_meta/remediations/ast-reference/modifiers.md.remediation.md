@@ -1,0 +1,43 @@
+---
+remediation_report: true
+remediator_model: claude-opus-5
+remediated_at: 2026-08-04T14:20:00Z
+target_doc: ast-reference/modifiers.md
+review_report: ../../reviews/ast-reference/modifiers.md.review.md
+target_doc_source_commit_before: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+target_doc_source_commit_after: 53b76e6d3009b8e6434d41573524c7ce5c499d23
+actions:
+  fixed: 5
+  rejected_bogus: 0
+  rejected_out_of_scope: 1
+  deferred: 2
+  escalated: 0
+---
+
+# Remediation report for ast-reference/modifiers.md
+
+## Summary
+
+Five findings were fixed, two were deferred, and one was rejected as out
+of scope. All 15 conceptual `Key fields` cells now use the inherited
+`args: List<Expr*>`, the layout callout now explains how binding data is
+represented, the `TargetIntrinsicModifier` predicate/capability
+confusion was corrected, `workgraph.slang` is no longer called a
+core-module source, and the generation-history prose was removed. The
+two deferrals (F-001 single-table merge, F-002 page-wide Grammar audit)
+both rewrite the same 264 catalog rows and are regeneration-scale.
+F-008 concerns the front-matter digest, which belongs to the operator.
+The page is 54,950 bytes, still under its 65,536-byte cap.
+
+## Actions
+
+| Finding ID | Action | Rationale | Fix summary |
+| --- | --- | --- | --- |
+| F-001 | deferred | Correct against `docs/generated/design/_meta/prompts/_common.md:99` ("a single table"), and the page is an outlier: `declarations.md`, `expressions.md`, `statements.md`, and `types.md` each use one table. Merging 264 rows out of 26 tables is a full `## Nodes` rewrite that also has to relocate the interstitial group prose and drops 26 `###` anchor targets, so it is not a minimal edit. It touches exactly the rows F-002 also rewrites. Follow-up: regenerate `## Nodes` for `modifiers.md` and `values.md` in one cycle, or state the sub-table allowance in the family contract. | — |
+| F-002 | deferred | Valid: `docs/generated/design/_meta/prompts/ast-reference-modifiers.md:21-25` reserves `(none)` for synthesis-only modifiers, and parsed attributes such as `ForceUnrollAttribute` are marked `(none)`. The scale blocks an immediate minimal fix: 217 of the 264 rows carry `(none)`, and deciding each one requires cross-referencing 126 `attribute_syntax` declarations across `core.meta.slang`, `diff.meta.slang`, `hlsl.meta.slang`, and `workgraph.slang` plus the parser's keyword-modifier map. Follow-up: perform the Grammar audit as part of the F-001 table rewrite, since both edit the same rows. | — |
+| F-003 | fixed | Confirmed: `docs/generated/design/_meta/prompts/_common.md:104-108` mandates `name: Type`, and `source/slang/slang-ast-modifier.h:804-815` declares `AttributeBase::args` as `List<Expr*>`. A field extraction over the header confirms that none of the 15 classes declares a member of its own, so the inherited list is the only real storage; the existing Summary cells already carry each argument's meaning, so nothing was lost. | 15 `Key fields` cells (`UnrollAttribute`, `SPIRVInstructionOpAttribute`, the eight `UncheckedGLSL*` layout rows, and the five tessellation rows) now read `args: List<Expr*>` (inherited); the intro paragraph's conceptual-argument convention sentence was rewritten to match |
+| F-004 | fixed | Confirmed at HEAD: `source/slang/slang-ast-modifier.h:481-495` declares `HLSLLayoutSemantic::registerName` / `componentMask` and `HLSLRegisterSemantic::spaceName` as `Token`, and `:1085-1086` declares `GLSLBindingAttribute::binding` / `set` as `int32_t`. `docs/generated/design/_meta/prompts/ast-reference-modifiers.md:47` requires the binding role. Semantic rules are deferred to the linked checking page, per that prompt's forbidden-content clause. | `### GLSLLayout*Modifier family`: added a closing paragraph naming the checked binding/set pair and the HLSL register tokens, and pointing at `../pipeline/03-semantic-check.md` for the rules |
+| F-005 | fixed | Confirmed: `source/slang/slang-ast-modifier.h:282-284` documents `targetToken` as the token naming the intrinsic's target, while `:292-295` documents `predicateToken` / `scrutinee` / `scrutineeDeclRef` as a guard on an identifier. The two are independent, so "only applied when a capability is in effect" misattributed target selection to the predicate. | `### TargetIntrinsicModifier and SpecializedForTargetModifier`: `targetToken` now named as what selects the target's capabilities, and the predicate described as a separate guard resolved through `scrutineeDeclRef` |
+| F-006 | fixed | Correct: the file is `source/standard-modules/experimental/workgraph.slang`, not a `.meta.slang` core-module source. | `## Source`: "four core-module sources" -> "four sources — three core-module `.meta.slang` files and one experimental standard module", and the work-graph clause now names it as the experimental standard module |
+| F-007 | fixed | The absence of the three class names is a source fact worth keeping, but the surrounding narrative about what the page "was asked to cover", about no manifest path recovering the names, and about a future regeneration is generation-history prose with no source basis; `docs/generated/design/_meta/prompts/_common.md:74-81` excludes speculative and editorial material. No page links the old heading anchor, so renaming it was safe. | Section retitled `### Absent groupings: no HLSLAttribute or LayoutModifier base`; opening clause now states the three names appear nowhere under `source/`, and the closing prompt-history and future-regeneration sentences were deleted |
+| F-008 | rejected-out-of-scope | `docs/generated/design/_meta/prompts/_remediate.md:97-100` reserves `watched_paths_digest` for the operator's `regenerate.py mark-fresh` run and forbids the remediator from editing it. The finding's own recommendation agrees ("do not edit the generated page during review"). The page was edited under other findings, so `mark-fresh` will record the seven-file digest. | — |

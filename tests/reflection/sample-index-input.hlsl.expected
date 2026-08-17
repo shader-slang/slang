@@ -27,7 +27,10 @@ standard output = {
                                     "elementType": {
                                         "kind": "scalar",
                                         "scalarType": "float32"
-                                    }
+                                    },
+                                    "sizes": [
+                                        {"kind": "varyingInput", "value": 1}
+                                    ]
                                 },
                                 "stage": "fragment",
                                 "binding": {"kind": "varyingInput", "index": 0},
@@ -37,10 +40,16 @@ standard output = {
                                 "name": "sampleIndex",
                                 "type": {
                                     "kind": "scalar",
-                                    "scalarType": "uint32"
+                                    "scalarType": "uint32",
+                                    "sizes": [
+
+                                    ]
                                 },
                                 "semanticName": "SV_SAMPLEINDEX"
                             }
+                        ],
+                        "sizes": [
+                            {"kind": "varyingInput", "value": 1}
                         ]
                     }
                 }
@@ -56,7 +65,10 @@ standard output = {
                     "elementType": {
                         "kind": "scalar",
                         "scalarType": "float32"
-                    }
+                    },
+                    "sizes": [
+                        {"kind": "varyingOutput", "value": 1}
+                    ]
                 }
             }
         }

@@ -12,6 +12,8 @@ void __requireTargetExtension(constexpr String extensionName);
 in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
+in uint __builtinWaveIndex : SV_WaveIndex;
+in uint __builtinGroupIndex : SV_GroupIndex;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -76,7 +78,7 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
@@ -119,7 +121,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, appendstructuredbuffer)]
 struct AppendStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferAppend))
@@ -131,6 +133,7 @@ struct AppendStructuredBuffer
     ///@param numStructs The number of elements in the buffer.
     ///@param stride The stride of the buffer.
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, appendstructuredbuffer)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -174,23 +177,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
-    ///@param T The type of the value to load from the buffer.
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return The value loaded from the buffer.
-    ///
-    ///@remarks
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint Load(int location)
     {
         __target_switch
@@ -201,6 +193,18 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -212,24 +216,12 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location
-    /// with additional alignment.
-    ///@param location The input address in bytes.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -240,19 +232,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load2`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load2";
+        case hlsl:
+            return Load2(location);
         default:
             return __byteAddressBufferLoad<uint2>(this, location, alignment);
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -264,41 +277,28 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of stride of `uint2`, which is 8.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 8. Invalid
-    /// value of location will cause undefined behavior.
-    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalAlignmentOf<uint2>());
         }
     }
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -309,19 +309,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load3`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load3";
+        case hlsl:
+            return Load3(location);
         default:
             return __byteAddressBufferLoad<uint3>(this, location, alignment);
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -333,39 +354,28 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of stride of `uint3`, which is 12.
-    ///@param location The input address in bytes which must be a multiple of alignment of 12.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalAlignmentOf<uint3>());
         }
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -376,19 +386,40 @@ struct ByteAddressBuffer
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load4`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load4";
+        case hlsl:
+            return Load4(location);
         default:
             return __byteAddressBufferLoad<uint4>(this, location, alignment);
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
@@ -400,47 +431,65 @@ struct ByteAddressBuffer
         }
     }
 
-    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 16.
-    ///@param location The input address in bytes which must be a multiple of alignment of 16.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalAlignmentOf<uint4>());
         }
     }
 
+    /// Load a value with type `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
+    /// Load a value with type `T` from the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
+    /// On other targets, `alignment` is forwarded to the lowered load instruction.
     [__readNone]
     [ForceInline]
-    T LoadAligned<T>(uint location, uint alignment)
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
-    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiply of size of `T`.
-    ///@return T value with type `T` loaded from the buffer.
+    /// Load a value with type `T` from the buffer at the specified location with natural alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural alignment.
+    ///@return The value loaded from the buffer.
     ///@remarks
-    ///Currently, this function only supports when `T` is scalar, vector or matrix type.
+    /// Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
     T LoadAligned<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 };
 
@@ -520,7 +569,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
-[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+[require(cpp_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -919,9 +968,17 @@ float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampl
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
@@ -930,12 +987,14 @@ float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord 
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLodOffset($0, $1, $2, $3)";
     }
 }
 
@@ -1029,9 +1088,17 @@ float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTextu
     }
 }
 
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
@@ -1040,12 +1107,14 @@ float __glsl_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerC
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_offset<TTexture, TCoord, TOffset>(TTexture t,SamplerComparisonState s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLodOffset($p, $2, $3, $4)";
     }
 }
 
@@ -1258,8 +1327,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().Sample(__getSampler(), location);
@@ -1288,8 +1357,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().Sample(__getSampler(), location, offset);
@@ -1319,8 +1388,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -1342,14 +1411,14 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location ConstOffset|MinLod $offset $clamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location ConstOffset|MinLod $offset $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         default:
             status = 0;
@@ -1378,8 +1447,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias $bias;
+                    __truncate $$T result __sampledType(T) %__sampled;
 
                 };
             case wgsl:
@@ -1408,8 +1477,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $this $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleBias(__getSampler(), location, bias, offset);
@@ -1433,21 +1502,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract  %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -1485,7 +1554,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -1525,7 +1594,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -1576,20 +1645,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue ConstOffset|MinLod $offset $clamp;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue ConstOffset|MinLod $offset $clamp;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -1641,7 +1710,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
+    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
@@ -1706,13 +1775,32 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLodOffset(sampler1DShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler1DArrayShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler2DShadow sampler, vec3 P, float lod, ivec2 offset)
+            //
+            // GL_EXT_texture_shadow_lod adds the following variant:
+            // - float textureLodOffset(sampler2DArrayShadow sampler, vec4 P, float lod, ivec2 offset)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), level, offset);
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), level, offset);
+                else
+                    return __glsl150_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+                else
+                    return __glsl_shadow_lod_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
             }
             else
             {
-                return __glsl_texture_level_offset(this, __makeVector(location, compareValue), level, offset);
+                static_assert(Shape.dimensions != 3, "_Texture::SampleCmpLevel with offset: cube shadow types do not support textureLodOffset in GLSL");
+                return 0.0;
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -1745,13 +1833,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -1817,20 +1905,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
@@ -1851,7 +1939,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -1873,7 +1961,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -1889,13 +1977,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -1920,8 +2008,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad $gradX $gradY;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY);
@@ -1948,8 +2036,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset);
@@ -1978,8 +2066,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -2001,14 +2089,14 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -2064,8 +2152,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod $level;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleLevel(__getSampler(), location, level);
@@ -2092,8 +2180,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $this $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 return __getTexture().SampleLevel(__getSampler(), location, level, offset);
@@ -2116,14 +2204,14 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -2193,6 +2281,31 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     }
 }
 
+// Combine a texture and sampler into a sampled image at the IR level.
+// Kept outside spirv_asm so NonUniform propagates to the combined result.
+__intrinsic_op($(kIROp_MakeCombinedTextureSampler))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int, S>
+_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,1,format> __makeCombinedTextureSampler(
+    _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> texture,
+    S sampler);
+
+// Extract the image from a combined sampled image at the IR level.
+// Kept outside spirv_asm so NonUniform propagates to the extracted image.
+__intrinsic_op($(kIROp_CombinedTextureSamplerGetTexture))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format> __extractImage(
+    _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> combinedSampler);
+
+// Gather with a texel offset. The SPIR-V backend selects `ConstOffset` (no capability) or `Offset`
+// (`ImageGatherExtended`) based on whether the offset is a compile-time constant.
+__intrinsic_op($(kIROp_ImageGatherOffset))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+vector<T.Element,4> __spirvImageGatherOffset(
+    _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,1,format> sampledImage,
+    vector<float, Shape.dimensions+isArray> location,
+    int component,
+    vector<int, Shape.planeDimensions> offset);
+
 // Non-combined texture types specific functions
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
@@ -2215,10 +2328,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return (spirv_asm {
                 OpCapability ImageQuery;
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float2 = OpImageQueryLod %sampledImage $location;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float2 = OpImageQueryLod $sampledImage $location;
             }).x;
         }
     }
@@ -2238,10 +2352,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return (spirv_asm {
                 OpCapability ImageQuery;
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float2 = OpImageQueryLod %sampledImage $location;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float2 = OpImageQueryLod $sampledImage $location;
             }).y;
         }
     }
@@ -2261,10 +2376,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return (spirv_asm {
                 OpCapability ImageQuery;
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float2 = OpImageQueryLod %sampledImage $location;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float2 = OpImageQueryLod $sampledImage $location;
             }).x;
         }
     }
@@ -2284,10 +2400,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return (spirv_asm {
                 OpCapability ImageQuery;
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float2 = OpImageQueryLod %sampledImage $location;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float2 = OpImageQueryLod $sampledImage $location;
             }).y;
         }
     }
@@ -2390,6 +2507,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     static const int access = 0;
     static const int isCombined = 0;
 
+    // The `case spirv:` paths in this extension combine the texture and sampler
+    // into a sampled image at the IR level (via __makeCombinedTextureSampler)
+    // so that NonUniform decorations propagate correctly to the OpSampledImage
+    // result per Vulkan VUID-RuntimeSpirv-None-10148.
+
     //@public:
     [__readNone]
     [ForceInline]
@@ -2466,11 +2588,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2532,11 +2655,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffset($p, $2, $3)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<
@@ -2595,12 +2719,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffsetClampARB($p, $2, $3, $4)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|ConstOffset|MinLod $offset $clamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|ConstOffset|MinLod $offset $clamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -2618,19 +2743,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".Sample";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod %sampledImage $location ConstOffset|MinLod $offset $clamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location ConstOffset|MinLod $offset $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         default:
             status = 0;
@@ -2679,11 +2805,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctexture($p, $2, $3)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias $bias;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias $bias;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2742,11 +2869,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureOffset($p, $2, $4, $3)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleImplicitLod %sampledImage $location None|Bias|ConstOffset $bias $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleImplicitLod $sampledImage $location None|Bias|ConstOffset $bias $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2779,26 +2907,27 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleBias";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod %sampledImage $location Bias|ConstOffset|MinLod $bias $offset $clamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleImplicitLod $sampledImage $location Bias|ConstOffset|MinLod $bias $offset $clamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
        }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __requireComputeDerivative();
@@ -2825,10 +2954,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case metal:
             return __metal_SampleCmp(__metal_asDepthTexture(this), s, location, compareValue);
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue;
             };
         case wgsl:
             __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2851,7 +2981,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
     {
         __target_switch
@@ -2884,7 +3014,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __requireComputeDerivative();
@@ -2907,10 +3037,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case metal:
             return __metal_SampleCmp(__metal_asDepthTexture(this), s, location, compareValue, offset);
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset $offset;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue ConstOffset $offset;
             };
         case wgsl:
             __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -2943,25 +3074,26 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset|MinLod $offset $clamp;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue ConstOffset|MinLod $offset $clamp;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv_wgsl, texture_shadow)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -3058,10 +3190,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case metal:
             return __metal_SampleCmpLevel(__metal_asDepthTexture(this), s, location, compareValue, level);
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod $level;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Lod $level;
             };
         }
     }
@@ -3074,13 +3207,32 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLodOffset(sampler1DShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler1DArrayShadow sampler, vec3 P, float lod, int offset)
+            // - float textureLodOffset(sampler2DShadow sampler, vec3 P, float lod, ivec2 offset)
+            //
+            // GL_EXT_texture_shadow_lod adds the following variant:
+            // - float textureLodOffset(sampler2DArrayShadow sampler, vec4 P, float lod, ivec2 offset)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), level, offset);
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), level, offset);
+                else
+                    return __glsl150_texture_level_offset(this, s, __makeVector(location, compareValue), level, offset);
+            }
+            else if (Shape.dimensions == 2)
+            {
+                if (isArray == 0)
+                    return __glsl150_texture_level_offset(this, s, __makeVector(location,compareValue), level, offset);
+                else
+                    return __glsl_shadow_lod_texture_level_offset(this, s, __makeVector(location, compareValue), level, offset);
             }
             else
             {
-                return __glsl_texture_level_offset(this, s, __makeVector(location,compareValue), level, offset);
+                static_assert(Shape.dimensions != 3, "_Texture::SampleCmpLevel with offset: cube shadow types do not support textureLodOffset in GLSL");
+                return 0.0;
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -3090,10 +3242,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         case metal:
             return __metal_SampleCmpLevel(__metal_asDepthTexture(this), s, location, compareValue, level, offset);
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $level $offset;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Lod|ConstOffset $level $offset;
             };
         }
     }
@@ -3111,17 +3264,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevel";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $level $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Lod|ConstOffset $level $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -3140,10 +3294,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpGrad";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad $gradX $gradY;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Grad $gradX $gradY;
             };
         }
     }
@@ -3163,10 +3318,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpGrad";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
             };
         }
     }
@@ -3186,24 +3342,25 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpGrad";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefExplicitLod $sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
     {
         __requireComputeDerivative();
@@ -3215,17 +3372,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpBias";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias $bias;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue Bias $bias;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -3238,17 +3396,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpBias";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                result:$$float = OpImageSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
             };
         }
     }
 
     [__readNone]
     [ForceInline]
-    [require(hlsl_spirv, texture_shadowgrad)]
+    [require(hlsl_spirv, texture_shadowbias)]
     float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
@@ -3261,17 +3420,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpBias";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint $$float;
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint $$float;
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleDrefImplicitLod $sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
 
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                OpStore &status %residentCode;
-                result:$$float = OpCompositeExtract %sparseResult 1;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                OpStore &status %__residentCode;
+                result:$$float = OpCompositeExtract %__sparseResult 1;
             };
         }
     }
@@ -3318,11 +3478,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
             __intrinsic_asm "$ctextureGrad($p, $2, $3, $4)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad $gradX $gradY;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad $gradX $gradY;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3381,11 +3542,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
             __intrinsic_asm "$ctextureGradOffset($p, $2, $3, $4, $5)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset $gradX $gradY $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
 
                 };
             case wgsl:
@@ -3444,12 +3606,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
             __intrinsic_asm "$ctextureGradOffsetClampARB($p, $2, $3, $4, $5, $6)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
                     OpCapability MinLod;
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -3467,19 +3630,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleGrad";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability MinLod;
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod %sampledImage $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
        }
     }
@@ -3559,11 +3723,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     }
                 }
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod $level;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod $level;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3623,11 +3788,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureLodOffset($p, $2, $3, $4)$z";
             case spirv:
+                let sampledImage = __makeCombinedTextureSampler(this, s);
                 return spirv_asm
                 {
-                    %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                    %sampled : __sampledType(T) = OpImageSampleExplicitLod %sampledImage $location None|Lod|ConstOffset $level $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled : __sampledType(T) = OpImageSampleExplicitLod $sampledImage $location None|Lod|ConstOffset $level $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3659,18 +3825,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleLevel";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, s);
             return spirv_asm
             {
                 OpCapability SparseResidency;
-                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
-                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod %sampledImage $location Lod|ConstOffset $level $offset;
-                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                %__sparseResult:%__sparseResultType = OpImageSparseSampleExplicitLod $sampledImage $location Lod|ConstOffset $level $offset;
+                %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                OpStore &status %residentCode;
-                __truncate $$T result __sampledType(T) %sampled;
+                OpStore &status %__residentCode;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -3759,9 +3926,10 @@ vector<T.Element,4> __texture_gather(
         // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
         __intrinsic_asm "$0.gather($1, $2, int2(0), metal::component($3))";
     case spirv:
+        let sampledImage = __makeCombinedTextureSampler(texture, s);
         return spirv_asm {
-            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component;
+            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+            result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component;
         };
     case wgsl:
         __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -3848,11 +4016,8 @@ vector<T.Element,4> __texture_gather_offset(
         // Tv gather(sampler s, float2 coord, int2 offset = int2(0), component c = component::x) const
         __intrinsic_asm "$0.gather($1, $2, $3, metal::component($4))";
     case spirv:
-        return spirv_asm {
-            OpCapability ImageGatherExtended;
-            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component Offset $offset;
-        };
+        let sampledImage = __makeCombinedTextureSampler(texture, s);
+        return __spirvImageGatherOffset(sampledImage, location, component, offset);
     case wgsl:
         __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D)
@@ -3902,10 +4067,7 @@ vector<T.Element,4> __texture_gather_offset(
     case glsl:
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
-        return spirv_asm {
-            OpCapability ImageGatherExtended;
-            result:$$vector<T.Element,4> = OpImageGather $sampler $location $component Offset $offset;
-        };
+        return __spirvImageGatherOffset(sampler, location, component, offset);
     }
 }
 
@@ -3928,10 +4090,11 @@ vector<T.Element,4> __texture_gather_offsets(
         __intrinsic_asm "textureGatherOffsets($p, $2, $T3[]($3, $4, $5, $6)), $7";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
+        let sampledImage = __makeCombinedTextureSampler(texture, s);
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component ConstOffsets $offsets;
+            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+            result:$$vector<T.Element,4> = OpImageGather $sampledImage $location $component ConstOffsets $offsets;
         };
     }
 }
@@ -3993,9 +4156,10 @@ vector<T.Element,4> __texture_gatherCmp(
         // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
         __intrinsic_asm "$0.gather_compare($1, $2, $3)";
     case spirv:
+        let sampledImage = __makeCombinedTextureSampler(texture, s);
         return spirv_asm {
-            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue;
+            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+            result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue;
         };
     case wgsl:
         __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -4066,9 +4230,10 @@ vector<T.Element,4> __texture_gatherCmp_offset(
         // Tv gather_compare(sampler s, float2 coord, float compare_value, int2 offset = int2(0)) const
         __intrinsic_asm "$0.gather_compare($1, $2, $3, $4)";
     case spirv:
+        let sampledImage = __makeCombinedTextureSampler(texture, s);
         return spirv_asm {
-            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
+            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+            result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue ConstOffset $offset;
         };
     case wgsl:
         __wgsl_check_texture_type_texel_offset<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format>();
@@ -4128,10 +4293,11 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
         __intrinsic_asm "textureGatherOffsets($p, $2, $3, $T4[]($4, $5, $6, $7))";
     case spirv:
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
+        let sampledImage = __makeCombinedTextureSampler(texture, s);
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffsets $offsets;
+            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+            result:$$vector<T.Element,4> = OpImageDrefGather $sampledImage $location $compareValue ConstOffsets $offsets;
         };
     }
 }
@@ -4205,7 +4371,7 @@ $}
         case cuda:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -4254,7 +4420,7 @@ $}
             // CUDA tex2Dgather doesn't support offset - ignore offset parameter
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D), "CUDA Gather is supported only for 2D textures");
             static_assert(isArray == 0, "CUDA Gather does not support texture arrays");
-            __intrinsic_asm "tex2Dgather<$T0>($0, ($2).x, ($2).y$(componentArg))";
+            __intrinsic_asm "tex2Dgather<$TR>($0, ($2).x, ($2).y$(componentArg))";
         case metal:
         case wgsl:
             static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE),
@@ -4354,7 +4520,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    // Static requirement is plain `texture_sm_4_1`, not the `_samplerless` alias: this block
+    // is generic over `isCombined`, and a *combined* sampler's GLSL `texelFetch` needs no
+    // `GL_EXT_samplerless_texture_functions`. The samplerless atom here would spuriously fire
+    // `warning[E41012]` under an explicit `-profile` (#11874); the extension is added at emit
+    // time for the bare case only, via the `isCombined`-gated `__requireTargetExtension` below.
+    // (The two `hlsl_spirv`-only sparse-fetch `Load` overloads below keep the alias -- they
+    // have no GLSL path, so the samplerless atom is inert there.)
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -4363,6 +4536,12 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case hlsl:
             __intrinsic_asm ".Load";
 		case cuda:
+            // The 'tex*fetch_int<T>' prelude templates below have no half implementation
+            // (specialized only for float/uint/int, and the 1D template's body is a stub),
+            // so a half texel produces broken CUDA. Reject it here; the shape catch-all
+            // below does not.
+            static_assert(!__isHalf<T>(),
+                "'Load' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
             if (isArray != 0)
             {
                 switch(Shape.flavor)
@@ -4458,19 +4637,20 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             let lod = location[lodLoc];
             if (isCombined != 0)
             {
+                let image = __extractImage(this);
                 return spirv_asm
                 {
-                    %image:__imageType(this) = OpImage $this;
-                    %sampled:__sampledType(T) = OpImageFetch %image $coord Lod $lod;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    %__sampled:__sampledType(T) = OpImageFetch $image $coord Lod $lod;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             }
             else
             {
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageFetch $this $coord Lod $lod;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageFetch $this $coord Lod $lod;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             }
         case wgsl:
@@ -4506,7 +4686,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -4524,19 +4704,20 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 let lod = location[lodLoc];
                 if (isCombined != 0)
                 {
+                    let image = __extractImage(this);
                     return spirv_asm
                     {
-                        %image:__imageType(this) = OpImage $this;
-                        %sampled:__sampledType(T) = OpImageFetch %image $coord Lod|ConstOffset $lod $offset;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                        %__sampled:__sampledType(T) = OpImageFetch $image $coord Lod|ConstOffset $lod $offset;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
                 else
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset $lod $offset;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $this $coord Lod|ConstOffset $lod $offset;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
         }
@@ -4556,18 +4737,19 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
              let lod = location[lodLoc];
              if (isCombined != 0)
              {
+                 let image = __extractImage(this);
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
-                     %image:__imageType(this) = OpImage $this;
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $coord Lod|ConstOffset $lod $offset;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $image $coord Lod|ConstOffset $lod $offset;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                     OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     OpStore &status %__residentCode;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
              else
@@ -4575,14 +4757,14 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract  %__sparseResult 1;
 
-                     OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     OpStore &status %__residentCode;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
         default:
@@ -4595,7 +4777,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -4614,19 +4796,20 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 case spirv:
                     if (isCombined != 0)
                     {
+                        let image = __extractImage(this);
                         return spirv_asm
                         {
-                            %image:__imageType(this) = OpImage $this;
-                            %sampled:__sampledType(T) = OpImageFetch %image $location;
-                            __truncate $$T result __sampledType(T) %sampled;
+                            // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                            %__sampled:__sampledType(T) = OpImageFetch $image $location;
+                            __truncate $$T result __sampledType(T) %__sampled;
                         };
                     }
                     else
                     {
                         return spirv_asm
                         {
-                            %sampled:__sampledType(T) = OpImageFetch $this $location;
-                            __truncate $$T result __sampledType(T) %sampled;
+                            %__sampled:__sampledType(T) = OpImageFetch $this $location;
+                            __truncate $$T result __sampledType(T) %__sampled;
                         };
                     }
                 case wgsl:
@@ -4647,7 +4830,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex)
     {
         __target_switch
@@ -4690,19 +4873,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             case spirv:
                 if (isCombined != 0)
                 {
+                    let image = __extractImage(this);
                     return spirv_asm
                     {
-                        %image:__imageType(this) = OpImage $this;
-                        %sampled:__sampledType(T) = OpImageFetch %image $location Sample $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                        %__sampled:__sampledType(T) = OpImageFetch $image $location Sample $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
                 else
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $location Sample $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $this $location Sample $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
             case wgsl:
@@ -4714,7 +4898,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv_wgsl, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions + isArray + 1> locationAndSampleIndex)
     {
         return Load(__vectorReshape<Shape.dimensions + isArray>(locationAndSampleIndex), locationAndSampleIndex[Shape.dimensions + isArray]);
@@ -4722,7 +4906,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+    [require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset)
     {
         __target_switch
@@ -4737,19 +4921,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
             case spirv:
                 if (isCombined != 0)
                 {
+                    let image = __extractImage(this);
                     return spirv_asm
                     {
-                        %image:__imageType(this) = OpImage $this;
-                        %sampled:__sampledType(T) = OpImageFetch %image $location ConstOffset|Sample $offset $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                        %__sampled:__sampledType(T) = OpImageFetch $image $location ConstOffset|Sample $offset $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
                 else
                 {
                     return spirv_asm
                     {
-                        %sampled:__sampledType(T) = OpImageFetch $this $location ConstOffset|Sample $offset  $sampleIndex;
-                        __truncate $$T result __sampledType(T) %sampled;
+                        %__sampled:__sampledType(T) = OpImageFetch $this $location ConstOffset|Sample $offset  $sampleIndex;
+                        __truncate $$T result __sampledType(T) %__sampled;
                     };
                 }
         }
@@ -4766,18 +4951,19 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         case spirv:
              if (isCombined != 0)
              {
+                 let image = __extractImage(this);
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
-                     %image:__imageType(this) = OpImage $this;
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $location ConstOffset|Sample $offset $sampleIndex;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $image $location ConstOffset|Sample $offset $sampleIndex;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                     OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     OpStore &status %__residentCode;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
              else
@@ -4785,14 +4971,14 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                  return spirv_asm
                  {
                      OpCapability SparseResidency;
-                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %__sparseResultType = OpTypeStruct $$uint __sampledType(T);
 
-                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
-                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
-                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+                     %__sparseResult:%__sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
+                     %__residentCode:$$uint = OpCompositeExtract %__sparseResult 0;
+                     %__sampled:__sampledType(T) = OpCompositeExtract %__sparseResult 1;
 
-                     OpStore &status %residentCode;
-                     __truncate $$T result __sampledType(T) %sampled;
+                     OpStore &status %__residentCode;
+                     __truncate $$T result __sampledType(T) %__sampled;
                  };
              }
         default:
@@ -4805,7 +4991,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -4828,7 +5014,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
         get
         {
             __target_switch
@@ -4915,8 +5101,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case metal:
                 switch (Shape.flavor)
@@ -5016,8 +5202,8 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location ConstOffset $offset;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -5252,8 +5438,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location Sample $sampleIndex;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
             case wgsl:
                 __wgsl_check_texture_type<T, Shape, isArray, isMS, sampleCount, $(access), isShadow, isCombined, format>();
@@ -5277,8 +5463,8 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
             case spirv:
                 return spirv_asm
                 {
-                    %sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
-                    __truncate $$T result __sampledType(T) %sampled;
+                    %__sampled:__sampledType(T) = OpImageRead $this $location ConstOffset|Sample $offset $sampleIndex;
+                    __truncate $$T result __sampledType(T) %__sampled;
                 };
         }
     }
@@ -5725,23 +5911,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, constexpr uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(cpp_cuda, byteaddressbuffer)]
@@ -5752,12 +5938,20 @@ __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(cpp_cuda, structuredbuffer)]
+[require(cpp_cuda_spirv, structuredbuffer)]
 LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(cpp_cuda, structuredbuffer)]
+[require(cpp_cuda_spirv, structuredbuffer)]
 LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer);
+
+__intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+[require(spirv, structuredbuffer)]
+LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer, uint element);
+
+__intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+[require(spirv, structuredbuffer)]
+LayoutPtr<T, L> __getStructuredBufferElementPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer, uint element);
 
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
@@ -5794,28 +5988,33 @@ struct StructuredBuffer : IArray<T>
         stride = rs.y;
     }
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @return The element at the specified index.
+    __intrinsic_op($(kIROp_StructuredBufferLoad))
+    [__readNone]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
+
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
     /// @param[out] status The status of the operation.
     /// @return The element at the specified index.
     ///
     /// @remarks
+    /// This function is only supported when targeting HLSL.
     /// You can't access the output parameter `status` directly; instead,
     /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    __intrinsic_op($(kIROp_StructuredBufferLoad))
-    [__readNone]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
-    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
-
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
     [require(hlsl, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param index The index of buffer.
     /// @return The element at the specified index.
@@ -5824,7 +6023,7 @@ struct StructuredBuffer : IArray<T>
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_spirv_llvm, structuredbuffer)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
         get;
     };
 };
@@ -5973,23 +6172,12 @@ struct $(item.name)
         }
     }
 
-    /// Load a 32-bit unsigned integer or value with type of `T` from the buffer at the specified location.
-    ///@param T The type of the value to load from the buffer.
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return The value loaded from the buffer.
-    ///
-    ///@remarks
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint Load(int location)
     {
         __target_switch
@@ -6000,9 +6188,21 @@ struct $(item.name)
         }
     }
 
+    /// Load a 32-bit unsigned integer from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return The 32-bit unsigned integer loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint Load(int location, out uint status)
     {
         __target_switch
@@ -6011,24 +6211,12 @@ struct $(item.name)
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location
-    /// with additional alignment.
-    ///@param location The input address in bytes.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
     ///@return Two 32-bit unsigned integers loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -6039,39 +6227,59 @@ struct $(item.name)
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load2`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load2";
+        case hlsl:
+            return Load2(location);
         default:
             return __byteAddressBufferLoad<uint2>(this, location, alignment);
         }
     }
 
-    /// Load two 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint2`, which is 8.
-    ///@param location The input address in bytes, which must be a multiple of alignment of 8.
-    ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
+    /// Load two 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 8.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, __naturalStrideOf<uint2>());
+            return __byteAddressBufferLoad<uint2>(this, location, __naturalAlignmentOf<uint2>());
         }
     }
 
+    /// Load two 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Two 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint2 Load2(uint location, out uint status)
     {
         __target_switch
@@ -6082,21 +6290,10 @@ struct $(item.name)
 
     /// Load three 32-bit unsigned integers from the buffer at the specified location.
     ///@param location The input address in bytes, which must be a multiple of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -6107,39 +6304,59 @@ struct $(item.name)
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load3`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load3";
+        case hlsl:
+            return Load3(location);
         default:
             return __byteAddressBufferLoad<uint3>(this, location, alignment);
         }
     }
 
-    /// Load three 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint3`, which is 12.
-    ///@param location The input address in bytes which must be a multiple of alignment of 12.
-    ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
+    /// Load three 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, __naturalStrideOf<uint3>());
+            return __byteAddressBufferLoad<uint3>(this, location, __naturalAlignmentOf<uint3>());
         }
     }
 
+    /// Load three 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Three 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint3 Load3(uint location, out uint status)
     {
         __target_switch
@@ -6149,21 +6366,11 @@ struct $(item.name)
     }
 
     /// Load four 32-bit unsigned integers from the buffer at the specified location.
-    ///@param location The input address in bytes which must be a multiple of alignment of 4.
-    ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
-    ///@param[out] status The status of the operation.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
-    ///
-    ///@remarks
-    /// This function only supports when targeting HLSL.
-    /// You can't access the output parameter `status` directly; instead,
-    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
-    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
-    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
-    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -6174,39 +6381,59 @@ struct $(item.name)
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with a known alignment.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param alignment The known alignment of `location`, which must be a multiple of 4.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only; the load is emitted as the native `.Load4`
+    /// intrinsic, which does not accept an alignment operand. On other targets, `alignment` is
+    /// forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load4";
+        case hlsl:
+            return Load4(location);
         default:
             return __byteAddressBufferLoad<uint4>(this, location, alignment);
         }
     }
 
-    /// Load four 32-bit unsigned integers from the buffer at the specified location with alignment
-    /// of `uint4`, which is 16.
-    ///@param location The input address in bytes which must be a multiple of alignment of 16.
-    ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
+    /// Load four 32-bit unsigned integers from the buffer at the specified location with natural alignment.
+    ///@param location The input address in bytes, which must be a multiple of 16.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, __naturalStrideOf<uint4>());
+            return __byteAddressBufferLoad<uint4>(this, location, __naturalAlignmentOf<uint4>());
         }
     }
 
+    /// Load four 32-bit unsigned integers from the buffer at the specified location.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@param[out] status The status of the operation.
+    ///@return Four 32-bit unsigned integers loaded from the buffer.
+    ///
+    ///@remarks
+    /// This function is only supported when targeting HLSL.
+    /// You can't access the output parameter `status` directly; instead,
+    /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
+    /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
+    /// Gather, or Load operation accessed mapped tiles in a tiled resource.
+    /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(hlsl)]
+    [require(hlsl, byteaddressbuffer_rw)]
     uint4 Load4(uint location, out uint status)
     {
         __target_switch
@@ -6215,33 +6442,49 @@ struct $(item.name)
         }
     }
 
+    /// Load a value with type `T` from the buffer at the specified location.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of 4.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// This overload does not assume alignment beyond 4 bytes and may be lowered to scalar 4-byte loads.
+    /// Use `LoadAligned<T>` when `location` has a stronger alignment guarantee.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
+    /// Load a value with type `T` from the buffer at the specified location with a known alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of `alignment`.
+    ///@param alignment The known alignment of `location` in bytes; a compile-time constant.
+    ///@return The value loaded from the buffer.
+    ///@remarks
+    /// On HLSL, `alignment` is informational only and does not affect the emitted intrinsic.
+    /// On other targets, `alignment` is forwarded to the lowered load instruction.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-    T LoadAligned<T>(uint location, uint alignment)
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
+    T LoadAligned<T>(uint location, constexpr uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
-    /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
-    ///@param location The input address in bytes which must be a multiple of size of `T`.
-    ///@return T value with type `T` loaded from the buffer.
+    /// Load a value with type `T` from the buffer at the specified location with natural alignment.
+    ///@param T The type of the value to load from the buffer.
+    ///@param location The input address in bytes, which must be a multiple of `T`'s natural alignment.
+    ///@return The value loaded from the buffer.
     ///@remarks
-    ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
+    /// Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
     T LoadAligned<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
+        return __byteAddressBufferLoad<T>(this, location, __naturalAlignmentOf<T>());
     }
 
 ${
@@ -6814,7 +7057,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store2";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint2>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint2>(), value);
         }
     }
 
@@ -6848,7 +7091,7 @@ $}
 
     /// Set three values to the buffer at the specified location, the address will be aligned
     /// to the alignment of `uint3`, which is 12.
-    ///@param address The input address in bytes, which must be a multiple of 12.
+    ///@param address The input address in bytes, which must be a multiple of 4 (the natural alignment of `uint3`).
     ///@param value Three input values.
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
@@ -6858,7 +7101,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store3";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint3>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint3>(), value);
         }
     }
 
@@ -6903,7 +7146,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".Store4";
         default:
-            __byteAddressBufferStore(this, address, __naturalStrideOf<uint4>(), value);
+            __byteAddressBufferStore(this, address, __naturalAlignmentOf<uint4>(), value);
         }
     }
 
@@ -6916,7 +7159,7 @@ $}
 
     [__unsafeForceInlineEarly]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
-    void Store<T>(uint address, T value, uint alignment)
+    void Store<T>(uint address, T value, constexpr uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
     }
@@ -6930,7 +7173,7 @@ $}
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void StoreAligned<T>(uint address, T value)
     {
-        __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);
+        __byteAddressBufferStore(this, address, __naturalAlignmentOf<T>(), value);
     }
 };
 
@@ -7004,28 +7247,34 @@ struct $(item.name) : IRWArray<T>
     [require(hlsl)]
     uint IncrementCounter();
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
+    /// @param TIndex Type of the index.
+    /// @param location The index of buffer.
+    /// @return The element at the specified index.
+    [__NoSideEffect]
+    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
+    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
+
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param location The index of buffer.
     /// @param[out] status The status of the operation.
     /// @return The element at the specified index.
     ///
     /// @remarks
+    /// This function is only supported when targeting HLSL.
     /// You can't access the output parameter `status` directly; instead,
     /// pass the status to the `CheckAccessFullyMapped` intrinsic function.
     /// `CheckAccessFullyMapped` returns TRUE if all values from the corresponding Sample,
     /// Gather, or Load operation accessed mapped tiles in a tiled resource.
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
-    /// When targeting non-HLSL, the status is always 0.
-    [__NoSideEffect]
-    __intrinsic_op($(kIROp_RWStructuredBufferLoad))
-    T Load<TIndex : __BuiltinIntegerType>(TIndex location);
-
     [__NoSideEffect]
     __intrinsic_op($(kIROp_RWStructuredBufferLoadStatus))
+    [require(hlsl, structuredbuffer_rw)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location, out uint status);
 
-    /// Load a element from the buffer at the specified location.
+    /// Load an element from the buffer at the specified location.
     /// @param TIndex Type of the index.
     /// @param index The index of buffer.
     /// @return The element at the specified index.
@@ -7038,6 +7287,7 @@ struct $(item.name) : IRWArray<T>
         [__NoSideEffect]
         [nonmutating]
         __intrinsic_op($(kIROp_RWStructuredBufferGetElementPtr))
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
         ref;
     }
 };
@@ -7491,8 +7741,8 @@ bool all(vector<T,N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpINotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAll $$bool result %castResult
+                OpINotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAll $$bool result %__castResult
             };
         }
         else
@@ -7500,8 +7750,8 @@ bool all(vector<T,N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAll $$bool result %castResult
+                OpFUnordNotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAll $$bool result %__castResult
             };
         }
     case wgsl:
@@ -7683,8 +7933,8 @@ bool any(vector<T, N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpINotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAny $$bool result %castResult
+                OpINotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAny $$bool result %__castResult
             };
         }
         else
@@ -7692,8 +7942,8 @@ bool any(vector<T, N> x)
             let zero = __default<vector<T,N>>();
             return spirv_asm
             {
-                OpFUnordNotEqual $$vector<bool,N> %castResult $x $zero;
-                OpAny $$bool result %castResult
+                OpFUnordNotEqual $$vector<bool,N> %__castResult $x $zero;
+                OpAny $$bool result %__castResult
             };
         }
     case wgsl:
@@ -7747,8 +7997,8 @@ double asdouble(uint lowbits, uint highbits)
     case cpp: __intrinsic_asm "$P_asdouble($0, $1)";
     case cuda: __intrinsic_asm "$P_asdouble($0, $1)";
     case spirv: return spirv_asm {
-        %v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
-        result:$$double = OpExtInst glsl450 59 %v
+        %__v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
+        result:$$double = OpExtInst glsl450 59 %__v
     };
     case llvm:
         uint64_t val = uint64_t(lowbits) | (uint64_t(highbits)<<32u);
@@ -10167,9 +10417,9 @@ T EvaluateAttributeSnapped(__constref T x, int2 offset)
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
             OpCapability InterpolationFunction;
-            %foffset:$$float2 = OpConvertSToF $offset;
-            %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$T = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
+            %__foffset:$$float2 = OpConvertSToF $offset;
+            %__offsetdiv16:$$float2 = OpFDiv %__foffset $tmp;
+            result:$$T = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %__offsetdiv16
         };
     }
     }
@@ -10191,9 +10441,9 @@ vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
             OpCapability InterpolationFunction;
-            %foffset:$$float2 = OpConvertSToF $offset;
-            %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
+            %__foffset:$$float2 = OpConvertSToF $offset;
+            %__offsetdiv16:$$float2 = OpFDiv %__foffset $tmp;
+            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %__offsetdiv16
         };
     }
     }
@@ -10416,9 +10666,9 @@ float f16tof32(uint value)
     case spirv:
     {
         return spirv_asm {
-            %lowBits = OpUConvert $$uint16_t $value;
-            %half = OpBitcast $$half %lowBits;
-            result:$$float = OpFConvert %half
+            %__lowBits = OpUConvert $$uint16_t $value;
+            %__half = OpBitcast $$half %__lowBits;
+            result:$$float = OpFConvert %__half
         };
     }
     case wgsl: __intrinsic_asm "unpack2x16float($0).x";
@@ -10441,9 +10691,9 @@ vector<float, N> f16tof32(vector<uint, N> value)
     case spirv:
     {
         return spirv_asm {
-            %lowBits = OpUConvert $$vector<uint16_t,N> $value;
-            %half = OpBitcast $$vector<half,N> %lowBits;
-            result:$$vector<float,N> = OpFConvert %half
+            %__lowBits = OpUConvert $$vector<uint16_t,N> $value;
+            %__half = OpBitcast $$vector<half,N> %__lowBits;
+            result:$$vector<float,N> = OpFConvert %__half
         };
     }
     default:
@@ -10469,9 +10719,9 @@ uint f32tof16(float value)
     case spirv:
     {
         return spirv_asm {
-            %half = OpFConvert $$half $value;
-            %lowBits = OpBitcast $$uint16_t %half;
-            result:$$uint = OpUConvert %lowBits
+            %__half = OpFConvert $$half $value;
+            %__lowBits = OpBitcast $$uint16_t %__half;
+            result:$$uint = OpUConvert %__lowBits
         };
     }
     case wgsl: __intrinsic_asm "pack2x16float(vec2f($0,0.0))";
@@ -10494,9 +10744,9 @@ vector<uint, N> f32tof16(vector<float, N> value)
     case spirv:
     {
         return spirv_asm {
-            %half = OpFConvert $$vector<half,N> $value;
-            %lowBits = OpBitcast $$vector<uint16_t,N> %half;
-            result:$$vector<uint,N> = OpUConvert %lowBits
+            %__half = OpFConvert $$vector<half,N> $value;
+            %__lowBits = OpBitcast $$vector<uint16_t,N> %__half;
+            result:$$vector<uint,N> = OpUConvert %__lowBits
         };
     }
     default:
@@ -11004,39 +11254,39 @@ T fmod(T x, T y)
     // OpenGL document defines "Modulus" as "Returns x - y * floor(x / y)".
     // The use of "Floor()" makes the difference.
     //
-    // In Metal, `fmod` is Modulus function.
+    // In Metal, `fmod` is a Remainder function.
     // Metal document defines it as "Returns x - y * trunc(x/y)".
-    // Note that the function name is same to HLSL but it behaves differently.
+    // This matches HLSL `fmod`, so no sign correction is needed.
     //
     // The tricky ones are when x or y is a negative value.
     //
-    //       | Remainder | Modulus
-    //  x  y | x= i*y +f | x-y*floor(x/y)
-    // ------+-----------+------------------------------
-    //  4  3 | 4= 1*3 +1 | 4-3*floor( 4/3) = 4-3* 1 = 1
-    //  3  3 | 3= 1*3 +0 | 3-3*floor( 3/3) = 3-3* 1 = 0
-    //  2  3 | 2= 0*3 +2 | 2-3*floor( 2/3) = 2-3* 0 = 2
-    //  1  3 | 1= 0*3 +1 | 1-3*floor( 1/3) = 1-3* 0 = 1
-    //  0  3 | 0= 0*3 +0 | 0-3*floor( 0/3) = 0-3* 0 = 0
-    // -1  3 |-1= 0*3 -1 |-1-3*floor(-1/3) =-1-3*-1 = 2
-    // -2  3 |-2= 0*3 -2 |-2-3*floor(-2/3) =-2-3*-1 = 1
-    // -3  3 |-3=-1*3  0 |-3-3*floor(-3/3) =-3-3*-1 = 0
-    // -4  3 |-4=-1*3 -1 |-4-3*floor(-4/3) =-4-3*-2 = 2
+    //       | Remainder        | Modulus
+    //  x  y | x - y*trunc(x/y) | x-y*floor(x/y)
+    // ------+------------------+------------------------------
+    //  4  3 | 4= 1*3 +1        | 4-3*floor( 4/3) = 4-3* 1 = 1
+    //  3  3 | 3= 1*3 +0        | 3-3*floor( 3/3) = 3-3* 1 = 0
+    //  2  3 | 2= 0*3 +2        | 2-3*floor( 2/3) = 2-3* 0 = 2
+    //  1  3 | 1= 0*3 +1        | 1-3*floor( 1/3) = 1-3* 0 = 1
+    //  0  3 | 0= 0*3 +0        | 0-3*floor( 0/3) = 0-3* 0 = 0
+    // -1  3 |-1= 0*3 -1        |-1-3*floor(-1/3) =-1-3*-1 = 2
+    // -2  3 |-2= 0*3 -2        |-2-3*floor(-2/3) =-2-3*-1 = 1
+    // -3  3 |-3=-1*3  0        |-3-3*floor(-3/3) =-3-3*-1 = 0
+    // -4  3 |-4=-1*3 -1        |-4-3*floor(-4/3) =-4-3*-2 = 2
     //
     // When y is a negative value,
     //
-    //       | Remainder | Modulus
-    //  x  y | x= i*y +f | x-y*floor(x/y)
-    // ------+-----------+------------------------------
-    //  4 -3 | 4=-1*-3+1 | 4+3*floor( 4/-3) = 4+3*-2 =-2
-    //  3 -3 | 3=-1*-3+0 | 3+3*floor( 3/-3) = 3+3*-1 = 0
-    //  2 -3 | 2= 0*-3+2 | 2+3*floor( 2/-3) = 2+3*-1 =-1
-    //  1 -3 | 1= 0*-3+1 | 1+3*floor( 1/-3) = 1+3*-1 =-2
-    //  0 -3 | 0= 0*-3+0 | 0+3*floor( 0/-3) = 0+3* 0 = 0
-    // -1 -3 |-1= 0*-3-1 |-1+3*floor(-1/-3) =-1+3* 0 =-1
-    // -2 -3 |-2= 0*-3-2 |-2+3*floor(-2/-3) =-2+3* 0 =-2
-    // -3 -3 |-3= 1*-3 0 |-3+3*floor(-3/-3) =-3+3* 1 = 0
-    // -4 -3 |-4= 1*-3-1 |-4+3*floor(-4/-3) =-4+3* 1 =-1
+    //       | Remainder        | Modulus
+    //  x  y | x - y*trunc(x/y) | x-y*floor(x/y)
+    // ------+------------------+------------------------------
+    //  4 -3 | 4=-1*-3+1        | 4+3*floor( 4/-3) = 4+3*-2 =-2
+    //  3 -3 | 3=-1*-3+0        | 3+3*floor( 3/-3) = 3+3*-1 = 0
+    //  2 -3 | 2= 0*-3+2        | 2+3*floor( 2/-3) = 2+3*-1 =-1
+    //  1 -3 | 1= 0*-3+1        | 1+3*floor( 1/-3) = 1+3*-1 =-2
+    //  0 -3 | 0= 0*-3+0        | 0+3*floor( 0/-3) = 0+3* 0 = 0
+    // -1 -3 |-1= 0*-3-1        |-1+3*floor(-1/-3) =-1+3* 0 =-1
+    // -2 -3 |-2= 0*-3-2        |-2+3*floor(-2/-3) =-2+3* 0 =-2
+    // -3 -3 |-3= 1*-3 0        |-3+3*floor(-3/-3) =-3+3* 1 = 0
+    // -4 -3 |-4= 1*-3-1        |-4+3*floor(-4/-3) =-4+3* 1 =-1
 
     __target_switch
     {
@@ -11046,9 +11296,7 @@ T fmod(T x, T y)
         // GLSL doesn't have a function for remainder.
         __intrinsic_asm "(($0 < 0.0) ? -mod(-$0,abs($1)) : mod($0,abs($1)))";
     case hlsl: __intrinsic_asm "fmod";
-    case metal:
-        // Metal doesn't have a function for remainder.
-        __intrinsic_asm "(($0 < 0.0) ? -fmod(-$0,abs($1)) : fmod($0,abs($1)))";
+    case metal: __intrinsic_asm "fmod";
     case spirv:
         // OpFRem return "The floating-point remainder whose sign
         // matches the sign of Operand 1", where Operand 1 is "x".
@@ -11292,7 +11540,7 @@ T fwidth(T p)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(glsl_hlsl_spirv_wgsl, fragmentprocessing)]
+[require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
 vector<T, N> fwidth(vector<T, N> x)
 {
     __requireComputeDerivative();
@@ -11301,6 +11549,8 @@ vector<T, N> fwidth(vector<T, N> x)
     case hlsl:
         __intrinsic_asm "fwidth($0)";
     case glsl:
+        __intrinsic_asm "fwidth($0)";
+    case metal:
         __intrinsic_asm "fwidth($0)";
     case spirv:
         return spirv_asm
@@ -11314,7 +11564,7 @@ vector<T, N> fwidth(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(glsl_hlsl_spirv, fragmentprocessing)]
+[require(glsl_hlsl_metal_spirv_wgsl, fragmentprocessing)]
 matrix<T, N, M> fwidth(matrix<T, N, M> x)
 {
     __target_switch
@@ -12297,8 +12547,8 @@ T log10(T x)
     {
         const T tmp = T(0.43429448190325182765112891891661);
         return spirv_asm {
-            %baseElog:$$T = OpExtInst glsl450 Log $x;
-            result:$$T = OpFMul %baseElog $tmp
+            %__baseElog:$$T = OpExtInst glsl450 Log $x;
+            result:$$T = OpFMul %__baseElog $tmp
         };
     }
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
@@ -12320,8 +12570,8 @@ vector<T,N> log10(vector<T,N> x)
     {
         const T tmp = T(0.43429448190325182765112891891661);
         return spirv_asm {
-            %baseElog:$$vector<T,N> = OpExtInst glsl450 Log $x;
-            result:$$vector<T,N> = OpVectorTimesScalar %baseElog $tmp
+            %__baseElog:$$vector<T,N> = OpExtInst glsl450 Log $x;
+            result:$$vector<T,N> = OpVectorTimesScalar %__baseElog $tmp
         };
     }
     case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
@@ -13845,9 +14095,9 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 /// @param T The variadic type pack parameter for the arguments to be printed.
 /// @param format The format string.
 /// @param args (optional) The arguments to be printed.
-/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, and maps to `OpDebugPrintf` for SPIR-V target,
-/// and maps to `debugPrintfEXT` for GLSL target. Depending on the target and execution environment, the function may have
-/// no effect.
+/// @remarks The function maps to `printf` for HLSL, CPU and CUDA targets, maps to `OpDebugPrintf` for SPIR-V target,
+/// maps to `debugPrintfEXT` for GLSL target, and maps to `os_log_default.log` for Metal target.
+/// Depending on the target and execution environment, the function may have no effect.
 /// @example
 /// ```cpp
 /// void test(int x, float y)
@@ -13856,10 +14106,30 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 ///     printf(R"(x = "%d", y = "%f")", x, y);
 /// }
 /// ```
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, printf)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, printf)]
 [require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
+
+/// Abort shader execution with a debug message (VK_KHR_shader_abort).
+/// @param T The variadic type pack parameter for the arguments to be included in the message.
+/// @param format The format string. Must be a string literal.
+/// @param args (optional) Scalar and vector basic-type arguments to include in the message.
+/// @remarks The function maps to `abortEXT` for GLSL targets and emits `OpAbortKHR` for SPIR-V
+/// targets. When executed, shader execution terminates and the message is surfaced to the host
+/// through the retrieval mechanism defined by the VK_KHR_shader_abort extension (for example,
+/// the Vulkan device fault mechanism). Struct, matrix, array, pointer, resource, cooperative
+/// vector, and cooperative matrix arguments are rejected with diagnostic E55211.
+/// @example
+/// ```cpp
+/// void test(uint val)
+/// {
+///     abort("Unexpected value: %u", val);
+/// }
+/// ```
+[require(abort)]
+__intrinsic_op($(kIROp_Abort))
+void abort<each T>(NativeString format, expand each T args);
 
 // Tessellation factor fixup routines
 /// @category tessellation Tessellation functions
@@ -14495,8 +14765,8 @@ int sign(T x)
         if (__isFloat<T>())
             return spirv_asm
             {
-                %fsign:$$T = OpExtInst glsl450 FSign $x;
-                result:$$int = OpConvertFToS %fsign
+                %__fsign:$$T = OpExtInst glsl450 FSign $x;
+                result:$$int = OpConvertFToS %__fsign
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
@@ -14521,8 +14791,8 @@ vector<int, N> sign(vector<T, N> x)
         if (__isFloat<T>())
             return spirv_asm
             {
-                %fsign:$$vector<T, N> = OpExtInst glsl450 FSign $x;
-                result:$$vector<int, N> = OpConvertFToS %fsign
+                %__fsign:$$vector<T, N> = OpExtInst glsl450 FSign $x;
+                result:$$vector<int, N> = OpConvertFToS %__fsign
             };
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
@@ -15404,7 +15674,7 @@ uint WaveMaskCountBits(WaveMask mask, bool value)
 // It seems this can only mean the active threads are the "threads the program flow would lead to". This implies a lockstep
 // "straight SIMD" style interpretation. That being the case this op on HLSL is just a memory barrier without any Sync.
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -15417,6 +15687,9 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        // Metal simdgroup_barrier always syncs all 32 lanes; mask is ignored.
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_device | metal::mem_flags::mem_threadgroup)";
     }
 }
 
@@ -15436,7 +15709,7 @@ void AllMemoryBarrierWithWaveMaskSync(WaveMask mask)
 // aspect of HLSL seems to make everything in lock step - but that's not quite so, it only has to apparently be that way as far as the programmers
 // model appears - divergence could perhaps potentially still happen.
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
 {
     __target_switch
@@ -15449,10 +15722,13 @@ void GroupMemoryBarrierWithWaveMaskSync(WaveMask mask)
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        // Metal simdgroup_barrier always syncs all 32 lanes; mask is ignored.
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_threadgroup)";
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void AllMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -15465,10 +15741,12 @@ void AllMemoryBarrierWithWaveSync()
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_device | metal::mem_flags::mem_threadgroup)";
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void GroupMemoryBarrierWithWaveSync()
 {
     __target_switch
@@ -15481,6 +15759,8 @@ void GroupMemoryBarrierWithWaveSync()
     case spirv:
         __subgroupBarrier();
         return;
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(metal::mem_flags::mem_threadgroup)";
     }
 }
 
@@ -15628,8 +15908,8 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
         return spirv_asm
         {
             OpCapability GroupNonUniformBallot;
-            %mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %mask
+            %__mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %__mask
         };
     }
 }
@@ -16974,10 +17254,14 @@ uint WaveGetLaneIndex()
 
 /// Returns the number of waves (subgroups) in the current workgroup.
 /// Equivalent to GLSL gl_NumSubgroups.
+///
+/// On GLSL and SPIR-V this lowers to gl_NumSubgroups / BuiltIn NumSubgroups,
+/// which are restricted to compute-class execution models (compute, mesh,
+/// amplification); using it from any other stage is a capability error.
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
 uint WaveGetNumWaves()
 {
     __target_switch
@@ -17004,6 +17288,65 @@ uint WaveGetNumWaves()
         default:
             static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
             return 0; // unreachable, but needed to satisfy compiler
+        }
+    }
+}
+
+/// Returns the index of the current wave (subgroup) within the workgroup.
+/// Equivalent to GLSL gl_SubgroupID / Metal simdgroup_index_in_threadgroup.
+///
+/// On GLSL and SPIR-V this lowers to gl_SubgroupID / BuiltIn SubgroupId,
+/// which are restricted to compute-class execution models (compute, mesh,
+/// amplification); using it from any other stage is a capability error.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[NonUniformReturn]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_workgroup_index)]
+uint WaveGetWaveIndex()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupID)";
+    case cuda:
+        {
+            uint3 tid = cudaThreadIdx();
+            uint3 blockDim = cudaBlockDim();
+            uint flattenedTid = tid.x + tid.y * blockDim.x + tid.z * blockDim.x * blockDim.y;
+            return flattenedTid / WaveGetLaneCount();
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniform;
+            result:$$uint = OpLoad builtin(SubgroupId:uint)
+        };
+    case metal:
+        return __builtinWaveIndex;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        __stage_switch
+        {
+        case compute:
+            return __builtinWaveIndex;
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for WGSL");
+            return 0;
+        }
+    case hlsl:
+        __stage_switch
+        {
+        case compute:
+            {
+                uint groupIndex = __builtinGroupIndex;
+                uint waveSize = WaveGetLaneCount();
+                return groupIndex / waveSize;
+            }
+        default:
+            static_assert(false, "WaveGetWaveIndex is only supported in compute shaders for HLSL");
+            return 0;
         }
     }
 }
@@ -18027,8 +18370,8 @@ uint WavePrefixCountBits(bool value)
         return spirv_asm
         {
             OpCapability GroupNonUniformBallot;
-            %mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
-            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %mask
+            %__mask:$$uint4 = OpGroupNonUniformBallot Subgroup $value;
+            OpGroupNonUniformBallotBitCount $$uint result Subgroup 2 %__mask
         };
     default:
         return WaveMaskPrefixCountBits(WaveGetActiveMask(), value);
@@ -19031,8 +19374,8 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
             __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
-                %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
-                __truncate $$T result __sampledType(T) %sampled;
+                %__sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
+                __truncate $$T result __sampledType(T) %__sampled;
             };
         }
     }
@@ -19639,7 +19982,7 @@ void IgnoreHit()
     case spirv:
         spirv_asm
         {
-            OpIgnoreIntersectionKHR; %_ = OpLabel
+            OpIgnoreIntersectionKHR; %___ = OpLabel
         };
     }
 }
@@ -19659,7 +20002,7 @@ void AcceptHitAndEndSearch()
     case spirv:
         spirv_asm
         {
-            OpTerminateRayKHR; %_ = OpLabel
+            OpTerminateRayKHR; %___ = OpLabel
         };
     }
 }
@@ -19954,8 +20297,8 @@ float3x4 ObjectToWorld3x4()
     case spirv:
         return spirv_asm
         {
-            %mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
-            result:$$float3x4 = OpTranspose %mat;
+            %__mat:$$float4x3 = OpLoad builtin(ObjectToWorldKHR:float4x3);
+            result:$$float3x4 = OpTranspose %__mat;
         };
     }
 }
@@ -19976,8 +20319,8 @@ float3x4 WorldToObject3x4()
     case spirv:
         return spirv_asm
         {
-            %mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
-            result:$$float3x4 = OpTranspose %mat;
+            %__mat:$$float4x3 = OpLoad builtin(WorldToObjectKHR:float4x3);
+            result:$$float3x4 = OpTranspose %__mat;
         };
     }
 }
@@ -20044,6 +20387,8 @@ float RayCurrentTime()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
             result:$$float = OpLoad builtin(CurrentRayTimeNV:float);
         };
     }
@@ -20091,9 +20436,9 @@ float4 GetSpherePositionAndRadius()
             OpExtension "SPV_NV_linear_swept_spheres";
             OpCapability RayTracingLinearSweptSpheresGeometryNV;
             OpCapability RayTracingSpheresGeometryNV;
-            %pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
-            %rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
-            result:$$float4 = OpCompositeConstruct %pos %rad;
+            %__pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
+            %__rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
+            result:$$float4 = OpCompositeConstruct %__pos %__rad;
         };
     }
 }
@@ -20117,15 +20462,15 @@ float2x4 GetLssPositionsAndRadii()
             OpExtension "SPV_NV_linear_swept_spheres";
             OpCapability RayTracingLinearSweptSpheresGeometryNV;
             OpCapability RayTracingSpheresGeometryNV;
-            %positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
-            %radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
-            %r0:$$float = OpCompositeExtract %radii 0;
-            %r1:$$float = OpCompositeExtract %radii 1;
-            %p0:$$float3 = OpCompositeExtract %positions 0;
-            %p1:$$float3 = OpCompositeExtract %positions 1;
-            %a:$$float4 = OpCompositeConstruct %p0 %r0;
-            %b:$$float4 = OpCompositeConstruct %p1 %r1;
-            result:$$float2x4 = OpCompositeConstruct %a %b;
+            %__positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
+            %__radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
+            %__r0:$$float = OpCompositeExtract %__radii 0;
+            %__r1:$$float = OpCompositeExtract %__radii 1;
+            %__p0:$$float3 = OpCompositeExtract %__positions 0;
+            %__p1:$$float3 = OpCompositeExtract %__positions 1;
+            %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+            %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+            result:$$float2x4 = OpCompositeConstruct %__a %__b;
         };
 
     }
@@ -20402,8 +20747,8 @@ uint dot4add_u8packed(uint x, uint y, uint acc)
             OpCapability DotProduct;
             OpCapability DotProductInput4x8BitPacked;
             OpExtension "SPV_KHR_integer_dot_product";
-            %dotResult = OpUDot $$uint $x $y 0;
-            result:$$uint = OpIAdd %dotResult $acc;
+            %__dotResult = OpUDot $$uint $x $y 0;
+            result:$$uint = OpIAdd %__dotResult $acc;
         };
     default:
         uint4 vecX = unpackUint4x8ToUint32(x);
@@ -20430,8 +20775,8 @@ int dot4add_i8packed(uint x, uint y, int acc)
             OpCapability DotProduct;
             OpCapability DotProductInput4x8BitPacked;
             OpExtension "SPV_KHR_integer_dot_product";
-            %dotResult = OpSDot $$int $x $y 0;
-            result:$$int = OpIAdd %dotResult $acc;
+            %__dotResult = OpSDot $$int $x $y 0;
+            result:$$int = OpIAdd %__dotResult $acc;
         };
     default:
         int4 vecX = unpackInt4x8ToInt32(x);
@@ -20519,7 +20864,7 @@ void DispatchMesh<P>(uint threadGroupCountX, uint threadGroupCountY, uint thread
             OpEmitMeshTasksEXT $threadGroupCountX $threadGroupCountY $threadGroupCountZ &meshPayload;
             // OpEmitMeshTasksExt is a terminator, so we need to start a new
             // block to hold whatever comes after this intrinsic
-            %_ = OpLabel
+            %___ = OpLabel
         };
     }
 }
@@ -20768,9 +21113,8 @@ float3 HitTriangleVertexPosition(uint index)
                 OpCapability RayTracingPositionFetchKHR;
                 OpExtension "SPV_KHR_ray_tracing";
                 OpExtension "SPV_KHR_ray_tracing_position_fetch";
-                %_ptr_Input_v3float = OpTypePointer Input $$float3;
-                %addr : %_ptr_Input_v3float = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
-                result:$$float3 = OpLoad %addr;
+                %__addr : $$Ptr<float3, Access::Read, AddressSpace::VaryingInput> = OpAccessChain builtin(HitTriangleVertexPositionsKHR:float3[3]) $index;
+                result:$$float3 = OpLoad %__addr;
             };
     }
 }
@@ -21145,8 +21489,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 0;
             return spirv_asm
             {
-                %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
-                result:$$bool = OpLogicalNot %rr;
+                %__rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
+                result:$$bool = OpLogicalNot %__rr;
             };
         }
     }
@@ -21708,7 +22052,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
 ${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
-    const char* kCandidateCommittedMetal[] = {"get_candidate_", "get_committed_"};
+    // Middle piece of the MSL method name. Callers add the "get_" or "is_" prefix.
+    const char* kCandidateCommittedMetal[] = {"candidate_", "committed_"};
 
     // Access Candidate and Committed Matrices.
     for (uint32_t candidateOrCommitted = 0; candidateOrCommitted < 2; candidateOrCommitted++)
@@ -21801,13 +22146,13 @@ $}
         {
         case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(method.name)EXT($0, $(ccTF)))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)3x4";
-        case metal: __intrinsic_asm "transpose($0->$(ccNameMetal)$(method.metalName)())";
+        case metal: __intrinsic_asm "transpose($0->get_$(ccNameMetal)$(method.metalName)())";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
             {
-                %m:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
-                result:$$float3x4 = OpTranspose %m;
+                %__m:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
+                result:$$float3x4 = OpTranspose %__m;
             };
         }
     }
@@ -21825,7 +22170,7 @@ $}
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.name)EXT($0, $(ccTF))";
         case hlsl: __intrinsic_asm ".$(ccName)$(method.name)4x3";
-        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
+        case metal: __intrinsic_asm "$0->get_$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -21857,6 +22202,8 @@ ${
         {"float2", "TriangleBarycentrics", "Barycentrics", "triangle_barycentric_coord"},
     };
     for (auto method : rayQueryMethods) {
+        // MSL names boolean queries "is_" and everything else "get_".
+        auto metalPrefix = strcmp(method.type, "bool") == 0 ? "is_" : "get_";
 $}
 
     __glsl_extension(GL_EXT_ray_query)
@@ -21869,7 +22216,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
-        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
+        case metal: __intrinsic_asm "$0->$(metalPrefix)$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -21999,6 +22346,328 @@ $}
             };
         }
     };
+
+    // --------------------------------------------------------------------
+    // Line-swept-spheres (LSS) and sphere geometry ray-query accessors.
+    //
+    // These expose the inline-ray-query side of the LSS feature added with
+    // the SPV_NV_linear_swept_spheres SPIR-V extension and the NVAPI NvRt*
+    // ray-query calls. Each accessor has a "candidate" form (the primitive
+    // currently being considered during traversal) and a "committed" form
+    // (the closest accepted hit). The IsNonOpaque* candidate checks report
+    // whether a candidate sphere/LSS is non-opaque so the shader can decide
+    // whether to commit it; their committed counterparts report the hit type.
+    //
+    // Targets: HLSL (via NVAPI), GLSL, and SPIR-V (SPV_NV_linear_swept_spheres).
+    // SPIR-V encodes candidate vs committed via the Intersection operand
+    // (candidate == 0, committed == 1); GLSL via the boolean second argument
+    // (false == candidate, true == committed).
+    // --------------------------------------------------------------------
+
+    /// Gets the object-space center position (xyz) and radius (w) of the
+    /// candidate sphere primitive.
+    /// @return float4 where xyz is the sphere center and w is the radius
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CandidateSphereObjectPositionAndRadiusNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateSphereObjectPositionAndRadius";
+        case glsl: __intrinsic_asm "vec4(rayQueryGetIntersectionSpherePositionNV($0, false), rayQueryGetIntersectionSphereRadiusNV($0, false))";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                %__pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCandidate;
+                %__rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCandidate;
+                result:$$float4 = OpCompositeConstruct %__pos %__rad;
+            };
+        }
+    }
+
+    /// Gets the object-space center position (xyz) and radius (w) of the
+    /// committed sphere primitive.
+    /// @return float4 where xyz is the sphere center and w is the radius
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    float4 CommittedSphereObjectPositionAndRadiusNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedSphereObjectPositionAndRadius";
+        case glsl: __intrinsic_asm "vec4(rayQueryGetIntersectionSpherePositionNV($0, true), rayQueryGetIntersectionSphereRadiusNV($0, true))";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                %__pos:$$float3 = OpRayQueryGetIntersectionSpherePositionNV &this $iCommitted;
+                %__rad:$$float = OpRayQueryGetIntersectionSphereRadiusNV &this $iCommitted;
+                result:$$float4 = OpCompositeConstruct %__pos %__rad;
+            };
+        }
+    }
+
+    /// Gets the object-space endpoint positions and radii of the candidate
+    /// line-swept-sphere (LSS) primitive.
+    /// @return float2x4 whose rows are (endpoint.xyz, radius) for the two LSS endpoints
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CandidateLssObjectPositionsAndRadiiNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateLssObjectPositionsAndRadii";
+        case glsl:
+            // glslang requires the candidate/committed selector to be a
+            // compile-time constant, so the literal is baked into a dedicated
+            // helper rather than passed as a runtime argument.
+            __requirePrelude(R"(
+                mat2x4 _slang_rayQueryGetCandidateLssPositionsAndRadii(rayQueryEXT rq) {
+                    vec3 _slang_lss_p[2];
+                    float _slang_lss_r[2];
+                    rayQueryGetIntersectionLSSPositionsNV(rq, false, _slang_lss_p);
+                    rayQueryGetIntersectionLSSRadiiNV(rq, false, _slang_lss_r);
+                    return mat2x4(vec4(_slang_lss_p[0], _slang_lss_r[0]), vec4(_slang_lss_p[1], _slang_lss_r[1]));
+                }
+            )");
+            __intrinsic_asm "_slang_rayQueryGetCandidateLssPositionsAndRadii($0)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                %__positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCandidate;
+                %__radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCandidate;
+                %__p0:$$float3 = OpCompositeExtract %__positions 0;
+                %__p1:$$float3 = OpCompositeExtract %__positions 1;
+                %__r0:$$float = OpCompositeExtract %__radii 0;
+                %__r1:$$float = OpCompositeExtract %__radii 1;
+                %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+                %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+                result:$$float2x4 = OpCompositeConstruct %__a %__b;
+            };
+        }
+    }
+
+    /// Gets the object-space endpoint positions and radii of the committed
+    /// line-swept-sphere (LSS) primitive.
+    /// @return float2x4 whose rows are (endpoint.xyz, radius) for the two LSS endpoints
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float2x4 CommittedLssObjectPositionsAndRadiiNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedLssObjectPositionsAndRadii";
+        case glsl:
+            // glslang requires the candidate/committed selector to be a
+            // compile-time constant, so the literal is baked into a dedicated
+            // helper rather than passed as a runtime argument.
+            __requirePrelude(R"(
+                mat2x4 _slang_rayQueryGetCommittedLssPositionsAndRadii(rayQueryEXT rq) {
+                    vec3 _slang_lss_p[2];
+                    float _slang_lss_r[2];
+                    rayQueryGetIntersectionLSSPositionsNV(rq, true, _slang_lss_p);
+                    rayQueryGetIntersectionLSSRadiiNV(rq, true, _slang_lss_r);
+                    return mat2x4(vec4(_slang_lss_p[0], _slang_lss_r[0]), vec4(_slang_lss_p[1], _slang_lss_r[1]));
+                }
+            )");
+            __intrinsic_asm "_slang_rayQueryGetCommittedLssPositionsAndRadii($0)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                %__positions:$$float3[2] = OpRayQueryGetIntersectionLSSPositionsNV &this $iCommitted;
+                %__radii:$$float[2] = OpRayQueryGetIntersectionLSSRadiiNV &this $iCommitted;
+                %__p0:$$float3 = OpCompositeExtract %__positions 0;
+                %__p1:$$float3 = OpCompositeExtract %__positions 1;
+                %__r0:$$float = OpCompositeExtract %__radii 0;
+                %__r1:$$float = OpCompositeExtract %__radii 1;
+                %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+                %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+                result:$$float2x4 = OpCompositeConstruct %__a %__b;
+            };
+        }
+    }
+
+    /// Gets the hit parameter (position along the LSS axis, in [0,1]) for the
+    /// candidate line-swept-sphere intersection.
+    /// @return Scalar hit parameter along the candidate LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CandidateLssHitParameterNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateLssHitParameter";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionLSSHitValueNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$float = OpRayQueryGetIntersectionLSSHitValueNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Gets the hit parameter (position along the LSS axis, in [0,1]) for the
+    /// committed line-swept-sphere intersection.
+    /// @return Scalar hit parameter along the committed LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    float CommittedLssHitParameterNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedLssHitParameter";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionLSSHitValueNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$float = OpRayQueryGetIntersectionLSSHitValueNV &this $iCommitted;
+            };
+        }
+    }
+
+    /// Checks whether the candidate intersection is a non-opaque line-swept
+    /// sphere (LSS) primitive.
+    /// @return true if the candidate is a non-opaque LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CandidateIsNonOpaqueLssNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateIsNonOpaqueLss";
+        case glsl: __intrinsic_asm "rayQueryIsLSSHitNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsLSSHitNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Checks whether the committed intersection is a line-swept-sphere (LSS)
+    /// primitive.
+    /// @return true if the committed hit is an LSS primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_lss_nv)]
+    bool CommittedIsLssNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedIsLss";
+        case glsl: __intrinsic_asm "rayQueryIsLSSHitNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsLSSHitNV &this $iCommitted;
+            };
+        }
+    }
+
+    /// Checks whether the candidate intersection is a non-opaque sphere
+    /// primitive.
+    /// @return true if the candidate is a non-opaque sphere primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CandidateIsNonOpaqueSphereNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCandidateIsNonOpaqueSphere";
+        case glsl: __intrinsic_asm "rayQueryIsSphereHitNV($0, false)";
+        case spirv:
+            uint iCandidate = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsSphereHitNV &this $iCandidate;
+            };
+        }
+    }
+
+    /// Checks whether the committed intersection is a sphere primitive.
+    /// @return true if the committed hit is a sphere primitive
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_query)
+    __glsl_extension(GL_NV_linear_swept_spheres)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery_sphere_nv)]
+    bool CommittedIsSphereNV()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtCommittedIsSphere";
+        case glsl: __intrinsic_asm "rayQueryIsSphereHitNV($0, true)";
+        case spirv:
+            uint iCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingSpheresGeometryNV;
+                result:$$bool = OpRayQueryIsSphereHitNV &this $iCommitted;
+            };
+        }
+    }
 }
 
 //
@@ -22008,7 +22677,7 @@ $}
 /// @category stage_io
 __magic_type(SubpassInputType)
 __intrinsic_type($(kIROp_SubpassInputType))
-[require(glsl_hlsl_spirv, subpass)]
+[require(glsl_hlsl_metal_spirv, subpass)]
 struct __SubpassImpl<T, let isMS:int>
 {
 }
@@ -22020,25 +22689,9 @@ typealias SubpassInput = __SubpassImpl<T, isMS>;
 __generic<T>
 extension __SubpassImpl<T, 0>
 {
-    [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
-    T SubpassLoad()
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "$0.SubpassLoad()";
-        case glsl: __intrinsic_asm "subpassLoad($0)";
-        case spirv:
-        {
-            let zeroVec = int2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $this $zeroVec
-            };
-        }
-        }
-    }
+    [require(glsl_hlsl_metal_spirv, subpass)]
+    __intrinsic_op($(kIROp_SubpassLoad))
+    T SubpassLoad();
 }
 
 /// @category stage_io
@@ -22048,25 +22701,9 @@ typealias SubpassInputMS = __SubpassImpl<T, isMS>;
 __generic<T>
 extension __SubpassImpl<T, 1>
 {
-    [ForceInline]
-    [require(glsl_hlsl_spirv, subpass)]
-    T SubpassLoad(int sample)
-    {
-        __target_switch
-        {
-        case hlsl: __intrinsic_asm "$0.SubpassLoad($1)";
-        case glsl: __intrinsic_asm "subpassLoad($0, $1)";
-        case spirv:
-        {
-            let zeroVec = int2(0);
-            return spirv_asm
-            {
-                OpCapability StorageImageReadWithoutFormat;
-                result:$$T = OpImageRead $this $zeroVec Sample $sample
-            };
-        }
-        }
-    }
+    [require(glsl_hlsl_metal_spirv, subpass)]
+    __intrinsic_op($(kIROp_SubpassLoad))
+    T SubpassLoad(int sample);
 }
 
 ///
@@ -22694,7 +23331,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHit(
+            __glslMakeMotionHitNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,
@@ -22856,7 +23493,7 @@ struct HitObject
             // Save the attributes
             __hitObjectAttributes<attr_t>() = attributes;
 
-            __glslMakeMotionHitWithIndex(
+            __glslMakeMotionHitWithIndexNV(
                 __return_val,
                 AccelerationStructure,
                 InstanceIndex,              ///? Same as instanceid ?
@@ -23176,6 +23813,15 @@ struct HitObject
             __InvokeHLSL_DXR(
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
+        case hlsl_nvapi:
+            // This 2-argument Invoke is DXR-1.3-native-SER-only; NVAPI SER has no equivalent
+            // (its Invoke requires an AccelerationStructure). Without this case the NVAPI target
+            // would select `case hlsl:` and emit `dx::HitObject::Invoke` applied to an
+            // `NvHitObject`, producing invalid HLSL. Diagnose cleanly instead. (#11903)
+            static_assert(false, "HitObject::Invoke(hitObject, payload) has no NVAPI form; on an "
+                "NVAPI shader-execution-reordering target call "
+                "HitObject::Invoke(accelerationStructure, hitObject, payload), or compile for a "
+                "native DXR 1.3 SER target.");
         }
     }
 
@@ -23300,22 +23946,22 @@ struct HitObject
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
-                %origin:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
-                %tmin:$$float = OpHitObjectGetRayTMinNV &this;
-                %direction:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
-                %tmax:$$float = OpHitObjectGetRayTMaxNV &this;
-                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+                %__origin:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
+                %__tmin:$$float = OpHitObjectGetRayTMinNV &this;
+                %__direction:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
+                %__tmax:$$float = OpHitObjectGetRayTMaxNV &this;
+                result:$$RayDesc = OpCompositeConstruct %__origin %__tmin %__direction %__tmax;
             };
         case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderEXT;
-                %origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
-                %tmin:$$float = OpHitObjectGetRayTMinEXT &this;
-                %direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
-                %tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
-                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+                %__origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+                %__tmin:$$float = OpHitObjectGetRayTMinEXT &this;
+                %__direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+                %__tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
+                result:$$RayDesc = OpCompositeConstruct %__origin %__tmin %__direction %__tmax;
             };
         }
     }
@@ -23567,8 +24213,8 @@ struct HitObject
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     int GetClusterID()
     {
         __target_switch
@@ -23576,10 +24222,12 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
             };
@@ -23588,7 +24236,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -23598,22 +24247,25 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
-                %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
-                %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
-                result:$$float4 = OpCompositeConstruct %position %radius;
+                %__position:$$float3 = OpHitObjectGetSpherePositionNV &this;
+                %__radius:$$float = OpHitObjectGetSphereRadiusNV &this;
+                result:$$float4 = OpCompositeConstruct %__position %__radius;
             };
         }
     }
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -23623,28 +24275,31 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 OpCapability RayTracingSpheresGeometryNV;
-                %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
-                %radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
-                %r0:$$float = OpCompositeExtract %radii 0;
-                %r1:$$float = OpCompositeExtract %radii 1;
-                %p0:$$float3 = OpCompositeExtract %positions 0;
-                %p1:$$float3 = OpCompositeExtract %positions 1;
-                %a:$$float4 = OpCompositeConstruct %p0 %r0;
-                %b:$$float4 = OpCompositeConstruct %p1 %r1;
-                result:$$float2x4 = OpCompositeConstruct %a %b;
+                %__positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
+                %__radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
+                %__r0:$$float = OpCompositeExtract %__radii 0;
+                %__r1:$$float = OpCompositeExtract %__radii 1;
+                %__p0:$$float3 = OpCompositeExtract %__positions 0;
+                %__p1:$$float3 = OpCompositeExtract %__positions 1;
+                %__a:$$float4 = OpCompositeConstruct %__p0 %__r0;
+                %__b:$$float4 = OpCompositeConstruct %__p1 %__r1;
+                result:$$float2x4 = OpCompositeConstruct %__a %__b;
             };
         }
     }
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsSphereHit()
     {
         __target_switch
@@ -23654,10 +24309,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsSphereHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsSphereHitNV &this;
             };
@@ -23666,7 +24323,8 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, raytracing_lss_ho)]
+    [require(cuda_hlsl, raytracing_lss_ho)]
+    [require(spirv, spvShaderInvocationReorderNV)]
     bool IsLssHit()
     {
         __target_switch
@@ -23676,10 +24334,12 @@ struct HitObject
             {
                 __intrinsic_asm "optixHitObjectIsLSSHit";
             }
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
+                OpExtension "SPV_NV_shader_invocation_reorder";
                 OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability ShaderInvocationReorderNV;
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
                 result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
@@ -24363,7 +25023,7 @@ struct HitObject
     // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
     static void __glslMakeMissMotionNV(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -24578,12 +25238,12 @@ struct HitObject
         }
     }
 
-    //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
+    // NV-specific helper used by public hitObjectRecordHitWithIndexMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHitWithIndex(
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitWithIndexNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
@@ -24630,12 +25290,12 @@ struct HitObject
         }
     }
 
-        // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
+    // NV-specific helper used by public hitObjectRecordHitMotionNV.
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionHit(
+    [require(glsl, ser_nv_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionHitNV(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
         int instanceid,
@@ -25962,13 +26622,14 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -25990,13 +26651,14 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Bias $bias;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Bias $bias;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26019,14 +26681,15 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintClampNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel MinLod $lodClamp;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel MinLod $lodClamp;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26050,14 +26713,15 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintClampNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Bias|MinLod $bias $lodClamp;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26080,13 +26744,14 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintLodNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Lod $lod;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Lod $lod;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26113,13 +26778,14 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintGradNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Grad $dx $dy;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Grad $dx $dy;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26144,14 +26810,15 @@ extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
         case glsl:
             __intrinsic_asm "textureFootprintGradClampNV($p, $*2)";
         case spirv:
+            let sampledImage = __makeCombinedTextureSampler(this, sampler);
             return spirv_asm {
                 OpCapability ImageFootprintNV;
                 OpCapability MinLod;
                 OpExtension "SPV_NV_shader_image_footprint";
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $sampler;
-                %resultVal:$$__FootprintData = OpImageSampleFootprintNV %sampledImage $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
-                OpStore &footprint %resultVal;
-                result:$$bool = OpCompositeExtract %resultVal 0;
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                %__resultVal:$$__FootprintData = OpImageSampleFootprintNV $sampledImage $coords $granularity $useCoarseLevel Grad|MinLod $dx $dy $lodClamp;
+                OpStore &footprint %__resultVal;
+                result:$$bool = OpCompositeExtract %__resultVal 0;
             };
         }
     }
@@ -26713,6 +27380,14 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     {
         return getDescriptorFromHandle(bindless);
     }
+
+    // Convert a `ResourceDescriptorHeap[i]` handle to this texture type.
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+    }
 }
 
 ${
@@ -26745,6 +27420,9 @@ for (auto type : kDynamicResourceCastableTypes) {
     auto kind = type.kind;
     auto typeName = type.name;
     auto access = type.access;
+    bool isSampler = (strcmp(dynamicKind, "Sampler") == 0);
+    auto untypedHandleType = isSampler ? "UntypedSamplerHandle" : "UntypedResourceHandle";
+    auto untypedHandleIndexFn = isSampler ? "__getUntypedSamplerHandleIndex" : "__getUntypedResourceHandleIndex";
     if (strstr(typeName, "<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
@@ -26767,6 +27445,14 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     __init(DescriptorHandle<$(typeName)> bindless)
     {
         return getDescriptorFromHandle(bindless);
+    }
+
+    // Convert a `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]` handle to this type.
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init($(untypedHandleType) h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<$(typeName)>(uint2($(untypedHandleIndexFn)(h), 0)));
     }
 }
 
@@ -26868,6 +27554,85 @@ __generic<T:IOpaqueDescriptor>
 __prefix T operator*(DescriptorHandle<T> value)
 {
     return getDescriptorFromHandle(value);
+}
+
+// HLSL SM6.6 `ResourceDescriptorHeap[i]` / `SamplerDescriptorHeap[j]`. Indexing a heap yields an
+// untyped handle wrapping the `uint` heap index; the concrete resource/sampler type is recovered
+// from the conversion target by the implicit conversions defined above and below. Availability is
+// gated on the untyped-handle constructor (and repeated on the heap subscript so the diagnostic
+// lands at the indexing site).
+__magic_type(UntypedResourceHandleType)
+__intrinsic_type($(kIROp_UntypedResourceHandleType))
+struct UntypedResourceHandle
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __intrinsic_op($(kIROp_CastUIntToUntypedResourceHandle))
+    __init(uint index);
+}
+
+__magic_type(UntypedSamplerHandleType)
+__intrinsic_type($(kIROp_UntypedSamplerHandleType))
+struct UntypedSamplerHandle
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __intrinsic_op($(kIROp_CastUIntToUntypedSamplerHandle))
+    __init(uint index);
+}
+
+// Recover the `uint` heap index stored in an untyped handle.
+__intrinsic_op($(kIROp_CastUntypedResourceHandleToUInt))
+uint __getUntypedResourceHandleIndex(UntypedResourceHandle h);
+
+__intrinsic_op($(kIROp_CastUntypedSamplerHandleToUInt))
+uint __getUntypedSamplerHandleIndex(UntypedSamplerHandle h);
+
+// The subscript repeats the constructor's availability gate so unsupported targets are diagnosed
+// at the indexing site.
+struct __ResourceDescriptorHeapType
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __subscript(uint index) -> UntypedResourceHandle
+    {
+        [ForceInline] get { return UntypedResourceHandle(index); }
+    }
+}
+
+struct __SamplerDescriptorHeapType
+{
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
+    __subscript(uint index) -> UntypedSamplerHandle
+    {
+        [ForceInline] get { return UntypedSamplerHandle(index); }
+    }
+}
+
+static const __ResourceDescriptorHeapType ResourceDescriptorHeap = {};
+static const __SamplerDescriptorHeapType SamplerDescriptorHeap = {};
+
+// Convert an untyped heap handle to a `DescriptorHandle<T>` / `.Handle`. Split across two per-kind
+// extensions so the resource-vs-sampler distinction is enforced at compile time: a resource-heap
+// handle converts only to a General (CBV_SRV_UAV) `DescriptorHandle<T>` and a sampler-heap handle
+// only to a sampler `T`, so a mismatched assignment is a compile error, not a silent runtime bug.
+__generic<T : __IDynamicResourceCastable<__DynamicResourceKind.General> >
+extension DescriptorHandle<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return DescriptorHandle<T>(uint2(__getUntypedResourceHandleIndex(h), 0));
+    }
+}
+
+__generic<T : __IDynamicResourceCastable<__DynamicResourceKind.Sampler> >
+extension DescriptorHandle<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedSamplerHandle h)
+    {
+        return DescriptorHandle<T>(uint2(__getUntypedSamplerHandleIndex(h), 0));
+    }
 }
 
 // https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
@@ -27578,7 +28343,7 @@ struct CoopMat
         case metal:
             __intrinsic_asm "_slang_simdgroup_fill($0, $1)";
         case hlsl:
-            __intrinsic_asm ".Splat";
+            __intrinsic_asm "$0 = $0.Splat($1)";
         }
     }
 
@@ -28009,27 +28774,27 @@ struct CoopMat
     ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
     [require(cuda_metal_spirv, cooperative_matrix)]
     void Store<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout = DefaultDataLayout
+    >(RWStructuredBuffer<T, L> buffer, uint element, uint stride)
     {
         __store<matrixLayout>(buffer, element, stride);
     }
 
     [require(cuda_metal_spirv, cooperative_matrix)]
-    internal void __store<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    void __store<
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout
+    >(RWStructuredBuffer<T, L> buffer, uint element, uint stride)
     {
-        let zero = 0;
-        let alignment = 16U;
         __target_switch
         {
         case spirv:
+            let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
+            let alignment = 16U;
             spirv_asm
             {
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28060,8 +28825,8 @@ struct CoopMat
             let alignment = 16U;
             return spirv_asm
             {
-                %pointer:$$T* = OpPtrAccessChain $buffer $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+                OpCooperativeMatrixStoreKHR %__pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28094,8 +28859,8 @@ struct CoopMat
         const int32_t scope = (int32_t)memoryScope;
         return spirv_asm
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
+            %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+            OpCooperativeMatrixStoreKHR %__pointer $this $matrixLayout $stride Aligned|MakePointerAvailable|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -28115,12 +28880,11 @@ struct CoopMat
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$T;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28180,12 +28944,11 @@ struct CoopMat
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$U;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+                OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28193,10 +28956,13 @@ struct CoopMat
             else
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
         case metal:
+            // This overload indexes the groupshared array in U elements. Metal's
+            // simdgroup_store writes through a T*, so offset in U first, then
+            // cast; only the row/column stride needs conversion to T elements.
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0])) + $2, (ulong)$3)", T;
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0]) + $2), (ulong)($3 * (sizeof($[1]) / sizeof($[0]))))", T, U;
             else
-                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0])) + $2, (ulong)$3, ulong2(0), true)", T;
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)(&((*($1))[0]) + $2), (ulong)($3 * (sizeof($[1]) / sizeof($[0]))), ulong2(0), true)", T, U;
         }
     }
 
@@ -28222,9 +28988,9 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)$2)", T;
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))))", T, U;
             else
-                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)$2, ulong2(0), true)", T;
+                __intrinsic_asm "simdgroup_store($0, (threadgroup $[0]*)($1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))), ulong2(0), true)", T, U;
         }
     }
 
@@ -28247,11 +29013,10 @@ struct CoopMat
     >(__ref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
+        let pointer = __getAddress(data[element]);
         spirv_asm
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$vector<U, L>;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            OpCooperativeMatrixStoreKHR $pointer $this $matrixLayout $stride Aligned !alignment;
         };
     }
 
@@ -28289,22 +29054,21 @@ $}
     [__NoSideEffect]
     [require(cuda_metal_spirv, cooperative_matrix)]
     static This Load<
-        let matrixLayout : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         uint stride)
     {
-        let zero = 0;
         let alignment = 16U;
         __target_switch
         {
         case spirv:
+            let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
             return spirv_asm
             {
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28342,8 +29106,8 @@ $}
             let alignment = 16;
             return spirv_asm
             {
-                %pointer:$$T* = OpPtrAccessChain $buffer $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %__pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28379,8 +29143,8 @@ $}
         const int32_t scope = (int32_t)memoryScope;
         return spirv_asm
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
+            %__pointer:$$T* = OpPtrAccessChain $buffer $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %__pointer $matrixLayout $stride Aligned|MakePointerVisible|NonPrivatePointer !alignment $scope;
         };
     }
 
@@ -28401,12 +29165,11 @@ $}
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             return spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$T;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28467,12 +29230,11 @@ $}
         __target_switch
         {
         case spirv:
+            let pointer = __getAddress(data[element]);
             let alignment = 16U;
             return spirv_asm
             {
-                %workgroupPointerType = OpTypePointer Workgroup $$U;
-                %pointer:%workgroupPointerType = OpAccessChain &data $element;
-                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
@@ -28480,10 +29242,13 @@ $}
             else
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
         case metal:
+            // This overload indexes the groupshared array in U elements. Metal's
+            // simdgroup_load reads through a T*, so offset in U first, then cast;
+            // only the row/column stride needs conversion to T elements.
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)(&((*($0))[0])) + $1, (ulong)$2)", T;
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)(&((*($0))[0]) + $1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))))", T, U;
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)(&((*($0))[0])) + $1, (ulong)$2)", T;
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)(&((*($0))[0]) + $1), (ulong)($2 * (sizeof($[1]) / sizeof($[0]))))", T, U;
         }
     }
 
@@ -28509,9 +29274,9 @@ $}
                 __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
         case metal:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)($0), (ulong)$1)", T;
+                __intrinsic_asm "_slang_simdgroup_load<$TR>((const threadgroup $[0]*)($0), (ulong)($1 * (sizeof($[1]) / sizeof($[0]))))", T, U;
             else
-                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)($0), (ulong)$1)", T;
+                __intrinsic_asm "_slang_simdgroup_load_transpose<$TR>((const threadgroup $[0]*)($0), (ulong)($1 * (sizeof($[1]) / sizeof($[0]))))", T, U;
         }
     }
 
@@ -28535,11 +29300,10 @@ $}
     >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
+        let pointer = __getAddress(data[element]);
         return spirv_asm
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$vector<U, L>;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $pointer $matrixLayout $stride Aligned !alignment;
         };
     }
 
@@ -28690,9 +29454,10 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
@@ -28702,14 +29467,15 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     static This __loadLayout<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28717,9 +29483,7 @@ $}
         {
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment None;
         };
     }
 
@@ -28745,9 +29509,10 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
@@ -28761,15 +29526,16 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28777,9 +29543,7 @@ $}
         {
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
         };
     }
 
@@ -28801,9 +29565,10 @@ $}
     static This Load<
         U,
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
@@ -28815,15 +29580,16 @@ $}
     static This __loadLayoutDecode<
         U,
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28831,9 +29597,7 @@ $}
         {
             OpCapability CooperativeMatrixBlockLoadsNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
         };
     }
 
@@ -28862,9 +29626,10 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
@@ -28880,16 +29645,17 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout
     >(
-        $(RW)StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
         This ret;
@@ -28898,9 +29664,7 @@ $}
             OpCapability CooperativeMatrixTensorAddressingNV;
             OpCapability CooperativeMatrixBlockLoadsNV;
             OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
         };
     }
 
@@ -28923,14 +29687,15 @@ $}
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        RWStructuredBuffer<T> buffer,
+        RWStructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         __target_switch
         {
@@ -28939,9 +29704,7 @@ $}
             {
                 OpCapability CooperativeMatrixTensorAddressingNV;
                 OpExtension "SPV_NV_cooperative_matrix2";
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment None;
             };
         }
     }
@@ -28991,15 +29754,16 @@ $}
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
-        $(tensorViewTypes)
+        $(tensorViewTypes),
+        L : IBufferDataLayout = DefaultDataLayout
     >(
-        RWStructuredBuffer<T> buffer,
+        RWStructuredBuffer<T, L> buffer,
         uint element,
         TensorLayout<Dim, ClampMode> tensorLayout,
         TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
     {
-        let zero = 0;
         let alignment = 16U;
+        let pointer = __getStructuredBufferElementPtr<T, L>(buffer, element);
 
         __target_switch
         {
@@ -29008,9 +29772,7 @@ $}
             {
                 OpCapability CooperativeMatrixTensorAddressingNV;
                 OpExtension "SPV_NV_cooperative_matrix2";
-                %storagePointerType = OpTypePointer StorageBuffer $$T;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
             };
         }
     }
@@ -29150,6 +29912,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param N The number of columns in the matrix fragment.
 /// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
 /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param L The data layout of the StructuredBuffer.
 /// @param buffer The StructuredBuffer to load from.
 /// @param element The starting element index in the buffer.
 /// @param stride The stride in elements between consecutive rows or columns.
@@ -29162,9 +29925,10 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
+    L : IBufferDataLayout = DefaultDataLayout
 >(
-    StructuredBuffer<T> buffer,
+    StructuredBuffer<T, L> buffer,
     uint element,
     uint stride)
 {
@@ -29179,6 +29943,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 /// @param N The number of columns in the matrix fragment.
 /// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
 /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param L The data layout of the RWStructuredBuffer.
 /// @param buffer The RWStructuredBuffer to load from.
 /// @param element The starting element index in the buffer.
 /// @param stride The stride in elements between consecutive rows or columns.
@@ -29191,9 +29956,10 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
+    L : IBufferDataLayout = DefaultDataLayout
 >(
-    RWStructuredBuffer<T> buffer,
+    RWStructuredBuffer<T, L> buffer,
     uint element,
     uint stride)
 {
@@ -29918,14 +30684,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         this.copyFrom(other);
     }
 
-    [ForceInline]
-    [require(cooperative_vector)]
-    __init<each U : __BuiltinArithmeticType>(expand each U args)
-    {
-        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
-        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
-    }
-
     [OverloadRank(-10)]
     [ForceInline]
     [require(cooperative_vector)]
@@ -30019,19 +30777,17 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     [require(cooperative_vector)]
-    void store(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    void store<L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                OpCooperativeVectorStoreNV %pointer $byteOffset16ByteAligned $this None;
+                OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this None;
             };
+            return;
         default:
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -30168,18 +30924,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    static CoopVec<T, N> load(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             return spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -30192,18 +30945,15 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    static CoopVec<T, N> load(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
         case spirv:
-            let zero = 0;
+            let pointer = __getStructuredBufferPtr<T, L>(buffer);
             return spirv_asm
             {
-                %runtimeArrayType = OpTypeRuntimeArray $$T;
-                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -30902,6 +31652,327 @@ ${
 $}
 }
 
+// Only floating-point CoopVec instantiations are differentiable. Integer CoopVec types
+// intentionally do not get this conformance, so they still diagnose in AD entry points.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension CoopVec<T, N> : IDifferentiable
+{
+    typealias Differential = CoopVec<T, N>;
+
+    [Differentiable]
+    static Differential dzero()
+    {
+        return __default<Differential>();
+    }
+
+    [Differentiable]
+    static Differential dadd(Differential a, Differential b)
+    {
+        return __internal_add(a, b);
+    }
+}
+
+// Conditional custom derivatives keep the general arithmetic subscript unchanged while making
+// only floating-point CoopVec specializations differentiable.
+// `CoopVec<T, N>` stores differential lanes as `T`, while an accessor signature exposes them as
+// `T.Differential`. These types are representation-identical for builtin floating-point `T`, so
+// the reinterprets below only bridge the associated type in generic checking.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::__subscript::get)(
+    DifferentialPair<CoopVec<T, N>> self,
+    int index) -> DifferentialPair<T>
+{
+    return diffPair(self.p[index], reinterpret<T.Differential, T>(self.d[index]));
+}
+
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::__subscript::get)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    int index,
+    T.Differential dOut) -> void
+{
+    // The call site accumulates contributions from separate getter calls, so this rule returns
+    // only the selected lane's contribution and zero for every other lane.
+    var dSelf = CoopVec<T, N>.dzero();
+    dSelf[index] = reinterpret<T, T.Differential>(dOut);
+    self = diffPair(self.p, dSelf);
+}
+
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::__subscript::set)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    int index,
+    DifferentialPair<T> newValue) -> void
+{
+    var primal = self.p;
+    var differential = self.d;
+    primal[index] = newValue.p;
+    differential[index] = reinterpret<T, T.Differential>(newValue.d);
+    self = diffPair(primal, differential);
+}
+
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::__subscript::set)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    int index,
+    inout DifferentialPair<T> newValue) -> void
+{
+    var dSelf = self.d;
+    newValue = diffPair(newValue.p, reinterpret<T.Differential, T>(dSelf[index]));
+    // The store overwrote this lane, so its incoming adjoint belongs to `newValue`, not the old
+    // value of `self[index]`.
+    dSelf[index] = T(0);
+    self = diffPair(self.p, dSelf);
+}
+
+// Keep the general value-pack constructor as an extension so overload resolution compares it
+// against the floating differentiable constructor using extension-to-extension rules.
+extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(-1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    __init<each U : __BuiltinArithmeticType>(expand each U args)
+    {
+        // This preserves the existing arithmetic constructor behavior while letting the floating
+        // overload below win by overload rank for differentiable element and argument types.
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        this = __makeCoopVec<T, N>(expand (__arithmetic_cast<T>(each args)));
+    }
+}
+
+// Keep the differentiable value-pack constructor in the floating CoopVec extension.
+// The general constructor is also an extension, while this overload is only
+// available when both the CoopVec element type and constructor operands are differentiable.
+// The direct [Differentiable] annotation lets autodiff synthesize the constructor derivative.
+extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
+{
+    [OverloadRank(1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [Differentiable]
+    __init<each U : __BuiltinFloatingPointType>(expand each U args)
+    {
+        static_assert(countof(U) == N, "number of arguments to CoopVec constructor must match number of elements");
+        // Use the direct floating cast intrinsic so autodiff can transpose the constructor
+        // operands through kIROp_FloatCast instead of a wrapper call around __arithmetic_cast.
+        this = __makeCoopVec<T, N>(expand (__real_cast<T>(each args)));
+    }
+}
+
+// These arithmetic witnesses copy the normal CoopVec target-switch implementations.
+// The specialization is only here to satisfy differentiable arithmetic requirements.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension CoopVec<T, N> : IDifferentiableArithmetic
+{
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This add(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 + $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecAdd($0, $1)";
+        default: return __pureAdd(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This sub(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 - $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecSub($0, $1)";
+        default: return __pureSub(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    This mul(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 * $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecMul($0, $1)";
+        default: return __pureMul(other);
+        }
+    }
+
+    [Differentiable]
+    [ForceInline]
+    [require(cooperative_vector)]
+    This div(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 / $1";
+        default: return __pureDiv(other);
+        }
+    }
+
+    [Differentiable]
+    [require(cooperative_vector)]
+    This neg()
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "-$0";
+        default: return __pureNeg(this);
+        }
+    }
+}
+
+// Conditional custom derivatives for floating-point CoopVec arithmetic. Keeping these
+// as __func_extension declarations avoids differentiating the target-switch method bodies.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::add)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.add(other.p), self.d.add(other.d));
+}
+
+// Addition sends the incoming reverse gradient unchanged to both operands.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::add)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut);
+    other = diffPair(other.p, dOut);
+}
+
+// Subtraction is element-wise, so the primal and tangent paths both subtract component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::sub)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.sub(other.p), self.d.sub(other.d));
+}
+
+// Reverse subtraction flips the contribution flowing to the right operand.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::sub)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut);
+    other = diffPair(other.p, dOut.neg());
+}
+
+// Multiplication applies the product rule component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::mul)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    let d = self.d.mul(other.p).add(self.p.mul(other.d));
+    return diffPair(self.p.mul(other.p), d);
+}
+
+// Reverse multiplication uses the saved primal operands as the local scale factors.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::mul)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    let selfP = self.p;
+    let otherP = other.p;
+    self = diffPair(selfP, otherP.mul(dOut));
+    other = diffPair(otherP, selfP.mul(dOut));
+}
+
+// Division applies the quotient rule component-wise.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::div)(
+    DifferentialPair<CoopVec<T, N>> self,
+    DifferentialPair<CoopVec<T, N>> other) -> DifferentialPair<CoopVec<T, N>>
+{
+    let numerator = self.d.mul(other.p).sub(self.p.mul(other.d));
+    let denominator = other.p.mul(other.p);
+    return diffPair(self.p.div(other.p), numerator.div(denominator));
+}
+
+// Reverse division keeps primal values before mutating the differential pairs.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::div)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    inout DifferentialPair<CoopVec<T, N>> other,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    let selfP = self.p;
+    let otherP = other.p;
+    let denominator = otherP.mul(otherP);
+    self = diffPair(selfP, dOut.div(otherP));
+    other = diffPair(otherP, selfP.neg().mul(dOut).div(denominator));
+}
+
+// Negation forwards the negated primal and tangent.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+fwd_diff(CoopVec<T, N>::neg)(
+    DifferentialPair<CoopVec<T, N>> self) -> DifferentialPair<CoopVec<T, N>>
+{
+    return diffPair(self.p.neg(), self.d.neg());
+}
+
+// Reverse negation only flips the incoming gradient sign.
+[PreferRecompute]
+[ForceInline]
+__func_extension<T : __BuiltinFloatingPointType, let N : int>
+bwd_diff(CoopVec<T, N>::neg)(
+    inout DifferentialPair<CoopVec<T, N>> self,
+    CoopVec<T, N>.Differential dOut) -> void
+{
+    self = diffPair(self.p, dOut.neg());
+}
+
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
 CoopVec<T, N> __makeCoopVec<T : __BuiltinArithmeticType, let N : int, each U>(expand each U args);
 
@@ -31155,6 +32226,48 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
     }
 }
 
+// Provide CoopVec trig overloads needed by common differentiable math. HLSL/SPIR-V
+// lower natively when available; the fallback preserves element-wise semantics.
+[require(cooperative_vector)]
+CoopVec<T, N> sin<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "sin($0)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpExtInst glsl450 Sin $x;
+        };
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = sin(x[i]);
+        return ret;
+    }
+}
+
+[require(cooperative_vector)]
+CoopVec<T, N> cos<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "cos($0)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpExtInst glsl450 Cos $x;
+        };
+    default:
+        CoopVec<T, N> ret;
+        for(int i = 0; i < N; ++i)
+            ret[i] = cos(x[i]);
+        return ret;
+    }
+}
+
 // [ForceInline]
 [require(cooperative_vector)]
 CoopVec<T, N> exp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
@@ -31387,14 +32500,14 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWByteAddres
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
@@ -32862,34 +33975,6 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
     return packInt4x8Clamp(unpackedValue);
 }
 
-// Work-graphs
-
-//@public:
-/// read-only input to Broadcasting launch node.
-__generic<T>
-//TODO: DispatchNodeInputRecord should be available only for broadcasting node shader.
-//[require(broadcasting_node)]
-[require(spirv)]
-struct DispatchNodeInputRecord
-{
-    /// Provide an access to a record object that only holds a single record.
-    NodePayloadPtr<T> Get()
-    {
-        int index = 0;
-        __target_switch
-        {
-        case spirv:
-            return spirv_asm
-            {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
-                result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
-            };
-        }
-    }
-};
-
 //
 // Pack/Unpack Intrinsics
 //
@@ -32975,8 +34060,8 @@ uint32_t4 unpackUint4x8ToUint32(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
-            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
+            %__u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint32_t, 4> = OpUConvert %__u8Vec
         };
     default:
         return uint32_t4
@@ -33001,8 +34086,8 @@ uint16_t4 unpackUint4x8ToUint16(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
-            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
+            %__u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint16_t, 4> = OpUConvert %__u8Vec
         };
     default:
         return uint16_t4
@@ -33028,8 +34113,8 @@ int32_t4 unpackInt4x8ToInt32(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
-            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
+            %__s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int32_t, 4> = OpSConvert %__s8Vec
         };
     default:
         return int32_t4
@@ -33054,8 +34139,8 @@ int16_t4 unpackInt4x8ToInt16(uint packedValue)
     case spirv:
         return spirv_asm
         {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
-            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
+            %__s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int16_t, 4> = OpSConvert %__s8Vec
         };
     default:
         return int16_t4

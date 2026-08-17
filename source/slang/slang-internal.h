@@ -16,4 +16,6 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
     const Slang::GlobalSessionInternalDesc* internalDesc,
     slang::IGlobalSession** outGlobalSession);
 
+SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
+
 #endif

@@ -1,3 +1,5 @@
+// Used as example in docs/user-guide/03-convenience-features.md ("Lambda Expressions - Capture semantics")
+
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag,non-exhaustive): -target spirv
 
 [numthreads(1,1,1)]

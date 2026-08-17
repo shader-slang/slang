@@ -1,0 +1,29 @@
+//META: generated=true
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#phase-d-hlsl-emit-and-downstream-tools
+//META: doc_section_digest=6e338f870e1f336f86d9ce297f0955e56a8c161eb5a129e60e2a396aa3aa18b3
+//META: purpose=Boundary: a TextureCube<float> (scalar element, not float4) keeps its element-type parameter in the HLSL emit angle brackets.
+//META: intent=boundary
+//META: pipeline_stage=emit
+//META: warning=Auto-generated. May drift from source. Do not edit by hand.
+
+// Boundary axis: texture element type (scalar `float` instead of
+// the more usual `float4`). HLSL emit carries the angle-bracketed
+// element parameter through verbatim.
+
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute
+
+TextureCube<float> tex;
+SamplerState samp;
+RWStructuredBuffer<float> outBuf;
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void main(uint3 tid : SV_DispatchThreadID)
+{
+    outBuf[tid.x] = tex.SampleLevel(samp, float3(0.0, 1.0, 0.0), 0.0);
+}
+
+// CHECK: TextureCube<float{{ *}}> tex_{{[0-9]+}} : register(t{{[0-9]+}})

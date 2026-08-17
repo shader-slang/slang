@@ -1,6 +1,6 @@
 #include "slang-rich-diagnostics.h"
 
-#include "../compiler-core/slang-rich-diagnostics-render.h"
+#include "compiler-core/slang-rich-diagnostics-render.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-type.h"
 #include "slang-ir.h"
@@ -26,7 +26,7 @@ namespace Diagnostics
 %     local class_name = lua_module.toPascalCase(diagnostic.name)
 %     -- Escape quotes and backslashes in the message
 %     local escaped_message = diagnostic.message:gsub('\\', '\\\\'):gsub('"', '\\"')
-const DiagnosticInfo $(camel_name)Info = {$(diagnostic.code), $(lua_module.getSeverityEnum(diagnostic.severity)), "$(camel_name)", "$(escaped_message)"};
+const DiagnosticInfo $(camel_name)Info = {$(diagnostic.code), $(lua_module.getSeverityEnum(diagnostic.severity)), "$(camel_name)", "$(escaped_message)", $(lua_module.getWarningLevelEnum(diagnostic.level))};
 const DiagnosticInfo* $(class_name)::getInfo() { return &$(camel_name)Info; }
 % end
 
@@ -55,6 +55,15 @@ Index getRichDiagnosticsInfoCount()
 UnownedStringSlice nameToPrintableString(Name* name)
 {
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
+}
+
+String declToPrintableString(Decl* decl)
+{
+    if (!decl)
+        return "<unknown decl>";
+    StringBuilder sb;
+    printDiagnosticArg(sb, decl);
+    return sb.produceString();
 }
 
 String typeToPrintableString(Type* type)
@@ -263,7 +272,7 @@ String declVisibilityToPrintableString(DeclVisibility visibility)
 %           elseif ptype == "qualtype" then
           qualTypeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
-          nameToPrintableString($(base_expr)->getName())
+          declToPrintableString($(base_expr))
 %           elseif ptype == "modifier" then
           modifierToPrintableString($(base_expr))
 %           elseif ptype == "irinst" then

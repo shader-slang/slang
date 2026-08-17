@@ -765,8 +765,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(found_heading, "expected 'Branch' column heading")
 
     def test_phase1_fixture_has_no_extra_columns(self):
-        """Regression: the demo fixture (no branches / functions)
-        must not grow extra columns when phase-2 code is present."""
+        """Regression: the demo fixture (no branches / functions /
+        regions) must not grow extra columns when phase-2+ code is
+        present. Guards the shader-coverage rendering path."""
         out_dir = os.path.join(self.tmp, "phase1")
         self._run(
             os.path.join(FIXTURES, "demo-cpu.info"),
@@ -778,6 +779,8 @@ class CliIntegrationTests(unittest.TestCase):
             idx = f.read()
         self.assertNotIn("Function Coverage", idx)
         self.assertNotIn("Branch Coverage", idx)
+        self.assertNotIn("Region Coverage", idx)
+        self.assertNotIn("colRRate", idx)
 
     def test_idempotent_modulo_timestamp(self):
         """Two back-to-back runs differ only in the Date: row."""
@@ -810,6 +813,131 @@ class CliIntegrationTests(unittest.TestCase):
             )
 
         self.assertEqual(strip_date(first), strip_date(second))
+
+
+class JsonInputTests(unittest.TestCase):
+    """End-to-end checks for `llvm-cov export -format=json` input."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run(self, *args):
+        return subprocess.run(
+            [sys.executable, SCRIPT, *args],
+            capture_output=True,
+            text=True,
+        )
+
+    def test_json_input_renders_regions_column(self):
+        out_dir = os.path.join(self.tmp, "json-out")
+        res = self._run(
+            os.path.join(FIXTURES, "llvm-cov-json-sample.json"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # The JSON fixture carries non-zero region totals — column appears.
+        self.assertIn("Region Coverage", idx)
+        self.assertIn("colRRate", idx)
+        # The chrome metric grid is suppressed on the index page (the
+        # dirHeader rows already aggregate). The Regions card shows up
+        # on per-file pages instead — verify there.
+        per_file_pages = [
+            os.path.join(out_dir, e)
+            for e in os.listdir(out_dir)
+            if e.endswith(".html") and e != "index.html"
+        ]
+        self.assertTrue(per_file_pages)
+        any_with_regions = False
+        for p in per_file_pages:
+            with open(p, encoding="utf-8") as f:
+                if "Regions" in f.read():
+                    any_with_regions = True
+                    break
+        self.assertTrue(any_with_regions)
+
+    def test_json_input_drops_auth_summary(self):
+        """--auth-summary is rejected when input is JSON."""
+        out_dir = os.path.join(self.tmp, "mutex")
+        res = self._run(
+            os.path.join(FIXTURES, "llvm-cov-json-sample.json"),
+            "--auth-summary",
+            os.path.join(FIXTURES, "llvm-cov-report-sample.txt"),
+            "--output-dir",
+            out_dir,
+        )
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("--auth-summary", res.stderr)
+        self.assertIn("JSON", res.stderr)
+
+    def test_json_summary_drives_overall_numbers(self):
+        out_dir = os.path.join(self.tmp, "totals")
+        res = self._run(
+            os.path.join(FIXTURES, "llvm-cov-json-sample.json"),
+            "--output-dir",
+            out_dir,
+            "--quiet",
+        )
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        with open(os.path.join(out_dir, "index.html"), encoding="utf-8") as f:
+            idx = f.read()
+        # Totals from `summary` blocks: lines 16, regions 9, branches 6,
+        # functions 3 (across the two files in the fixture).
+        # Lines: 9/16 → 56.25 % (rounds to 56.2).
+        self.assertIn("56.2&nbsp;%", idx)
+
+    def test_json_gz_extension_accepted(self):
+        import gzip
+        sample = os.path.join(FIXTURES, "llvm-cov-json-sample.json")
+        with open(sample, "rb") as f:
+            payload = f.read()
+        gz_path = os.path.join(self.tmp, "input.json.gz")
+        with gzip.open(gz_path, "wb") as gz:
+            gz.write(payload)
+        out_dir = os.path.join(self.tmp, "gz-out")
+        res = self._run(gz_path, "--output-dir", out_dir, "--quiet")
+        self.assertEqual(res.returncode, 0, msg=res.stderr)
+        self.assertTrue(os.path.exists(os.path.join(out_dir, "index.html")))
+
+
+class RegionMetricTests(unittest.TestCase):
+    """Direct checks on the FileRecord region properties."""
+
+    def test_no_auth_no_regions_zero_total(self):
+        from lcov_io import FileRecord
+        rec = FileRecord(path="x")
+        self.assertEqual(rec.total_regions, 0)
+        self.assertEqual(rec.hit_regions, 0)
+        self.assertEqual(rec.percent_regions, 0.0)
+
+    def test_regions_list_drives_unauthed_totals(self):
+        from lcov_io import FileRecord, Region
+        rec = FileRecord(path="x")
+        rec.regions = [
+            Region(line_start=1, line_end=2, count=5),
+            Region(line_start=3, line_end=4, count=0),
+            Region(line_start=5, line_end=6, count=2),
+        ]
+        self.assertEqual(rec.total_regions, 3)
+        self.assertEqual(rec.hit_regions, 2)
+        self.assertAlmostEqual(rec.percent_regions, 200.0 / 3, places=4)
+
+    def test_auth_override_overrides_regions_list(self):
+        from lcov_io import AuthFileSummary, FileRecord, Region
+        rec = FileRecord(path="x")
+        rec.regions = [Region(line_start=1, line_end=2, count=0)]  # would be 0/1
+        rec.auth_override = AuthFileSummary(
+            region_total=10, region_missed=3
+        )
+        self.assertEqual(rec.total_regions, 10)
+        self.assertEqual(rec.hit_regions, 7)
+        self.assertEqual(rec.percent_regions, 70.0)
 
 
 if __name__ == "__main__":

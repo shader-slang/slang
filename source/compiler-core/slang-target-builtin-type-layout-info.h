@@ -9,6 +9,7 @@ namespace Slang
 struct TargetBuiltinTypeLayoutInfo
 {
     uint32_t genericPointerSize;
+    uint32_t stringSize, stringAlignment;
 };
 
 } // namespace Slang

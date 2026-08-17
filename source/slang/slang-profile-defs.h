@@ -75,6 +75,7 @@ PROFILE_STAGE(Mesh, mesh, SLANG_STAGE_MESH)
 PROFILE_STAGE(Amplification, amplification, SLANG_STAGE_AMPLIFICATION)
 PROFILE_STAGE_ALIAS(Task, task, Amplification)
 PROFILE_STAGE(Dispatch, dispatch, SLANG_STAGE_DISPATCH)
+PROFILE_STAGE(Node, node, SLANG_STAGE_NODE)
 
 // Note: HLSL and Direct3D convention erroneously uses the term "Pixel Shader"
 // for the thing that shades *fragments*. Slang strives to treat the more correct
