@@ -1247,7 +1247,7 @@ def render_pending_approvals(data):
             f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
         )
         pr_number = p.get("pr_number")
-        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}", f"#{pr_number}") if pr_number else ""
+        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}/files", f"#{pr_number}") if pr_number else ""
         html += (
             "  <tr>"
             f"<td>{p['waited_min']} min</td>"
@@ -1409,7 +1409,7 @@ PENDING_APPROVALS_JS = """
           var event = p.event === "merge_group"
             ? "<strong>merge_group</strong>" : esc(p.event);
           var pr = p.pr_number
-            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '">#' + p.pr_number + '</a>'
+            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '/files">#' + p.pr_number + '</a>'
             : '';
           html += '<tr>' +
             '<td>' + p.waited + ' min</td>' +
