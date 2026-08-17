@@ -12138,8 +12138,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // silently take the wrong branch for a conformance to an imported COM
         // interface, so the decoration is copied across up front. It is the only
         // decoration lowering reads off an interface type before prelink.
-        if (as<IRInterfaceType>(symbols[0]) &&
-            symbols[0]->findDecoration<IRComInterfaceDecoration>())
+        // Unwrapped first: for a generic interface the symbol found by mangled
+        // name is the outer `IRGeneric`, and the decoration sits on the
+        // `IRInterfaceType` it returns. `getGenericReturnVal` is a no-op for the
+        // non-generic case, so one call covers both shapes.
+        auto borrowedInterface = getGenericReturnVal(symbols[0]);
+        if (as<IRInterfaceType>(borrowedInterface) &&
+            borrowedInterface->findDecoration<IRComInterfaceDecoration>())
         {
             declBuilder->addSimpleDecoration<IRComInterfaceDecoration>(declInterface);
         }
