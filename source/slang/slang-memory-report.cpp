@@ -10,8 +10,14 @@
 #include "slang-session.h"
 
 #if defined(_WIN32)
-#include <psapi.h>
+// clang-format off
+// Order matters and alphabetical order is wrong: psapi.h uses BOOL, DWORD and WINAPI without
+// declaring them, so putting it first fails to compile with a cascade of "missing ';' before
+// identifier 'WINAPI'". Sorting is disabled rather than separated by a blank line because
+// clang-format regroups include blocks and would restore the broken order.
 #include <windows.h>
+#include <psapi.h>
+// clang-format on
 #ifdef _MSC_VER
 // Link psapi where the symbol lives, following slang-win-visual-studio-util.cpp's use of the same
 // pragma for advapi32/Shell32 — this keeps a single-caller platform dependency out of the build
