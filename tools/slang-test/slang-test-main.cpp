@@ -1489,10 +1489,17 @@ static Result _executeRPC(
             "retrying once on a freshly spawned test server; a second unreadable reply will "
             "be reported against this test";
         break;
-    default:
+    case RPCAttemptOutcome::Lost:
         retryMessage =
             "retrying once on a freshly spawned test server; a second loss will be reported "
             "against this test";
+        break;
+    default:
+        // Unreachable: isRetryable above admits exactly the three cases handled here. Listed
+        // rather than defaulted so that adding a fourth retryable outcome fails here instead
+        // of silently inheriting one of these messages.
+        SLANG_ASSERT(!"unhandled retryable outcome");
+        retryMessage = "retrying once on a freshly spawned test server";
         break;
     }
     context->getTestReporter()->message(TestMessageType::RunError, retryMessage);

@@ -1,4 +1,5 @@
 // test-server.cpp
+
 #include "compiler-core/slang-json-rpc-connection.h"
 #include "compiler-core/slang-test-server-protocol.h"
 #include "core/slang-io.h"
@@ -801,8 +802,10 @@ SlangResult TestServer::execute()
 #endif
         }
 
-        // Straight to the fd, not through m_connection: the connection would frame it
-        // correctly, which is the one thing this must not do. The real reply still follows.
+        // Written to stdout directly rather than through m_connection, which would frame it
+        // correctly -- the one thing this must not do. The flush is load-bearing: it puts
+        // these bytes ahead of the reply the connection writes next, which is what makes the
+        // client read them as the start of that reply.
         if (garbleOnRequest && servedCount == garbleOnRequest - 1)
         {
             const char garbage[] = "this-is-not-a-jsonrpc-header\r\n\r\n";
