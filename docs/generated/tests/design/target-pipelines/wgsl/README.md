@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: 2d20887e08dea7601545bf1467296a65eb7476616cf179944754c934c4bb91bd
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: bc78bd447b0aeab75cd02aa8de6e9cf8a328323df3e68d3f0eb3f64c5ac19e07
 source_doc: docs/generated/design/target-pipelines/wgsl.md
-source_doc_digest: 5eced7d4285dded5ddeb2cc8735115296c087396e347883773196aff16373530
+source_doc_digest: 751475e8d3e12f85e8973f442a6b40945f12a36e20ac4c00faaed643a8de6b5e
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -39,10 +39,55 @@ because the generation runner has no GPU, no Tint and no Dawn; the single
 `-target wgsl-spirv-asm` test is gated with `requires-tool=tint` and runs
 only in CI.
 
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md). **This
+enumeration is partial**: it covers the two spelling sections the doc-gap fill
+(#12477) rewrote, which is where the bundle had no coverage at all. The phase
+sections (A-D), the conditional gates and the notable-pass sections are not yet
+enumerated, so a claim there is neither listed below nor guaranteed covered.
+
+### `#emitted-spellings`
+
+1. An `int` literal `N` emits as the constructor call `i32(N)`, not a bare literal.
+2. A `uint` literal `N` emits as `u32(N)`.
+3. An `int64_t` / `uint64_t` literal emits as `i64(N)` / `u64(N)`.
+4. An `intptr_t` / `uintptr_t` literal emits as `i64`/`u64` or `i32`/`u32`, chosen by target pointer size.
+5. An `int16_t` / `uint16_t` literal emits nothing and reports `Int16NotSupportedInWgsl`.
+6. A `float` literal `x` emits as `xf`.
+7. A `half` literal `x` emits as `xh`, and `enable f16;` is added to the front matter.
+8. A `float` NaN emits as the generated prelude call `_slang_getNan()`.
+9. A `float` infinity emits as `_slang_getInfinity(true)` / `_slang_getInfinity(false)`.
+10. `vector<T,N>` with N > 1 emits as `vecN<T>`.
+11. `vector<T,1>` emits as the bare scalar type.
+12. `matrix<T,R,C>` emits as `matRxC<T>`, the same two digits in the same order, which is deliberately the transpose of the Slang matrix because WGSL reads `matAxB` as A columns by B rows.
+13. `T[N]` emits as `array<T, i32(N)>` — the extent is itself an `int` literal and takes the constructor spelling.
+14. `T[]` (unsized) emits as `array<T>`.
+15. `Atomic<T>` emits as `atomic<T>`.
+16. `Ptr<T>` in address space `A` emits as `ptr<A, T>`.
+
+### `#texture-sampler-and-texture-intrinsic-spellings`
+
+17. The texture type name is assembled in pieces: `texture` or `texture_storage`, then `_depth`, then `_multisampled`, then the shape suffix, then `_array`.
+18. Each sampled shape has its documented spelling: `Texture1D`→`texture_1d`, `Texture2D`→`texture_2d`, `Texture3D`→`texture_3d`, `TextureCube`→`texture_cube`, `Texture2DArray`→`texture_2d_array`, `Texture2DMS`→`texture_multisampled_2d`.
+19. A sampled texture's type parameter is the *scalar* element type, not the vector: `Texture2D<float4>` emits `texture_2d<f32>`.
+20. A shadow texture emits `texture_depth_2d` with no type parameter at all.
+21. A storage texture takes a texel format and an access mode in the type-parameter position instead of an element type.
+22. The storage format is the `[format(...)]` attribute when present, and is otherwise inferred by `getWgslImageFormat`: `float`→`r32float`, `float2`→`rg32float`, `float4`→`rgba32float`.
+23. The storage access mode is `read_write` for a `RWTexture*` and `write` for a write-only texture; `rgba16f` is not a valid `read_write` format and reports `StorageTextureAccessModeNotSupportedInWgsl`.
+24. `SamplerState` emits as `sampler` and `SamplerComparisonState` as `sampler_comparison`.
+25. Each access intrinsic maps to its WGSL builtin (`Sample`→`textureSample`, `SampleLevel`→`textureSampleLevel`, `SampleBias`, `SampleGrad`, `SampleCmp`→`textureSampleCompare`, `SampleCmpLevelZero`→`textureSampleCompareLevel`, `Gather*`, `Load`→`textureLoad`, `RWTexture*` subscript store→`textureStore`).
+26. For an array texture the intrinsic template splits the coordinate: the trailing component becomes a separate layer argument, spelled `i32(...)` for sample/load and `u32(...)` for the gather family.
+27. WGSL has no `textureLoad` or `textureStore` for cube textures, so those combinations are rejected by a `static_assert` inside the intrinsic body.
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                               | Intent     | Anchor                                                                                                                                                                        | Tests                                                                                                                            |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| C1, C2, C3: An integer literal emits as a constructor call — `i32(N)`, `u32(N)`, `i64(N)` — rather than a bare literal. | basic, types | [#emitted-spellings](../../../../design/target-pipelines/wgsl.md#emitted-spellings) | [`emitted-spellings-integer-literal-constructors.slang`](emitted-spellings-integer-literal-constructors.slang) |
+| C10, C11, C12, C13, C14: Composite spellings: `vecN<T>`, a one-element vector collapsing to the bare scalar, `matRxC<T>`, `array<T, i32(N)>` and unsized `array<T>`. | basic, corner, types | [#emitted-spellings](../../../../design/target-pipelines/wgsl.md#emitted-spellings) | [`emitted-spellings-composite-types.slang`](emitted-spellings-composite-types.slang) |
+| C21, C22, C23: A storage texture takes a texel format plus access mode, with the format inferred per element type and the mode `read_write` for a `RWTexture`. | basic, types | [#texture-sampler-and-texture-intrinsic-spellings](../../../../design/target-pipelines/wgsl.md#texture-sampler-and-texture-intrinsic-spellings) | [`texture-storage-format-and-access-mode-emission.slang`](texture-storage-format-and-access-mode-emission.slang) |
+| C26: For an array texture the intrinsic template splits the coordinate, passing the trailing component as a separate `i32(...)` layer argument. | basic, corner | [#texture-sampler-and-texture-intrinsic-spellings](../../../../design/target-pipelines/wgsl.md#texture-sampler-and-texture-intrinsic-spellings) | [`texture-array-coordinate-split-emission.slang`](texture-array-coordinate-split-emission.slang) |
 | The wgsl-spirv-asm target compiles the WGSL text through Tint to a SPIR-V module and then disassembles it via glslang into assembly whose OpEntryPoint names main                   | functional | [#downstream-tint](../../../../design/target-pipelines/wgsl.md#downstream-tint)                                                                                               | [`tint-downstream-spirv-emit.slang`](tint-downstream-spirv-emit.slang)                                                           |
 | Five-level nested if/else with a merged value still lowers via the var+per-branch-assignment pattern of eliminatePhis                                                               | stress     | [#eliminatephis-with-default-options](../../../../design/target-pipelines/wgsl.md#eliminatephis-with-default-options)                                                         | [`nested-branches-five-deep-phi.slang`](nested-branches-five-deep-phi.slang)                                                     |
 | eliminatePhis with default options replaces phi nodes with an explicit var and per-branch assignments                                                                               | functional | [#eliminatephis-with-default-options](../../../../design/target-pipelines/wgsl.md#eliminatephis-with-default-options)                                                         | [`eliminate-phis-default-options.slang`](eliminate-phis-default-options.slang)                                                   |

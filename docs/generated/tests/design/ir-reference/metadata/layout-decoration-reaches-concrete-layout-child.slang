@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#layout
-//META: doc_section_digest=191c3cf4521ced3200561deb00c6eb3357c4d39bab0db9c1eb01023ed957cfe2
+//META: doc_section_digest=8611701da03ed9b5dca8322f8af4809da1b1c134d53509c9de4451b865f1b242
 //META: purpose=A laid-out instruction is connected to its layout by a layout decoration whose operand is a concrete Layout child.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

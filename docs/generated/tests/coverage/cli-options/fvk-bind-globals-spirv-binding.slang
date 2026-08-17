@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#option-set-toggles
-//META: doc_section_digest=730d07f4cad01d2edbbbf03523fae836c3254cc356ffd1ac578d0a21bad19381
+//META: doc_section_digest=51a3cfba2e9b446866969702a281584b197e5b4c38e04278312f866f3a25794f
 //META: purpose=Verifies -fvk-bind-globals N set places the $Globals cbuffer at SPIR-V Binding N / DescriptorSet set instead of the default 0/0.
 //META: intent=characterization
 //META: covers=source/slang/slang-options.cpp

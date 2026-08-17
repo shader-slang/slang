@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/serialization.md#what-is-serialized
-//META: doc_section_digest=61e59f5357bfee2348343a5eccfff46967819da5efb8140c8e1f42c2a2c1d0f6
+//META: doc_section_digest=456bd69b24e5d578fa07710e00330f51f0dfdbb20bd9dc1ce60597ce05acfea7
 //META: purpose=A .slang-module written by slangc carries the checked AST/IR of its public symbol, and re-reading the container with -dump-module recovers the export name, name hint and function type.
 //META: intent=functional
 //META: pipeline_stage=link
