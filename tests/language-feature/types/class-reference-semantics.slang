@@ -4,8 +4,10 @@
 // reference affects the other (unlike structs which are value types).
 // NOTE: Uses single-field class due to interpreter crash with multi-field classes.
 
+// DISABLED: single-argument construction of a class with a user __init aborts with
+// "could not resolve target declaration for call" (fires under slangi and every text
+// target). Tracked by shader-slang/slang#12485. Re-enable once that is fixed.
 //DISABLE_TEST:INTERPRET(filecheck=CHECK):
-// DISABLED: interpreter crash "could not resolve target declaration for call" on class constructors
 
 class Box
 {

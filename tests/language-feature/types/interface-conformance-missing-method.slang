@@ -12,7 +12,7 @@ interface IRequired
 }
 
 struct Incomplete : IRequired
-//CHECK:            ^^^^^^^^^ missing interface member
+//CHECK:            ^^^^^^^^^ error E38100
 //CHECK:            ^^^^^^^^^ type 'Incomplete' does not provide required interface member 'compute'
 {
     int data;

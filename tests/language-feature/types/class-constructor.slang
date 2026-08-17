@@ -2,8 +2,10 @@
 
 // Test class constructors (__init) with default and parameterized forms.
 
+// DISABLED: single-argument construction of a class with a user __init aborts with
+// "could not resolve target declaration for call" (fires under slangi and every text
+// target). Tracked by shader-slang/slang#12485. Re-enable once that is fixed.
 //DISABLE_TEST:INTERPRET(filecheck=CHECK):
-// DISABLED: interpreter crash "could not resolve target declaration for call" on class constructors
 
 class Counter
 {

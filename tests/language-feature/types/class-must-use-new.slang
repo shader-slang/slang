@@ -13,6 +13,6 @@ class MyClass
 void test()
 {
     MyClass obj = MyClass();
-//CHECK:                 ^ class can only be initialized by `new`
+//CHECK:                 ^ error E30066
 //CHECK:                 ^ a class can only be initialized by a `new` clause
 }

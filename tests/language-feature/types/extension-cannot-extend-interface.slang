@@ -11,7 +11,7 @@ interface IMyInterface
 }
 
 extension IMyInterface
-//CHECK:  ^^^^^^^^^^^^ cannot extend interface type 'IMyInterface'
+//CHECK:  ^^^^^^^^^^^^ error E30852
 //CHECK:  ^^^^^^^^^^^^ cannot extend interface type 'IMyInterface'. consider using a generic extension: `extension<T:IMyInterface> T {...}`
 {
 }

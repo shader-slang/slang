@@ -11,7 +11,7 @@ void computeMain()
 {
     int local = 5;
     int* p = __getAddress(local);
-//CHECK:     ^^^^^^^^^^^^ invalid __getAddress usage
+//CHECK:     ^^^^^^^^^^^^ error E31160
 //CHECK:     ^^^^^^^^^^^^ cannot take the address of a function-local variable
 
     output[0] = *p;

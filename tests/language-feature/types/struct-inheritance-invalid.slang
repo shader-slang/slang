@@ -17,7 +17,7 @@ struct Base2
 }
 
 struct Derived : Base1, Base2
-//CHECK:                ^^^^^ a struct type may only inherit from one other struct type, and that type must appear first in the list of bases
+//CHECK:                ^^^^^ error E30820
 {
     int z;
 }

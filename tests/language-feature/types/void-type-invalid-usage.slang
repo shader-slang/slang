@@ -8,7 +8,7 @@ void test()
 {
     void x;
 /*CHECK:
+    ^^^^ error E30009
     ^^^^ invalid type 'void'
-    ^^^^ invalid type 'void'.
 */
 }

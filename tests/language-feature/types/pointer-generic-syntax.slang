@@ -1,8 +1,10 @@
 // pointer-generic-syntax.slang
 
-// DISABLED: requires GPU runtime (__getAddress on buffer elements unsupported on CPU/SPIRV)
 // Test Ptr<T> generic syntax equivalence with T*.
 
+// DISABLED: __getAddress on a structured-buffer element (buf[i]) is rejected as a
+// function-local address on every target (spirv/cuda/cpp), not just GPU. Tracked by
+// shader-slang/slang#12581. Re-enable with a -cpu directive once that is fixed.
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

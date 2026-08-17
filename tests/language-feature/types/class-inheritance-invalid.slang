@@ -10,7 +10,7 @@ struct MyStruct
 }
 
 class BadClass : MyStruct
-//CHECK:         ^^^^^^^^ class 'BadClass' cannot inherit from type 'MyStruct' that is neither a class nor an interface
+//CHECK:         ^^^^^^^^ error E30814
 {
     int extra;
 }

@@ -7,6 +7,6 @@
 void test()
 {
     int arr[-1];
+//CHECK:     ^ error E30025
 //CHECK:     ^ array size must be non-negative
-//CHECK:     ^ array size must be non-negative.
 }

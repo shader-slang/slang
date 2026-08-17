@@ -12,6 +12,6 @@ struct Foo
 extension Foo
 {
     int y;
-//CHECK:^ declaration not allowed in this context
+//CHECK:^ error E31400
 //CHECK:^ non-static member variable declaration is not allowed inside extension.
 }

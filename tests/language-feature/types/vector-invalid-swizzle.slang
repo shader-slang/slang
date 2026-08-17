@@ -13,10 +13,10 @@ void computeMain()
     float4 v = float4(1.0, 2.0, 3.0, 4.0);
 
     float2 bad1 = v.st;
-//CHECK:            ^^ member not found
+//CHECK:            ^^ error E30027
 //CHECK:            ^^ 'st' is not a member of 'vector<float,4>'.
 
     float bad2 = v.q;
-//CHECK:           ^ member not found
+//CHECK:           ^ error E30027
 //CHECK:           ^ 'q' is not a member of 'vector<float,4>'.
 }

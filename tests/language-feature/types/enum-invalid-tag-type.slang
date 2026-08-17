@@ -5,7 +5,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 enum Bad : float
-//CHECK:   ^^^^^ invalid enum tag type
+//CHECK:   ^^^^^ error E32000
 //CHECK:   ^^^^^ invalid tag type for 'enum': 'float'
 {
     A,
