@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/overload-resolution.md#conversions-that-do-not-have-their-own-cost-level
-//META: doc_section_digest=234f96bc98a7bac5b1f6d6a6347fc524534856924818bfab5d35d45f80856a61
+//META: doc_section_digest=ecd3a6f3ea79e7ef3d125546849e46357976725d2a9d4de69b69741a1f69fac4
 //META: purpose=A ConstantBuffer source is implicitly dereferenced at kConversionCost_ImplicitDereference (10) before converting onward, so an overload taking ConstantBuffer<Foo> beats one taking Foo.
 //META: intent=functional
 //META: pipeline_stage=emit

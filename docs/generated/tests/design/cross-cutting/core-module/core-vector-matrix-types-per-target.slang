@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#what-the-core-module-provides
-//META: doc_section_digest=9e789f76018ea954bfb264040a694991a83baab0f112111a9b519188a6174ec6
+//META: doc_section_digest=d5f0effc9a6866c35191d883a901be38534ac7a715ab357584db096360bfa37e
 //META: purpose=The core module's vector and matrix types are emitted in each target's own spelling: float3/float4x4 on HLSL, vec3/mat3x3 on GLSL, vec3<f32>/mat3x3<f32> on WGSL, float3/matrix<float,..> on Metal, float3/makeMatrix on CUDA and Vector/Matrix templates on C++.
 //META: intent=functional
 //META: pipeline_stage=emit
