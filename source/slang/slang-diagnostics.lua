@@ -1415,6 +1415,30 @@ err(
     span { loc = "expr:Expr", message = "the result of calling '~name:Name' is discarded; this function is marked '[NoDiscard]'." }
 )
 
+-- Expression-statement diagnostics (see shader-slang/slang#12428). A default-on warning is raised
+-- to an error under Slang 202c by an override installed once at the start of module checking, so no
+-- language-version branching appears in the checking logic itself.
+warning(
+    "expression-statement-disallowed-form",
+    30073,
+    "this form of expression should not be used as a statement",
+    span { loc = "expr:Expr", message = "the result of this expression is not used; did you mean to call it with '()'?" }
+)
+
+warning(
+    "discarded-expression-result",
+    30074,
+    "result of this expression is not used",
+    span { loc = "expr:Expr", message = "the result of this expression is not used; assign it to a variable or discard it explicitly with '(void)'." }
+)
+
+err(
+    "type-name-used-as-expression-statement",
+    30088,
+    "this expression does not name a value",
+    span { loc = "expr:Expr", message = "this expression names a type or namespace, not a value, and cannot be used where a value is expected." }
+)
+
 err(
     "no-discard-on-void-function",
     30069,

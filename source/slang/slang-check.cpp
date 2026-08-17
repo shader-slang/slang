@@ -193,6 +193,28 @@ void checkTranslationUnit(
 
     SemanticsDeclVisitorBase visitor((SemanticsContext(&sharedSemanticsContext)));
 
+    // The expression-statement warnings (case 1 and case 2 of shader-slang/slang#12428) are errors
+    // by default under Slang 202c. Rather than branch on the language version inside the checking
+    // logic, install a severity override so the warnings are raised to errors while this module is
+    // checked. (Case 3 is already an error at all language versions.)
+    //
+    // The sink is shared across every translation unit of the compile request, so the override must
+    // be scoped to this module: snapshot the overrides, install ours, and restore on the way out
+    // (including on an exception, via `SLANG_DEFER`), so a 202c module does not force these to
+    // errors for a sibling module compiled at an earlier language version.
+    auto sink = translationUnit->compileRequest->getSink();
+    auto savedSeverityOverrides = sink->getSeverityOverrides();
+    SLANG_DEFER(sink->setSeverityOverrides(savedSeverityOverrides));
+    if (translationUnit->getModuleDecl()->languageVersion >= SLANG_LANGUAGE_VERSION_202C)
+    {
+        for (auto info :
+             {Diagnostics::ExpressionStatementDisallowedForm::getInfo(),
+              Diagnostics::DiscardedExpressionResult::getInfo()})
+        {
+            sink->overrideDiagnosticSeverity(info->id, Severity::Error, info);
+        }
+    }
+
     // Apply the visitor to do the main semantic
     // checking that is required on all declarations
     // in the translation unit.

@@ -35,5 +35,5 @@ float test<T : IFoo>(int id)
 void computeMain(uint id : SV_DispatchThreadID)
 {
     // CHECK: 4.0
-    test<Impl>(id); 
+    (void)test<Impl>(id);
 }

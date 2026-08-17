@@ -3846,9 +3846,43 @@ Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
     // that is allowable in an expression context (e.g., make sure
     // that `expr` names a value and not a type).
     //
-    // TODO: Implement this step.
+    // For most call sites this is handled by the coercion that follows (coercing to a known target
+    // type rejects a type-valued expression). For sites that require a proper-typed value but have
+    // no target type to coerce to (an expression statement, most notably), see
+    // `checkExprOfProperOrVoidType`.
 
     return checkedExpr;
+}
+
+bool SemanticsVisitor::isExprOfNonValueType(Expr* expr)
+{
+    // An expression whose type is one of these "names a X, not a value" types does not denote a
+    // runtime value: it names a type (`MyType`, a generic like `RWStructuredBuffer`, an interface)
+    // or a namespace (`SomeNamespace`). None of these can reach IR lowering, which lists them under
+    // `UNEXPECTED_CASE` (`slang-lower-to-ir.cpp`); a bare one used as a value crashes there (the
+    // `unexpected: TypeType` of shader-slang/slang#12433, and likewise `NamespaceType`).
+    auto type = expr->type.type;
+    return as<TypeType>(type) || as<NamespaceType>(type) || as<GenericDeclRefType>(type);
+}
+
+Expr* SemanticsVisitor::checkExprOfProperOrVoidType(Expr* expr, ExprCheckingRole role)
+{
+    SLANG_UNUSED(role);
+    expr = CheckExpr(expr);
+
+    // Enforce that the checked expression denotes a value (case 3 of shader-slang/slang#12428): if
+    // it instead names a type or namespace it is not valid where a value is required, and left
+    // unchecked it would reach IR lowering and hit an `unexpected: <...>Type` internal error.
+    // Diagnose it and rewrite to an `ErrorType` so that downstream discarded-result checks skip it
+    // (cascading-error avoidance). A `void`-typed expression is allowed here and handled by the
+    // caller.
+    if (isExprOfNonValueType(expr))
+    {
+        getSink()->diagnose(Diagnostics::TypeNameUsedAsExpressionStatement{.expr = expr});
+        expr->type = QualType(m_astBuilder->getErrorType());
+    }
+
+    return expr;
 }
 
 static bool _canLValueCoerceScalarType(Type* a, Type* b)

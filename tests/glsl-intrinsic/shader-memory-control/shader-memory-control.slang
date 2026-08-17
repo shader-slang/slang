@@ -45,9 +45,9 @@ bool testMemoryBarrierAtomicCounter()
 {
     for (int i = 0; i < 4; i++)
     {
-        atomicExchange(raceCondition.data[1], 2);
+        (void)atomicExchange(raceCondition.data[1], 2);
         memoryBarrierAtomicCounter();
-        atomicExchange(raceCondition.data[1], 1);
+        (void)atomicExchange(raceCondition.data[1], 1);
         memoryBarrierAtomicCounter();
         if (raceCondition.data[1] != 1)
             return false;

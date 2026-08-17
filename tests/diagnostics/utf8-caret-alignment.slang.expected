@@ -1,10 +1,22 @@
 result code = -1
 standard error = {
+warning[E30073]: this form of expression should not be used as a statement
+  --> tests/diagnostics/utf8-caret-alignment.slang:13:15
+   |
+13 | /* αβγ */ bbb;
+   |           ^^^ the result of this expression is not used; did you mean to call it with '()'?
+---'
 error[E30015]: undefined identifier
   --> tests/diagnostics/utf8-caret-alignment.slang:13:15
    |
 13 | /* αβγ */ bbb;
    |           ^^^ undefined identifier 'bbb'.
+---'
+warning[E30073]: this form of expression should not be used as a statement
+  --> tests/diagnostics/utf8-caret-alignment.slang:16:14
+   |
+16 | /* 救命 */ ddd;
+   |            ^^^ the result of this expression is not used; did you mean to call it with '()'?
 ---'
 error[E30015]: undefined identifier
   --> tests/diagnostics/utf8-caret-alignment.slang:16:14
@@ -12,11 +24,23 @@ error[E30015]: undefined identifier
 16 | /* 救命 */ ddd;
    |            ^^^ undefined identifier 'ddd'.
 ---'
+warning[E30073]: this form of expression should not be used as a statement
+  --> tests/diagnostics/utf8-caret-alignment.slang:21:14
+   |
+21 | /* é */ eee;
+   |         ^^^ the result of this expression is not used; did you mean to call it with '()'?
+---'
 error[E30015]: undefined identifier
   --> tests/diagnostics/utf8-caret-alignment.slang:21:14
    |
 21 | /* é */ eee;
    |         ^^^ undefined identifier 'eee'.
+---'
+warning[E30073]: this form of expression should not be used as a statement
+  --> tests/diagnostics/utf8-caret-alignment.slang:26:13
+   |
+26 | /*	x */ fff;
+   |         ^^^ the result of this expression is not used; did you mean to call it with '()'?
 ---'
 error[E30015]: undefined identifier
   --> tests/diagnostics/utf8-caret-alignment.slang:26:13
