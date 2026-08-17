@@ -8,9 +8,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
 
-interface IStringLength
+interface ITagged
 {
-    int length();
+    int getTag();
 }
 
 struct Wrapper<T : IArithmetic>
@@ -18,17 +18,17 @@ struct Wrapper<T : IArithmetic>
     T value;
 }
 
-extension<T : IArithmetic> Wrapper<T> : IStringLength
+extension<T : IArithmetic> Wrapper<T> : ITagged
 {
-    int length()
+    int getTag()
     {
         return 1;
     }
 }
 
-int getLen<U : IStringLength>(U obj)
+int getTagVia<U : ITagged>(U obj)
 {
-    return obj.length();
+    return obj.getTag();
 }
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
@@ -44,9 +44,9 @@ void computeMain()
     wf.value = 3.14;
 
     // CHECK: 1
-    outputBuffer[0] = getLen(wi);
+    outputBuffer[0] = getTagVia(wi);
     // CHECK: 1
-    outputBuffer[1] = getLen(wf);
+    outputBuffer[1] = getTagVia(wf);
     // CHECK: 42
     outputBuffer[2] = wi.value;
     // CHECK: 3

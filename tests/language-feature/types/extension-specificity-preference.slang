@@ -1,10 +1,18 @@
 // extension-specificity-preference.slang
 
-// Test that direct conformance is preferred over extension-provided conformance.
-// When there are multiple ways for a type to conform to an interface:
-// 1. Direct implementation on the type wins.
-// 2. A concrete extension on the type is next.
-// 3. A generic extension is the fallback.
+// Test which ITransform conformance is selected for MyStruct when both a concrete
+// extension (`extension MyStruct : ITransform`) and a blanket generic extension
+// (`extension<T : IGetVal> T : ITransform`) supply one.
+//
+// The selection is by *witness visibility in the calling context*, not a global
+// "concrete beats generic" ranking: whichever ITransform witness is statically in
+// scope where `transform()` is resolved is the one used.
+//   - When the concrete type MyStruct is known (a direct `s.transform()` call, or a
+//     `<T : ITransform>` generic that carries MyStruct's own ITransform witness), the
+//     concrete extension is visible -> `v * 10`.
+//   - Inside a `<T : IGetVal>` generic, only the blanket `extension<T : IGetVal> T`
+//     witness is in scope (the concrete MyStruct extension is not reachable for an
+//     arbitrary IGetVal), so the generic extension is used -> `v + 1`.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
@@ -38,12 +46,12 @@ extension<T : IGetVal> T : ITransform
     int transform() { return this.getVal() + 1; }
 }
 
-int callTransformDirect<T : ITransform>(T val)
+int callTransformViaITransform<T : ITransform>(T val)
 {
     return val.transform();
 }
 
-int callTransformViaConstraint<T : IGetVal>(T val)
+int callTransformViaIGetVal<T : IGetVal>(T val)
 {
     return val.transform();
 }
@@ -56,15 +64,17 @@ void computeMain()
 {
     MyStruct s = { 5 };
 
-    // Direct call: uses the concrete extension (5 * 10 = 50)
+    // Concrete type known: concrete extension's witness is visible (5 * 10 = 50).
     // CHECK: 50
     outputBuffer[0] = s.transform();
 
-    // Through ITransform constraint: uses concrete extension (50)
+    // Through a <T : ITransform> constraint, T carries MyStruct's own (concrete)
+    // ITransform witness (50).
     // CHECK: 50
-    outputBuffer[1] = callTransformDirect(s);
+    outputBuffer[1] = callTransformViaITransform(s);
 
-    // Through IGetVal constraint: uses generic extension (5 + 1 = 6)
+    // Through a <T : IGetVal> constraint, only the blanket generic extension's
+    // witness is in scope (5 + 1 = 6).
     // CHECK: 6
-    outputBuffer[2] = callTransformViaConstraint(s);
+    outputBuffer[2] = callTransformViaIGetVal(s);
 }

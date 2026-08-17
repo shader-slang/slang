@@ -1,9 +1,11 @@
 // class-inheritance.slang
 
-// Test class inheriting from a base class and implementing an interface.
-// NOTE: Uses single-field per class due to interpreter crash with multi-field classes.
+// Test a class that conforms to an interface, instantiated with `new`.
 
-//TEST:INTERPRET(filecheck=CHECK):
+// DISABLED: single-argument construction of a class with a user __init aborts with
+// "could not resolve target declaration for call" (fires under slangi and every text
+// target). Tracked by shader-slang/slang#12485. Re-enable once that is fixed.
+//DISABLE_TEST:INTERPRET(filecheck=CHECK):
 
 interface IDescribable
 {

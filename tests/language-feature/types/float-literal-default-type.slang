@@ -1,42 +1,39 @@
 // float-literal-default-type.slang
 
-// Test that unsuffixed floating-point literals default to float (not double).
+// Test that an unsuffixed floating-point literal defaults to `float`, not `double`.
+// Reading the value into a `float` destination cannot prove this (double->float is
+// an implicit conversion, so it would pass either way). Instead we resolve an
+// overloaded call: `whichType` returns 1 for a `float` argument and 2 for a `double`
+// argument, so the returned tag observes the *inferred* literal type directly.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
+RWStructuredBuffer<int> outputBuffer;
 
-float identity(float x) { return x; }
+int whichType(float x) { return 1; }
+int whichType(double x) { return 2; }
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // Unsuffixed literal 1.0 should be float, assignable directly
+    // Unsuffixed literal: infers to float -> float overload -> 1.
     var a = 1.0;
-    float fa = a;
+    // CHECK: 1
+    outputBuffer[0] = whichType(a);
 
-    // CHECK: 1.0
-    outputBuffer[0] = fa;
+    // Arithmetic on unsuffixed literals stays float -> 1.
+    var b = 2.0 + 0.5;
+    // CHECK: 1
+    outputBuffer[1] = whichType(b);
 
-    // Unsuffixed literal passed to a function expecting float (no conversion needed)
-    var b = 3.5;
-    float fb = identity(b);
+    var c = 7.0f;
+    // CHECK: 1
+    outputBuffer[2] = whichType(c);
 
-    // CHECK: 3.5
-    outputBuffer[1] = fb;
-
-    // Arithmetic with unsuffixed literals produces float
-    var c = 2.0 + 0.5;
-    float fc = c;
-
-    // CHECK: 2.5
-    outputBuffer[2] = fc;
-
-    // Explicit 'f' suffix also yields float
-    var d = 7.0f;
-    float fd = d;
-
-    // CHECK: 7.0
-    outputBuffer[3] = fd;
+    // Control: an explicit `double` resolves to the double overload -> 2,
+    // proving the discriminator is real and the above are genuinely float.
+    double d = 1.0;
+    // CHECK: 2
+    outputBuffer[3] = whichType(d);
 }

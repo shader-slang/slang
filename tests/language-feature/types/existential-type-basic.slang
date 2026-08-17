@@ -49,8 +49,8 @@ void computeMain()
     outputBuffer[1] = computeArea(rc);
     // CHECK: 37
     outputBuffer[2] = computeArea(sq) + computeArea(rc);
-    // CHECK: 9
     Square sq2;
     sq2.side = 3;
+    // CHECK: 9
     outputBuffer[3] = computeArea(sq2);
 }

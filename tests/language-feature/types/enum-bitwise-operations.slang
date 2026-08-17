@@ -1,6 +1,7 @@
 // enum-bitwise-operations.slang
 
-// Test that enums conform to ILogical and support bitwise operations (|, &, ~).
+// Test that `[Flags]` enums support the bitwise operators `|`, `&`, and `~`,
+// producing the expected integer bit patterns.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 

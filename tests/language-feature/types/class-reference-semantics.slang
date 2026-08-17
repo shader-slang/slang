@@ -1,8 +1,8 @@
 // class-reference-semantics.slang
 
-// Test that class assignment shares the reference: modifying via one
-// reference affects the other (unlike structs which are value types).
-// NOTE: Uses single-field class due to interpreter crash with multi-field classes.
+// Test that a class has reference semantics: passing an instance to a function
+// and mutating a field there is visible to the caller (unlike a struct, which
+// would be copied by value).
 
 // DISABLED: single-argument construction of a class with a user __init aborts with
 // "could not resolve target declaration for call" (fires under slangi and every text

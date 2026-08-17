@@ -6,6 +6,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
 
+// anyValueSize gives the interface a fixed any-value buffer so a `This`-returning
+// method can be dynamically dispatched; 8 bytes comfortably holds the single-int
+// conformer below.
 [anyValueSize(8)]
 interface IClonable
 {

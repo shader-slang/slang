@@ -4,6 +4,8 @@
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
+// Struct inheritance emits warning 30816 ("inheritance is unstable"); suppress it so
+// the warning text does not perturb the compared output on the synthesized-check path.
 #pragma warning(disable:30816)
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

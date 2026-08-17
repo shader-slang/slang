@@ -7,9 +7,9 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj -output-using-type
 
-interface IStringLength
+interface IFieldCount
 {
-    int getLength();
+    int getFieldCount();
 }
 
 struct MyData
@@ -19,17 +19,17 @@ struct MyData
     int c;
 }
 
-extension MyData : IStringLength
+extension MyData : IFieldCount
 {
-    int getLength()
+    int getFieldCount()
     {
         return 3;
     }
 }
 
-int queryLength<T : IStringLength>(T val)
+int queryFieldCount<T : IFieldCount>(T val)
 {
-    return val.getLength();
+    return val.getFieldCount();
 }
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
@@ -41,8 +41,8 @@ void computeMain()
     MyData d = { 10, 20, 30 };
 
     // CHECK: 3
-    outputBuffer[0] = d.getLength();
+    outputBuffer[0] = d.getFieldCount();
 
     // CHECK: 3
-    outputBuffer[1] = queryLength(d);
+    outputBuffer[1] = queryFieldCount(d);
 }

@@ -1,6 +1,9 @@
 // interface-is-as-operators.slang
 
-// Test `is` operator for type testing and `as` for downcasting.
+// Test the `is` operator for type testing and `as` for downcasting. Two distinct
+// forms are exercised: `tryGetSquareSide` uses value-level `shape is Square` /
+// `shape as Square` (a test on the value), while `identify` uses `T is Square`
+// (a test on the static type parameter).
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj -output-using-type
