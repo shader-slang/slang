@@ -153,14 +153,14 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
                 sb << " " << name << " " << v.intValue << " " << v.intValue2;
             }
             break;
-        case CompilerOptionName::TraceCoverageBindless: // intValue0: space; intValue1: array index
-        case CompilerOptionName::TraceCoverageBinding:  // intValue0: index; intValue1: space
+        case CompilerOptionName::TraceCoverageBinding: // intValue0: index; intValue1: space
             for (auto v : option.value)
             {
                 sb << " " << name << " " << v.intValue << " " << v.intValue2;
             }
             break;
-        case CompilerOptionName::TraceCoverageReservedSpace: // intValue0: space
+        case CompilerOptionName::TraceCoverageReservedSpace:  // intValue0: space
+        case CompilerOptionName::TraceCoverageBindlessIndex:  // intValue0: array index
             for (auto v : option.value)
             {
                 sb << " " << name << " " << v.intValue;

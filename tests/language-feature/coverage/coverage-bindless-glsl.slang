@@ -7,7 +7,7 @@
 // blocks, where the block's own trailing `uint64_t _data[]` is the structured
 // buffer's contents and the OUTER `[]` is the descriptor array.
 
-//TEST:SIMPLE(filecheck=CHECK):-target glsl -stage compute -entry computeMain -profile glsl_460 -trace-coverage -trace-coverage-bindless 31 7
+//TEST:SIMPLE(filecheck=CHECK):-target glsl -stage compute -entry computeMain -profile glsl_460 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
 
 RWStructuredBuffer<uint> outBuf;
 

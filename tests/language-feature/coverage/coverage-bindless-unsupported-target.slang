@@ -6,7 +6,7 @@
 // shader would not find out until its pipeline layout failed to match at runtime,
 // which is exactly the class of failure the option exists to remove.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry computeMain -profile sm_6_0 -trace-coverage -trace-coverage-bindless 31 3
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry computeMain -profile sm_6_0 -trace-coverage -trace-coverage-bindless-index 3
 
 RWStructuredBuffer<uint> outBuf;
 

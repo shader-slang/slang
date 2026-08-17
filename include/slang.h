@@ -1307,23 +1307,23 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
-        TraceCoverageBindless =
-            158, // int2: PROTOTYPE. intValue0 = descriptor set/space, intValue1 =
-                 //   this shader's index. Synthesizes `__slang_coverage` as an
-                 //   unbounded descriptor array of structured buffers placed at
-                 //   (binding 0, <space>), indexed per shader:
-                 //   `__slang_coverage[<index>][slot]`. Many separately compiled
-                 //   shaders sharing one pipeline then occupy a single descriptor
-                 //   binding instead of one binding each.
+        TraceCoverageBindlessIndex =
+            158, // int: PROTOTYPE. Synthesize `__slang_coverage` as an unbounded
+                 //   descriptor array of structured buffers rather than a single
+                 //   buffer, and index it with this value:
+                 //   `__slang_coverage[N][slot]`. Many separately compiled
+                 //   shaders sharing one pipeline then occupy a single
+                 //   descriptor binding instead of one binding each, and each
+                 //   shader's buffer is sized independently by the host.
                  //
-                 //   The binding is 0 and not configurable, and the space is
-                 //   required rather than auto-allocated, because an unbounded
-                 //   array is backed by a variable descriptor count, which
-                 //   Vulkan permits only on a set's LAST binding. Giving the
-                 //   array its own set is the only placement that is always
-                 //   valid, so the option encodes it rather than leaving the
-                 //   host to satisfy it. Mutually exclusive with
-                 //   `TraceCoverageBinding` for the same reason.
+                 //   Where the array itself lives is a separate decision, made
+                 //   with `TraceCoverageBinding` (or left to auto-allocation).
+                 //   Note for hosts: if the descriptor array is declared with
+                 //   `VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT`,
+                 //   Vulkan requires it to be the highest-numbered binding in
+                 //   its set. A fixed `descriptorCount` carries no such
+                 //   restriction. Either way it is the host's layout to satisfy
+                 //   and the compiler cannot see it.
                  //
                  //   The index is a compile-time constant and therefore part of
                  //   the compiled artifact: a host that keys a shader cache on
@@ -1331,7 +1331,7 @@ typedef uint32_t SlangSizeT;
                  //   identity rather than from load order, or an unchanged
                  //   shader recompiles whenever that order shifts. Supplying it
                  //   at pipeline creation instead would remove that constraint;
-                 //   see the issue linked from the PR. Khronos targets only.
+                 //   see the issue linked from the PR. SPIR-V and GLSL only.
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

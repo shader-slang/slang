@@ -655,27 +655,26 @@ void initCommandOptions(CommandOptions& options)
          "(register index, space) instead of auto-allocating a slot. "
          "Useful when the host needs the binding fixed at compile time "
          "before any host metadata reads run. Implies `-trace-coverage`."},
-        {OptionKind::TraceCoverageBindless,
-         "-trace-coverage-bindless",
-         "-trace-coverage-bindless <space> <index>",
+        {OptionKind::TraceCoverageBindlessIndex,
+         "-trace-coverage-bindless-index",
+         "-trace-coverage-bindless-index <index>",
          "PROTOTYPE. Synthesize `__slang_coverage` as an unbounded descriptor "
-         "array of structured buffers at (binding 0, <space>) instead of a "
-         "single buffer, and index it per shader: "
-         "`__slang_coverage[<index>][slot]`. Many separately compiled shaders "
-         "sharing one pipeline then occupy a single descriptor binding rather "
-         "than one binding each, and each shader's buffer is sized "
-         "independently by the host. "
-         "The binding is 0 and the space is required rather than "
-         "auto-allocated: an unbounded array is backed by a variable descriptor "
-         "count, which Vulkan permits only on a set's LAST binding, so giving "
-         "the array a set of its own is the only placement that is always "
-         "valid. For the same reason this cannot be combined with "
-         "`-trace-coverage-binding`. "
+         "array of structured buffers rather than a single buffer, and index it "
+         "with <index>: `__slang_coverage[<index>][slot]`. Many separately "
+         "compiled shaders sharing one pipeline then occupy a single descriptor "
+         "binding rather than one binding each, and each shader's buffer is "
+         "sized independently by the host. "
+         "Place the array with `-trace-coverage-binding <index> <space>`, or "
+         "leave it to auto-allocation. If the host declares the descriptor "
+         "array with a VARIABLE descriptor count, Vulkan requires it to be the "
+         "highest-numbered binding in its set; a fixed descriptor count carries "
+         "no such restriction. That is the host's layout to satisfy -- the "
+         "compiler cannot see it. "
          "<index> is a compile-time constant and so becomes part of the "
          "compiled output: a host that keys a shader cache on that output must "
          "derive <index> from a stable shader identity rather than from load "
          "order, or an unchanged shader recompiles whenever that order shifts. "
-         "Khronos targets only. Implies `-trace-coverage`."},
+         "SPIR-V and GLSL only. Implies `-trace-coverage`."},
         {OptionKind::TraceCoverageReservedSpace,
          "-trace-coverage-reserved-space",
          "-trace-coverage-reserved-space <space>",
@@ -3241,27 +3240,25 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;
             }
-        case OptionKind::TraceCoverageBindless:
+        case OptionKind::TraceCoverageBindlessIndex:
             {
-                // -trace-coverage-bindless <space> <index>
-                Int bindlessSpace, bindlessIndex;
-                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindlessSpace));
+                // -trace-coverage-bindless-index <index>
+                // Negative is rejected up front: -1 is the internal "not
+                // requested" sentinel, so accepting it would silently mean the
+                // single-buffer form.
+                Int bindlessIndex;
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindlessIndex));
-                for (auto parsed : {bindlessSpace, bindlessIndex})
+                if (bindlessIndex > std::numeric_limits<int>::max())
                 {
-                    if (parsed > std::numeric_limits<int>::max())
-                    {
-                        m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
-                            .option = arg.value,
-                            .parsedValue = parsed,
-                            .location = arg.loc,
-                        });
-                        return SLANG_FAIL;
-                    }
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindlessIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(
-                    OptionKind::TraceCoverageBindless,
-                    (int)bindlessSpace,
+                    OptionKind::TraceCoverageBindlessIndex,
                     (int)bindlessIndex);
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;

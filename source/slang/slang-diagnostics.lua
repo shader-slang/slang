@@ -5202,19 +5202,13 @@ warning(
 err(
     "coverage-bindless-value-out-of-range",
     45118,
-    "`TraceCoverageBindless` requires a non-negative descriptor space and index. The command-line parser rejects negatives, so this reports a host setting the option directly through the API: a negative index would silently fall back to the single-buffer form, giving one binding per shader rather than the shared array that was asked for."
-)
-
-err(
-    "coverage-bindless-binding-conflict",
-    45117,
-    "`-trace-coverage-bindless` and `-trace-coverage-binding` both place the synthesized `__slang_coverage`; pass only one. `-trace-coverage-bindless` already fixes the binding at 0 and takes the space, because a variable-descriptor-count array is only valid as the last binding of a descriptor set and so must have a set to itself."
+    "`TraceCoverageBindlessIndex` requires a non-negative index. The command-line parser rejects negatives, so this reports a host setting the option directly through the API: a negative index would silently fall back to the single-buffer form, giving one binding per shader rather than the shared array that was asked for."
 )
 
 err(
     "coverage-bindless-target-not-supported",
     45116,
-    "`-trace-coverage-bindless` is only supported on Khronos targets: it synthesizes `__slang_coverage` as an unbounded descriptor array, which requires descriptor indexing. Omit it to use the single-buffer form, which every coverage-capable target supports."
+    "`-trace-coverage-bindless-index` is only supported on Khronos targets (SPIR-V and GLSL): it synthesizes `__slang_coverage` as an unbounded descriptor array, which requires descriptor indexing. Omit it to use the single-buffer form, which every coverage-capable target supports."
 )
 
 err(
