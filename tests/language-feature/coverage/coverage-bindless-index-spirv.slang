@@ -10,6 +10,13 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
 
+// A SECOND run with its own prefix, carrying only a -NOT directive so it scans
+// the whole disassembly. A `CHECK-NOT` appended to the run above would only
+// scan from the last CHECK match to the end of input — and decorations are
+// emitted BEFORE the code, so a stray `NonUniform` would sit in the region
+// that check never looks at, and the test would pass while asserting nothing.
+//TEST:SIMPLE(filecheck=NOUNIFORM):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
+
 RWStructuredBuffer<uint> outBuf;
 
 [numthreads(1, 1, 1)]
@@ -41,7 +48,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: OpAccessChain %{{.*}} %__slang_coverage %int_7
 
 // The array index is one constant for the whole module, so it is uniform by
-// construction. Marking it non-uniform would push every counter increment
-// onto the non-uniform descriptor-indexing path for nothing, so nothing here
-// may be decorated NonUniform.
-//CHECK-NOT: NonUniform
+// construction. Marking it non-uniform would push every counter increment onto
+// the non-uniform descriptor-indexing path for nothing.
+//NOUNIFORM-NOT: NonUniform

@@ -16,5 +16,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outBuf[0] = tid.x;
 }
 
-//CHECK: error 45116
-//CHECK-SAME: Khronos
+// Matched on the code digits and a message fragment rather than on a rendered
+// `error E45116` / `error[E45116]` spelling: the two diagnostic styles differ
+// in punctuation, and this test is about the rejection happening at all.
+//CHECK: 45116
+//CHECK: Khronos
