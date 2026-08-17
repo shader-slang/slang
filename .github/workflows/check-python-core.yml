@@ -123,10 +123,23 @@ jobs:
   # port to the Windows runner, and widening the matrix would mean rewriting
   # working checks to add coverage none of them needed.
   import-check-windows:
+    # Same draft gate as check-python-core above: a draft PR should not hold a
+    # Windows runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: windows-latest
     name: Import-check compile-perf suite (windows-latest)
+    # This job executes PR-authored Python, so give it the tree and nothing
+    # else. The workflow has no top-level permissions block, which otherwise
+    # means the default token scope.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # checkout persists the token into .git/config by default, leaving it
+          # readable by the very PR code this job then imports. Nothing here
+          # runs an authenticated git command.
+          persist-credentials: false
 
       # `python`, not `python3`: the Windows runner image puts the system
       # interpreter on PATH under that name, and this workflow deliberately
