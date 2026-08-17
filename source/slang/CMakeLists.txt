@@ -225,14 +225,14 @@ add_custom_target(
     copy_slang_headers
     COMMAND
         ${CMAKE_COMMAND} -E make_directory
-        "${CMAKE_BINARY_DIR}/$<CONFIG>/include"
+        "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/include"
     COMMAND
         ${CMAKE_COMMAND} -E copy_directory "${slang_SOURCE_DIR}/include"
-        "${CMAKE_BINARY_DIR}/$<CONFIG>/include"
+        "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/include"
     COMMAND
         ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/slang-tag-version.h"
-        "${CMAKE_BINARY_DIR}/$<CONFIG>/include/slang-tag-version.h"
+        "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/include/slang-tag-version.h"
 )
 set_target_properties(copy_slang_headers PROPERTIES FOLDER "generated")
 
