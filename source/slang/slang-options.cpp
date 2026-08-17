@@ -655,6 +655,20 @@ void initCommandOptions(CommandOptions& options)
          "(register index, space) instead of auto-allocating a slot. "
          "Useful when the host needs the binding fixed at compile time "
          "before any host metadata reads run. Implies `-trace-coverage`."},
+        {OptionKind::TraceCoverageBindlessIndex,
+         "-trace-coverage-bindless-index",
+         "-trace-coverage-bindless-index <index>",
+         "PROTOTYPE. Synthesize `__slang_coverage` as an unbounded descriptor "
+         "array of structured buffers rather than a single buffer, and index it "
+         "with <index>: `__slang_coverage[<index>][slot]`. Many separately "
+         "compiled shaders sharing one pipeline then occupy a single descriptor "
+         "binding instead of one binding each. <index> is a compile-time constant "
+         "and so becomes part of the compiled output: a host that keys a shader "
+         "cache on that output must derive <index> from a stable shader identity "
+         "rather than from load order, or an unchanged shader recompiles whenever "
+         "that order shifts. Khronos targets only. Combine with "
+         "`-trace-coverage-binding <index> <space>` to place the array itself. "
+         "Implies `-trace-coverage`."},
         {OptionKind::TraceCoverageReservedSpace,
          "-trace-coverage-reserved-space",
          "-trace-coverage-reserved-space <space>",
@@ -3217,6 +3231,29 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     (int)bindingIndex,
                     (int)bindingSpace);
                 // Implies -trace-coverage so users don't have to spell both.
+                linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
+                break;
+            }
+        case OptionKind::TraceCoverageBindlessIndex:
+            {
+                // -trace-coverage-bindless-index <index>
+                // Same up-front rejection of negatives as the binding option:
+                // -1 is the internal "not requested" sentinel, so letting a
+                // user spell it would silently mean single-buffer mode.
+                Int bindlessIndex;
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, bindlessIndex));
+                if (bindlessIndex > std::numeric_limits<int>::max())
+                {
+                    m_sink->diagnose(Diagnostics::CoverageBindingOptionOutOfRange{
+                        .option = arg.value,
+                        .parsedValue = bindlessIndex,
+                        .location = arg.loc,
+                    });
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(
+                    OptionKind::TraceCoverageBindlessIndex,
+                    (int)bindlessIndex);
                 linkage->m_optionSet.set(OptionKind::TraceCoverage, true);
                 break;
             }

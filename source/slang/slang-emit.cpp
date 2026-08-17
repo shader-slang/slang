@@ -1151,6 +1151,15 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
+        // PROTOTYPE: `-trace-coverage-bindless-index`. -1 means the ordinary
+        // single-buffer form; >= 0 selects the unbounded-descriptor-array
+        // form and supplies this shader's index into it.
+        int bindlessIndex = -1;
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
+        {
+            if (values->getCount() > 0)
+                bindlessIndex = (int)(*values)[0].intValue;
+        }
         // Default to uint64. Customers opt down to uint32 (4 bytes per
         // slot) only when targeting a runtime driver without 64-bit
         // shader-atomic-add support — notably MoltenVK on Apple Silicon,
@@ -1222,6 +1231,7 @@ Result linkAndOptimizeIR(
             (int)reservedSpaces.getCount(),
             counterByteWidth,
             coverageBoolean,
+            bindlessIndex,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

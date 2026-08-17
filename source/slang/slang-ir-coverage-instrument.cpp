@@ -677,6 +677,7 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     const int* reservedSpaces,
     int reservedSpaceCount,
     int counterByteWidth,
+    int bindlessIndex,
     int& outSpace,
     int& outBinding)
 {
@@ -716,7 +717,17 @@ static IRGlobalParam* synthesizeCoverageBuffer(
     IRInst* typeOperands[2] = {counterElementType, builder.getType(kIROp_DefaultBufferLayoutType)};
     auto bufferType = (IRType*)builder.getType(kIROp_HLSLRWStructuredBufferType, 2, typeOperands);
 
-    auto param = builder.createGlobalParam(bufferType);
+    // Bindless form: the global becomes an UNBOUNDED array of buffers, so
+    // one (space, binding) covers every shader in the pipeline and each
+    // shader reaches its own buffer through its index. Unsized rather than
+    // sized because the count is a host runtime decision — it is the
+    // descriptor array's `descriptorCount`, which the shader must not
+    // constrain. On SPIR-V this is what pulls in `RuntimeDescriptorArray`.
+    IRType* globalType = bufferType;
+    if (bindlessIndex >= 0)
+        globalType = builder.getUnsizedArrayType(bufferType);
+
+    auto param = builder.createGlobalParam(globalType);
     builder.addNameHintDecoration(param, UnownedTerminatedStringSlice(kCoverageBufferName));
 
     auto varLayout = createCoverageBufferVarLayout(builder, targetRequest, kind, space, binding);
@@ -953,6 +964,9 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
+    // The `RWStructuredBuffer<T>` type itself — the ARRAY ELEMENT type in
+    // the bindless form, and the global's own type otherwise.
+    IRType* singleBufferType = nullptr;
     // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
     // counter is written with a plain non-atomic store of 1 instead of an
     // atomic add, recording whether the entry executed (0 / non-zero) rather
@@ -961,24 +975,39 @@ struct CoverageInstrumenter
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
+    // `-trace-coverage-bindless-index`, or -1 for the single-buffer form.
+    // When set, `coverageBuffer` is an unbounded ARRAY of buffers and every
+    // access indexes it first.
+    int bindlessIndex = -1;
+
     CoverageInstrumenter(
         IRModule* m,
         IRGlobalParam* buf,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md,
-        bool booleanMode)
+        bool booleanMode,
+        int bindlessIndex)
         : module(m)
         , coverageBuffer(buf)
         , sourceManager(sm)
         , outMetadata(md)
         , booleanMode(booleanMode)
+        , bindlessIndex(bindlessIndex)
     {
         IRBuilder tmpBuilder(module);
-        // The unchecked `cast` is safe: this instrumenter only ever runs
-        // on the buffer synthesized by `synthesizeCoverageBuffer`, which
-        // creates it as a structured-buffer type. We never construct a
+        // The unchecked `cast`s are safe: this instrumenter only ever runs
+        // on the global synthesized by `synthesizeCoverageBuffer`, which
+        // creates it as a structured-buffer type, or as an unbounded array
+        // of one in the bindless form. We never construct a
         // `CoverageInstrumenter` over a caller-provided buffer.
-        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(coverageBuffer->getDataType());
+        IRType* globalType = coverageBuffer->getDataType();
+        if (bindlessIndex >= 0)
+            globalType = cast<IRArrayTypeBase>(globalType)->getElementType();
+        auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(globalType);
+        // Kept for the bindless element extract below: the two-operand
+        // `emitElementExtract` cannot infer an element type through an
+        // unsized array of structured buffers, and asserts instead.
+        singleBufferType = (IRType*)bufferType;
         counterElementType = bufferType->getElementType();
         counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
@@ -1050,8 +1079,23 @@ struct CoverageInstrumenter
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
 
+        // Bindless form: select this shader's buffer out of the descriptor
+        // array first, then index within it. The array index is uniform by
+        // construction — it is one compile-time constant for the whole
+        // module — so this deliberately does NOT mark the access
+        // non-uniform: doing so would push every counter increment onto the
+        // non-uniform descriptor-indexing path for no reason.
+        IRInst* bufferInst = coverageBuffer;
+        if (bindlessIndex >= 0)
+        {
+            bufferInst = builder.emitElementExtract(
+                singleBufferType,
+                coverageBuffer,
+                builder.getIntValue(intType, (IRIntegerValue)bindlessIndex));
+        }
+
         IRInst* getElemArgs[] = {
-            coverageBuffer,
+            bufferInst,
             builder.getIntValue(intType, (IRIntegerValue)slot),
         };
         IRInst* slotPtr = builder.emitIntrinsicInst(
@@ -1305,6 +1349,7 @@ void instrumentCoverage(
     int reservedSpaceCount,
     int counterByteWidth,
     bool booleanMode,
+    int bindlessIndex,
     TargetRequest* targetRequest,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
@@ -1346,6 +1391,21 @@ void instrumentCoverage(
     {
         if (sink)
             sink->diagnose(Diagnostics::CoverageReservedSpaceIgnored{});
+    }
+
+    // The bindless form needs descriptor indexing, which only the Khronos
+    // targets have here: an unbounded array of buffers has no meaning on
+    // CPU/CUDA (no descriptors to index) and no verified lowering on the
+    // others. Reject rather than silently falling back to the single-buffer
+    // form — a host that asked for one binding and got one binding PER
+    // SHADER would only find out from a pipeline-layout mismatch at runtime.
+    if (bindlessIndex >= 0 && !isKhronosTarget(targetRequest))
+    {
+        if (sink)
+            sink->diagnose(Diagnostics::CoverageBindlessTargetNotSupported{});
+        for (auto op : markerOps)
+            op->removeAndDeallocate();
+        return;
     }
 
     // Reject a user-declared global parameter named `__slang_coverage`.
@@ -1406,6 +1466,7 @@ void instrumentCoverage(
         reservedSpaces,
         reservedSpaceCount,
         counterByteWidth,
+        bindlessIndex,
         chosenSpace,
         chosenBinding);
 
@@ -1461,7 +1522,8 @@ void instrumentCoverage(
         buffer,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata,
-        booleanMode);
+        booleanMode,
+        bindlessIndex);
     instrumenter.run(markerOps);
 }
 

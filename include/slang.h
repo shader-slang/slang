@@ -1307,6 +1307,18 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
+        TraceCoverageBindlessIndex =
+            158, // int: PROTOTYPE. Synthesize `__slang_coverage` as an unbounded
+                 //   descriptor array of structured buffers rather than a single
+                 //   buffer, and index it with this value: `__slang_coverage[N][slot]`.
+                 //   Lets many separately-compiled shaders that share one pipeline
+                 //   occupy one descriptor binding instead of one binding each.
+                 //   The index is a compile-time constant and therefore part of the
+                 //   compiled artifact: a host that keys a shader cache on the
+                 //   compiled output must derive it from a stable shader identity
+                 //   rather than from load order, or an unchanged shader will
+                 //   recompile whenever that order shifts. Khronos targets only.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
