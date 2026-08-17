@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#literal-payload-encoding
-//META: doc_section_digest=f6737af21fc0ce62bf35ca601aa6d8bc483fabcafaedad874ca80c1323a37207
+//META: doc_section_digest=5f27d4bb5fbd1429627db68bec594389689c236998e7182eaaf350ae3ceda2ee
 //META: purpose=Boundary: `uint8_t(256)` (one past unsigned-8 MAX) constant-folds to a `0 : UInt8` payload, demonstrating unsigned modular wrap on the narrowing path.
 //META: intent=boundary
 //META: pipeline_stage=lower

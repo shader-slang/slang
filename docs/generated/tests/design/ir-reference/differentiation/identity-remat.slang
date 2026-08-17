@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#synthesized-derivative-witnesses
-//META: doc_section_digest=d0d372acea2ddd87761f403b676bd55520cc30b10f78ab301fc5cad68440e053
+//META: doc_section_digest=4ac46248bc67dd90a58b5dbd80b92929f4d02dd326a0ef7823411d0e2a772c21
 //META: purpose=A user-provided __apply whose minimal context is its BwdCallable gets a remat member built from IdentityRemat over the apply_bwd member.
 //META: intent=functional
 //META: pipeline_stage=lower

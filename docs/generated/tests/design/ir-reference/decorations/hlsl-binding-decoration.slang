@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-and-binding
-//META: doc_section_digest=928ba5f8c333b9ec8b6e55397dc87060a4d672e8f7a0cc913acb7f02d7fea184
+//META: doc_section_digest=fefaa116238af2b286c6cb73dc3224a4704918ed8d0cdbaa5e118e7c7b474c44
 //META: purpose=A global parameter declared with a register(uN) binding lowers to a HasExplicitHLSLBinding decoration on the parameter.
 //META: intent=functional
 //META: pipeline_stage=lower
