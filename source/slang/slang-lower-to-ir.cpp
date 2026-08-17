@@ -12096,6 +12096,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (!isDeclInDifferentModule(context, decl))
             return false;
 
+        // `addLinkageDecoration` hashes the mangled name when this request
+        // obfuscates, except for core-module decls, which are compiled once and
+        // never obfuscated. In that one combination -- obfuscating a reference to
+        // a non-core module -- the declaration would carry the hashed name while
+        // the symbol we found carries the original, so prelink would not match
+        // them up. Derive from the AST instead; correctness first, and obfuscated
+        // builds are not the workload this optimises.
+        if (context->shared->m_obfuscateCode && !isFromCoreModule(decl))
+            return false;
+
         auto owningModule = getModule(decl);
         if (!owningModule)
             return false;
@@ -12120,6 +12130,20 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRInterfaceType* declInterface = declBuilder->createInterfaceType(0, nullptr);
         auto declVal = finishOuterGenerics(declBuilder, declInterface, declGeneric);
         addLinkageDecoration(declSubContext, declInterface, decl);
+
+        // `visitInheritanceDecl` reads this off the interface while lowering a
+        // witness table, to decide whether to keep the table alive with an
+        // `[HLSLExport]` decoration -- and that happens before `prelinkIR`
+        // supplies the definition. A declaration carrying only linkage would
+        // silently take the wrong branch for a conformance to an imported COM
+        // interface, so the decoration is copied across up front. It is the only
+        // decoration lowering reads off an interface type before prelink.
+        if (as<IRInterfaceType>(symbols[0]) &&
+            symbols[0]->findDecoration<IRComInterfaceDecoration>())
+        {
+            declBuilder->addSimpleDecoration<IRComInterfaceDecoration>(declInterface);
+        }
+
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
 
         context->shared->externalSymbolsToPrelink.add(symbols[0]);
