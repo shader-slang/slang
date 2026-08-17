@@ -703,17 +703,18 @@ using `getBindlessSpaceIndex() >= 0` as the usage test.
 
 Default behavior assigns binding indices based on descriptor types:
 
-| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
-|------------------------|-------------------------------------------|---------------|
-| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
-| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
-| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
-| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
-| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
-| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
-| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
-| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
-| Unknown                | Other                                     | 3             |
+| Enum Value              | Vulkan Descriptor Type                    | Binding Index |
+|-------------------------|-------------------------------------------|---------------|
+| Sampler                 | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler  | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| SampledImage            | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| StorageImage            | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
+| UniformTexelBuffer      | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
+| StorageTexelBuffer      | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
+| ConstantBuffer_Read     | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
+| StorageBuffer_Read      | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| StorageBuffer_ReadWrite | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| Unknown                 | Other                                     | 3             |
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
@@ -807,31 +808,33 @@ public enum BindlessDescriptorOptions
 
 `None` provides the following bindings for descriptor types:
 
-| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
-|------------------------|-------------------------------------------|---------------|
-| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
-| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
-| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
-| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 3             |
-| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 4             |
-| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 5             |
-| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 6             |
-| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
-| Unknown                | Other                                     | 8             |
+| Enum Value              | Vulkan Descriptor Type                    | Binding Index |
+|-------------------------|-------------------------------------------|---------------|
+| Sampler                 | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler  | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| SampledImage            | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| StorageImage            | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 3             |
+| UniformTexelBuffer      | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 4             |
+| StorageTexelBuffer      | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 5             |
+| ConstantBuffer_Read     | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 6             |
+| StorageBuffer_Read      | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
+| StorageBuffer_ReadWrite | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
+| Unknown                 | Other                                     | 8             |
 
 `VkMutable` provides the following bindings for descriptor types:
 
-| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
-|------------------------|-------------------------------------------|---------------|
-| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
-| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
-| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
-| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
-| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
-| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
-| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
-| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
-| Unknown                | Other                                     | 3             |
+| Enum Value              | Vulkan Descriptor Type                    | Binding Index |
+|-------------------------|-------------------------------------------|---------------|
+| Sampler                 | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler  | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| SampledImage            | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| StorageImage            | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
+| UniformTexelBuffer      | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
+| StorageTexelBuffer      | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
+| ConstantBuffer_Read     | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
+| StorageBuffer_Read      | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| StorageBuffer_ReadWrite | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| Unknown                 | Other                                     | 3             |
 
 The `kind` and `descriptorAccess` constants allow user code to fetch resources from different locations depending on the type and access of the resource being requested. The `DescriptorKind` and
 `DescriptorAccess` enums are defined as:
