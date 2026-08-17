@@ -262,6 +262,8 @@ void TestReporter::consolidateWith(TestReporter* other)
     m_totalTestCount += other->m_totalTestCount;
     m_testServerLossCount += other->m_testServerLossCount;
     m_testServerLossTests.addRange(other->m_testServerLossTests);
+    m_testServerProtocolErrorCount += other->m_testServerProtocolErrorCount;
+    m_testServerProtocolErrorTests.addRange(other->m_testServerProtocolErrorTests);
 
     // A deferral and the final result that redeems it can be recorded by two different
     // sub-reporters, because the retry pass is run by a fresh set of threads. Merge both sets and
@@ -288,6 +290,19 @@ void TestReporter::recordTestServerLoss()
     if (m_inTest && m_currentInfo.name.getLength())
     {
         m_testServerLossTests.add(m_currentInfo.name);
+    }
+}
+
+void TestReporter::recordTestServerProtocolError()
+{
+    std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
+    m_testServerProtocolErrorCount++;
+    // Named for the same reason a loss is: one is noise, a test recurring is the shortlist
+    // for whatever is corrupting the channel.
+    if (m_inTest && m_currentInfo.name.getLength())
+    {
+        m_testServerProtocolErrorTests.add(m_currentInfo.name);
     }
 }
 
@@ -903,6 +918,24 @@ void TestReporter::outputSummary()
                     m_testServerLossCount);
                 printf("---\n");
                 for (const auto& name : m_testServerLossTests)
+                {
+                    printf("%s\n", name.getBuffer());
+                }
+                printf("---\n");
+            }
+
+            // Same contract as the loss block above, separate because the two rates move
+            // independently.
+            if (m_testServerProtocolErrorCount)
+            {
+                printf(
+                    "\nwarning: %d test server protocol error(s); the server returned a reply "
+                    "the client could not parse under each test below and the request "
+                    "succeeded on a freshly spawned one, so the malformed reply was the "
+                    "server's doing and not the test's:\n",
+                    m_testServerProtocolErrorCount);
+                printf("---\n");
+                for (const auto& name : m_testServerProtocolErrorTests)
                 {
                     printf("%s\n", name.getBuffer());
                 }
