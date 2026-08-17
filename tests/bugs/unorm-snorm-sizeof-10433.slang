@@ -10,6 +10,16 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
+typealias U4 = unorm float4;
+
+// `sizeof` has to fold during semantic checking, not only by the time IR layout runs:
+// generic argument unification compares the folded values, so an unfolded
+// `sizeof(U4)` makes `G<sizeof(U4)>` a distinct type from `G<16>` and the call below
+// fails with E30019. Emitted-code checks alone do not catch that -- the IR layout path
+// supplies the right constant afterwards either way.
+struct G<let N : int> { int get() { return N; } }
+void takesG16(G<16> g) {}
+
 RWTexture2D<unorm float4> utex;
 RWTexture2D<snorm float2> stex;
 RWStructuredBuffer<int> outputBuffer;
@@ -26,6 +36,12 @@ void computeMain()
     outputBuffer[1] = alignof(u4);
     outputBuffer[2] = sizeof(s2);
     outputBuffer[3] = alignof(s2);
+
+    // The assertion here is that this compiles: if `sizeof(U4)` does not fold during
+    // checking, the argument is `G<sizeof(unorm vector<float,4>)>` and this call is
+    // rejected with E30019.
+    G<sizeof(U4)> g;
+    takesG16(g);
 
     // Every value folds at compile time, so the emitted code contains the
     // constants rather than any size computation.

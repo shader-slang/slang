@@ -180,6 +180,7 @@ public:
 
     int getTypeBits(IRType* type)
     {
+        type = (IRType*)unwrapAttributedType(type);
         switch (type->getOp())
         {
         case kIROp_BoolType:
@@ -560,6 +561,11 @@ public:
     // Returns true for any type that translates into an aggregate type in LLVM.
     bool isAggregateType(IRType* type)
     {
+        // An attributed type classifies as whatever it wraps -- the attribute is a semantic
+        // marker, so `unorm S` is as much an aggregate as `S`. Unwrapped here rather than at
+        // the six call sites, because one that forgot would put an aggregate on the scalar
+        // load/store/return path and miscompile silently.
+        type = (IRType*)unwrapAttributedType(type);
         switch (type->getOp())
         {
         case kIROp_ArrayType:
@@ -1170,6 +1176,7 @@ struct LLVMEmitter
 
         auto minSize = std::min(dstSizeAlignment.size, srcSizeAlignment.size);
 
+        type = (IRType*)unwrapAttributedType(type);
         switch (type->getOp())
         {
         case kIROp_ArrayType:
@@ -1250,6 +1257,7 @@ struct LLVMEmitter
         bool isVolatile = false)
     {
         IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
+        valType = (IRType*)unwrapAttributedType(valType);
         switch (valType->getOp())
         {
         case kIROp_BoolType:
@@ -1300,6 +1308,7 @@ struct LLVMEmitter
     {
         IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
 
+        valType = (IRType*)unwrapAttributedType(valType);
         switch (valType->getOp())
         {
         case kIROp_BoolType:
