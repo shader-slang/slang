@@ -831,11 +831,22 @@ typedef uint32_t SlangSizeT;
     // mixed ASan builds. `static` does not prevent a definition from being
     // emitted; it removes the external name, so each translation unit gets its own
     // internal copy and no shared symbol remains for the checker to compare. The
-    // value is still folded at compile time because it is `constexpr`. Inside
-    // `extern "C"`, `static` is what forces internal linkage (not merely dropping
-    // `inline`), since the linkage-specification otherwise treats the declaration
-    // as `extern`. See issue #11927.
-    static constexpr SlangTargetFlags kDefaultTargetFlags =
+    // value is still folded at compile time because it is `constexpr`.
+    //
+    // `static` also settles a subtlety specific to this declaration, which sits
+    // inside `extern "C"`: per `[dcl.link]/7` a declaration in a
+    // linkage-specification is treated as if it were `extern`, which would defeat
+    // the usual "namespace-scope const has internal linkage" rule and leave a bare
+    // `constexpr` external. In practice the compilers we build with do not apply
+    // that reading and give a bare `constexpr` here internal linkage anyway, so
+    // `static` is not load-bearing on them; it states the requirement outright
+    // rather than resting on which reading a toolchain takes.
+    //
+    // `[[maybe_unused]]` keeps GCC's `-Wunused-const-variable=2` quiet for
+    // consumers that include this header without naming the constant. An `inline`
+    // variable is never flagged as unused, but an internal-linkage one can be.
+    // See issue #11927.
+    [[maybe_unused]] static constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
     /*!
@@ -4865,11 +4876,13 @@ enum class CoverageBranchArmKind : uint32_t
 // definition carries no external symbol name, so ASan has nothing to match
 // against the copy inside a non-instrumented libslang and the ODR violation that
 // breaks mixed ASan builds cannot arise. See the note on `kDefaultTargetFlags`
-// for the full rationale. `static` is not strictly required at this site: the
-// declaration is at namespace scope, where a bare `constexpr` already has
-// internal linkage. It is required at `kDefaultTargetFlags`, which sits inside
-// `extern "C"`. Spelling both the same way keeps the rule uniform. See issue #11927.
-static constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
+// for the full rationale, including why `static` is spelled out there rather than
+// left to a bare `constexpr`. This declaration is at namespace scope, where a bare
+// `constexpr` already has internal linkage, so `static` is for uniformity and to
+// keep a future re-add of `inline` from silently reintroducing the bug.
+// `[[maybe_unused]]` suppresses GCC's `-Wunused-const-variable=2` for consumers
+// that include this header without naming the constant. See issue #11927.
+[[maybe_unused]] static constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
