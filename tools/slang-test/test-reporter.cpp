@@ -298,8 +298,8 @@ void TestReporter::recordTestServerProtocolError()
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     m_testServerProtocolErrorCount++;
-    // Named for the same reason a loss is: one malformed reply is noise, the same test
-    // appearing repeatedly is the shortlist for whatever is corrupting the channel.
+    // Named for the same reason a loss is: one is noise, a test recurring is the shortlist
+    // for whatever is corrupting the channel.
     if (m_inTest && m_currentInfo.name.getLength())
     {
         m_testServerProtocolErrorTests.add(m_currentInfo.name);
@@ -924,8 +924,8 @@ void TestReporter::outputSummary()
                 printf("---\n");
             }
 
-            // Same contract as the loss block above, reported separately because the two
-            // rates move independently and a combined number would hide which one moved.
+            // Same contract as the loss block above, separate because the two rates move
+            // independently.
             if (m_testServerProtocolErrorCount)
             {
                 printf(

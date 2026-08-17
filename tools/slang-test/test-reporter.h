@@ -124,11 +124,9 @@ public:
     /// Record that a test server returned an unreadable reply under a test that then passed
     /// on a fresh one.
     ///
-    /// Kept apart from a loss rather than folded into it: the server did not die here, it
-    /// answered with bytes the client could not parse, and the two have different causes. The
-    /// rates move independently -- a run can double its crash count while its malformed-reply
-    /// count stays flat -- so a single combined number would hide exactly the signal that
-    /// tells the two apart.
+    /// Kept apart from a loss: the server did not die, and the two rates move independently
+    /// (a run can double its crash count while this stays flat), so one combined number would
+    /// hide which moved.
     void recordTestServerProtocolError();
 
     /// True if can write output directly to stderr

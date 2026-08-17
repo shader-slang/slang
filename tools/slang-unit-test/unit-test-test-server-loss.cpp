@@ -119,9 +119,8 @@ static SlangResult _runSlangTestWithDyingServer(
 /// Run slang-test in a child process with its test server rigged to write an unreadable
 /// reply on the Nth request.
 ///
-/// Separate from the dying-server helper rather than another flag on it, because the
-/// scenario differs in the way that matters: the server stays alive. Nothing dies, no
-/// connection closes, and the client has to conclude "unusable reply" from the bytes alone.
+/// Separate from the dying-server helper because the scenario differs where it matters: the
+/// server stays alive, so the client must conclude "unusable reply" from the bytes alone.
 static SlangResult _runSlangTestWithGarblingServer(
     UnitTestContext* context,
     int garbleOnRequest,
@@ -231,12 +230,8 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
 
 /// A server that returns one unreadable reply, where the retry lands on a fresh one.
 ///
-/// The counterpart of the innocent-loss case, and the reason it exists: a malformed reply
-/// used not to be retried at all, on the reasoning that two sides disagreeing about the wire
-/// format would disagree identically on a new process. The errors seen in practice are not a
-/// format disagreement -- they hit a handful of different tests per run, rotate, and pass on
-/// other runs -- so the test that happened to be in flight was failed, and one unreadable
-/// reply reds a whole suite.
+/// Counterpart of the innocent-loss case. A malformed reply used not to be retried at all, so
+/// whichever test was in flight failed -- and one unreadable reply reds a whole suite.
 SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
 {
     if (_cannotRunHere())
@@ -257,9 +252,8 @@ SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
 
-    // Recovered, and counted separately from a loss. Folding the two together would defeat
-    // the point of the number: the whole reason to have it is to see whether a change to the
-    // crash rate moved the malformed-reply rate, and a combined total cannot answer that.
+    // Recovered, and counted separately from a loss -- a combined total could not show
+    // whether a change to the crash rate moved the malformed-reply rate.
     SLANG_CHECK(_contains(
         output,
         "test server protocol error(s); the server returned a reply the client could not "
@@ -270,10 +264,8 @@ SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
 
 /// A server that garbles every reply, so no retry can ever succeed.
 ///
-/// The guard on the change above: retrying a malformed reply must not become a way to grind
-/// a genuinely broken channel until something looks green. Two fresh servers failing the
-/// same request is the version-mismatch case the old no-retry rule assumed, and it still has
-/// to fail the run.
+/// The guard on the retry: a genuinely broken channel -- the version-mismatch case the old
+/// no-retry rule assumed -- must still fail the run rather than be ground until it looks green.
 SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
 {
     if (_cannotRunHere())

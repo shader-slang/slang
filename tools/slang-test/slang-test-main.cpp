@@ -1447,31 +1447,18 @@ static Result _executeRPC(
         return SLANG_OK;
     }
 
-    // A lost server earns a second attempt; a failed SPAWN earns one too, since a transient
-    // resource shortage is worth one more try. They are kept distinct because only the first
-    // can be attributed to the test: nothing ran on a server that never started.
+    // Lost and StartFailed retry, kept distinct because only Lost can be charged to the test:
+    // nothing ran on a server that never started.
     //
-    // A protocol error earns one as well. That is a reversal: this used to reason that "the
-    // two sides disagree about the wire format, which a new process will disagree about
-    // identically", and for a genuine version mismatch that holds. But the errors actually
-    // seen are not that. On the agentic nightly they land on seven or eight *different* tests
-    // out of ~6300, the victims rotate run to run, and every one of them passes on other runs
-    // -- a static format disagreement would fail all 6300 identically. What the reply is is a
-    // reply that got corrupted in flight (see the malformed-response issue #12534), which is
-    // transient by nature and exactly what a fresh server discriminates. The old reasoning
-    // also cost a whole suite per occurrence: one unparseable reply reds ~6300 tests.
+    // ProtocolError retries too. This used to reason that a wire-format disagreement would
+    // repeat on a new process, but the errors seen are not that: ~7 per 6300-test run, on
+    // different tests each time, each passing on other runs (#12534). They are replies
+    // corrupted in flight, which a fresh server discriminates -- and a real disagreement
+    // still repeats and is charged to the test below.
     //
-    // If a real format disagreement ever does appear, the retry does not hide it -- the
-    // second attempt disagrees identically and the pair is charged to the test below, which
-    // is the same discriminator the loss path relies on.
-    //
-    // The rest still do not retry, deliberately:
-    //
-    // - A timeout is re-paid in full (another connectionTimeOutInMs) and a fresh server has
-    //   to recompile the core module first, so retrying a slow request is the one way to
-    //   turn a two-minute problem into a five-minute one.
-    // - A send failure never got a reply to be corrupted; the request could not be written
-    //   at all, so there is nothing in flight for a fresh server to do differently.
+    // The rest do not:
+    // - TimedOut re-pays connectionTimeOutInMs plus a core-module recompile on the new server.
+    // - SendFailed never got a reply to corrupt; the request was never written.
     const bool isRetryable = first == RPCAttemptOutcome::Lost ||
                              first == RPCAttemptOutcome::StartFailed ||
                              first == RPCAttemptOutcome::ProtocolError;
@@ -1486,9 +1473,9 @@ static Result _executeRPC(
     // was doing) does not reproduce on a virgin process, while an input that genuinely kills
     // the compiler kills this one too -- and then the failure is reported against the test,
     // where it belongs, instead of being retried until it looks green.
-    // Worded to cover both causes it is reached for. A repeated StartFailed is NOT charged
-    // to the test -- that needs `second == Lost && first == Lost` below -- so promising that
-    // "a second loss will be reported against this test" would be false on the spawn path.
+    //
+    // One message per cause: only Lost and ProtocolError can be charged to the test, so the
+    // spawn path must not promise that a second failure will be.
     const char* retryMessage = nullptr;
     switch (first)
     {
@@ -1542,10 +1529,8 @@ static Result _executeRPC(
             "crash caused by this input rather than as an unrelated server loss");
     }
 
-    // And only a repeated PROTOCOL ERROR implicates it the other way. Two fresh servers
-    // failing to produce a readable reply for this one request is the version-mismatch case
-    // the old no-retry rule assumed, or an input that makes the server emit something it
-    // cannot frame; either way it reproduces, so it is the test's to answer for.
+    // Likewise a repeated PROTOCOL ERROR: two fresh servers failing to frame a reply to this
+    // one request reproduces, so it is the test's to answer for.
     if (second == RPCAttemptOutcome::ProtocolError && first == RPCAttemptOutcome::ProtocolError)
     {
         context->getTestReporter()->messageFormat(
