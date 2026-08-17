@@ -138,8 +138,8 @@ struct MemoryWalker
         addIRModule(module->getIRModule(), category);
     }
 
-    /// Add everything a linkage owns: its own AST builder, the modules loaded through it, the IR
-    /// modules it produced, and its source managers.
+    /// Add everything a linkage owns: its own AST builder, the modules loaded through it, and its
+    /// source managers.
     void addLinkage(Linkage* linkage, ModuleCategory category)
     {
         if (!linkage)
@@ -147,14 +147,9 @@ struct MemoryWalker
         addASTBuilder(linkage->getASTBuilder(), category);
         for (const RefPtr<LoadedModule>& module : linkage->loadedModulesList)
             addModule(module, category);
-        // IR the linkage produced rather than loaded — the linked and specialized clones built
-        // during code generation. Always `Generated`, whichever linkage produced them: they are an
-        // output of compiling, not something that was imported. Whether a `Module` also references
-        // one of these is not assumed either way; the arena-level dedup makes the total correct
-        // regardless, and a clone that a module does own is charged to whichever category reached
-        // it first.
-        for (const RefPtr<IRModule>& irModule : linkage->compiledModules)
-            addIRModule(irModule, ModuleCategory::Generated);
+        // `Linkage::compiledModules` is deliberately NOT walked. It is written nowhere in the tree
+        // — a vestigial field whose only reader would be this walk — so counting it produced a
+        // counter that was always zero while appearing to measure code generation.
         addSourceManager(linkage->getSourceManager());
     }
 
@@ -234,6 +229,21 @@ MemoryReport captureMemoryReport(Linkage* linkage, FrontEndCompileRequest* front
 
     walker.report.processRss = rssBeforeWalk;
 
+    // The per-category split must account for exactly the aggregate it splits. The two are kept in
+    // step by different mechanisms — `addASTBuilder` attributes the difference its call made, so a
+    // repeat visit adds nothing, while `addIRModule` attributes the whole arena because it has
+    // already returned early on a repeat visit — and an invariant upheld two different ways is
+    // exactly the kind that a third category would quietly break.
+    size_t astSplit = 0;
+    size_t irSplit = 0;
+    for (size_t i = 0; i < size_t(ModuleCategory::CountOf); ++i)
+    {
+        astSplit += walker.report.astArenaReservedBy[i];
+        irSplit += walker.report.irArenaReservedBy[i];
+    }
+    SLANG_ASSERT(astSplit == walker.report.astArenaReserved);
+    SLANG_ASSERT(irSplit == walker.report.irArenaReserved);
+
     return walker.report;
 }
 
@@ -257,12 +267,10 @@ void appendMemoryReportLines(const MemoryReport& report, StringBuilder& out)
     // instead of them: the aggregate is what compares against a release that predates the split.
     const size_t builtin = size_t(ModuleCategory::Builtin);
     const size_t user = size_t(ModuleCategory::User);
-    const size_t generated = size_t(ModuleCategory::Generated);
     emit("builtinModuleAstKb", report.astArenaReservedBy[builtin]);
     emit("builtinModuleIrKb", report.irArenaReservedBy[builtin]);
     emit("userModuleAstKb", report.astArenaReservedBy[user]);
     emit("userModuleIrKb", report.irArenaReservedBy[user]);
-    emit("generatedIrKb", report.irArenaReservedBy[generated]);
     emit("sourceArenaUsedKb", report.sourceArenaUsed);
     emit("sourceArenaReservedKb", report.sourceArenaReserved);
     emit("sourceContentKb", report.sourceContent);
@@ -282,6 +290,10 @@ void appendMemoryReportLines(const MemoryReport& report, StringBuilder& out)
     const size_t attributed = report.astArenaReserved + report.irArenaReserved +
                               report.irSideTables + report.sourceArenaReserved +
                               report.sourceContent;
+    // Floored at zero rather than allowed to go negative, and the floor is reachable: `reserved`
+    // over-counts residency for blocks that were obtained but never written, so on a workload
+    // dominated by block slack the components can claim more than the process total. A zero here
+    // therefore means "attribution met or exceeded the total", not "everything is attributed".
     emit("unattributedKb", report.processRss > attributed ? report.processRss - attributed : 0);
 }
 

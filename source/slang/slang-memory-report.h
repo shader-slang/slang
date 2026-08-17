@@ -22,12 +22,14 @@ enum class ModuleCategory
     /// essentially the whole footprint.
     Builtin,
 
-    /// Modules loaded from the source being compiled.
+    /// Modules loaded from the source being compiled, and the modules under compilation.
     User,
 
-    /// IR the linkage produced rather than loaded — the linked and specialized clones built during
-    /// code generation. Separated because it grows with the compile, not with what was imported.
-    Generated,
+    // There is deliberately no category for the linked and specialized IR built during code
+    // generation. That IR is transient — released once target code has been emitted — so an
+    // account taken after the compile finishes cannot see it, and a counter for it would report a
+    // constant zero that reads as "code generation costs no memory". Measuring it needs sampling
+    // at the peak rather than at the end; see tools/compile-perf/DESIGN.md.
 
     CountOf,
 };
@@ -35,11 +37,16 @@ enum class ModuleCategory
 /// A per-component account, in bytes, of the memory the compiler is holding.
 ///
 /// Each arena-backed component carries two numbers because they answer different questions.
-/// `Used` is the payload the component asked for; `Reserved` is what the arena took from the OS to
-/// satisfy those requests. Only `Reserved` is resident, and the gap between the two is real process
-/// memory that no component's payload explains — `ASTBuilder` arenas allocate in 2 MiB blocks while
-/// `IRModule` arenas use 16 KiB blocks, so the slack differs sharply between the two and a single
-/// "AST is N bytes" number would hide it.
+/// `Used` is the payload the component asked for; `Reserved` is what the arena obtained from the
+/// allocator to satisfy those requests. The gap between them is block slack — `ASTBuilder` arenas
+/// allocate in 2 MiB blocks while `IRModule` arenas use 16 KiB ones, so a single "AST is N bytes"
+/// number would hide a difference that is real process memory.
+///
+/// `Reserved` is an UPPER BOUND on a component's residency, not its residency: pages inside a
+/// reserved block that have not been written are not resident. On an empty-shader compile the AST
+/// arena reserves 8.0 MiB against 5.6 MiB used, so up to 2.4 MiB of what is attributed may never
+/// appear in the process total. This is why the residual below is computed with a floor rather
+/// than allowed to go negative.
 struct MemoryReport
 {
     size_t astArenaUsed = 0;
