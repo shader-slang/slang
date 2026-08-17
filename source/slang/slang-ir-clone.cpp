@@ -386,6 +386,28 @@ IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
     if (newInst == oldInst)
         return newInst;
 
+    // `cloneInstAndOperands` routes hoistable ops (e.g. `IRWitnessTable`) through
+    // global value numbering: if an inst with the same op/type/operands already
+    // exists, that pre-existing inst is returned instead of a fresh one. Such an
+    // inst was already fully populated by whichever earlier `cloneInst` call first
+    // created it, so grafting `oldInst`'s decorations/children onto it here would
+    // append a second, unrelated set of entries rather than merging anything
+    // meaningful. This matters for witness tables in particular: entries are not
+    // part of the dedup key (`IRInstKey::operator==` only compares op/type/
+    // operands), so a generic conformance witness specialized to a type that
+    // lowers to the same underlying representation as another, unrelated
+    // conformance (e.g. an enum's witness for an interface, specialized at its
+    // `__Tag` type, colliding with that same underlying type's own witness) can
+    // dedup onto that unrelated table. Appending the generic's entries onto it
+    // would then leave two entries for the same requirement key, and
+    // `findWitnessTableEntry`'s first-match lookup could resolve to the wrong,
+    // self-referential one. A pre-existing hoistable inst is recognized by
+    // already having decorations/children at this point, since a freshly created
+    // one is always empty until the caller populates it below.
+    //
+    if (getIROpInfo(newInst->getOp()).isHoistable() && newInst->getFirstDecorationOrChild())
+        return newInst;
+
     cloneInstDecorationsAndChildren(env, builder->getModule(), oldInst, newInst);
 
     return newInst;
