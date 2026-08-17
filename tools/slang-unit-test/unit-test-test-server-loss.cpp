@@ -154,14 +154,19 @@ static String _allOutput(const ExecuteResult& res)
 /// per-loss diagnostics and its summary -- is discarded. That happened: the first CI failure
 /// of these tests reported "res.resultCode == 0" and nothing else, on a platform that cannot
 /// be reproduced locally, which is the worst possible combination.
-static void _dumpChildRun(const char* caseName, int dieOnRequest, const ExecuteResult& res)
+static void _dumpChildRun(
+    const char* caseName,
+    const char* envVar,
+    int ordinal,
+    const ExecuteResult& res)
 {
     const String output = _allOutput(res);
     printf(
-        "\n--- %s: inner slang-test (SLANG_TEST_SERVER_DIE_ON_REQUEST=%d) exited %d ---\n"
+        "\n--- %s: inner slang-test (%s=%d) exited %d ---\n"
         "%s\n--- end inner run ---\n",
         caseName,
-        dieOnRequest,
+        envVar,
+        ordinal,
         res.resultCode,
         output.getBuffer());
     fflush(stdout);
@@ -182,7 +187,7 @@ SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
     const String output = _allOutput(res);
     if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
     {
-        _dumpChildRun("healthy", 0, res);
+        _dumpChildRun("healthy", "SLANG_TEST_SERVER_DIE_ON_REQUEST", 0, res);
     }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
@@ -211,7 +216,7 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
     const String output = _allOutput(res);
     if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
     {
-        _dumpChildRun("innocent", 3, res);
+        _dumpChildRun("innocent", "SLANG_TEST_SERVER_DIE_ON_REQUEST", 3, res);
     }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
@@ -247,7 +252,7 @@ SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
     const String output = _allOutput(res);
     if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
     {
-        _dumpChildRun("garbled", 3, res);
+        _dumpChildRun("garbled", "SLANG_TEST_SERVER_GARBLE_ON_REQUEST", 3, res);
     }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
@@ -279,7 +284,7 @@ SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
     const String output = _allOutput(res);
     if (res.resultCode == 0)
     {
-        _dumpChildRun("persistent-garble", 1, res);
+        _dumpChildRun("persistent-garble", "SLANG_TEST_SERVER_GARBLE_ON_REQUEST", 1, res);
     }
     SLANG_CHECK(res.resultCode != 0);
     SLANG_CHECK(_contains(output, "unreadable reply from a freshly spawned test server twice"));
@@ -307,7 +312,7 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
     // nothing.
     if (res.resultCode == 0)
     {
-        _dumpChildRun("killer", 1, res);
+        _dumpChildRun("killer", "SLANG_TEST_SERVER_DIE_ON_REQUEST", 1, res);
     }
     SLANG_CHECK(res.resultCode != 0);
 
@@ -346,7 +351,7 @@ SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
     const String output = _allOutput(res);
     if (!_contains(output, "killed by signal"))
     {
-        _dumpChildRun("signal", 3, res);
+        _dumpChildRun("signal", "SLANG_TEST_SERVER_KILL_ON_REQUEST", 3, res);
     }
 
     // The number, and the name that makes it actionable. Before this path existed the same
@@ -387,9 +392,19 @@ SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters)
     worker.m_testServerLossTests.add("worker/b.slang");
     worker.m_testServerLossTests.add("worker/b.slang"); // same test, two servers lost
 
+    parent.m_testServerProtocolErrorCount = 1;
+    parent.m_testServerProtocolErrorTests.add("main/c.slang");
+    worker.m_testServerProtocolErrorCount = 1;
+    worker.m_testServerProtocolErrorTests.add("worker/d.slang");
+
     parent.consolidateWith(&worker);
 
     SLANG_CHECK(parent.m_testServerLossCount == 3);
     // Concatenated, not unioned: a repeat is the frequency signal, so the duplicate survives.
     SLANG_CHECK(parent.m_testServerLossTests.getCount() == 3);
+
+    // The protocol-error pair consolidates the same way, and stays a separate total: folding
+    // it into the loss count would make each number unable to answer what it exists for.
+    SLANG_CHECK(parent.m_testServerProtocolErrorCount == 2);
+    SLANG_CHECK(parent.m_testServerProtocolErrorTests.getCount() == 2);
 }

@@ -1,5 +1,4 @@
 // test-server.cpp
-
 #include "compiler-core/slang-json-rpc-connection.h"
 #include "compiler-core/slang-test-server-protocol.h"
 #include "core/slang-io.h"
@@ -17,6 +16,7 @@
 #include "test-server-diagnostics.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <limits>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -675,7 +675,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 ///
 /// Returns 0 (disabled) for anything unset or unparseable, so a typo in the variable name
 /// leaves the server behaving normally rather than dying on request one. Shared by the
-/// exit-on-request and kill-on-request hooks.
+/// exit-on-request, kill-on-request and garble-on-request hooks.
 static int _requestOrdinalFromEnv(const char* name)
 {
     StringBuilder value;
@@ -684,7 +684,11 @@ static int _requestOrdinalFromEnv(const char* name)
         return 0;
     }
     Int64 ordinal = 0;
-    if (SLANG_FAILED(StringUtil::parseInt64(value.getUnownedSlice(), ordinal)) || ordinal <= 0)
+    // The upper bound is part of "unparseable": the return narrows to int, so a larger value
+    // would come back negative and the `ordinal - 1` comparisons at the call sites would then
+    // overflow -- disabled is the only safe reading of a request number no run can reach.
+    if (SLANG_FAILED(StringUtil::parseInt64(value.getUnownedSlice(), ordinal)) || ordinal <= 0 ||
+        ordinal > Int64(std::numeric_limits<int>::max()))
     {
         return 0;
     }
