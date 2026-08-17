@@ -24,13 +24,11 @@ class Counter
 
 void main()
 {
-    // Default constructor
     Counter c0 = new Counter();
 
     // CHECK: 0
     printf("%d\n", c0.value);
 
-    // Parameterized constructor
     Counter c1 = new Counter(100);
 
     // CHECK: 100
