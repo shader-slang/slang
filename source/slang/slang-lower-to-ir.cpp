@@ -12070,56 +12070,70 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return irBuilder->emitSpecializeInst(irBuilder->getGenericKind(), value, args);
     }
 
+    /// Lower an interface owned by another module as a declaration, and arrange
+    /// for `prelinkIR` to supply its definition. Returns false when there is no
+    /// lowered IR to borrow, in which case the caller derives it from the AST as
+    /// before.
+    ///
+    /// Deriving an interface is expensive -- every requirement's type is lowered,
+    /// and each carries an expanded capability set -- and it reconstructs
+    /// something the owning module already holds. A six-line kernel whose only
+    /// core-module call is `sin()` otherwise rebuilds fifteen core interfaces,
+    /// seventy-five requirement entries and sixty keys into its own IR, and does
+    /// it again for every module in the session.
+    ///
+    /// The entries are deferred, not dropped. `prelinkIR` replaces the
+    /// declaration with the cloned definition at the end of lowering and before
+    /// any mandatory optimization, so every consumer that reads an interface's
+    /// requirement list still sees a complete interface: autodiff asserts on
+    /// `getRequirementCount()`, and specialization and witness-table lowering
+    /// scan the entries.
+    ///
+    /// This is the same handoff `lowerFuncDeclInContext` uses to make an imported
+    /// `[__unsafeForceInlineEarly]` function's body available locally.
+    bool tryBorrowInterfaceFromOwningModule(InterfaceDecl* decl, LoweredValInfo& outVal)
+    {
+        if (!isDeclInDifferentModule(context, decl))
+            return false;
+
+        auto owningModule = getModule(decl);
+        if (!owningModule)
+            return false;
+
+        // Absent while the builtin modules are themselves being built:
+        // `autodiff.meta.slang` imports `core.meta.slang` before core has lowered
+        // IR to borrow.
+        auto owningIRModule = owningModule->getIRModule();
+        if (!owningIRModule)
+            return false;
+
+        String mangledName = getMangledName(context->astBuilder, decl);
+        auto symbols = owningIRModule->findSymbolByMangledName(mangledName);
+        if (symbols.getCount() == 0)
+            return false;
+
+        NestedContext declContext(this);
+        auto declBuilder = declContext.getBuilder();
+        auto declSubContext = declContext.getContext();
+
+        auto declGeneric = emitOuterGenerics(declSubContext, decl, decl);
+        IRInterfaceType* declInterface = declBuilder->createInterfaceType(0, nullptr);
+        auto declVal = finishOuterGenerics(declBuilder, declInterface, declGeneric);
+        addLinkageDecoration(declSubContext, declInterface, decl);
+        context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
+
+        context->shared->externalSymbolsToPrelink.add(symbols[0]);
+        outVal = LoweredValInfo::simple(declVal);
+        return true;
+    }
+
     LoweredValInfo visitInterfaceDecl(InterfaceDecl* decl)
     {
-        // An interface that belongs to another module is not re-derived from its
-        // AST here. Deriving it is expensive -- every requirement's type is
-        // lowered, and each carries an expanded capability set -- and it
-        // reconstructs something the owning module already holds in lowered form.
-        // A six-line kernel that calls `sin()` otherwise rebuilds fifteen
-        // core-module interfaces, seventy-five requirement entries and sixty keys
-        // into its own IR, and does it again for every module in the session.
-        //
-        // Instead we emit a declaration and hand the owning module's IR symbol to
-        // `prelinkIR`, which replaces declarations with cloned definitions. The
-        // entries are therefore deferred, not dropped: prelink runs at the end of
-        // lowering and before any mandatory optimization, so every consumer that
-        // reads an interface's requirement list still sees a complete interface --
-        // autodiff asserts on `getRequirementCount()`, and specialization and
-        // witness-table lowering scan the entries.
-        //
-        // This is the same handoff `lowerFuncDeclInContext` uses to make an
-        // imported `[__unsafeForceInlineEarly]` function's body available locally.
-        if (isDeclInDifferentModule(context, decl))
-        {
-            if (auto owningModule = getModule(decl))
-            {
-                if (auto owningIRModule = owningModule->getIRModule())
-                {
-                    String mangledName = getMangledName(context->astBuilder, decl);
-                    auto symbols = owningIRModule->findSymbolByMangledName(mangledName);
-                    if (symbols.getCount() > 0)
-                    {
-                        NestedContext declContext(this);
-                        auto declBuilder = declContext.getBuilder();
-                        auto declSubContext = declContext.getContext();
-
-                        auto declGeneric = emitOuterGenerics(declSubContext, decl, decl);
-                        IRInterfaceType* declInterface =
-                            declBuilder->createInterfaceType(0, nullptr);
-                        auto declVal = finishOuterGenerics(declBuilder, declInterface, declGeneric);
-                        addLinkageDecoration(declSubContext, declInterface, decl);
-                        context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
-
-                        context->shared->externalSymbolsToPrelink.add(symbols[0]);
-                        return LoweredValInfo::simple(declVal);
-                    }
-                }
-            }
-            // Nothing lowered to borrow -- the owning module has not been lowered
-            // yet, as happens while the builtin modules are themselves being
-            // built -- so fall through and derive it from the AST as before.
-        }
+        // An interface owned by another module is borrowed from it rather than
+        // re-derived here; see `tryBorrowInterfaceFromOwningModule`.
+        LoweredValInfo borrowed;
+        if (tryBorrowInterfaceFromOwningModule(decl, borrowed))
+            return borrowed;
 
         // The members of an interface will turn into the keys that will
         // be used for lookup operations into witness
