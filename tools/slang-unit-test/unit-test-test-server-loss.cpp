@@ -116,6 +116,31 @@ static SlangResult _runSlangTestWithDyingServer(
     return ProcessUtil::execute(cmdLine, outResult);
 }
 
+/// Run slang-test in a child process with its test server rigged to write an unreadable
+/// reply on the Nth request.
+///
+/// Separate from the dying-server helper rather than another flag on it, because the
+/// scenario differs in the way that matters: the server stays alive. Nothing dies, no
+/// connection closes, and the client has to conclude "unusable reply" from the bytes alone.
+static SlangResult _runSlangTestWithGarblingServer(
+    UnitTestContext* context,
+    int garbleOnRequest,
+    ExecuteResult& outResult)
+{
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slang-test"));
+    cmdLine.addArg("-use-test-server");
+    cmdLine.addArg("-server-count");
+    cmdLine.addArg("1");
+    cmdLine.addArg(kInnerTestPrefix);
+
+    ScopedEnvVar nestedGuard(kNestedGuardEnvVar, "1");
+    ScopedEnvVar garbleAfter(
+        "SLANG_TEST_SERVER_GARBLE_ON_REQUEST",
+        String(garbleOnRequest).getBuffer());
+    return ProcessUtil::execute(cmdLine, outResult);
+}
+
 static String _allOutput(const ExecuteResult& res)
 {
     StringBuilder builder;
@@ -202,6 +227,70 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
     // stopped happening per connection would drift them run to run.
     SLANG_CHECK(_contains(output, "test server loss(es); the server died under each test below"));
     SLANG_CHECK(_contains(output, "on request #3 of this connection (it had answered 2)"));
+}
+
+/// A server that returns one unreadable reply, where the retry lands on a fresh one.
+///
+/// The counterpart of the innocent-loss case, and the reason it exists: a malformed reply
+/// used not to be retried at all, on the reasoning that two sides disagreeing about the wire
+/// format would disagree identically on a new process. The errors seen in practice are not a
+/// format disagreement -- they hit a handful of different tests per run, rotate, and pass on
+/// other runs -- so the test that happened to be in flight was failed, and one unreadable
+/// reply reds a whole suite.
+SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
+{
+    if (_cannotRunHere())
+    {
+        SLANG_IGNORE_TEST
+    }
+
+    // Garbles its 3rd reply, so the first two are served and the retry -- on a server that
+    // has garbled nothing -- succeeds.
+    ExecuteResult res;
+    SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithGarblingServer(unitTestContext, 3, res)));
+
+    const String output = _allOutput(res);
+    if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
+    {
+        _dumpChildRun("garbled", 3, res);
+    }
+    SLANG_CHECK(res.resultCode == 0);
+    SLANG_CHECK(_contains(output, "100% of tests passed"));
+
+    // Recovered, and counted separately from a loss. Folding the two together would defeat
+    // the point of the number: the whole reason to have it is to see whether a change to the
+    // crash rate moved the malformed-reply rate, and a combined total cannot answer that.
+    SLANG_CHECK(_contains(
+        output,
+        "test server protocol error(s); the server returned a reply the client could not "
+        "parse"));
+    // The loss block must NOT appear: nothing died here.
+    SLANG_CHECK(!_contains(output, "the server died under each test below"));
+}
+
+/// A server that garbles every reply, so no retry can ever succeed.
+///
+/// The guard on the change above: retrying a malformed reply must not become a way to grind
+/// a genuinely broken channel until something looks green. Two fresh servers failing the
+/// same request is the version-mismatch case the old no-retry rule assumed, and it still has
+/// to fail the run.
+SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
+{
+    if (_cannotRunHere())
+    {
+        SLANG_IGNORE_TEST
+    }
+
+    ExecuteResult res;
+    SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithGarblingServer(unitTestContext, 1, res)));
+
+    const String output = _allOutput(res);
+    if (res.resultCode == 0)
+    {
+        _dumpChildRun("persistent-garble", 1, res);
+    }
+    SLANG_CHECK(res.resultCode != 0);
+    SLANG_CHECK(_contains(output, "unreadable reply from a freshly spawned test server twice"));
 }
 
 /// A server that dies on every request, so no retry can ever succeed.

@@ -1451,15 +1451,30 @@ static Result _executeRPC(
     // resource shortage is worth one more try. They are kept distinct because only the first
     // can be attributed to the test: nothing ran on a server that never started.
     //
-    // The rest do not retry, deliberately:
+    // A protocol error earns one as well. That is a reversal: this used to reason that "the
+    // two sides disagree about the wire format, which a new process will disagree about
+    // identically", and for a genuine version mismatch that holds. But the errors actually
+    // seen are not that. On the agentic nightly they land on seven or eight *different* tests
+    // out of ~6300, the victims rotate run to run, and every one of them passes on other runs
+    // -- a static format disagreement would fail all 6300 identically. What the reply is is a
+    // reply that got corrupted in flight (see the malformed-response issue #12534), which is
+    // transient by nature and exactly what a fresh server discriminates. The old reasoning
+    // also cost a whole suite per occurrence: one unparseable reply reds ~6300 tests.
+    //
+    // If a real format disagreement ever does appear, the retry does not hide it -- the
+    // second attempt disagrees identically and the pair is charged to the test below, which
+    // is the same discriminator the loss path relies on.
+    //
+    // The rest still do not retry, deliberately:
     //
     // - A timeout is re-paid in full (another connectionTimeOutInMs) and a fresh server has
     //   to recompile the core module first, so retrying a slow request is the one way to
     //   turn a two-minute problem into a five-minute one.
-    // - A protocol or send failure means the two sides disagree about the wire format, which
-    //   a new process will disagree about identically.
-    const bool isRetryable =
-        first == RPCAttemptOutcome::Lost || first == RPCAttemptOutcome::StartFailed;
+    // - A send failure never got a reply to be corrupted; the request could not be written
+    //   at all, so there is nothing in flight for a fresh server to do differently.
+    const bool isRetryable = first == RPCAttemptOutcome::Lost ||
+                             first == RPCAttemptOutcome::StartFailed ||
+                             first == RPCAttemptOutcome::ProtocolError;
     if (!isRetryable)
     {
         return SLANG_FAIL;
@@ -1474,13 +1489,26 @@ static Result _executeRPC(
     // Worded to cover both causes it is reached for. A repeated StartFailed is NOT charged
     // to the test -- that needs `second == Lost && first == Lost` below -- so promising that
     // "a second loss will be reported against this test" would be false on the spawn path.
-    context->getTestReporter()->message(
-        TestMessageType::RunError,
-        first == RPCAttemptOutcome::StartFailed
-            ? "no test server could be spawned; retrying once, and a second failure to spawn "
-              "will fail this test without blaming its input"
-            : "retrying once on a freshly spawned test server; a second loss will be reported "
-              "against this test");
+    const char* retryMessage = nullptr;
+    switch (first)
+    {
+    case RPCAttemptOutcome::StartFailed:
+        retryMessage =
+            "no test server could be spawned; retrying once, and a second failure to spawn "
+            "will fail this test without blaming its input";
+        break;
+    case RPCAttemptOutcome::ProtocolError:
+        retryMessage =
+            "retrying once on a freshly spawned test server; a second unreadable reply will "
+            "be reported against this test";
+        break;
+    default:
+        retryMessage =
+            "retrying once on a freshly spawned test server; a second loss will be reported "
+            "against this test";
+        break;
+    }
+    context->getTestReporter()->message(TestMessageType::RunError, retryMessage);
 
     // Straight into outRes, as the first attempt does: _executeRPCOnce writes it only on
     // success, so a second loss leaves the caller's own init() value intact rather than a
@@ -1497,6 +1525,10 @@ static Result _executeRPC(
         {
             context->getTestReporter()->recordTestServerLoss();
         }
+        else if (first == RPCAttemptOutcome::ProtocolError)
+        {
+            context->getTestReporter()->recordTestServerProtocolError();
+        }
         return SLANG_OK;
     }
 
@@ -1508,6 +1540,19 @@ static Result _executeRPC(
             TestMessageType::TestFailure,
             "this test killed a freshly spawned test server twice in a row; treating it as a "
             "crash caused by this input rather than as an unrelated server loss");
+    }
+
+    // And only a repeated PROTOCOL ERROR implicates it the other way. Two fresh servers
+    // failing to produce a readable reply for this one request is the version-mismatch case
+    // the old no-retry rule assumed, or an input that makes the server emit something it
+    // cannot frame; either way it reproduces, so it is the test's to answer for.
+    if (second == RPCAttemptOutcome::ProtocolError && first == RPCAttemptOutcome::ProtocolError)
+    {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::TestFailure,
+            "this test drew an unreadable reply from a freshly spawned test server twice in a "
+            "row; treating it as caused by this input rather than as an unrelated malformed "
+            "response");
     }
 
     return SLANG_FAIL;

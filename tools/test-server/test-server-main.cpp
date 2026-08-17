@@ -760,6 +760,15 @@ SlangResult TestServer::execute()
     // way. Without it the headline diagnostic of this change has no test driving it, and a
     // regression in the WTERMSIG recording would pass CI in silence.
     const int killOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_KILL_ON_REQUEST");
+
+    // Third member of the family, and the only one where the server stays alive. It writes
+    // bytes that are not a JSON-RPC message into the response channel just before the Nth
+    // request is answered, so the client reads a reply it cannot frame. That is the shape of
+    // the malformed-response failure (#12534) -- something putting stray output into the
+    // channel -- and it is the case the client's protocol-error retry exists for. Like its
+    // two siblings it is otherwise unschedulable: it happens a handful of times per 6000-test
+    // run, on a different test each time.
+    const int garbleOnRequest = _requestOrdinalFromEnv("SLANG_TEST_SERVER_GARBLE_ON_REQUEST");
     int servedCount = 0;
 
     while (m_connection->isActive() && !m_quit)
@@ -789,6 +798,17 @@ SlangResult TestServer::execute()
 #else
             _Exit(1);
 #endif
+        }
+
+        // Written straight to the fd rather than through m_connection, because the connection
+        // would frame it correctly and correct framing is the one thing this must not do. The
+        // real reply still follows, so the client sees a channel whose next bytes are not a
+        // message -- not a silent server.
+        if (garbleOnRequest && servedCount == garbleOnRequest - 1)
+        {
+            const char garbage[] = "this-is-not-a-jsonrpc-header\r\n\r\n";
+            fwrite(garbage, 1, sizeof(garbage) - 1, stdout);
+            fflush(stdout);
         }
 
         // Failure doesn't make the execution terminate
