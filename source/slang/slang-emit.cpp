@@ -1105,16 +1105,19 @@ Result linkAndOptimizeIR(
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
-    if (requiredLoweringPassSet.coverageTracing)
+    // Placement options are read and validated OUTSIDE the gate below.
+    // `requiredLoweringPassSet.coverageTracing` is derived from coverage marker
+    // ops present in the IR, so a shader with nothing instrumentable in it
+    // would otherwise accept a contradictory or unsupported option set in
+    // total silence — the user asked for a placement and got no compilation
+    // and no diagnostic.
+    int explicitBinding = -1;
+    int explicitSpace = -1;
+    int bindlessIndex = -1;
     {
-        // Pull explicit binding values from `-trace-coverage-binding`
-        // here; pass -1 for either side to request auto-allocation in
-        // the synthesis routine.
-        int explicitBinding = -1;
-        int explicitSpace = -1;
-        List<int> reservedSpaces;
-        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        auto& placementOpts = codeGenContext->getTargetReq()->getOptionSet();
+        if (auto values =
+                placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
             if (values->getCount() > 0)
             {
@@ -1122,6 +1125,52 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
+        // PROTOTYPE: `-trace-coverage-bindless <space> <index>`. -1 leaves the
+        // ordinary single-buffer form; >= 0 selects the
+        // unbounded-descriptor-array form.
+        //
+        // The array's placement is not a separate decision: binding is fixed at
+        // 0 and the space comes from this option, because a
+        // variable-descriptor-count array is only valid as a set's last
+        // binding, so the array gets a set to itself. That is also why an
+        // explicit `-trace-coverage-binding` alongside it is rejected rather
+        // than merged — the two would describe one placement in two ways.
+        if (auto values =
+                placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindless))
+        {
+            if (values->getCount() > 0)
+            {
+                if (explicitBinding >= 0 || explicitSpace >= 0)
+                {
+                    if (sink)
+                        sink->diagnose(Diagnostics::CoverageBindlessBindingConflict{});
+                    return SLANG_FAIL;
+                }
+                // The CLI parser rejects negatives, but a host setting
+                // `TraceCoverageBindless` through the API bypasses it. A
+                // negative index would silently fall back to the single-buffer
+                // form — one binding per shader, which is the opposite of what
+                // the caller asked for — and a negative space would defeat the
+                // fixed placement the option exists to guarantee.
+                int requestedSpace = (int)(*values)[0].intValue;
+                int requestedIndex = (int)(*values)[0].intValue2;
+                if (requestedSpace < 0 || requestedIndex < 0)
+                {
+                    if (sink)
+                        sink->diagnose(Diagnostics::CoverageBindlessValueOutOfRange{});
+                    return SLANG_FAIL;
+                }
+                explicitSpace = requestedSpace;
+                explicitBinding = 0;
+                bindlessIndex = requestedIndex;
+            }
+        }
+    }
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        List<int> reservedSpaces;
+        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
         {
             for (auto value : *values)
@@ -1149,32 +1198,6 @@ Result linkAndOptimizeIR(
                     return SLANG_FAIL;
                 }
                 reservedSpaces.add((int)value.intValue);
-            }
-        }
-        // PROTOTYPE: `-trace-coverage-bindless <space> <index>`. -1 means the
-        // ordinary single-buffer form; >= 0 selects the
-        // unbounded-descriptor-array form.
-        //
-        // The array's placement is not a separate decision: binding is fixed at
-        // 0 and the space comes from the option, because a variable-descriptor-
-        // count array is only valid as a set's last binding, so the array gets a
-        // set to itself. That is also why combining this with an explicit
-        // `-trace-coverage-binding` is rejected rather than merged — the two
-        // would be describing the same placement in two ways.
-        int bindlessIndex = -1;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBindless))
-        {
-            if (values->getCount() > 0)
-            {
-                if (explicitBinding >= 0 || explicitSpace >= 0)
-                {
-                    if (sink)
-                        sink->diagnose(Diagnostics::CoverageBindlessBindingConflict{});
-                    return SLANG_FAIL;
-                }
-                explicitSpace = (int)(*values)[0].intValue;
-                explicitBinding = 0;
-                bindlessIndex = (int)(*values)[0].intValue2;
             }
         }
         // Default to uint64. Customers opt down to uint32 (4 bytes per

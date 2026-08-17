@@ -1318,7 +1318,7 @@ typedef uint32_t SlangSizeT;
                  //
                  //   The binding is 0 and not configurable, and the space is
                  //   required rather than auto-allocated, because an unbounded
-                 //   array is backed by a variable descriptor count — which
+                 //   array is backed by a variable descriptor count, which
                  //   Vulkan permits only on a set's LAST binding. Giving the
                  //   array its own set is the only placement that is always
                  //   valid, so the option encodes it rather than leaving the

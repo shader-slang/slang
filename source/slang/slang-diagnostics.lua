@@ -5200,6 +5200,12 @@ warning(
 )
 
 err(
+    "coverage-bindless-value-out-of-range",
+    45118,
+    "`TraceCoverageBindless` requires a non-negative descriptor space and index. The command-line parser rejects negatives, so this reports a host setting the option directly through the API: a negative index would silently fall back to the single-buffer form, giving one binding per shader rather than the shared array that was asked for."
+)
+
+err(
     "coverage-bindless-binding-conflict",
     45117,
     "`-trace-coverage-bindless` and `-trace-coverage-binding` both place the synthesized `__slang_coverage`; pass only one. `-trace-coverage-bindless` already fixes the binding at 0 and takes the space, because a variable-descriptor-count array is only valid as the last binding of a descriptor set and so must have a set to itself."
