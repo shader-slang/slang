@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=647327ee76a1bc33d8bcf7d2abc19a2f16ee4e63d10bad4d1d5d48c120029d9d
+//META: doc_section_digest=4b61bbe5577fdd277138f6c76e47bb415b4e0d9c6365f3fd1961205026f01739
 //META: purpose=Boundary - the [MaxIters(N)] attribute produces a loopMaxIters decoration carrying the upper-bound integer N on the loop.
 //META: intent=boundary
 //META: pipeline_stage=lower

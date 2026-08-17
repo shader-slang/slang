@@ -102,7 +102,16 @@ _CLAUDE_FAMILY_TOKENS = ("claude", "anthropic")
 
 
 def _rel_to_repo(path: Path) -> str:
-    return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    """Repo-relative label for a path, or the path itself if it lies outside.
+
+    The fallback exists so that a pure, path-taking lint can be exercised
+    against a temporary fixture in `selftest` without the label lookup being
+    the thing that fails. Every real call site passes a path under the repo.
+    """
+    try:
+        return str(path.relative_to(REPO_ROOT)).replace(os.sep, "/")
+    except ValueError:
+        return str(path)
 
 
 # --------------------------------------------------------------------------
@@ -880,6 +889,89 @@ def lint_doc(spec: DocSpec) -> list[LintIssue]:
                 )
             )
     issues.extend(lint_markdown_tables(spec.path, text))
+    return issues
+
+
+_LIQUID_OPENER_RE = re.compile(r"\{\{|\{%")
+
+
+def lint_liquid_safe(md_path: Path) -> list[LintIssue]:
+    r"""Check one file for a raw Liquid opener (`{{` or `{%`) in its body.
+
+    GitHub Pages runs Jekyll, which treats any file carrying YAML
+    front-matter as a *page* and renders Liquid over its body BEFORE
+    Markdown -- so a `{{` inside a code span or a fenced block is still an
+    opening Liquid tag. How that fails depends on what follows it, and both
+    outcomes are wrong:
+
+    - Unterminated: Liquid's scan for the closing `}}` uses `/\}\}?/`
+      against a non-greedy body, so it stops at the FIRST `}`. In
+      `float2x2 m = {{1,2},{3,4}}` that is the single `}` after `1,2`, so
+      the tag never closes, Liquid raises "Variable ... was not properly
+      terminated", and the ENTIRE site build aborts. This took the Pages
+      build down for five days (fixed for the tests tree by #12511).
+    - Terminated: a `{{[0-9]+}}` FileCheck wildcard parses fine and is then
+      evaluated as a template expression, rendering empty -- so the pattern
+      the prose is documenting silently does not appear on the page.
+
+    These files are also read on github.com, where Liquid is NOT processed,
+    so the fix cannot be a `{% raw %}` wrapper or an HTML entity inside a
+    backtick span: both show up literally there. Two spellings are correct
+    on both surfaces -- space the braces where whitespace is semantically
+    irrelevant (`{ {1,2},{3,4} }`), or show an exact token with numeric
+    entities in a raw `<code>` element
+    (`<code>&#123;&#123;.*&#125;&#125;</code>`, which renders as `{{.*}}`
+    everywhere while never presenting a literal `{{` to Liquid).
+
+    Files WITHOUT front-matter are skipped, and that is the whole rule
+    rather than a filename convention: Jekyll copies them verbatim, so
+    their `{{` never reaches Liquid. Keying on the property Jekyll itself
+    keys on is what keeps a newly-invented output file type covered
+    automatically.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    fm = _FM_RE.match(text)
+    if not fm:
+        return issues
+    fm_end_line = text.count("\n", 0, fm.end())
+    for lineno, line in enumerate(text.split("\n"), start=1):
+        if lineno <= fm_end_line:
+            continue
+        if _LIQUID_OPENER_RE.search(line):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"line {lineno} has a raw Liquid opener that the GitHub "
+                    f"Pages build renders (an unterminated one aborts the "
+                    f"whole build); space the braces or write the exact "
+                    f"token as `<code>&#123;&#123;...&#125;&#125;</code>`",
+                )
+            )
+    return issues
+
+
+def lint_liquid_safe_tree() -> list[LintIssue]:
+    """Run `lint_liquid_safe` over every Markdown file in the generated tree.
+
+    Deliberately a tree walk rather than a pass over the manifest's docs:
+    the hazard belongs to every file Jekyll publishes, and this tree emits
+    several kinds the manifest does not enumerate -- reviews, remediations,
+    gap-intake reports. A per-category hook would leave the next new kind
+    unguarded, which is exactly how the eight raw openers in
+    `_meta/gap-intake/` arrived unnoticed.
+
+    Tree-wide, so it runs on a full lint only, matching `lint_doc_gap_state`
+    -- CI's gate is a full run.
+    """
+    issues: list[LintIssue] = []
+    for md in sorted(DOCS_ROOT.rglob("*.md")):
+        issues.extend(lint_liquid_safe(md))
     return issues
 
 
@@ -2023,11 +2115,18 @@ def lint_gap_intake_report(
     The cross-check that matters is against the *live* gap queue rather
     than against a sibling report: unlike remediation, whose work list is
     the review report next to it, intake's work list is recomputed from
-    the test bundles every run. So a row naming a gap the suite does not
-    report is an error (it would write a decision about nothing into the
-    ledger), while a gap the suite reports and the report does not
-    mention is a warning (the operator may be working through a document
-    in batches).
+    the test bundles every run. So a row naming a gap that is neither in
+    that queue nor already recorded in the ledger is an error (it would
+    write a decision about nothing), while a gap the suite reports and the
+    report does not mention is a warning (the operator may be working
+    through a document in batches).
+
+    Both halves of that first test are needed, because acting on a gap is
+    what removes it from the queue. A gap's id is derived from the prose
+    of its `## Doc gaps observed` row, so once the document is fixed and
+    the bundle README is regenerated without that row, the id stops being
+    reported. Checking the queue alone would turn every report red at
+    exactly the moment its work landed.
 
     Returns (issues, front_matter_dict_or_None).
     """
@@ -2164,16 +2263,24 @@ def lint_gap_intake_report(
                 f" {len(table)} row(s)",
             )
         )
+    ledger_gaps = load_doc_gap_state().get("gaps", {})
     for gid in sorted(seen - queue_ids):
+        # A decided gap has left the queue by design, so its row is a
+        # completed record rather than a decision about nothing. Only a row
+        # naming an id the ledger has never heard of is unactionable, and
+        # that is the one `cmd_mark_gap_intake` must not be handed: it reads
+        # `queue[gid]` for the entry's `kind` and `summary`.
+        if _gap_status(gid, ledger_gaps) != "open":
+            continue
         issues.append(
             LintIssue(
                 rel,
                 "error",
-                f"action row {gid} names a gap the test suite does not report"
-                f" against {target}",
+                f"action row {gid} names a gap that is neither in the live"
+                f" queue for {target} nor recorded in the ledger, so there is"
+                " no gap to write a decision about",
             )
         )
-    ledger_gaps = load_doc_gap_state().get("gaps", {})
     unaddressed = sorted(
         gid
         for gid in queue_ids - seen
@@ -2248,8 +2355,17 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
     intake_at = _yaml_to_str(fm["intake_at"])
     model = _yaml_to_str(fm["intake_model"])
     report_rel = _report_rel(report_path)
+    written = 0
     for row in table:
         gid = row["Gap ID"]
+        # Lint accepts a row whose gap has already been decided and has
+        # therefore dropped out of the queue, so re-running this on a report
+        # that already landed arrives here with nothing left to look up.
+        # Keeping the recorded entry is also the honest choice: rebuilding it
+        # is impossible without `queue[gid]`, and the stored `decided_at` /
+        # `decided_by_model` say when the call was actually made.
+        if gid not in queue:
+            continue
         status = row["Action"].lower()
         entry = {
             "status": status,
@@ -2272,8 +2388,11 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
         if finding:
             entry["finding_id"] = finding
         gaps[gid] = entry
+        written += 1
     save_doc_gap_state(state)
-    print(f"marked gap intake: {args.doc} ({len(table)} gap(s))")
+    already = len(table) - written
+    note = f", {already} already recorded" if already else ""
+    print(f"marked gap intake: {args.doc} ({written} gap(s){note})")
     return 0
 
 
@@ -2287,10 +2406,23 @@ FINDINGS_DIR = REPO_ROOT / "docs/generated/tests/_meta/findings"
 # The real guard against a spurious match -- including the URL case,
 # `https://…/findings/filed/test.yaml/comments` -- is `_finding_exists`: an id
 # that names no file is not a reference, however it was spelled.
+# Both spellings use the id grammar the *producer* fixes: `finding.schema.json`
+# declares `id` as `^[a-z0-9][a-z0-9-]*$`, so lowercase-kebab is the only form a
+# finding can be born with. Widening either recognizer past that would let this
+# consumer accept a spelling no finding can actually have.
+_FINDING_ID_HEAD = r"[a-z0-9]"
+_FINDING_ID_TAIL = r"[a-z0-9-]"
+
 _FINDING_REF_RE = re.compile(
-    r"(?<!\w)findings/(?:filed/)?([A-Za-z0-9][A-Za-z0-9._-]*)\.yaml"
+    rf"(?<!\w)findings/(?:filed/)?({_FINDING_ID_HEAD}{_FINDING_ID_TAIL}*)\.yaml"
 )
-_FINDING_ID_RE = re.compile(r"`([a-z0-9][a-z0-9-]{4,})`")
+
+# The bare form additionally demands 5+ characters. Unlike the path form it
+# scans undelimited prose, where every backticked token is a candidate and
+# `_finding_exists` turns each into a filesystem probe; the floor keeps short
+# inline code spans like `void` or `q` from becoming stat() calls. No finding is
+# anywhere near that short -- the shortest of the 82 committed ids is 21 chars.
+_FINDING_ID_RE = re.compile(rf"`({_FINDING_ID_HEAD}{_FINDING_ID_TAIL}{{4,}})`")
 
 
 def _finding_exists(candidate: str) -> bool:
@@ -2501,6 +2633,10 @@ def cmd_lint(args, manifest: Manifest) -> int:
     # The doc-gap ledger is tree-wide, not per-document, so it is checked
     # only on a full lint run.
     if not explicit_targets:
+        for issue in lint_liquid_safe_tree():
+            print(f"{issue.severity}: {issue.doc}: {issue.message}")
+            if issue.severity == "error":
+                any_error = True
         for issue in lint_doc_gap_state():
             print(f"{issue.severity}: {issue.doc}: {issue.message}")
             if issue.severity == "error":
@@ -2568,6 +2704,54 @@ def cmd_selftest(args, manifest: Manifest) -> int:
     check("finding missing path rejected", _finding_ref("see findings/nope.yaml"), None)
     check("finding missing bare id rejected", _finding_ref("`no-such-finding`"), None)
     check("finding absent entirely", _finding_ref("this is a compiler bug"), None)
+
+    # Both recognizers here, and the `finding_id` pattern in
+    # doc-gap-state.schema.json, must stay within the id grammar that
+    # finding.schema.json fixes at the producer. They drifted apart once --
+    # the two consumer-side patterns had been widened to `[A-Za-z0-9._-]`,
+    # so this driver would accept and store an id no finding could ever
+    # have. Pin all three against the producer rather than each other, so
+    # the schema stays the single source of truth.
+    producer_pattern = json.loads(
+        (REPO_ROOT / "docs/generated/tests/_meta/schema/finding.schema.json").read_text()
+    )["properties"]["id"]["pattern"]
+    check("producer id grammar unchanged", producer_pattern, "^[a-z0-9][a-z0-9-]*$")
+    ledger_schema = json.loads(
+        (META_DIR / "schema/doc-gap-state.schema.json").read_text()
+    )
+    check(
+        "ledger schema pins the producer's id grammar",
+        ledger_schema["$defs"]["entry"]["properties"]["finding_id"]["pattern"],
+        producer_pattern,
+    )
+    # Assert on the patterns themselves, not through `_finding_ref`: that
+    # function gates every candidate on `_finding_exists`, so a widened
+    # regex still returns None for an id no file has, and a check routed
+    # through it would pass no matter how wide the grammar got.
+    for spelling, pattern, probe in (
+        ("path form", _FINDING_REF_RE, "see findings/{}.yaml"),
+        ("bare id", _FINDING_ID_RE, "covered by `{}`"),
+    ):
+        # Each starts lowercase, so the *tail* grammar is what has to
+        # reject them; a probe starting with the offending character would
+        # be turned away by the head and prove nothing about the tail.
+        for bad in ("mixedCaseFindingId", "under_scored_finding_id", "dotted.finding.id"):
+            m = pattern.search(probe.format(bad))
+            check(
+                f"{spelling} grammar does not admit {bad!r}",
+                m.group(1) if m else None,
+                None,
+            )
+
+    # The bare form's 5-character floor, pinned so the comment explaining
+    # it stays true. The path form has no floor: `findings/` already
+    # delimits it, so there is nothing to disambiguate.
+    check("bare id ignores a 4-character code span", _FINDING_ID_RE.search("`abcd`"), None)
+    check(
+        "bare id accepts 5 characters",
+        _FINDING_ID_RE.search("`abcde`").group(1),
+        "abcde",
+    )
 
     # -- _gap_summary -------------------------------------------------
     check("summary short passthrough", _gap_summary("  a   b "), "a b")
@@ -2681,6 +2865,145 @@ def cmd_selftest(args, manifest: Manifest) -> int:
         any("schema_version" in m for m in lint_state({}, version=2)),
         True,
     )
+
+    # -- lint_gap_intake_report vs the ledger -------------------------
+    # Acting on a gap is what removes it from the live queue, so the queue
+    # alone cannot tell "this row named nothing" from "this row's work
+    # landed". Neither branch is reachable from the committed corpus: every
+    # action row there names a gap the ledger has already decided, so the
+    # error never fires and the accept-anyway path is indistinguishable from
+    # a plain pass. An inversion here would either wave through a report
+    # that hands `mark-gap-intake` an id it will KeyError on, or turn every
+    # worked report permanently red.
+    import tempfile
+
+    def lint_report(gid: str, ledger: dict) -> list[str]:
+        report = (
+            "---\n"
+            "gap_intake_report: true\n"
+            'intake_model: "claude-opus-5[1m]"\n'
+            "intake_at: 2026-08-11T16:42:39Z\n"
+            "target_doc: ast-reference/values.md\n"
+            f"target_doc_source_commit_before: {'0' * 40}\n"
+            f"target_doc_source_commit_after: {'1' * 40}\n"
+            "gap_count: 1\n"
+            "actions:\n"
+            "  fixed: 1\n"
+            "  rejected_bogus: 0\n"
+            "  rejected_out_of_scope: 0\n"
+            "  deferred: 0\n"
+            "  escalated_to_finding: 0\n"
+            "---\n\n"
+            "## Actions\n\n"
+            "| Gap ID | Action | Evidence | Fix summary |\n"
+            "| --- | --- | --- | --- |\n"
+            f"| {gid} | fixed | `source/slang/x.h:1` says so | edited it |\n"
+        )
+        saved = DOC_GAP_STATE_PATH.read_text(encoding="utf-8")
+        try:
+            DOC_GAP_STATE_PATH.write_text(
+                json.dumps({"schema_version": 1, "gaps": ledger}), encoding="utf-8"
+            )
+            with tempfile.TemporaryDirectory() as _rd:
+                p = Path(_rd) / "r.gap-intake.md"
+                p.write_text(report, encoding="utf-8")
+                found, _fm = lint_gap_intake_report(p, manifest)
+                return [i.message for i in found if i.severity == "error"]
+        finally:
+            DOC_GAP_STATE_PATH.write_text(saved, encoding="utf-8")
+
+    absent = "d" * 12
+    decided = {
+        "status": "fixed",
+        "target_doc": "docs/generated/design/ast-reference/values.md",
+        "kind": "missing-example",
+        "decided_at": "2026-08-11T00:00:00Z",
+        "rationale": "because",
+    }
+    check(
+        "intake rejects a row naming a gap no one has heard of",
+        any("no gap to write a decision about" in m for m in lint_report(absent, {})),
+        True,
+    )
+    check(
+        "intake accepts a row whose gap the ledger already decided",
+        any(
+            "no gap to write a decision about" in m
+            for m in lint_report(absent, {absent: decided})
+        ),
+        False,
+    )
+
+    # -- lint_liquid_safe ---------------------------------------------
+    # The Pages guard. Every branch below is one the committed tree cannot
+    # exercise: a full `lint` run over a clean tree proves only that no file
+    # currently trips it, which is equally true of a check that never fires.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as _td:
+        _tmp = Path(_td)
+
+        def _liquid_issues(name: str, body: str) -> int:
+            f = _tmp / name
+            f.write_text(body, encoding="utf-8")
+            return len(lint_liquid_safe(f))
+
+        _FM = "---\ntitle: x\n---\n\n"
+        # The shape that took the site down: the scan for `}}` stops at the
+        # first single `}`, so the tag never closes.
+        check(
+            "liquid: unterminated opener is an error",
+            _liquid_issues("fatal.md", _FM + "probe `float2x2 m = {{1,2},{3,4}}` here\n"),
+            1,
+        )
+        # And the shape that merely renders empty -- also rejected, because
+        # the documented pattern silently does not survive to the page.
+        check(
+            "liquid: terminated opener is still an error",
+            _liquid_issues("wildcard.md", _FM + "matches `{{[0-9]+}}` there\n"),
+            1,
+        )
+        # A fenced block is not a shelter: Liquid runs before Markdown.
+        check(
+            "liquid: opener inside a fence is an error",
+            _liquid_issues("fence.md", _FM + "```\n{{ x }}\n```\n"),
+            1,
+        )
+        # Statement tags too, not just output tags.
+        check(
+            "liquid: statement opener is an error",
+            _liquid_issues("stmt.md", _FM + "a {% if x %} b\n"),
+            1,
+        )
+        # Both dual-safe spellings must pass, or the rule the prompt teaches
+        # would be unfollowable.
+        check(
+            "liquid: spaced braces pass",
+            _liquid_issues("spaced.md", _FM + "write `{ {1,2},{3,4} }` instead\n"),
+            0,
+        )
+        check(
+            "liquid: entity spelling passes",
+            _liquid_issues(
+                "entity.md",
+                _FM + "shows <code>&#123;&#123;[0-9]+&#125;&#125;</code> exactly\n",
+            ),
+            0,
+        )
+        # No front-matter means Jekyll copies the file verbatim and Liquid
+        # never sees it. Keying on front-matter rather than on a filename is
+        # what keeps a new output kind covered without being listed.
+        check(
+            "liquid: no front-matter is skipped",
+            _liquid_issues("plain.md", "no front matter, so `{{1,2},{3,4}}` is fine\n"),
+            0,
+        )
+        # Front-matter itself is stripped before Liquid runs.
+        check(
+            "liquid: opener inside front-matter is ignored",
+            _liquid_issues("fm.md", "---\ntitle: \"{{x}}\"\n---\n\nbody\n"),
+            0,
+        )
 
     for f in failures:
         print(f"FAIL {f}")
