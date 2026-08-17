@@ -668,7 +668,14 @@ void initCommandOptions(CommandOptions& options)
          "rather than from load order, or an unchanged shader recompiles whenever "
          "that order shifts. Khronos targets only. Combine with "
          "`-trace-coverage-binding <index> <space>` to place the array itself. "
-         "Implies `-trace-coverage`."},
+         "When placed that way the array must be the HIGHEST-NUMBERED BINDING "
+         "IN ITS DESCRIPTOR SET: an unbounded array is backed by a variable "
+         "descriptor count, which Vulkan only permits on the last binding of a "
+         "set. The compiler cannot see the host's pipeline layout and so cannot "
+         "check this; a host that places another binding after the array in the "
+         "same set gets an invalid layout with no diagnostic here. "
+         "Auto-allocation is unaffected: it always assigns a fresh descriptor "
+         "set, where the array is the only binding. Implies `-trace-coverage`."},
         {OptionKind::TraceCoverageReservedSpace,
          "-trace-coverage-reserved-space",
          "-trace-coverage-reserved-space <space>",

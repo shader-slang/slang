@@ -1318,6 +1318,13 @@ typedef uint32_t SlangSizeT;
                  //   compiled output must derive it from a stable shader identity
                  //   rather than from load order, or an unchanged shader will
                  //   recompile whenever that order shifts. Khronos targets only.
+                 //   When the array is placed explicitly with
+                 //   `TraceCoverageBinding`, it must be the highest-numbered
+                 //   binding in its descriptor set: an unbounded array is backed
+                 //   by a variable descriptor count, which Vulkan permits only on
+                 //   a set's last binding. The compiler cannot see the host
+                 //   pipeline layout and does not check this. Auto-allocation is
+                 //   unaffected — it always picks a fresh set.
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
