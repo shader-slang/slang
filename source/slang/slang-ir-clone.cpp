@@ -386,24 +386,14 @@ IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
     if (newInst == oldInst)
         return newInst;
 
-    // `cloneInstAndOperands` routes hoistable ops (e.g. `IRWitnessTable`) through
-    // global value numbering: if an inst with the same op/type/operands already
-    // exists, that pre-existing inst is returned instead of a fresh one. Such an
-    // inst was already fully populated by whichever earlier `cloneInst` call first
-    // created it, so grafting `oldInst`'s decorations/children onto it here would
-    // append a second, unrelated set of entries rather than merging anything
-    // meaningful. This matters for witness tables in particular: entries are not
-    // part of the dedup key (`IRInstKey::operator==` only compares op/type/
-    // operands), so a generic conformance witness specialized to a type that
-    // lowers to the same underlying representation as another, unrelated
-    // conformance (e.g. an enum's witness for an interface, specialized at its
-    // `__Tag` type, colliding with that same underlying type's own witness) can
-    // dedup onto that unrelated table. Appending the generic's entries onto it
-    // would then leave two entries for the same requirement key, and
-    // `findWitnessTableEntry`'s first-match lookup could resolve to the wrong,
-    // self-referential one. A pre-existing hoistable inst is recognized by
-    // already having decorations/children at this point, since a freshly created
-    // one is always empty until the caller populates it below.
+    // `cloneInstAndOperands` may also return a *different*, pre-existing
+    // hoistable inst via global value numbering (e.g. two witness tables with
+    // the same op/type/operands but different entries, since entries aren't
+    // part of the dedup key). That inst is already fully populated, so
+    // grafting `oldInst`'s children onto it here would add a duplicate,
+    // unrelated entry instead of merging anything. Detect this the same way:
+    // a freshly created hoistable inst is empty until populated below, so one
+    // that already has children here must be a pre-existing dedup hit.
     //
     if (getIROpInfo(newInst->getOp()).isHoistable() && newInst->getFirstDecorationOrChild())
         return newInst;
