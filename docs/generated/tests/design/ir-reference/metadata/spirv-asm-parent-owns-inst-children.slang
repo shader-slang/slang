@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#spir-v-inline-asm
-//META: doc_section_digest=ce88f8a50b24a7084d3ffc7d6b519378c907043ce6579a0868a664482dac2a56
+//META: doc_section_digest=a544501358aed36f3f133415204b9977b364ccd43461f6c58c5064f737d4446d
 //META: purpose=A spirv_asm block lowers to a SPIRVAsm parent instruction owning SPIRVAsmInst children, each of which takes its SPIR-V opcode as operand 0.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

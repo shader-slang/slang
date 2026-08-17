@@ -220,3 +220,39 @@ jobs:
           path: slang-test-output.log
           retention-days: 14
           if-no-files-found: ignore
+
+  # Post the nightly's result to Slack. Scheduled runs only, so manual
+  # workflow_dispatch verification runs stay quiet. A separate job (rather
+  # than in-job steps) is required because the agentic-tests job ends with
+  # `exit $rc`, which would skip any trailing steps on a red run.
+  #
+  # Requires the SLACK_WEBHOOK_AGENTIC_TESTS repository secret pointing at
+  # the target channel's Slack Workflow webhook, whose variable key is
+  # "Agentic-Nightly" (mirrors how the sibling nightlies map a single
+  # payload key to their message).
+  notify:
+    needs: [agentic-tests]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        if: needs.agentic-tests.result == 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Agentic-Nightly": ":green-check-mark: Agentic nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_AGENTIC_TESTS }}
+
+      - name: Failure notification
+        if: needs.agentic-tests.result != 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Agentic-Nightly": ":alert: Agentic nightly: ${{ needs.agentic-tests.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_AGENTIC_TESTS }}
