@@ -12119,7 +12119,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         String mangledName = getMangledName(context->astBuilder, decl);
         auto symbols = owningIRModule->findSymbolByMangledName(mangledName);
-        if (symbols.getCount() == 0)
+
+        // Search the list rather than taking the first entry: a mangled name maps
+        // to a *list* of symbols, and only one of them is the interface. Finding
+        // it explicitly means the "no interface under this name" case is a plain
+        // "nothing to borrow" -- handled by falling through to AST derivation --
+        // rather than an assumption about ordering that would fail silently.
+        IRInst* borrowedSymbol = nullptr;
+        IRInterfaceType* borrowedInterface = nullptr;
+        for (auto symbol : symbols)
+        {
+            if (auto interfaceType = as<IRInterfaceType>(getGenericReturnVal(symbol)))
+            {
+                borrowedSymbol = symbol;
+                borrowedInterface = interfaceType;
+                break;
+            }
+        }
+        if (!borrowedInterface)
             return false;
 
         NestedContext declContext(this);
@@ -12136,31 +12153,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // `[HLSLExport]` decoration -- and that happens before `prelinkIR`
         // supplies the definition. A declaration carrying only linkage would
         // silently take the wrong branch for a conformance to an imported COM
-        // interface, so the decoration is copied across up front. It is the only
-        // decoration lowering reads off an interface type before prelink.
-        // Unwrapped first: for a generic interface the symbol found by mangled
-        // name is the outer `IRGeneric`, and the decoration sits on the
-        // `IRInterfaceType` it returns. `getGenericReturnVal` is a no-op for the
-        // non-generic case, so one call covers both shapes.
-        auto borrowedInterface = getGenericReturnVal(symbols[0]);
-        if (as<IRInterfaceType>(borrowedInterface))
+        // interface. It is the only decoration lowering reads off an interface
+        // type before prelink.
+        //
+        // Copied with its GUID operand, not re-created: the decoration is not a
+        // flag. `addComInterfaceDecoration` is its only construction path
+        // (`slang-ir-insts.h:5333`) and always stores the GUID as operand 0,
+        // which `CPPSourceEmitter::emitComInterface` reads back and asserts is 32
+        // characters (`slang-emit-cpp.cpp:716`). The operand is therefore an
+        // invariant of the decoration, not something to test for.
+        if (auto comDecoration = borrowedInterface->findDecoration<IRComInterfaceDecoration>())
         {
-            // Copied with its GUID operand, not re-created: the decoration is not
-            // a flag. `addComInterfaceDecoration` stores the GUID as operand 0
-            // and `CPPSourceEmitter::emitComInterface` reads it back, asserting
-            // the string is 32 characters (`slang-emit-cpp.cpp:716`), so an
-            // operand-less copy would abort the C++ emitter rather than merely
-            // losing information.
-            if (auto comDecoration = borrowedInterface->findDecoration<IRComInterfaceDecoration>())
-            {
-                if (auto guid = as<IRStringLit>(comDecoration->getOperand(0)))
-                    declBuilder->addComInterfaceDecoration(declInterface, guid->getStringSlice());
-            }
+            auto guid = as<IRStringLit>(comDecoration->getOperand(0));
+            SLANG_RELEASE_ASSERT(guid && "ComInterface decoration without its GUID operand");
+            declBuilder->addComInterfaceDecoration(declInterface, guid->getStringSlice());
         }
 
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
 
-        context->shared->externalSymbolsToPrelink.add(symbols[0]);
+        context->shared->externalSymbolsToPrelink.add(borrowedSymbol);
         outVal = LoweredValInfo::simple(declVal);
         return true;
     }
