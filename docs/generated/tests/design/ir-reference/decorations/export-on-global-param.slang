@@ -1,18 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#linkage-and-lifetime
-//META: doc_section_digest=51a07b0aba2f9f7d1b6cdf9777d9f2f83e7fbd3758ac6f0a6e034ab8f5d4454b
+//META: doc_section_digest=71129d05eff64ad258a0ba3326a79769f2e4a43a55b9975b0f92d155b6e49e80
 //META: purpose=A user-declared uniform global parameter carries an export decoration with the variable-linkage mangled name (prefix _SV).
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Global parameters get their own export decoration during
-// LOWER-TO-IR. The variable-namespace prefix in the mangled name
-// is `_SV` (distinct from `_SR` for functions and `_ST` for
-// types).
+// Verifies that `export` is attached to global parameters, not only to
+// functions, and that the mangled name it carries is namespaced by symbol
+// kind. The CHECK pins the `_SV` variable prefix together with the
+// parameter's `nameHint` and the `let %buf` declaration line, so the
+// decoration is tied to the global it names.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=4430d3efb9516cd383356961351a223b29ad1c948e7c5ea9bf0a36d832a4b940
-//META: purpose=Boundary - a `nointerpolation` modifier produces interpolationMode with mode operand 2, the documented value distinct from `linear` (0), `noperspective` (1), `centroid` (3), and `sample` (4).
+//META: doc_section_digest=9dcc3971ffe320daffa3155aa97909cc164f7f1f53867e82746329293f4841f5
+//META: purpose=Boundary - a `nointerpolation` modifier produces interpolationMode with mode operand 2, distinct from linear (0) and sample (4).
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary - the existing interpolation-mode-decoration.slang
-// uses `nointerpolation` but wildcards the mode integer. This
-// test pins the specific value (2) for the nointerpolation mode.
+// Verifies the mid-range value of the interpolation-mode encoding. Using
+// the same varying-field surface as its `linear` and `sample` siblings and
+// changing only the modifier isolates the operand as the single thing under
+// test.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

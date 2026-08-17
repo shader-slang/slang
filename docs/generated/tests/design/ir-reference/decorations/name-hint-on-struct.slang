@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#naming-and-provenance
-//META: doc_section_digest=a4c5fd44f393f8eeb578e194ab17a820313eedd2ca9b40bee286c2789f24926e
+//META: doc_section_digest=27db05e9ed21dcf7b3b3b503ce38c4b1487eb65c172fd7c96e296073bd39b0e5
 //META: purpose=A user-declared struct carries a nameHint decoration whose string operand is the source identifier of the struct.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc places nameHint in the Naming and provenance category
-// with the role of carrying a human-readable name across IR
-// passes. struct decls produce nameHint too, not only functions.
+// Verifies that `nameHint` also names type declarations. The CHECK pins the
+// decoration and then `struct %WidgetData`, showing the identifier is
+// preserved on the type inst so later dumps and diagnostics can refer to
+// the type by its source name.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

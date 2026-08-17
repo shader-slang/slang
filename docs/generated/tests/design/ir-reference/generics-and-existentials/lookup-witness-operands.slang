@@ -1,22 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#lookupwitness--lookupwitnessmethod
-//META: doc_section_digest=c4815aeb9b6c67b5092b523e0e44f337c6c8104ecdaafadc93a47d08bdef573b
+//META: doc_section_digest=7bee6071e4a281e3b0a360470ad403730021ec831c4724b2fe0ec4cfc70d7595
 //META: purpose=A method call on a generic-constrained value lowers to lookupWitness(witnessTable, requirementKey) with that two-operand shape.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### lookupWitness / LookupWitnessMethod`: "operands are
-// `witnessTable, requirementKey`". Inside the generic body of
-// `int helper<T : IFoo>(T t, int x) { return t.run(x); }`, the
-// `t.run(x)` call is rewritten as
-// `lookupWitness(%witnessParam, %IFoox5Frun)` — first operand is
-// the witness-table generic parameter, second is the key naming
-// the requirement.
-
+// Verifies the operand pair of a witness lookup. Inside a generic body the
+// receiver's concrete type is unknown, so `t.run(x)` cannot name a callee
+// directly; the CHECK asserts it becomes a two-operand `lookupWitness` whose
+// second operand is the key named after the interface requirement.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };

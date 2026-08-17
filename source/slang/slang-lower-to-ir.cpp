@@ -4056,8 +4056,8 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
 
     auto parentDeclRef = callableDeclRef.getParent();
 
-    if (auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
-        parentDeclRef = subscriptDeclRef.getParent();
+    if (parentDeclRef.as<SubscriptDecl>() || parentDeclRef.as<PropertyDecl>())
+        parentDeclRef = parentDeclRef.getParent();
 
     if (auto genericDeclRef = parentDeclRef.as<GenericDecl>())
         parentDeclRef = genericDeclRef.getParent();

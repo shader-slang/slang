@@ -1059,7 +1059,15 @@ Expr* SemanticsVisitor::ConstructLookupResultExpr(
         }
     }
 
-    return ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    auto resultExpr = ConstructDeclRefExpr(item.declRef, bb, name, loc, originalExpr);
+    // A property reference does not produce an `InvokeExpr` during semantic checking. Register
+    // its accessors here so that lowering can later select the getter or setter without losing
+    // the derivative associations needed by the enclosing differentiable function.
+    if (m_parentDifferentiableAttr && item.declRef.as<PropertyDecl>())
+    {
+        registerAssociatedMethods(this, item.declRef);
+    }
+    return resultExpr;
 }
 
 void SemanticsVisitor::suggestCompletionItems(
@@ -3445,6 +3453,19 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
 void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 {
+    // A subscript or property denotes storage, while its accessors are the functions that are
+    // actually called. Register every accessor because the getter-versus-setter decision is
+    // intentionally deferred until lowering materializes the storage reference.
+    if (declRef.as<SubscriptDecl>() || declRef.as<PropertyDecl>())
+    {
+        for (auto accessorDeclRef :
+             getMembersOfType<AccessorDecl>(context->getASTBuilder(), declRef.as<ContainerDecl>()))
+        {
+            registerAssociatedMethods(context, accessorDeclRef);
+        }
+        return;
+    }
+
     // Lower witness for ForwardDifferentiable for this function.
     // First we'll turn it into a func-as-type-expr, then check that
     // to get the function reference as a type, and then get the witness
@@ -3673,14 +3694,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
             if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
-                if (auto subscriptDeclRef = fnExpr->declRef.as<SubscriptDecl>())
-                {
-                    for (auto accessorDeclRef :
-                         getMembersOfType<AccessorDecl>(m_astBuilder, subscriptDeclRef))
-                        registerAssociatedMethods(this, accessorDeclRef);
-                }
-                else
-                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
     }
@@ -9521,7 +9535,13 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
 
     // We will iterate over all the operands in all the insts and check
-    // them
+    // them. Setting `failed` makes us return an error-typed expression via
+    // `CreateErrorExpr` at the end of this function; a caller only keeps that
+    // expression away from IR lowering (which aborts on an ErrorType) when the
+    // sink's error count is non-zero. So every site that sets `failed` must
+    // diagnose an *error*, never a warning — a warning-severity `failed` path
+    // is what caused the abort in #12497. (The lone warning in this function,
+    // SpirvLayoutSensitiveTypeInAsm, deliberately does not set `failed`.)
     bool failed = false;
 
     // Track %id's that have been defined in this asm block.
@@ -9536,10 +9556,12 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
+            // Per the `failed` invariant above, this diagnoses an error (not
+            // the parser's E29106 semicolon-hint warning): the opcode takes no
+            // operands, so this is a definite error rather than a recovery guess.
             failed = true;
-            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+            getSink()->diagnose(Diagnostics::SpirvInstructionTakesNoOperands{
                 .opcode = inst.opcode.token.getContent(),
-                .maxOperands = 0,
                 .location = inst.opcode.token.loc});
             continue;
         }

@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#functype
-//META: doc_section_digest=7e903f116cccaa2d6cdd7b7b3629e179d6417c0f583ea8c8d54a18facbc96121
-//META: purpose=A FuncType holds parameter types and a result type; a function-typed value is invokable to produce its result.
+//META: doc_section_digest=5e92206b0f0b0b7cbc40b1055a81166a8628747c755d5cf61ab0cfb9b61096cf
+//META: purpose=A FuncType holds parameter types followed by a result type; a value of a callable type is invokable to produce its result.
 //META: intent=functional
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies FuncType's claim that it holds parameter types and a
-// return type: a callable value can be invoked with its parameter
-// type and returns its result type. The IFunc-like callable-as-
-// interface idiom survives the interpreter; CHECK asserts the
-// invoked result.
+// Verifies the parameter-then-result shape of a callable type by
+// passing a callable value through a generic that only knows it is
+// callable with an int and yields an int. CHECK asserts the invoked
+// result, which requires both the parameter type and the result type to
+// have travelled with the value.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
