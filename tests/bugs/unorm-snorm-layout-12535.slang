@@ -10,7 +10,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<unorm float> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):name=snormBuffer
+// Seeded with a value that is not the all-zero bit pattern: a broken snorm read
+// also yields 0, so checking against 0 would pass either way.
+//TEST_INPUT:ubuffer(data=[-0.25], stride=4):name=snormBuffer
 StructuredBuffer<snorm float> snormBuffer;
 
 // `v` (a `unorm float4`) is first so its offset matches under natural and
@@ -32,10 +34,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[1] = n.v.w;          // 4.0
     outputBuffer[2] = n.u;            // 0.5
     outputBuffer[3] = n.s;            // -0.5
-    outputBuffer[4] = snormBuffer[0]; // 0.0 (input is 0)
+    outputBuffer[4] = snormBuffer[0]; // -0.25
     // CHECK: 1.0
     // CHECK: 4.0
     // CHECK: 0.5
     // CHECK: -0.5
-    // CHECK: 0.0
+    // CHECK: -0.25
 }

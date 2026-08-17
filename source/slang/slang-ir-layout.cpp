@@ -483,10 +483,18 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
     case kIROp_AttributedType:
         {
-            // An `IRAttributedType` attribute records a semantic property, never a
-            // change to storage (a storage-changing property is a distinct IR
-            // type), so it lays out as its base type regardless of the attribute.
+            // Only layout-transparent attributes reach here: `unorm`/`snorm` select a
+            // texture image format at emit and `no_diff` carries no storage, so the
+            // type lays out as its base. Enumerated rather than accepted wholesale
+            // because the `Attr` family also holds storage-shaped members
+            // (`AlignedAttr`, `TypeAlignmentAttr`, `TypeSizeAttr`); none is attached
+            // to a *type* today -- `AlignedAttr` goes on an `IRLoad` -- and this trips
+            // if that ever changes, rather than silently laying out as the base.
             auto attributedType = cast<IRAttributedType>(type);
+            SLANG_ASSERT(
+                attributedType->getAttr()->getOp() == kIROp_NoDiffAttr ||
+                attributedType->getAttr()->getOp() == kIROp_UNormAttr ||
+                attributedType->getAttr()->getOp() == kIROp_SNormAttr);
             return getSizeAndAlignment(
                 targetReq,
                 this,
