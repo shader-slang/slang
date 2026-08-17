@@ -822,29 +822,26 @@ typedef uint32_t SlangSizeT;
         // This flag will be deprecated, use CompilerOption instead.
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-    // Requires internal linkage: `static`, never `inline`. An `inline constexpr`
+    // Must have internal linkage, and must never be `inline`. An `inline constexpr`
     // variable has external linkage, so wherever it is odr-used the definition is
     // emitted under one shared external symbol name. AddressSanitizer wraps the
     // copy in an instrumented module with a redzone, which changes the size it
     // records for that symbol; the copy in a non-instrumented libslang has none,
     // the sizes disagree, and ASan's ODR checker reports a violation that breaks
-    // mixed ASan builds. `static` does not prevent a definition from being
+    // mixed ASan builds. Internal linkage does not stop a definition from being
     // emitted; it removes the external name, so each translation unit gets its own
-    // internal copy and no shared symbol remains for the checker to compare. The
-    // value is still folded at compile time because it is `constexpr`.
+    // copy and no shared symbol remains for the checker to compare. The value is
+    // still folded at compile time because it is `constexpr`.
     //
-    // `static` also settles a subtlety specific to this declaration, which sits
-    // inside `extern "C"`: per `[dcl.link]/7` a declaration in a
-    // linkage-specification is treated as if it were `extern`, which would defeat
-    // the usual "namespace-scope const has internal linkage" rule and leave a bare
-    // `constexpr` external. In practice the compilers we build with do not apply
-    // that reading and give a bare `constexpr` here internal linkage anyway, so
-    // `static` is not load-bearing on them; it states the requirement outright
-    // rather than resting on which reading a toolchain takes.
+    // `static` is how that internal linkage is spelled, here and at
+    // `kInvalidCoverageCounterIndex`. It is explicitness rather than the thing
+    // doing the work: clang and gcc both give a bare `constexpr` internal linkage
+    // even inside this `extern "C"` block, though `[dcl.link]/7` ("treated as if
+    // it contains the `extern` specifier") can be read as saying otherwise.
     //
-    // `[[maybe_unused]]` keeps GCC's `-Wunused-const-variable=2` quiet for
-    // consumers that include this header without naming the constant. An `inline`
-    // variable is never flagged as unused, but an internal-linkage one can be.
+    // `[[maybe_unused]]` suppresses GCC's `-Wunused-const-variable=2`, which its
+    // documentation defines as warning for unused constant static variables
+    // defined in headers. An `inline` variable is not subject to it.
     // See issue #11927.
     [[maybe_unused]] static constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
@@ -4872,16 +4869,10 @@ enum class CoverageBranchArmKind : uint32_t
     DefaultArm = 4,
 };
 
-// Uses `static` for internal linkage, matching `kDefaultTargetFlags`: the
-// definition carries no external symbol name, so ASan has nothing to match
-// against the copy inside a non-instrumented libslang and the ODR violation that
-// breaks mixed ASan builds cannot arise. See the note on `kDefaultTargetFlags`
-// for the full rationale, including why `static` is spelled out there rather than
-// left to a bare `constexpr`. This declaration is at namespace scope, where a bare
-// `constexpr` already has internal linkage, so `static` is for uniformity and to
-// keep a future re-add of `inline` from silently reintroducing the bug.
-// `[[maybe_unused]]` suppresses GCC's `-Wunused-const-variable=2` for consumers
-// that include this header without naming the constant. See issue #11927.
+// Internal linkage via `static`, and `[[maybe_unused]]` to suppress GCC's
+// `-Wunused-const-variable=2`, for the same reasons as `kDefaultTargetFlags`; see
+// the note there. Never `inline`: that is what would give this constant external
+// linkage and reintroduce the ASan ODR failure in mixed builds. See issue #11927.
 [[maybe_unused]] static constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// Per-coverage-entry attribution returned by
