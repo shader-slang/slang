@@ -2179,13 +2179,20 @@ public:
         return &m_annotationLookupCache;
     }
 
-    /// Return the bytes this module holds OUTSIDE its `MemoryArena`: the deduplication context's
-    /// lookup tables and the module's own side maps.
+    /// Return the bytes held by this module's `Dictionary` lookup tables — the deduplication
+    /// context's maps plus the analysis, mangled-name, unique-id and annotation maps — which live
+    /// on the heap rather than in the module's `MemoryArena`.
     ///
     /// Reported separately from the arena rather than folded into it, because the two answer
-    /// different questions — the arena is the cost of the instructions themselves, while this is
-    /// the cost of being able to find them. The mangled-name map owns a `List` per entry, so those
-    /// are walked rather than assumed empty.
+    /// different questions: the arena is the cost of the instructions themselves, this is the cost
+    /// of being able to find them. The mangled-name map owns a `List` per entry, so those are
+    /// walked rather than assumed empty.
+    ///
+    /// Deliberately NOT a total of everything heap-backed the module owns. `m_containerPool` (a
+    /// fixed-size pool of recycled scratch containers) and `m_linkingInfo` are excluded, because
+    /// sizing them would need new accessors on `ObjectPool` and `HashSet` for quantities that are
+    /// scratch and link-time state rather than lookup structure. What they hold lands in the
+    /// report's unattributed remainder, which is where unmeasured memory is supposed to land.
     size_t calcSideTableMemoryAllocated() const
     {
         size_t total = m_deduplicationContext.calcTotalMemoryAllocated() +
@@ -2193,8 +2200,8 @@ public:
                        m_mapMangledNameToGlobalInst.calcTotalMemoryAllocated() +
                        m_mapInstToUniqueId.calcTotalMemoryAllocated() +
                        m_annotationLookupCache.calcTotalMemoryAllocated();
-        for (const auto& [mangledName, globalInsts] : m_mapMangledNameToGlobalInst)
-            total += size_t(globalInsts.getCapacity()) * sizeof(IRInst*);
+        for (const auto& entry : m_mapMangledNameToGlobalInst)
+            total += size_t(entry.second.getCapacity()) * sizeof(IRInst*);
         return total;
     }
 

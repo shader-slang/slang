@@ -66,14 +66,14 @@ size_t currentProcessRssBytes()
     FILE* file = fopen("/proc/self/statm", "r");
     if (!file)
         return 0;
-    long totalPages = 0;
+    // The FIRST field is skipped with `%*ld`, not read into an unused variable: it is total program
+    // size, which would overstate the footprint by counting memory never faulted in. The second is
+    // resident pages, the number wanted here.
     long residentPages = 0;
-    const int fieldsRead = fscanf(file, "%ld %ld", &totalPages, &residentPages);
+    const int fieldsRead = fscanf(file, "%*ld %ld", &residentPages);
     fclose(file);
-    if (fieldsRead != 2)
+    if (fieldsRead != 1)
         return 0;
-    // The second field is resident pages; the first is total program size and would overstate the
-    // footprint by counting memory that was never faulted in.
     return size_t(residentPages) * size_t(sysconf(_SC_PAGESIZE));
 #endif
 }
@@ -147,9 +147,12 @@ struct MemoryWalker
         addASTBuilder(linkage->getASTBuilder(), category);
         for (const RefPtr<LoadedModule>& module : linkage->loadedModulesList)
             addModule(module, category);
-        // IR modules produced by this linkage that no `Module` owns — the linked and specialized
-        // clones built during code generation. Always `Generated`, whichever linkage produced
-        // them: they are an output of compiling, not something that was loaded.
+        // IR the linkage produced rather than loaded — the linked and specialized clones built
+        // during code generation. Always `Generated`, whichever linkage produced them: they are an
+        // output of compiling, not something that was imported. Whether a `Module` also references
+        // one of these is not assumed either way; the arena-level dedup makes the total correct
+        // regardless, and a clone that a module does own is charged to whichever category reached
+        // it first.
         for (const RefPtr<IRModule>& irModule : linkage->compiledModules)
             addIRModule(irModule, ModuleCategory::Generated);
         addSourceManager(linkage->getSourceManager());
@@ -160,6 +163,11 @@ struct MemoryWalker
     /// The parent chain matters: a linkage's source manager is created with the global session's
     /// builtin manager as its parent, and the core module's text hangs off that parent rather than
     /// off the manager the compile used directly.
+    ///
+    /// Meeting an already-visited manager stops the walk (`return`) rather than skipping just that
+    /// one (`continue`), which is correct only because a manager enters `visited` exclusively via
+    /// this loop, and this loop always continues to the root once it starts. So a visited manager
+    /// implies its entire parent chain is visited too, and there is nothing further up to find.
     void addSourceManager(SourceManager* sourceManager)
     {
         for (; sourceManager; sourceManager = sourceManager->getParent())
@@ -183,6 +191,13 @@ struct MemoryWalker
 
 MemoryReport captureMemoryReport(Linkage* linkage, FrontEndCompileRequest* frontEndReq)
 {
+    // Read the process total BEFORE walking, because the walk allocates: its visited set is real
+    // resident memory that belongs to no component, so a total read afterwards would carry it while
+    // the components did not, inflating the unattributed remainder by the cost of measuring. The
+    // two readings are a few microseconds apart, which is far below the resolution at which any of
+    // these numbers are compared.
+    const size_t rssBeforeWalk = currentProcessRssBytes();
+
     MemoryWalker walker;
     if (!linkage)
         return walker.report;
@@ -217,10 +232,7 @@ MemoryReport captureMemoryReport(Linkage* linkage, FrontEndCompileRequest* front
                 walker.addModule(translationUnit->getModule(), ModuleCategory::User);
     }
 
-    // Read last, so the total covers everything the walk itself allocated (the visited set) rather
-    // than reporting a total from before that allocation and charging the difference to the
-    // residual.
-    walker.report.processRss = currentProcessRssBytes();
+    walker.report.processRss = rssBeforeWalk;
 
     return walker.report;
 }
