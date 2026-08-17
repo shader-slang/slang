@@ -97,13 +97,6 @@ docs/generated/tests/conformance/types-extension/enum-extension-static-members.s
 #    generates that test, so the entry no longer resolved to a file.
 docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
 
-# https://github.com/shader-slang/slang/issues/12440 — a `getStringHash`
-# argument that does not fold to a string literal kills slangc (SIGSEGV on
-# Linux, SIGBUS on macOS, no output) instead of reporting E41023. The check
-# that should catch it tests an unchecked cast, so it never fires.
-# Remove this entry when 12440 is fixed.
-docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
-
 # Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
 # `countof(a)` on a static array folds to the element type's byte size
 # instead of the array's element count (int[9] -> 4, double[6] -> 8),

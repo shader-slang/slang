@@ -20,9 +20,16 @@ public:
     {
         enum Enum : Flags
         {
-            // AttachDebugger and DisableStdErrRedirection are ignored on non-Windows platforms.
+            /// Ignored on non-Windows platforms.
             AttachDebugger = 0x01,
+
+            /// Leave the child's stderr alone, so it inherits this process's.
+            ///
+            /// Honoured on Windows AND Unix. It was Windows-only, which made it a silent
+            /// no-op on Linux: the child's stderr went to a pipe regardless, and a caller
+            /// that did not drain that pipe discarded everything written to it.
             DisableStdErrRedirection = 0x02,
+
             /// Give the child a stdin it cannot read from, instead of a pipe. Honored on all
             /// platforms. Contract: a read of the child's stdin reports an *error* rather than
             /// reaching end-of-file (an EOF read would instead succeed with empty input, which is a
@@ -51,6 +58,18 @@ public:
 
     /// Get the value returned from the process when it exited/returned.
     int32_t getReturnValue() const { return m_returnValue; }
+
+    /// The signal that killed the process, or 0 if it exited under its own control.
+    ///
+    /// Kept separate from the return value rather than folded into it, because on Unix an
+    /// exit status is narrowed to int8_t so that a tool returning -1 round-trips: a
+    /// shell-style 128+signal encoding would collide with that range (137 would read as
+    /// -119). Without this, every signal death is indistinguishable from every other and from
+    /// a reader that never ran -- getReturnValue() stays at its initial value for all of them,
+    /// so a process killed by SIGKILL and one killed by SIGSEGV report the same thing.
+    ///
+    /// Always 0 on Windows, which has no signals; use getReturnValue() there.
+    int32_t getTerminationSignal() const { return m_terminationSignal; }
 
     /// True if the process has terminated
     virtual bool isTerminated() = 0;
@@ -99,7 +118,8 @@ public:
     static uint32_t getId();
 
 protected:
-    int32_t m_returnValue = 0; ///< Value returned if process terminated
+    int32_t m_returnValue = 0;       ///< Value returned if process terminated
+    int32_t m_terminationSignal = 0; ///< Signal that killed the process, 0 if none (Unix only)
     RefPtr<Stream>
         m_streams[Index(StdStreamType::CountOf)]; ///< Streams to communicate with the process
 };

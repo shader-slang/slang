@@ -2175,7 +2175,10 @@ struct LLVMEmitter
         case kIROp_GetStringHash:
             {
                 auto getStringHashInst = cast<IRGetStringHash>(inst);
-                auto stringLit = getStringHashInst->getStringLit();
+                // Checked, unlike `getStringLit()`. CPU-like targets skip
+                // `checkGetStringHashInsts` altogether, so this test is the only thing between a
+                // non-literal operand and reading another instruction's storage as string data.
+                auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
                 if (stringLit)
                 {
