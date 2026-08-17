@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/core-module.md#core-module
-//META: doc_section_digest=8489fad23ce3c21f6f3d24794bba24b5d2a69ab1e82e6e16bfa45871b21462f3
+//META: doc_section_digest=261236714a826217dc94815d8118cf46f225066afa1514d96e19894b7a9f81e2
 //META: purpose=StructuredBuffer and RWStructuredBuffer from the HLSL meta-module legalize to each target's own binding shape, and the read-only one keeps a read-only marker where the target has one.
 //META: intent=functional
 //META: pipeline_stage=layout

@@ -107,23 +107,6 @@ docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
 # still buckets it as failed(expected) via expected-failures.txt.
 docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang
 
-# `getStringHash` on a String that does not fold to a literal SIGSEGVs
-# slangc during compilation instead of reporting E41023; tracked by
-# _meta/findings/getstringhash-nonliteral-argument-sigsegv.yaml. This is a
-# distinct crash from string-hash-stable-value-cpu.slang above (that one
-# dies while *executing* a CPU kernel whose argument IS a literal).
-#
-# Identified in coverage run 31235323797, job 93046595167 (macos):
-# `Bus error: 10` on both attempts immediately after
-# ir-reference/misc/string-hash-fold-emitted-constant.slang.6 passed, i.e.
-# on the next test in sorted order. Confirmed locally on macOS aarch64 —
-# `slangc string-hash-non-literal-diagnostic.slang -target hlsl -entry main
-# -stage compute` exits 138 (128 + SIGBUS). The test arrived in the
-# 2026-08-04 regeneration round and sorts between .6 and the already-listed
-# string-hash-stable-value-cpu.slang, so it became the new first crasher in
-# this directory.
-docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
-
 # HLSL-prelude state leak (NOT a crash). These four tests assert that emitted
 # HLSL contains the standard prelude's NVAPI guard
 # (`#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"`). All four pass

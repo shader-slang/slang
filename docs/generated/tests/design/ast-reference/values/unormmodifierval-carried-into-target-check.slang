@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/values.md#modifier-values
-//META: doc_section_digest=4536635b38a6466b02bda12ed26c1d3f85e08898f1c387eaf21ba05a06ce719f
+//META: doc_section_digest=cc9b5af8e7e88defd3d066b93057c4ed4b13419aa0e459c9e09a634d498558b7
 //META: purpose=A resource-format modifier becomes part of the texture's element type rather than being dropped after checking, so a target whose texture element types are restricted rejects the modified spelling that it accepts unmodified.
 //META: intent=negative
 //META: pipeline_stage=check
