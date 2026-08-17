@@ -1447,19 +1447,21 @@ static Result _executeRPC(
         return SLANG_OK;
     }
 
-    // A lost server earns a second attempt; a failed SPAWN earns one too, since a transient
-    // resource shortage is worth one more try. They are kept distinct because only the first
-    // can be attributed to the test: nothing ran on a server that never started.
+    // Lost and StartFailed retry, kept distinct because only Lost can be charged to the test:
+    // nothing ran on a server that never started.
     //
-    // The rest do not retry, deliberately:
+    // ProtocolError retries too. This used to reason that a wire-format disagreement would
+    // repeat on a new process, but the errors seen are not that: ~7 per 6300-test run, on
+    // different tests each time, each passing on other runs (#12534). They are replies
+    // corrupted in flight, which a fresh server discriminates -- and a real disagreement
+    // still repeats and is charged to the test below.
     //
-    // - A timeout is re-paid in full (another connectionTimeOutInMs) and a fresh server has
-    //   to recompile the core module first, so retrying a slow request is the one way to
-    //   turn a two-minute problem into a five-minute one.
-    // - A protocol or send failure means the two sides disagree about the wire format, which
-    //   a new process will disagree about identically.
-    const bool isRetryable =
-        first == RPCAttemptOutcome::Lost || first == RPCAttemptOutcome::StartFailed;
+    // The rest do not:
+    // - TimedOut re-pays connectionTimeOutInMs plus a core-module recompile on the new server.
+    // - SendFailed never got a reply to corrupt; the request was never written.
+    const bool isRetryable = first == RPCAttemptOutcome::Lost ||
+                             first == RPCAttemptOutcome::StartFailed ||
+                             first == RPCAttemptOutcome::ProtocolError;
     if (!isRetryable)
     {
         return SLANG_FAIL;
@@ -1471,16 +1473,36 @@ static Result _executeRPC(
     // was doing) does not reproduce on a virgin process, while an input that genuinely kills
     // the compiler kills this one too -- and then the failure is reported against the test,
     // where it belongs, instead of being retried until it looks green.
-    // Worded to cover both causes it is reached for. A repeated StartFailed is NOT charged
-    // to the test -- that needs `second == Lost && first == Lost` below -- so promising that
-    // "a second loss will be reported against this test" would be false on the spawn path.
-    context->getTestReporter()->message(
-        TestMessageType::RunError,
-        first == RPCAttemptOutcome::StartFailed
-            ? "no test server could be spawned; retrying once, and a second failure to spawn "
-              "will fail this test without blaming its input"
-            : "retrying once on a freshly spawned test server; a second loss will be reported "
-              "against this test");
+    //
+    // One message per cause: only Lost and ProtocolError can be charged to the test, so the
+    // spawn path must not promise that a second failure will be.
+    const char* retryMessage = nullptr;
+    switch (first)
+    {
+    case RPCAttemptOutcome::StartFailed:
+        retryMessage =
+            "no test server could be spawned; retrying once, and a second failure to spawn "
+            "will fail this test without blaming its input";
+        break;
+    case RPCAttemptOutcome::ProtocolError:
+        retryMessage =
+            "retrying once on a freshly spawned test server; a second unreadable reply will "
+            "be reported against this test";
+        break;
+    case RPCAttemptOutcome::Lost:
+        retryMessage =
+            "retrying once on a freshly spawned test server; a second loss will be reported "
+            "against this test";
+        break;
+    default:
+        // Unreachable: isRetryable above admits exactly the three cases handled here. Listed
+        // rather than defaulted so that adding a fourth retryable outcome fails here instead
+        // of silently inheriting one of these messages.
+        SLANG_ASSERT(!"unhandled retryable outcome");
+        retryMessage = "retrying once on a freshly spawned test server";
+        break;
+    }
+    context->getTestReporter()->message(TestMessageType::RunError, retryMessage);
 
     // Straight into outRes, as the first attempt does: _executeRPCOnce writes it only on
     // success, so a second loss leaves the caller's own init() value intact rather than a
@@ -1497,6 +1519,10 @@ static Result _executeRPC(
         {
             context->getTestReporter()->recordTestServerLoss();
         }
+        else if (first == RPCAttemptOutcome::ProtocolError)
+        {
+            context->getTestReporter()->recordTestServerProtocolError();
+        }
         return SLANG_OK;
     }
 
@@ -1508,6 +1534,17 @@ static Result _executeRPC(
             TestMessageType::TestFailure,
             "this test killed a freshly spawned test server twice in a row; treating it as a "
             "crash caused by this input rather than as an unrelated server loss");
+    }
+
+    // Likewise a repeated PROTOCOL ERROR: two fresh servers failing to frame a reply to this
+    // one request reproduces, so it is the test's to answer for.
+    if (second == RPCAttemptOutcome::ProtocolError && first == RPCAttemptOutcome::ProtocolError)
+    {
+        context->getTestReporter()->messageFormat(
+            TestMessageType::TestFailure,
+            "this test drew an unreadable reply from a freshly spawned test server twice in a "
+            "row; treating it as caused by this input rather than as an unrelated malformed "
+            "response");
     }
 
     return SLANG_FAIL;
