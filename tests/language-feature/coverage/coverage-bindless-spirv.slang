@@ -8,14 +8,14 @@
 // mode exists only for hosts whose shader database compiles each shader on its
 // own, so each one's slots restart at 0 and would otherwise collide.
 
-//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
+//TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-bindless 31 7
 
 // A SECOND run with its own prefix, carrying only a -NOT directive so it scans
 // the whole disassembly. A `CHECK-NOT` appended to the run above would only
 // scan from the last CHECK match to the end of input — and decorations are
 // emitted BEFORE the code, so a stray `NonUniform` would sit in the region
 // that check never looks at, and the test would pass while asserting nothing.
-//TEST:SIMPLE(filecheck=NOUNIFORM):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
+//TEST:SIMPLE(filecheck=NOUNIFORM):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-bindless 31 7
 
 RWStructuredBuffer<uint> outBuf;
 

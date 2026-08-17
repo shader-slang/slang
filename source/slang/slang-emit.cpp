@@ -1151,14 +1151,31 @@ Result linkAndOptimizeIR(
                 reservedSpaces.add((int)value.intValue);
             }
         }
-        // PROTOTYPE: `-trace-coverage-bindless-index`. -1 means the ordinary
-        // single-buffer form; >= 0 selects the unbounded-descriptor-array
-        // form and supplies this shader's index into it.
+        // PROTOTYPE: `-trace-coverage-bindless <space> <index>`. -1 means the
+        // ordinary single-buffer form; >= 0 selects the
+        // unbounded-descriptor-array form.
+        //
+        // The array's placement is not a separate decision: binding is fixed at
+        // 0 and the space comes from the option, because a variable-descriptor-
+        // count array is only valid as a set's last binding, so the array gets a
+        // set to itself. That is also why combining this with an explicit
+        // `-trace-coverage-binding` is rejected rather than merged — the two
+        // would be describing the same placement in two ways.
         int bindlessIndex = -1;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
+        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBindless))
         {
             if (values->getCount() > 0)
-                bindlessIndex = (int)(*values)[0].intValue;
+            {
+                if (explicitBinding >= 0 || explicitSpace >= 0)
+                {
+                    if (sink)
+                        sink->diagnose(Diagnostics::CoverageBindlessBindingConflict{});
+                    return SLANG_FAIL;
+                }
+                explicitSpace = (int)(*values)[0].intValue;
+                explicitBinding = 0;
+                bindlessIndex = (int)(*values)[0].intValue2;
+            }
         }
         // Default to uint64. Customers opt down to uint32 (4 bytes per
         // slot) only when targeting a runtime driver without 64-bit

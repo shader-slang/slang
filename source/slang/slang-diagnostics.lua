@@ -5200,9 +5200,15 @@ warning(
 )
 
 err(
+    "coverage-bindless-binding-conflict",
+    45117,
+    "`-trace-coverage-bindless` and `-trace-coverage-binding` both place the synthesized `__slang_coverage`; pass only one. `-trace-coverage-bindless` already fixes the binding at 0 and takes the space, because a variable-descriptor-count array is only valid as the last binding of a descriptor set and so must have a set to itself."
+)
+
+err(
     "coverage-bindless-target-not-supported",
     45116,
-    "`-trace-coverage-bindless-index` is only supported on Khronos targets: it synthesizes `__slang_coverage` as an unbounded descriptor array, which requires descriptor indexing. Omit it to use the single-buffer form, which every coverage-capable target supports."
+    "`-trace-coverage-bindless` is only supported on Khronos targets: it synthesizes `__slang_coverage` as an unbounded descriptor array, which requires descriptor indexing. Omit it to use the single-buffer form, which every coverage-capable target supports."
 )
 
 err(
