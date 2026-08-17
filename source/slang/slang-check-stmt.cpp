@@ -32,6 +32,82 @@ public:
 private:
     OuterStmtInfo m_outerStmt;
 };
+
+/// Return the name an operator/callee expression refers to, or an empty slice if it has none.
+///
+/// A parsed operator expression names its operator through an unresolved `VarExpr` (e.g.
+/// `functionExpr` is a `VarExpr` named `"+="`); after checking, a resolved call names its callee
+/// through a `DeclRefExpr`. This reads whichever is present, so callers can classify an
+/// expression's operator both before and after semantic checking.
+UnownedStringSlice getReferencedName(Expr* expr)
+{
+    // Use `getUnownedStringSliceText`, which slices the `Name`'s own storage, rather than
+    // `getText(...).getUnownedSlice()`, which would slice a temporary `String` returned by value.
+    if (auto varExpr = as<VarExpr>(expr))
+        return getUnownedStringSliceText(varExpr->name);
+    if (auto declRefExpr = as<DeclRefExpr>(expr))
+        return getUnownedStringSliceText(declRefExpr->declRef.getName());
+    return UnownedStringSlice();
+}
+
+/// Return the operator name of an `OperatorExpr` (`+=`, `,`, `++`, ...), or an empty slice.
+UnownedStringSlice getOperatorName(OperatorExpr* operatorExpr)
+{
+    return getReferencedName(operatorExpr->functionExpr);
+}
+
+bool isCompoundAssignmentOperatorName(UnownedStringSlice name)
+{
+    static const char* kCompoundAssignmentOps[] =
+        {"+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="};
+    for (auto op : kCompoundAssignmentOps)
+    {
+        if (name == UnownedStringSlice(op))
+            return true;
+    }
+    return false;
+}
+
+/// Is `expr` an assignment expression, including a compound assignment (`+=`, `-=`, ...)?
+///
+/// Only a plain `=` parses to an `AssignExpr`; a compound assignment parses to an operator call
+/// (`operator+=`), so testing `AssignExpr` alone would miss the compound forms.
+bool isAssignmentExpr(Expr* expr)
+{
+    if (as<AssignExpr>(expr))
+        return true;
+    if (auto operatorExpr = as<OperatorExpr>(expr))
+        return isCompoundAssignmentOperatorName(getOperatorName(operatorExpr));
+    return false;
+}
+
+bool isIncrementOrDecrementExpr(Expr* expr)
+{
+    if (!as<PrefixExpr>(expr) && !as<PostfixExpr>(expr))
+        return false;
+    auto name = getOperatorName(as<OperatorExpr>(expr));
+    return name == UnownedStringSlice("++") || name == UnownedStringSlice("--");
+}
+
+/// Is `expr` a genuine function/method call (`f(x)`, `obj.method()`), as opposed to an operator
+/// expression such as `a + b` or `a, b`? In the AST hierarchy `OperatorExpr` derives from
+/// `InvokeExpr`, so a plain `as<InvokeExpr>` would also match operator forms. An explicit or
+/// implicit cast is an `InvokeExpr` that is not an `OperatorExpr`, and is intentionally treated as
+/// an allowed call-like form here (see `diagnoseExpressionStatementForm`).
+bool isCallExpr(Expr* expr)
+{
+    return as<InvokeExpr>(expr) && !as<OperatorExpr>(expr);
+}
+
+/// Is `expr` a form that is evaluated purely for its effect and legitimately appears as a bare
+/// statement even though it is not a call/assignment/`++`/`--`? An inline `spirv_asm { ... }` block
+/// executes its instructions for effect, and an `expand <expr>` evaluates a pack expansion for
+/// effect (e.g. `expand __tupleForEach(...);`). Both are ordinary statement forms in user code, so
+/// case (1) must not flag them.
+bool isEffectfulStatementForm(Expr* expr)
+{
+    return as<SPIRVAsmExpr>(expr) || as<ExpandExpr>(expr);
+}
 } // namespace
 
 void SemanticsVisitor::checkStmt(Stmt* stmt, SemanticsContext const& context)
@@ -296,8 +372,9 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         SemanticsExprVisitor subExprVisitor(sideEffectContext);
         stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
 
-        // A `for` loop's side-effect expression also discards its result.
-        maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
+        // A `for` loop's side-effect expression also discards its result, but is a position where
+        // discarding a value is expected, so only the `[NoDiscard]` diagnostic applies here.
+        maybeDiagnoseDiscardedResult(stmt->sideEffectExpression, /*warnOnDiscardedValue*/ false);
     }
     subContext.checkStmt(stmt->statement);
 
@@ -683,7 +760,17 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
-    stmt->expression = CheckExpr(stmt->expression);
+    // Case (1) of shader-slang/slang#12428 is a purely syntactic check on the form written by the
+    // user, so it runs on the original parsed AST before `CheckExpr` may rewrite node types (e.g.
+    // the builtin-operator fast path). It is not suppressed by the type-based checks below.
+    diagnoseExpressionStatementForm(stmt->expression);
+
+    // Check the expression, and diagnose case (3): a bare type name used as a statement
+    // (`MyType;`). On that error the expression is left with an `ErrorType`, which suppresses the
+    // discarded-value warning below via the usual cascading-error avoidance.
+    stmt->expression =
+        checkExprOfProperOrVoidType(stmt->expression, ExprCheckingRole::ExpressionStatement);
+
     // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
     // comparison may be either a resolved `operator==` call or a builtin fast-path
     // `BuiltinOperatorExpr` (the common scalar case).
@@ -700,30 +787,100 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     if (isDanglingEquality)
         getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
 
-    maybeDiagnoseDiscardedNoDiscardResult(stmt->expression);
+    // Diagnose a `[NoDiscard]` call whose result is discarded (case 2's stronger sibling) and, for
+    // an expression statement, a discarded non-`void` result (case 2). The dangling-`==` above is
+    // already a discarded-result diagnostic for that form, so suppress the general case-2 warning
+    // when it fired.
+    maybeDiagnoseDiscardedResult(stmt->expression, !isDanglingEquality);
 }
 
-void SemanticsStmtVisitor::maybeDiagnoseDiscardedNoDiscardResult(Expr* expr)
+void SemanticsStmtVisitor::diagnoseExpressionStatementForm(Expr* expr)
 {
-    // Peel transparent wrappers that don't change whether the result is discarded: a call
-    // wrapped in parentheses (`(t.load());`) still discards the call's result.
-    while (auto paren = as<ParenExpr>(expr))
+    // Peel wrappers that don't change the statement's essential form, so it is classified by the
+    // expression inside: parentheses (`(f());`) and a `try` clause (`try f();`, which is an
+    // ordinary effectful call statement in a `throws` context, not a disallowed bare form).
+    for (;;)
     {
-        expr = paren->base;
+        if (auto paren = as<ParenExpr>(expr))
+        {
+            expr = paren->base;
+            continue;
+        }
+        if (auto tryExpr = as<TryExpr>(expr))
+        {
+            expr = tryExpr->base;
+            continue;
+        }
+        break;
+    }
+
+    // A comma sequence in discarded position discards each operand, so classify each operand as its
+    // own statement-like expression rather than flagging the comma expression as a whole.
+    if (auto operatorExpr = as<OperatorExpr>(expr))
+    {
+        if (getOperatorName(operatorExpr) == UnownedStringSlice(","))
+        {
+            for (auto arg : operatorExpr->arguments)
+                diagnoseExpressionStatementForm(arg);
+            return;
+        }
+    }
+
+    // The forms whose result is normally discarded on purpose are the only ones allowed as a
+    // statement: an assignment (`=` or a compound `+=`), a genuine call (also covering a cast such
+    // as `(int)x;` or `(void)x;`, which is an `InvokeExpr` that is not an `OperatorExpr`), a
+    // prefix/postfix `++`/`--`, and an effect-only form (`spirv_asm { ... }`, `expand <expr>`).
+    // Anything else (a bare variable, a bare member reference, a bare unapplied function reference,
+    // a lambda, ...) does nothing useful as a statement.
+    if (isAssignmentExpr(expr) || isCallExpr(expr) || isIncrementOrDecrementExpr(expr) ||
+        isEffectfulStatementForm(expr))
+        return;
+
+    getSink()->diagnose(Diagnostics::ExpressionStatementDisallowedForm{.expr = expr});
+}
+
+void SemanticsStmtVisitor::maybeDiagnoseDiscardedResult(Expr* expr, bool warnOnDiscardedValue)
+{
+    // Peel transparent wrappers that don't change whether the result is discarded, so the
+    // classification below sees the real underlying expression:
+    //   - parentheses (`(t.load());` still discards the call's result),
+    //   - a `try` clause (`try f();` discards the same result `f();` would), and
+    //   - a `LetExpr` temporary binding, which checking inserts around an expression to hoist a
+    //     value into a temporary (e.g. opening an existential to dynamically dispatch an interface
+    //     method, `moveTemp` in `slang-check-expr.cpp`). The binding is transparent to whether the
+    //     wrapped expression's result is discarded, and its own synthesized node carries no user
+    //     source location, so without peeling an assignment like `buf[i] = obj.method();`
+    //     (rewritten to `let tmp = ...; buf[i] = ...`) would be misclassified as a discarded
+    //     non-`void` result.
+    for (;;)
+    {
+        if (auto paren = as<ParenExpr>(expr))
+        {
+            expr = paren->base;
+            continue;
+        }
+        if (auto tryExpr = as<TryExpr>(expr))
+        {
+            expr = tryExpr->base;
+            continue;
+        }
+        if (auto letExpr = as<LetExpr>(expr))
+        {
+            expr = letExpr->body;
+            continue;
+        }
+        break;
     }
 
     // A comma operator in a discarded context discards each of its operands, so recurse
     // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
     if (auto operatorExpr = as<OperatorExpr>(expr))
     {
-        if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+        if (getOperatorName(operatorExpr) == UnownedStringSlice(","))
         {
-            if (getText(func->name) == ",")
-            {
-                for (auto arg : operatorExpr->arguments)
-                    maybeDiagnoseDiscardedNoDiscardResult(arg);
-                return;
-            }
+            for (auto arg : operatorExpr->arguments)
+                maybeDiagnoseDiscardedResult(arg, warnOnDiscardedValue);
+            return;
         }
     }
 
@@ -738,50 +895,119 @@ void SemanticsStmtVisitor::maybeDiagnoseDiscardedNoDiscardResult(Expr* expr)
     {
         if (select->arguments.getCount() == 3)
         {
-            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[1]);
-            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[2]);
+            maybeDiagnoseDiscardedResult(select->arguments[1], warnOnDiscardedValue);
+            maybeDiagnoseDiscardedResult(select->arguments[2], warnOnDiscardedValue);
         }
         return;
     }
     if (auto shortCircuit = as<LogicOperatorShortCircuitExpr>(expr))
     {
         if (shortCircuit->arguments.getCount() == 2)
-            maybeDiagnoseDiscardedNoDiscardResult(shortCircuit->arguments[1]);
+            maybeDiagnoseDiscardedResult(shortCircuit->arguments[1], warnOnDiscardedValue);
         return;
     }
 
     // If the discarded expression is a call to a function marked `[NoDiscard]`, report that
     // the result is being ignored.
-    auto invokeExpr = as<InvokeExpr>(expr);
-    if (!invokeExpr)
-        return;
-
-    // `[NoDiscard]` on a `void`-returning function is already rejected at the declaration
-    // (see `NoDiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
-    // error but not fatal, so checking continues and calls to such a function still reach
-    // here; this guard suppresses an additional, nonsensical "result is discarded" error
-    // at every call site on top of the declaration error.
-    if (invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType()))
-        return;
-
-    auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
-    if (!funcDeclRefExpr)
-        return;
-
-    auto calleeDecl = funcDeclRefExpr->declRef.getDecl();
-    if (!calleeDecl)
-        return;
-
-    // Bare discarded construction is intentionally outside this diagnostic.
-    if (as<ConstructorDecl>(calleeDecl))
-        return;
-
-    if (calleeDecl->findModifier<NoDiscardAttribute>())
+    if (auto invokeExpr = as<InvokeExpr>(expr))
     {
-        getSink()->diagnose(Diagnostics::DiscardedNoDiscardResult{
-            .name = calleeDecl->getName(),
-            .expr = invokeExpr});
+        // `[NoDiscard]` on a `void`-returning function is already rejected at the declaration
+        // (see `NoDiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
+        // error but not fatal, so checking continues and calls to such a function still reach
+        // here; this guard suppresses an additional, nonsensical "result is discarded" error
+        // at every call site on top of the declaration error.
+        bool isVoid =
+            invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType());
+        if (!isVoid)
+        {
+            if (auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr))
+            {
+                if (auto calleeDecl = funcDeclRefExpr->declRef.getDecl())
+                {
+                    // Bare discarded construction is intentionally outside the `[NoDiscard]`
+                    // diagnostic.
+                    if (!as<ConstructorDecl>(calleeDecl) &&
+                        calleeDecl->findModifier<NoDiscardAttribute>())
+                    {
+                        getSink()->diagnose(Diagnostics::DiscardedNoDiscardResult{
+                            .name = calleeDecl->getName(),
+                            .expr = invokeExpr});
+                        return;
+                    }
+                }
+            }
+        }
     }
+
+    auto type = expr->type.type;
+    if (!type)
+        return;
+
+    // A leaf that names a type or namespace rather than a value is case (3). The top-level
+    // expression is already handled by `checkExprOfProperOrVoidType` in `visitExpressionStmt`, but
+    // a comma operand (e.g. the `MyType` in `MyType, a;`), and any leaf reached from a `for` loop's
+    // side-effect expression, is only reached here; left unchecked it keeps its non-value type and
+    // reaches IR lowering as `unexpected: TypeType`/`NamespaceType` (the crash of
+    // shader-slang/slang#12433). This shares the same predicate as the top-level check and must run
+    // before the `warnOnDiscardedValue` gate below, because a non-value expression is invalid
+    // regardless of whether a discarded value is being diagnosed. Diagnose it and rewrite the leaf
+    // to an `ErrorType`, both so lowering is safe and so the case-2 check below is skipped via the
+    // usual cascading-error avoidance.
+    if (isExprOfNonValueType(expr))
+    {
+        getSink()->diagnose(Diagnostics::TypeNameUsedAsExpressionStatement{.expr = expr});
+        expr->type = QualType(m_astBuilder->getErrorType());
+        return;
+    }
+
+    // Case (2) of shader-slang/slang#12428: warn on an expression statement that computes a
+    // non-`void` value and then discards it. This is only performed in expression-statement
+    // position (`warnOnDiscardedValue`), not for a `for` loop's side-effect expression.
+    if (!warnOnDiscardedValue)
+        return;
+
+    // The core/builtin modules intentionally discard non-`void` results throughout (e.g. atomic
+    // and NVAPI intrinsics that both return a value and act through an `out` parameter). Those are
+    // deliberate, expert-authored uses, and this warning is user-facing UX; do not apply it to
+    // builtin-module source. (Case 1's syntactic check and case 3's error still apply everywhere.)
+    if (auto module = getShared()->getModule())
+    {
+        if (auto moduleDecl = module->getModuleDecl())
+        {
+            if (moduleDecl->hasModifier<FromCoreModuleModifier>())
+                return;
+        }
+    }
+
+    // An `expand <expr>` statement (a pack expansion evaluated for effect) has an `ExpandType`
+    // whose pattern type is the type produced for each element of the expansion. Use that pattern
+    // type for the discarded-result classification, so `expand f(each xs);` where `f` returns
+    // `void` produces no values and is not treated as a discarded result, while an expansion of a
+    // non-`void` result still is.
+    if (auto expandType = as<ExpandType>(type))
+        type = expandType->getPatternType();
+
+    // Skip an error-typed result (cascading-error avoidance; e.g. case (3) already diagnosed a bare
+    // type name and rewrote it to an `ErrorType`) and a `void` result (nothing is discarded).
+    if (as<ErrorType>(type) || type->equals(m_astBuilder->getVoidType()))
+        return;
+
+    // A bare unapplied function reference (e.g. `someFunc;`, not a call) has a `FuncType`; that is
+    // diagnosed as a disallowed statement form (case 1) with a more helpful "did you mean to call
+    // it?" message, so it should not also draw a generic "result unused" warning here. This applies
+    // only to the bare reference, not to a genuine call that happens to *return* a function value
+    // (`getFunc();` where `getFunc` returns a `functype`) — that discards a real result and is
+    // diagnosed normally.
+    if (as<FuncType>(type) && !isCallExpr(expr))
+        return;
+
+    // An assignment yields the assigned value and `++`/`--` yield the incremented value, but both
+    // are idiomatic statements written for their effect, so their (non-`void`) result is not
+    // considered discarded.
+    if (isAssignmentExpr(expr) || isIncrementOrDecrementExpr(expr))
+        return;
+
+    getSink()->diagnose(Diagnostics::DiscardedExpressionResult{.expr = expr});
 }
 
 void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)

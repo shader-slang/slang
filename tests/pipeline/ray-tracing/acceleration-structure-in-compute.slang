@@ -16,5 +16,5 @@ int helper(RaytracingAccelerationStructure a, int b)
 void main(
     uniform RaytracingAccelerationStructure x)
 {
-    helper(x, 1);
+    (void)helper(x, 1);
 }

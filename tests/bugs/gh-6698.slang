@@ -4,7 +4,7 @@
 // The check works for entry-point-reachable code: when an unsized array is
 // passed through a call chain that reaches getCount(), E56002 fires.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
 
 int f(int b[]) { return b.getCount(); }
 //CHECK:                          ^ cannot get size of unsized array

@@ -32,7 +32,7 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     MyType<3> t;
-    test(t);
+    (void)test(t);
     // CHECK: 3
     outputBuffer[0] = test(t);
 

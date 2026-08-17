@@ -22,6 +22,6 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(uint i : SV_GroupIndex)
 {
     var exponent : int = 0;
-    frexp(inputBuffer[i], exponent);
+    (void)frexp(inputBuffer[i], exponent);
     outputBuffer[i] = exponent;
 }
