@@ -701,7 +701,7 @@ handle uses from the emitted shader. Hosts that need to decide whether to bind a
 should query target metadata for `IBindlessResourceMetadata::usesBindlessResourceHeap()` instead of
 using `getBindlessSpaceIndex() >= 0` as the usage test.
 
-Default behavior assigns binding indices based on descriptor types:
+Default behavior assigns binding indices based on descriptor types. The "Enum Value" column lists the members of the `VkMutableBindlessBindings` enum (defined in the core module), which is used here because `VkMutable` is the current default:
 
 | Enum Value              | Vulkan Descriptor Type                    | Binding Index |
 |-------------------------|-------------------------------------------|---------------|
@@ -715,6 +715,8 @@ Default behavior assigns binding indices based on descriptor types:
 | StorageBuffer_Read      | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
 | StorageBuffer_ReadWrite | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
 | Unknown                 | Other                                     | 3             |
+
+> `StorageBuffer_Read` and `StorageBuffer_ReadWrite` are listed as separate rows even though they share the same `VK_DESCRIPTOR_TYPE_STORAGE_BUFFER` descriptor type and binding index; they are distinct enum members that intentionally alias the same storage-buffer slot, not a duplicated row.
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
@@ -806,7 +808,7 @@ public enum BindlessDescriptorOptions
 }
 ```
 
-`None` provides the following bindings for descriptor types:
+`None` provides the following bindings for descriptor types, listing the members of the `DefaultVkBindlessBindings` enum:
 
 | Enum Value              | Vulkan Descriptor Type                    | Binding Index |
 |-------------------------|-------------------------------------------|---------------|
@@ -821,7 +823,7 @@ public enum BindlessDescriptorOptions
 | StorageBuffer_ReadWrite | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
 | Unknown                 | Other                                     | 8             |
 
-`VkMutable` provides the following bindings for descriptor types:
+`VkMutable` provides the following bindings for descriptor types, listing the members of the `VkMutableBindlessBindings` enum:
 
 | Enum Value              | Vulkan Descriptor Type                    | Binding Index |
 |-------------------------|-------------------------------------------|---------------|
