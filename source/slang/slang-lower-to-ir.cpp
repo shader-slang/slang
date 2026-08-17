@@ -12143,10 +12143,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // `IRInterfaceType` it returns. `getGenericReturnVal` is a no-op for the
         // non-generic case, so one call covers both shapes.
         auto borrowedInterface = getGenericReturnVal(symbols[0]);
-        if (as<IRInterfaceType>(borrowedInterface) &&
-            borrowedInterface->findDecoration<IRComInterfaceDecoration>())
+        if (as<IRInterfaceType>(borrowedInterface))
         {
-            declBuilder->addSimpleDecoration<IRComInterfaceDecoration>(declInterface);
+            // Copied with its GUID operand, not re-created: the decoration is not
+            // a flag. `addComInterfaceDecoration` stores the GUID as operand 0
+            // and `CPPSourceEmitter::emitComInterface` reads it back, asserting
+            // the string is 32 characters (`slang-emit-cpp.cpp:716`), so an
+            // operand-less copy would abort the C++ emitter rather than merely
+            // losing information.
+            if (auto comDecoration = borrowedInterface->findDecoration<IRComInterfaceDecoration>())
+            {
+                if (auto guid = as<IRStringLit>(comDecoration->getOperand(0)))
+                    declBuilder->addComInterfaceDecoration(declInterface, guid->getStringSlice());
+            }
         }
 
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
