@@ -509,11 +509,11 @@ def _warnings_output_selfcheck():
          0, "warnings=1", "⚠️"),
         # regression only: the write precedes SystemExit(EXIT_REGRESSION)
         ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE},
-         1, "warnings=0", "🔴"),
+         EXIT_REGRESSION, "warnings=0", "🔴"),
         # both tiers at once: a regression outranks a warning in the header,
         # and the warning is still counted rather than swallowed by it
         ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE * 1.07},
-         1, "warnings=1", "🔴"),
+         EXIT_REGRESSION, "warnings=1", "🔴"),
     ]
 
     d = tempfile.mkdtemp(prefix="trend_selfcheck_")
@@ -577,6 +577,72 @@ def _warnings_output_selfcheck():
 
 _warnings_output_selfcheck()
 del _warnings_output_selfcheck
+
+
+def _abort_exit_code_selfcheck():
+    """Drive main()'s "cannot judge" exits and pin their code and diagnostic.
+
+    These are the two aborts behind the false-alert incident, and neither is
+    reachable from the pure classifier checks above — main() has to run for
+    them at all. The exit CODE is the assertion that matters: swapping either
+    abort() back to `raise SystemExit(f"...")` reproduces the message verbatim
+    while silently returning the code to 1, and nothing else here would see
+    it.
+    """
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="trend_abort_selfcheck_")
+    saved_argv = sys.argv
+    saved_actions = os.environ.get("GITHUB_ACTIONS")
+    try:
+        os.environ.pop("GITHUB_ACTIONS", None)
+        os.makedirs(os.path.join(d, "tracking"))
+        # Enough points that the missing-label case reaches the label lookup
+        # and aborts THERE, rather than at the earlier "not enough points"
+        # return, which is a clean exit and a different path entirely.
+        with analyze.open_output(os.path.join(d, "tracking", "tracking.json")) as fh:
+            json.dump({"runner": "r1",
+                       "points": [{"label": f"2026-01-0{i}-aaaaaaaaa",
+                                   "date": f"2026-01-0{i}", "kind": "daily",
+                                   "runner": "r1",
+                                   "metrics": {"minimal|compileInner": 100.0}}
+                                  for i in range(1, 6)]}, fh)
+
+        # (results dir, label, expected fragment of the diagnostic)
+        for results, label, want in (
+                (os.path.join(d, "no-such-dir"), "2026-01-09-zzzzzzzzz",
+                 "no tracking series"),
+                (d, "2026-01-09-not-a-real-label", "no such point")):
+            sys.argv = ["trend.py", "--results", results, "--label", label]
+            err, code = io.StringIO(), 0
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(err):
+                    main()
+            except SystemExit as e:
+                code = e.code
+            assert code == EXIT_CANNOT_EVALUATE, \
+                (f"trend abort fixture: --label {label} exited {code!r}, "
+                 f"expected EXIT_CANNOT_EVALUATE ({EXIT_CANNOT_EVALUATE}) — a "
+                 f"run that judged nothing must not exit with a code the Slack "
+                 f"step could read as a measured regression")
+            assert want in err.getvalue(), \
+                (f"trend abort fixture: --label {label} must say why it gave "
+                 f"up; got {err.getvalue()!r}")
+    finally:
+        sys.argv = saved_argv
+        if saved_actions is None:
+            os.environ.pop("GITHUB_ACTIONS", None)
+        else:
+            os.environ["GITHUB_ACTIONS"] = saved_actions
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_abort_exit_code_selfcheck()
+del _abort_exit_code_selfcheck
 
 
 if __name__ == "__main__":

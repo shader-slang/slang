@@ -110,3 +110,31 @@ jobs:
           python3 -c "import bench, report, breakdown, daily_movers, \
               new_release_check, sweep, sweep_report, track, trend, \
               compare_repro, ladder_scaling, fetch_releases, slack_status"
+
+  # The compile-perf suite's only Windows consumer is the scheduled nightly,
+  # so a Windows-only defect in an import-time self-check merges green and
+  # surfaces a day later as a lost data point rather than as a PR failure.
+  # That is exactly how a text-mode newline round-trip in a corpus.py fixture
+  # took out a nightly: the Ubuntu legs above cannot see it, because text mode
+  # only rewrites \n on Windows.
+  #
+  # Deliberately a separate job rather than another entry in the os matrix:
+  # the steps above use `find -print0` and process substitution, which do not
+  # port to the Windows runner, and widening the matrix would mean rewriting
+  # working checks to add coverage none of them needed.
+  import-check-windows:
+    runs-on: windows-latest
+    name: Import-check compile-perf suite (windows-latest)
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      # `python`, not `python3`: the Windows runner image puts the system
+      # interpreter on PATH under that name, and this workflow deliberately
+      # uses whatever Python is already there rather than setup-python.
+      - name: Import-check compile-perf suite (runs its self-check asserts)
+        shell: bash
+        run: |
+          cd tools/compile-perf
+          python -c "import bench, report, breakdown, daily_movers, \
+              new_release_check, sweep, sweep_report, track, trend, \
+              compare_repro, ladder_scaling, fetch_releases, slack_status"

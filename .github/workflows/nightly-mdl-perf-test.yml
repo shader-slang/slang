@@ -439,12 +439,15 @@ jobs:
         # `trend.py --label ""`, which aborts on the empty value; that makes
         # steps.trend.outcome 'failure'.
         #
-        # The gate covers a MISSING label, not an unusable one. On 2026-08-15
-        # the sweep minted a label and then died before registering a point, so
-        # this step ran, aborted with "no such point in the tracking series",
-        # and Slack announced a >=10% regression. exit_code below is what
-        # closes that gap: outcome collapses every failure to 'failure', while
-        # the code still distinguishes a regression from an abort.
+        # The gate covers a MISSING label, not an unusable one: a sweep can
+        # mint a label and still die before registering its point, and this
+        # step then runs and aborts on a label that resolves to nothing. So
+        # the gate cannot be the only thing standing between an operational
+        # failure and a regression alert.
+        #
+        # exit_code below is what carries that distinction. steps.trend.outcome
+        # collapses every non-zero exit to 'failure'; only trend.py's
+        # EXIT_REGRESSION means a comparison ran and a metric moved.
         if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
@@ -472,10 +475,17 @@ jobs:
           TREND_OUTCOME: ${{ steps.trend.outcome }}
           TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
           # Empty when the trend step was skipped, or when it died before
-          # publishing a code. classify() reads an absent value as "cannot
-          # rule out a regression" and keeps the red line, so the fallback
-          # errs towards over-reporting rather than towards silence.
+          # publishing a code. Only trend.py's EXIT_REGRESSION produces the
+          # regression line, so an absent or unrecognised value reports "could
+          # not evaluate" — a red job and an alert either way, just an honest
+          # sentence.
           TREND_EXIT: ${{ steps.trend.outputs.exit_code || '' }}
+          # THIS job's status, as distinct from the measurement job's above. A
+          # step `if:` carries an implicit success(), so a failure before the
+          # trend step (a checkout, say) SKIPS it while JOB_STATUS stays
+          # 'success' — which classified as the quiet "trend did not run" line
+          # on a job that is red.
+          ANALYZE_STATUS: ${{ job.status }}
           # The MEASUREMENT job's result, not this job's: a regression is
           # reported by TREND_OUTCOME, while JOB_STATUS answers "did the
           # sweep itself fail", which now happens in a different job.
@@ -487,7 +497,7 @@ jobs:
             exit 0
           fi
           export DATE=$(date -u +%Y-%m-%d)
-          # The five-way classification lives in slack_status.py rather than
+          # The classification lives in slack_status.py rather than
           # here. Its branch ORDER is load-bearing — a regression drives
           # job.status to failure too, so testing JOB_STATUS first would report
           # every regression as a generic "job failed" — and as bash in a
