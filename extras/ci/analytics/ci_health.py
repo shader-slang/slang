@@ -1391,17 +1391,37 @@ PENDING_APPROVALS_JS = """
 
       // A run triggered from a fork branch has an empty `pull_requests`
       // field (GitHub only populates it for same-repo branches), so the PR
-      // has to be looked up separately by head owner/branch.
-      var lookups = pending
-        .filter(function (p) { return p.pr_number === null && p.event === "pull_request" && p.head_owner; })
-        .map(function (p) {
-          var lookupUrl = "https://api.github.com/repos/" + repo + "/pulls?head=" +
-            encodeURIComponent(p.head_owner) + ":" + encodeURIComponent(p.branch) + "&state=open";
-          return fetch(lookupUrl)
-            .then(function (r) { return r.ok ? r.json() : []; })
-            .then(function (prs) { p.pr_number = prs.length ? prs[0].number : null; })
-            .catch(function () {});
-        });
+      // has to be looked up separately by head owner/branch. Dedup by
+      // owner/branch (several waiting runs can share one PR) and cap the
+      // number of lookups so a burst of unresolved fork runs cannot fire
+      // more requests than an unauthenticated client's rate limit allows.
+      var MAX_HEAD_LOOKUPS = 20;
+      var seenKeys = {};
+      var uniqueTargets = [];
+      pending.forEach(function (p) {
+        if (p.pr_number !== null || p.event !== "pull_request" || !p.head_owner) return;
+        var key = p.head_owner + ":" + p.branch;
+        if (seenKeys[key]) return;
+        seenKeys[key] = true;
+        if (uniqueTargets.length < MAX_HEAD_LOOKUPS) uniqueTargets.push(key);
+      });
+
+      var lookups = uniqueTargets.map(function (key) {
+        var lookupUrl = "https://api.github.com/repos/" + repo + "/pulls?head=" +
+          encodeURIComponent(key.split(":")[0]) + ":" + encodeURIComponent(key.split(":").slice(1).join(":")) +
+          "&state=open";
+        return fetch(lookupUrl)
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (prs) {
+            if (!prs.length) return;
+            pending.forEach(function (p) {
+              if (p.pr_number === null && (p.head_owner + ":" + p.branch) === key) {
+                p.pr_number = prs[0].number;
+              }
+            });
+          })
+          .catch(function () {});
+      });
 
       return Promise.all(lookups).then(function () { return pending; });
     })

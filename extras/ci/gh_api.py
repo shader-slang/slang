@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import time
+from urllib.parse import urlencode
 
 MAX_RETRIES = 3
 RETRY_BACKOFF_SECONDS = 2
@@ -139,7 +140,8 @@ def find_pr_number_by_head(repo, head_owner, head_branch):
     """
     if not head_owner or not head_branch:
         return None
-    data, err = gh_api(f"repos/{repo}/pulls?head={head_owner}:{head_branch}&state=open")
+    query = urlencode({"head": f"{head_owner}:{head_branch}", "state": "open"})
+    data, err = gh_api(f"repos/{repo}/pulls?{query}")
     if err or not data:
         return None
     return data[0].get("number")
