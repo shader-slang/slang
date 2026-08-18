@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T11:10:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=c30676792ca6f1372f6890c3fd562187e4a7cabbe9ae1f4e4b3e18f0608adae7
 //META: purpose=Fires diagnostic E30120 (static-ref-to-this) - static function cannot refer to non-static member via `this`
 //META: intent=negative
 //META: pipeline_stage=check
@@ -23,4 +23,4 @@ struct S
 
 void main() {}
 
-// CHECK: 30120
+//CHECK: 30120

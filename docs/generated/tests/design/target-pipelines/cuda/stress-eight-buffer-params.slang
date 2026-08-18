@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T21:00:00+00:00
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=8b42a0484e7164aa54875b4aaa03c568525e124c304dc81e94646c8ccd24dd6c
+//META: doc_section_digest=dc8998821e048cc2136a09100dd12b179d65f855a316bc0f1a8c26f8eaf6337d
 //META: purpose=Stress: eight RWStructuredBuffer parameters all packed into GlobalParams_0 on CUDA emit because moveEntryPointUniformParamsToGlobalScope is skipped.
 //META: intent=stress
 //META: pipeline_stage=emit

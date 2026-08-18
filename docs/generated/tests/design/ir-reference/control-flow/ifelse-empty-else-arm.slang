@@ -1,17 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#ifelse
-//META: doc_section_digest=7e284974bac81cfe7a4ad420d50d47c3ab731d9a15b876fdbff0eeaf9972d4ef
-//META: purpose=An if statement without an else still lowers to a four-operand ifElse with a synthesized merge block as the explicit structured join.
+//META: doc_section_digest=58ff39ee4b5eb63d9fd7dd839e0f9f67e7ef5727cd278b7eee0411b98e5d64fe
+//META: purpose=An `if` with no `else` lowers to a degenerate four-operand ifElse whose falseBlock operand names the same block as the afterBlock.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Even with no else arm, the front-end emits the structured ifElse
-// terminator with a four-operand shape; the false-arm and the merge
-// are the same target.
+// Verifies the degenerate ifElse shape an else-less `if` produces: the
+// convenience emitter reuses the merge block as the false target, so
+// operand 2 (falseBlock) and operand 3 (afterBlock) name the same block.
+// The CHECK binds the fourth operand to a FileCheck variable and requires
+// the third operand to be that same block id, which a lowering that
+// synthesized four distinct blocks could not satisfy.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -30,4 +33,6 @@ void main()
 
 // CHECK-LABEL: func %main
 // CHECK: cmpGT(%a, 0 : Int)
-// CHECK: ifElse(%{{[0-9]+}}, %{{[0-9]+}}, %{{[0-9]+}}, %{{[0-9]+}})
+// falseBlock and afterBlock are bound to the same capture, so this only
+// matches when the lowering collapsed them onto one block.
+// CHECK: ifElse(%{{[0-9]+}}, %{{[0-9]+}}, %[[AFTER:[0-9]+]], %[[AFTER]])

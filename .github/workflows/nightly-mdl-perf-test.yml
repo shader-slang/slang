@@ -39,6 +39,9 @@ on:
       publish:
         description: "push results + update tracking + deploy pages (set false for one-off measurements: results are uploaded as a run artifact only)"
         default: "true"
+      notify-slack:
+        description: "send the Slack notification for this manual run too (scheduled runs always notify) — lets the notification path be tested end-to-end without waiting for the cron"
+        default: "false"
 
 concurrency:
   group: nightly-mdl-perf-test
@@ -64,6 +67,10 @@ jobs:
     # step at the boundary.
     runs-on:
       labels: [Windows, X64, nvrgfx-perf-kernelvm-bridge]
+    outputs:
+      # Consumed by the analyze job, which runs elsewhere. The label pins the
+      # trend judgement to the point THIS run registered.
+      perf_label: ${{ steps.sweep.outputs.perf_label }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -158,6 +165,7 @@ jobs:
           token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
 
       - name: Run nightly sweep + update tracking
+        id: sweep
         shell: bash
         # Inputs arrive via env and are never interpolated into the script, so a
         # value with shell metacharacters can't break out — it's just an argv item.
@@ -190,6 +198,9 @@ jobs:
           # (daily labels share the swept commit's DATE, so several points can
           # share a date and series order alone cannot identify this run's).
           echo "PERF_LABEL=$LABEL" >> "$GITHUB_ENV"
+          # Also a job OUTPUT, not only job-scoped env: the analyze job runs on
+          # a different machine and cannot see this job's $GITHUB_ENV.
+          echo "perf_label=$LABEL" >> "$GITHUB_OUTPUT"
 
           # publish=false: measure only — write results to a workspace dir that
           # the artifact step uploads; no tracking registration.
@@ -359,6 +370,59 @@ jobs:
           git -C "$GITHUB_WORKSPACE/perf-pages" remote set-url origin \
             "https://github.com/${{ env.PERF_RESULTS_REPO }}.git" 2>/dev/null || true
 
+  # Analysis and notification, deliberately NOT on the perf runner.
+  #
+  # Nothing below measures anything: the trend check and the Slack message
+  # only need the results repo, which the nightly job has already pushed. The
+  # perf pool sits behind an egress proxy (192.168.240.1:3128) that denies
+  # CONNECT to hooks.slack.com, so every notification from there failed with
+  # "Tunnel connection failed: 403 Forbidden" while the step still exited 0 by
+  # design. A GitHub-hosted runner has unrestricted egress, so moving the
+  # notification here fixes it without asking anyone to change a proxy ACL we
+  # do not own.
+  #
+  # It is also the first split of the suite along the line we want long term:
+  # the quiesced machine measures, and anything that merely reads results runs
+  # where it is cheap and unrestricted.
+  # No setup-python here, deliberately: ubuntu-latest ships Python 3, the suite
+  # is stdlib-only, and check-python-core.yml already exercises these same
+  # scripts against the system interpreter on ubuntu-22.04/24.04 (its step is
+  # named "Verify using system Python (no setup-python)"). Pinning an
+  # interpreter here would add a network-dependent download to a job whose
+  # value is being cheap and reliable, and would test a version the suite is
+  # not otherwise verified against. The nightly job keeps its own setup-python
+  # because the Windows perf runner does need it.
+  analyze:
+    needs: nightly
+    # always(): a failed sweep is exactly when the notification matters most.
+    if: always() && needs.nightly.result != 'skipped'
+    runs-on: ubuntu-latest
+    env:
+      # PERF_RESULTS_REPO and PUBLISH are workflow-level and inherited; only
+      # the label has to cross the job boundary, because it is computed during
+      # the sweep rather than declared up front.
+      PERF_LABEL: ${{ needs.nightly.outputs.perf_label }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # Same suite-ref/ref priority the nightly job uses, so measurement
+          # and analysis run the SAME suite revision. A backfill dispatch
+          # (ref=<old commit>, suite-ref=<new suite>) would otherwise measure
+          # with one trend.py and judge with another — and the tracking format
+          # is exactly the kind of thing that drifts between them.
+          ref: ${{ github.event.inputs['suite-ref'] || github.event.inputs.ref || github.ref }}
+          persist-credentials: false
+          # The suite scripts only; no submodules and no history needed.
+          fetch-depth: "1"
+
+      - name: Checkout perf results repo
+        if: env.PUBLISH == 'true'
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ env.PERF_RESULTS_REPO }}
+          path: "perf-results"
+          token: ${{ secrets.SLANG_COMPILE_PERF_PAT }}
+
       # Runs AFTER the push so the data is stored even when this step fails the
       # job. trend.py exits non-zero (job red + ::error:: annotations) when a
       # primary timer drifts past threshold vs the trailing median. --label
@@ -366,9 +430,111 @@ jobs:
       # keyed by the swept commit's date, so several points can share a date
       # and the series' last point may be a sibling, not this run's.
       - name: Check trend (fail on regression)
-        if: env.PUBLISH == 'true'
+        id: trend
+        # The label gate is load-bearing, not belt-and-braces. A step `if`
+        # carries an implicit success() over the steps BEFORE it IN THIS JOB —
+        # which are only the checkouts here, so it no longer means "the sweep
+        # succeeded" the way it did when this step lived in the nightly job.
+        # Without the gate, a night that fails before the sweep reaches
+        # `trend.py --label ""`, which aborts on the empty value; that makes
+        # steps.trend.outcome 'failure'.
+        #
+        # The gate covers a MISSING label, not an unusable one: a sweep can
+        # mint a label and still die before registering its point, and this
+        # step then runs and aborts on a label that resolves to nothing. So
+        # the gate cannot be the only thing standing between an operational
+        # failure and a regression alert.
+        #
+        # exit_code below is what carries that distinction. steps.trend.outcome
+        # collapses every non-zero exit to 'failure'; only trend.py's
+        # EXIT_REGRESSION means a comparison ran and a metric moved.
+        if: env.PUBLISH == 'true' && needs.nightly.outputs.perf_label != ''
         shell: bash
         run: |
-          set -euo pipefail
-          cd "$SUITE"
-          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" --label "${PERF_LABEL:?}"
+          # No `set -e`: the exit code has to be published BEFORE it propagates,
+          # and `exit "$code"` at the end is what keeps the job red either way.
+          set -uo pipefail
+          cd "$GITHUB_WORKSPACE/tools/compile-perf"
+          code=0
+          python3 trend.py --results "$GITHUB_WORKSPACE/perf-results" \
+            --label "${PERF_LABEL:?}" || code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Notify Slack
+        if: always() && (github.event_name == 'schedule' || github.event.inputs['notify-slack'] == 'true')
+        shell: bash
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_COMPILE_PERF }}
+          # 'skipped' means trend analysis did not run, which has two causes:
+          # publish=false (a measurement-only dispatch, where the sweep DID
+          # succeed) and an empty label (a sweep that failed before minting
+          # one). JOB_STATUS is what separates them — classify() reaches its
+          # quiet "trend did not run" line only when the job also succeeded,
+          # so the failed-sweep case still reports as a job failure.
+          TREND_OUTCOME: ${{ steps.trend.outcome }}
+          TREND_WARNINGS: ${{ steps.trend.outputs.warnings || '0' }}
+          # Empty when the trend step was skipped, or when it died before
+          # publishing a code. Only trend.py's EXIT_REGRESSION produces the
+          # regression line, so an absent or unrecognised value reports "could
+          # not evaluate" — a red job and an alert either way, just an honest
+          # sentence.
+          TREND_EXIT: ${{ steps.trend.outputs.exit_code || '' }}
+          # THIS job's status, as distinct from the measurement job's above. A
+          # step `if:` carries an implicit success(), so a failure before the
+          # trend step (a checkout, say) SKIPS it while JOB_STATUS stays
+          # 'success' — which classified as the quiet "trend did not run" line
+          # on a job that is red.
+          ANALYZE_STATUS: ${{ job.status }}
+          # The MEASUREMENT job's result, not this job's: a regression is
+          # reported by TREND_OUTCOME, while JOB_STATUS answers "did the
+          # sweep itself fail", which now happens in a different job.
+          JOB_STATUS: ${{ needs.nightly.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLACK_WEBHOOK_COMPILE_PERF not set; skipping Slack notification"
+            exit 0
+          fi
+          export DATE=$(date -u +%Y-%m-%d)
+          # The classification lives in slack_status.py rather than
+          # here. Its branch ORDER is load-bearing — a regression drives
+          # job.status to failure too, so testing JOB_STATUS first would report
+          # every regression as a generic "job failed" — and as bash in a
+          # workflow that only runs on a scheduled nightly, nothing could test
+          # it. As a module it is covered by the import-time self-checks that
+          # check-python-core.yml runs on every PR touching these files.
+          # One invocation, split in-shell: two calls could not disagree here,
+          # but one process is cheaper and there is no second place to keep in
+          # step. A failure warns rather than reds the run, matching the
+          # webhook-failure contract below.
+          if ! CLASSIFIED=$(python3 "$GITHUB_WORKSPACE/tools/compile-perf/slack_status.py"); then
+            echo "::warning title=Slack notification skipped::slack_status.py failed"
+            exit 0
+          fi
+          export ICON="${CLASSIFIED%%$'\n'*}"
+          export STATUS="${CLASSIFIED#*$'\n'}"
+          python3 -c "
+          import json, os, urllib.request
+          payload = {
+              'text': (
+                  f'{os.environ[\"ICON\"]} *Compile-perf nightly — {os.environ[\"DATE\"]}*\n'
+                  f'{os.environ[\"STATUS\"]}\n'
+                  f'• Run: {os.environ[\"RUN_URL\"]}\n'
+                  f'• Report: https://shader-slang.org/slang-compile-perf/'
+              )
+          }
+          req = urllib.request.Request(
+              os.environ['SLACK_WEBHOOK'],
+              data=json.dumps(payload).encode(),
+              headers={'Content-Type': 'application/json'})
+          # Non-blocking by contract: a Slack outage must not red an
+          # otherwise-green run (a red step here would be indistinguishable
+          # from a real regression at a glance). The ::warning:: annotation
+          # keeps a broken webhook visible on the run summary.
+          try:
+              urllib.request.urlopen(req, timeout=10)
+              print('Slack notification sent')
+          except Exception as e:
+              print(f'::warning title=Slack notification failed::{e}')
+          "

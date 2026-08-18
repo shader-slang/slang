@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T19:00:00+00:00
-//META: source_commit=ed8f508fc647eecd788a4bd2bb63a4a6f5c80246
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#func
-//META: doc_section_digest=1ffac9b7fdcad876f978c7247b8626d96221178b89de6dd5e191f70ce0142862
+//META: doc_section_digest=deb5e1ca3ce3504c71e6588591557fba17b76b32217464f0d32bb1a25b6f910c
 //META: purpose=An entry-point function lowers to a func parent opcode whose Func(...) result type carries the signature.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The compute entry point `main` should appear as `func %main : Func(Void)`
-// — the `func` parent opcode with its return-and-parameter types
-// recorded on the `Func(...)` result type of the opcode itself.
+// Verifies that a function is a `func` parent inst whose signature lives on
+// its own result type rather than in an operand list. The compute entry point
+// `main` takes nothing and returns nothing, so CHECK asserts the dump header
+// reads `func %main : Func(Void)` — a `Func(...)` result type with only the
+// return type in it.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

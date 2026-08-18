@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:25:00Z
-//META: source_commit=6b490bc8cb3cf11b356ddf70168c5609efa46341
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/name-resolution/scopes.md#sibling-scopes
-//META: doc_section_digest=1730544025501f67efee33835c81f561c62ac7733b5e89832c526106e61b012f
+//META: doc_section_digest=745e90bcc2440ac2accf9529f203ae4435a595ab30563e368559c64f8e6f978e
 //META: purpose=A `using` declaration splices the named namespace's scope in as a sibling, making the namespace's members reachable without qualification.
 //META: intent=functional
 //META: pipeline_stage=check

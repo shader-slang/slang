@@ -261,6 +261,13 @@ err(
 )
 
 err(
+    "downstream-linking-unavailable",
+    116,
+    "linking multiple SPIR-V modules was required, but the loaded 'slang-glslang' library does not export 'glslang_linkSPIRV'; no SPIR-V was linked. Install a 'slang-glslang' library matching this Slang version, which provides SPIR-V linking",
+    span { loc = "location" }
+)
+
+err(
     "unknown-source-language",
     19,
     "unknown source language '~language'",
@@ -1154,6 +1161,17 @@ warning(
     29116,
     "layout-sensitive SPIR-V type declaration in spirv_asm",
     span { loc = "location", message = "layout-sensitive SPIR-V type declaration '~opcode' in spirv_asm may not preserve Slang data-layout information; form layout-sensitive pointers/values with Slang types or expressions and pass them into spirv_asm instead" }
+)
+
+-- Distinct from the E29106 "too many operands" *warning* above: that one is the
+-- parser's recovery guess (the extra tokens are likely a missing semicolon), so
+-- it stays a warning; this is the checker finding an opcode that takes no
+-- operands at all, which is a definite error (see visitSPIRVAsmExpr).
+err(
+    "spirv-instruction-takes-no-operands",
+    29118,
+    "SPIR-V instruction takes no operands",
+    span { loc = "location", message = "~opcode does not take any operands" }
 )
 
 

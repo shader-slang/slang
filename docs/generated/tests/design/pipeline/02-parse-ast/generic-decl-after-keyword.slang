@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T15:00:00+00:00
-//META: source_commit=74db89b9f77cdced9c4d0c47f377b38fffb9180b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#generics-ambiguity
-//META: doc_section_digest=2adc733a81916b42380544b008460df5b366206d39b999775293a73fe57f1756
+//META: doc_section_digest=eb0fd6263e6c05fcda56c26f5dbe0c80c738c9165b8bfd51abc3dc4235097f39
 //META: purpose=A generic declaration after a decl keyword is unambiguous; the parser collects the parameter list into a GenericDecl and continues with the inner declaration.
 //META: intent=functional
 //META: pipeline_stage=parse

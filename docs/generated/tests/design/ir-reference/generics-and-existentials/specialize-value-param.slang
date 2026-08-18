@@ -1,20 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
-//META: purpose=A generic with a compile-time integer value parameter lowers to specialize(%base, N : Int) — int literal appears in the operand list.
+//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
+//META: purpose=A generic with a compile-time integer value parameter lowers to specialize(%base, N : Int) — the literal appears in the argument list.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on generic value-parameter axis: `struct FixedArr<int N>`
-// referenced as `FixedArr<4>` should produce `specialize(%FixedArr,
-// 4 : Int)` — the per-doc `### specialize` row says operands are
-// `base, arg, ...` without restricting to types, and the
-// observed dump form for an integer literal arg is `N : Int`.
-
+// Boundary on argument *kind*: a generic argument need not be a type. A
+// value-parameter generic instantiated at `4` puts the integer literal
+// directly into the argument list, and the CHECK pins `4 : Int` in that
+// position.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 struct FixedArr<int N> { int data[N]; };

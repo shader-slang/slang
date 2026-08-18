@@ -1,20 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#existential-destructuring
-//META: doc_section_digest=02ff34102848a32784b08786fff8eb6145699715106f91aa1145c3476f2f96f7
+//META: doc_section_digest=bfaba91cd7aecc07abcd6aed864d007e29538d6fe91106d3d1dd5e36f206a91a
 //META: purpose=Dispatching through an interface-typed value produces extractExistentialType(%i) whose result type is Type.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `### Existential destructuring` lists `extractExistentialType`
-// as "Reads the packed concrete type from an existential". The
-// dump shape is `let %T : Type = extractExistentialType(%i)` —
-// the result is itself a type-level value (its result type is
-// `Type`, and downstream uses see `%T` as a type).
-
+// Verifies the type projection and, specifically, that it yields a *type* as a
+// value rather than becoming the concrete type itself. The CHECK reads the
+// binding's declared type and asserts it is `Type`, so the recovered concrete
+// type is the projection's result, not its annotation.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };
@@ -31,4 +28,4 @@ void main()
     buf[0] = i.run(inVal);
 }
 
-// CHECK: let  %{{[0-9]+}}	: Type	= extractExistentialType(%i)
+// CHECK: let  %{{[0-9]+}} : Type = extractExistentialType(%i)

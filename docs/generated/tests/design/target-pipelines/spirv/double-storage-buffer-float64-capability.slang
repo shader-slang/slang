@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-d-ir-to-spir-v-emit-simplification-loop-downstream-tools
-//META: doc_section_digest=a11b0c6012622aa65eafd1deea44aaeb117d13faf8de8cf2fe2778e1dd206d36
+//META: doc_section_digest=981125a6c3119290dc85c7e2ef21bc96155d4ca3760c011f47ca6e6b10fd54c9
 //META: purpose=A double element in a StructuredBuffer triggers OpCapability Float64 and emits OpTypeFloat 64.
 //META: intent=boundary
 //META: pipeline_stage=emit

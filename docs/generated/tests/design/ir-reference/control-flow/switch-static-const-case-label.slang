@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-switches
-//META: doc_section_digest=417ae366d1846ca418a679faf16ce1ba5835ea98eecce720cd5f530619796001
+//META: doc_section_digest=93e3e0077c420a8fd04038823472fc8368e454763e1fd6cc905f959fe8e07ee8
 //META: purpose=Case-label values in a switch terminator appear as inline literal operands `<N> : Int`, including for case labels named via static const.
 //META: intent=functional
 //META: pipeline_stage=lower

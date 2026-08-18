@@ -105,15 +105,15 @@ AST-side classes these come from are catalogued in
 [../ast-reference/types.md](../ast-reference/types.md).
 
 The core-module sources that carry those `__intrinsic_type(...)`
-attributes are not in this page's manifest `watched_paths`, so a change
-there cannot mark this page stale. That gap is real and it bit this
-page: the ten `WorkGraphRecordTypeBase` opcodes are declared in
-[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang),
-which **no** document in the manifest watches. The manifest should add
-`source/standard-modules/experimental/workgraph.slang`,
+attributes are in this page's manifest `watched_paths`:
 `source/slang/core.meta.slang`, `source/slang/hlsl.meta.slang` and
-`source/slang/slang-ir.h.lua` (which owns the `kIROp_*` naming rule and
-the flag map) to this page's watched paths.
+[workgraph.slang](../../../../source/standard-modules/experimental/workgraph.slang)
+(which declares the ten `WorkGraphRecordTypeBase` opcodes) all
+resolve, so a change to any of them marks this page stale. The one
+remaining omission is `source/slang/slang-ir.h.lua`, which owns both
+the `kIROp_*` naming rule cited above (`instEnums`, line 276) and the
+`flagMap` behind this page's Flags column (lines 228-234); the
+manifest should add it.
 
 ## Family hierarchy
 
@@ -173,6 +173,23 @@ Two markers appear in the tables below:
   than FIDDLE-generated, so its accessor names may differ from the Lua
   operand names.
 
+One rule governs how every opcode below appears in `-dump-ir`.
+`shouldFoldInstIntoUses`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) lines
+7822-7859) folds *all* types into their use sites, and `dumpInstExpr`
+(line 8275) prints a folded inst as its mnemonic followed by its
+operand list — so a type reads as `Mnemonic(operand, ...)` at each
+use (`Enum(Int)`, `StructuredBuffer(Float, Std140Layout, ...)`) and a
+nullary type as the bare mnemonic (`Float`, `UntypedResourceHandle`).
+The exceptions are the four *nominal* type opcodes `struct`, `class`,
+`GLSLShaderStorageBuffer` and `interface`, which are excluded from
+folding and instead get their own top-level definition line that use
+sites refer to by `%id`. Of those four only the first three are also
+printed with their children in braces by `dumpIRParentInst` (the
+special-case switch at line 8296); `interface` takes the ordinary path,
+so it prints as `let %I : Type = interface(...)` with its requirement
+entries in the operand list.
+
 ### Basic scalar types
 
 All `BasicType` children are hoistable; one IR value per scalar type
@@ -196,11 +213,25 @@ to the right opcode, and the generated per-type helpers
 | `Float` | `IRFloatType` | — | H | `BasicExpressionType(Float)` | 32-bit floating-point. |
 | `Double` | `IRDoubleType` | — | H | `BasicExpressionType(Double)` | 64-bit floating-point. |
 | `Char` | `IRCharType` | — | H | `BasicExpressionType(Char)` | Character type used by string-literal element type. |
-| `IntPtr` | `IRIntPtrType` | — | H | `BasicExpressionType(IntPtr)` | Signed integer with pointer-equivalent width. |
-| `UIntPtr` | `IRUIntPtrType` | — | H | `BasicExpressionType(UIntPtr)` | Unsigned integer with pointer-equivalent width. |
+| `IntPtr` | `IRIntPtrType` | — | H | `BasicExpressionType(IntPtr)`, spelled `intptr_t` in source | Signed integer with pointer-equivalent width; `ssize_t` is a typedef of it (`core.meta.slang` line 24). |
+| `UIntPtr` | `IRUIntPtrType` | — | H | `BasicExpressionType(UIntPtr)`, spelled `uintptr_t` in source | Unsigned integer with pointer-equivalent width; `size_t` and `usize_t` are typedefs of it (`core.meta.slang` lines 20-22). |
 | `AfterBaseType` | `IRAfterBaseType` | — | | — | Sentinel opcode just past the `BasicType` range; not a real type and never created, only a boundary for opcode classification. |
 
 ### Storage-only floating-point
+
+All three are ordinary public core-module `struct`s
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines
+1705-1751, declared under `//@public:`), so the names are usable
+directly in shader source — a
+`struct S { BFloat16 b; FloatE4M3 e; FloatE5M2 f; }` gives three fields
+of three distinct opcodes rather than three aliases of `Half`. What
+they do *not* get is arithmetic: each conforms only to
+`IFloatingPointCoopElement`, not to `__BuiltinArithmeticType`, so a
+value has to be converted to a built-in floating-point type first
+(`float(s.b)`), through the `extension<T : __BuiltinFloatingPointType>`
+constructors at line 1754. Each also carries `[require(...)]`
+capability gates — `spvFloat8EXT` / `cuda_sm_8_9` for the two 8-bit
+forms, `spvBFloat16KHR` / `cuda_sm_8_0` for `BFloat16`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -252,11 +283,11 @@ Both are built by `IRBuilder::getArrayTypeBase`
 | `Mat` | `IRMatrixType` | `elementType, rowCount, columnCount, layout` | H | `MatrixExpressionType` | Fixed-shape matrix; `layout` is an int literal selecting row-major / column-major. |
 | `MetalPackedVec` | `IRMetalPackedVectorType` | `elementType, elementCount` | H | (synthesized) | Element-aligned, unpadded vector storage type for Metal device buffers; emitted as MSL `packed_T<N>`. |
 | `Atomic` | `IRAtomicType` | `elementType` | H | core-module `Atomic<T>` | Atomic-typed view of an element type. |
-| `Result` | `IRResultType` | `valueType, errorType` | H | `ResultType` (`Result<T, E>`) | Sum of a success value type and an error type. |
+| `Result` | `IRResultType` | `valueType, errorType` | H | No AST type and no source spelling: a function's `throws E` clause lowers to `Func(T, params..., FuncThrowTypeAttr(E))` (`_lowerInfoFromFuncParameters`, line 4814), and the error-handling pass ([slang-ir-lower-error-handling.cpp](../../../../source/slang/slang-ir-lower-error-handling.cpp) lines 43 and 93) rewrites that into `Func(Result(T, E), params...)` | Sum of a success value type and an error type; `int f(int) throws MyErr` ends up as `Func(Result(Int, Enum(...)), Int)`. |
 | `Optional` | `IROptionalType` | `valueType` | H | `OptionalType` (`Optional<T>`) | Value-or-none. |
 | `Conditional` | `IRConditionalType` | `valueType, hasValue` | H | (synthesized) | Static-condition-tagged optional; `hasValue` is an `IRInst`-valued condition. |
-| `Enum` | `IREnumType` | `tagType` (children declare cases) | P | `EnumDecl` (`visitEnumDecl`, line 12340) | Enum type; children are the case declarations. |
-| `Conjunction` | `IRConjunctionType`‡ | `caseTypes...`† | H | `AndType` AST node | Logical AND of types (used for combined interface constraints); `getCaseCount()` / `getCaseType(i)` read all operands. |
+| `Enum` | `IREnumType` | `tagType` | P | `EnumDecl` (`visitEnumDecl`, line 12352) | Enum type; the tag type is its only content — flagged `parent`, but nothing puts the cases inside it. |
+| `Conjunction` | `IRConjunctionType`‡ | `caseTypes...`† | H | `AndType` AST node — the `&` type operator, e.g. the generic constraint `T : IA & IB` (`visitAndType`, line 2997) | Logical AND of types; `getCaseCount()` / `getCaseType(i)` read all operands. Rarely visible: `emitGenericConstraintValue` (line 12789) decomposes a conjunction used as a generic constraint into one `witness_table` parameter per case plus a `MakeTuple` of the witnesses, so the lowered generic's signature holds the separate constraints, not the `Conjunction`. |
 | `Attributed` | `IRAttributedType` | `baseType, attrs...`† | H | `unorm` / `snorm` / `Aligned` and other type modifiers | A base type with one or more attached `Attr` opcodes (see [metadata.md](metadata.md)); built by `getAttributedType(baseType, count, attributes)`. |
 
 ### Work-graph record types
@@ -298,6 +329,41 @@ The context-channel types are keyed by the function they belong to;
 generated builders and has a hand-written
 `IRBuilder::getBackwardDiffIntermediateContextType`.
 
+Which of the three context-channel *families* a function gets is
+decided at semantic-checking time, by the differentiation attribute on
+the primal function. Each arm of the checker's
+`IBackwardDifferentiable` extension synthesis sets the `irOp` of the
+two structs it synthesizes — `BwdCallable` and `MinimalContext` —
+directly
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 15142-15183, 15227-15268 and 19210-19277):
+
+| Attribute on the primal function | `BwdCallable` opcode | `MinimalContext` opcode |
+| --- | --- | --- |
+| `[Differentiable]`, `[BackwardDifferentiable]` | `BackwardDiffIntermediateContextType` | `BackwardDiffMinimalContextType` |
+| `[TreatAsDifferentiable]` | `TrivialBackwardDiffIntermediateContextType` | `TrivialBackwardDiffMinimalContextType` |
+| `[BackwardDerivative(fn)]`, `[BackwardDerivativeOf(fn)]` | `BackwardContextFromLegacyBwdDiffFunc` | `BackwardMinimalContextFromLegacyBwdDiffFunc` |
+
+The two columns are *not* alternatives: both structs are synthesized
+for every differentiable function, and the function's
+`IBackwardDifferentiable` witness table names both. For
+`[Differentiable] float f(float x) { return x * x; }`, a `-dump-ir`
+of a shader that calls `bwd_diff(f)` prints
+`witness_table_entry(%30,BackwardDiffIntermediateContextType(%f))`
+and `witness_table_entry(%29,BackwardDiffMinimalContextType(%f))` in
+the same `witness_table`. Re-marking `f` `[TreatAsDifferentiable]`
+replaces both with the `Trivial*` pair; moving the derivative into a
+user-written `[BackwardDerivative(f_bwd)]` replaces them with the
+`FromLegacy*` pair, which carries the user function as its second
+operand (`BackwardContextFromLegacyBwdDiffFunc(%f, %f_bwd_diff)`).
+
+The pair divides by role, not by state size. `apply_bwd` returns the
+minimal context beside the primal result
+(`Func(tuple_type(Float, BackwardDiffMinimalContextType(%f)), Float)`),
+`remat` expands that into the full one
+(`Func(BackwardDiffIntermediateContextType(%f), BackwardDiffMinimalContextType(%f), Float)`),
+and the propagate function takes the full one.
+
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `DiffPair` | `IRDifferentialPairType` | `valueType, witnessTable` | H | `DifferentialPairType` AST node | Type of a `{primal, differential}` pair value; accessors are `getValueType()` / `getWitness()`. |
@@ -327,6 +393,17 @@ generated builders and has a hand-written
 | `MakeTensorAddressingTensorView` | `IRMakeTensorAddressingTensorView` | — | | (synthesized) | Helper that materializes a tensor view. |
 
 ### Existentials and interfaces
+
+`interface` is the one row here that is visible as its own line in a
+dump. Being nominal it is never folded into its uses, and
+`visitInterfaceDecl` allocates it with one operand per requirement and
+then emits the entries immediately *before* it
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+lines 12124-12130), so the entries print as their own top-level
+`interface_req_entry(<requirement key>, <requirement type>)` lines and
+the `interface` line lists them by `%id`. For `interface IShape { float
+area(); }` the entry for `area` is
+`interface_req_entry(%key, Func(Float, this_type(%IShape)))`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -379,11 +456,22 @@ line 4727 and wraps the parameter's lowered type accordingly.
 ### Sampler and buffer-layout types
 
 Six of the buffer-layout markers are real core-module types that
-satisfy `IBufferDataLayout` and reach the IR through
-`lowerSimpleIntrinsicType`; the other four are chosen by the target
-layout logic in
+satisfy `IBufferDataLayout`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+23-71) and reach the IR through `lowerSimpleIntrinsicType`; the other
+four are chosen by the target layout logic in
 [slang-ir-layout.cpp](../../../../source/slang/slang-ir-layout.cpp)
 (lines 1030-1061) and have no source spelling.
+
+Where a named marker lands is the buffer type's data-layout operand,
+not a different buffer opcode: `L` is the second generic parameter of
+`StructuredBuffer<T, L : IBufferDataLayout = DefaultDataLayout>`
+(same file, line 5970), so `StructuredBuffer<float, Std140DataLayout>
+b;` gives `b` the type `StructuredBuffer(Float, Std140Layout, ...)`
+while an unannotated `RWStructuredBuffer<float>` gets
+`RWStructuredBuffer(Float, DefaultLayout, ...)`. Two of the six are
+themselves capability-gated — `Std140DataLayout` and
+`Std430DataLayout` carry `[require(spirv)]` / `[require(glsl)]`.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
@@ -534,11 +622,21 @@ takes a single `IRSetBase` operand — the set opcodes themselves
 
 `Vec(elementType, elementCount)` is the IR encoding of HLSL
 `vector<T,N>`. `Mat(elementType, rowCount, columnCount, layout)`
-adds two shape operands and a `layout` int literal that selects
-the row-major / column-major convention. Both types are
-hoistable, so the same vector type appears as a single IR value
-across the module — which is why structural type-equality is
-implemented as an `IRInst*` comparison.
+adds two shape operands and a `layout` int literal holding a
+`SlangMatrixLayoutMode` value — `0` unknown, `1` row-major, `2`
+column-major, the same three values the core module splices into
+`kRowMajorMatrixLayout` / `kColumnMajorMatrixLayout`
+([core.meta.slang](../../../../source/slang/core.meta.slang) lines
+2295-2296). The fourth generic parameter of `matrix<T, R, C, L>`
+defaults to *unknown* (line 2301) and `visitMatrixExpressionType`
+(line 2858) lowers whatever the AST holds straight into operand 3, so
+a plain `float4x4` lowers with `0`; a `row_major` / `column_major`
+modifier pins `1` / `2` at check time, and `specializeMatrixLayout`
+rewrites a surviving `0` to the target's `-matrix-layout-row-major` /
+`-matrix-layout-column-major` setting (row-major when unset) before
+emit. Both types are hoistable, so the same vector type appears as a
+single IR value across the module — which is why structural
+type-equality is implemented as an `IRInst*` comparison.
 
 ### `MetalPackedVec`
 
@@ -593,10 +691,16 @@ is the `tagType` — the underlying integer type that stores the
 enum's value — and it is built by `IRBuilder::createEnumType` from
 that tag type during `EnumDecl` lowering
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line 12352). The enum's cases are not operands; they are encoded as
-child instructions of the `Enum`, so enumerating an enum's cases means
-walking the children of the `Enum` inst rather than reading its operand
-list.
+line 12364). The cases are neither operands nor children. The `P` flag
+only means the opcode *can* hold children; `createEnumType`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5337)
+creates the inst with the tag-type operand alone, and
+`visitEnumCaseDecl` (line 12334) lowers each case to the value of its
+tag expression — an ordinary constant whose *type* is the `Enum`, not a
+member of it. So there is nothing to enumerate on the inst, and because
+`Enum` is not one of the nominal opcodes it is folded into its uses:
+`enum Color { Red = 3, Green = 7 }` shows up only as `Enum(Int)`
+wherever the type is mentioned.
 
 ### `Ptr` and the access-qualifier / address-space operands
 
@@ -621,13 +725,25 @@ is emission. The SPIR-V backend writes it as
 `OpTypeUntypedPointerKHR` and lowers field and element addresses
 through `OpUntypedAccessChainKHR`
 ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp)).
-It is never produced by lowering: `slang-ir-spirv-legalize.cpp`
-(lines 1296-1321) retypes a `ConstantBuffer<T>` fetched from a
-descriptor heap to a Uniform `SPIRVUntypedPtr` so the uniform-buffer
-descriptor kind survives while nested arrays are still addressed
-logically, without a pointer-type `ArrayStride`. The same pass
-propagates the untyped-ness: taking a field or element address off an
-untyped base produces another `SPIRVUntypedPtr` rather than a `Ptr`.
+It is never produced by lowering:
+`processConstantBufferDescriptorHeapLoad` in
+`slang-ir-spirv-legalize.cpp` (lines 1301-1337) retypes a
+`ConstantBuffer<T>` fetched from a descriptor heap to a Uniform
+`SPIRVUntypedPtr` so the uniform-buffer descriptor kind survives while
+nested arrays are still addressed logically, without a pointer-type
+`ArrayStride`. The same pass propagates the untyped-ness: taking a
+field or element address off an untyped base produces another
+`SPIRVUntypedPtr` rather than a `Ptr`. The heap fetch alone does not
+trigger any of this. That pass only rewrites a
+`SPIRVLoadDescriptorFromHeap` typed by a `ConstantBuffer`, and the only
+thing that emits one is the `case spvDescriptorHeapEXT` arm of the
+`__target_switch` in `defaultGetDescriptorFromHandle`
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+27708-27807) — a capability that is `SPV_EXT_descriptor_heap +
+SPV_KHR_untyped_pointers`. A plain `-target spirv` compile of
+`ConstantBuffer<T> cb = ResourceDescriptorHeap[i];` takes the default
+`__castDescriptorHandleToResource` arm instead, and emits no
+`OpTypeUntypedPointerKHR` at all.
 
 ### `UntypedResourceHandle` and `UntypedSamplerHandle`
 
@@ -643,7 +759,14 @@ four conversion opcodes `CastUIntToUntypedResourceHandle`,
 ([slang-ir-lower-dynamic-resource-heap.cpp](../../../../source/slang/slang-ir-lower-dynamic-resource-heap.cpp),
 run from [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line
 1950) forwards each cast to its `uint` operand and removes it, and layout
-and emit treat a survivor as an internal error. Unlike the work-graph
+and emit treat a survivor as an internal error. Where they *are* visible
+is a lowering-stage `-dump-ir` snapshot: the heap subscripts are
+declared to return them
+([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) lines
+27590-27607), so the value `ResourceDescriptorHeap[i]` produces is a
+`let` typed `UntypedResourceHandle` feeding the conversion call, and the
+concrete resource type (`RWStructuredBuffer(UInt, ...)`) appears only on
+the result of that conversion, never on the handle. Unlike the work-graph
 record types, these two *are* also bound to C++ `Type` subclasses by
 `__magic_type(UntypedResourceHandleType)` /
 `__magic_type(UntypedSamplerHandleType)` in
@@ -666,6 +789,17 @@ operand 0. The three `Empty*` variants are nullary because their records
 have no payload. Two decorations reserved for stable serialization,
 `workGraphRecordType` and `workGraphRecordElementType`, name the old
 representation these opcodes replaced; new code uses the type opcodes.
+
+None of the ten is reachable from a plain compile. Producing one takes
+four things together: `import experimental.workgraph;`, the
+`-experimental-feature` option (the module is declared
+`[ExperimentalModule]`, which
+[slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 15449 turns into an `ExperimentalModuleDecoration` and the module
+loader rejects without the option), a `[shader("node")]` entry point
+compiled with `-stage node`, and a profile of SM 6.8 or later —
+`-profile lib_6_8` — because the `node` stage capability is defined as
+`_node + _sm_6_8`.
 
 ### `AnyValueType`
 
@@ -736,10 +870,15 @@ the comment will swap the two sets.
 The reverse-mode autodiff pipeline threads recorded primal-side
 state through the call graph via *context channels*. Each
 function's context-channel type is one of the `*Context*` types
-above, keyed by the function value. The choice between the
-`Minimal`, ordinary, and `Trivial` variants is set by the
-specialization pass based on whether the propagation strategy
-needs full state, minimal state, or nothing.
+above, keyed by the function value. Which family the pair comes from
+is fixed by the attribute on the primal function, as tabulated under
+[Differentiation types](#differentiation-types); a later pass decides
+only the *contents*. `MinimalContext` "will hold the same data as
+`BwdCallable`" when the checker synthesizes it, and "the backward
+diff translation pass will later determine exactly what goes in the
+minimal context"
+([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
+lines 3727-3728).
 
 ## See also
 

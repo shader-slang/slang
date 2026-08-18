@@ -1,0 +1,35 @@
+schema_version: 1
+id: torch-autobind-unmappable-param-sigsegv
+bundle: coverage/torch
+suspected_kind: sigsegv
+title: "[AutoPyBindCUDA] kernel with unmappable param crashes after diagnosing E56001"
+observed_at: "2026-06-11T16:00:00+00:00"
+scope: cuda
+evidence:
+  command: "./build/RelWithDebInfo/bin/slangc docs/generated/tests/_meta/findings/torch-autobind-unmappable-param-sigsegv.repro.slang -target torch -line-directive-mode none"
+  source_slang: docs/generated/tests/_meta/findings/torch-autobind-unmappable-param-sigsegv.repro.slang
+  observed_summary: |
+    An [AutoPyBindCUDA][CudaKernel] function whose parameter type cannot be mapped to a
+    host type (here `String`) first correctly emits error E56001 "CUDA type mapping failed",
+    but the compiler then crashes with SIGSEGV (exit 139) instead of stopping cleanly after
+    the diagnostic.
+  exit_code: 139
+  stderr_tail: "error[E56001]: CUDA type mapping failed\\n  | Could not automatically map 'string' to a host type. Automatic binding generation failed for 'myKernel'"
+expected:
+  claim: |
+    When an [AutoPyBindCUDA] kernel parameter type cannot be auto-mapped to a host type, the
+    compiler should emit the E56001 diagnostic and abort the binding generation cleanly with a
+    non-zero error exit, as it does for mappable struct/array/builtin parameter types in the
+    sibling test (which compile without crashing). A diagnosed error must never be followed by
+    a SIGSEGV.
+  citation_kind: sibling-test
+  citation: tests/autodiff/autobind-struct-with-builtin-types.slang
+provenance:
+  agent_model: claude-opus-4-8[1m]
+  source_commit: ef1068b5485e09b3a7afadba2e25f9541e29af42
+  doc_anchor: source/slang/slang-ir-pytorch-cpp-binding.cpp
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out — mappable params (struct/array/builtin) compile cleanly; only the unmappable case crashes, and E56001 proves the input is recognized and reaches the intended diagnostic."
+    - "Diagnostic suppresses emit so the crash is benign: ruled out — the process exits 139 (SIGSEGV), not the 255 that a normal diagnosed error produces (cf. E55101/E55102 paths, which exit 255 cleanly)."
