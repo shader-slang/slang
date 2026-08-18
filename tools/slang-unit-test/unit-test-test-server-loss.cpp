@@ -116,6 +116,30 @@ static SlangResult _runSlangTestWithDyingServer(
     return ProcessUtil::execute(cmdLine, outResult);
 }
 
+/// Run slang-test in a child process with its test server rigged to write an unreadable
+/// reply on the Nth request.
+///
+/// Separate from the dying-server helper because the scenario differs where it matters: the
+/// server stays alive, so the client must conclude "unusable reply" from the bytes alone.
+static SlangResult _runSlangTestWithGarblingServer(
+    UnitTestContext* context,
+    int garbleOnRequest,
+    ExecuteResult& outResult)
+{
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->executableDirectory, "slang-test"));
+    cmdLine.addArg("-use-test-server");
+    cmdLine.addArg("-server-count");
+    cmdLine.addArg("1");
+    cmdLine.addArg(kInnerTestPrefix);
+
+    ScopedEnvVar nestedGuard(kNestedGuardEnvVar, "1");
+    ScopedEnvVar garbleAfter(
+        "SLANG_TEST_SERVER_GARBLE_ON_REQUEST",
+        String(garbleOnRequest).getBuffer());
+    return ProcessUtil::execute(cmdLine, outResult);
+}
+
 static String _allOutput(const ExecuteResult& res)
 {
     StringBuilder builder;
@@ -130,14 +154,19 @@ static String _allOutput(const ExecuteResult& res)
 /// per-loss diagnostics and its summary -- is discarded. That happened: the first CI failure
 /// of these tests reported "res.resultCode == 0" and nothing else, on a platform that cannot
 /// be reproduced locally, which is the worst possible combination.
-static void _dumpChildRun(const char* caseName, int dieOnRequest, const ExecuteResult& res)
+static void _dumpChildRun(
+    const char* caseName,
+    const char* envVar,
+    int ordinal,
+    const ExecuteResult& res)
 {
     const String output = _allOutput(res);
     printf(
-        "\n--- %s: inner slang-test (SLANG_TEST_SERVER_DIE_ON_REQUEST=%d) exited %d ---\n"
+        "\n--- %s: inner slang-test (%s=%d) exited %d ---\n"
         "%s\n--- end inner run ---\n",
         caseName,
-        dieOnRequest,
+        envVar,
+        ordinal,
         res.resultCode,
         output.getBuffer());
     fflush(stdout);
@@ -158,7 +187,7 @@ SLANG_UNIT_TEST(testServerLossHealthyRunIsUnaffected)
     const String output = _allOutput(res);
     if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
     {
-        _dumpChildRun("healthy", 0, res);
+        _dumpChildRun("healthy", "SLANG_TEST_SERVER_DIE_ON_REQUEST", 0, res);
     }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
@@ -187,7 +216,7 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
     const String output = _allOutput(res);
     if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
     {
-        _dumpChildRun("innocent", 3, res);
+        _dumpChildRun("innocent", "SLANG_TEST_SERVER_DIE_ON_REQUEST", 3, res);
     }
     SLANG_CHECK(res.resultCode == 0);
     SLANG_CHECK(_contains(output, "100% of tests passed"));
@@ -202,6 +231,63 @@ SLANG_UNIT_TEST(testServerLossInnocentTestIsNotBlamed)
     // stopped happening per connection would drift them run to run.
     SLANG_CHECK(_contains(output, "test server loss(es); the server died under each test below"));
     SLANG_CHECK(_contains(output, "on request #3 of this connection (it had answered 2)"));
+}
+
+/// A server that returns one unreadable reply, where the retry lands on a fresh one.
+///
+/// Counterpart of the innocent-loss case. A malformed reply used not to be retried at all, so
+/// whichever test was in flight failed -- and one unreadable reply reds a whole suite.
+SLANG_UNIT_TEST(testServerProtocolErrorInnocentTestIsNotBlamed)
+{
+    if (_cannotRunHere())
+    {
+        SLANG_IGNORE_TEST
+    }
+
+    // Garbles its 3rd reply, so the first two are served and the retry -- on a server that
+    // has garbled nothing -- succeeds.
+    ExecuteResult res;
+    SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithGarblingServer(unitTestContext, 3, res)));
+
+    const String output = _allOutput(res);
+    if (res.resultCode != 0 || !_contains(output, "100% of tests passed"))
+    {
+        _dumpChildRun("garbled", "SLANG_TEST_SERVER_GARBLE_ON_REQUEST", 3, res);
+    }
+    SLANG_CHECK(res.resultCode == 0);
+    SLANG_CHECK(_contains(output, "100% of tests passed"));
+
+    // Recovered, and counted separately from a loss -- a combined total could not show
+    // whether a change to the crash rate moved the malformed-reply rate.
+    SLANG_CHECK(_contains(
+        output,
+        "test server protocol error(s); the server returned a reply the client could not "
+        "parse"));
+    // The loss block must NOT appear: nothing died here.
+    SLANG_CHECK(!_contains(output, "the server died under each test below"));
+}
+
+/// A server that garbles every reply, so no retry can ever succeed.
+///
+/// The guard on the retry: a genuinely broken channel -- the version-mismatch case the old
+/// no-retry rule assumed -- must still fail the run rather than be ground until it looks green.
+SLANG_UNIT_TEST(testServerProtocolErrorPersistentGarbleFailsTheRun)
+{
+    if (_cannotRunHere())
+    {
+        SLANG_IGNORE_TEST
+    }
+
+    ExecuteResult res;
+    SLANG_CHECK(SLANG_SUCCEEDED(_runSlangTestWithGarblingServer(unitTestContext, 1, res)));
+
+    const String output = _allOutput(res);
+    if (res.resultCode == 0)
+    {
+        _dumpChildRun("persistent-garble", "SLANG_TEST_SERVER_GARBLE_ON_REQUEST", 1, res);
+    }
+    SLANG_CHECK(res.resultCode != 0);
+    SLANG_CHECK(_contains(output, "unreadable reply from a freshly spawned test server twice"));
 }
 
 /// A server that dies on every request, so no retry can ever succeed.
@@ -226,7 +312,7 @@ SLANG_UNIT_TEST(testServerLossPersistentKillerFailsTheRun)
     // nothing.
     if (res.resultCode == 0)
     {
-        _dumpChildRun("killer", 1, res);
+        _dumpChildRun("killer", "SLANG_TEST_SERVER_DIE_ON_REQUEST", 1, res);
     }
     SLANG_CHECK(res.resultCode != 0);
 
@@ -265,7 +351,7 @@ SLANG_UNIT_TEST(testServerLossReportsTheKillingSignal)
     const String output = _allOutput(res);
     if (!_contains(output, "killed by signal"))
     {
-        _dumpChildRun("signal", 3, res);
+        _dumpChildRun("signal", "SLANG_TEST_SERVER_KILL_ON_REQUEST", 3, res);
     }
 
     // The number, and the name that makes it actionable. Before this path existed the same
@@ -306,9 +392,19 @@ SLANG_UNIT_TEST(testServerLossConsolidatesAcrossReporters)
     worker.m_testServerLossTests.add("worker/b.slang");
     worker.m_testServerLossTests.add("worker/b.slang"); // same test, two servers lost
 
+    parent.m_testServerProtocolErrorCount = 1;
+    parent.m_testServerProtocolErrorTests.add("main/c.slang");
+    worker.m_testServerProtocolErrorCount = 1;
+    worker.m_testServerProtocolErrorTests.add("worker/d.slang");
+
     parent.consolidateWith(&worker);
 
     SLANG_CHECK(parent.m_testServerLossCount == 3);
     // Concatenated, not unioned: a repeat is the frequency signal, so the duplicate survives.
     SLANG_CHECK(parent.m_testServerLossTests.getCount() == 3);
+
+    // The protocol-error pair consolidates the same way, and stays a separate total: folding
+    // it into the loss count would make each number unable to answer what it exists for.
+    SLANG_CHECK(parent.m_testServerProtocolErrorCount == 2);
+    SLANG_CHECK(parent.m_testServerProtocolErrorTests.getCount() == 2);
 }
