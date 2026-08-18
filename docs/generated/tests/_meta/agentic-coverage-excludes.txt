@@ -106,35 +106,3 @@ docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
 # in-process crash, so nightly-slang-test.yml (subprocess/test-server)
 # still buckets it as failed(expected) via expected-failures.txt.
 docs/generated/tests/design/ir-reference/misc/string-hash-stable-value-cpu.slang
-
-# HLSL-prelude state leak (NOT a crash). These four tests assert that emitted
-# HLSL contains the standard prelude's NVAPI guard
-# (`#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"`). All four pass
-# in isolation and fail here, because a preceding
-# `//TEST:COMPARE_COMPUTE(...):-cpu` test poisons the session they share so the
-# NEXT `-target hlsl` compile omits the HLSL prelude entirely (reproduced: a
-# single `-cpu` compute test before an nvapi test drops the guard; a non-cpu
-# HLSL-emit test before it does not). Because many `-cpu` tests exist throughout
-# the suite there is no single "leaker" to exclude, and the tests themselves are
-# correct, so they are excluded rather than weakened.
-#
-# The leak is not specific to the coverage pass being in-process. These tests
-# fail on nightly-slang-test.yml as well, because the test server is equally
-# long-lived and reuses one GlobalSession across the tests it handles: the three
-# `target-pipelines/hlsl` tests failed on run 31294644845, and the `06-emit`
-# one, which passed there, failed on run 31361305751. Which of them is hit
-# depends on whether a `-cpu` test happened to run before it on the same server,
-# so the victim set moves between runs. All four are listed in
-# expected-failures.txt for the nightly; slang-test keeps expected failures out
-# of its exit code, and an entry that passes is reported in the step summary
-# rather than failing the job, so a moving victim set is safe to list.
-# First identified locally 2026-07-09; nightly behaviour confirmed 2026-08-10.
-#
-# Path note: the first entry used to read
-# `.../06-emit/preludes-included-by-c-and-cuda.slang`. The 2026-08-04
-# regeneration round renamed it to `preludes-included-by-cuda-cpp-and-hlsl.slang`
-# (the bundle grew an HLSL directive), orphaning the entry.
-docs/generated/tests/design/pipeline/06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang
-docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-present-without-nv-intrinsic.slang
-docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-with-wave-intrinsic.slang
-docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditional.slang

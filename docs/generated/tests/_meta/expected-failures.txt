@@ -183,32 +183,6 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffe
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
 
-# https://github.com/shader-slang/slang/issues/12442 — render-test blanks the
-# HLSL prelude on the shared global session and never restores it, so these
-# tests fail whenever a `-cpu` COMPARE_COMPUTE test runs before them in the
-# same process. Order-dependent, so they pass in isolation. Remove these
-# entries when 12442 is fixed.
-docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-present-without-nv-intrinsic.slang
-docs/generated/tests/design/target-pipelines/hlsl/nvapi-guard-with-wave-intrinsic.slang
-docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditional.slang
-# Same leak, fourth victim. This one passed on the nightly when the three above
-# were triaged, which is why it was not listed then; it failed on run
-# 31361305751 with the same missing `#ifdef SLANG_HLSL_ENABLE_NVAPI`. Only the
-# `-target hlsl` directive (`.2`) is affected -- the cuda and cpp directives in
-# the same file do not read the HLSL prelude and must keep reporting.
-docs/generated/tests/design/pipeline/06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang.2
-# Same leak, fifth victim, and the reason it was not listed with the others is
-# the same: it passed when it was generated. It asserts the guarded
-# `#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"` block, which is
-# exactly what the blanked prelude drops, so the `CHECK` for the `#ifdef` finds
-# nothing. Failed on nightly runs 31863743484, 31926143161 and 31993906894 with
-# the same FileCheck positions each time (`actual-output:7:34` scanning from,
-# `10:14` possible match), i.e. deterministic rather than flaky. Confirmed to be
-# the ordering leak and not the test: it passes alone under
-# `slang-test -use-test-server -server-count 1`, and fails in the same process
-# when a `-cpu` COMPARE_COMPUTE test is run before it.
-docs/generated/tests/design/target-pipelines/hlsl/nvapi-front-matter-defines-enable-macro.slang
-
 # https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
 # construction is rejected inside a generic function's array bound with
 # E33070 "expected a function, got 'typeof(Size)'", while the same spelling
