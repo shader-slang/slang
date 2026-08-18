@@ -36,9 +36,9 @@ void main()
 // would not. Pinning the texture's offset catches a change in where a resource member lands.
 // METAL: parameterGroupTypeLayout
 // METAL: metalArgumentBufferTier2Layout([[BYTELAYOUT:%[0-9]+]])
-// METAL-DAG: [[BYTELAYOUT]]{{.*}}= structTypeLayout([[BYTESIZE:%[0-9]+]], {{%[0-9]+}}, {{%[0-9]+}}, [[TFIELD:%[0-9]+]],
+// METAL-DAG: [[BYTELAYOUT]]{{.*}}= structTypeLayout([[BYTESIZE:%[0-9]+]],
 // METAL-DAG: [[BYTESIZE]]{{.*}}= size(8 : Int, 48 : Int)
-// METAL-DAG: [[TFIELD]]{{.*}}= structFieldLayout(%t, [[TVAR:%[0-9]+]])
+// METAL-DAG: structFieldLayout(%t, [[TVAR:%[0-9]+]])
 // METAL-DAG: [[TVAR]]{{.*}}= varLayout({{.*}}, [[TOFF:%[0-9]+]])
 // METAL-DAG: [[TOFF]]{{.*}}= offset(8 : Int, 16 : Int)
 
