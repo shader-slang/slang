@@ -446,12 +446,19 @@ process peaks. Prefer in-process bracketing for any new phase metric.
    tracked series; see the reproduction recipe below.
 
 **Ad-hoc investigation recipe.** For "what is in the unattributed remainder", the
-tracked series will not answer it and does not need to. On macOS:
-`MallocStackLogging=1 slangc <a workload long enough to sample> &` then
-`malloc_history <pid> -callTree -invert` for allocation sites by live bytes, and
-`vmmap -summary <pid>` for the region-type split. This identified the retained
-core-module container (#12530) and the ~30 MB of freed-but-unreturned allocator
-slack that no component will ever explain.
+tracked series will not answer it and does not need to. On macOS, against a
+workload that runs long enough to sample (a second is plenty):
+
+```bash
+MallocStackLogging=1 slangc -target spirv -o /tmp/out.spv big.slang &
+PID=$!
+malloc_history $PID -callTree -invert   # live bytes by allocation site
+vmmap -summary $PID                     # resident split by region type
+wait $PID
+```
+
+This identified the retained core-module container (#12530) and the ~30 MB of
+freed-but-unreturned allocator slack that no component will ever explain.
 
 **Why an unattributed line is published rather than driven to zero.** Allocator
 slack is real resident memory belonging to no component, and the process also
@@ -476,10 +483,13 @@ publish per `track_memory` workload are:
 | `unattributedKb` | the honesty term; currently the majority of the footprint |
 | `endOfCompileRssKb` | the same-instant anchor that makes the remainder well defined |
 
-`Reserved` rather than `Used` is charted because reserved is what is resident and
-therefore what sums toward RSS; `Used` is stored, and the gap between them is a
-drill-down (it is real memory — AST arenas carry ~29% block slack against IR's
-0.02%). `sourceArenaUsed/Reserved` is stored but **not** charted: that arena's only
+`Reserved` rather than `Used` is charted because reserved is what the allocator
+handed out and therefore the closest available proxy for what sums toward RSS —
+but it is an UPPER BOUND on residency, not residency: pages in a reserved block
+that were never written are not resident. `Used` is stored, and the gap between
+them is a drill-down (it is real memory — AST arenas carry ~29% block slack
+against IR's 0.02%). That same gap is why `unattributedKb` can legitimately hit
+its zero floor: the components can claim more than the process total. `sourceArenaUsed/Reserved` is stored but **not** charted: that arena's only
 client in the tree is `SourceManager::allocateStringSlice`, called from the parser
 for scoped identifiers, so it reads ~0 by construction. Downstream compiler DLLs
 stay a documented constant inside the remainder rather than a series — release
@@ -489,11 +499,10 @@ sweeps never load them.
 
 1. ~~`endOfCompileRssKb`~~ and ~~`irSideTablesKb`~~ — done; the side tables measured
    2.1 MiB, refuting the expectation that they were a major owner.
-2. **Close the walk's gap.** `malloc_history` attributes 122 M to `MemoryArena`
-   block allocation while the report accounts for 91.7 MiB of arenas; ~25 MiB of
-   arena blocks are never reached. `tryLoadBuiltinModuleFromDLL` contributes 8.83 M
-   of IR through a path that does not appear to land in `coreModules` or any walked
-   linkage.
+2. ~~Close the walk's gap.~~ — done. The missing ~25 MiB was the code being
+   compiled: a translation unit's `Module` holds it, and the walk only ever received
+   a `Linkage`. Threading the front-end request through moved the unattributed line
+   on a large workload from 191 to 166 MiB, matching what `malloc_history` predicted.
 3. **A retained-serialized-image counter.** The single largest known unattributed
    item, 41.5 MB (#12530). Also the counterweight to on-demand IR loading: that work
    shrinks the deserialized IR while *requiring* the container to stay reachable, so
