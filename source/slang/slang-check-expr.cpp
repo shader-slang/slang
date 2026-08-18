@@ -9296,6 +9296,32 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
     List<Val*> modifierVals;
     for (auto modifier : expr->modifiers)
     {
+        // A failed base-type resolution was already diagnosed and leaves no type to validate the
+        // modifier against (shader-slang/slang#12558).
+        if (baseType)
+        {
+            if (ModifierValidityDisposition disposition;
+                queryModifierValidityOnType(modifier, baseType, disposition))
+            {
+                switch (disposition)
+                {
+                case ModifierValidityDisposition::Error:
+                    getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
+                    continue;
+                case ModifierValidityDisposition::Warn:
+                    getSink()->diagnose(
+                        Diagnostics::ModifierNotApplicableHere{.modifier = modifier});
+                    break;
+                case ModifierValidityDisposition::Allow:
+                    break;
+                }
+            }
+            else if (applyModifierDenyByDefault(this, getSink(), modifier))
+            {
+                continue;
+            }
+        }
+
         if (auto matrixLayoutModifier = as<MatrixLayoutModifier>(modifier))
         {
             if (auto matrixType = as<MatrixExpressionType>(baseType))
