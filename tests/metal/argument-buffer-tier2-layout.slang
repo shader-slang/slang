@@ -33,11 +33,14 @@ void main()
 // Under tier 2 the element occupies 48 bytes with the texture at byte 16, while the
 // element's own layout reports 3 argument buffer element slots instead. Pinning the byte
 // size catches the wrong ruleset being attached, which a check for a struct layout alone
-// would not.
+// would not. Pinning the texture's offset catches a change in where a resource member lands.
 // METAL: parameterGroupTypeLayout
 // METAL: metalArgumentBufferTier2Layout([[BYTELAYOUT:%[0-9]+]])
-// METAL-DAG: [[BYTELAYOUT]]{{.*}}= structTypeLayout([[BYTESIZE:%[0-9]+]],
+// METAL-DAG: [[BYTELAYOUT]]{{.*}}= structTypeLayout([[BYTESIZE:%[0-9]+]], {{%[0-9]+}}, {{%[0-9]+}}, [[TFIELD:%[0-9]+]],
 // METAL-DAG: [[BYTESIZE]]{{.*}}= size(8 : Int, 48 : Int)
+// METAL-DAG: [[TFIELD]]{{.*}}= structFieldLayout(%t, [[TVAR:%[0-9]+]])
+// METAL-DAG: [[TVAR]]{{.*}}= varLayout({{.*}}, [[TOFF:%[0-9]+]])
+// METAL-DAG: [[TOFF]]{{.*}}= offset(8 : Int, 16 : Int)
 
 // The positive check keeps each negative honest, since a run that produced no layout, or
 // failed outright, would otherwise satisfy it.

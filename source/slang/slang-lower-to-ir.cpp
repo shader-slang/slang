@@ -16128,9 +16128,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        auto elementTypeLayout = paramGroupTypeLayout->elementVarLayout
-                                     ? paramGroupTypeLayout->elementVarLayout->typeLayout
-                                     : nullptr;
+        auto elementTypeLayout = paramGroupTypeLayout->elementVarLayout->typeLayout;
         // An element measured in argument buffer element slots carries no byte offsets, so
         // a consumer wanting them needs a second layout computed under tier 2 rules.
         //
