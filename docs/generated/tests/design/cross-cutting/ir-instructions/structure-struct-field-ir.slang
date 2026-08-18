@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#type-instructions
-//META: doc_section_digest=90ad3422172b6f924f66f6a3985bb274c504d3a3d2e99937b3e44e0b93ad4822
+//META: doc_section_digest=8c1eb8ee680b73163dd4cc94fdd0ab4a8e10437d06a9406050a668f87a36ea3d
 //META: purpose=A struct declaration lowers to a `struct` type parent whose children are `field`s keyed by `key`.
 //META: intent=functional
 //META: pipeline_stage=lower

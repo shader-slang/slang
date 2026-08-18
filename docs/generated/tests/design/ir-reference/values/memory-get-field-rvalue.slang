@@ -1,16 +1,15 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#fieldaddress-vs-fieldextract
-//META: doc_section_digest=b929d13db9d53781ec2c11e4242e8e0af59a8dca73a1df81aaebfca2c9aa94f1
+//META: doc_section_digest=c51c6f434f2f289530bd44c1c012d7d1ae5c9ab1af33f21f78b660210957b529
 //META: purpose=A `MemberExpr` on a struct *value* (rvalue position) lowers to `get_field`, while the lvalue path uses `get_field_addr`.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc's `FieldAddress` vs `FieldExtract` notable-opcode note
-// distinguishes the lvalue (`get_field_addr`) and rvalue
+// Verifies the distinction between `FieldAddress` and `FieldExtract`, which separates the lvalue (`get_field_addr`) and rvalue
 // (`get_field`) paths. A `uniform` struct global is a value, so
 // reading its fields surfaces `get_field` (the cross-cutting bundle
 // covers `get_field_addr` via a local struct).

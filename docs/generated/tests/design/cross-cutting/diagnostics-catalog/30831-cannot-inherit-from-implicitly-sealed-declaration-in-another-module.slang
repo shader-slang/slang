@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00+00:00
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=4308fbe31167a7a2b9786bfadb0ed1310f96dff875724fee9c11ee36ed811772
+//META: doc_section_digest=0c500bd9212cb1ee1483f1128b90f164872d1312dfa8c67341ede85de7ac04f2
 //META: purpose=Fires diagnostic E30831 (cannot-inherit-from-implicitly-sealed-declaration-in-another-module) -- cannot inherit from type '~baseType:Type' in module '~moduleName:Name' because it is implicitly 'sealed'
 //META: intent=negative
 //META: pipeline_stage=check
@@ -16,4 +16,4 @@
 struct S : String {}
 
 
-// CHECK: E30831
+//CHECK: E30831

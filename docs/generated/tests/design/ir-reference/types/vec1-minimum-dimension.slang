@@ -1,16 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#vec-and-mat
-//META: doc_section_digest=3375fc96f25274ba6b5f61268aab7b799044240063cd3b64ac3928c13a5702fc
+//META: doc_section_digest=5a7818957c25646b5df9f0a0213f5663d921d65b0099abf4ef8c860d93e0d5ae
 //META: purpose=Boundary: minimum-dimension vector (vector<float,1>) is typed Vec(Float, 1 : Int) in the IR.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `Vec(elementType, elementCount)` is parameterised by
-// element count. The smallest documented elementCount is `1`; a
+// minimum-dimension vector (vector<float,1>) is typed Vec(Float, 1 :
+// Int) in the IR. The smallest documented elementCount is `1`; a
 // `uniform vector<float,1>` surfaces `Vec(Float, 1 : Int)` in the
 // dump.
 

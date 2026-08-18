@@ -1,21 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
-//META: purpose=Five textually identical specialize(%base, Int) call sites all share the same hoistable callee value — the dispatch site spelling is invariant.
+//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
+//META: purpose=Five textually identical specialize(%base, Int) call sites all share the same hoistable callee value.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Stress on specialize-hoistable axis: many identical call
-// sites. `### specialize` says the opcode is hoistable so
-// identical specializations dedupe — at five call sites the
-// dump should still spell `call specialize(%base, Int)(...)` at
-// every site, with the same `%base` token (verifying the same
-// IR value is reused).
-
+// Stresses the hoistable-dedup property at volume: five call sites of the same
+// instantiation. Each CHECK matches one call site and all five spell the same
+// callee, which is what dedup by (base, args) guarantees.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 uniform int a;

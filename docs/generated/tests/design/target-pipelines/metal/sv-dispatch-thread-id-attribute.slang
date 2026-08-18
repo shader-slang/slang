@@ -1,19 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:50:00Z
-//META: source_commit=2aa9f69f5e2e75f6e2f4231a451a1a022818e18b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeirformetal
-//META: doc_section_digest=43faa16ce410de3ffb63136a8e3d7ca1d85bcf4dd72e95e139b70b0b674d35a6
-//META: purpose=SV_DispatchThreadID lowers to a uint3 entry-point parameter carrying the Metal [[thread_position_in_grid]] system-value attribute.
+//META: doc_section_digest=4d7da86c9111decda82bc36fc42891b6498a808e7662d276403e78bf864b8dba
+//META: purpose=`SV_DispatchThreadID` lowers to a `uint3` kernel parameter carrying Metal's `[[thread_position_in_grid]]` system-value attribute.
 //META: intent=functional
-//META: pipeline_stage=emit
+//META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `legalizeEntryPointVaryingParamsForMetal` rewrites the
-// SV_DispatchThreadID input into a `uint3` kernel parameter
-// with `[[thread_position_in_grid]]`. We match the attribute
-// as a bare substring because `[[...]]` would be parsed as a
-// FileCheck regex variable.
+// Verifies the varying-parameter half of `legalizeIRForMetal`: an HLSL
+// system-value semantic has no meaning in MSL, so the parameter must be
+// re-annotated with the equivalent Metal attribute. CHECK matches the
+// parameter declaration and then, on the same emitted line, the
+// `thread_position_in_grid` marker -- matched as a bare substring because
+// FileCheck would read the literal `[[...]]` form as a variable reference.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#basic-scalar-types
-//META: doc_section_digest=90fd91b1a21860b3569e7b02fb36035ba69014ded4abafe7604e89fcb5aea51a
+//META: doc_section_digest=b3e088ac3dc9706ad8749cb8f9a4f8033e0bd510147eb7d3d1d0a3563b2dd6ca
 //META: purpose=The Bool scalar opcode encodes `bool`; a `void` function uses the Void opcode as its Func result-type operand.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `Bool` and `Void` together in the basic-scalar
-// table. A `bool` struct field surfaces `field(%key, Bool)` and a
-// `void` entry point surfaces `func %main : Func(Void)` in the
-// dump.
+// The Bool scalar opcode encodes `bool`; a `void` function uses the
+// Void opcode as its Func result-type operand. A `bool` struct field
+// surfaces `field(%key, Bool)` and a `void` entry point surfaces `func
+// %main : Func(Void)` in the dump.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

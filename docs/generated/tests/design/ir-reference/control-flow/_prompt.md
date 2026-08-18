@@ -169,6 +169,16 @@ in `README.md`.
 Control-flow-opcode claims are best observed through `-dump-ir`
 against the IR dump. The standard form used here is:
 
+**The `LOWER-TO-IR` dump is not raw lowering output.**
+`generateIRForTranslationUnit` runs a mandatory pass block
+(`lowerErrorHandling`, `lowerDefer`, SCCP, `simplifyCFG`, …) before
+printing it. So this dump cannot settle a claim about what AST lowering
+_itself_ emits — only about what survives that block. Do not report a
+gap of the form "the doc says lowering produces X but the first dump
+shows Y"; check whether one of those passes consumed or introduced the
+difference first. Three such gaps were filed against
+`ir-reference/control-flow.md` and all three were false.
+
 ```
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 ```

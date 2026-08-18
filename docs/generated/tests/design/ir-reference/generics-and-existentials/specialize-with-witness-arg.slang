@@ -1,20 +1,17 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#specialize
-//META: doc_section_digest=4965484dbbae47fbcb43a84ac453b10df0094aeb1ec637158927580932cf4106
+//META: doc_section_digest=1523536872ebc337e174666c5cf954c332dd4d3653ef98ebc19e0608a020c147
 //META: purpose=A specialize on an interface-constrained generic passes the type argument followed by the conforming witness table.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// `helper<A>(a, x)` for `int helper<T : IFoo>(T t, int x)` should
-// produce `call specialize(%helper, %A, %witness)(%a, %x)` — the
-// witness flows as an extra `specialize` argument after the type
-// argument. The doc's `### specialize` row's "Applies generic
-// arguments to a generic value (function, type, or witness)" claim.
-
+// Verifies that a conformance constraint contributes an extra `specialize`
+// argument. `helper<T : IFoo>` needs a witness that `T` conforms, so the call
+// site's argument list is (type, witness) rather than (type) alone; the CHECK
+// pins two arguments after the base, the first being the concrete type `%A`.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IFoo { int run(int x); };

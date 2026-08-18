@@ -1,22 +1,22 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:43:00Z
-//META: source_commit=b15b8060d2525b8cd123f2268fafbcd82e837fb3
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#legalizeirformetal
-//META: doc_section_digest=43faa16ce410de3ffb63136a8e3d7ca1d85bcf4dd72e95e139b70b0b674d35a6
-//META: purpose=For a struct-returning vertex shader, the wrapper built by legalizeVertexShaderOutputParamsForMetal retargets entry-point-param decorations, so a hoisted `uniform` entry-point parameter still binds as a `constant*` parameter with a `[[buffer(0)]]` attribute on the emitted vertex function.
+//META: doc_section_digest=4d7da86c9111decda82bc36fc42891b6498a808e7662d276403e78bf864b8dba
+//META: purpose=`legalizeShaderOutputParamsForMetal` re-targets entry-point-param decorations onto its wrapper, so a hoisted `uniform` vertex parameter still binds as a `constant*` argument with a `[[buffer(0)]]` slot.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the vertex-shader wrapper swap does not lose the binding of a
-// uniform entry-point parameter: the entry returns a struct (forcing the
-// wrapper path) and computes its position from the uniform (so the
-// parameter is live). The CHECKs assert the emitted vertex function is
-// the renamed main_0 and that its parameter list still carries a
-// buffer(0)-attributed constant-pointer argument -- the observable
-// consequence of retargetEntryPointParamDecorations re-pointing the
-// decoration at the wrapper.
+// Verifies the `retargetEntryPointParamDecorations` step. A struct-
+// returning vertex entry point is replaced by a wrapper function, and the
+// `uniform` parameter hoisted in Phase A carries a decoration naming the
+// *original* function; without re-pointing it, the later global-context
+// pass would drop the uniform and the kernel would read uninitialized
+// memory. CHECK asserts the emitted vertex function is the renamed
+// `main_0` and still has a `constant`-address-space parameter with a
+// `buffer(0)` slot, which is only true if the decoration survived.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage vertex
 

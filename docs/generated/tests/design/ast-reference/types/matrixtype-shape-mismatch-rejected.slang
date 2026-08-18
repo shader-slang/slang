@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/types.md#basicexpressiontype-vectorexpressiontype-matrixexpressiontype
-//META: doc_section_digest=5f41283b162e626d8a46ba0564c2bfa3960821954aadd78336372f0416cb5f48
+//META: doc_section_digest=eb9e797ca9c3dbb949a62072e232852c0f820f49dd331388c5e7ffcde24a8c1c
 //META: purpose=Two MatrixExpressionTypes with different row/column counts are distinct; assigning a float2x2 to a float3x3 is rejected.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Negative probe of the row/column operands of MatrixExpressionType:
-// a float2x2 and a float3x3 differ in both counts, so an implicit
-// assignment across shapes has no conversion and is rejected. CHECK
-// pins the type-mismatch diagnostic.
+// Negative probe of the row and column operands: float2x2 and float3x3
+// differ in both counts and there is no implicit conversion between
+// them. CHECK pins the type-mismatch pair, whose rendered types spell
+// out both shapes.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 

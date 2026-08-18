@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#decorations
-//META: doc_section_digest=07908c83d735faee5ec2bad31d6fd52d29e333c23af2fd0650793137f330b2ad
+//META: doc_section_digest=af2eb87d563403d52d71a7d33122c279b70c033339e51393dbe00f9f5f506a59
 //META: purpose=A function selected as a pipeline entry point carries an `entryPoint` decoration in the IR and lowers to a target entry-point declaration.
 //META: intent=functional
 //META: pipeline_stage=lower

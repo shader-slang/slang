@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/cross-cutting/ir-instructions.md#type-instructions
-//META: doc_section_digest=90ad3422172b6f924f66f6a3985bb274c504d3a3d2e99937b3e44e0b93ad4822
+//META: doc_section_digest=888243734c872495cb014c721c075987fe7d0342f0ed8a4fbd71890cda43218d
 //META: purpose=A vector-typed value uses the `Vec` IR type with element-type and element-count operands.
 //META: intent=functional
 //META: pipeline_stage=lower

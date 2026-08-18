@@ -4,6 +4,7 @@ self-hosted-runner:
     - benchmark
     - build
     - falcor
+    - falcor-bridge
     - GCP
     - GCP-T4
     - GPU

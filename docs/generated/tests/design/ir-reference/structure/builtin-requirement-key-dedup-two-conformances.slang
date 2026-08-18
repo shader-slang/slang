@@ -1,23 +1,20 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T15:18:00Z
-//META: source_commit=ef4bd0b0d91a213b52e333ce39dfe8b73efca3d2
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/structure.md#builtinrequirementkey--builtinrequirementkey
-//META: doc_section_digest=28df938d7b6c7f1da019467d16e8588fdfdf4490713d538aea7f26ee4dd9331f
-//META: purpose=BuiltinRequirementKey is deduplicated by construction: two distinct conformances to the same built-in interface reference the same key inst in their witness_table_entry rows.
+//META: doc_section_digest=d4cd5719f0455c4590eab034c86ccb9dfcac298707fabbcaa0455bcade824d2d
+//META: purpose=A builtinRequirementKey is deduplicated by construction, so two distinct conformances to the same built-in interface reference the same key inst.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies hoistable dedup of built-in requirement keys. `GradA` and
-// `GradB` each conform to IDifferentiable, so each gets its own
-// witness_table — but the same logical built-in requirement must resolve
-// to ONE key inst. Built-in keys carry no name hint, so they print as
-// numbered values; the CHECKs capture the numbered key of one
-// witness_table_entry and require a second entry (necessarily in a
-// different table, since a table holds each requirement once) to
-// reference the identical inst. If dedup broke, the second table's
-// entries would name a fresh key and the second match would fail.
+// Verifies the hoistable-identity claim: the key's identity is its kind
+// operand, so the same logical built-in requirement resolves to one inst.
+// `GradA` and `GradB` each get their own witness table, and a table holds each
+// requirement at most once. CHECK captures the numbered key of one
+// `witness_table_entry` into a FileCheck variable and requires a later entry —
+// necessarily in the other table — to name the identical inst.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -27,12 +24,12 @@ uniform RWStructuredBuffer<float> buf;
 struct GradA : IDifferentiable
 {
     float a;
-};
+}
 
 struct GradB : IDifferentiable
 {
     float b;
-};
+}
 
 [numthreads(1, 1, 1)]
 void main()
