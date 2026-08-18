@@ -431,4 +431,9 @@ SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
     return SLANG_OK;
 }
 
+SlangResult HTTPPacketConnection::writeRaw(const void* bytes, size_t sizeInBytes)
+{
+    return m_writeStream->write(bytes, sizeInBytes);
+}
+
 } // namespace Slang

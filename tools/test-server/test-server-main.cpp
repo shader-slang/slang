@@ -802,15 +802,14 @@ SlangResult TestServer::execute()
 #endif
         }
 
-        // Written to stdout directly rather than through m_connection, which would frame it
-        // correctly -- the one thing this must not do. The flush is load-bearing: it puts
-        // these bytes ahead of the reply the connection writes next, which is what makes the
-        // client read them as the start of that reply.
+        // Written through the same transport stream as the real reply, but without HTTP
+        // framing. Mixing stdio with the transport handle can let platform buffering change
+        // the bytes on the wire; this needs to be a malformed header, not a buffering test.
         if (garbleOnRequest && servedCount == garbleOnRequest - 1)
         {
             const char garbage[] = "this-is-not-a-jsonrpc-header\r\n\r\n";
-            fwrite(garbage, 1, sizeof(garbage) - 1, stdout);
-            fflush(stdout);
+            SLANG_RETURN_ON_FAIL(
+                m_connection->getUnderlyingConnection()->writeRaw(garbage, sizeof(garbage) - 1));
         }
 
         // Failure doesn't make the execution terminate
