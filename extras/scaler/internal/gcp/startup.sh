@@ -137,29 +137,56 @@ log "Current Actions runner version: $current_runner_version"
 # died before it could pick up a job, and someone had to notice the outage
 # and bump the constant by hand. Querying "latest" removes that manual step;
 # every boot self-heals against whatever GitHub currently accepts.
-latest_runner_version="$(curl -fsSL --retry 3 --connect-timeout 10 --max-time 30 \
-  https://api.github.com/repos/actions/runner/releases/latest |
-  grep -o '"tag_name": *"v[^"]*"' | head -n 1 | sed -E 's/.*"v([^"]*)"/\1/')"
+#
+# Fetch the release JSON once and reuse it for both the version and the
+# per-asset SHA-256 digest, rather than issuing a second request. GitHub
+# started publishing a "digest" field on every release asset in June 2026
+# (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
+# so tracking "latest" does not have to give up checksum verification.
+if ! release_json="$(mktemp /tmp/runner-release.XXXXXX.json)"; then
+  fail_update_and_shutdown "Failed to create temporary release metadata file"
+fi
+if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 30 \
+  https://api.github.com/repos/actions/runner/releases/latest -o "$release_json"; then
+  fail_update_and_shutdown "Failed to fetch latest Actions runner release metadata from GitHub API"
+fi
+
+latest_runner_version="$(grep -o '"tag_name": *"v[^"]*"' "$release_json" | head -n 1 | sed -E 's/.*"v([^"]*)"/\1/')"
 if [ -z "$latest_runner_version" ]; then
   fail_update_and_shutdown "Failed to determine latest Actions runner version from GitHub API"
 fi
 log "Latest Actions runner version: $latest_runner_version"
+
+# The asset list is a flat array of objects with "name" before "digest" in
+# GitHub's field order, so scanning forward from the matching asset's "name"
+# line to the next "digest" line reliably finds that asset's own digest
+# rather than a different asset's, without needing a JSON parser.
+runner_asset_name="actions-runner-linux-x64-${latest_runner_version}.tar.gz"
+latest_runner_digest="$(awk -v name="\"name\": \"${runner_asset_name}\"" '
+  index($0, name) { found=1 }
+  found && /"digest":/ { print; exit }
+' "$release_json" | sed -E 's/.*"digest": *"sha256:([a-f0-9]+)".*/\1/')"
+rm -f "$release_json"
+
+if [ -z "$latest_runner_digest" ]; then
+  fail_update_and_shutdown "Failed to determine SHA-256 digest for ${runner_asset_name} from GitHub API"
+fi
 
 if [ "$current_runner_version" != "$latest_runner_version" ]; then
   log "Updating Actions runner to v${latest_runner_version}..."
   if ! runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"; then
     fail_update_and_shutdown "Failed to create temporary Actions runner archive"
   fi
-  runner_url="https://github.com/actions/runner/releases/download/v${latest_runner_version}/actions-runner-linux-x64-${latest_runner_version}.tar.gz"
+  runner_url="https://github.com/actions/runner/releases/download/v${latest_runner_version}/${runner_asset_name}"
 
   if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
     fail_update_and_shutdown "Failed to download Actions runner v${latest_runner_version}"
   fi
 
-  # No pre-known checksum to verify against when tracking "latest" (GitHub's
-  # release API does not publish one) — integrity relies on TLS plus
-  # GitHub's own asset hosting, same as the extraction step immediately
-  # below trusting the archive it just downloaded over HTTPS.
+  if ! printf '%s  %s\n' "$latest_runner_digest" "$runner_archive" | sha256sum -c - >/dev/null 2>&1; then
+    fail_update_and_shutdown "Actions runner v${latest_runner_version} checksum verification failed"
+  fi
+
   if ! chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"; then
     fail_update_and_shutdown "Failed to change owner for Actions runner v${latest_runner_version} archive"
   fi

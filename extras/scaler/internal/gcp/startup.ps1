@@ -117,10 +117,22 @@ if (-not $latestRunnerVersion) {
 }
 Write-Log "Latest Actions runner version: $latestRunnerVersion"
 
+# GitHub started publishing a "digest" field on every release asset in June
+# 2026 (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
+# so tracking "latest" does not have to give up checksum verification —
+# read it from the same release object already fetched above instead of
+# issuing a second request.
+$runnerAssetName = "actions-runner-win-x64-${latestRunnerVersion}.zip"
+$runnerAsset = $latestRelease.assets | Where-Object { $_.name -eq $runnerAssetName } | Select-Object -First 1
+if (-not $runnerAsset -or -not $runnerAsset.digest) {
+    Stop-WithFailure "Failed to determine SHA-256 digest for ${runnerAssetName} from GitHub API"
+}
+$expectedHash = ($runnerAsset.digest -replace '^sha256:', '').ToLowerInvariant()
+
 if ($installedRunnerVersion -ne $latestRunnerVersion) {
     Write-Log "Updating Actions runner to v${latestRunnerVersion}..."
     $runnerArchive = Join-Path $env:TEMP ("actions-runner-{0}.zip" -f ([guid]::NewGuid().ToString("N")))
-    $runnerUrl = "https://github.com/actions/runner/releases/download/v${latestRunnerVersion}/actions-runner-win-x64-${latestRunnerVersion}.zip"
+    $runnerUrl = "https://github.com/actions/runner/releases/download/v${latestRunnerVersion}/${runnerAssetName}"
 
     # Retry the download a few times to tolerate transient network errors,
     # mirroring the curl --retry 3 behaviour on the Linux side.
@@ -143,10 +155,17 @@ if ($installedRunnerVersion -ne $latestRunnerVersion) {
         Stop-WithFailure "Failed to download Actions runner v${latestRunnerVersion} after ${downloadAttempts} attempts" $runnerArchive
     }
 
-    # No pre-known checksum to verify against when tracking "latest" (GitHub's
-    # release API does not publish one) — integrity relies on TLS plus
-    # GitHub's own asset hosting, same as the extraction step immediately
-    # below trusting the archive it just downloaded over HTTPS.
+    try {
+        $actualHash = (Get-FileHash -Path $runnerArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    catch {
+        Stop-WithFailure "Failed to hash Actions runner v${latestRunnerVersion}: $_" $runnerArchive
+    }
+
+    if ($actualHash -ne $expectedHash) {
+        Stop-WithFailure "Actions runner v${latestRunnerVersion} checksum verification failed (expected ${expectedHash}, got ${actualHash})" $runnerArchive
+    }
+
     try {
         Expand-Archive -Path $runnerArchive -DestinationPath $runnerDir -Force
     }
