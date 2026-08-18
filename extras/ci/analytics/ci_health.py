@@ -319,7 +319,7 @@ def fetch_pending_approvals(repo):
     is a PR that sits until its job timeout and then reports as a test failure.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    from gh_api import gh_api_list
+    from gh_api import find_pr_number_by_head, gh_api_list
 
     runs, err = gh_api_list(
         f"repos/{repo}/actions/runs?status=waiting&per_page=100",
@@ -340,6 +340,12 @@ def fetch_pending_approvals(repo):
             waited_min = 0
         prs = run.get("pull_requests") or []
         pr_number = prs[0].get("number") if prs else None
+        if pr_number is None and run.get("event") == "pull_request":
+            # A run triggered from a fork branch has an empty `pull_requests`
+            # field (GitHub only populates it for same-repo branches), so the
+            # PR has to be looked up by head owner/branch instead.
+            head_owner = ((run.get("head_repository") or {}).get("owner") or {}).get("login")
+            pr_number = find_pr_number_by_head(repo, head_owner, run.get("head_branch"))
         pending.append(
             {
                 "run_id": run.get("id"),
@@ -1376,12 +1382,30 @@ PENDING_APPROVALS_JS = """
           actor: (r.actor || {}).login || "?",
           event: r.event || "",
           branch: r.head_branch || "",
+          head_owner: ((r.head_repository || {}).owner || {}).login || "",
           title: r.display_title || String(r.id),
           waited: waited,
           pr_number: prs.length ? prs[0].number : null,
         };
       }).sort(function (a, b) { return b.waited - a.waited; });
 
+      // A run triggered from a fork branch has an empty `pull_requests`
+      // field (GitHub only populates it for same-repo branches), so the PR
+      // has to be looked up separately by head owner/branch.
+      var lookups = pending
+        .filter(function (p) { return p.pr_number === null && p.event === "pull_request" && p.head_owner; })
+        .map(function (p) {
+          var lookupUrl = "https://api.github.com/repos/" + repo + "/pulls?head=" +
+            encodeURIComponent(p.head_owner) + ":" + encodeURIComponent(p.branch) + "&state=open";
+          return fetch(lookupUrl)
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (prs) { p.pr_number = prs.length ? prs[0].number : null; })
+            .catch(function () {});
+        });
+
+      return Promise.all(lookups).then(function () { return pending; });
+    })
+    .then(function (pending) {
       var oldest = pending.length ? pending[0].waited : 0;
       var fg, bg, label, summary;
       if (!pending.length) {
