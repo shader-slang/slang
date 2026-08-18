@@ -74,9 +74,9 @@ def run(command, key):
     profile = {}
     for i in range(samples):
         try:
-            results = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True).decode('utf-8')
+            results = subprocess.check_output(command, stderr=subprocess.STDOUT).decode('utf-8')
         except subprocess.CalledProcessError as exc:
-            print(f"[Error] Failed to run command: {command}")
+            print(f"[Error] Failed to run command: {subprocess.list2cmdline(command)}")
             print(exc.output.decode('utf-8'))
             return  # Return without adding to timings
 
@@ -97,24 +97,24 @@ def run(command, key):
         print(f"[Warning] No timing data collected for {key}")
 
 def compile_cmd(file, output, stage=None, entry=None, emit=False):
-    cmd = f'{slangc} -report-perf-benchmark {file}'
+    cmd = [slangc, '-report-perf-benchmark', file]
 
     if stage:
-        cmd += f' -stage {stage}'
+        cmd += ['-stage', stage]
         if entry:
-            cmd += f' -entry {entry}'
+            cmd += ['-entry', entry]
         else:
-            cmd += f' -entry {stage}'
+            cmd += ['-entry', stage]
 
     if emit:
-        cmd += f' -target {target_ext}'
+        cmd += ['-target', target_ext]
         output += '.' + target_ext
         if target == 'dxil-embedded':
-            cmd += ' -profile lib_6_6'
+            cmd += ['-profile', 'lib_6_6']
     elif embed:
-        cmd += ' -embed-dxil'
+        cmd += ['-embed-dxil']
 
-    cmd += f' -o {output}'
+    cmd += ['-o', output]
 
     return cmd
 

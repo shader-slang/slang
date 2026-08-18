@@ -295,6 +295,9 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
         SemanticsContext sideEffectContext = withInForLoopSideEffect();
         SemanticsExprVisitor subExprVisitor(sideEffectContext);
         stmt->sideEffectExpression = subExprVisitor.CheckExpr(stmt->sideEffectExpression);
+
+        // A `for` loop's side-effect expression also discards its result.
+        maybeDiagnoseDiscardedNoDiscardResult(stmt->sideEffectExpression);
     }
     subContext.checkStmt(stmt->statement);
 
@@ -400,8 +403,19 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
     generateUniqueIDForStmt(stmt);
     WithOuterStmt subContext(this, stmt);
 
-    // TODO(tfoley): need to coerce condition to an integral type...
     stmt->condition = CheckExpr(stmt->condition);
+
+    // Reject a non-integer/enum selector here so no inconsistent `switch` reaches IR
+    // lowering; skip when the condition already failed to check to avoid a cascade.
+    auto conditionType = stmt->condition->type.type;
+    if (conditionType && !as<ErrorType>(conditionType) &&
+        !isValidCompileTimeConstantType(conditionType))
+    {
+        getSink()->diagnose(
+            Diagnostics::SwitchConditionNotInteger{.type = conditionType, .expr = stmt->condition});
+        return;
+    }
+
     subContext.checkStmt(stmt->body);
 
     // check the case value exits within the switch
@@ -410,12 +424,11 @@ void SemanticsStmtVisitor::visitSwitchStmt(SwitchStmt* stmt)
 
 void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
 {
-    auto switchStmt = FindOuterStmt<SwitchStmt>();
+    // A 'case' statement must be directly enclosed by a 'switch' statement. If
+    // this is not the case, the parser has already diagnosed an error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
     if (!switchStmt)
-    {
-        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
         return;
-    }
 
     // Check that the type for the `case` is consistent with the type for the `switch`.
     auto expr = CheckExpr(stmt->expr);
@@ -429,14 +442,11 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     stmt->expr = expr;
     stmt->exprVal = exprVal;
 
-    if (switchStmt)
-    {
-        // We stash the ID of the target statement in the `case`
-        // statement so that they can be correlated later, during
-        // code generation.
-        //
-        stmt->targetOuterStmtID = switchStmt->uniqueID;
-    }
+    // We stash the ID of the target statement in the `case`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
 }
 
 void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -515,19 +525,18 @@ void SemanticsStmtVisitor::visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
 
 void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
 {
-    auto switchStmt = FindOuterStmt<SwitchStmt>();
+    // A 'default' statement must be directly enclosed by a 'switch'
+    // statement. If this is not the case, the parser has already diagnosed an
+    // error.
+    SwitchStmt* switchStmt = m_outerStmts ? as<SwitchStmt>(m_outerStmts->stmt) : nullptr;
     if (!switchStmt)
-    {
-        getSink()->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = stmt});
-    }
-    else
-    {
-        // We stash the ID of the target statement in the `case`
-        // statement so that they can be correlated later, during
-        // code generation.
-        //
-        stmt->targetOuterStmtID = switchStmt->uniqueID;
-    }
+        return;
+
+    // We stash the ID of the target statement in the `default`
+    // statement so that they can be correlated later, during
+    // code generation.
+    //
+    stmt->targetOuterStmtID = switchStmt->uniqueID;
 }
 
 void SemanticsStmtVisitor::visitIfStmt(IfStmt* stmt)
@@ -675,15 +684,103 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
     stmt->expression = CheckExpr(stmt->expression);
+    // Warn on a dangling `==` whose result is discarded (likely a mistyped `=`). The
+    // comparison may be either a resolved `operator==` call or a builtin fast-path
+    // `BuiltinOperatorExpr` (the common scalar case).
+    bool isDanglingEquality = false;
     if (auto operatorExpr = as<OperatorExpr>(stmt->expression))
     {
         if (auto func = as<VarExpr>(operatorExpr->functionExpr))
+            isDanglingEquality = func->name && func->name->text == "==";
+    }
+    else if (auto builtinOp = as<BuiltinOperatorExpr>(stmt->expression))
+    {
+        isDanglingEquality = (builtinOp->op == BuiltinOperationKind::Eql);
+    }
+    if (isDanglingEquality)
+        getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = stmt->expression});
+
+    maybeDiagnoseDiscardedNoDiscardResult(stmt->expression);
+}
+
+void SemanticsStmtVisitor::maybeDiagnoseDiscardedNoDiscardResult(Expr* expr)
+{
+    // Peel transparent wrappers that don't change whether the result is discarded: a call
+    // wrapped in parentheses (`(t.load());`) still discards the call's result.
+    while (auto paren = as<ParenExpr>(expr))
+    {
+        expr = paren->base;
+    }
+
+    // A comma operator in a discarded context discards each of its operands, so recurse
+    // into them (e.g. `for (int i = 0; i < n; t.load(), i++)` discards `t.load()`).
+    if (auto operatorExpr = as<OperatorExpr>(expr))
+    {
+        if (auto func = as<VarExpr>(operatorExpr->functionExpr))
         {
-            if (func->name && func->name->text == "==")
+            if (getText(func->name) == ",")
             {
-                getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = operatorExpr});
+                for (auto arg : operatorExpr->arguments)
+                    maybeDiagnoseDiscardedNoDiscardResult(arg);
+                return;
             }
         }
+    }
+
+    // A ternary `?:` and a short-circuiting `&&`/`||` both yield a chosen operand's result
+    // verbatim, so discarding the whole expression discards that operand's result. Recurse into
+    // the operands that can become the result:
+    //   - both arms of a ternary (`arguments[1]`/`arguments[2]`; the condition `arguments[0]` is
+    //     consumed to choose an arm, not passed through), and
+    //   - the right-hand operand of `&&`/`||` (`arguments[1]`; the left operand is consumed to
+    //     decide whether the right is evaluated, not passed through).
+    if (auto select = as<SelectExpr>(expr))
+    {
+        if (select->arguments.getCount() == 3)
+        {
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[1]);
+            maybeDiagnoseDiscardedNoDiscardResult(select->arguments[2]);
+        }
+        return;
+    }
+    if (auto shortCircuit = as<LogicOperatorShortCircuitExpr>(expr))
+    {
+        if (shortCircuit->arguments.getCount() == 2)
+            maybeDiagnoseDiscardedNoDiscardResult(shortCircuit->arguments[1]);
+        return;
+    }
+
+    // If the discarded expression is a call to a function marked `[NoDiscard]`, report that
+    // the result is being ignored.
+    auto invokeExpr = as<InvokeExpr>(expr);
+    if (!invokeExpr)
+        return;
+
+    // `[NoDiscard]` on a `void`-returning function is already rejected at the declaration
+    // (see `NoDiscardOnVoidFunction` in `checkCallableDeclCommon`). That diagnostic is an
+    // error but not fatal, so checking continues and calls to such a function still reach
+    // here; this guard suppresses an additional, nonsensical "result is discarded" error
+    // at every call site on top of the declaration error.
+    if (invokeExpr->type.type && invokeExpr->type.type->equals(m_astBuilder->getVoidType()))
+        return;
+
+    auto funcDeclRefExpr = as<DeclRefExpr>(invokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return;
+
+    auto calleeDecl = funcDeclRefExpr->declRef.getDecl();
+    if (!calleeDecl)
+        return;
+
+    // Bare discarded construction is intentionally outside this diagnostic.
+    if (as<ConstructorDecl>(calleeDecl))
+        return;
+
+    if (calleeDecl->findModifier<NoDiscardAttribute>())
+    {
+        getSink()->diagnose(Diagnostics::DiscardedNoDiscardResult{
+            .name = calleeDecl->getName(),
+            .expr = invokeExpr});
     }
 }
 
@@ -736,34 +833,40 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         tryFoldIntegerConstantExpression(initialVal, ConstantFoldingKind::CompileTime, nullptr));
 
     ConstantIntVal* finalVal = nullptr;
-    auto binaryExpr = as<InfixExpr>(stmt->predicateExpression);
-    if (!binaryExpr)
-        return;
-    auto compareFuncExpr = as<DeclRefExpr>(binaryExpr->functionExpr);
-    if (!compareFuncExpr)
-        return;
-    if (!compareFuncExpr->declRef.getDecl())
-        return;
     IROp compareOp = kIROp_Nop;
-    if (auto intrinsicOpModifier =
-            compareFuncExpr->declRef.getDecl()->findModifier<IntrinsicOpModifier>())
+    // A comparison loop predicate `i < N` on builtin scalar operands is always rewritten by the
+    // fast path to a `BuiltinOperatorExpr`, so that is the only form we need to recognize here.
+    auto cmpExpr = as<BuiltinOperatorExpr>(stmt->predicateExpression);
+    if (!cmpExpr)
+        return;
+    switch (cmpExpr->op)
     {
-        compareOp = (IROp)intrinsicOpModifier->op;
-    }
-    else
-    {
+    case BuiltinOperationKind::Less:
+        compareOp = kIROp_Less;
+        break;
+    case BuiltinOperationKind::Leq:
+        compareOp = kIROp_Leq;
+        break;
+    case BuiltinOperationKind::Greater:
+        compareOp = kIROp_Greater;
+        break;
+    case BuiltinOperationKind::Geq:
+        compareOp = kIROp_Geq;
+        break;
+    default:
+        // Only ordering comparisons drive trip-count inference.
         return;
     }
-    if (binaryExpr->arguments.getCount() != 2)
+    if (cmpExpr->arguments.getCount() != 2)
         return;
-    auto leftCompareOperand = binaryExpr->arguments[0];
-    auto rightCompareOperand = binaryExpr->arguments[1];
+    auto leftCompareOperand = cmpExpr->arguments[0];
+    auto rightCompareOperand = cmpExpr->arguments[1];
     if (!leftCompareOperand)
         return;
     if (!rightCompareOperand)
         return;
     if (auto rightVal = tryFoldIntegerConstantExpression(
-            binaryExpr->arguments[1],
+            cmpExpr->arguments[1],
             ConstantFoldingKind::CompileTime,
             nullptr))
     {
@@ -775,7 +878,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     }
     else if (
         auto leftVal = tryFoldIntegerConstantExpression(
-            binaryExpr->arguments[0],
+            cmpExpr->arguments[0],
             ConstantFoldingKind::CompileTime,
             nullptr))
     {

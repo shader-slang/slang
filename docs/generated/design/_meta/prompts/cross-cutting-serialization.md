@@ -29,8 +29,8 @@ modules.
 3. `## Backends` — describe the two encoding backends present:
    - **Generic serialize** ([slang-serialize.cpp](../../../../source/slang/slang-serialize.cpp))
    - **Fossil** ([slang-serialize-fossil.cpp](../../../../source/slang/slang-serialize-fossil.cpp))
-   Identify what each is used for (verify by reading the watched
-   files).
+     Identify what each is used for (verify by reading the watched
+     files).
 4. `## RIFF container format` — explain at a high level that modules
    are wrapped in a RIFF-style chunked container. Cite
    [slang-serialize-riff.cpp](../../../../source/slang/slang-serialize-riff.cpp).
@@ -41,11 +41,16 @@ modules.
    as the authoritative document. State the constraint that
    `slang-ir-insts.lua` opcode insertions need to obey for older
    modules to keep deserializing.
-7. `## Round-trip and repro files` — short note that the historical
-   `-dump-repro` / `-load-repro` machinery is deprecated (per
-   [CLAUDE.md](../../../../CLAUDE.md)), so do not document it as
-   recommended; mention it only if it appears in the watched paths
-   so readers know it exists.
+7. `## Round-trip and repro files` — short note on the repro machinery.
+   Be precise about which part is discouraged:
+   [CLAUDE.md](../../../../CLAUDE.md) lists only `-dump-repro` among the
+   options not to use, and explicitly _retains_ `-load-repro` and
+   `-extract-repro` as specialized repro-handling tools whose inputs are
+   validated before use. An earlier revision of this prompt called the
+   whole `-dump-repro` / `-load-repro` machinery deprecated, which
+   contradicts the very file it cited and produced a critical finding on
+   the page. Mention the machinery only if it appears in the watched
+   paths, so readers know it exists.
 
 ## Quality checklist (in addition to the universal one)
 

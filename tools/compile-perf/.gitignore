@@ -1,0 +1,13 @@
+*.html
+*.log
+*.png
+*.pyc
+*.svg
+__pycache__/
+# no trailing slash: the local dir may be a SYMLINK, which corpus/ does not match
+corpus
+gen/
+releases/
+results/
+results_baseline_orig/
+slang-compile-perf/

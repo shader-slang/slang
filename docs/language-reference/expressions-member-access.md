@@ -1,31 +1,55 @@
-> TODO
+> TODO - THIS PAGE HAS NOT YET BEEN SCRUTINIZED
 
 Member Expression
 -----------------
 
-A _member expression_ consists of a base expression followed by a dot (`.`) and an identifier naming a member to be accessed:
+**Grammar:**
 
-```hlsl
-base.m
-```
+> _`namespace-identifier`_ (**`'.'`** | **`'::'`**) _`member-identifier`_
+>
+> _`type-expr`_ (**`'.'`** | **`'::'`**) _`member-identifier`_
+>
+> _`value-expr`_ **`'.'`** _`member-identifier`_
+>
+> _`pointer-value-expr`_ **`'->'`** _`member-identifier`_
 
-When `base` is a structure type, this expression looks up the field or other member named by `m`.
-Just as for an identifier expression, the result of a member expression may be overloaded, and might be disambiguated based on how it is used.
+A _member access expression_ selects a member of a namespace, type, or a value expression.
 
-A member expression is an l-value if the base expression is an l-value and the member it refers to is mutable.
+If the left-hand-side is a namespace identifier, the member access expression is a qualified lookup in that
+namespace. The expression type may be an arbitrary namespace member including a value, a type, or a
+namespace. See [name lookup](basics-name-lookup.md) for details.
+
+If the left-hand-side is a type expression, the member access expression is a static member lookup within that
+type. See [enumerations](types-enum.md), [structs](types-struct.md), and [name lookup](basics-name-lookup.md)
+for details.
+
+If the left-hand-side is a value, then:
+
+1. If the value is a scalar, vector, matrix, or tuple value, the member access expression is a swizzle
+   expression. See _Swizzle Expressions_ below.
+
+2. If the value type is a [struct](types-struct.md), then the:
+
+   1. If _`member-identifier`_ names a member (a field or a function), then the expression is a value
+      expression for that member, matching the value category.
+
+   2. If _`member-identifier`_ names a property, then the expression is translated as a `get` or `set`
+      accessor of that property, depending on whether the expression reads or assigns that property.
 
 ### Implicit Dereference
 
 If the base expression of a member reference is a _pointer-like type_ such as `ConstantBuffer<T>`, then a member reference expression will implicitly dereference the base expression to refer to the pointed-to value (e.g., in the case of `ConstantBuffer<T>` this is the buffer contents of type `T`).
+
+For an explicit pointer, the arrow operator `->` dereferences the pointer and then selects a member: `x->m` is equivalent to `(*x).m`. Because it operates on a pointer, `->` is subject to the same experimental status as the pointer dereference operator `*`.
 
 ### Vector Swizzles
 
 When the base expression of a member expression is of a vector type `vector<T,N>` then a member expression is a _vector swizzle expression_.
 The member name must conform to these constraints:
 
-* The member name must comprise between one and four ASCII characters
-* The characters must be come either from the set (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to element indics of (0, 1, 2, 3)
-* The element index corresponding to each character must be less than `N`
+- The member name must comprise between one and four ASCII characters
+- The characters must be come either from the set (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to element indics of (0, 1, 2, 3)
+- The element index corresponding to each character must be less than `N`
 
 If the member name of a swizzle consists of a single character, then the expression has type `T` and is equivalent to a subscript expression with the corresponding element index.
 
@@ -35,7 +59,15 @@ A vector swizzle expression is an l-value if the base expression was an l-value 
 
 ### Matrix Swizzles
 
-> Note: The Slang implementation currently doesn't support matrix swizzles.
+When the base expression of a member expression is of a matrix type, then a
+member expression with HLSL-style matrix swizzle syntax is a _matrix swizzle
+expression_. Supported forms include zero-based `_mij` components and
+one-based shorthand components such as `_41`. Multiple components can be
+combined, for example `m._41_32`.
+
+A matrix swizzle expression is an l-value if the base expression was an l-value
+and the swizzle does not select duplicate matrix elements. Constant-indexed
+subscripts of matrix swizzle l-values are also l-values.
 
 ### Static Member Expressions
 

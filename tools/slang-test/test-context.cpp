@@ -1,11 +1,11 @@
 // test-context.cpp
 #include "test-context.h"
 
-#include "../../source/compiler-core/slang-language-server-protocol.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-shared-library.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "compiler-core/slang-language-server-protocol.h"
+#include "core/slang-io.h"
+#include "core/slang-shared-library.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,6 +64,11 @@ void TestContext::setThreadIndex(int index)
 void TestContext::setMaxTestRunnerThreadCount(int count)
 {
     m_jsonRpcConnections.setCount(count);
+    m_rpcRequestOrdinals.setCount(count);
+    for (auto& ordinal : m_rpcRequestOrdinals)
+    {
+        ordinal = 0;
+    }
     m_testRequirements.setCount(count);
     m_reporters.setCount(count);
     for (auto& reporter : m_reporters)
@@ -92,7 +97,7 @@ TestReporter* TestContext::getTestReporter()
     return m_reporters[slangTestThreadIndex];
 }
 
-SlangResult TestContext::locateFileCheck()
+SlangResult TestContext::locateLLVMFileCheck()
 {
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
 
@@ -121,8 +126,6 @@ Result TestContext::init(const char* inExePath)
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
-
-    SLANG_RETURN_ON_FAIL(locateFileCheck());
 
     return SLANG_OK;
 }
@@ -301,6 +304,14 @@ void TestContext::destroyRPCConnection()
         m_jsonRpcConnections[slangTestThreadIndex]->disconnect();
         m_jsonRpcConnections[slangTestThreadIndex].setNull();
     }
+    // The next server starts at zero: the ordinal measures the age of one server process,
+    // not of the thread.
+    m_rpcRequestOrdinals[slangTestThreadIndex] = 0;
+}
+
+int TestContext::advanceRPCRequestOrdinal()
+{
+    return ++m_rpcRequestOrdinals[slangTestThreadIndex];
 }
 
 Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()
@@ -311,6 +322,9 @@ Slang::JSONRPCConnection* TestContext::getOrCreateJSONRPCConnection()
         {
             return nullptr;
         }
+        // Paired with the reset in destroyRPCConnection so the invariant holds however the
+        // slot became empty, not only on the path that empties it today.
+        m_rpcRequestOrdinals[slangTestThreadIndex] = 0;
     }
 
     return m_jsonRpcConnections[slangTestThreadIndex];

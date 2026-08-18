@@ -1,6 +1,9 @@
 // slang-emit-hlsl-prelude.cpp
 #include "slang-emit-hlsl.h"
+#include "slang-ir-util-hlsl.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-type-system-shared.h"
 
 namespace Slang
 {
@@ -46,7 +49,10 @@ vector<OutElTy, MatM> __slang_linalg_Mul(
         dx::linalg::MatrixUse::A,
         dx::linalg::MatrixScope::Thread>;
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    return dx::linalg::Multiply<OutElTy>(mat, input);
+    return dx::linalg::MultiplyAdd<OutElTy>(
+        mat,
+        dx::linalg::MakeInterpretedVector<InputDT>(input),
+        (vector<OutElTy, MatM>)0);
 }
 
 template<
@@ -79,7 +85,10 @@ vector<OutElTy, MatM> __slang_linalg_MulAdd(
     MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
     using BiasVecTy = vector<BiasElTy, BiasVecDim>;
     BiasVecTy biasVec = biasBuf.template Load<BiasVecTy>(biasOff);
-    return dx::linalg::MultiplyAdd<OutElTy>(mat, input, biasVec);
+    return dx::linalg::MultiplyAdd<OutElTy>(
+        mat,
+        dx::linalg::MakeInterpretedVector<InputDT>(input),
+        biasVec);
 }
 
 template<
@@ -109,7 +118,7 @@ void __slang_linalg_OuterProductAccumulate(
 template<typename ElTy, uint N, typename BufTy>
 void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
 {
-    dx::linalg::VectorAccumulate(inputVec, buffer, offset);
+    dx::linalg::InterlockedAccumulate(inputVec, buffer, offset);
 }
 )";
 
@@ -384,9 +393,9 @@ __slang_cm_muladd(
         switch (slangValue)
         {
         case SLANG_SCALAR_TYPE_INT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedS8x32" : "DATA_TYPE_SINT8_T4_PACKED");
+            return UnownedStringSlice(sm610OrAbove ? "I8" : "DATA_TYPE_SINT8_T4_PACKED");
         case SLANG_SCALAR_TYPE_UINT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedU8x32" : "DATA_TYPE_UINT8_T4_PACKED");
+            return UnownedStringSlice(sm610OrAbove ? "U8" : "DATA_TYPE_UINT8_T4_PACKED");
         default:
             SLANG_UNEXPECTED(
                 "Unsupported packed cooperative vector input interpretation for HLSL emission");
@@ -418,6 +427,193 @@ __slang_cm_muladd(
     default:
         SLANG_UNEXPECTED("Unsupported cooperative vector component type for HLSL emission");
     }
+}
+
+static const char* getBarrierMemoryTypeFlagName(uint32_t flag)
+{
+    switch (flag)
+    {
+    case BarrierMemoryTypeFlags::UavMemory:
+        return "UAV_MEMORY";
+    case BarrierMemoryTypeFlags::GroupSharedMemory:
+        return "GROUP_SHARED_MEMORY";
+    case BarrierMemoryTypeFlags::NodeInputMemory:
+        return "NODE_INPUT_MEMORY";
+    case BarrierMemoryTypeFlags::NodeOutputMemory:
+        return "NODE_OUTPUT_MEMORY";
+    default:
+        return nullptr;
+    }
+}
+
+static uint32_t const* getBarrierMemoryTypeFlagBits(Count& outCount)
+{
+    static const uint32_t flagBits[] = {
+        BarrierMemoryTypeFlags::UavMemory,
+        BarrierMemoryTypeFlags::GroupSharedMemory,
+        BarrierMemoryTypeFlags::NodeInputMemory,
+        BarrierMemoryTypeFlags::NodeOutputMemory,
+    };
+    outCount = SLANG_COUNT_OF(flagBits);
+    return flagBits;
+}
+
+static uint32_t getBarrierMemoryTypeEmitMask()
+{
+    Count flagBitCount = 0;
+    auto flagBits = getBarrierMemoryTypeFlagBits(flagBitCount);
+
+    uint32_t mask = 0;
+    for (Count ii = 0; ii < flagBitCount; ++ii)
+        mask |= flagBits[ii];
+    return mask;
+}
+
+static const char* getBarrierSemanticFlagName(uint32_t flag)
+{
+    switch (flag)
+    {
+    case BarrierSemanticFlags::GroupSync:
+        return "GROUP_SYNC";
+    case BarrierSemanticFlags::GroupScope:
+        return "GROUP_SCOPE";
+    case BarrierSemanticFlags::DeviceScope:
+        return "DEVICE_SCOPE";
+    default:
+        return nullptr;
+    }
+}
+
+static uint32_t const* getBarrierSemanticFlagBits(Count& outCount)
+{
+    static const uint32_t flagBits[] = {
+        BarrierSemanticFlags::GroupSync,
+        BarrierSemanticFlags::GroupScope,
+        BarrierSemanticFlags::DeviceScope,
+    };
+    outCount = SLANG_COUNT_OF(flagBits);
+    return flagBits;
+}
+
+static uint32_t getBarrierSemanticEmitMask()
+{
+    Count flagBitCount = 0;
+    auto flagBits = getBarrierSemanticFlagBits(flagBitCount);
+
+    uint32_t mask = 0;
+    for (Count ii = 0; ii < flagBitCount; ++ii)
+        mask |= flagBits[ii];
+    return mask;
+}
+
+static char const* getWorkGraphRecordTypeName(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_DispatchNodeInputRecordType:
+        return "DispatchNodeInputRecord";
+    case kIROp_ThreadNodeInputRecordType:
+        return "ThreadNodeInputRecord";
+    case kIROp_GroupNodeInputRecordsType:
+        return "GroupNodeInputRecords";
+    case kIROp_EmptyNodeInputType:
+        return "EmptyNodeInput";
+    case kIROp_ThreadNodeOutputRecordsType:
+        return "ThreadNodeOutputRecords";
+    case kIROp_GroupNodeOutputRecordsType:
+        return "GroupNodeOutputRecords";
+    case kIROp_NodeOutputType:
+        return "NodeOutput";
+    case kIROp_NodeOutputArrayType:
+        return "NodeOutputArray";
+    case kIROp_EmptyNodeOutputType:
+        return "EmptyNodeOutput";
+    case kIROp_EmptyNodeOutputArrayType:
+        return "EmptyNodeOutputArray";
+    default:
+        SLANG_UNEXPECTED("unrecognized work-graph record type IROp");
+        UNREACHABLE_RETURN(nullptr);
+    }
+}
+
+void HLSLSourceEmitter::emitWorkGraphRecordType(IRType* type)
+{
+    auto typeName = getWorkGraphRecordTypeName(type->getOp());
+    SLANG_RELEASE_ASSERT(typeName);
+
+    m_writer->emit(typeName);
+    if (auto elementType = getWorkGraphRecordElementType(type))
+    {
+        m_writer->emit("<");
+        emitType(elementType);
+        m_writer->emit(">");
+    }
+}
+
+void HLSLSourceEmitter::emitNamedMemoryTypeFlagSet(uint32_t flagVal)
+{
+    SLANG_RELEASE_ASSERT(getBarrierMemoryTypeEmitMask() == getKnownBarrierMemoryTypeFlags());
+    SLANG_RELEASE_ASSERT(isValidBarrierMemoryTypeFlags(flagVal));
+
+    m_writer->emit("(");
+    if (flagVal == BarrierMemoryTypeFlags::AllMemory)
+    {
+        m_writer->emit("ALL_MEMORY");
+    }
+    else
+    {
+        Count flagBitCount = 0;
+        auto flagBits = getBarrierMemoryTypeFlagBits(flagBitCount);
+        bool first = true;
+        for (Count ii = 0; ii < flagBitCount; ++ii)
+        {
+            auto bit = flagBits[ii];
+            if (!(flagVal & bit))
+                continue;
+
+            if (!first)
+                m_writer->emit(" | ");
+            auto name = getBarrierMemoryTypeFlagName(bit);
+            SLANG_RELEASE_ASSERT(name);
+            m_writer->emit(name);
+            first = false;
+        }
+        SLANG_RELEASE_ASSERT(!first);
+    }
+    m_writer->emit(")");
+}
+
+void HLSLSourceEmitter::emitNamedSemanticFlagSet(uint32_t flagVal)
+{
+    SLANG_RELEASE_ASSERT(getBarrierSemanticEmitMask() == getKnownBarrierSemanticFlags());
+    SLANG_RELEASE_ASSERT(isValidBarrierSemanticFlags(flagVal));
+
+    m_writer->emit("(");
+    if (flagVal == BarrierSemanticFlags::Reorder)
+    {
+        m_writer->emit("REORDER");
+    }
+    else
+    {
+        Count flagBitCount = 0;
+        auto flagBits = getBarrierSemanticFlagBits(flagBitCount);
+        bool first = true;
+        for (Count ii = 0; ii < flagBitCount; ++ii)
+        {
+            auto bit = flagBits[ii];
+            if (!(flagVal & bit))
+                continue;
+
+            if (!first)
+                m_writer->emit(" | ");
+            auto name = getBarrierSemanticFlagName(bit);
+            SLANG_RELEASE_ASSERT(name);
+            m_writer->emit(name);
+            first = false;
+        }
+        SLANG_RELEASE_ASSERT(!first);
+    }
+    m_writer->emit(")");
 }
 
 /* static */ UnownedStringSlice HLSLSourceEmitter::getInterpolationModifier_keyword(

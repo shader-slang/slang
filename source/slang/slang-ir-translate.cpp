@@ -4,6 +4,7 @@
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -466,14 +467,22 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             if (!isSetSpecializedGeneric(instWithCanonicalOperands))
             {
                 auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
-                auto specResult = specializeGeneric(ctx->getSpecializationContext(), specInst);
+                auto specResult =
+                    specializeGeneric(ctx->getSpecializationContext(), specInst, false);
 
                 if (specResult && as<IRGlobalValueWithCode>(specResult))
                 {
                     // If we ended up with something that has code,
-                    // specialization may have opened up some simplification opportunities.
+                    // specialization may have opened up simplification opportunities.
                     //
 
+                    // Specialize any child instructions. This handles any non-hoistable
+                    // instructions and peephole-style opportunities.
+                    // TODO: Should this just run both specialization and peephole in a loop until
+                    // we reach a fixed point?
+                    specializeChildInsts(ctx->getSpecializationContext(), specResult);
+
+                    // Fold any constants within the specialized code.
                     applySparseConditionalConstantPropagation(
                         specResult,
                         ctx->getTargetProgram(),
@@ -488,8 +497,9 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
                         return nullptr;
                 }
 
-                if (specResult && specResult != specInst)
-                    specInst->replaceUsesWith(specResult);
+                auto currentSpecInst = as<IRSpecialize>(instRef->getOperand(0));
+                if (specResult && currentSpecInst && specResult != currentSpecInst)
+                    currentSpecInst->replaceUsesWith(specResult);
 
                 // No need to memoize since specializeGeneric will already have memoized this.
                 return specResult;
@@ -501,11 +511,29 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             specializeWitnessLookup(cast<IRLookupWitnessMethod>(instWithCanonicalOperands)));
     }
 
+    // Only `set` insts are cached (the O(N) hot path; the other kinds reaching this fall-through
+    // are non-monotonic). See `resolvedStructuralFixedPoints` for the whitelist rationale.
+    if (as<IRSetBase>(instWithCanonicalOperands))
+        ctx->recordStructuralFixedPoint(instWithCanonicalOperands);
     return instWithCanonicalOperands;
 }
 
 IRInst* TranslationContext::resolveInst(IRInst* inst)
 {
+    // Fast path: a recorded structural fixed point resolves to itself with no side
+    // effects, so skip the (potentially O(operandCount)) operand re-walk. A null `inst`
+    // needs no explicit guard: it can never have been recorded (`recordStructuralFixedPoint`
+    // asserts `IRSetBase`), so the lookup just misses and the slow path below returns
+    // nullptr as before. The entry is only valid while the inst remains attached to the
+    // module; use SLANG_RELEASE_ASSERT (not SLANG_ASSERT, which compiles to an assume in
+    // release) so a future caller that passes an inst removed/deallocated since it was
+    // recorded fails loudly in every build rather than reading a stale pointer.
+    if (resolvedStructuralFixedPoints.contains(inst))
+    {
+        SLANG_RELEASE_ASSERT(inst->getParent() && as<IRModuleInst>(inst->getParent()));
+        return inst;
+    }
+
     IRBuilder builder(irModule);
     while (auto resolvedInst = _resolveInstRec(this, inst))
     {

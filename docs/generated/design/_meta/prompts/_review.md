@@ -82,11 +82,19 @@ For every dimension that is not `pass`, file at least one finding.
    the source does not support either way (speculation).
 6. **front_matter_validity** — The YAML front-matter contains every
    required key (`generated`, `model`, `generated_at`,
-   `source_commit`, `watched_paths_digest`, `warning`). The
-   `watched_paths_digest` matches what `regenerate.py digest <doc>`
-   would produce at `source_commit` (you do not need to recompute
-   it; flag only obvious mismatches such as a non-hex value or a
-   missing field).
+   `source_commit`, `watched_paths_digest`, `warning`). Check only
+   that the keys are present and well-formed (for example, flag a
+   non-hex or missing digest).
+
+   Do **not** file a finding because the front-matter
+   `watched_paths_digest` differs from `regenerate.py digest <doc>`.
+   The two disagree routinely and harmlessly: `mark-fresh` records the
+   real digest in `freshness.json` without rewriting the document, so
+   the front-matter copy is only as current as whatever the generating
+   agent last typed. For an aggregator page whose `watched_paths` glob
+   matches its own directory the value cannot be made to agree at all,
+   because writing it into the page changes the page. Staleness is
+   tracked in `freshness.json`, not in the document.
 
 ## Severity
 
@@ -129,14 +137,43 @@ remediator can act on it without re-reading the source themselves.
 ## Output format
 
 Your single output is a Markdown file matching this contract.
-Filename (informational; the operator decides the path):
+
+### Output path (mandatory, exact)
+
+Write the report to **exactly** this path:
 
 ```
 docs/generated/design/_meta/reviews/<target_doc>.review.md
 ```
 
-Hierarchy under `_meta/reviews/` mirrors the manifest key (e.g.
-`_meta/reviews/pipeline/05-ir-passes.md.review.md`).
+`<target_doc>` is the manifest key of the document being reviewed,
+e.g. `pipeline/05-ir-passes.md`, so the resulting path is e.g.
+`docs/generated/design/_meta/reviews/pipeline/05-ir-passes.md.review.md`.
+The directory hierarchy under `_meta/reviews/` mirrors the
+manifest-key hierarchy under `docs/generated/design/` one-for-one,
+and the `.review.md` suffix is appended to the manifest key.
+
+If a file already exists at that exact path (e.g. from a prior
+review cycle on the same document), **overwrite it in place**.
+The ledger in `review-state.json` references the canonical path
+above; a report at any other location is invisible to the driver.
+
+You **must not**:
+
+- create a new sibling subdirectory under `_meta/reviews/` (e.g.
+  `_meta/reviews/2026-05-29/...`, `_meta/reviews/run-N/...`,
+  `_meta/reviews/<your-model>/...`);
+- write to a date-stamped, run-stamped, or model-stamped variant of
+  the filename (e.g. `<target_doc>.review.2026-05-29.md`);
+- write the report under `docs/generated/design/<target_doc>` or
+  any other location outside `_meta/reviews/`;
+- preserve the prior report by renaming it (e.g. to `.bak`,
+  `.old`, or `.prev`).
+
+Exactly one review report per document exists on disk at any time:
+the most recent one, at the canonical path above. The prior
+report's content lives in git history; the operator does not need
+a copy on disk.
 
 ### Front-matter (mandatory)
 
@@ -147,7 +184,7 @@ reviewer_model: <model identifier, e.g. gpt-5-2026-01-15>
 reviewed_at: <ISO 8601 UTC, seconds precision, e.g. 2026-05-15T18:00:00+00:00>
 target_doc: <manifest key of the reviewed document>
 target_doc_source_commit: <the `source_commit` from the reviewed doc's front-matter>
-target_doc_watched_paths_digest: <the `watched_paths_digest` from the reviewed doc's front-matter>
+target_doc_watched_paths_digest: <the output of `regenerate.py digest <doc>` — NOT the doc's front-matter copy, which is routinely stale>
 source_commit: <HEAD SHA at review time>
 checklist:
   factual_accuracy: pass | partial | fail
@@ -177,13 +214,13 @@ The `severity_breakdown` counts must sum to `finding_count`.
    `slang-emit.cpp`", "resolved all 17 relative links", etc.
 4. `## Findings` — a Markdown table with exactly these columns:
 
-   | Column | Content |
-   | --- | --- |
-   | ID | Sequential `F-001`, `F-002`, ...; unique within the report. |
-   | Severity | One of `critical`, `major`, `minor`, `nit`. |
-   | Location | A heading anchor or line range inside the target doc (e.g. `## Phase B`, lines 110-115). |
-   | Description | One short paragraph. Be precise; quote the offending text in backticks. |
-   | Evidence | The source file (with line number) that proves the finding, or a peer doc reference. |
+   | Column         | Content                                                                                                              |
+   | -------------- | -------------------------------------------------------------------------------------------------------------------- |
+   | ID             | Sequential `F-001`, `F-002`, ...; unique within the report.                                                          |
+   | Severity       | One of `critical`, `major`, `minor`, `nit`.                                                                          |
+   | Location       | A heading anchor or line range inside the target doc (e.g. `## Phase B`, lines 110-115).                             |
+   | Description    | One short paragraph. Be precise; quote the offending text in backticks.                                              |
+   | Evidence       | The source file (with line number) that proves the finding, or a peer doc reference.                                 |
    | Recommendation | A specific, actionable fix (e.g. "change line N from X to Y", "delete the row about Z", "add the section `## Foo`"). |
 
    If there are no findings, write `(no findings)` on a single line

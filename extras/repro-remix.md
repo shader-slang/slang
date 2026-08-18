@@ -1,6 +1,6 @@
 # RTX Remix Shader Compilation Reproduction Script
 
-This script (`repro-remix.sh`) helps reproduce issues from the [RTX Remix nightly workflow](../.github/workflows/compile-rtx-remix-shaders-nightly.yml) locally.
+This script (`repro-remix.sh`) helps reproduce issues from the [RTX Remix nightly workflow](../.github/workflows/nightly-remix-test.yml) locally.
 
 ## Purpose
 
@@ -80,12 +80,14 @@ slang/
 This script uses a clean approach to avoid binary overwrite issues:
 
 **What it does:**
+
 - Comments out the Slang dependency in `packman-external.xml`
 - Creates a backup file (`packman-external.xml.backup`)
 - Packman skips downloading Slang entirely
 - Creates `external/slang` directory manually with your Debug build
 
 **Benefits:**
+
 - ✅ **No overwrite risk** - Packman never downloads or manages Slang
 - ✅ **Clean separation** - Your custom build is independent from packman
 - ✅ **Easy to verify** - Check `packman-external.xml` to see commented section
@@ -103,6 +105,7 @@ cat external/dxvk-remix/packman-external.xml | grep -A 2 "slang"
 ```
 
 You should see:
+
 ```xml
     <!-- Slang section commented out by repro-remix.sh
     <dependency name="slang" linkPath="external/slang">
@@ -147,17 +150,20 @@ You can modify these in the script if needed for testing.
 When the nightly CI fails:
 
 1. **Pull latest Slang changes**:
+
    ```bash
    git pull origin master
    ```
 
 2. **Build Slang in Debug**:
+
    ```bash
    cmake.exe --preset default
    cmake.exe --build --preset debug
    ```
 
 3. **Run reproduction script**:
+
    ```bash
    ./extras/repro-remix.sh
    ```
@@ -196,6 +202,7 @@ The script closely matches the CI workflow, with these minor differences:
 ### "slangc.exe not found"
 
 Make sure you built Slang in Debug configuration first:
+
 ```bash
 cmake.exe --preset default
 cmake.exe --build --preset debug
@@ -208,17 +215,20 @@ Packman may have failed. Check network connection and try again with `--clean`.
 ### "Unexpectedly low shader count"
 
 If you see this error:
+
 ```
 ERROR: Unexpectedly low shader count: 54 headers, 46 .spv files
 ERROR: Expected at least 100 shaders - this indicates a partial build failure
 ```
 
 This indicates a partial compilation failure. Common causes:
+
 - Some shaders failed to compile (check meson logs)
 - Build script stopped early
 - Missing dependencies or tools
 
 **To debug:**
+
 ```bash
 # Verify the actual shader count
 find external/dxvk-remix/_BuildShadersOnly/src/dxvk/rtx_shaders -name '*.spv' | wc -l
@@ -234,6 +244,7 @@ cat external/dxvk-remix/_BuildShadersOnly/meson-logs/meson-log.txt | grep -i "fa
 ### "packman-external.xml not found"
 
 If you see this error, the dxvk-remix repository structure may have changed. Check:
+
 ```bash
 ls external/dxvk-remix/
 ```
@@ -241,6 +252,7 @@ ls external/dxvk-remix/
 ### XML commenting failed
 
 If the awk command fails to comment out Slang, you can manually edit:
+
 ```bash
 # Open in editor
 notepad external/dxvk-remix/packman-external.xml
@@ -251,13 +263,14 @@ notepad external/dxvk-remix/packman-external.xml
 ### PowerShell execution errors
 
 If `build_shaders_only.ps1` fails, you might need to adjust execution policy:
+
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 ## Related Documentation
 
-- [Main workflow file](../.github/workflows/compile-rtx-remix-shaders-nightly.yml)
+- [Main workflow file](../.github/workflows/nightly-remix-test.yml)
 - [Building Slang](../docs/building.md)
 - [SPIRV debugging guide](../CLAUDE.md#slangc-with--target-spirv-asm)
 - [dxvk-remix repository](https://github.com/NVIDIAGameWorks/dxvk-remix)

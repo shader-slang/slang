@@ -1,0 +1,126 @@
+# Uncovered diagnostic codes — bucket 1 of 5
+# 123 codes in this bucket. Range 29000..30502.
+# code	severity	name	message
+29000	err	snippet-parsing-failed	snippet parsing failed
+29100	err	unrecognized-spirv-opcode	unrecognized SPIR-V opcode
+29101	err	misplaced-result-id-marker	misplaced result-id marker
+29102	note	consider-op-copy-object	consider adding an OpCopyObject instruction to the end of the spirv_asm expression
+29103	note	no-such-address	unable to take the address of this address-of asm operand
+29104	error	spirvCoreGrammarJSONParseFailure	unexpected JSON in spirv core grammar file: $0
+29105	err	spirv-instruction-without-result-type-id	instruction has no result-type-id operand
+29106	warning	spirv-instruction-with-too-many-operands	too many operands
+29107	err	spirv-unable-to-resolve-name	unknown SPIR-V identifier
+29108	err	spirv-non-constant-bitwise-or	invalid bitwise or operand
+29109	err	spirv-operand-range	literal integer out of range
+29110	err	unknown-target-name	unknown target name
+29111	err	spirv-invalid-truncate	invalid truncate operation
+29112	err	spirv-instruction-with-not-enough-operands	not enough operands
+29113	err	spirv-id-redefinition	SPIR-V id redefinition
+29114	err	spirv-undefined-id	undefined SPIR-V id
+29115	err	target-switch-case-cannot-be-a-stage	cannot use stage name in __target_switch
+29116	warning	spirv-layout-sensitive-type-in-asm	layout-sensitive SPIR-V type declaration in spirv_asm
+30000	error	argsAreInvalid	Args for '%0' are invalid
+30020	err	expected-array-expression	expected an array expression
+30021	note	this-type-mismatch-after-erasure	the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead
+30024	err	cannot-convert-array-of-smaller-to-larger-size	array size mismatch prevents conversion
+30028	err	disallowed-array-of-non-addressable-type	arrays of non-addressable type not allowed
+30030	err	reference-type-as-struct-field	reference type cannot be used as struct field
+30031	err	non-addressable-type-in-structured-buffer	non-addressable type cannot be used in StructuredBuffer
+30048	err	argument-has-more-memory-qualifiers-than-param	memory qualifier mismatch
+30049	note	attempting-to-assign-to-const-variable	attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+30052	err	invalid-swizzle-expr	invalid swizzle expression
+30053	err	break-label-not-found	break label not found
+30054	err	target-label-does-not-mark-breakable-stmt	invalid break target
+30055	err	use-of-non-short-circuiting-operator-in-diff-func	non-short-circuiting `?:` not allowed in differentiable function
+30058	warning	dangling-equality-expr	result of '==' not used
+30061	err	expected-a-namespace	expected a namespace
+30062	note	implicit-cast-used-as-lvalue-ref	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value with a reference
+30063	note	implicit-cast-used-as-lvalue-type	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value with this type
+30064	note	implicit-cast-used-as-lvalue	argument was implicitly cast from '~from:Type' to '~to:Type', and Slang does not support using an implicit cast as an l-value for this usage
+30067	err	mutating-method-on-function-input-parameter-error	mutating method called on `in` parameter
+30068	warning	mutating-method-on-function-input-parameter-warning	mutating method called on `in` parameter
+30071	err	var-cannot-be-unsized	cannot instantiate unsized type
+30072	err	param-cannot-be-unsized	function parameter cannot be unsized
+30075	err	cannot-specialize-generic	cannot specialize generic
+30077	err	concrete-argument-to-output-interface	concrete type passed to interface-typed output parameter
+30078	err	coherent-keyword-on-a-pointer	cannot have coherent qualifier on pointer
+30079	err	cannot-take-constant-pointers	cannot take address of immutable object
+30080	err	ambiguous-conversion	ambiguous conversion
+30081	warning	unrecommended-implicit-conversion	implicit conversion not recommended
+30082	warning	implicit-conversion-to-double	implicit float-to-double conversion
+30083	err	count-of-argument-is-invalid	invalid countof argument
+30084	err	float-bit-cast-type-mismatch	bit cast type mismatch
+30085	err	float-bit-cast-requires-constant	bit cast requires constant
+30086	err	size-of-data-layout-is-invalid	invalid data layout for sizeof/alignof
+30091	err	try-invoke-callee-should-throw	callee in 'try' does not throw
+30092	err	callee-of-try-call-must-be-func	callee in 'try' must be a function
+30094	err	must-use-try-clause-to-call-a-throw-func	callee may throw, use 'try'
+30095	err	error-type-of-callee-incompatible-with-caller	incompatible error types
+30096	err	differential-type-should-serve-as-its-own-differential-type	invalid differential type
+30097	err	function-not-marked-as-differentiable	function not differentiable
+30098	err	non-static-member-function-not-allowed-as-diff-operand	non-static function reference not allowed
+30099	err	size-of-argument-is-invalid	invalid sizeof argument
+30100	err	static-ref-to-non-static-member	type cannot refer to non-static member
+30101	err	cannot-dereference-type	cannot dereference type
+30102	err	decl-not-allowed	declaration not allowed here
+30103	err	expect-type-pack-after-each	expected type pack after 'each'
+30104	err	each-expr-must-be-inside-expand-expr	'each' must be inside 'expand'
+30105	err	expand-term-captures-no-type-packs	'expand' captures no type packs
+30106	err	improper-use-of-type	type cannot be used in this context
+30107	err	parameter-pack-must-be-const	parameter pack must be 'const'
+30111	err	return-type-mismatch-inside-lambda	lambda return type mismatch
+30112	err	non-copyable-type-captured-in-lambda	non-copyable type captured
+30113	err	uncaught-throw-inside-defer	'throw' requires 'catch' inside defer
+30114	err	uncaught-try-inside-defer	'try' requires 'catch' inside defer
+30115	err	uncaught-throw-in-non-throw-func	uncaught 'throw' in non-throwing function
+30116	err	throw-type-incompatible-with-error-type	throw type incompatible with error type
+30117	err	forward-reference-in-generic-constraint	forward reference in generic constraint
+30118	err	cannot-mix-differentiable-value-and-ptr-outputs	cannot mix differentiable value types with differentiable pointer outputs
+30119	err	reading-from-write-only	cannot read from writeonly
+30120	err	static-ref-to-this	static function cannot refer to non-static member via `this`
+30121	err	differentiable-member-should-have-corresponding-field-in-diff-type	missing field in differential type
+30122	err	forward-reference-in-generic-default-initializer	forward reference in generic default initializer
+30123	warning	cannot-synthesize-dadd-dzero-for-custom-differential	cannot synthesize complete differential method
+30300	err	is-operator-value-must-be-interface-type	'is'/'as' operator requires interface-typed expression
+30301	err	is-operator-cannot-use-interface-as-rhs	cannot use 'is' with interface on right-hand side
+30302	err	as-operator-cannot-use-interface-as-rhs	cannot use 'as' with interface on right-hand side
+30303	err	value-requirement-must-be-compile-time-const	value requirement requires static const
+30304	err	is-as-on-unrelated-concrete-types	'is'/'as' on unrelated concrete types
+30305	err	global-gen-param-in-global-scope-only	type_param outside global scope
+30306	err	static-const-requirement-must-be-int-or-bool	invalid static const requirement type
+30310	err	type-is-not-differentiable	type is not differentiable
+30311	err	type-cannot-conform-to-both-value-and-pointer-diff-interfaces	type cannot conform to both value and pointer differentiation interfaces
+30312	err	interface-requirement-cannot-be-override	interface requirement cannot override
+30313	err	treat-as-differentiable-on-interface-requirement	[TreatAsDifferentiable] cannot be applied to interface requirement
+30314	err	maybe-differentiable-on-non-interface-requirement	[MaybeDifferentiable] cannot be applied to non-interface requirement
+30315	err	optional-has-diff-type-info-constraint-is-invalid	optional __hasDiffTypeInfo constraint invalid
+30316	err	type-does-not-have-diff-type-info	type does not have diff type info
+30317	err	non-method-interface-requirement-cannot-have-body	interface requirement has body
+30400	err	cannot-define-ptr-type-to-managed-resource	pointer to managed resource invalid
+30402	err	invalid-constraint-sub-type	type '~type:Type' is not a valid left hand side of a type constraint
+30403	err	required-constraint-is-not-checked	the constraint providing '~decl:Decl' is optional and must be checked with an 'is' statement before usage
+30404	err	invalid-equality-constraint-sup-type	type '~type:Type' is not a proper type to use in a generic equality constraint
+30405	err	no-valid-equality-constraint-sub-type	generic equality constraint requires at least one operand to be dependant on the generic declaration
+30406	note	invalid-equality-constraint-sub-type	type '~type:Type' cannot be constrained by a type equality
+30407	warning	failed-equality-constraint-canonical-order	failed to resolve canonical order of generic equality constraint
+30410	err	pack-query-argument-is-invalid	invalid ~queryName argument
+30411	err	empty-pack-query-is-invalid	cannot apply ~queryName to an empty pack
+30412	err	pack-query-requires-non-empty-pack	cannot apply ~queryName to a pack that may be empty
+30413	err	invalid-non-empty-pack-constraint-target	`nonempty(...)` requires a generic type pack or value pack parameter
+30414	err	empty-pack-does-not-satisfy-non-empty-constraint	empty pack does not satisfy `nonempty(...)` constraint
+30415	err	optional-non-empty-pack-constraint-is-invalid	`optional nonempty(...)` is not meaningful
+30416	err	non-empty-pack-constraint-target-must-be-from-current-generic	`nonempty(...)` target must be a generic pack parameter declared in the current generic
+30417	err	shape-pack-argument-is-invalid	invalid ~opName argument
+30418	err	shape-pack-rank-mismatch	~opName requires packs of the same rank
+30419	err	shape-pack-axis-out-of-range	~opName axis is out of range
+30420	err	shape-concat-non-axis-mismatch	__shapeConcat requires non-axis dimensions to match
+30421	err	shape-permute-order-length-mismatch	__shapePermute requires an order pack with matching rank
+30422	err	shape-permute-index-out-of-range	__shapePermute index is out of range
+30423	err	shape-permute-duplicate-index	__shapePermute order contains a duplicate index
+30424	err	shape-pack-no-valid-axis	~opName has no valid axis
+30425	err	shape-concat-no-valid-axis	__shapeConcat has no valid axis
+30426	err	shape-permute-duplicate-equivalent-index	__shapePermute order contains a duplicate index
+30499	note	use-let-for-generic-value-param	use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'
+30500	err	included-file-missing-implementing	missing 'implementing' declaration
+30501	err	included-file-missing-implementing-do-you-mean-import	missing 'implementing' declaration
+30502	err	included-file-does-not-implement-current-module	module name mismatch in included file

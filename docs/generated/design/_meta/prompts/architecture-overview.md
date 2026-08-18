@@ -18,7 +18,14 @@ tree before.
 1. `# Architectural Overview` (title)
 2. `## Purpose` — one paragraph naming Slang's role (a shading-language
    compiler) and the public artefacts it produces (`slangc`, the
-   `libslang` shared library, runtime bindings).
+   `slang-compiler` shared library, runtime bindings including the
+   WebAssembly bindings). Do not call the library `libslang`: the build
+   sets `OUTPUT_NAME slang-compiler`
+   ([../../../../source/slang/CMakeLists.txt](../../../../source/slang/CMakeLists.txt)
+   lines 310 and 351), and `libslang` / `slang.dll` exist only as
+   backward-compatibility aliases gated on `SLANG_ENABLE_SLANG_PROXY`
+   (lines 425 and 515). Naming `libslang` as the primary artefact was a
+   critical review finding in a past round.
 3. `## Top-level decomposition` — describe the major subsystem layers in
    the source tree:
    - `source/core/` — platform-agnostic C++ utilities.
@@ -36,12 +43,15 @@ tree before.
    - `source/slang-llvm/`, `source/slang-glslang/`,
      `source/slang-dispatcher/` — downstream-compiler shims.
    - `tools/`, `tests/`, `extras/`, `external/` — auxiliary trees.
-   Each layer gets a one- to three-sentence description anchored to a
-   specific representative file.
+     Each layer gets a one- to three-sentence description anchored to a
+     specific representative file.
 4. `## Compilation request lifecycle` — describe (without becoming a
    pipeline document) the high-level objects that flow through
    compilation: `CompileRequest`, `TranslationUnitRequest`,
-   `EntryPointRequest`, `TargetRequest`, `Linkage`, `Module`, `Session`,
+   `FrontEndEntryPointRequest` (there is no type named
+   `EntryPointRequest`; an earlier revision of this prompt said there
+   was, and the page it produced named a nonexistent type),
+   `TargetRequest`, `Linkage`, `Module`, `Session`,
    `IComponentType`. Cite where they are declared
    ([slang-compile-request.h](../../../../source/slang/slang-compile-request.h),
    [slang-module.h](../../../../source/slang/slang-module.h),

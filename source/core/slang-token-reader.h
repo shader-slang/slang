@@ -139,7 +139,7 @@ public:
     }
 };
 
-class TextFormatException : public Exception
+class SLANG_EXCEPTION_TYPE_VISIBLE TextFormatException : public Exception
 {
 public:
     TextFormatException(String message)

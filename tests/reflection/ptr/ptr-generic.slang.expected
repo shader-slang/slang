@@ -9,7 +9,10 @@ standard output = {
             "binding": {"kind": "uniform", "offset": 0, "size": 8, "elementStride": 0},
             "type": {
                 "kind": "pointer",
-                "valueType": "GenericStruct"
+                "valueType": "GenericStruct",
+                "sizes": [
+                    {"kind": "uniform", "value": 8, "alignment": 8}
+                ]
             }
         },
         {
@@ -21,8 +24,14 @@ standard output = {
                 "access": "readWrite",
                 "resultType": {
                     "kind": "scalar",
-                    "scalarType": "int32"
-                }
+                    "scalarType": "int32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                },
+                "sizes": [
+                    {"kind": "uniform", "value": 16, "alignment": 8}
+                ]
             }
         }
     ],
@@ -40,7 +49,10 @@ standard output = {
                         "elementType": {
                             "kind": "scalar",
                             "scalarType": "uint32"
-                        }
+                        },
+                        "sizes": [
+
+                        ]
                     }
                 }
             ],

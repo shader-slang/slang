@@ -31,14 +31,17 @@ related autodiff helpers.
   - **Rematerialization** (`RematFunc*`, `checkpointObj`).
   - **Diagnostics and reporting** (`ReportCheckpointStore`,
     `DiffTypeInfo`).
-- Most autodiff opcodes are `(synthesized)` — they are introduced
-  by the autodiff IR passes
+- Most autodiff opcodes are introduced by the autodiff IR passes
   (`slang-ir-autodiff*.cpp`,
   `slang-ir-differential-pair-overload-decoration.cpp`,
-  ...). Cite that in the prose around the table and use `(synthesized)`
-  in the `AST origin` column rather than guessing AST nodes.
+  ...) rather than lowered from an AST node. Say so in the prose around
+  the table, and in the `AST origin` column **name the specific pass or
+  function that constructs the opcode** — do not write `(synthesized)`,
+  which is a retired catch-all (see the column contract in
+  [_common.md](_common.md)). Where nothing in `source/` constructs an
+  opcode, write **no producer at HEAD**. Never guess an AST node.
 - Cross-link to:
-  - [types.md](types.md) for the differential-pair *types*.
+  - [types.md](types.md) for the differential-pair _types_.
   - [values.md](values.md) for ordinary make/extract patterns
     that this family mirrors.
   - [../../design/autodiff.md](../../design/autodiff.md) for the
@@ -72,7 +75,8 @@ Cover at least:
 ## Quality checklist (in addition to the universal one and the family contract)
 
 - [ ] Every Lua entry inside the three `*Base` groups is listed.
-- [ ] Every `(synthesized)` row is consistent with the autodiff pass
-      that introduces it (cite the pass file name in the family-level
-      prose).
+- [ ] Every pass-produced row names the autodiff pass that introduces
+      it, and that attribution is consistent with the pass file cited
+      in the family-level prose. No row uses the retired catch-all
+      `(synthesized)`.
 - [ ] Hierarchy diagram shows the three `*Base` groups.

@@ -57,8 +57,19 @@ pass interact with the rest of the pipeline.
     CUDAHeader/PyTorch arm).
   - `lowerCooperativeVectors` runs in the conditional CUDA arm
     (line ~1461).
-  - `lowerCombinedTextureSamplers` runs for CUDA via the CPU-like
-    fallthrough (line ~1517-1522).
+  - `lowerCombinedTextureSamplers` does **not** run for CUDA. CUDA
+    reaches the `default:` arm of that `switch`, and the arm falls
+    through to the HLSL/Metal/WGSL cases only when
+    `ArtifactDescUtil::isCpuLikeTarget(artifactDesc)` holds — which it
+    does not for CUDA, because a CUDA artifact is `Kind::Source` with
+    payload `CUDA` while `isCpuLikeTarget` accepts only payload `C` or
+    `Cpp`, by exact equality rather than `isDerivedFrom`
+    ([slang-artifact-desc-util.cpp](../../../../source/compiler-core/slang-artifact-desc-util.cpp)
+    line 612). So CUDA simply breaks. An earlier revision of this prompt
+    claimed the opposite and produced a critical finding on the page;
+    more generally, **do not treat CUDA as CPU-like** — for the same
+    reason, `performTypeInlining` and `checkGetStringHashInsts` both do
+    run for CUDA.
   - `shouldLegalizeExistentialAndResourceTypes = false` is set
     for CUDA at line 2504 (in `emitEntryPointsSourceFromIR`),
     causing several Phase-B passes to skip:
@@ -80,7 +91,7 @@ pass interact with the rest of the pipeline.
   - `undoParameterCopy` (line ~2048 CPU/CUDA/Metal arm).
   - `eliminatePhis` with **default** options.
   - `applyVariableScopeCorrection` runs (line ~2324 `target !=
-    SPIRV`).
+SPIRV`).
 - **Phase D — CUDA emit and downstream tools.** From
   `emitEntryPointsSourceFromIR` through the `CUDASourceEmitter`
   (line ~2459), `simplifyForEmit`, and `sourceEmitter->emitModule`.
@@ -128,13 +139,18 @@ Cover at least:
 - `lowerBuiltinTypesForKernelEntryPoints` — strips Slang-only
   shader types from kernel signatures.
 - The effect of `shouldLegalizeExistentialAndResourceTypes =
-  false` — explain which Phase-B passes skip and why (CUDA's C++
+false` — explain which Phase-B passes skip and why (CUDA's C++
   type system handles existentials and resources directly).
 - The CUDA-immutable-load pass
   ([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp))
   if it appears in the pipeline; verify whether it is invoked
   from `linkAndOptimizeIR`.
-- `eliminatePhis` with default options — contrast with SPIR-V.
+- `eliminatePhis` with default options. Do **not** write that this
+  contrasts with SPIR-V: the defaults in
+  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
+  `useRegisterAllocation = true`, and the direct-SPIR-V branch assigns
+  those same two values, so there is no difference to contrast.
 
 ## Quality checklist (in addition to the universal one and the contract)
 

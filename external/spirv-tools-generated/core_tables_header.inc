@@ -77,6 +77,7 @@ enum Extension : uint32_t {
   kSPV_EXT_fragment_shader_interlock,
   kSPV_EXT_long_vector,
   kSPV_EXT_mesh_shader,
+  kSPV_EXT_ocp_microscaling_types,
   kSPV_EXT_opacity_micromap,
   kSPV_EXT_optnone,
   kSPV_EXT_physical_storage_buffer,
@@ -224,7 +225,10 @@ enum Extension : uint32_t {
   kSPV_QCOM_cooperative_matrix_conversion,
   kSPV_QCOM_image_processing,
   kSPV_QCOM_image_processing2,
+  kSPV_QCOM_image_processing3,
+  kSPV_QCOM_multiple_wait_queues,
   kSPV_QCOM_tile_shading,
+  kSPV_SAMSUNG_intrinsic,
   kSPV_VALIDATOR_ignore_type_decl_unique,
   kSPV_VALVE_mixed_float_dot_product,
 };

@@ -6,7 +6,7 @@ See [_common.md](_common.md) for the universal rules and the
 ## Target
 
 Produce `docs/generated/design/ir-reference/metadata.md` — the
-per-opcode reference for IR metadata families that are *not*
+per-opcode reference for IR metadata families that are _not_
 decorations: `Layout` (around line 2617), `Attr` (around line 2650),
 `Debug*` (around lines 2714-2750), and `SPIRVAsmOperand` (around
 line 2754).
@@ -18,7 +18,7 @@ line 2754).
     (`VarLayout`, `EntryPointLayout`, `TypeLayout`,
     `StructLayout`, `OffsetAttr`, `SizeAttr`, ...).
   - **Attribute** — `Attr` parent and its children
-    (general-purpose IR attributes that are *not* decorations).
+    (general-purpose IR attributes that are _not_ decorations).
   - **Debug info** — `DebugLine`, `DebugValue`, `DebugFunction`,
     `DebugScope`, `DebugBuildIdentifier`, `DebugCompilationUnit`,
     `DebugSource`, `DebugInlinedAt`, ... Cite the SPIR-V non-semantic
@@ -26,8 +26,12 @@ line 2754).
     to a SPIR-V instruction; do not over-claim.
   - **SPIR-V inline asm operands** — `SPIRVAsmOperand` family and
     related opcodes used by the inline `__intrinsic_asm` mechanism.
-- The `AST origin` column for these opcodes is usually
-  `(synthesized)` — they are introduced by IR passes
+- Most of these opcodes are introduced by IR passes rather than by AST
+  lowering, so the `AST origin` column must **name the producing pass**
+  — the retired catch-all `(synthesized)` is not acceptable, and an
+  opcode nothing in `source/` constructs is marked **no producer at
+  HEAD** (see the column contract in [_common.md](_common.md)). The
+  usual producers are
   (`slang-ir-insert-debug-value-store.cpp` for debug ops,
   `slang-ir-layout-impl.cpp` for layout, the SPIR-V emitter for
   asm operands). For `Layout` opcodes that originate from
@@ -49,10 +53,10 @@ Cover at least:
 
 ## Forbidden content
 
-- Layout *algorithm* — see
+- Layout _algorithm_ — see
   [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) and the
   `slang-ir-layout*.cpp` files.
-- Debug-info *emission* — see
+- Debug-info _emission_ — see
   [../pipeline/06-emit.md](../pipeline/06-emit.md) and
   `slang-emit-spirv.cpp`.
 

@@ -1,0 +1,46 @@
+schema_version: 1
+id: slangi-vm-bool-false-arg-evaluates-as-true
+bundle: language-reference/expressions-literal
+suspected_kind: wrong-codegen
+title: "[slangi] bool `false` arg evaluates as `true` in callee body"
+observed_at: 2026-06-01T13:30:00+00:00
+scope: cpp
+evidence:
+  command: ./build/Release/bin/slangi <repro.slang>
+  source_slang: docs/generated/tests/language-reference/expressions-literal/bool-true-false.slang
+  observed_summary: |
+    A function `int fn(bool x) { if (x) return 1; else return 2; }` called as
+    `fn(false)` returns `1` (the `true` branch) instead of `2`. The same
+    pattern called as `fn(true)` correctly returns `1`. Confirmed via a
+    minimal reduction: `fn(false)` consistently evaluates as if `x == true`
+    inside the callee body. `-target hlsl` and `-target cpu` emit the
+    correct call sites; only `slangi` (the bytecode interpreter) is wrong,
+    so the bug is in the VM, not the frontend.
+  exit_code: 0
+  minimized_repro: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    int fn(bool x) { if (x) return 1; else return 2; }
+    void main()
+    {
+        //CHECK: a=1 b=2
+        printf("a=%d b=%d\n", fn(true), fn(false));
+        // Actual: a=1 b=1
+    }
+expected:
+  claim: |
+    A function called with the `false` literal as a bool argument must see
+    `false` inside its body. The language reference's `BooleanLiteral`
+    production fixes the spellings as `'true' | 'false'`, and the
+    `false` literal is by definition the bool value `false`.
+  citation_kind: doc
+  citation: docs/language-reference/expressions-literal.md
+provenance:
+  agent_model: claude-opus-4-7
+  source_commit: d25453d7f0b4867db4cb5eabf34fb6cd088cf596
+  doc_anchor: docs/language-reference/expressions-literal.md#boolean-literal-expressions
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Test bug: ruled out via two independent reductions, both with explicit if/else and with ternary inside an overloaded function. Both reproduce on slangi only."
+    - "Frontend bug: ruled out by inspecting -target hlsl emit, which shows the correct probe(true) / probe(false) call sites."
+    - "Related to #11375 (slangi VM constants-OOB on printf-after-short-circuit): the symptom shape is different (this is a wrong-value, not a VM abort), but both are in the same VM. May share a root cause."

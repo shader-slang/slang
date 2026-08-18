@@ -1,6 +1,6 @@
 #include "slang-ir-any-value-marshalling.h"
 
-#include "../core/slang-math.h"
+#include "core/slang-math.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -140,45 +140,19 @@ struct AnyValueMarshallingContext
             bool isBindless,
             IRIntegerValue sizeInBytes) = 0;
 
-        void ensureOffsetAt4ByteBoundary()
-        {
-            if (intraFieldOffset)
-            {
-                fieldOffset++;
-                intraFieldOffset = 0;
-            }
-        }
-        void ensureOffsetAt8ByteBoundary()
-        {
-            ensureOffsetAt4ByteBoundary();
-            if ((fieldOffset & 1) != 0)
-                fieldOffset++;
-        }
-        void ensureOffsetAt2ByteBoundary()
-        {
-            if (intraFieldOffset == 0)
-                return;
-            if (intraFieldOffset <= 2)
-            {
-                intraFieldOffset = 2;
-                return;
-            }
-            fieldOffset++;
-            intraFieldOffset = 0;
-            return;
-        }
-
+        // Round the cursor up to the next multiple of `n` bytes, skipping
+        // the padding bytes the payload layout has at this position. The
+        // fixed-size variants are convenience wrappers.
         void ensureOffsetAtNByteBoundary(int n)
         {
-            if (n == 1)
-                return;
-            else if (n == 2)
-                ensureOffsetAt2ByteBoundary();
-            else if (n == 4)
-                ensureOffsetAt4ByteBoundary();
-            else if (n == 8)
-                ensureOffsetAt8ByteBoundary();
+            SLANG_ASSERT(n > 0);
+            auto alignedByteOffset = (uint32_t)align(fieldOffset * 4 + intraFieldOffset, n);
+            fieldOffset = alignedByteOffset / 4;
+            intraFieldOffset = alignedByteOffset % 4;
         }
+        void ensureOffsetAt2ByteBoundary() { ensureOffsetAtNByteBoundary(2); }
+        void ensureOffsetAt4ByteBoundary() { ensureOffsetAtNByteBoundary(4); }
+        void ensureOffsetAt8ByteBoundary() { ensureOffsetAtNByteBoundary(8); }
 
         void advanceOffset(uint32_t bytes)
         {
@@ -281,6 +255,22 @@ struct AnyValueMarshallingContext
         case kIROp_StructType:
             {
                 auto structType = cast<IRStructType>(dataType);
+
+                // Align the struct's start to its natural alignment,
+                // and pad its end out to its natural size.
+                IRSizeAndAlignment structLayout;
+                bool hasStructLayout =
+                    SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
+                        context->targetRequest,
+                        dataType,
+                        &structLayout)) &&
+                    structLayout.size != IRSizeAndAlignment::kIndeterminateSize &&
+                    structLayout.size >= 0;
+                if (hasStructLayout)
+                    context->ensureOffsetAtNByteBoundary((int)structLayout.alignment);
+                uint32_t startFieldOffset = context->fieldOffset;
+                uint32_t startIntraFieldOffset = context->intraFieldOffset;
+
                 for (auto field : structType->getFields())
                 {
                     auto fieldAddr = builder->emitFieldAddress(
@@ -288,6 +278,18 @@ struct AnyValueMarshallingContext
                         concreteTypedVar,
                         field->getKey());
                     emitMarshallingCode(builder, context, fieldAddr);
+                }
+
+                if (hasStructLayout)
+                {
+                    auto packedSize = (int64_t)(context->fieldOffset - startFieldOffset) * 4 +
+                                      (int64_t)context->intraFieldOffset - startIntraFieldOffset;
+                    // A struct that starts at its natural alignment packs
+                    // within its natural size; a violation means the walk
+                    // and the natural layout have diverged.
+                    SLANG_ASSERT(packedSize <= structLayout.size);
+                    if (packedSize < structLayout.size)
+                        context->advanceOffset(uint32_t(structLayout.size - packedSize));
                 }
                 break;
             }
@@ -1195,13 +1197,24 @@ struct AnyValueMarshallingContext
     void processPackInst(IRPackAnyValue* packInst)
     {
         auto operand = packInst->getValue();
-        auto func = ensureMarshallingFunc(
-            operand->getDataType(),
-            cast<IRAnyValueType>(packInst->getDataType()));
+        auto resultType = packInst->getDataType();
+
+        // Earlier lowering can make a symbolic AnyValue pack physically trivial. For example,
+        // lowering `UntaggedUnion({Foo, none})` to `Foo` turns `PackAnyValue<Foo>(foo)` into an
+        // identity. Remove that identity here, where all AnyValue packs are normally lowered, but
+        // retain genuine packs whose result is still an `IRAnyValueType`.
+        if (operand->getDataType() == resultType && !as<IRAnyValueType>(resultType))
+        {
+            packInst->replaceUsesWith(operand);
+            packInst->removeAndDeallocate();
+            return;
+        }
+
+        auto func = ensureMarshallingFunc(operand->getDataType(), cast<IRAnyValueType>(resultType));
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(packInst);
-        auto callInst = builder->emitCallInst(packInst->getDataType(), func.packFunc, 1, &operand);
+        auto callInst = builder->emitCallInst(resultType, func.packFunc, 1, &operand);
         packInst->replaceUsesWith(callInst);
         packInst->removeAndDeallocate();
     }
@@ -1209,14 +1222,23 @@ struct AnyValueMarshallingContext
     void processUnpackInst(IRUnpackAnyValue* unpackInst)
     {
         auto operand = unpackInst->getValue();
-        auto func = ensureMarshallingFunc(
-            unpackInst->getDataType(),
-            cast<IRAnyValueType>(operand->getDataType()));
+        auto resultType = unpackInst->getDataType();
+
+        // Apply the same normalization to an unpack whose symbolic input has lowered to its
+        // concrete result type. For example, `UnpackAnyValue<Foo>(foo)` becomes `foo`; handling it
+        // in the ordinary marshalling pass keeps direct-payload lowering free of a cleanup scan.
+        if (operand->getDataType() == resultType && !as<IRAnyValueType>(resultType))
+        {
+            unpackInst->replaceUsesWith(operand);
+            unpackInst->removeAndDeallocate();
+            return;
+        }
+
+        auto func = ensureMarshallingFunc(resultType, cast<IRAnyValueType>(operand->getDataType()));
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(unpackInst);
-        auto callInst =
-            builder->emitCallInst(unpackInst->getDataType(), func.unpackFunc, 1, &operand);
+        auto callInst = builder->emitCallInst(resultType, func.unpackFunc, 1, &operand);
         unpackInst->replaceUsesWith(callInst);
         unpackInst->removeAndDeallocate();
     }

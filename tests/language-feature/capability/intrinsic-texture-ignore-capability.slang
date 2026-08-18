@@ -64,7 +64,7 @@ bool textureFuncs( Sampler1D<T> gsampler1D
 {
     typealias gvec4 = vector<T.Element,4>;
 
-    constexpr ivec2 ivec2_0 = ivec2(0);
+    const ivec2 ivec2_0 = ivec2(0);
 
     return true
         // 8.9.1. Texture Query Functions
@@ -373,7 +373,7 @@ bool itextureFuncs(Sampler1D<T> gsampler1D
 {
     typealias gvec4 = vector<T.Element, 4>;
 
-    constexpr ivec2 ivec2_0 = ivec2(0);
+    const ivec2 ivec2_0 = ivec2(0);
 
     return true
         // 8.9.1. Texture Query Functions

@@ -1094,6 +1094,156 @@ SLANG_UNIT_TEST(slangVMAllowsInteriorWorkingSetPointerOffsetBack)
 }
 
 #if SLANG_ENABLE_VALIDATION_VM_BYTECODE
+SLANG_UNIT_TEST(slangVMAllowsParameterPointerOffsetIntoCallerWorkingSet)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    while (constants.getCount() % sizeof(uint32_t))
+        constants.add(0);
+    uint32_t elementIndex = 1;
+    auto indexOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, elementIndex);
+    uint32_t value = 123;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, value);
+
+    List<uint8_t> callerCode;
+
+    List<VMOperand> getWorkingSetPtrOperands;
+    getWorkingSetPtrOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    appendVMTestInst(
+        callerCode,
+        VMOp::GetWorkingSetPtr,
+        8,
+        getWorkingSetPtrOperands.getArrayView());
+
+    List<VMOperand> callOperands;
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 16, 0));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionFuncs, 1, 0));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    appendVMTestInst(callerCode, VMOp::Call, 0, callOperands.getArrayView());
+
+    List<VMOperand> retOperands;
+    retOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 12, sizeof(value)));
+    appendVMTestInst(callerCode, VMOp::Ret, sizeof(value), retOperands.getArrayView());
+
+    List<uint8_t> calleeCode;
+
+    List<VMOperand> getElementPtrOperands;
+    getElementPtrOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 8, sizeof(void*)));
+    getElementPtrOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    getElementPtrOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, indexOffset, sizeof(elementIndex)));
+    appendVMTestInst(
+        calleeCode,
+        VMOp::GetElementPtr,
+        sizeof(value),
+        getElementPtrOperands.getArrayView());
+
+    List<VMOperand> storeOperands;
+    storeOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 8, sizeof(void*)));
+    storeOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+    appendVMTestInst(calleeCode, VMOp::Store, sizeof(value), storeOperands.getArrayView());
+
+    List<VMOperand> noOperands;
+    appendVMTestInst(calleeCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    List<uint32_t> parameterOffsets;
+    parameterOffsets.add(0);
+    auto blob = createVMTestBlobWithTwoFunctions(
+        callerCode,
+        24,
+        sizeof(value),
+        calleeCode,
+        16,
+        0,
+        parameterOffsets.getArrayView(),
+        sizeof(void*),
+        constants);
+
+    ComPtr<slang::IByteCodeRunner> runner;
+    slang::ByteCodeRunnerDesc runnerDesc = {};
+    SLANG_CHECK(slang_createByteCodeRunner(&runnerDesc, runner.writeRef()) == SLANG_OK);
+    SLANG_CHECK(runner->loadModule(blob) == SLANG_OK);
+    SLANG_CHECK(runner->selectFunctionByIndex(0) == SLANG_OK);
+    SLANG_CHECK(runner->execute(nullptr, 0) == SLANG_OK);
+    size_t returnValSize = 0;
+    auto returnVal = (uint32_t*)runner->getReturnValue(&returnValSize);
+    SLANG_CHECK(returnValSize == sizeof(value));
+    SLANG_CHECK(*returnVal == value);
+}
+
+SLANG_UNIT_TEST(slangVMRejectsParameterPointerAccessOutsideCallerWorkingSet)
+{
+    List<uint8_t> constants;
+    appendVMTestMainString(constants);
+    while (constants.getCount() % sizeof(uint32_t))
+        constants.add(0);
+    uint32_t elementIndex = 16;
+    auto indexOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, elementIndex);
+    uint32_t value = 123;
+    auto valueOffset = (uint32_t)constants.getCount();
+    appendVMTestValue(constants, value);
+
+    List<uint8_t> callerCode;
+
+    List<VMOperand> getWorkingSetPtrOperands;
+    getWorkingSetPtrOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    appendVMTestInst(
+        callerCode,
+        VMOp::GetWorkingSetPtr,
+        8,
+        getWorkingSetPtrOperands.getArrayView());
+
+    List<VMOperand> callOperands;
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 12, 0));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionFuncs, 1, 0));
+    callOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    appendVMTestInst(callerCode, VMOp::Call, 0, callOperands.getArrayView());
+
+    List<VMOperand> noOperands;
+    appendVMTestInst(callerCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    List<uint8_t> calleeCode;
+
+    List<VMOperand> getElementPtrOperands;
+    getElementPtrOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 8, sizeof(void*)));
+    getElementPtrOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 0, sizeof(void*)));
+    getElementPtrOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, indexOffset, sizeof(elementIndex)));
+    appendVMTestInst(
+        calleeCode,
+        VMOp::GetElementPtr,
+        sizeof(value),
+        getElementPtrOperands.getArrayView());
+
+    List<VMOperand> storeOperands;
+    storeOperands.add(makeVMTestOperand(kSlangByteCodeSectionWorkingSet, 8, sizeof(void*)));
+    storeOperands.add(
+        makeVMTestOperand(kSlangByteCodeSectionConstants, valueOffset, sizeof(value)));
+    appendVMTestInst(calleeCode, VMOp::Store, sizeof(value), storeOperands.getArrayView());
+    appendVMTestInst(calleeCode, VMOp::Ret, 0, noOperands.getArrayView());
+
+    List<uint32_t> parameterOffsets;
+    parameterOffsets.add(0);
+    auto blob = createVMTestBlobWithTwoFunctions(
+        callerCode,
+        16,
+        0,
+        calleeCode,
+        16,
+        0,
+        parameterOffsets.getArrayView(),
+        sizeof(void*),
+        constants);
+
+    expectVMExecuteFails(blob);
+}
+
 SLANG_UNIT_TEST(slangVMRejectsWorkingSetEndPointerOffsetForward)
 {
     List<uint8_t> constants;

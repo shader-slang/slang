@@ -15,7 +15,7 @@ Relevant Lua entries are scattered: `specialize`, `lookupWitness` /
 `LookupWitnessMethod` (around line 932-933), `MakeExistential`,
 `ExtractExistentialValue` / `Type` / `WitnessTable` (around lines
 2477-...), `BindExistentialsType` / `BoundInterface` (handled as
-*types* in [types.md](types.md) but cross-linked here), `RTTIObject`
+_types_ in [types.md](types.md) but cross-linked here), `RTTIObject`
 / `getSequentialID`, `bind_global_generic_param`, `thisTypeWitness`,
 `TypeEqualityWitness`.
 
@@ -38,8 +38,11 @@ Relevant Lua entries are scattered: `specialize`, `lookupWitness` /
   [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp):
   `lowerGenericApp`, `lowerWitnessLookup`,
   `lowerExistentialMake*` / `lowerExistentialExtract*`,
-  `lowerCastToInterface`. Several of these opcodes are
-  `(synthesized)` — produced only by IR passes.
+  `lowerCastToInterface`. Several of these opcodes are produced only
+  by IR passes; name the specific pass rather than writing the retired
+  catch-all `(synthesized)`, and mark an opcode nothing in `source/`
+  constructs as **no producer at HEAD** (see the column contract in
+  [_common.md](_common.md)).
 - Cross-link to [types.md](types.md) for `BindExistentialsType`,
   `BoundInterface`, `AnyValueType`, and the dynamic-dispatch type
   family.

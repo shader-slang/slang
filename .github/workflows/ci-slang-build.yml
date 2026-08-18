@@ -63,6 +63,8 @@ jobs:
       IS_FORK_PR: >-
         ${{ inputs.is-fork-pr
             || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true) }}
+      # Keep macOS CI from spending time on DXC source builds.
+      SLANG_CI_DXC_BUILD_FROM_SOURCE: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
 
     defaults:
       run:
@@ -78,7 +80,7 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
           ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
@@ -87,9 +89,14 @@ jobs:
           fetch-depth: "250"
           fetch-tags: true
 
-      # Restore sccache local cache from master
+      # Restore sccache local cache from master. sccache is a build
+      # accelerator, not a correctness input: a cache miss or a transient
+      # cache-service error must degrade to a slower (cold) build, never fail
+      # the job. Without continue-on-error a 5xx/timeout from the cache backend
+      # fails the build step, which in the merge queue evicts the whole batch.
       - name: Restore sccache cache
-        uses: actions/cache/restore@v4
+        continue-on-error: true
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
           key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
@@ -99,7 +106,7 @@ jobs:
       # Authenticate to Google Cloud for LLVM downloads (skip for fork PRs)
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
@@ -136,7 +143,7 @@ jobs:
 
       - name: Upload IR version check results
         if: ${{ steps.check-ir-versions.outputs.artifact_created == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ir-version-check-results
           path: ir-version-check-artifact/
@@ -172,8 +179,12 @@ jobs:
           if [[ "${{ inputs.platform }}" == "wasm" ]]; then
             git clone https://github.com/emscripten-core/emsdk.git
             pushd emsdk
-              ./emsdk install latest
-              ./emsdk activate latest
+              # Pin emsdk to a known-good version. An unpinned `latest`
+              # silently broke the wasm link step when emscripten 6.0.0
+              # shipped on 2026-06-04 (see #11481). 6.0.0 is the version
+              # that fix was validated against.
+              ./emsdk install 6.0.0
+              ./emsdk activate 6.0.0
               source ./emsdk_env.sh
             popd
             cmake --workflow --preset generators --fresh
@@ -223,6 +234,7 @@ jobs:
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
@@ -231,6 +243,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             else
@@ -240,6 +253,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
                 -DSLANG_IGNORE_ABORT_MSG=ON \
+                $SLANG_CI_DXC_BUILD_FROM_SOURCE \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             fi
@@ -252,6 +266,25 @@ jobs:
           elif command -v ccache &> /dev/null; then
             echo "📊 ccache statistics (post-build):"
             ccache --show-stats || true
+          fi
+
+      - name: Verify Vulkan-Headers was not fetched
+        if: inputs.platform != 'wasm'
+        run: |
+          vulkan_headers_fetch_dir="build/_deps/vulkan_headers-src"
+          if [[ -e "$vulkan_headers_fetch_dir" ]]; then
+            echo "::error title=Unexpected Vulkan-Headers download::Found $vulkan_headers_fetch_dir"
+            cat <<'EOF'
+          Slang owns the Vulkan-Headers checkout in external/vulkan. external/CMakeLists.txt sets
+          FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS so slang-rhi reuses that checkout instead of
+          downloading a second copy. Finding build/_deps/vulkan_headers-src means that redirect
+          stopped working. The two projects could then compile against different Vulkan header
+          versions.
+
+          Check that FETCHCONTENT_SOURCE_DIR_VULKAN_HEADERS is set before add_subdirectory(slang-rhi)
+          and that slang-rhi still declares the FetchContent dependency as vulkan_headers.
+          EOF
+            exit 1
           fi
 
       - name: Check documented compiler versions
@@ -319,14 +352,14 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
           path: |
             build/dist-${{inputs.config}}/**/ZIP/slang/*
             build.em/Release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
           path: artifacts-staging/
@@ -339,7 +372,7 @@ jobs:
       # caller from accidentally enabling fork-driven or /ci-driven cache writes.
       - name: Save sccache cache
         if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
           key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}

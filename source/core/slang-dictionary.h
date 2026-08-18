@@ -143,7 +143,18 @@ public:
     //
 
     // Removes all values from the map
-    void clear() { map.clear(); }
+    void clear()
+    {
+        if (!map.empty())
+            map.clear();
+    }
+
+    // Removes all values and releases backing storage.
+    void clearAndDeallocate()
+    {
+        InnerMap emptyMap(0, map.hash_function(), map.key_eq(), map.get_allocator());
+        map.swap(emptyMap);
+    }
 
     // Erases the value at the specified key if it exists
     void remove(const TKey& key) { map.erase(key); }
@@ -178,6 +189,7 @@ public:
     //
 
     std::size_t getCount() const { return map.size(); }
+    std::size_t getBucketCount() const { return map.bucket_count(); }
 
     //
     // Lookup
@@ -398,7 +410,9 @@ public:
 
 public:
     auto getCount() const { return dict.getCount(); }
+    auto getBucketCount() const { return dict.getBucketCount(); }
     void clear() { dict.clear(); }
+    void clearAndDeallocate() { dict.clearAndDeallocate(); }
     bool add(const T& obj) { return dict.addIfNotExists(obj, _DummyClass()); }
     bool add(T&& obj) { return dict.addIfNotExists(_Move(obj), _DummyClass()); }
     void remove(const T& obj) { dict.remove(obj); }

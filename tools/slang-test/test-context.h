@@ -3,15 +3,15 @@
 #ifndef TEST_CONTEXT_H_INCLUDED
 #define TEST_CONTEXT_H_INCLUDED
 
-#include "../../source/compiler-core/slang-downstream-compiler-util.h"
-#include "../../source/compiler-core/slang-downstream-compiler.h"
-#include "../../source/compiler-core/slang-json-rpc-connection.h"
-#include "../../source/core/slang-dictionary.h"
-#include "../../source/core/slang-platform.h"
-#include "../../source/core/slang-render-api-util.h"
-#include "../../source/core/slang-std-writers.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-tool-util.h"
+#include "compiler-core/slang-downstream-compiler-util.h"
+#include "compiler-core/slang-downstream-compiler.h"
+#include "compiler-core/slang-json-rpc-connection.h"
+#include "core/slang-dictionary.h"
+#include "core/slang-platform.h"
+#include "core/slang-render-api-util.h"
+#include "core/slang-std-writers.h"
+#include "core/slang-string-util.h"
+#include "core/slang-test-tool-util.h"
 #include "filecheck.h"
 #include "options.h"
 #include "slang-com-ptr.h"
@@ -128,6 +128,17 @@ public:
     /// True if can run unit tests
     bool canRunUnitTests() const { return options.apiOnly == false; }
 
+    /// How many requests this thread's test server has been asked to serve, counting the one
+    /// about to be sent. Reset whenever the connection is (re)created, so it is the age of the
+    /// CURRENT server process rather than a running total for the thread.
+    ///
+    /// Reported when a server dies, because it is the cheapest discriminator we have between
+    /// the two explanations for a death: a server that consistently dies around the same
+    /// ordinal is accumulating something across requests, while ordinals scattered uniformly
+    /// point outward at the machine. Neither is visible from the request that happened to be
+    /// in flight.
+    int advanceRPCRequestOrdinal();
+
     /// Given a spawn type, return the final spawn type.
     /// In particular we want 'Default' spawn type to vary by the environment (for example running
     /// on test server on CI)
@@ -205,10 +216,12 @@ public:
 
     Slang::IFileCheck* getFileCheck() { return m_fileCheck; };
 
+    /// Invoke after it has been determined that the LLVM render target is enabled
+    SlangResult locateLLVMFileCheck();
+
 protected:
     SlangResult _createJSONRPCConnection(Slang::RefPtr<Slang::JSONRPCConnection>& out);
 
-    SlangResult locateFileCheck();
 
     struct SharedLibraryTool
     {
@@ -218,6 +231,9 @@ protected:
     };
 
     Slang::List<Slang::RefPtr<Slang::JSONRPCConnection>> m_jsonRpcConnections;
+    /// Parallel to m_jsonRpcConnections: requests served by each thread's CURRENT server.
+    /// Indexed by thread, so it needs no lock for the same reason the connections do not.
+    Slang::List<int> m_rpcRequestOrdinals;
     Slang::List<TestReporter*> m_reporters;
     Slang::List<TestRequirements*> m_testRequirements = nullptr;
 

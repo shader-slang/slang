@@ -53,8 +53,8 @@ and how the emitted HLSL source flows into DXC (DXIL) or fxc
   `floatNonUniformResourceIndex` (line ~1980 `!isSPIRV`),
   `legalizeArrayReturnType` (line ~2151 `!isMetalTarget && !isSPIRV`),
   `legalizeUniformBufferLoad` (`isKhronosTarget || target == HLSL`),
-  `eliminatePhis` with **default** options (no register
-  allocation),
+  `eliminatePhis` with default options (which, note, _do_ use
+  register allocation — see below),
   `applyVariableScopeCorrection` (line ~2324 `target != SPIRV`).
 - **Phase D — HLSL emit and downstream tools.** From
   `emitEntryPointsSourceFromIR` (line ~2365) through the
@@ -71,7 +71,7 @@ and how the emitted HLSL source flows into DXC (DXIL) or fxc
 - Default to one node per `SLANG_PASS`; collapse only contiguous
   unconditional runs that exceed ~8 nodes.
 - Mention the historical name `legalizeEntryPointsForGLSL`
-  explicitly when it does *not* run for HLSL (it is in the
+  explicitly when it does _not_ run for HLSL (it is in the
   `case GLSL / SPIRV / SPIRVAssembly` arm, so HLSL falls into the
   `default` arm and skips it).
 
@@ -80,7 +80,7 @@ and how the emitted HLSL source flows into DXC (DXIL) or fxc
 Group rows as in the SPIR-V page:
 
 1. `requiredLoweringPassSet.*` flags — list only those that gate a
-   pass for HLSL (most do; the GLSL-SSBO flag does *not* fire for
+   pass for HLSL (most do; the GLSL-SSBO flag does _not_ fire for
    HLSL because the surrounding `!isKhronosTarget && reqSet.glslSSBO`
    gate is HLSL-reachable, so HLSL does run the
    `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` pass).
@@ -112,12 +112,18 @@ Cover at least:
 - `legalizeEmptyRayPayloadsForHLSL` — DXC requirement for
   non-empty payloads.
 - `legalizeByteAddressBufferOps` with `scalarizeVectorLoadStore =
-  true` — different from SPIR-V which keeps vectors.
+true` — different from SPIR-V which keeps vectors.
 - `lowerGLSLShaderStorageBufferObjectsToStructuredBuffers` — only
   fires for non-Khronos targets, so it runs for HLSL but **not**
   for SPIR-V / GLSL.
-- `eliminatePhis` with default options — contrast with SPIR-V
-  which sets `useRegisterAllocation = true`.
+- `eliminatePhis` with default options. Do **not** write that this
+  contrasts with SPIR-V: the defaults in
+  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
+  `useRegisterAllocation = true`, and the direct-SPIR-V branch in
+  `slang-emit.cpp` assigns those _same_ two values, so there is no
+  difference to contrast. An earlier revision of this prompt asserted
+  the opposite and put that error on the page.
 - `applyVariableScopeCorrection` — emits scope-correcting copies
   required by HLSL but not SPIR-V.
 - The downstream DXC / fxc chain: DXC is the default for shader

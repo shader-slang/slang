@@ -53,10 +53,10 @@ and how `legalizeIRForWGSL` and `WGSLSourceEmitter` cooperate.
   `floatNonUniformResourceIndex` runs (line ~1980 / 1983-1984 also
   covers `isWGPUTarget`),
   `legalizeLogicalAndOr` runs (`isD3DTarget || isKhronosTarget ||
-  isWGPUTarget || isMetalTarget`),
+isWGPUTarget || isMetalTarget`),
   `eliminatePhis` with **default** options,
   `applyVariableScopeCorrection` runs (line ~2324 `target !=
-  SPIRV`).
+SPIRV`).
 - **Phase D — WGSL emit and downstream tools.** From
   `emitEntryPointsSourceFromIR` through the `WGSLSourceEmitter`
   (line ~2469), `simplifyForEmit`, and `sourceEmitter->emitModule`.
@@ -101,7 +101,12 @@ Cover at least:
 - `floatNonUniformResourceIndex` — WGSL is one of the `!isSPIRV`
   arms; explain why WGSL needs a textual non-uniform-resource-index
   representation.
-- `eliminatePhis` with default options — contrast with SPIR-V.
+- `eliminatePhis` with default options. Do **not** write that this
+  contrasts with SPIR-V: the defaults in
+  [slang-ir-eliminate-phis.h](../../../../source/slang/slang-ir-eliminate-phis.h)
+  (lines 13-14) are `eliminateCompositeTypedPhiOnly = false` and
+  `useRegisterAllocation = true`, and the direct-SPIR-V branch assigns
+  those same two values, so there is no difference to contrast.
 - The downstream Tint translator — invoked only for
   `WGSLSPIRV` / `WGSLSPIRVAssembly`. Validation is delegated.
 

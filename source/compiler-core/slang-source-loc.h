@@ -2,11 +2,11 @@
 #ifndef SLANG_SOURCE_LOC_H_INCLUDED
 #define SLANG_SOURCE_LOC_H_INCLUDED
 
-#include "../core/slang-basic.h"
-#include "../core/slang-castable.h"
-#include "../core/slang-crypto.h"
-#include "../core/slang-memory-arena.h"
-#include "../core/slang-string-slice-pool.h"
+#include "core/slang-basic.h"
+#include "core/slang-castable.h"
+#include "core/slang-crypto.h"
+#include "core/slang-memory-arena.h"
+#include "core/slang-string-slice-pool.h"
 #include "slang-com-ptr.h"
 #include "slang-source-map.h"
 #include "slang.h"
@@ -65,8 +65,7 @@ struct PathInfo
                     ///< taken as to map to a loaded file)
         TokenPaste, ///< No paths, just created to do a macro expansion
         TypeParse,  ///< No path, just created to do a type parse
-        CommandLine,    ///< A macro constructed from the command line
-        MacroExpansion, ///< A specific invocation of a macro; foundPath holds the macro name
+        CommandLine, ///< A macro constructed from the command line
     };
 
     /// True if has a canonical path
@@ -122,10 +121,6 @@ struct PathInfo
     {
         return PathInfo{Type::FromString, userPath, String()};
     }
-    static PathInfo makeFromMacroExpansion(const String& macroName)
-    {
-        return PathInfo{Type::MacroExpansion, macroName, String()};
-    }
 
     Type type;             ///< The type of path
     String foundPath;      ///< The path where the file was found (might contain relative elements)
@@ -147,10 +142,11 @@ public:
     {
     }
 
-    SourceLoc(SourceLoc const& loc)
-        : raw(loc.raw)
-    {
-    }
+    // Copying must stay defaulted (not user-provided) so SourceLoc remains
+    // trivially copyable: aggregates that embed a SourceLoc in a union rely on
+    // that to get trivial whole-object copies (see
+    // `GenericArgumentInferenceFailure` in slang-check-impl.h).
+    SourceLoc(SourceLoc const& loc) = default;
 
     SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return raw == rhs.raw; }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(raw == rhs.raw); }
@@ -318,6 +314,14 @@ public:
     void setContents(ISlangBlob* blob);
     /// Set the content as a string
     void setContents(const String& content);
+
+    /// Return the contents of `rawBlob` decoded to UTF-8 with any leading Unicode
+    /// Byte-Order-Marker removed. This is the canonical "raw file bytes -> source text" transform:
+    /// a UTF-8 file with no BOM is returned unchanged (same blob), while a BOM-prefixed or
+    /// non-UTF-8 file is decoded into a fresh blob. Both `setContents` and any other consumer that
+    /// needs BOM-free source text from an on-disk blob should route through here so the decode
+    /// lives in exactly one place.
+    static ComPtr<ISlangBlob> decodeContentBlob(ISlangBlob* rawBlob);
 
     /// Calculate a display path -> can canonicalize if necessary
     String calcVerbosePath() const;

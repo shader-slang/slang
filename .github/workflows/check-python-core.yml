@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "extras/**/*.py"
+      - "tools/compile-perf/**/*.py"
       - ".github/workflows/check-python-core.yml"
   merge_group:
     types: [checks_requested]
@@ -19,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: Parse Python with core Python (${{ matrix.os }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
       - name: Verify using system Python (no setup-python)
         run: |
@@ -34,7 +35,7 @@ jobs:
               echo "FAIL: $f"
               failed=1
             fi
-          done < <(find extras -type f -name '*.py' -print0)
+          done < <(find extras tools/compile-perf -type f -name '*.py' -print0)
           exit $failed
 
       - name: Check for non-stdlib imports
@@ -47,15 +48,16 @@ jobs:
 
           # Collect all .py stems and package dirs under extras/ so that
           # cross-directory project-local imports are recognized.
-          extras = Path('extras')
           project_modules = set()
-          for p in extras.rglob('*.py'):
-              project_modules.add(p.stem)
-          for p in extras.rglob('__init__.py'):
-              project_modules.add(p.parent.name)
+          for root in (Path('extras'), Path('tools/compile-perf')):
+              for p in root.rglob('*.py'):
+                  project_modules.add(p.stem)
+              for p in root.rglob('__init__.py'):
+                  project_modules.add(p.parent.name)
 
           errors = []
-          for filepath in sorted(extras.rglob('*.py')):
+          scan = [*Path('extras').rglob('*.py'), *Path('tools/compile-perf').rglob('*.py')]
+          for filepath in sorted(scan):
               with open(filepath) as f:
                   tree = ast.parse(f.read(), str(filepath))
               def check_module(top, desc):
@@ -95,3 +97,57 @@ jobs:
               sys.exit(1)
           print('All imports are stdlib-only (local sibling modules allowed).')
           "
+
+      # Importing the compile-perf suite executes its import-time self-check
+      # asserts (lib/manifest.py workload validation, daily_movers/report/
+      # breakdown fixtures, new_release_check cutoff pins) — without this the
+      # only thing that ever imports these modules is the nightly, so a
+      # broken import or failed self-check would merge cleanly and surface
+      # as a lost nightly data point instead of a PR failure.
+      - name: Import-check compile-perf suite (runs its self-check asserts)
+        run: |
+          cd tools/compile-perf
+          python3 -c "import bench, report, breakdown, daily_movers, \
+              new_release_check, sweep, sweep_report, track, trend, \
+              compare_repro, ladder_scaling, fetch_releases, slack_status"
+
+  # The compile-perf suite's only Windows consumer is the scheduled nightly,
+  # so a Windows-only defect in an import-time self-check merges green and
+  # surfaces a day later as a lost data point rather than as a PR failure.
+  # That is exactly how a text-mode newline round-trip in a corpus.py fixture
+  # took out a nightly: the Ubuntu legs above cannot see it, because text mode
+  # only rewrites \n on Windows.
+  #
+  # Deliberately a separate job rather than another entry in the os matrix:
+  # the steps above use `find -print0` and process substitution, which do not
+  # port to the Windows runner, and widening the matrix would mean rewriting
+  # working checks to add coverage none of them needed.
+  import-check-windows:
+    # Same draft gate as check-python-core above: a draft PR should not hold a
+    # Windows runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: windows-latest
+    name: Import-check compile-perf suite (windows-latest)
+    # This job executes PR-authored Python, so give it the tree and nothing
+    # else. The workflow has no top-level permissions block, which otherwise
+    # means the default token scope.
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          # checkout persists the token into .git/config by default, leaving it
+          # readable by the very PR code this job then imports. Nothing here
+          # runs an authenticated git command.
+          persist-credentials: false
+
+      # `python`, not `python3`: the Windows runner image puts the system
+      # interpreter on PATH under that name, and this workflow deliberately
+      # uses whatever Python is already there rather than setup-python.
+      - name: Import-check compile-perf suite (runs its self-check asserts)
+        shell: bash
+        run: |
+          cd tools/compile-perf
+          python -c "import bench, report, breakdown, daily_movers, \
+              new_release_check, sweep, sweep_report, track, trend, \
+              compare_repro, ladder_scaling, fetch_releases, slack_status"

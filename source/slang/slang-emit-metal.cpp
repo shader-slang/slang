@@ -1,13 +1,13 @@
 // slang-emit-metal.cpp
 #include "slang-emit-metal.h"
 
-#include "../core/slang-writer.h"
+#include "core/slang-type-text-util.h"
+#include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
-#include <assert.h>
 
 namespace Slang
 {
@@ -194,6 +194,17 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
     {
         if (auto sysSemanticAttr = layout->findSystemValueSemanticAttr())
             _emitUserSemantic(sysSemanticAttr->getName(), sysSemanticAttr->getIndex());
+    }
+}
+
+void MetalSourceEmitter::emitTempModifiers(IRInst* temp)
+{
+    // Metal has no `precise` keyword; drop it and warn.
+    if (temp->findDecoration<IRPreciseDecoration>())
+    {
+        getSink()->diagnose(Diagnostics::PreciseQualifierUnsupportedOnTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(getTarget())),
+            .location = temp->sourceLoc});
     }
 }
 
@@ -888,6 +899,29 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             return true;
         }
+    case kIROp_Printf:
+        {
+            // Metal has no `printf`; its equivalent is the MSL 3.2 shader logging facility. Of the
+            // severity levels `log` is the one whose `MTLLogLevelNotice` survives the widest range
+            // of host `MTLLogState` configurations.
+            ensurePrelude(kMetalBuiltinPreludeLogging);
+            m_extensionTracker->requireMetalLanguageVersion(SemanticVersion(3, 2));
+            m_extensionTracker->requireLogging();
+            m_writer->emit("os_log_default.log(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (inst->getOperandCount() > 1)
+            {
+                List<IRInst*> args;
+                collectFlattenedVariadicOperands(inst, 1, args);
+                for (auto arg : args)
+                {
+                    m_writer->emit(", ");
+                    emitOperand(arg, getInfo(EmitOp::General));
+                }
+            }
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_ByteAddressBufferLoad:
         {
             // This only works for loads of 4-byte values.
@@ -1153,6 +1187,31 @@ void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             default:
                 break;
             }
+
+            // Suffix finite half/float literals so MSL doesn't type a bare decimal
+            // as `double` (which breaks `as_type<ushort>(h)`, #11837). NaN/Inf and
+            // Double stay bare; non-finite half/float is a known remaining gap.
+            if (auto basicType = as<IRBasicType>(inst->getDataType()))
+            {
+                const char* suffix = nullptr;
+                switch (basicType->getBaseType())
+                {
+                case BaseType::Half:
+                    suffix = "h";
+                    break;
+                case BaseType::Float:
+                    suffix = "f";
+                    break;
+                default:
+                    break;
+                }
+                if (suffix)
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    m_writer->emit(suffix);
+                    return;
+                }
+            }
             break;
         }
 
@@ -1248,6 +1307,15 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitVectorTypeNameImpl(
                 vecType->getElementType(),
                 getIntVal(vecType->getElementCount()));
+            return;
+        }
+    case kIROp_MetalPackedVectorType:
+        {
+            auto packedVecType = (IRMetalPackedVectorType*)type;
+            m_writer->emit("packed_");
+            emitVectorTypeNameImpl(
+                packedVecType->getElementType(),
+                getIntVal(packedVecType->getElementCount()));
             return;
         }
     case kIROp_MatrixType:

@@ -493,12 +493,17 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T mod(T x, T y)
 {
-    // SPIR-V doesn't have "modulus".
-    // All of Op?Mod and OpFRem are "remainder".
-
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
+    case spirv:
+        // `OpFMod` is a floor-modulus (its sign follows Operand 2), which is
+        // exactly what `mod()` computes, so use it directly rather than the
+        // multi-instruction `x - y*floor(x/y)` expansion below.
+        return spirv_asm
+        {
+            result:$$T = OpFMod $x $y
+        };
     default:
         return x - y * floor(x / y);
     }
@@ -513,6 +518,11 @@ public vector<T, N> mod(vector<T, N> x, T y)
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
+    case spirv:
+        // `OpFMod` requires both operands to have the result type, so broadcast
+        // the scalar divisor and defer to the vector/vector overload rather than
+        // duplicating the opcode here.
+        return mod(x, vector<T, N>(y));
     default:
         return x - y * floor(x / y);
     }
@@ -527,6 +537,11 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
     __target_switch
     {
     case glsl: __intrinsic_asm "mod";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<T, N> = OpFMod $x $y
+        };
     default:
         return x - y * floor(x / y);
     }
@@ -964,11 +979,11 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
     {
     case glsl: __intrinsic_asm "uaddCarry";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$uint = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$uint = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpIAddCarry $x $y;
+        %__carry:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &carry %__carry;
+        result:$$uint = OpCompositeExtract %__temp 0
     };
     default:
         let result = x * y;
@@ -987,11 +1002,11 @@ public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, 
     {
     case glsl: __intrinsic_asm "uaddCarry";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpIAddCarry $x $y;
-        %carry:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &carry %carry;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpIAddCarry $x $y;
+        %__carry:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &carry %__carry;
+        result:$$vector<uint,N> = OpCompositeExtract %__temp 0
     };
     default:
         VECTOR_MAP_TRINARY(uint, N, uaddCarry, x, y, carry);
@@ -1007,11 +1022,11 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
     {
     case glsl: __intrinsic_asm "usubBorrow";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$uint = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$uint = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpISubBorrow $x $y;
+        %__borrow:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &borrow %__borrow;
+        result:$$uint = OpCompositeExtract %__temp 0
     };
     default:
         borrow = (y > x) ? 1 : 0;
@@ -1029,11 +1044,11 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
     {
     case glsl: __intrinsic_asm "usubBorrow";
     case spirv: return spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpISubBorrow $x $y;
-        %borrow:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &borrow %borrow;
-        result:$$vector<uint,N> = OpCompositeExtract %temp 0
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpISubBorrow $x $y;
+        %__borrow:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &borrow %__borrow;
+        result:$$vector<uint,N> = OpCompositeExtract %__temp 0
     };
     default:
         VECTOR_MAP_TRINARY(uint, N, usubBorrow, x, y, borrow);
@@ -1049,12 +1064,12 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
     {
     case glsl: __intrinsic_asm "umulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$uint $$uint;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$uint = OpCompositeExtract %temp 0;
-        %msb:$$uint = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$uint $$uint;
+        %__temp:%__ResType = OpUMulExtended $x $y;
+        %__lsb:$$uint = OpCompositeExtract %__temp 0;
+        %__msb:$$uint = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         uint64_t result = uint64_t(x) * uint64_t(y);
@@ -1073,12 +1088,12 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
     {
     case glsl: __intrinsic_asm "umulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
-        %temp:%ResType = OpUMulExtended $x $y;
-        %lsb:$$vector<uint,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<uint,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$vector<uint,N> $$vector<uint,N>;
+        %__temp:%__ResType = OpUMulExtended $x $y;
+        %__lsb:$$vector<uint,N> = OpCompositeExtract %__temp 0;
+        %__msb:$$vector<uint,N> = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         [ForceUnroll]
@@ -1098,12 +1113,12 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
     {
     case glsl: __intrinsic_asm "imulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$int $$int;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$int = OpCompositeExtract %temp 0;
-        %msb:$$int = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$int $$int;
+        %__temp:%__ResType = OpSMulExtended $x $y;
+        %__lsb:$$int = OpCompositeExtract %__temp 0;
+        %__msb:$$int = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         int64_t result = int64_t(x) * int64_t(y);
@@ -1122,12 +1137,12 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
     {
     case glsl: __intrinsic_asm "imulExtended";
     case spirv: spirv_asm {
-        %ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
-        %temp:%ResType = OpSMulExtended $x $y;
-        %lsb:$$vector<int,N> = OpCompositeExtract %temp 0;
-        %msb:$$vector<int,N> = OpCompositeExtract %temp 1;
-        OpStore &lsb %lsb;
-        OpStore &msb %msb;
+        %__ResType = OpTypeStruct $$vector<int,N> $$vector<int,N>;
+        %__temp:%__ResType = OpSMulExtended $x $y;
+        %__lsb:$$vector<int,N> = OpCompositeExtract %__temp 0;
+        %__msb:$$vector<int,N> = OpCompositeExtract %__temp 1;
+        OpStore &lsb %__lsb;
+        OpStore &msb %__msb;
     };
     default:
         [ForceUnroll]
@@ -2761,10 +2776,21 @@ public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2
 // -------------------
 // texelFetch
 // -------------------
+//
+// These `texelFetch` (and the `texelFetchOffset` below) overloads all take a *combined*
+// sampler -- `Sampler1D`/`Sampler2DRect`/`SamplerBuffer`, or an explicit `isCombined=1`
+// `_Texture`. On GLSL they lower to `texelFetch(sampler2D, ...)`, which never needs
+// `GL_EXT_samplerless_texture_functions` (that extension is only for texelFetch on a *bare*
+// texture). The static requirement is therefore plain `texture_sm_4_1`, not the
+// `texture_sm_4_1_samplerless` alias: carrying the samplerless atom on these combined-only
+// sites would spuriously fire `warning[E41012] profile implicitly upgraded` under an explicit
+// `-profile`, even though no `#extension` is emitted (see #11874). Where the samplerless
+// extension is genuinely needed (a bare-texture fetch) it is added at emit time by the
+// `isCombined`-gated `__requireTargetExtension` in `_Texture`'s `Load`.
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetch(Sampler1D<T> sampler, int p, int lod)
 {
     return __vectorReshape2<T.Element,4>(sampler.Load(int2(p, lod)));
@@ -2772,7 +2798,7 @@ public vector<T.Element,4> texelFetch(Sampler1D<T> sampler, int p, int lod)
 
 __generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetch(_Texture<
         T,
         Shape,
@@ -2790,7 +2816,7 @@ public vector<T.Element,4> texelFetch(_Texture<
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetch(Sampler2DRect<T> sampler, ivec2 p)
 {
     return __vectorReshape2<T.Element,4>(sampler.Load(int3(p.xy,0)));
@@ -2798,7 +2824,7 @@ public vector<T.Element,4> texelFetch(Sampler2DRect<T> sampler, ivec2 p)
 
 __generic<T:ITexelElement, let format:int>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetch(SamplerBuffer<T,format> sampler, int p)
 {
     return __vectorReshape2<T.Element,4>(sampler.Load(p));
@@ -2806,7 +2832,7 @@ public vector<T.Element,4> texelFetch(SamplerBuffer<T,format> sampler, int p)
 
 __generic<T:ITexelElement, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetch(_Texture<
         T,
         __Shape2D,
@@ -2834,7 +2860,7 @@ public vector<T.Element,4> texelFetch(_Texture<
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetchOffset(Sampler1D<T> sampler, int p, int lod, constexpr int offset)
 {
     return __vectorReshape2<T.Element,4>(sampler.Load(int2(p, lod), offset));
@@ -2842,7 +2868,7 @@ public vector<T.Element,4> texelFetchOffset(Sampler1D<T> sampler, int p, int lod
 
 __generic<T:ITexelElement, Shape:__ITextureShape, let isArray:int, let sampleCount:int, let format:int>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetchOffset(_Texture<
         T,
         Shape,
@@ -2860,7 +2886,7 @@ public vector<T.Element,4> texelFetchOffset(_Texture<
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(cpp_glsl_hlsl_spirv, texture_sm_4_1_samplerless)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_1)]
 public vector<T.Element,4> texelFetchOffset(Sampler2DRect<T> sampler, ivec2 p, constexpr ivec2 offset)
 {
     return __vectorReshape2<T.Element,4>(sampler.Load(__makeVector(p, 0), offset));
@@ -4474,6 +4500,11 @@ __generic<T : __BuiltinType>
 internal typealias __ImagePtr<T> =
     Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)AddressSpace::Image)>;
 
+// Form a texel pointer for image atomics at the IR level.
+// Kept outside spirv_asm so NonUniform propagates to the texel pointer.
+__intrinsic_op($(kIROp_ImageTexelPointer))
+__ImagePtr<T> __imageTexelPointer<T, TImage, TCoord>(TImage image, TCoord coord, int sample);
+
 ${
 {
     struct ImageTypeInfo
@@ -4687,11 +4718,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) %ptr Device None $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVTypePrefix)Add$(targetType.SPVAtomicSuffix) $ptr Device None $data
                 };
             }
             }
@@ -4709,11 +4741,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicExchange $ptr Device Relaxed $data
                 };
             }
             }
@@ -4731,11 +4764,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) $ptr Device Relaxed $data
                 };
             }
             }
@@ -4753,11 +4787,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) $ptr Device Relaxed $data
                 };
             }
             }
@@ -4778,11 +4813,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicAnd $ptr Device Relaxed $data
                 };
             }
             }
@@ -4799,11 +4835,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicOr $ptr Device Relaxed $data
                 };
             }
             }
@@ -4821,11 +4858,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicXor $ptr Device Relaxed $data
                 };
             }
             }
@@ -4842,11 +4880,12 @@ $}
                 let imageP = __getLegalizedSPIRVGlobalParamAddr(image);
                 typeRequireChecks_image_atomic_int64<$(targetType.type)>();
                 $(SPV_DEFAULT_SAMPLE_VAR_IF_MISSING)
+                let ptr = __imageTexelPointer<$(targetType.type)>(imageP, P, sample);
                 return spirv_asm
                 {
                     OpCapability ImageQuery;
-                    %ptr:$$__ImagePtr<$(targetType.type)> = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
+                    // Do not copy resource-type $operands into %temporaries; NonUniform does not propagate to asm-local ids.
+                    result:$$$(targetType.type) = OpAtomicCompareExchange $ptr Device Relaxed Relaxed $data $compare
                 };
             }
             }
@@ -5196,8 +5235,8 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
         {
             return spirv_asm
             {
-                %mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
-                result:$$mat3x4 = OpTranspose %mat
+                %__mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %__mat
             };
         }
         }
@@ -5243,8 +5282,8 @@ public property mat3x4 gl_WorldToObject3x4EXT
         {
             return spirv_asm
             {
-                %mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
-                result:$$mat3x4 = OpTranspose %mat
+                %__mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
+                result:$$mat3x4 = OpTranspose %__mat
             };
         }
         }
@@ -5676,7 +5715,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectTraceRayNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5708,7 +5747,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectTraceRayMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5774,7 +5813,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordHitNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5839,7 +5878,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5860,7 +5899,7 @@ public void hitObjectRecordHitMotionNV(
     {
     case _GL_NV_shader_invocation_reorder_motion:
     {
-        HitObject::__glslMakeMotionHit(
+        HitObject::__glslMakeMotionHitNV(
             hitObject,
             topLevel,
             instanceid,
@@ -5908,7 +5947,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5970,7 +6009,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectRecordHitWithIndexMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5990,7 +6029,7 @@ public void hitObjectRecordHitWithIndexMotionNV(
     {
     case _GL_NV_shader_invocation_reorder_motion:
     {
-        HitObject::__glslMakeMotionHitWithIndex(
+        HitObject::__glslMakeMotionHitWithIndexNV(
             hitObject,
             topLevel,
             instanceid,
@@ -6036,7 +6075,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordMissNV(
     inout hitObjectNV hitObject,
     uint sbtRecordIndex,
@@ -6056,7 +6095,7 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
-[require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionNV(
     inout hitObjectNV hitObject,
     uint sbtRecordIndex,
@@ -6077,7 +6116,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectRecordEmptyNV(hitObjectNV hitObject)
 {
     hitObject = HitObject::MakeNop();
@@ -6087,7 +6126,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectExecuteShaderNV(
     inout hitObjectNV hitObject,
     constexpr int payload)
@@ -6114,7 +6153,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public bool hitObjectIsEmptyNV(hitObjectNV hitObject)
 {
     return hitObject.IsNop();
@@ -6124,7 +6163,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public bool hitObjectIsMissNV(hitObjectNV hitObject)
 {
     return hitObject.IsMiss();
@@ -6134,7 +6173,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public bool hitObjectIsHitNV(hitObjectNV hitObject)
 {
     return hitObject.IsHit();
@@ -6144,7 +6183,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMin;
@@ -6154,7 +6193,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().TMax;
@@ -6164,7 +6203,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Origin;
@@ -6174,7 +6213,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetRayDesc().Direction;
@@ -6184,7 +6223,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayOriginNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayOrigin();
@@ -6194,7 +6233,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public vec3 hitObjectGetObjectRayDirectionNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectRayDirection();
@@ -6204,7 +6243,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetObjectToWorldNV(hitObjectNV hitObject)
 {
     return hitObject.GetObjectToWorld();
@@ -6214,7 +6253,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
     return hitObject.GetWorldToObject();
@@ -6224,7 +6263,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetInstanceCustomIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceID();
@@ -6234,7 +6273,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetInstanceIdNV(hitObjectNV hitObject)
 {
     return hitObject.GetInstanceIndex();
@@ -6244,7 +6283,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetGeometryIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetGeometryIndex();
@@ -6254,7 +6293,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public int hitObjectGetPrimitiveIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetPrimitiveIndex();
@@ -6264,7 +6303,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public uint hitObjectGetHitKindNV(hitObjectNV hitObject)
 {
     return hitObject.GetHitKind();
@@ -6274,7 +6313,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public void hitObjectGetAttributesNV(
     inout hitObjectNV hitObject,
     constexpr int attributeLocation)
@@ -6300,7 +6339,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public uvec2 hitObjectGetShaderRecordBufferHandleNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderRecordBufferHandle();
@@ -6310,7 +6349,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public uint hitObjectGetShaderBindingTableRecordIndexNV(hitObjectNV hitObject)
 {
     return hitObject.GetShaderTableIndex();
@@ -6320,7 +6359,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen_closesthit_miss)]
+[require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
 public float hitObjectGetCurrentTimeNV(hitObjectNV hitObject)
 {
     return hitObject.GetCurrentTime();
@@ -6330,7 +6369,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen)]
+[require(glsl_spirv, ser_nv_raygen)]
 public void reorderThreadNV(uint hint, uint bits)
 {
     ReorderThread(hint, bits);
@@ -6340,7 +6379,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen)]
+[require(glsl_spirv, ser_nv_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject)
 {
     ReorderThread(hitObject);
@@ -6350,7 +6389,7 @@ __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
-[require(glsl_spirv, ser_raygen)]
+[require(glsl_spirv, ser_nv_raygen)]
 public void reorderThreadNV(hitObjectNV hitObject, uint hint, uint bits)
 {
     ReorderThread(hitObject, hint, bits);
@@ -7267,19 +7306,21 @@ void setupExtForSubgroupBallotBuiltIn() {
     }
 }
 
+[require(glsl_spirv, subgroup_workgroup_index)]
 public property uint gl_NumSubgroups
 {
     [ForceInline]
-    [require(glsl_spirv, subgroup_basic)]
+    [require(glsl_spirv, subgroup_workgroup_index)]
     get {
         return WaveGetNumWaves();
     }
 }
 
+[require(glsl_spirv, subgroup_workgroup_index)]
 public property uint gl_SubgroupID
 {
     [ForceInline]
-    [require(glsl_spirv, subgroup_basic)]
+    [require(glsl_spirv, subgroup_workgroup_index)]
     get {
         return WaveGetWaveIndex();
     }
@@ -9925,7 +9966,7 @@ public uint atomicCounterDecrement(atomic_uint c)
         // we want a discarded side effect and then return the new value
         return spirv_asm
         {
-            %discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
+            %__discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
             OpLoad $$uint result $c
         };
     }

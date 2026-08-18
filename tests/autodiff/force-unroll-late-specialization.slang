@@ -3,7 +3,7 @@
 //
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none
 
-// CHECK-LABEL: __device__ float3  loadVecOnce_0(
+// CHECK-LABEL: __device__ float3  DiffTensorView_loadVecOnce_0(
 // CHECK: *&((&result_0)->x) =
 // CHECK: *&((&result_0)->y) =
 // CHECK: *&((&result_0)->z) =

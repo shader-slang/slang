@@ -23,11 +23,11 @@ runner path roots.
 
 ## Picking an input format
 
-| Producer | Recommended input | Why |
-| -------- | ----------------- | --- |
-| `llvm-cov` on Linux/macOS C++ | `llvm-cov export -format=json` | Native regions, lossless branches/functions, totals match `llvm-cov report` by construction |
-| Shader coverage (`shader-coverage-to-lcov.py`) | LCOV `.info` | Producer emits LCOV natively |
-| Windows OpenCppCoverage → Cobertura → LCOV | LCOV `.info` | No JSON variant available upstream |
+| Producer                                       | Recommended input              | Why                                                                                         |
+| ---------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------- |
+| `llvm-cov` on Linux/macOS C++                  | `llvm-cov export -format=json` | Native regions, lossless branches/functions, totals match `llvm-cov report` by construction |
+| Shader coverage (`shader-coverage-to-lcov.py`) | LCOV `.info`                   | Producer emits LCOV natively                                                                |
+| Windows OpenCppCoverage → Cobertura → LCOV     | LCOV `.info`                   | No JSON variant available upstream                                                          |
 
 > **Why not just always feed LCOV?** `llvm-cov export -format=lcov`
 > is lossy on the LLVM path: regions are missing entirely, BRDA
@@ -366,7 +366,7 @@ cmake --build --preset debug --target shader-coverage-demo
 cd examples/shader-coverage-demo
 ./../../build/Debug/bin/shader-coverage-demo --mode=dispatch --backend=cpu
 cp coverage.lcov             ../../tools/coverage-html/tests/fixtures/demo-cpu.info
-cp simulate.coverage-mapping.json ../../tools/coverage-html/tests/fixtures/demo-cpu.coverage-mapping.json
+cp simulate.coverage-manifest.json ../../tools/coverage-html/tests/fixtures/demo-cpu.coverage-manifest.json
 ```
 
 ### Updating the genhtml visual target
@@ -405,7 +405,7 @@ tools/coverage-html/
     ├── test_merge.py              # merger unit + integration tests
     └── fixtures/
         ├── demo-cpu.info          # real LCOV from shader-coverage-demo
-        ├── demo-cpu.coverage-mapping.json
+        ├── demo-cpu.coverage-manifest.json
         ├── genhtml-reference/     # visual target for parity
         ├── VISUAL-PARITY.md       # acceptance checklist
         ├── slangc-llvm-cov-sample.info  # real-data BRDA + FN/FNDA fixture

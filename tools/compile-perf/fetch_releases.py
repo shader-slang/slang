@@ -1,0 +1,435 @@
+#!/usr/bin/env python3
+"""Download + cache prebuilt slangc for a range of Slang releases.
+
+Auto-detects the host platform (Linux / Windows / macOS) and fetches the matching
+release asset, so the per-release history can be re-swept on whatever CI runner is
+current — overridable with --platform. The corporate proxy blocks the github.com
+/releases/download/ path, but the GitHub *API* asset endpoint (Accept:
+application/octet-stream) redirects to the reachable release-assets CDN, so that
+is what we use.
+
+The default tag set is the minor releases (vYYYY.N, no patch suffix) in a date
+window, read from the local Slang git checkout's tags. Patch releases can be
+added with --include-patches, or an explicit list passed with --tags.
+
+Writes releases/<tag>/ with the extracted tree and a releases/index.json mapping
+tag -> {slangc, version, date}.
+"""
+import argparse
+import json
+import os
+import platform
+import subprocess
+import sys
+import tarfile
+import urllib.request
+import zipfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # allow running from any directory
+
+from lib import analyze
+
+DEFAULT_REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))  # slang checkout
+API = "https://api.github.com/repos/shader-slang/slang"
+# Preferred asset suffixes per platform, best first. On Linux the plain build
+# targets the newest glibc and the -glibc-N builds are for older hosts.
+ASSET_SUFFIXES = {
+    "linux": ["-linux-x86_64.tar.gz", "-linux-x86_64-glibc-2.28.tar.gz",
+              "-linux-x86_64-glibc-2.27.tar.gz"],
+    "windows": ["-windows-x86_64.zip"],
+    "macos": ["-macos-aarch64.zip", "-macos-x86_64.zip"],
+}
+
+
+def host_platform():
+    s = platform.system().lower()
+    return "windows" if s.startswith("win") else "macos" if s == "darwin" else "linux"
+
+
+def gh_get(url):
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+    tok = os.environ.get("GITHUB_TOKEN")
+    if tok:
+        req.add_header("Authorization", f"Bearer {tok}")
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.load(r)
+
+
+def window_tags(repo, since, until, include_patches):
+    """Ordered [(date, tag)] of release tags in [since, until] from local git."""
+    out = subprocess.check_output(
+        ["git", "-C", repo, "for-each-ref",
+         "--sort=creatordate", "--format=%(creatordate:short) %(refname:short)",
+         "refs/tags"],
+        text=True,
+    )
+    import re
+    minor = re.compile(r"^v\d{4}\.\d+$")
+    patch = re.compile(r"^v\d{4}\.\d+\.\d+$")
+    tags = []
+    for line in out.splitlines():
+        date, _, tag = line.partition(" ")
+        if not (since <= date <= until):
+            continue
+        if minor.match(tag) or (include_patches and patch.match(tag)):
+            tags.append((date, tag))
+    return tags
+
+
+def pick_asset(release, suffixes):
+    by_name = {a["name"]: a for a in release.get("assets", [])}
+    ver = release["tag_name"].lstrip("v")
+    for suf in suffixes:
+        name = f"slang-{ver}{suf}"
+        if name in by_name:
+            return by_name[name]
+    return None
+
+
+def download_asset(asset, dest):
+    """Download via the API asset id with octet-stream Accept (proxy-safe)."""
+    url = f"{API}/releases/assets/{asset['id']}"
+    req = urllib.request.Request(url, headers={"Accept": "application/octet-stream"})
+    tok = os.environ.get("GITHUB_TOKEN")
+    if tok:
+        req.add_header("Authorization", f"Bearer {tok}")
+    with urllib.request.urlopen(req, timeout=180) as r, open(dest, "wb") as fh:
+        while True:
+            chunk = r.read(1 << 20)
+            if not chunk:
+                break
+            fh.write(chunk)
+
+
+def find_slangc(root):
+    for dirpath, _, files in os.walk(root):
+        if os.path.basename(dirpath) == "bin":
+            for name in ("slangc", "slangc.exe"):
+                if name in files:
+                    return os.path.join(dirpath, name)
+    return None
+
+
+def _tar_filter_supported():
+    """Whether this interpreter's tarfile offers the "data" extraction filter.
+
+    A function rather than an inline hasattr so the self-check can simulate an
+    interpreter without it, which is the only way to exercise the refusal
+    branch in _safe_extract: from Python 3.14 the filter is the default and
+    that branch is unreachable. Patching this is surgical, where deleting
+    tarfile.data_filter would break tarfile's own default-filter lookup."""
+    return hasattr(tarfile, "data_filter")
+
+
+def _safe_extract(archive, names, dest):
+    """extractall, but reject any member that would escape `dest` (zip/tar-slip).
+
+    Zip members that are SYMLINKS (macOS release zips ship
+    lib/libslang-compiler.dylib -> libslang-compiler.<ver>.dylib) are
+    recreated as symlinks: zipfile.extractall writes them as small text files
+    holding the target path, which dlopen then rejects with "slice is not
+    valid mach-o file". Link targets must stay inside `dest` too."""
+    base = os.path.realpath(dest)
+    for name in names:
+        target = os.path.realpath(os.path.join(dest, name))
+        if target != base and not target.startswith(base + os.sep):
+            raise SystemExit(f"refusing unsafe archive member '{name}' (escapes {dest})")
+    if isinstance(archive, zipfile.ZipFile):
+        if os.name == "nt":
+            # Both release zips (windows-x86_64, macos-*) can land here, but a
+            # Windows HOST cannot recreate the macOS dylib symlinks anyway:
+            # os.symlink needs SeCreateSymbolicLinkPrivilege, which the perf
+            # runner does not have. The Windows asset carries none, and a
+            # macOS asset is never run from Windows, so extract plainly — the
+            # member-name check above is the whole guard. This branch must
+            # exist: zipfile.extractall takes no filter= kwarg and ZipFile has
+            # no getmembers(), so falling through to the tar path below is a
+            # TypeError on every Windows release fetch.
+            archive.extractall(dest)
+            return
+        links, regular = [], []
+        for i in archive.infolist():
+            (links if (i.external_attr >> 16) & 0o170000 == 0o120000
+             else regular).append(i)
+        archive.extractall(dest, members=regular)
+        for i in links:
+            linkto = archive.read(i).decode("utf-8")
+            path = os.path.join(dest, i.filename)
+            resolved = os.path.realpath(os.path.join(os.path.dirname(path), linkto))
+            if not resolved.startswith(base + os.sep):
+                raise SystemExit(
+                    f"refusing unsafe symlink '{i.filename}' -> '{linkto}'")
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            if os.path.lexists(path):
+                os.unlink(path)
+            os.symlink(linkto, path)
+        return
+    # Tar (the Linux release assets — Windows and macOS both ship zips, which
+    # returned above). The member-NAME check is not sufficient on its own: a
+    # tar can carry a symlink `link -> ../outside` followed by a regular
+    # member `link/evil`, and at validation time `dest/link` does not exist
+    # yet, so realpath resolves it lexically and the name passes. Extraction
+    # then creates the symlink and writes through it, landing the file
+    # outside dest.
+    #
+    # tarfile's "data" filter rejects exactly that (absolute and escaping link
+    # targets). It became the DEFAULT in 3.14, but this suite runs on whatever
+    # system Python the runner has, so it is requested explicitly — guarded on
+    # the feature rather than a version number, because `filter=` did not exist
+    # before its backport (3.9.17 / 3.10.12 / 3.11.4 / 3.12) and passing it to
+    # an older tarfile raises TypeError. hasattr(tarfile, "data_filter") is the
+    # documented probe for that backport.
+    if _tar_filter_supported():
+        archive.extractall(dest, filter="data")
+        return
+    # Pre-backport interpreter: there is no filter to ask for, so refuse link
+    # members rather than extract them unchecked. Release tarballs have not
+    # carried any (the macOS zip is where the symlinks live), so this fails
+    # loudly on a genuinely new archive shape instead of guessing.
+    risky = [m.name for m in archive.getmembers() if m.issym() or m.islnk()]
+    if risky:
+        raise SystemExit(
+            f"refusing tar with link members {risky} on Python "
+            f"{sys.version_info.major}.{sys.version_info.minor}, which predates "
+            f"tarfile's 'data' extraction filter; upgrade Python to extract "
+            f"this archive safely")
+    archive.extractall(dest)
+
+
+def fetch_one(tag, date, outdir, suffixes, force):
+    tagdir = os.path.join(outdir, tag)
+    existing = find_slangc(tagdir) if os.path.isdir(tagdir) else None
+    if existing and not force:
+        return {"tag": tag, "date": date, "slangc": existing, "cached": True}
+
+    release = gh_get(f"{API}/releases/tags/{tag}")
+    asset = pick_asset(release, suffixes)
+    if not asset:
+        return {"tag": tag, "date": date, "error": f"no asset matching {suffixes}"}
+
+    os.makedirs(tagdir, exist_ok=True)
+    arpath = os.path.join(tagdir, asset["name"])
+    print(f"  downloading {asset['name']} ({asset['size'] // (1<<20)} MB) ...",
+          flush=True)
+    download_asset(asset, arpath)
+    if asset["name"].endswith(".zip"):
+        with zipfile.ZipFile(arpath) as z:
+            _safe_extract(z, z.namelist(), tagdir)
+    else:
+        with tarfile.open(arpath, "r:gz") as t:
+            _safe_extract(t, t.getnames(), tagdir)
+    os.remove(arpath)
+    slangc = find_slangc(tagdir)
+    if not slangc:
+        return {"tag": tag, "date": date, "error": "slangc not found in archive"}
+    if not slangc.endswith(".exe"):
+        os.chmod(slangc, 0o755)
+    return {"tag": tag, "date": date, "slangc": slangc, "cached": False}
+
+
+def verify(slangc):
+    try:
+        v = subprocess.run([slangc, "-v"], capture_output=True, text=True, timeout=30)
+        return (v.stdout + v.stderr).strip().splitlines()[0] if (v.stdout or v.stderr) else "?"
+    except Exception as e:  # noqa: BLE001
+        return f"FAILED: {e}"
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument("--repo", default=DEFAULT_REPO, help="local slang git checkout")
+    ap.add_argument("--since", default="2025-08-01", help="YYYY-MM-DD inclusive")
+    ap.add_argument("--until", default="2026-12-31", help="YYYY-MM-DD inclusive")
+    ap.add_argument("--include-patches", action="store_true")
+    ap.add_argument("--tags", default=None, help="comma-separated explicit tags (overrides window)")
+    ap.add_argument("--out", default=os.path.join(HERE, "releases"))
+    ap.add_argument("--platform", default=host_platform(),
+                    choices=sorted(ASSET_SUFFIXES), help="release asset platform (default: host)")
+    ap.add_argument("--force", action="store_true", help="re-download even if cached")
+    args = ap.parse_args()
+    suffixes = list(ASSET_SUFFIXES[args.platform])
+    # macOS ships both arches; the table lists aarch64 first, so on an Intel host
+    # prefer the x86_64 asset rather than downloading the ARM build.
+    if args.platform == "macos" and platform.machine().lower() in ("x86_64", "amd64"):
+        suffixes.sort(key=lambda s: "x86_64" not in s)
+
+    if args.tags:
+        # keep chronological order from git where possible
+        all_in_window = window_tags(args.repo, "0000", "9999", True)
+        order = {t: d for d, t in all_in_window}
+        tags = [(order.get(t, "?"), t) for t in args.tags.split(",")]
+    else:
+        tags = window_tags(args.repo, args.since, args.until, args.include_patches)
+
+    if not tags:
+        sys.exit("no tags matched")
+    os.makedirs(args.out, exist_ok=True)
+    print(f"{len(tags)} releases to fetch ({args.platform}) -> {args.out}")
+
+    index = []
+    for date, tag in tags:
+        print(f"[{tag}] {date}")
+        rec = fetch_one(tag, date, args.out, suffixes, args.force)
+        if "slangc" in rec:
+            rec["version"] = verify(rec["slangc"])
+            state = "cached" if rec.get("cached") else "downloaded"
+            print(f"  ok ({state}): {rec['version']}")
+        else:
+            print(f"  ERROR: {rec['error']}")
+        index.append(rec)
+
+    ipath = os.path.join(args.out, "index.json")
+    with analyze.open_output(ipath) as fh:
+        json.dump(index, fh, indent=2)
+    ok = sum(1 for r in index if "slangc" in r)
+    print(f"\n{ok}/{len(index)} releases ready. wrote {ipath}")
+    if ok != len(index):
+        sys.exit(1)
+
+
+# Import-time self-check for the zip-symlink extraction and its escape
+# guard (POSIX only, matching the branch in _safe_extract): a symlink member
+# must be recreated as a real symlink — zipfile's default text-file
+# placeholder is exactly the dlopen-breaking bug this fixed — and a link
+# target escaping the destination must be rejected.
+if os.name != "nt":
+    import io
+    import shutil
+    import tempfile
+
+    def _mkzip(linkto):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("lib/real.dylib", b"x")
+            info = zipfile.ZipInfo("lib/link.dylib")
+            info.external_attr = (0o120777 << 16)
+            z.writestr(info, linkto)
+        buf.seek(0)
+        return zipfile.ZipFile(buf)
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_")
+    try:
+        with _mkzip("real.dylib") as _z:
+            _safe_extract(_z, _z.namelist(), _d)
+        assert os.path.islink(os.path.join(_d, "lib/link.dylib")), \
+            "zip symlink member must extract as a real symlink"
+        try:
+            with _mkzip("../../outside") as _z:
+                _safe_extract(_z, _z.namelist(), _d)
+            raise AssertionError("escaping symlink target must be rejected")
+        except SystemExit:
+            pass
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _mkzip
+
+    # The same escape, through the TAR branch — the one the Linux release
+    # assets take. This shape defeats the member-name check on its own:
+    # `dest/link` does not exist when the names are validated, so
+    # realpath resolves `link/evil` lexically inside dest and it passes. Only
+    # the extraction filter stops the write.
+    def _mktar(linkto):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as t:
+            li = tarfile.TarInfo("link")
+            li.type = tarfile.SYMTYPE
+            li.linkname = linkto
+            t.addfile(li)
+            payload = b"pwned"
+            fi = tarfile.TarInfo("link/evil")
+            fi.size = len(payload)
+            t.addfile(fi, io.BytesIO(payload))
+        buf.seek(0)
+        return tarfile.open(fileobj=buf)
+
+    def _try_extract_slip(dest, outside):
+        """Extract the malicious tar into `dest`; return True if it escaped."""
+        try:
+            with _mktar(os.path.join("..", "outside")) as _t:
+                _safe_extract(_t, _t.getnames(), dest)
+        except (SystemExit, tarfile.TarError, OSError):
+            pass  # rejected — by whichever of the two guards applies
+        return os.path.exists(os.path.join(outside, "evil"))
+
+    _d = tempfile.mkdtemp(prefix="fetch_selfcheck_tar_")
+    try:
+        _outside = os.path.join(_d, "outside")
+        _dest = os.path.join(_d, "dest")
+        os.makedirs(_outside)
+        os.makedirs(_dest)
+        assert not _try_extract_slip(_dest, _outside), \
+            ("tar symlink-slip escaped the destination: a link member plus a "
+             "regular member written through it must not land outside dest")
+
+        # The branch above is only load-bearing on interpreters whose default
+        # extraction filter is NOT already "data" — from 3.14 the default
+        # protects regardless, which would make the check above pass even with
+        # every guard here deleted. So pin the part this module actually owns:
+        # with the backport probe hidden, _safe_extract must refuse the link
+        # members itself rather than fall through to an unfiltered extractall.
+        # That fallback is dead code on a modern interpreter and would
+        # otherwise never be executed anywhere.
+        _saved_probe = _tar_filter_supported
+        try:
+            globals()["_tar_filter_supported"] = lambda: False
+            _refused = False
+            try:
+                with _mktar(os.path.join("..", "outside")) as _t:
+                    _safe_extract(_t, _t.getnames(), _dest)
+            except SystemExit:
+                _refused = True          # our refusal — the contract
+            except (tarfile.TarError, OSError):
+                pass                     # extraction was ATTEMPTED and the
+                                         # interpreter stopped it; that is the
+                                         # reliance this check exists to reject
+            assert _refused, \
+                ("without tarfile's data filter available, _safe_extract must "
+                 "refuse link members itself rather than attempt an unfiltered "
+                 "extractall and rely on the interpreter to stop it")
+        finally:
+            globals()["_tar_filter_supported"] = _saved_probe
+        del _saved_probe, _refused
+    finally:
+        shutil.rmtree(_d, ignore_errors=True)
+    del _d, _dest, _outside, _mktar, _try_extract_slip
+
+
+# The Windows-HOST zip path, checked from every platform by faking os.name.
+# ASSET_SUFFIXES["windows"] is a .zip, so this IS the branch the release sweep
+# takes on its Windows runner, and nothing else reaches it: check-python-core
+# runs on Linux, and the sweep itself only reports the failure a whole run
+# later. Faking the attribute is the same surgical patching
+# _tar_filter_supported exists for — os.name is read at call time, and on
+# POSIX os.path stays bound to posixpath, so only the branch under test moves.
+# Without its own return a ZipFile falls into the tar code, whose `filter=`
+# kwarg and getmembers() call ZipFile does not have.
+#
+# Imported again here rather than relied on from the block above: that one is
+# guarded on POSIX, and on a real Windows host these names would be unbound.
+import io
+import shutil
+import tempfile
+
+_saved_os_name = os.name
+_zbuf = io.BytesIO()
+with zipfile.ZipFile(_zbuf, "w") as _z:
+    _z.writestr("bin/slangc.exe", b"x")
+_zbuf.seek(0)
+_d = tempfile.mkdtemp(prefix="fetch_selfcheck_nt_")
+try:
+    os.name = "nt"
+    with zipfile.ZipFile(_zbuf) as _z:
+        _safe_extract(_z, _z.namelist(), _d)
+    assert os.path.isfile(os.path.join(_d, "bin", "slangc.exe")), \
+        "a zip on a Windows host must extract, not fall through to the tar path"
+finally:
+    os.name = _saved_os_name
+    shutil.rmtree(_d, ignore_errors=True)
+del _saved_os_name, _zbuf, _z, _d
+
+
+if __name__ == "__main__":
+    main()

@@ -907,7 +907,7 @@ SlangResult LLVMDownstreamCompiler::compile(
                 // from the IR builder JIT path; the wrapper pairs disable
                 // with create() so a future caller can't accidentally
                 // construct an LLJIT with AVX-512 enabled.
-                Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createAVX512SafeLLJIT();
+                Expected<std::unique_ptr<llvm::orc::LLJIT>> expectJit = createSlangLLJIT();
                 if (!expectJit)
                 {
                     /* JS: NOTE!
@@ -1071,7 +1071,7 @@ createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCom
     return SLANG_E_NO_INTERFACE;
 }
 
-extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
+extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V2(
     Slang::CharSlice targetTripleSlice,
     Slang::TargetBuiltinTypeLayoutInfo* out)
 {
@@ -1090,6 +1090,8 @@ extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
     unsigned pointerBits = targetTriple.getArchPointerBitWidth();
 
     out->genericPointerSize = pointerBits / 8;
+    out->stringSize = out->genericPointerSize;
+    out->stringAlignment = out->genericPointerSize;
 
     return SLANG_OK;
 }

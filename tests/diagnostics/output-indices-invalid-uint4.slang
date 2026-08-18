@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -O0 -skip-spirv-validation
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -skip-spirv-validation
 
 // Regression test for #9435: only `uint` (points), `uint2` (lines)
 // and `uint3` (triangles) are valid `OutputIndices` element shapes.

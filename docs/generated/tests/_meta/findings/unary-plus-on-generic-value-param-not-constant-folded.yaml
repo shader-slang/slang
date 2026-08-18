@@ -1,0 +1,44 @@
+schema_version: 1
+id: unary-plus-on-generic-value-param-not-constant-folded
+bundle: coverage/check-expr
+suspected_kind: wrong-diagnostic
+title: "Unary + on a generic value parameter is not constant-folded"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: diagnostics
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc -target hlsl -entry test -stage fragment <file> -o /tmp/o.hlsl"
+  source_slang: docs/generated/tests/coverage/check-expr/subscript-too-many-indices-diag.slang
+  observed_summary: |
+    Symbolic constant folding accepts `-N` and `N * 2 + 1` for a generic value parameter `N`
+    but rejects `+N`. All three appear in the same shader shape:
+      struct Buf<let N : int>
+      {
+          static int a() { int arr[N * 2 + 1]; ... }   // accepted
+          static int b() { int arr[-N + 8];    ... }   // accepted
+          static int c() { int arr[+N];        ... }   // rejected
+      }
+    Only the third produces:
+      error[E39999]: expression does not evaluate to a compile-time constant
+        --> ... int arr[+N]; ...
+      error[E30071]: cannot instantiate unsized type
+    `+3` on a plain literal folds fine, so it is the combination of unary `+` with a
+    symbolic operand that fails. The same behaviour is observed via slangi and via
+    slangc -target hlsl.
+  exit_code: 255
+  stderr_tail: "error[E39999]: expression does not evaluate to a compile-time constant"
+expected:
+  claim: |
+    Unary `+` should be an identity on an integer constant expression, so `int arr[+N]`
+    should fold exactly like `int arr[N]` and like the accepted `int arr[-N + 8]` in the
+    same shader; a valid compile-time constant should not be rejected.
+  citation_kind: sibling-test
+  citation: tests/language-feature/generics/generic-default-value-param.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "Unary + is deliberately unsupported on symbolic values: no diagnostic says so; the error is the generic 'not a compile-time constant', and the negation/multiplication forms in the same position are accepted."
+    - "Parse-level issue where `[+N]` is not read as unary plus: not investigated further; recorded as an observation only."

@@ -31,9 +31,9 @@ Audience: a developer who just opened
 4. `## Pages` — a table:
 
    ```markdown
-   | Page | Family | Lua entry root | Approx. opcodes |
-   | --- | --- | --- | --- |
-   | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~200 |
+   | Page                 | Family            | Lua entry root    | Approx. opcodes |
+   | -------------------- | ----------------- | ----------------- | --------------- |
+   | [types.md](types.md) | Type instructions | `Type` (line ~20) | ~200            |
    ```
 
    Counts are approximate: count `struct_name = "..."` entries plus
@@ -45,9 +45,11 @@ Audience: a developer who just opened
    the reader at the `slang-lower-to-ir.cpp` `visit*` functions for
    the AST origin information, and at the
    [../ast-reference/](../ast-reference) subtree for the AST side.
-   Note that opcodes with no direct AST source (autodiff
-   intermediates, IR-pass artefacts) carry `(synthesized)` or `—` in
-   the per-page AST-origin column.
+   Note that an opcode with no direct AST source names its producing
+   pass or function in the per-page AST-origin column, and that an
+   opcode nothing in `source/` constructs is marked **no producer at
+   HEAD**. The old catch-alls `(synthesized)` and a bare `—` are
+   retired; see the column contract in [_common.md](_common.md).
 6. `## Cross-cutting topics` — bullets pointing at the
    `docs/generated/design/pipeline/` and
    `docs/generated/design/cross-cutting/` documents that touch the IR:

@@ -191,6 +191,11 @@ typedef unsigned long long CUsurfObject;
 struct SamplerStateUnused;
 typedef SamplerStateUnused* SamplerState;
 
+// Same treatment for SamplerComparisonState: a declared/bound comparison sampler is a no-op
+// placeholder here so that unused globals of this type compile. It does not implement SampleCmp.
+struct SamplerComparisonStateUnused;
+typedef SamplerComparisonStateUnused* SamplerComparisonState;
+
 
 // TODO(JS): Not clear yet if this can be handled on CUDA, by just ignoring.
 // For now, just map to the index type.
@@ -804,6 +809,10 @@ SLANG_MAKE_VECTOR_FROM_SCALAR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_MAKE_VECTOR_FROM_SCALAR(__half)
 #if !SLANG_CUDA_RTC
+// The non-RTC branch of SLANG_MAKE_VECTOR_FROM_SCALAR omits the 1-wide
+// form (the CUDA SDK owns make_* for the standard vector types), so the
+// extended float types spell theirs out here. They must return T1{x},
+// not the scalar; tests/cuda/cuda-prelude-vec1-make.cu pins the family.
 SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 {
     return __half1{x};
@@ -813,9 +822,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 #if SLANG_CUDA_ENABLE_BF16
 SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_bfloat16)
 #if !SLANG_CUDA_RTC
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat16 x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat161 make___nv_bfloat161(__nv_bfloat16 x)
 {
-    return __nv_bfloat16{x};
+    return __nv_bfloat161{x};
 }
 #endif
 #endif
@@ -824,13 +833,13 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat
 SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e4m3)
 SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e5m2)
 #if !SLANG_CUDA_RTC
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m3 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m31 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
 {
-    return __nv_fp8_e4m3{x};
+    return __nv_fp8_e4m31{x};
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m2 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m21 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
 {
-    return __nv_fp8_e5m2{x};
+    return __nv_fp8_e5m21{x};
 }
 #endif
 #endif
@@ -7554,7 +7563,7 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
 //     __CUDA_NO_HALF2_OPERATORS__ so the prelude can supply HLSL-friendly versions).
 //   - __nv_bfloat162 ops come straight from <cuda_bf16.h>.
 // So this trait only needs to expose the pair type and the per-type broadcast
-// intrinsic — arithmetic in the WmmaFragment operator overloads can use native
+// intrinsic - arithmetic in the WmmaFragment operator overloads can use native
 // `+`, `-`, `*`, `/`, unary `-` directly.
 // ====================================================================================
 
@@ -8018,7 +8027,7 @@ struct WmmaFragment
     __device__ unsigned FragmentRead(int regIndex) const { return regs[regIndex]; }
 
     // Uses movmatrix.sync.aligned.m8n8.trans.b16 to transpose each 8x8 sub-block
-    // independently. Does NOT swap off-diagonal blocks — this reinterprets
+    // independently. Does NOT swap off-diagonal blocks - this reinterprets
     // row-major as column-major (and vice versa) without a full 16x16 transpose.
     //
     // Before:  reg0=A00, reg1=A10, reg2=A01, reg3=A11
@@ -8097,7 +8106,7 @@ struct WmmaFragment
 //
 // Register layout for m16n16k16 = 2x m16n8k16:
 //   A: 4 regs (shared between both calls)
-//   B: 4 regs (b[0:1] → lo N-half, b[2:3] → hi N-half)
+//   B: 4 regs (b[0:1] -> lo N-half, b[2:3] -> hi N-half)
 //   C/D half:  4 regs (2 per sub-tile)
 //   C/D float: 8 regs (4 per sub-tile)
 //
@@ -8189,7 +8198,7 @@ __device__ inline void mma<__nv_bfloat16, float, 16, 8, 16>(
 //
 // Override the generic WMMA-based Fp16MMAHelper for the m16n16k16 shape.
 // Each specialization fixes CType, DType AND M=16,N=16,K=16, making it
-// strictly more specialized than the corresponding generic — no ambiguity.
+// strictly more specialized than the corresponding generic - no ambiguity.
 // ====================================================================================
 
 template<typename CType, typename DType, int M, int N, int K>
@@ -8393,7 +8402,7 @@ __device__ inline void mma_sat<unsigned char, int32_t, 16, 8, 16>(
 // Int8MMAHelper m16n16k16 (via 2x mma.sync.m16n8k16)
 //
 // Register layout for m16n16k16 = 2x m16n8k16 with 8-bit inputs / 32-bit accum:
-//   A: 2 regs per thread (shared between both calls — A is full-width for both N halves)
+//   A: 2 regs per thread (shared between both calls - A is full-width for both N halves)
 //   B: 2 regs per thread (b[0] -> lo N-half cols 0..7, b[1] -> hi N-half cols 8..15)
 //   C/D: 8 regs per thread (4 per sub-tile)
 // ====================================================================================
@@ -8556,7 +8565,7 @@ struct Fp8MMAHelper<AInputT, half, half, 16, 16, 16>
 // Selects between Fp16MMAHelper (half x half), Bf16MMAHelper (bfloat16 x bfloat16),
 // Int8MMAHelper (s8/u8 x s32 accumulator), and Fp8MMAHelper (e4m3/e5m2 x f16/f32
 // accumulator) based on the input element type.  AType is required to equal BType
-// — the supported PTX shapes always have matching A/B element types.
+// - the supported PTX shapes always have matching A/B element types.
 // ====================================================================================
 
 template<

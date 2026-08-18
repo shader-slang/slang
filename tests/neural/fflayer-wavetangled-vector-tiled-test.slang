@@ -25,11 +25,11 @@ import common;
 
 typealias ElementType = float;
 
-//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=258)
-//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set buffers.parameters = ubuffer(stride=4, count=272)
+//TEST_INPUT: set buffers.dParameters = ubuffer(stride=4, count=272)
 
 static const int BiasOffset = 256;
-static const int ParamBufferSize = 258;
+static const int ParamBufferSize = 272;
 typealias Layout = OptimalLayout;
 
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
@@ -78,6 +78,7 @@ typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, Sub
 typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize, WarpCount>;
 
 typealias Layer = FFLayer<ElementType, InVec, OutVec, Layout, IdentityActivation<ElementType>, true>;
+typealias NoBiasLayer = FFLayer<ElementType, InVec, OutVec, Layout, IdentityActivation<ElementType>, false>;
 
 [Differentiable]
 OutVec computeLayerOutput(Address paramAddr, InVec input, Layer layer)
@@ -158,8 +159,16 @@ void testFFLayerParameterCount(int tid, int resIndex)
     // For 4->2 layer with bias: 4*2 + 2 = 10
     bool isPassed = (Layer.ParameterCount == 10);
 
-    // OptimalLayout: ceil(2/16)*ceil(4/16)*256 + 2 = 1*1*256 + 2 = 258
-    isPassed = isPassed && (Layer.StorageSize == 258);
+    // OptimalLayout reserves a padded bias block after the physical weight matrix.
+    isPassed = isPassed && (Layer.StorageSize == 272);
+    isPassed = isPassed && (Layer.WeightStorageSize == 256);
+    isPassed = isPassed && (Layer.BiasStorageSize == 16);
+
+    // The logical no-bias layer has fewer parameters, but keeps the same physical
+    // optimal-layout envelope so layer offsets are independent of HasBias.
+    isPassed = isPassed && (NoBiasLayer.ParameterCount == 8);
+    isPassed = isPassed && (NoBiasLayer.StorageSize == 272);
+    isPassed = isPassed && (NoBiasLayer.BiasStorageSize == 16);
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)

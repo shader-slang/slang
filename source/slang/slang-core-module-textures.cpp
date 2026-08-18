@@ -112,6 +112,7 @@ void TextureTypeInfo::writeFuncBody(
             sb << i << "else if (isCombined != 0)\n";
             sb << i << "{\n";
             {
+                sb << i << "let image = __extractImage(this);\n";
                 sb << i << "return spirv_asm\n";
                 BraceScope spirvCombinedScope{i, sb, ";\n"};
                 sb << spirvCombined << "\n";
@@ -492,7 +493,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             auto generateSpirvAsm =
                 [&](StringBuilder& spirv, bool isRW, UnownedStringSlice imageVar)
             {
-                spirv << "%vecSize:$$uint";
+                spirv << "%__vecSize:$$uint";
                 if (sizeDimCount > 1)
                     spirv << sizeDimCount;
                 spirv << " = ";
@@ -512,27 +513,27 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                     {
                         if (UnownedStringSlice(rawT) == "int")
                         {
-                            spirv << "%c_" << uintSourceVal << " : $$" << rawT << " = OpBitcast %"
+                            spirv << "%__c_" << destParam << " : $$" << rawT << " = OpBitcast %"
                                   << uintSourceVal << "; ";
                         }
                         else
                         {
-                            spirv << "%c_" << uintSourceVal << " : $$" << rawT
-                                  << " = OpConvertUToF %" << uintSourceVal << "; ";
+                            spirv << "%__c_" << destParam << " : $$" << rawT << " = OpConvertUToF %"
+                                  << uintSourceVal << "; ";
                         }
-                        spirv << "OpStore &" << destParam << "%c_" << uintSourceVal << ";";
+                        spirv << "OpStore &" << destParam << "%__c_" << destParam << ";";
                     }
                 };
                 auto extractSizeComponent = [&](int componentId, const char* destParam)
                 {
-                    String elementVal = String("_") + destParam;
+                    String elementVal = String("__") + destParam;
                     if (sizeDimCount == 1)
                     {
-                        spirv << "%" << elementVal << " : $$uint = OpCopyObject %vecSize; ";
+                        spirv << "%" << elementVal << " : $$uint = OpCopyObject %__vecSize; ";
                     }
                     else
                     {
-                        spirv << "%" << elementVal << " : $$uint = OpCompositeExtract %vecSize "
+                        spirv << "%" << elementVal << " : $$uint = OpCompositeExtract %__vecSize "
                               << componentId << "; ";
                     }
                     convertAndStore(elementVal.getUnownedSlice(), destParam);
@@ -567,21 +568,22 @@ void TextureTypeInfo::writeGetDimensionFunctions()
 
                 if (isMultisample)
                 {
-                    spirv << "%_sampleCount : $$uint = OpImageQuerySamples" << imageVar << ";";
-                    convertAndStore(UnownedStringSlice("_sampleCount"), "sampleCount");
+                    spirv << "%__sampleCount : $$uint = OpImageQuerySamples" << imageVar << ";";
+                    convertAndStore(UnownedStringSlice("__sampleCount"), "sampleCount");
                 }
 
                 if (includeMipInfo)
                 {
-                    spirv << "%_levelCount : $$uint = OpImageQueryLevels" << imageVar << ";";
-                    convertAndStore(UnownedStringSlice("_levelCount"), "numberOfLevels");
+                    spirv << "%__levelCount : $$uint = OpImageQueryLevels" << imageVar << ";";
+                    convertAndStore(UnownedStringSlice("__levelCount"), "numberOfLevels");
                 }
             };
             StringBuilder spirvCombined;
             {
                 spirvCombined << "OpCapability ImageQuery; ";
-                spirvCombined << "%image:__imageType(this) = OpImage $this; ";
-                generateSpirvAsm(spirvCombined, false, toSlice("%image"));
+                // Do not copy resource-type $operands into %temporaries; NonUniform does not
+                // propagate to asm-local ids.
+                generateSpirvAsm(spirvCombined, false, toSlice("$image"));
             }
 
             StringBuilder spirvDefault;

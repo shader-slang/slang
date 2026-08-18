@@ -1,0 +1,43 @@
+schema_version: 1
+id: wgsl-sample-interpolation-modifier-dropped
+bundle: design/ast-reference/modifiers
+suspected_kind: wrong-codegen
+title: "WGSL: `sample` interpolation modifier is dropped from the emitted varying"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: wgsl
+evidence:
+  command: "build/RelWithDebInfo/bin/slangc docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang -target wgsl -entry main -stage fragment"
+  source_slang: docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang
+  observed_summary: |
+    A fragment varying declared `sample float4 perSample : COLOR0;` emits with no
+    interpolation attribute at all on the WGSL back end:
+      struct pixelInput_0
+      {
+          @location(0) perSample_0 : vec4<f32>,
+      };
+    Every other shader back end reproduces the per-sample rate from the same source file:
+    HLSL keeps `sample`, GLSL emits `sample layout(location = 0) in vec4 ...`, Metal emits
+    `[[sample_perspective]]`, and SPIR-V emits `OpDecorate %v_perSample Sample`. WGSL is the
+    only target where the rate silently disappears, so a shader cross-compiled to WGSL is
+    interpolated per-fragment rather than per-sample.
+    `nointerpolation` on the same struct field does emit (`@interpolate(flat)`), so the
+    varying plumbing itself reaches the WGSL emitter -- it is specifically a sampling
+    qualifier with no accompanying interpolation type that is lost.
+  exit_code: 0
+expected:
+  claim: |
+    A `sample` (or `centroid`) interpolation modifier on a fragment varying should reach the
+    emitted WGSL as an `@interpolate(perspective, sample)` attribute, the WGSL spelling for
+    the same per-sample rate the other back ends emit.
+  citation_kind: doc
+  citation: docs/generated/design/ast-reference/modifiers.md
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: ed8fa34c20f7ed61ca34b92ea83626541d602495
+  doc_anchor: docs/generated/design/ast-reference/modifiers.md#interpolation-modes
+agent_self_assessment:
+  confidence: medium
+  alternatives_considered:
+    - "WGSL cannot express a per-sample rate: ruled out -- the WGSL grammar admits `@interpolate(perspective, sample)`, and the emitter already has the string `sample` prepared for the second argument."
+    - "Test bug (wrong CHECK pattern): ruled out -- the raw slangc output above contains no `@interpolate` substring at all, independent of any FileCheck pattern."
+    - "Deliberate suppression pending a WGSL validation rule: possible, but no diagnostic is emitted, whereas the comparable `precise` gap on WGSL does warn (E56005), so the silence looks unintended."

@@ -8,7 +8,7 @@
 // varyings only; array-typed varyings hit a separate recursion path.
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry vertexMain -stage vertex
-//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -entry vertexMain -stage vertex -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv-asm -entry vertexMain -stage vertex -emit-spirv-directly -O3
 
 struct VertexOutput
 {

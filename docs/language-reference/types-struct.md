@@ -2,88 +2,93 @@
 
 ## Syntax
 
-Struct *no-body* declaration:
-> *`struct-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`simple-type-spec`*] **`';'`**
+Struct _no-body_ declaration:
 
-Struct *with-members* declaration:
-> *`struct-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
-> **`'{'`** *`member-list`* **`'}'`**
+> _`struct-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`modifier-list`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [_`identifier`_] [_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`bases-clause`_] [**`'='`** _`simple-type-spec`_] **`';'`**
 
-Struct *link-time extern type* declaration:
-> *`struct-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`simple-type-spec`*] **`';'`**
+Struct _with-members_ declaration:
 
-Struct *link-time export type alias* declaration:
-> *`struct-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`simple-type-spec`* **`';'`**
+> _`struct-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`modifier-list`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [_`identifier`_] [_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`bases-clause`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** _`where-clause`_)\*<br>
+> **`'{'`** _`member-list`_ **`'}'`**
+
+Struct _link-time extern type_ declaration:
+
+> _`struct-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`modifier-list`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'extern'`** **`'struct'`** [_`identifier`_] [_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`bases-clause`_] [**`'='`** _`simple-type-spec`_] **`';'`**
+
+Struct _link-time export type alias_ declaration:
+
+> _`struct-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[_`modifier-list`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'export'`** **`'struct'`** [_`identifier`_] [_`generic-params-decl`_]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** _`bases-clause`_] **`'='`** _`simple-type-spec`_ **`';'`**
 
 Member list:
-> *`member-list`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;( *`var-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;| *`type-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;| *`function-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;| *`constructor-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;| *`property-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;| *`subscript-op-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;| *`function-call-op-decl`* )*
+
+> _`member-list`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;( _`var-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| _`type-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| _`function-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| _`constructor-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| _`property-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| _`subscript-op-decl`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| _`function-call-op-decl`_ )*
 
 ### Parameters
 
-- *`modifier-list`* is an optional list of modifiers (TODO: link)
-- *`identifier`* is an optional name of the declared struct type
-- *`generic-params-decl`* is an optional generic parameters declaration. See [generics](generics.md).
-- *`bases-clause`* is an optional list of inherited [interfaces](types-interface.md).
-- *`simple-type-spec`* is an optional type expression for an alias type. See [Modules (TODO)](TODO).
-- *`where-clause`* is an optional generic constraint expression. See [generics](generics.md).
-- *`member-list`* is a list of struct members. A member is one of:
-  - *`var-decl`* is a member variable declaration. See [Variables (TODO)](TODO)
-  - *`type-decl`* is a nested [type declaration](types.md).
-  - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
-  - *`constructor-decl`* is a [constructor declaration](#constructor).
-  - *`property-decl`* is a [property declaration](#property).
-  - *`subscript-op-decl`* is a [subscript operator declaration](#subscript-op).
-  - *`function-call-op-decl`* is a [function call operator declaration](#function-call-op).
+- _`modifier-list`_ is an optional list of modifiers (TODO: link)
+- _`identifier`_ is an optional name of the declared struct type
+- _`generic-params-decl`_ is an optional generic parameters declaration. See [generics](generics.md).
+- _`bases-clause`_ is an optional list of inherited [interfaces](types-interface.md).
+- _`simple-type-spec`_ is an optional type expression for an alias type. See [Modules (TODO)](TODO).
+- _`where-clause`_ is an optional generic constraint expression. See [generics](generics.md).
+- _`member-list`_ is a list of struct members. A member is one of:
+  - _`var-decl`_ is a member variable declaration. See [Variables (TODO)](TODO)
+  - _`type-decl`_ is a nested [type declaration](types.md).
+  - _`function-decl`_ is a member function declaration. See [Functions (TODO)](TODO)
+  - _`constructor-decl`_ is a [constructor declaration](#constructor).
+  - _`property-decl`_ is a [property declaration](#property).
+  - _`subscript-op-decl`_ is a [subscript operator declaration](#subscript-op).
+  - _`function-call-op-decl`_ is a [function call operator declaration](#function-call-op).
 
 > ⚠️ **Warning:** The syntax for bracketed attributes list after **`'struct'`** was deprecated in Slang 2025,
-> and it has been removed in Slang 2026. Add bracketed attributes in *`modifier-list`* before the
+> and it has been removed in Slang 2026. Add bracketed attributes in _`modifier-list`_ before the
 > **`'struct'`** keyword, instead. ([Issue #9691](https://github.com/shader-slang/slang/issues/9691))
-
 
 ## Description
 
 A structure is a type consisting of an ordered sequence of members. A `struct` declaration has the following
 forms:
 
-- The *no-body* declaration specifies an existence of a structure type. The declaration simply specifies that
+- The _no-body_ declaration specifies an existence of a structure type. The declaration simply specifies that
   a structure type with the specified name exists. This enables its use in type expressions without the member
   declarations.
-- The *with-members* declaration defines the structure type with a layout and an [extensible](types-extension.md)
+- The _with-members_ declaration defines the structure type with a layout and an [extensible](types-extension.md)
   list of non-layout members.
-- The *link-time extern type* declaration specifies the existence of a structure type that is defined in
+- The _link-time extern type_ declaration specifies the existence of a structure type that is defined in
   another module. See [Modules (TODO)](TODO).
-- The *link-time export type* declaration specifies that a structure type is exported with a type alias. See
+- The _link-time export type_ declaration specifies that a structure type is exported with a type alias. See
   [Modules (TODO)](TODO).
 
-When the *`identifier`* is specified, it is the name of the structure. Otherwise, the structure is anonymous,
+When the _`identifier`_ is specified, it is the name of the structure. Otherwise, the structure is anonymous,
 which means that it is assigned an unspecified unique name. The main use of anonymous structures is in inline
 type definition expressions. For example, `struct { int a; } obj;` defines variable `obj` with an anonymous
 structure type that has field `int a;`. Anonymous structure declarations are meaningful only in the
-*with-members* form.
+_with-members_ form.
 
 A structure member is declared in the structure body and is one of the following:
+
 - A static data member; declared as a variable with the `static` keyword.
-- A non-static data member (*aka.* field); declared as a variable.
+- A non-static data member (_aka._ field); declared as a variable.
 - A [constructor](#constructor).
 - A [static member function](#static-member-function); declared as a function with the `static` modifier
   keyword.
@@ -104,6 +109,7 @@ A data member and a member function can be declared with the `static` keyword.
   - Invoke both the static and the non-static member functions.
 
 Data members may be assigned with a default initializer. The following rules apply:
+
 - When an object is initialized using an initializer list, the default initializer of a non-static data member
   specifies the initial value when the initializer list does not provide one.
 - When an object is initialized using a constructor, the default initializer of a non-static data member
@@ -123,16 +129,16 @@ A structure may conform to one or more [interface](types-interface.md) types.
 A structure may be extended with a [type extension](types-extension.md).
 
 `struct` members may be declared with access control specifiers `public`, `internal`, or `private` (specified
-in *`modifier-list`*). The default member visibility is `internal`. Nested `struct` members have access to
+in _`modifier-list`_). The default member visibility is `internal`, except that starting with language version
+2026 a member with no explicit specifier inherits the visibility of its enclosing `struct` (so an unmodified
+member of a `public` struct is `public`). Nested `struct` members have access to
 `private` members of the enclosing `struct`. See [access control (TODO)](TODO) for further information.
-
 
 > ⚠️ **Warning:** Structure inheriting from another structure is deprecated. It may not work as expected.
 
-
 ## Objects {#object}
 
-An object is an *instance* of a `struct`. An instance consists of all non-static data members defined in a
+An object is an _instance_ of a `struct`. An instance consists of all non-static data members defined in a
 `struct`. The data members may be initialized using an initializer list or a constructor. For details, see
 [variable declarations](declarations.md).
 
@@ -141,12 +147,13 @@ An object is an *instance* of a `struct`. An instance consists of all non-static
 ### Syntax
 
 Declaration without body: (interfaces only)
-> **`'__init'`** [*`generic-params-decl`*] **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\* **`';'`**
+
+> **`'__init'`** [_`generic-params-decl`_] **`'('`** _`param-list`_ **`')'`** (**`'where'`** _`where-clause`_)\* **`';'`**
 
 Declaration with body:
-> **`'__init'`** [*`generic-params-decl`*] **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** *`body-stmt`*\*  **`'}'`**
 
+> **`'__init'`** [_`generic-params-decl`_] **`'('`** _`param-list`_ **`')'`** (**`'where'`** _`where-clause`_)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** _`body-stmt`_\* **`'}'`**
 
 ### Description
 
@@ -163,10 +170,10 @@ instantiation.
 
 `const` data members cannot be initialized by the constructor.
 
-*`where-clause`* is an optional generic constraint expression, discussed in [generics](generics.md).
-
+_`where-clause`_ is an optional generic constraint expression, discussed in [generics](generics.md).
 
 **Example:**
+
 ```hlsl
 struct TestClass
 {
@@ -239,14 +246,12 @@ state.
 
 > 📝 **Remark 2:** Accessing data members that are in undefined state is undefined behavior.
 
-
 ## Static Member Functions {#static-member-function}
 
 A static member function is a regular function enclosed within the `struct` name space. Static member
 functions may access only static structure members.
 
 Invocation of a static member function does not require an object.
-
 
 ## Non-static Member Functions {#nonstatic-member-function}
 
@@ -263,33 +268,38 @@ Non-static member functions cannot be invoked without an object.
 > 📝 **Remark:** In C++ terminology, a member function is `const` by default. Attribute `[mutating]` makes it
 > a non-`const` member function.
 
-
 ## Properties {#property}
 
 ### Syntax
 
 Modern syntax, implicit `get` declaration: (interfaces only)
-> **`'property'`** *`identifier`* **`':'`** *`simple-type-spec`* **`';'`**
+
+> **`'property'`** _`identifier`_ **`':'`** _`simple-type-spec`_ **`';'`**
 
 Modern syntax, explicit accessor declarations:
-> **`'property'`** *`identifier`* **`':'`** *`simple-type-spec`*<br>
-> **`'{'`** *`accessor-decl`*\*  **`'}'`**
+
+> **`'property'`** _`identifier`_ **`':'`** _`simple-type-spec`_<br>
+> **`'{'`** _`accessor-decl`_\* **`'}'`**
 
 Traditional syntax, implicit `get` declaration: (interfaces only)
-> **`'property'`** *`traditional-var-decl`* **`';'`**
+
+> **`'property'`** _`traditional-var-decl`_ **`';'`**
 
 Traditional syntax, explicit accessor declarations:
-> **`'property'`** *`traditional-var-decl`*<br>
-> **`'{'`** *`accessor-decl`*\*  **`'}'`**
+
+> **`'property'`** _`traditional-var-decl`_<br>
+> **`'{'`** _`accessor-decl`_\* **`'}'`**
 
 Accessor declaration syntax, no body: (interfaces only)
-> *`accessor-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** *`param-list`* **`')'`**] **`';'`**
+
+> _`accessor-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** _`param-list`_ **`')'`**] **`';'`**
 
 Accessor declaration syntax, with body:
-> *`accessor-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** *`param-list`* **`')'`**]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** *`body-stmt`*\*  **`'}'`**
+
+> _`accessor-decl`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** _`param-list`_ **`')'`**]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** _`body-stmt`_\* **`'}'`**
 
 ### Description
 
@@ -312,8 +322,8 @@ The property declaration forms without accessor or accessor body declarations ar
 > ⚠️ **Warning:** Property reference accessor `ref` is a Slang internal language feature. It is subject to
 > change and may not work as expected.
 
-
 **Example:**
+
 ```hlsl
 struct TestClass
 {
@@ -381,7 +391,6 @@ void main(uint3 id : SV_DispatchThreadID)
 The static and non-static structure members and nested types are accessed using \``.`\`.
 
 > ⚠️ **Warning:** The C++-style scope resolution operator \``::`\` is deprecated. It should not be used.
-
 
 **Example:**
 
@@ -471,13 +480,15 @@ int tmp4 = TestStruct::incrementAndReturnB();
 ### Syntax
 
 Implicit `get` declaration: (interfaces only)
-> **`'__subscript'`** **`'('`** *`param-list`* **`')'`** **`'->'`** *`simple-type-spec`* **`';'`**
+
+> **`'__subscript'`** **`'('`** _`param-list`_ **`')'`** **`'->'`** _`simple-type-spec`_ **`';'`**
 
 Explicit accessor declarations:
-> **`'__subscript'`** **`'('`** *`param-list`* **`')'`** **`'->'`** *`simple-type-spec`*<br>
-> **`'{'`** *`accessor-decl`*\*  **`'}'`**
 
-See [properties](#property) for *`accessor-decl`* syntax.
+> **`'__subscript'`** **`'('`** _`param-list`_ **`')'`** **`'->'`** _`simple-type-spec`_<br>
+> **`'{'`** _`accessor-decl`_\* **`'}'`**
+
+See [properties](#property) for _`accessor-decl`_ syntax.
 
 ### Description
 
@@ -552,11 +563,13 @@ void main(uint3 id : SV_DispatchThreadID)
 ### Syntax
 
 Declaration without body: (interfaces only)
-> *`simple-type-spec`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`** **`';'`**
+
+> _`simple-type-spec`_ **`'operator'`** **`'(' ')'`** **`'('`** _`param-list`_ **`')'`** **`';'`**
 
 Declaration with body:
-> *`simple-type-spec`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`**<br>
-> **`'{'`** *`body-stmt`*\* **`'}'`**
+
+> _`simple-type-spec`_ **`'operator'`** **`'(' ')'`** **`'('`** _`param-list`_ **`')'`**<br>
+> **`'{'`** _`body-stmt`_\* **`'}'`**
 
 ### Description
 
@@ -601,12 +614,11 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
-
 # Memory Layout
 
 ## Natural Layout
 
-The *natural layout* for a structure type uses the following rules:
+The _natural layout_ for a structure type uses the following rules:
 
 - The alignment of a structure is the maximum of 1, alignment of any member, and alignment of any parent type.
 - The data is laid out in order of:
@@ -614,7 +626,7 @@ The *natural layout* for a structure type uses the following rules:
   - Non-static data members
 - Offset of the data items:
   - The offset of the first data item is 0
-  - The offset of the *Nth* data item is the offset+size of the previous item rounded up to the alignment of
+  - The offset of the _Nth_ data item is the offset+size of the previous item rounded up to the alignment of
     the item
 - The size of the structure is offset+size of the last item. That is, the structure is not tail-padded and rounded
   up to the alignment of the structure.
@@ -652,6 +664,6 @@ This Type
 ---------
 
 Within the body of a structure or interface declaration, the keyword `This` may be used to refer to the
-enclosing type. Inside of a structure type declaration, `This` refers to the structure type itself.  Inside
+enclosing type. Inside of a structure type declaration, `This` refers to the structure type itself. Inside
 of an interface declaration, `This` refers to the concrete type that is conforming to the interface (that is,
 the type of `this`).

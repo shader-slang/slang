@@ -9,9 +9,9 @@ Using the Reflection API
 This chapter provides an introduction to the Slang reflection API.
 Our goals in this chapter are to:
 
-* Demonstrate the recommended types and operations to use for the most common reflection scenarios
+- Demonstrate the recommended types and operations to use for the most common reflection scenarios
 
-* Provide an underlying mental model for how Slang's reflection information represents the structure of a program
+- Provide an underlying mental model for how Slang's reflection information represents the structure of a program
 
 We will describe the structure of a program that traverses all of the parameters of a shader program and prints information (including binding locations) for them.
 The code shown here is derived from the [reflection-api](https://github.com/shader-slang/slang/tree/master/examples/reflection-api) example that is included in the Slang repository.
@@ -38,7 +38,7 @@ We start our discussion of the reflection API with two of the fundamental buildi
 A key property of GPU shader programming is that the same type may be laid out differently, depending on how it is used.
 For example, a user-defined `struct` type `Stuff` will often be laid out differently if it is used in a `ConstantBuffer<Stuff>` than in a `StructuredBuffer<Stuff>`.
 
-Because the same thing can be laid out in multiple ways (even within the same program), the Slang reflection API represents types and variables as distinct things from the *layouts* applied to them.
+Because the same thing can be laid out in multiple ways (even within the same program), the Slang reflection API represents types and variables as distinct things from the _layouts_ applied to them.
 This section focuses only on the underlying types/variables, while later sections will build on these concepts to show how layouts can be reflected.
 
 ### Variables
@@ -63,7 +63,7 @@ void printVariable(
 ### Types
 
 A `TypeReflection` represents some type in the input program.
-There are various different *kinds* of types, such as arrays, user-defined `struct` types, and built-in types like `int`.
+There are various different _kinds_ of types, such as arrays, user-defined `struct` types, and built-in types like `int`.
 The reflection API represents these different cases with the `TypeReflection::Kind` enumeration.
 
 On its own, a `TypeReflection` does not include layout information.
@@ -143,7 +143,7 @@ The `void` type is also considered a scalar type (`slang::ScalarType::Void`).
 
 #### Structure Types
 
-A structure type may have zero or more *fields*.
+A structure type may have zero or more _fields_.
 Each field is represented as a `VariableReflection`.
 A `TypeReflection` allows the fields to be enumerated using `getFieldCount()` and `getFieldByIndex()`.
 
@@ -207,7 +207,7 @@ case slang::TypeReflection::Kind::Array:
     break;
 ```
 
-Some array types, like `Stuff[]`, have *unbounded* size.
+Some array types, like `Stuff[]`, have _unbounded_ size.
 The Slang reflection API represents this case using the maximum value possible for the `size_t` result from `getElementCount()`:
 
 ```c++
@@ -280,19 +280,19 @@ case slang::TypeReflection::Kind::Resource:
     break;
 ```
 
-The *result type* of a resource is simply whatever would be returned by a basic read operation on that resource.
+The _result type_ of a resource is simply whatever would be returned by a basic read operation on that resource.
 For resource types in Slang code, the result type is typically written as a generic type parameter after the type name.
 For a `StructuredBuffer<Thing>` the result type is `Thing`, while for a `Texture2D<int3>` it is `int3`.
 A texture type like `Texture2D` that does not give an explicit result type has a default result type of `float4`.
 
-The *access* of a resource (`SlangResourceAccess`) represents how the elements of the resource may be accessed by shader code.
+The _access_ of a resource (`SlangResourceAccess`) represents how the elements of the resource may be accessed by shader code.
 For Slang resource types, access is typically encoded as a prefix on the type name.
 For example, an unprefixed `Texture2D` has read-only access (`SLANG_RESOURCE_ACCESS_READ`), while a `RWTexture2D` has read-write access (`SLANG_RESOURCE_ACCESS_READ_WRITE`).
 
-The *shape* of a resource (`SlangResourceShape`) represents the conceptual rank/dimensionality of the resource and how it is indexed.
+The _shape_ of a resource (`SlangResourceShape`) represents the conceptual rank/dimensionality of the resource and how it is indexed.
 For Slang resource type names, everything after the access prefix is typically part of the shape.
 
-A resource shape breaks down into a *base shape* along with a few possible suffixes like array-ness:
+A resource shape breaks down into a _base shape_ along with a few possible suffixes like array-ness:
 
 ```c++
 void printResourceShape(SlangResourceShape shape)
@@ -330,7 +330,7 @@ case slang::TypeReflection::Kind::ShaderStorageBuffer:
 Layout for Types and Variables
 ------------------------------
 
-The Slang reflection API provides `VariableLayoutReflection` and `TypeLayoutReflection` to represent a *layout* of a given variable or type.
+The Slang reflection API provides `VariableLayoutReflection` and `TypeLayoutReflection` to represent a _layout_ of a given variable or type.
 As discussed earlier, the same type might have multiple different layouts used for it in the same program.
 
 ### Layout Units
@@ -365,7 +365,7 @@ The key insight is that layout is multi-dimensional: the same type can have a si
 For example, when compiling the above code for D3D12/DXIL, the answer is that the `Uniforms::material` has an offset of one `t` register, one `s` register, and 32 bytes.
 Similarly, the size of the `Material` type is one `t` register, one `s` register, and 16 bytes.
 
-We refer to these distinct units of measure used in layouts (including bytes, `t` registers, and `s` registers) as *layout units*.
+We refer to these distinct units of measure used in layouts (including bytes, `t` registers, and `s` registers) as _layout units_.
 Layout units are represented in the Slang reflection API with the `slang::ParameterCategory` enumeration.
 (We will avoid the term "parameter category," despite that being the name currently exposed in the public API; that name has turned out to be a less-than-ideal choice).
 
@@ -390,7 +390,7 @@ void printVarLayout(slang::VariableLayoutReflection* varLayout)
 
 #### Offsets
 
-The offsets stored by a `VariableLayoutReflection` are always *relative* to the enclosing `struct` type, scope, or other context that surrounds the variable.
+The offsets stored by a `VariableLayoutReflection` are always _relative_ to the enclosing `struct` type, scope, or other context that surrounds the variable.
 
 The `VariableLayoutReflection::getOffset` method can be used to query the relative offset of a variable for any given layout unit:
 
@@ -430,7 +430,7 @@ void printRelativeOffsets(
 #### Spaces / Sets
 
 For certain target platforms and layout units, the offset of a variable for that unit might include an additional dimension that represents a Vulkan/SPIR-V descriptor set, D3D12/DXIL register space, or a WebGPU/WGSL binding group.
-In this chapter, we will uniformly refer to all of these concepts as *spaces*.
+In this chapter, we will uniformly refer to all of these concepts as _spaces_.
 
 The relative space offset of a variable layout for a given layout unit can be queried with `getBindingSpace()`:
 
@@ -496,7 +496,7 @@ void printSize(
 }
 ```
 
-Note that the size of a type may be *unbounded* for a particular layout unit; this case is encoded just like the unbounded case for the element count of an array type (`~size_t(0)`).
+Note that the size of a type may be _unbounded_ for a particular layout unit; this case is encoded just like the unbounded case for the element count of an array type (`~size_t(0)`).
 
 The layout units used by a particular type layout can be iterated over using `getCategoryCount()` and `getCategoryByIndex()`:
 
@@ -521,7 +521,7 @@ For any given layout unit, a type layout can also reflect the alignment of the t
 Alignment is typically only interesting when the layout unit is bytes (`slang::ParameterCategory::Uniform`).
 
 Note that, unlike in C/C++, a type layout in Slang may have a size that is not a multiple of its alignment.
-The *stride* of a type layout (for a given layout unit) is its size rounded up to its alignment, and is used as the distance between consecutive elements in arrays.
+The _stride_ of a type layout (for a given layout unit) is its size rounded up to its alignment, and is used as the distance between consecutive elements in arrays.
 The stride of a type layout can be queried for any chosen layout unit with `TypeLayoutReflection::getStride()`.
 
 Note that all of the `TypeLayoutReflection` methods `getSize()`, `getAlignment()`, and `getStride()` default to returning information in bytes, if a layout unit is not specified.
@@ -607,7 +607,7 @@ case slang::TypeReflection::Kind::Array:
 
 #### Matrix Type Layouts
 
-A layout for a matrix type stores a matrix layout *mode* (`SlangMatrixLayoutMode`) to record whether the type was laid out in row-major or column-major layout:
+A layout for a matrix type stores a matrix layout _mode_ (`SlangMatrixLayoutMode`) to record whether the type was laid out in row-major or column-major layout:
 
 ```c++
 case slang::TypeReflection::Kind::Matrix:
@@ -627,7 +627,7 @@ For an explanation of why these conventions differ, please see the relevant [app
 #### Single-Element Containers
 
 Constant buffers, parameter blocks, and other types representing grouping of parameters are the most subtle cases to handle for reflection.
-The Slang reflection API aspires to provide complete and accurate information for these cases, but understanding *why* the provided data is what it is requires an appropriate mental model.
+The Slang reflection API aspires to provide complete and accurate information for these cases, but understanding _why_ the provided data is what it is requires an appropriate mental model.
 
 ##### Simple Cases
 
@@ -735,26 +735,26 @@ Furthermore, that constant buffer `binding` will be the first binding within the
 
 ##### Container and Element
 
-In order to properly handle all of the nuances described here, the layout for a type like `ConstantBuffer<Thing>` or `ParameterBlock<Thing>` includes both layout information for the element of the container (a `Thing`) as well as layout information for the *container* itself.
+In order to properly handle all of the nuances described here, the layout for a type like `ConstantBuffer<Thing>` or `ParameterBlock<Thing>` includes both layout information for the element of the container (a `Thing`) as well as layout information for the _container_ itself.
 Furthermore, the layout information for both the element and container need to support storing offset information (not just size), relative to the overall `ConstantBuffer<>` or `ParameterBlock<>`.
 
 The breakdown is thus:
 
-* The size information for the complete container type layout reflects whatever usage "leaks" out, such that it would need to be accounted for when further aggregating the overall type.
+- The size information for the complete container type layout reflects whatever usage "leaks" out, such that it would need to be accounted for when further aggregating the overall type.
 
-* Information about the allocated container is stored as a variable layout, queried with `getContainerVarLayout()`
+- Information about the allocated container is stored as a variable layout, queried with `getContainerVarLayout()`
 
-  * The type layout for that variable layout shows what was allocated to represent the container itself, including any implicitly-allocated constant buffer
+  - The type layout for that variable layout shows what was allocated to represent the container itself, including any implicitly-allocated constant buffer
 
-  * The offsets of that variable layout show where the container is situated relative to the overall type.
-  With the current layout strategies used by the Slang compiler, all of these offsets will be zero.
+  - The offsets of that variable layout show where the container is situated relative to the overall type.
+    With the current layout strategies used by the Slang compiler, all of these offsets will be zero.
 
-* Information about the element is stored as a variable layout, queried with `getElementVarLayout()`
+- Information about the element is stored as a variable layout, queried with `getElementVarLayout()`
 
-  * The type layout of that variable layout shows how the element type is laid out inside container.
+  - The type layout of that variable layout shows how the element type is laid out inside container.
 
-  * The offsets on that variable layout show where the element is situated relative to the overall type.
-  These offsets will be non-zero in cases where there is some layout unit used by both the element type and the container itself.
+  - The offsets on that variable layout show where the element is situated relative to the overall type.
+    These offsets will be non-zero in cases where there is some layout unit used by both the element type and the container itself.
 
 Given this understanding, we can now look at the logic to reflect a type layout for a constant buffer, parameter block, or similar type.
 
@@ -883,8 +883,7 @@ We see here that the type layout for the element is as expected of a layout for 
 In particular, note how the `material` field has a relative offset of zero bindings from the start of the `struct`, as is expected for the first field.
 In order to account for the automatically-introduced constant buffer that is used by the container part of the layout, the element variable layout includes a relative offset of one binding (`ParameterCategory::DescriptorTableSlot`).
 
-In a later section we will discuss how to easily sum up the various relative offsets shown in an example like this, when an application wants to compute a *cumulative* offset for a field like `params.material.sampler`.
-
+In a later section we will discuss how to easily sum up the various relative offsets shown in an example like this, when an application wants to compute a _cumulative_ offset for a field like `params.material.sampler`.
 
 ##### Pitfalls to Avoid
 
@@ -918,7 +917,7 @@ void printProgramLayout(
 }
 ```
 
-The global scope and entry points are each an example of a *scope* where top-level shader parameters can be declared.
+The global scope and entry points are each an example of a _scope_ where top-level shader parameters can be declared.
 Scopes are represented in the reflection API using `VariableLayoutReflection`s.
 We will now discuss the details of reflection for scopes, starting with the global scope as an example.
 
@@ -1039,7 +1038,7 @@ SamplerState sampler;
 
 the Slang compiler will detect that `envMap` is explicitly bound to `binding` 1 in space (aka descriptor `set`) 0, and that neither `diffuseMap` nor `sampler` has been explicitly bound.
 Both of the unbound parameters need to be passed inside of some space, so the compiler will allocate space 1 for that purpose (as space 0 was already claimed by explicit bindings).
-In simplistic terms, the compiler will behave *as if* the global-scope parameters are wrapped up in a `struct` and then further wrapped up into a `ParameterBlock<>`.
+In simplistic terms, the compiler will behave _as if_ the global-scope parameters are wrapped up in a `struct` and then further wrapped up into a `ParameterBlock<>`.
 
 This case shows up in the Slang reflection API as the scope having a type layout with the parameter-block kind:
 
@@ -1053,13 +1052,13 @@ case slang::TypeReflection::Kind::ParameterBlock:
     break;
 ```
 
-In cases where the parameters in a scope require *both* a constant buffer and a parameter block to be automatically introduced, the scope is reflected as if things were wrapped with `ParameterBlock<...>` and not `ParameterBlock<ConstantBuffer<...>>`.
+In cases where the parameters in a scope require _both_ a constant buffer and a parameter block to be automatically introduced, the scope is reflected as if things were wrapped with `ParameterBlock<...>` and not `ParameterBlock<ConstantBuffer<...>>`.
 That is, the binding information for the implicit constant buffer will be found as part of the container variable layout for the parameter block.
 
 #### Pitfalls to Avoid
 
 The `ProgramLayout` type has the appealingly-named `getParameterCount` and `getParameterByIndex()` methods, which seem to be the obvious way to navigate the global-scope parameters of a shader.
-However, we recommend *against* using these functions in applications that want to be able to systematically and robustly reflect any possible input shader code.
+However, we recommend _against_ using these functions in applications that want to be able to systematically and robustly reflect any possible input shader code.
 
 While the reflection API implementation makes an effort to ensure that the information returned by `getParameterByIndex()` is not incorrect, it is very difficult when using those functions to account for how global-scope parameters might have been grouped into an automatically-introduced constant buffer or parameter block.
 The `getGlobalConstantBufferBinding()` and `getGlobalConstantBufferSize()` methods can be used in some scenarios, but aren't the best way to get the relevant information.
@@ -1145,17 +1144,17 @@ case SLANG_STAGE_COMPUTE:
 
 #### Varying Parameters
 
-So far we have primarily been talking about the *uniform* shader parameters of a program: those that can be passed in from application code to shader code.
-Slang's reflection API also reflects the *varying* shader parameters that are passed between stages of a pipeline.
+So far we have primarily been talking about the _uniform_ shader parameters of a program: those that can be passed in from application code to shader code.
+Slang's reflection API also reflects the _varying_ shader parameters that are passed between stages of a pipeline.
 
 Variable and type layouts for varying shader parameters will typically show usage of:
 
-* Varying input slots (`slang::ParameterCategory::VaryingInput`) for stage inputs
-* Varying output slots (`slang::ParameterCategory::VaryingOutput`) for `out` parameters and the entry-point result
-* Both (`slang::ParameterCategory::VaryingInput` *and* `::VaryingOutput`) for `inout` parameters
-* Nothing (no usage for any unit) for *system value* parameters (typically using an `SV_*` semantic)
+- Varying input slots (`slang::ParameterCategory::VaryingInput`) for stage inputs
+- Varying output slots (`slang::ParameterCategory::VaryingOutput`) for `out` parameters and the entry-point result
+- Both (`slang::ParameterCategory::VaryingInput` _and_ `::VaryingOutput`) for `inout` parameters
+- Nothing (no usage for any unit) for _system value_ parameters (typically using an `SV_*` semantic)
 
-For user-defined varying parameters, some GPU APIs care about the *semantic* that has been applied to the parameter.
+For user-defined varying parameters, some GPU APIs care about the _semantic_ that has been applied to the parameter.
 For example, given this shader code:
 
 ```hlsl
@@ -1178,7 +1177,6 @@ Semantics are only relevant for shader parameters that became part of the varyin
 A semantic is decomposed into both a name and an index (e.g., `TEXCOORD5` has a name of `"TEXCOORD"` and an index of `5`).
 This information can be reflected with `getSemanticName()` and `getSemanticIndex()`:
 
-
 ```c++
 void printVarLayout(slang::VariableLayoutReflection* varLayout)
 {
@@ -1196,11 +1194,11 @@ void printVarLayout(slang::VariableLayoutReflection* varLayout)
 Calculating Cumulative Offsets
 ------------------------------
 
-All of the code so far has only extracted the *relative* offsets of variable layouts.
+All of the code so far has only extracted the _relative_ offsets of variable layouts.
 Offsets for fields have been relative to the `struct` that contains them.
 Offsets for top-level parameters have been relative to the scope that contains them, or even to a constant buffer or parameter block that was introduced for that scope.
 
-There are many cases where an application needs to calculate a *cumulative* offset (or even an absolute offset) for some parameter, even down to the granularity of individual `struct` fields.
+There are many cases where an application needs to calculate a _cumulative_ offset (or even an absolute offset) for some parameter, even down to the granularity of individual `struct` fields.
 As a notable example, allocation of D3D root signatures and Vulkan pipeline layouts for a program requires being able to enumerate the absolute offsets of all bindings in all descriptor tables/sets.
 
 Because offsets for certain layout units include an additional dimension for a space, our example application will define a simple `struct` to represent a cumulative offset:
@@ -1223,7 +1221,7 @@ However, we have already seen that in the context of a GPU language like Slang, 
 A naive implementation might try to represent a cumulative offset as a vector or dictionary of scalar offsets, with (up to) one for each layout unit.
 The sheer number of layout units (the cases of the `slang::ParameterCategory` enumeration) makes such an approach unwieldy.
 
-Instead we focus on the intuition that the cumulative offset of a variable layout, for any given layout unit, can be computed by summing up all the relative offsets along the *access path* to that variable.
+Instead we focus on the intuition that the cumulative offset of a variable layout, for any given layout unit, can be computed by summing up all the relative offsets along the _access path_ to that variable.
 For example, given code like:
 
 ```hlsl
@@ -1550,7 +1548,7 @@ Some application architectures make use of shader code that declares a large num
 Similarly, shader parameters may be declared at global scope even if they are only used by a single entry point in a pipeline.
 These kinds of architectures are not ideal, but they are pervasive.
 
-Slang's base reflection API *intentionally* does not provide information about which shader parameters are or are not used by a program, or specific entry points.
+Slang's base reflection API _intentionally_ does not provide information about which shader parameters are or are not used by a program, or specific entry points.
 This choice ensures that applications using the reflection API can robustly re-use data structures built from reflection data across hot reloads of shaders, or switches between variants of a program.
 
 Applications that need to know which parameters are used (and by which entry points or stages) need to query for additional metadata connected to the entry points of their compiled program using `IComponentType::getEntryPointMetadata()`:
@@ -1562,6 +1560,34 @@ program->getEntryPointMetadata(
         entryPointIndex,
         0, // target index
         &entryPointMetadata);
+```
+
+Target-wide post-emit metadata is queried through `IComponentType::getTargetMetadata()`. For
+`DescriptorHandle<T>`, `ProgramLayout::getBindlessSpaceIndex()` reports the frontend-reserved
+bindless space, which can be non-negative even when the emitted target does not use a descriptor
+heap path. Hosts should cast target metadata to `IBindlessResourceMetadata` and use
+`usesBindlessResourceHeap()` as a post-lowering signal, then combine it with the target binding
+model when deciding whether an explicit bindless resource heap binding is required:
+
+```c++
+slang::IComponentType* program = ...;
+Slang::ComPtr<slang::IMetadata> targetMetadata;
+Slang::ComPtr<slang::IBlob> diagnostics;
+if (SLANG_FAILED(program->getTargetMetadata(
+        0, // target index
+        targetMetadata.writeRef(),
+        diagnostics.writeRef())))
+{
+    // Handle error.
+    return;
+}
+
+auto bindlessMetadata = static_cast<slang::IBindlessResourceMetadata*>(
+    targetMetadata->castAs(slang::IBindlessResourceMetadata::getTypeGuid()));
+if (bindlessMetadata && bindlessMetadata->usesBindlessResourceHeap())
+{
+    // Bind the descriptor heap for this compiled target.
+}
 ```
 
 When traversal of reflection data reaches a leaf parameter, the application can use `IMetadata::isParameterLocationUsed()` with the absolute location of that parameter for a given layout unit:

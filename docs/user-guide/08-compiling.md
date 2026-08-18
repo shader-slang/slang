@@ -70,7 +70,7 @@ Developers are encouraged to use this model because it directly documents intent
 #### Explicit Entry Point Options
 
 For compatibility with existing code, the Slang compiler also supports explicit specification of entry point functions using configuration options external to shader source code.
-When these options are used the compiler will *ignore* all `[shader(...)]` attributes and only use the explicitly-specified entry points instead.
+When these options are used the compiler will _ignore_ all `[shader(...)]` attributes and only use the explicitly-specified entry points instead.
 
 ### Shader Parameters
 
@@ -85,22 +85,23 @@ It is important that both the application and generated GPU kernel code agree on
 Within the Slang system a _target_ represents a particular platform and set of capabilities that output code can be generated for.
 A target includes information such as:
 
-* The _format_ that code should be generated in: SPIR-V, DXIL, etc.
+- The _format_ that code should be generated in: SPIR-V, DXIL, etc.
 
-* A _profile_ that specifies a general feature/capability level for the target: D3D Shader Model 5.1, GLSL version 4.60, etc.
+- A _profile_ that specifies a general feature/capability level for the target: D3D Shader Model 5.1, GLSL version 4.60, etc.
 
-* Optional _capabilities_ that should be assumed available on the target: for example, specific Vulkan GLSL extensions.
+- Optional _capabilities_ that should be assumed available on the target: for example, specific Vulkan GLSL extensions.
 
-* Options that impact code generation: floating-point strictness, level of debug information to generate, etc.
+- Options that impact code generation: floating-point strictness, level of debug information to generate, etc.
 
 Slang supports compiling for multiple targets in the same compilation session.
 When using multiple targets at a time, it is important to understand the distinction between the _front-end_ of the compiler, and the _back-end_:
 
-* The compiler front-end comprises preprocessing, parsing, and semantic checking. The front-end runs once for each translation unit and its results are shared across all targets.
+- The compiler front-end comprises preprocessing, parsing, and semantic checking. The front-end runs once for each translation unit and its results are shared across all targets.
 
-* The compiler back-end generates output code, and thus runs once per target.
+- The compiler back-end generates output code, and thus runs once per target.
 
-> #### Note ####
+> #### Note
+>
 > Because front-end actions, including preprocessing, only run once, across all targets, the Slang compiler does not automatically provide any target-specific preprocessor `#define`s that can be used for preprocessor conditionals.
 > Applications that need target-specific `#define`s should always compile for one target at a time, and set up their per-target preprocessor state manually.
 
@@ -112,11 +113,11 @@ A `Texture2D` might consume a `t` register for Direct3D, a `binding` for Vulkan,
 The details of layout in Slang will come in a later chapter.
 For the purposes of the compilation model it is important to note that the layout computed for shader parameters depends on:
 
-* What modules and entry points are being used together; these define which parameters are relevant.
+- What modules and entry points are being used together; these define which parameters are relevant.
 
-* Some well-defined ordering of those parameters; this defines which parameters should be laid out before which others.
+- Some well-defined ordering of those parameters; this defines which parameters should be laid out before which others.
 
-* The rules and constraints that the target imposes on layout.
+- The rules and constraints that the target imposes on layout.
 
 An important design choice in Slang is to give the user of the compiler control over these choices.
 
@@ -152,7 +153,6 @@ The `slangc` tool, included in binary distributions of Slang, is a command-line 
 
 See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
 
-
 ### A Simple `slangc` Example
 
 Here we will repeat the example used in the [Getting Started](01-get-started.md) chapter.
@@ -179,7 +179,8 @@ we can compile the `computeMain()` entry point to SPIR-V using the following com
 slangc hello-world.slang -target spirv -o hello-world.spv
 ```
 
-> #### Note ####
+> #### Note
+>
 > Some targets require additional parameters. See [`slangc` Entry Points](#slangc-entry-points) for details. For example, to target HLSL, the equivalent command is:
 >
 > ```bat
@@ -194,11 +195,11 @@ Slang supports multiple file-name extensions for input files, but the most commo
 
 If multiple source files are passed to `slangc`, they will be grouped into translation units using the following rules:
 
-* If there are any `.slang` files, then all of them will be grouped into a single translation unit
+- If there are any `.slang` files, then all of them will be grouped into a single translation unit
 
-* Each `.hlsl` file will be grouped into a distinct translation unit of its own.
+- Each `.hlsl` file will be grouped into a distinct translation unit of its own.
 
-* Each `.slang-module` file forms its own translation unit.
+- Each `.slang-module` file forms its own translation unit.
 
 To read source from standard input, pass `-` as an input after `--` and specify the source language with `-lang`, because the language cannot be inferred from a file extension:
 
@@ -225,7 +226,8 @@ In code that does not use `[shader(...)]` attributes, a `-entry` option should b
 slangc hello-world.slang -entry computeMain -stage compute -target spirv -o hello-world.spv
 ```
 
-> #### Note ####
+> #### Note
+>
 > The `slangc` CLI [currently](https://github.com/shader-slang/slang/issues/5541) cannot automatically deduce `-entrypoint` and `-stage`/`-profile` options from `[shader(...)]` attributes when generating code for targets other than SPIRV, Metal, CUDA, or Optix. For targets such as HLSL, please continue to specify `-entry` and `-stage` options, even when compiling a file with the `[shader(...)]` attribute on its entry point.
 
 ### `slangc` Targets
@@ -237,9 +239,9 @@ Additional options for a target can be specified after the `-target` option.
 For example, a `-profile` option can be used to specify a profile that should be used.
 Slang provides two main kinds of profiles for use with `slangc`:
 
-* Direct3D "Shader Model" profiles have names like `sm_5_1` and `sm_6_3`
+- Direct3D "Shader Model" profiles have names like `sm_5_1` and `sm_6_3`
 
-* GLSL versions can be used as profiles with names like `glsl_430` and `glsl_460`
+- GLSL versions can be used as profiles with names like `glsl_430` and `glsl_460`
 
 ### `slangc` Kernels
 
@@ -254,11 +256,11 @@ In these cases, the ordering of arguments on the command line becomes significan
 When an option modifies or relates to another command-line argument, it implicitly applies to the most recent relevant argument.
 For example:
 
-* If there are multiple input files, then an `-entry` option applies to the preceding input file
+- If there are multiple input files, then an `-entry` option applies to the preceding input file
 
-* If there are multiple entry points, then a `-stage` option applies to the preceding `-entry` option
+- If there are multiple entry points, then a `-stage` option applies to the preceding `-entry` option
 
-* If there are multiple targets, then a `-profile` option applies to the preceding `-target` option
+- If there are multiple targets, then a `-profile` option applies to the preceding `-target` option
 
 Kernel `-o` options are the most complicated case, because they depend on both a target and entry point.
 A `-o` option applies to the preceding entry point, and the compiler will try to apply it to a matching target based on its file extension.
@@ -271,13 +273,13 @@ Users with very complicated compilation requirements will probably be better off
 
 The main other options are:
 
-* `-D<name>` or `-D<name>=<value>` can be used to introduce preprocessor macros.
+- `-D<name>` or `-D<name>=<value>` can be used to introduce preprocessor macros.
 
-* `-I<path>` or `-I <path>` can be used to introduce a _search path_ to be used when resolving `#include` directives and `import` declarations.
+- `-I<path>` or `-I <path>` can be used to introduce a _search path_ to be used when resolving `#include` directives and `import` declarations.
 
-* `-g` can be used to enable inclusion of debug information in output files (where possible and implemented).
+- `-g` can be used to enable inclusion of debug information in output files (where possible and implemented).
 
-* `-O<level>` can be used to control optimization levels when the Slang compiler invokes a downstream code generator.
+- `-O<level>` can be used to control optimization levels when the Slang compiler invokes a downstream code generator.
 
 See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
 
@@ -293,14 +295,15 @@ The mechanism used here is based on the `-X` mechanism used in GCC, to specify a
 
 When used, `option` is not interpreted by GCC, but is passed to the linker once compilation is complete. Slang extends this idea in several ways. First there are many more 'downstream' stages available to Slang than just `linker`. These different stages are known as `SlangPassThrough` types in the API and have the following names:
 
-* `fxc` - FXC HLSL compiler
-* `dxc` - DXC HLSL compiler
-* `glslang` - GLSLANG GLSL compiler
-* `visualstudio` - Visual Studio C/C++ compiler
-* `clang` - Clang C/C++ compiler
-* `gcc` - GCC C/C++ compiler
-* `genericcpp` - A generic C++ compiler (can be any one of Visual Studio, Clang, or GCC depending on the system and availability)
-* `nvrtc` - NVRTC CUDA compiler
+- `fxc` - FXC HLSL compiler
+- `dxc` - DXC HLSL compiler
+- `glslang` - GLSLANG GLSL compiler
+- `visualstudio` - Visual Studio C/C++ compiler
+- `clang` - Clang C/C++ compiler
+- `gcc` - GCC C/C++ compiler
+- `genericcpp` - A generic C++ compiler (can be any one of Visual Studio, Clang, or GCC depending on the system and availability)
+- `nvrtc` - NVRTC CUDA compiler
+- `spirv-opt` - spirv-tools SPIRV optimizer
 
 The Slang command line allows you to specify an argument to these downstream compilers, by using their name after the `-X`. So for example, to send an option `-Gfa` through to DXC you can use:
 
@@ -350,6 +353,14 @@ And the linker would see (as passed through by GCC):
 
 Setting options for tools that aren't used in a Slang compilation has no effect. This allows for setting `-X` options specific for all downstream tools on a command line, and they are only used as part of a compilation that needs them.
 
+Arguments passed via `-Xspirv-opt` are forwarded to the SPIRV-Tools optimizer as additional passes, registered on top of the passes selected by the `-O<level>` preset (they add to that level, they do not replace it). For example, to strip debug information in addition to the `-O1` passes:
+
+```
+-target spirv -O1 -Xspirv-opt --strip-debug
+```
+
+The accepted flags are the pass-selection flags of the `spirv-opt` command-line tool (for example `--strip-debug`, `--eliminate-dead-code-aggressive`, `-O`, `-Os`) — those recognized by SPIRV-Tools' `RegisterPassesFromFlags`. The full set is documented by the `spirv-opt` tool itself (see [`tools/opt/opt.cpp`](https://github.com/KhronosGroup/SPIRV-Tools/blob/main/tools/opt/opt.cpp) in the SPIRV-Tools repository, or run `spirv-opt --help`). Driver-level `spirv-opt` options that do not select a pass (such as `--target-env` or `--validate-after-all`) are not supported. An unrecognized flag is reported by SPIRV-Tools and the compilation fails. The selected passes run in addition to the `-OX` preset; because they are requested explicitly, they run even under `-O0` (which has no preset of its own, so only the selected passes run). They currently apply to the default direct SPIR-V path; they are not forwarded on the `-emit-spirv-via-glsl` path.
+
 NOTE! Not all tools that Slang uses downstream make command line argument parsing available. `FXC` and `GLSLANG` currently do not have any command line argument passing as part of their integration, although this could change in the future.
 
 The `-X` mechanism is also supported by render-test tool. In this usage `slang` becomes a downstream tool. Thus, you can use the `dxc` option `-Gfa` in a render-test via
@@ -366,7 +377,7 @@ This means that the dxc compilation in the render test (assuming dxc is invoked)
 
 Some options are made available via the same mechanism for all downstream compilers.
 
-* Use `-I` to specify include path for downstream compilers
+- Use `-I` to specify include path for downstream compilers
 
 For example to specify an include path "somePath" to DXC you can use...
 
@@ -374,16 +385,15 @@ For example to specify an include path "somePath" to DXC you can use...
 -Xdxc -IsomePath
 ```
 
-
 ### Convenience Features
 
 The `slangc` compiler provides a few conveniences for command-line compilation:
 
-* Most options can appear out of order when they are unambiguous. For example, if there is only a single translation unit a `-entry` option can appear before or after any file.
+- Most options can appear out of order when they are unambiguous. For example, if there is only a single translation unit a `-entry` option can appear before or after any file.
 
-* A `-target` option can be left out if it can be inferred from the only `-o` option present. For example, `-o hello-world.spv` already implies `-target spirv`.
+- A `-target` option can be left out if it can be inferred from the only `-o` option present. For example, `-o hello-world.spv` already implies `-target spirv`.
 
-* If a `-o` option is left out then kernel code will be written to the standard output. This output can be piped to a file, or can be printed to a console. In the latter case, the compiler will automatically disassemble binary formats for printing.
+- If a `-o` option is left out then kernel code will be written to the standard output. This output can be piped to a file, or can be printed to a console. In the latter case, the compiler will automatically disassemble binary formats for printing.
 
 ### Precompiled Modules
 
@@ -401,6 +411,7 @@ slangc my_library.slang -o my_library.slang-module
 ```
 
 This allows you to deploy just the `my_library.slang-module` file to users of the module, and it can be consumed in the user code with the same `import` syntax:
+
 ```hlsl
 import my_library;
 ```
@@ -411,9 +422,9 @@ The `slangc` tool is meant to serve the needs of many developers, including thos
 However, some applications will benefit from deeper integration of the Slang compiler into application-specific code and workflows.
 Notable features that Slang supports which cannot be accessed from `slangc` include:
 
-* Slang can provide _reflection_ information about shader parameters and their layouts for particular targets; this information is not currently output by `slangc`.
+- Slang can provide _reflection_ information about shader parameters and their layouts for particular targets; this information is not currently output by `slangc`.
 
-* Slang allows applications to control the way that shader modules and entry points are composed (which in turn influences their layout); `slangc` currently implements a single default policy for how to generate a composition of shader code.
+- Slang allows applications to control the way that shader modules and entry points are composed (which in turn influences their layout); `slangc` currently implements a single default policy for how to generate a composition of shader code.
 
 Applications that need more control over compilation are encouraged to use the C++ compilation API described in the next section.
 
@@ -449,6 +460,7 @@ VertexOutput vsMain()
 ```
 
 A single entry point from the preceding shader can be compiled to both SPIR-V Assembly and HLSL targets in one command:
+
 ```bat
 slangc targets.slang -entry psMain -target spirv-asm -o targets.spv-asm -target hlsl -o targets.hlsl
 ```
@@ -489,11 +501,13 @@ export __extern_cpp int main()
 ```
 
 Compile the above code as standalone executable, using -I option to find dependent header files:
+
 ```bat
 slangc cpu.slang -target executable -o cpu.exe -Xgenericcpp -I./include -Xgenericcpp -I./external/unordered_dense/include/
 ```
 
 Execute the resulting executable:
+
 ```bat
 C:\slang> cpu
 method
@@ -507,8 +521,8 @@ Two scenarios are provided, one in which the entry point is compiled in the same
 
 ```hlsl
 // lib.slang
-public int foo(int a) 
-{ 
+public int foo(int a)
+{
     return a + 1;
 }
 ```
@@ -529,16 +543,19 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 ```
 
 Compile lib.slang to lib.slang-module:
+
 ```bat
 slangc lib.slang -o lib.slang-module
 ```
 
 Scenario 1: Compile entry.slang and link lib and entry together in one step:
+
 ```bat
 slangc entry.slang -target spirv -o program.spv # Compile and link
 ```
 
 Scenario 2: Compile entry.slang to entry.slang-module and then link together lib and entry in a second invocation:
+
 ```bat
 slangc entry.slang -o entry.slang-module # Compile
 slangc lib.slang-module entry.slang-module -target spirv -o program.spv # Link
@@ -549,11 +566,11 @@ slangc lib.slang-module entry.slang-module -target spirv -o program.spv # Link
 Debug symbols can be added with the "-g<debug-level>" option.
 
 Adding '-g1' (or higher) to a SPIR-V compilation will emit extended 'DebugInfo' instructions.
+
 ```bat
 slangc vertex.slang -target spirv-asm -o v.spv-asm -g0 # Omit debug symbols
 slangc vertex.slang -target spirv-asm -o v.spv-asm -g1 # Add debug symbols
 ```
-
 
 #### Compiling with additional preprocessor macros
 
@@ -573,7 +590,8 @@ float4 psMain() : SV_Target
 }
 ```
 
-* Setting a user-defined macro "mymacro"
+- Setting a user-defined macro "mymacro"
+
 ```bat
 slangc macrodefine.slang -entry psMain -target spirv-asm -o targets.spvasm -Dmymacro
 ```
@@ -652,6 +670,22 @@ if (coopMeta)
 }
 ```
 
+### Experimental Standard Modules
+
+Some standard-library APIs are packaged as experimental modules. A shader must enable
+experimental features before importing one of these modules, for example with
+`slangc -experimental-feature`.
+
+The work graph APIs are available from:
+
+```slang
+import experimental.workgraph;
+```
+
+`experimental.workgraph` provides work graph node attributes, record types, and barrier
+helpers for HLSL Shader Model 6.8 work graph shaders. The module is experimental and the API
+surface may change before it is stabilized.
+
 ## Using the Compilation API
 
 The C++ API provided by Slang is meant to provide more complete control over compilation for applications that need it.
@@ -669,7 +703,8 @@ Application code is expected to correctly maintain the reference counts of `ISla
 Many Slang API calls return `SlangResult` values; this type is equivalent to (and binary-compatible with) the standard COM `HRESULT` type.
 As a matter of convention, Slang API calls return a zero value (`SLANG_OK`) on success, and a negative value on errors.
 
-> #### Note ####
+> #### Note
+>
 > Slang API interfaces may be named with the suffix "_Experimental", indicating that the interface is not complete, may have known bugs, and may change or be removed between Slang API releases.
 
 ### Creating a Global Session
@@ -691,11 +726,13 @@ The core module can take a significant amount of time to load, so applications a
 If you want to enable GLSL compatibility mode, you need to set `SlangGlobalSessionDesc::enableGLSL` to `true` when calling `createGlobalSession()`. This will load the necessary GLSL intrinsic module
 for compiling GLSL code. Without this setting, compiling GLSL code will result in an error.
 
-> #### Note ####
-> Currently, the global session type is *not* thread-safe.
+> #### Note
+>
+> Currently, the global session type is _not_ thread-safe.
 > Applications that wish to compile on multiple threads will need to ensure that each concurrent thread compiles with a distinct global session.
 
-> #### Note ####
+> #### Note
+>
 > Currently, the global session should be freed after any objects created from it.
 > See [issue 6344](https://github.com/shader-slang/slang/issues/6344).
 
@@ -704,11 +741,11 @@ for compiling GLSL code. Without this setting, compiling GLSL code will result i
 A _session_ uses the interface `slang::ISession`, and represents a scope for compilation with a consistent set of compiler options.
 In particular, all compilation with a single session will share:
 
-* A list of enabled compilation targets (with their options)
+- A list of enabled compilation targets (with their options)
 
-* A list of search paths (for `#include` and `import`)
+- A list of search paths (for `#include` and `import`)
 
-* A list of pre-defined macros
+- A list of pre-defined macros
 
 In addition, a session provides a scope for the loading and re-use of modules.
 If two pieces of code compiled in a session both `import` the same module, then that module will only be loaded and compiled once.
@@ -723,6 +760,7 @@ globalSession->createSession(sessionDesc, session.writeRef());
 ```
 
 The definition of `SessionDesc` structure is:
+
 ```C++
 struct SessionDesc
 {
@@ -765,6 +803,7 @@ struct SessionDesc
     uint32_t compilerOptionEntryCount = 0;
 };
 ```
+
 The user can specify a set of commonly used compiler options directly in the `SessionDesc` struct, such as `searchPath` and `preprocessMacros`.
 Additional compiler options can be specified via the `compilerOptionEntries` field, which is an array of `CompilerOptionEntry` that defines a key-value
 pair of a compiler option setting, see the [Compiler Options](#compiler-options) section.
@@ -866,7 +905,8 @@ if(diagnostics)
 }
 ```
 
-> #### Note ####
+> #### Note
+>
 > The `slang::IBlob` interface is binary-compatible with the `ID3D10Blob` and `ID3DBlob` interfaces used by some Direct3D compilation APIs.
 
 ### Entry Points
@@ -915,7 +955,8 @@ The Slang API allows layout to be queried on any `IComponentType` using `getLayo
 slang::ProgramLayout* layout = program->getLayout();
 ```
 
-> #### Note ####
+> #### Note
+>
 > In the current Slang API, the `ProgramLayout` type is not reference-counted.
 > Currently, the lifetime of a `ProgramLayout` is tied to the `IComponentType` that returned it.
 > An application must ensure that it retains the given `IComponentType` for as long as it uses the `ProgramLayout`.
@@ -936,6 +977,7 @@ See [Using the Reflection API](reflection) chapter for more details on the refle
 Before generating code, you must link the program to resolve all cross-module references. This can be done by calling
 `IComponentType::link` or `IComponentType::linkWithOptions` if you wish to specify additional compiler options for the program.
 For example:
+
 ```c++
 Slang::ComPtr<IComponentType> linkedProgram;
 Slang::ComPtr<ISlangBlob> diagnosticBlob;
@@ -966,7 +1008,6 @@ Any diagnostic messages related to back-end code generation (for example, if the
 The `kernelBlob` output is a `slang::IBlob` that can be used to access the generated code (whether binary or textual).
 In many cases `kernelBlob->getBufferPointer()` can be passed directly to the appropriate graphics API to load kernel code onto a GPU.
 
-
 ## Multithreading
 
 The following global-session creation helpers are thread-safe:
@@ -983,7 +1024,7 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-Beyond those helpers, Slang should still be treated as non-reentrant by default on shared objects. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and require external synchronization when multiple threads share a global session, a session, or objects created from them.
+Beyond those helpers, Slang should still be treated as non-reentrant by default on shared objects. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](<https://en.wikipedia.org/wiki/Reentrancy_(computing)>) and require external synchronization when multiple threads share a global session, a session, or objects created from them.
 
 Distinct global sessions may be used concurrently from different threads, even when those threads happen to call the same Slang API entry point at the same time.
 
@@ -1007,6 +1048,7 @@ This backend parallelism is still experimental. It is supported, but it should n
 All other functions and methods should still be assumed non-reentrant when they operate on shared Slang objects. Unless documented otherwise, protect a shared global session, session, or object graph derived from them with external synchronization.
 
 Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). Strict COM expects atomic reference counting. Slang does not yet make that guarantee uniformly across every exposed interface. Many core compiler objects implemented via `RefObject` or `ComBaseObject` do use atomic reference counts, but some interfaces still use custom or singleton lifetime management. Unless documented otherwise, do not assume that an arbitrary Slang API object can be retained or released safely from unrelated threads solely because it is exposed as a COM interface. One explicit cross-thread lifetime guarantee is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
+
 ## Compiler Options
 
 Both the `SessionDesc` and `TargetDesc` structures contain fields that encode a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
@@ -1014,6 +1056,7 @@ the `IComponentType::linkWithOptions()` method allows you to specify additional 
 documented in this section.
 
 The `CompilerOptionEntry` structure is defined as follows:
+
 ```c++
 struct CompilerOptionEntry
 {
@@ -1021,8 +1064,10 @@ struct CompilerOptionEntry
     CompilerOptionValue value;
 };
 ```
+
 Where `CompilerOptionName` is an `enum` specifying the compiler option to set, and `value` encodes the value of the option.
 `CompilerOptionValue` is a structure that allows you to encode up to two integer or string values for a compiler option:
+
 ```c++
 enum class CompilerOptionValueKind
 {
@@ -1039,64 +1084,67 @@ struct CompilerOptionValue
     const char* stringValue1 = nullptr;
 };
 ```
+
 The meaning of each integer or string value is dependent on the compiler option. The following table lists all available compiler options that can be set and
 meanings of their `CompilerOptionValue` encodings.
 
-|CompilerOptionName | Description |
-|:------------------ |:----------- |
-| MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
-| Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
-| Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
-| MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
-| MatrixLayoutRow    | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting. |
-| Profile            | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`. |
-| Stage              | Specifies the target entry point stage. `intValue0` encodes the stage defined in `SlangStage` enum. |
-| Target             | Specifies the target format. Has same effect as setting TargetDesc::format. |
-| WarningsAsErrors   | Specifies a list of warnings to be treated as errors. `stringValue0` encodes a comma separated list of warning codes or names, or can be "all" to indicate all warnings. |
-| DisableWarnings    | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names. |
-| EnableWarning      | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names. |
-| DisableWarning     | Specify a warning to disable. `stringValue0` encodes the warning code or name. |
-| ReportDownstreamTime | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting. |
-| ReportPerfBenchmark | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting. |
-| SkipSPIRVValidation | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting. |
-| Capability | Specify an additional capability available in the compilation target. `intValue0` encodes a capability defined in the `CapabilityName` enum. |
-| DefaultImageFormatUnknown | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting. |
-| DisableDynamicDispatch | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting. |
-| DisableSpecialization | (Internal use only) Disables specialization pass. `intValue0` encodes a bool value for the setting. |
-| FloatingPointMode | Specifies the floating-point mode. `intValue0` encodes the floating-point mode defined in the `SlangFloatingPointMode` enum. |
-| DebugInformation | Specifies the level of debug information to include in the generated code. `intValue0` encodes a value defined in the `SlangDebugInfoLevel` enum. |
-| LineDirectiveMode | Specifies the line directive mode for generated textual code such as HLSL or CUDA. `intValue0` encodes a value defined in the `SlangLineDirectiveMode` enum. |
-| Optimization | Specifies the optimization level. `intValue0` encodes the value for the setting defined in the `SlangOptimizationLevel` enum. |
-| Obfuscate | Specifies whether or not to turn on obfuscation. When obfuscation is on, Slang will strip variable and function names from the target code and replace them with hash values. `intValue0` encodes a bool value for the setting. |
-| VulkanBindShift | Specifies the `-fvk-bind-shift` option. `intValue0` (higher 8 bits): kind, `intValue0` (lower bits): set; `intValue1`: shift. |
-| VulkanBindGlobals | Specifies the `-fvk-bind-globals` option. `intValue0`: index, `intValue`: set. |
-| VulkanInvertY | Specifies the `-fvk-invert-y` option. `intValue0` specifies a bool value for the setting. |
-| VulkanUseDxPositionW | Specifies the `-fvk-use-dx-position-w` option. `intValue0` specifies a bool value for the setting. |
-| VulkanUseEntryPointName | When set, will keep the original name of entry points as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting. |
-| VulkanUseGLLayout | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting. |
-| VulkanEmitReflection | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIR-V. `intValue0` specifies a bool value for the setting. |
-| GLSLForceScalarLayout | Specifies the `-force-glsl-scalar-layout` option. When set will use `scalar` layout for all buffers when generating SPIR-V. `intValue0` specifies a bool value for the setting. |
-| EnableEffectAnnotations | When set will turn on compatibility mode to parse legacy HLSL effect annotation syntax. `intValue0` specifies a bool value for the setting. |
-| EmitSpirvViaGLSL | When set will emit SPIR-V by emitting GLSL first and then use glslang to produce the final SPIR-V code. `intValue0` specifies a bool value for the setting. |
-| EmitSpirvDirectly | When set will use Slang's direct-to-SPIR-V backend to generate SPIR-V directly from Slang IR. `intValue0` specifies a bool value for the setting. |
-| SPIRVCoreGrammarJSON | When set will use the provided SPIR-V grammar file to parse SPIR-V assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file. |
-| IncompleteLibrary | When set will not issue an error when the linked program has unresolved extern function symbols. `intValue0` specifies a bool value for the setting. |
-| DownstreamArgs | Provide additional arguments to the downstream compiler. `stringValue0` encodes the downstream compiler name, `stringValue1` encodes the argument list, one argument per line. |
-| DumpIntermediates | When set will dump the intermediate source output. `intValue0` specifies a bool value for the setting. |
-| DumpIntermediatePrefix | The file name prefix for the intermediate source output. `stringValue0` specifies a string value for the setting. |
-| DebugInformationFormat | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum. |
-| VulkanBindShiftAll | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift. |
-| GenerateWholeProgram | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting. |
-| UseUpToDateBinaryModule | When set will only load precompiled modules if it is up-to-date with its source. `intValue0` specifies a bool value for the setting. |
-| ValidateUniformity | When set will perform [uniformity analysis](a1-05-uniformity.md).|
-| SPIRVResourceHeapStride | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
-| SPIRVSamplerHeapStride | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`. |
-| ForceDXLayout | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
-| ForceCLayout | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting. |
-| DenormalModeFp16 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
-| UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| CompilerOptionName               | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| :------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MacroDefine                      | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Include                          | Specifies an additional search path. `stringValue0` encodes the additional path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Language                         | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| MatrixLayoutColumn               | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| MatrixLayoutRow                  | Use row major matrix layout as default. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Profile                          | Specifies the target profile. `intValue0` encodes the raw profile representation returned by `IGlobalSession::findProfile()`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Stage                            | Specifies the target entry point stage. `intValue0` encodes the stage defined in `SlangStage` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Target                           | Specifies the target format. Has same effect as setting TargetDesc::format.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| WarningsAsErrors                 | Specifies a list of warnings to be treated as errors. `stringValue0` encodes a comma separated list of warning codes or names, or can be "all" to indicate all warnings.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| DisableWarnings                  | Specifies a list of warnings to disable. `stringValue0` encodes comma separated list of warning codes or names.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| EnableWarning                    | Specifies a list of warnings to enable. `stringValue0` encodes comma separated list of warning codes or names.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| DisableWarning                   | Specify a warning to disable. `stringValue0` encodes the warning code or name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| WarningLevel                     | Enable a group of opt-in warnings, modeled on clang/gcc. `intValue0` encodes a `SlangWarningLevel` group (`SLANG_WARNING_LEVEL_ALL`/`_EXTRA`/`_PEDANTIC`; `SLANG_WARNING_LEVEL_DEFAULT` is the always-on group and is a no-op here). Repeatable and additive, matching the `-Wall`/`-Wextra`/`-Wpedantic` command-line flags. The groups are independent (not nested): `extra` is on by default while `pedantic` is off by default, and warnings in the always-on default group are unaffected.                                                                                               |
+| ReportDownstreamTime             | Turn on/off downstream compilation time report. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ReportPerfBenchmark              | Turn on/off reporting of time spent in different parts of the compiler. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| SkipSPIRVValidation              | Specifies whether or not to skip the validation step after emitting SPIR-V. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Capability                       | Specify an additional capability available in the compilation target. Can be a string or int value kind. `stringValue0` encodes the capability name as listed in [Capability Atoms](a4-02-reference-capability-atoms.md). `intValue0` encodes the raw capability representation returned by `IGlobalSession::findCapability`.                                                                                                                                                                                                                                                                 |
+| DefaultImageFormatUnknown        | Whether or not to use `unknown` as the image format when emitting SPIR-V for a texture/image resource parameter without a format specifier. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| DisableDynamicDispatch           | (Internal use only) Disables generation of dynamic dispatch code. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| DisableSpecialization            | (Internal use only) Disables specialization pass. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| FloatingPointMode                | Specifies the floating-point mode. `intValue0` encodes the floating-point mode defined in the `SlangFloatingPointMode` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| DebugInformation                 | Specifies the level of debug information to include in the generated code. `intValue0` encodes a value defined in the `SlangDebugInfoLevel` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| LineDirectiveMode                | Specifies the line directive mode for generated textual code such as HLSL or CUDA. `intValue0` encodes a value defined in the `SlangLineDirectiveMode` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Optimization                     | Specifies the optimization level. `intValue0` encodes the value for the setting defined in the `SlangOptimizationLevel` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Obfuscate                        | Specifies whether or not to turn on obfuscation. When obfuscation is on, Slang will strip variable and function names from the target code and replace them with hash values. `intValue0` encodes a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                               |
+| VulkanBindShift                  | Specifies the `-fvk-bind-shift` option. `intValue0` (higher 8 bits): kind, `intValue0` (lower bits): set; `intValue1`: shift.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| VulkanBindGlobals                | Specifies the `-fvk-bind-globals` option. `intValue0`: index, `intValue`: set.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| VulkanInvertY                    | Specifies the `-fvk-invert-y` option. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| VulkanUseDxPositionW             | Specifies the `-fvk-use-dx-position-w` option. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| VulkanUseEntryPointName          | When set, will keep the original name of entry points as they are defined in the source instead of renaming them to `main`. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| VulkanUseGLLayout                | When set, will use std430 layout instead of D3D buffer layout for raw buffer load/stores. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| VulkanEmitReflection             | Specifies the `-fspv-reflect` option. When set will include additional reflection instructions in the output SPIR-V. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| GLSLForceScalarLayout            | Specifies the `-force-glsl-scalar-layout` option. When set will use `scalar` layout for all buffers when generating SPIR-V. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| EnableEffectAnnotations          | When set will turn on compatibility mode to parse legacy HLSL effect annotation syntax. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| EmitSpirvViaGLSL                 | When set will emit SPIR-V by emitting GLSL first and then use glslang to produce the final SPIR-V code. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| EmitSpirvDirectly                | When set will use Slang's direct-to-SPIR-V backend to generate SPIR-V directly from Slang IR. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| SPIRVCoreGrammarJSON             | When set will use the provided SPIR-V grammar file to parse SPIR-V assembly blocks. `stringValue0` specifies a path to the spirv core grammar json file.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| IncompleteLibrary                | When set will not issue an error when the linked program has unresolved extern function symbols. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| DownstreamArgs                   | Provide additional arguments to the downstream compiler. `stringValue0` encodes the downstream compiler name, `stringValue1` encodes the argument list, one argument per line.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| DumpIntermediates                | When set will dump the intermediate source output. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| DumpIntermediatePrefix           | The file name prefix for the intermediate source output. `stringValue0` specifies a string value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| DebugInformationFormat           | Specifies the format of debug info. `intValue0` a value defined in the `SlangDebugInfoFormat` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| VulkanBindShiftAll               | Specifies the `-fvk-bind-shift` option for all spaces. `intValue0`: kind, `intValue1`: shift.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| GenerateWholeProgram             | When set will emit target code for the entire program instead of for a specific entry point. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| UseUpToDateBinaryModule          | When set, the compiler verifies that a precompiled `.slang-module` is up-to-date with its source before loading it; out-of-date binaries are recompiled from source. Standalone binaries whose primary source is not on the search path are still loaded (compiler-version and option-set validation are skipped in that path). `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                           |
+| ValidateUniformity               | When set will perform [uniformity analysis](a1-05-uniformity.md).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| SPIRVResourceHeapStride          | Specifies the byte stride for the resource descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to emit `OpConstantSizeOfEXT(ResourceType)` as the default stride. For `RaytracingAccelerationStructure` entries, the 0 default emits a literal 8-byte `ArrayStride` for the `uint64` device address elements; explicit stride values still override these defaults, but must be at least 8 bytes for acceleration-structure entries.                                                                                           |
+| SPIRVSamplerHeapStride           | Specifies the byte stride for the sampler descriptor heap when generating SPIR-V with `spvDescriptorHeapEXT`. `intValue0` encodes the stride in bytes; use 0 to let the driver compute the stride via `OpConstantSizeOfEXT`.                                                                                                                                                                                                                                                                                                                                                                  |
+| SPIRVUnifiedDescriptorHeapStride | When generating SPIR-V with `spvDescriptorHeapEXT`, emits each resource descriptor-heap runtime array's `ArrayStride` as the maximum of the image and buffer descriptor sizes, so a single heap shared by buffers and images is indexed at the device's unified stride. Only affects the default `OpConstantSizeOfEXT` path (used when `SPIRVResourceHeapStride` is 0); mutually exclusive with a non-zero `SPIRVResourceHeapStride` (combining the two is an error). Does not affect the sampler heap or acceleration-structure entries. `intValue0` specifies a bool value for the setting. |
+| ForceDXLayout                    | When set forces the compiler to use DirectX-compatible (HLSL register packing) rules when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                         |
+| ForceCLayout                     | When set forces the compiler to use C struct layout rules (natural alignment, no HLSL/GLSL padding) when laying out buffer struct fields during code generation. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                          |
+| DenormalModeFp16                 | Specifies how 16-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| DenormalModeFp32                 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| DenormalModeFp64                 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| UseMSVCStyleBitfieldPacking      | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ### Compiler Option ABI Stability
 

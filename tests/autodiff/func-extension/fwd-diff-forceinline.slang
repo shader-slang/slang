@@ -1,10 +1,11 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -O0 -g3 -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage compute -entry computeMain -g3 -experimental-feature
 
 // Test: callable decorators on `__func_extension` are applied to the
 // synthesized derivative function.
 
 RWStructuredBuffer<float> outputBuffer;
 
+[noinline]
 float cube(float x) { return x * x * x; }
 
 [ForceInline]

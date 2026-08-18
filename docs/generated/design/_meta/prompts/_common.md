@@ -80,6 +80,40 @@ Everything below the closing `---` is the body of the document.
 - Verbatim text from `docs/design/`, `docs/user-guide/`, the language
   reference, or upstream third-party documentation.
 
+## Liquid safety (GitHub Pages)
+
+**Never write a raw `{{` or `{%` anywhere in the body — not even inside a
+code span or a fenced block.** Every file you produce here carries YAML
+front-matter, so the GitHub Pages Jekyll build treats it as a page and
+runs Liquid over the whole body before Markdown. `{{` and `{%` open
+Liquid tags, and both ways they can fail are wrong:
+
+- **Unterminated — fatal.** Liquid's scan for the closing `}}` stops at
+  the first single `}`. In `float2x2 m = {{1,2},{3,4}}` that is the `}`
+  after `1,2`, so the tag never closes and the **entire site build
+  aborts**. This took the Pages build down for five days.
+- **Terminated — silently wrong.** A FileCheck wildcard such as
+  `{{[0-9]+}}` parses and is then evaluated as a template expression,
+  rendering empty. The pattern you were documenting does not appear on
+  the published page.
+
+These files are also read on github.com, where Liquid is not processed,
+so a `{% raw %}` wrapper or an HTML entity inside a backtick span is
+wrong too — both show up literally there. Two spellings are correct on
+both surfaces:
+
+- Where whitespace does not matter, space the braces: write
+  `float2x2 m = { {1,2},{3,4} }`, never `{{1,2},{3,4}}`.
+- Where the exact token matters, use a raw `<code>` element with numeric
+  brace entities:
+  `<code>&#123;&#123;[0-9]+&#125;&#125;</code>` renders as the literal
+  `{{[0-9]+}}` on github.com and on Pages alike. A backtick span will not
+  do — GitHub-Flavored Markdown does not decode entities inside one.
+
+`regenerate.py lint` enforces this over every front-matter file in the
+tree and fails the build on any raw opener, so this is a hard gate rather
+than a style preference.
+
 ## AST reference family contract
 
 The pages under `docs/generated/design/ast-reference/` share a common shape.
@@ -99,13 +133,13 @@ the following sections, in order:
 4. `## Nodes` — a single table with one row per concrete (FIDDLE-declared)
    class in the family, columns:
 
-   | Column | Content |
-   | --- | --- |
-   | Class | Backtick-wrapped exact class name as declared in the header. |
-   | Parent | Closest ancestor a reader needs to know — not always the immediate C++ base. Use the most semantically informative one (e.g. `BinaryExpr` rather than `OperatorExpr`). |
-   | Key fields | 1-4 fields that define the node's data shape, in `name: Type` form. Long field lists are summarized as "...plus N more; see header". |
-   | Grammar | Markdown link to the most specific anchor in [syntax-reference/grammar.md](../syntax-reference/grammar.md), or the literal text `(none)` for nodes that are synthesized rather than parsed (e.g. synthetic conformance decls). |
-   | Summary | One short clause; no markup beyond inline code. |
+   | Column     | Content                                                                                                                                                                                                                        |
+   | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | Class      | Backtick-wrapped exact class name as declared in the header.                                                                                                                                                                   |
+   | Parent     | Closest ancestor a reader needs to know — not always the immediate C++ base. Use the most semantically informative one (e.g. `BinaryExpr` rather than `OperatorExpr`).                                                         |
+   | Key fields | 1-4 fields that define the node's data shape, in `name: Type` form. Long field lists are summarized as "...plus N more; see header".                                                                                           |
+   | Grammar    | Markdown link to the most specific anchor in [syntax-reference/grammar.md](../syntax-reference/grammar.md), or the literal text `(none)` for nodes that are synthesized rather than parsed (e.g. synthetic conformance decls). |
+   | Summary    | One short clause; no markup beyond inline code.                                                                                                                                                                                |
 
 5. `## Notable nodes` — short prose callouts (2-5 sentences each) for the
    half-dozen or so nodes per family where the table form leaves out
@@ -137,13 +171,13 @@ and tutorial-style explanations of compiler theory (use the
 ## Name-resolution family contract
 
 The pages under `docs/generated/design/name-resolution/` document the
-*algorithmic* rules of identifier scopes, lookup, shadowing, visibility,
+_algorithmic_ rules of identifier scopes, lookup, shadowing, visibility,
 and overload resolution. They sit between the parsing overview in
 [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md) and the
 semantic-checking overview in
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md):
-the pipeline pages explain *where* in the compile flow name resolution
-happens; the name-resolution pages explain *what rules* are applied.
+the pipeline pages explain _where_ in the compile flow name resolution
+happens; the name-resolution pages explain _what rules_ are applied.
 
 A prompt that targets one of those pages (other than `index.md`) must
 produce a document with the following sections, in order:
@@ -173,7 +207,10 @@ produce a document with the following sections, in order:
    the symptom, the rule that handles it, and the diagnostic (or
    silent behavior) the compiler produces. Where relevant, cite the
    `Diagnostics::*` identifier from
-   [../../../../source/slang/slang-diagnostics.h](../../../../source/slang/slang-diagnostics.h).
+   [../../../../source/slang/slang-diagnostics.lua](../../../../source/slang/slang-diagnostics.lua).
+   Individual diagnostics are declared in that Lua file; `slang-diagnostics.h`
+   only describes the delivery interface, so citing the header for a specific
+   diagnostic points the reader at the wrong place.
 6. `## See also` — bullet list linking peer name-resolution pages,
    the relevant `ast-reference/` page(s), the relevant
    `pipeline/` page(s), and the glossary terms most directly relevant
@@ -202,8 +239,8 @@ They sit between the narrative survey in
 (which covers schema, flag bits, module versioning, and the "add an
 opcode" workflow) and the lowering pipeline page in
 [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) (which
-covers *when* AST nodes turn into IR). The IR-reference pages explain
-*which* opcodes exist, *what shape* they have, and *which AST node*
+covers _when_ AST nodes turn into IR). The IR-reference pages explain
+_which_ opcodes exist, _what shape_ they have, and _which AST node_
 (if any) lowers to each.
 
 A prompt that targets one of those pages (other than `index.md`) must
@@ -228,14 +265,14 @@ produce a document with the following sections, in order:
    the family. Sub-tables (split by sub-group) are encouraged when the
    family is large. Every table has the following columns, in order:
 
-   | Column | Content |
-   | --- | --- |
-   | Opcode | Backtick-wrapped Lua entry name; this is also the `kIROp_<name>` enum tag. |
-   | C++ wrapper | `IRFoo` struct name (from `struct_name` or implicit). Use an em-dash (`—`) when no wrapper exists. |
-   | Operands | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. |
-   | Flags | One-letter codes joined without separators: `H` hoistable, `P` parent, `G` global. Blank when none apply. |
-   | AST origin | The AST class (`VarDecl`, `BinaryExpr` (`+`), ...) whose `visit*` in `slang-lower-to-ir.cpp` produces this opcode, or `(synthesized)` for IR-pass-introduced opcodes, or `—` for opcodes with no direct AST source (e.g. autodiff intermediates). |
-   | Summary | One short clause; no markup beyond inline code. |
+   | Column      | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+   | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | Opcode      | Backtick-wrapped Lua entry name; this is also the `kIROp_<name>` enum tag.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+   | C++ wrapper | The `IRFoo` struct name, written **with** the `IR` prefix (`IRNameHintDecoration`, not `NameHintDecoration`). Do **not** use an em-dash here: no opcode is wrapper-less, so an em-dash column carries no information. One page in a past round had an em-dash in all 64 rows. Every opcode ends up with a wrapper, but fiddle does not generate all of them — `getAllOtherInstStructsData()` in [../../../../source/slang/slang-ir.h.lua](../../../../source/slang/slang-ir.h.lua) (near line 152) opens with `if not Slang["IR" .. struct_name] then`, so it _skips_ any opcode whose struct is already hand-written in `slang-ir-insts.h` and emits a struct only for the remainder. Mark which are hand-written (a footnote marker such as `‡` works) and state the count in the prose. |
+   | Operands    | Compact comma-separated operand names from the Lua entry, e.g. `elementType, count`. Use `(variadic)` for variadic ops and `—` for nullary. A Lua entry that declares `min_operands = N` but gives **no** operand names is common; write `(N unnamed)` for it — do not invent names, and do not fall back to `(variadic)`, which means something different. Where the C++ accessor in `slang-ir-insts.h` reveals what an unnamed operand actually is, you may name it and mark the cell with `†`, explaining the marker in a legend; that is strictly more useful than `(N unnamed)` and is allowed. Pages previously invented `(variadic, min=N)` and other spellings for this case, which produced avoidable review findings.                                                            |
+   | Flags       | One-letter codes joined without separators: `H` hoistable, `P` parent, `G` global. Blank when none apply.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+   | AST origin  | **Name the actual producer.** For an opcode lowered from the AST, that is the AST class plus the `visit*` in `slang-lower-to-ir.cpp` that produces it (`VarDecl`, `BinaryExpr` (`+`), ...). For an opcode introduced by a pass, name the pass or function (e.g. `lowerTypeLayout`, the forward-mode autodiff pass, the PyTorch binding pass). For an opcode that **nothing in `source/` constructs**, write **no producer at HEAD** and say so in the summary. The old catch-alls `(synthesized)` and a bare `—` are retired: they hid real distinctions and made unproduced opcodes indistinguishable from pass-produced ones. Verify a producer exists before naming one — an intrinsic-declared opcode (`__intrinsic_op`) has no `visit*` at all.                                       |
+   | Summary     | One short clause; no markup beyond inline code.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 5. `## Notable opcodes` — short prose callouts (2-5 sentences each)
    for the half-dozen or so opcodes per family where the table form
@@ -280,9 +317,9 @@ artifact. They sit between the unordered per-pass catalog in
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) and the
 backend-emit overview in
 [../pipeline/06-emit.md](../pipeline/06-emit.md): the catalog page
-explains *what* every pass is and groups them by topic; the
-target-pipeline pages explain *when* each pass runs for one target,
-*which gate selects it*, and *what loops* iterate it.
+explains _what_ every pass is and groups them by topic; the
+target-pipeline pages explain _when_ each pass runs for one target,
+_which gate selects it_, and _what loops_ iterate it.
 
 A prompt that targets one of those pages must produce a document
 with the following sections, in order:
@@ -326,13 +363,13 @@ with the following sections, in order:
    - A companion ordered table with one row per pass node in the
      diagram, columns:
 
-   | Column | Content |
-   | --- | --- |
-   | # | 1-based order within the phase. |
-   | Pass | Backtick-wrapped pass function name. |
-   | File | Markdown link to the `.cpp` file that defines the pass. |
-   | Gate | The condition (if any) that selects this pass; backtick-wrap the C++ expression. Use `(always)` when unconditional. |
-   | Notes | Optional one-clause clarification (e.g. flag values passed, second invocation, etc.); blank when none needed. |
+   | Column | Content                                                                                                             |
+   | ------ | ------------------------------------------------------------------------------------------------------------------- |
+   | #      | 1-based order within the phase.                                                                                     |
+   | Pass   | Backtick-wrapped pass function name.                                                                                |
+   | File   | Markdown link to the `.cpp` file that defines the pass.                                                             |
+   | Gate   | The condition (if any) that selects this pass; backtick-wrap the C++ expression. Use `(always)` when unconditional. |
+   | Notes  | Optional one-clause clarification (e.g. flag values passed, second invocation, etc.); blank when none needed.       |
 
 6. `## Conditional gates` — a single table consolidating every gate
    expression the phase diagrams reference, with the passes it
@@ -391,13 +428,19 @@ order:
 4. `## Shared shape` — references the **Target-pipeline page
    contract** and explains the four-phase decomposition once so
    readers do not have to re-read it on every page. Identifies
-   `linkAndOptimizeIR` (`slang-emit.cpp` line ~892) as the shared
-   orchestrator.
+   `linkAndOptimizeIR` (`slang-emit.cpp`) as the shared orchestrator.
+   Re-derive its line number rather than copying one from this file.
 5. `## Cross-target comparison` — a single table summarizing the
-   five targets, columns: **Target**, **CodeGenTarget enum values**,
+   five targets, columns: **Target**, **CodeGenTarget enum values**
+   (the enum is declared in `slang-target.h`, not `slang-compiler.h`),
    **Phase C entry**, **Phase D emitter**, **Downstream tools**,
-   **Loops** (Y/N + a short note such as
-   `simplifyIRForSpirvLegalization (8x16)`).
+   **Loops** (Y/N + a short note).
+   Two traps in this table, both of which produced wrong pages before:
+   SPIR-V's `legalizeIRForSPIRV` runs inside the emit step and belongs
+   to **Phase D**, not Phase C; and `simplifyIRForSpirvLegalization`
+   declares `kMaxIterations`/`kMaxFuncIterations` bounds whose counters
+   are never incremented, so describe it as running to convergence with
+   a nominal, unenforced bound rather than as "8 x 16".
 6. `## Filtering rules` — short paragraph reminding the reader that
    each target page filters out switch arms gated on a sibling
    target; a glance at one page should not be mistaken for the
@@ -419,7 +462,8 @@ The page `docs/generated/design/pipeline/04b-pre-link-passes.md`
 documents the ordered, per-translation-unit IR pass sequence that
 runs inside `generateIRForTranslationUnit`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
-line ~14386) **before** the module IR is cached on the
+line 15386 at the time of writing -- re-derive it, this citation has
+drifted by ~1000 lines before) **before** the module IR is cached on the
 `Module` and pulled into `linkAndOptimizeIR` by `linkIR`. The
 shape mirrors the **Target-pipeline page contract** above with
 adjustments: no downstream tools, no per-target dispatch, no
@@ -529,3 +573,28 @@ Before considering the document done, verify:
 - [ ] No speculative claims about code that does not exist.
 - [ ] Cross-references to dependency docs use relative paths.
 - [ ] No emojis, no editorial commentary, no copied prose.
+- [ ] **Identifier sweep run.** Extract every backticked identifier and
+      bracketed attribute from the page and grep each one against `source/`.
+      Lint validates markdown link _targets_ but never checks identifiers or
+      file paths named in prose, so a fabricated symbol survives it silently.
+      One page in a past round asserted `[OptixSbt]`, `[AutoBindEntry]`,
+      `coverageBufferUniformOffset`, `coverageBufferUniformSize`, and a
+      capability `optix_ray_tracing_pipeline` — none of which existed anywhere
+      in the tree. Two careful human-style reads missed all five; one scripted
+      sweep found them.
+- [ ] **File-name sweep run**, as a second pass. A tokenizing identifier sweep
+      splits on `-` and `.`, so `slang-ir-lower-untyped-resource-handle.cpp`
+      decomposes into fragments that each exist while the file does not.
+      Extract whole `*.{h,cpp,lua,capdef,slang}` names from links _and_ prose
+      and confirm each resolves. Real examples of non-existent files that
+      reached published pages: `slang-ir-autodiff-transcribe.cpp` (the
+      forward-mode code is in `slang-ir-autodiff-fwd.cpp`) and
+      `slang-ir-lower-untyped-resource-handle.cpp` (the pass lives in
+      `slang-ir-lower-dynamic-resource-heap.cpp`).
+- [ ] Every line-number citation re-derived with `rg -n` in this pass, not
+      carried forward. Drift is not uniform down a file: in one round
+      `slang-lower-to-ir.cpp` moved `+324` in one region and `+565` in another.
+- [ ] For an aggregator/index page whose `watched_paths` glob matches its own
+      directory, the front-matter `watched_paths_digest` is a moving target and
+      cannot be made to match. Leave it alone; `mark-fresh` records the
+      authoritative value in `freshness.json`.
