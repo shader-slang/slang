@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/wgsl.md#floatnonuniformresourceindex
-//META: doc_section_digest=df0b1871aaa936c2c53af8c4c39289b42f647c60d2d807e0ec7fd7a166359929
+//META: doc_section_digest=0164b19f2e0058532e69cb944ccea01bf6885f2346f7b081c69f5d94bf437802
 //META: purpose=NonUniformResourceIndex is rejected for a WGSL compute entry point with E36107 so floatNonUniformResourceIndex's textual-mode wrapper never reaches WGSL emit
 //META: intent=negative
 //META: pipeline_stage=check

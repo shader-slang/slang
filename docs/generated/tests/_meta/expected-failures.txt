@@ -97,13 +97,6 @@ docs/generated/tests/conformance/types-extension/enum-extension-static-members.s
 #    generates that test, so the entry no longer resolved to a file.
 docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
 
-# https://github.com/shader-slang/slang/issues/12440 — a `getStringHash`
-# argument that does not fold to a string literal kills slangc (SIGSEGV on
-# Linux, SIGBUS on macOS, no output) instead of reporting E41023. The check
-# that should catch it tests an unchecked cast, so it never fires.
-# Remove this entry when 12440 is fixed.
-docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
-
 # Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
 # `countof(a)` on a static array folds to the element type's byte size
 # instead of the array's element count (int[9] -> 4, double[6] -> 8),
@@ -190,13 +183,6 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffe
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
 
-# https://github.com/shader-slang/slang/issues/12441 — arithmetic on a value
-# loaded from a `unorm`/`snorm` texture selects `OpIAdd` for float data,
-# because the `Attributed(Float, unorm)` element type is not looked through
-# when classifying. Only fails where SPIR-V validation is enabled, i.e. the
-# nightly. Remove this entry when that half of 12441 is fixed.
-docs/generated/tests/coverage/emit/spirv-unorm-snorm-image-format-by-width.slang
-
 # https://github.com/shader-slang/slang/issues/12442 — render-test blanks the
 # HLSL prelude on the shared global session and never restores it, so these
 # tests fail whenever a `-cpu` COMPARE_COMPUTE test runs before them in the
@@ -211,6 +197,17 @@ docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditio
 # `-target hlsl` directive (`.2`) is affected -- the cuda and cpp directives in
 # the same file do not read the HLSL prelude and must keep reporting.
 docs/generated/tests/design/pipeline/06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang.2
+# Same leak, fifth victim, and the reason it was not listed with the others is
+# the same: it passed when it was generated. It asserts the guarded
+# `#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"` block, which is
+# exactly what the blanked prelude drops, so the `CHECK` for the `#ifdef` finds
+# nothing. Failed on nightly runs 31863743484, 31926143161 and 31993906894 with
+# the same FileCheck positions each time (`actual-output:7:34` scanning from,
+# `10:14` possible match), i.e. deterministic rather than flaky. Confirmed to be
+# the ordering leak and not the test: it passes alone under
+# `slang-test -use-test-server -server-count 1`, and fails in the same process
+# when a `-cpu` COMPARE_COMPUTE test is run before it.
+docs/generated/tests/design/target-pipelines/hlsl/nvapi-front-matter-defines-enable-macro.slang
 
 # https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
 # construction is rejected inside a generic function's array bound with

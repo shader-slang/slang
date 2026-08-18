@@ -1998,6 +1998,62 @@ def lint_markdown_tables(md_path: Path) -> list[LintIssue]:
     return issues
 
 
+_LIQUID_OPENER_RE = re.compile(r"\{\{|\{%")
+
+
+def lint_liquid_safe(md_path: Path) -> list[LintIssue]:
+    """Check that a bundle README carries no raw Liquid opener (`{{` or `{%`).
+
+    These READMEs have YAML front-matter, so the GitHub Pages Jekyll build
+    treats each as a page and runs Liquid over its body -- before Markdown
+    conversion, so a `{{` inside a code span or fence is still seen as a
+    Liquid output tag. The failure mode depends on what follows the `{{`.
+    In `float2x2 m = {{1,2},{3,4}}`, Liquid's non-greedy scan for the closing
+    `}}` stops at the first single `}` (after `1,2`), so the tag is never
+    terminated -- Liquid raises "Variable ... was not properly terminated"
+    and the whole site build aborts. A properly terminated `{{...}}` (e.g. a
+    FileCheck `{{.*}}` wildcard) parses instead and is evaluated as a
+    template expression -- usually rendering empty -- so the literal text
+    does not survive to the published page. Either way the sequence must not
+    reach Liquid.
+
+    The README is also read on github.com, where Liquid is not processed, so
+    the fix cannot be a `{% raw %}` wrapper or an HTML entity inside a
+    backtick span (both show literally there). Two dual-safe spellings pass:
+    space the braces where whitespace is semantically irrelevant
+    (`{ {1,2},{3,4} }`), or show an exact token with numeric entities inside
+    a raw `<code>` element (`<code>&#123;&#123;.*&#125;&#125;</code>`), which
+    renders as `{{.*}}` on both surfaces while never presenting a literal
+    `{{` to Liquid.
+
+    Front-matter is excluded: Jekyll strips it before Liquid runs, so its
+    contents never reach the Liquid renderer.
+    """
+    issues: list[LintIssue] = []
+    rel = _rel_to_repo(md_path)
+    try:
+        text = md_path.read_text(encoding="utf-8")
+    except OSError:
+        return issues
+    fm = _FM_RE.match(text)
+    fm_end_line = text.count("\n", 0, fm.end()) if fm else 0
+    for lineno, line in enumerate(text.split("\n"), start=1):
+        if lineno <= fm_end_line:
+            continue
+        if _LIQUID_OPENER_RE.search(line):
+            issues.append(
+                LintIssue(
+                    rel,
+                    "error",
+                    f"line {lineno} has a raw Liquid opener (`{{{{` or `{{%`)"
+                    f" that breaks the GitHub Pages build; space the braces"
+                    f" (`{{ {{1,2}} }}`) or show the exact token as"
+                    f" `<code>&#123;&#123;...&#125;&#125;</code>`",
+                )
+            )
+    return issues
+
+
 _REQUIRED_BUNDLE_FM_KEYS = (
     "generated",
     "model",
@@ -2194,6 +2250,7 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
 
     issues.extend(lint_markdown_links(bundle_md))
     issues.extend(lint_markdown_tables(bundle_md))
+    issues.extend(lint_liquid_safe(bundle_md))
 
     test_files = sorted(bdir.glob("*.slang"))
     if len(test_files) > spec.size_cap_files:
@@ -2208,6 +2265,29 @@ def lint_bundle(spec: BundleSpec) -> list[LintIssue]:
     for tf in test_files:
         for issue in _lint_test_file(spec, tf):
             issues.append(issue)
+    # Claim enumeration: `prompts/_claims.md` §4 makes `## Claims` the bundle's
+    # ground-truth list, and §6 defines completeness as "every claim there is
+    # either covered or classified". Without it a bundle has no way to show a
+    # claim as *missing*: `## Functional coverage` only lists claims that
+    # already have tests, so when the source doc gains new normative prose
+    # nothing reports the shortfall. That is how the doc-gap fill (#12477) added
+    # ~12k lines of newly checkable statements without a single bundle showing a
+    # coverage gap.
+    #
+    # Warning rather than error: most bundles predate the requirement, and an
+    # error would block every unrelated change until all of them are
+    # re-enumerated.
+    if "## Claims" not in text:
+        issues.append(
+            LintIssue(
+                f"{spec.dir}/README.md",
+                "warning",
+                "no ## Claims section; the bundle has no ground-truth claim"
+                " enumeration, so new normative prose in its source doc cannot"
+                " surface as missing coverage (prompts/_claims.md §1, §4)",
+            )
+        )
+
     # Untested-claims table: optional section, but if present must be a
     # table with the controlled Reason vocabulary.
     heading = "## Untested claims"
@@ -4447,6 +4527,38 @@ def cmd_selftest(args: argparse.Namespace) -> int:
         check(
             "links error names the path",
             "nope.md" in errors[0].message if errors else False,
+            True,
+        )
+
+    # lint_liquid_safe -- the Pages-build guard. A raw `{{` or `{%` in the
+    # body is an error either way it fails Liquid (an unterminated tag aborts
+    # the build, a terminated one is evaluated and drops the literal text);
+    # the two dual-safe spellings -- spaced braces and numeric entities in a
+    # `<code>` element -- pass; and a `{{` inside the front-matter is not
+    # counted, since Jekyll strips front-matter before Liquid runs.
+    with tempfile.TemporaryDirectory() as td:
+        fm = '---\ngenerated: true\nwarning: "x"\n---\n'
+        bad = Path(td) / "bad.md"
+        bad.write_text(fm + "probed with `float2x2 m = {{1,2},{3,4}}`.\n", encoding="utf-8")
+        tag = Path(td) / "tag.md"
+        tag.write_text(fm + "a {% raw %} block.\n", encoding="utf-8")
+        ok = Path(td) / "ok.md"
+        ok.write_text(
+            fm
+            + "spaced `float2x2 m = { {1,2},{3,4} }` and"
+            + " <code>&#123;&#123;.*&#125;&#125;</code> both render.\n",
+            encoding="utf-8",
+        )
+        fm_only = Path(td) / "fm.md"
+        fm_only.write_text('---\nwarning: "see {{x}}"\n---\nclean body.\n', encoding="utf-8")
+        check("liquid rejects raw output tag", len(lint_liquid_safe(bad)), 1)
+        check("liquid rejects raw statement tag", len(lint_liquid_safe(tag)), 1)
+        check("liquid accepts spaced braces and entities", len(lint_liquid_safe(ok)), 0)
+        check("liquid ignores front-matter", len(lint_liquid_safe(fm_only)), 0)
+        bad_issues = lint_liquid_safe(bad)
+        check(
+            "liquid error names the line",
+            "line 5" in bad_issues[0].message if bad_issues else False,
             True,
         )
 

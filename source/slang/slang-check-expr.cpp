@@ -9535,7 +9535,13 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     const auto& spirvInfo = getSession()->spirvCoreGrammarInfo;
 
     // We will iterate over all the operands in all the insts and check
-    // them
+    // them. Setting `failed` makes us return an error-typed expression via
+    // `CreateErrorExpr` at the end of this function; a caller only keeps that
+    // expression away from IR lowering (which aborts on an ErrorType) when the
+    // sink's error count is non-zero. So every site that sets `failed` must
+    // diagnose an *error*, never a warning — a warning-severity `failed` path
+    // is what caused the abort in #12497. (The lone warning in this function,
+    // SpirvLayoutSensitiveTypeInAsm, deliberately does not set `failed`.)
     bool failed = false;
 
     // Track %id's that have been defined in this asm block.
@@ -9550,10 +9556,12 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
 
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
+            // Per the `failed` invariant above, this diagnoses an error (not
+            // the parser's E29106 semicolon-hint warning): the opcode takes no
+            // operands, so this is a definite error rather than a recovery guess.
             failed = true;
-            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+            getSink()->diagnose(Diagnostics::SpirvInstructionTakesNoOperands{
                 .opcode = inst.opcode.token.getContent(),
-                .maxOperands = 0,
                 .location = inst.opcode.token.loc});
             continue;
         }
