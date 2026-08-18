@@ -118,7 +118,7 @@ if (-not $latestRunnerVersion) {
 Write-Log "Latest Actions runner version: $latestRunnerVersion"
 
 # GitHub started publishing a "digest" field on every release asset in June
-# 2026 (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
+# 2025 (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
 # so tracking "latest" does not have to give up checksum verification —
 # read it from the same release object already fetched above instead of
 # issuing a second request.

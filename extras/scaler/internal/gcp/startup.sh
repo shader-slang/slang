@@ -140,7 +140,7 @@ log "Current Actions runner version: $current_runner_version"
 #
 # Fetch the release JSON once and reuse it for both the version and the
 # per-asset SHA-256 digest, rather than issuing a second request. GitHub
-# started publishing a "digest" field on every release asset in June 2026
+# started publishing a "digest" field on every release asset in June 2025
 # (https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
 # so tracking "latest" does not have to give up checksum verification.
 if ! release_json="$(mktemp /tmp/runner-release.XXXXXX.json)"; then
