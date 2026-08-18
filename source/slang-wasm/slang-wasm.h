@@ -332,6 +332,9 @@ public:
 
     Session* createSession(int compileTarget);
 
+    // Returns the source of the builtin module "core" or "glsl", or an empty string otherwise.
+    std::string getBuiltinModuleSource(const std::string& moduleName);
+
     slang::IGlobalSession* interface() const { return m_interface; }
 
 private:

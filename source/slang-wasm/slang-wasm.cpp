@@ -98,6 +98,23 @@ Session* GlobalSession::createSession(int compileTarget)
     return new Session(session);
 }
 
+std::string GlobalSession::getBuiltinModuleSource(const std::string& moduleName)
+{
+    Slang::ComPtr<ISlangBlob> blob;
+    SlangResult result = Slang::getBuiltinModuleSource(
+        Slang::UnownedStringSlice(moduleName.c_str()),
+        blob.writeRef());
+    if (result != SLANG_OK)
+    {
+        g_error.type = std::string("INTERNAL");
+        g_error.result = result;
+        g_error.message = std::string("Failed to get the source of builtin module '") + moduleName +
+                          std::string("'");
+        return "";
+    }
+    return std::string((const char*)blob->getBufferPointer(), blob->getBufferSize());
+}
+
 Session::~Session()
 {
     m_componentTypes = {};

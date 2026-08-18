@@ -135,7 +135,22 @@ async function runSmokeTest() {
             throw new Error(`Unexpected default-value blob contents: 0x${answer.toString(16)}`);
         }
         console.log('Default-value blob reflection smoke test passed');
-        
+
+        const coreSource = globalSession.getBuiltinModuleSource('core');
+        for (const marker of ['public module core;', 'struct RayDesc', 'struct NullDifferential']) {
+            if (!coreSource.includes(marker)) {
+                throw new Error(`Core builtin module source is missing: ${marker}`);
+            }
+        }
+        const glslSource = globalSession.getBuiltinModuleSource('glsl');
+        if (!glslSource.includes('#define highp')) {
+            throw new Error('GLSL builtin module source is missing expected content');
+        }
+        if (globalSession.getBuiltinModuleSource('nonexistent') !== '') {
+            throw new Error('Unknown builtin module name should return an empty string');
+        }
+        console.log('Builtin module source smoke test passed');
+
         // Clean up
         linkedProgram.delete();
         program.delete();
