@@ -3906,6 +3906,31 @@ vector<T.Element,4> __texture_gather(
     case glsl:
         __intrinsic_asm "textureGather($p, $2, $3)";
     case metal:
+        if (isShadow == 1)
+        {
+            // Metal `depth2d`/`depth2d_array`/`depthcube`/`depthcube_array` `gather` takes no
+            // component argument (there is only one channel). Mirror the color paths below but
+            // drop the trailing `metal::component($3)`.
+            if (isArray == 1)
+            {
+                switch (Shape.flavor)
+                {
+                case $(SLANG_TEXTURE_2D):
+                    // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
+                    __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), int2(0))";
+                case $(SLANG_TEXTURE_CUBE):
+                    // Tv gather(sampler s, float3 coord, uint array) const
+                    __intrinsic_asm "$0.gather($1, ($2).xyz, uint(($2).w))";
+                }
+            }
+            if (Shape.flavor == $(SLANG_TEXTURE_CUBE))
+            {
+                // Tv gather(sampler s, float3 coord) const
+                __intrinsic_asm "$0.gather($1, $2)";
+            }
+            // Tv gather(sampler s, float2 coord, int2 offset = int2(0)) const
+            __intrinsic_asm "$0.gather($1, $2, int2(0))";
+        }
         if (isArray == 1)
         {
             switch (Shape.flavor)
@@ -4008,6 +4033,18 @@ vector<T.Element,4> __texture_gather_offset(
         static_assert(Shape.flavor == $(SLANG_TEXTURE_2D),
             "Metal supports offset variant of Gather only for 2D textures");
 
+        if (isShadow == 1)
+        {
+            // Metal `depth2d`/`depth2d_array` `gather` has a single channel and takes no component
+            // argument. Mirror the color paths below but drop the trailing `metal::component($4)`.
+            if (isArray == 1)
+            {
+                // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0)) const
+                __intrinsic_asm "$0.gather($1, ($2).xy, uint(($2).z), $3)";
+            }
+            // Tv gather(sampler s, float2 coord, int2 offset = int2(0)) const
+            __intrinsic_asm "$0.gather($1, $2, $3)";
+        }
         if (isArray == 1)
         {
             // Tv gather(sampler s, float2 coord, uint array, int2 offset = int2(0), component c = component::x) const
@@ -4847,20 +4884,20 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint($2))$z";
                         else
                             // T read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>($1), uint($2))$z";
                     }
                     else
                     {
                         if (isArray == 1)
                             // Document seems to have a typo. `lod` must be `sample`.
                             // Tv read(uint2 coord, uint array, uint lod = 0) const
-                            __intrinsic_asm "$c$0.read(($1).xy, ($1).z, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>(($1).xy), uint(($1).z), uint($2))$z";
                         else
                             // Tv read(uint2 coord, uint sample) const
-                            __intrinsic_asm "$c$0.read($1, uint($2))$z";
+                            __intrinsic_asm "$c$0.read(vec<uint,2>($1), uint($2))$z";
                     }
                     break;
                 }

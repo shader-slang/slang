@@ -257,7 +257,10 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             int paramCount = 0;
 
             StringBuilder metal;
-            const char* metalMipLevel = "0";
+            // Metal multisample textures have no mip chain, so their `get_width`/`get_height`/
+            // `get_depth` accessors take no LOD argument. Emit an empty argument for them; the
+            // single-arg `mipLevel` form is skipped for multisample above (`includeMipInfo`).
+            const char* metalMipLevel = isMultisample ? "" : "0";
 
             StringBuilder cuda;
             cuda << "{";
