@@ -148,10 +148,15 @@ public:
     /// Write. Will potentially block if write stream is blocking.
     SlangResult write(const void* content, size_t sizeInBytes);
 
-    /// Write bytes directly to the backing stream without HTTP framing.
+    /// Write `sizeInBytes` bytes from `bytes` directly to the backing stream, with no
+    /// Content-Length header and no other framing added -- unlike write(), whose `content`
+    /// argument is exactly the framed packet's payload.
     ///
-    /// This bypasses the packet protocol and should only be used by tests that need to provoke
-    /// malformed input at the peer, for example to drive ReadError::InvalidHeader.
+    /// This bypasses the packet protocol and exists only for tests that need to provoke
+    /// malformed input at the peer, for example to drive ReadError::InvalidHeader by writing
+    /// bytes that do not parse as an HTTP header. Returns whatever the backing stream's write()
+    /// returns; on failure the connection should be treated as unusable, the same as a failed
+    /// write().
     SlangResult writeRaw(const void* bytes, size_t sizeInBytes);
 
     /// Blocks until some result - a packet, closure, or some kind of error or timeout.

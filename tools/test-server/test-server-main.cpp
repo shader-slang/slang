@@ -802,9 +802,19 @@ SlangResult TestServer::execute()
 #endif
         }
 
-        // Written through the same transport stream as the real reply, but without HTTP
-        // framing. Mixing stdio with the transport handle can let platform buffering change
-        // the bytes on the wire; this needs to be a malformed header, not a buffering test.
+        // Written through writeRaw() on the same transport stream the framed reply uses next,
+        // rather than through a separate fwrite/fflush(stdout). Mixing a C-stdio write with the
+        // transport's own Stream (WinPipeStream/UnixPipeStream) does not guarantee the two end
+        // up ordered on the wire the way this hook needs -- the failure this line exists to
+        // reproduce is a malformed header at the client, not a race with platform buffering.
+        // Going through the same Stream as _executeSingle()'s reply below keeps both writes on
+        // one path, so the garbage is always ahead of the reply in write order.
+        //
+        // Checked with SLANG_RETURN_ON_FAIL rather than ignored: a failed writeRaw() means the
+        // transport is already broken (e.g. the peer closed its read end), in which case
+        // _executeSingle()'s own write below would fail identically. Falling through to attempt
+        // it anyway would not serve the request any more successfully; it would just replace a
+        // clear write failure here with a second, redundant one.
         if (garbleOnRequest && servedCount == garbleOnRequest - 1)
         {
             const char garbage[] = "this-is-not-a-jsonrpc-header\r\n\r\n";
