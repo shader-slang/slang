@@ -65,6 +65,8 @@ struct SpecializationContext
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
+        , expanded(*inModule->getContainerPool().getHashSet<IRInst>())
+        , workListStack(*inModule->getContainerPool().getList<IRInst>())
         , module(inModule)
         , targetProgram(target)
         , options(options)
@@ -75,6 +77,8 @@ struct SpecializationContext
         module->getContainerPool().free(&workList);
         module->getContainerPool().free(&workListSet);
         module->getContainerPool().free(&cleanInsts);
+        module->getContainerPool().free(&expanded);
+        module->getContainerPool().free(&workListStack);
     }
 
     bool isUnsimplifiedArithmeticInst(IRInst* inst)
@@ -286,15 +290,64 @@ struct SpecializationContext
     List<IRInst*>& workList;
     HashSet<IRInst*>& workListSet;
     HashSet<IRInst*>& cleanInsts;
-    void addToWorkList(IRInst* inst)
+
+    // `workListSet` tracks which insts are *currently queued* and is cleared on pop, so it
+    // dedups the drain queue but does not record that an inst's use closure was already walked.
+    // `expanded` is that separate memo: an inst is added the first time its forward use closure
+    // is walked, and (unlike `workListSet`) is not cleared on pop, so re-reaching an inst does
+    // not re-walk its closure. It is reset per drain in `processSpecializationWorkListFromRoot`,
+    // which is what lets an on-demand subtree seed still get a full first walk of its closure.
+    HashSet<IRInst*>& expanded;
+    List<IRInst*>& workListStack;
+
+    void enqueue(IRInst* inst)
     {
         if (workListSet.add(inst))
-        {
             workList.add(inst);
+    }
 
-
-            addUsersToWorkList(inst);
+    // Enqueue every instruction in the forward use closure of `seed` — everything reachable by
+    // following use edges forward — because specializing an inst may unblock specialization of
+    // the things that use it. Each inst's user list is enumerated at most once per drain (deduped
+    // by `expanded`). The walk uses an explicit stack so its depth is independent of the
+    // use-chain length; a long use chain must not overflow the call stack.
+    //
+    // `forceSeed` re-enumerates `seed`'s direct users even if `seed` is already in `expanded`,
+    // which the mutation call sites require (see `addUsersToWorkList`).
+    //
+    // Not re-entrant: nothing it does (enqueue, set/list operations, walking uses) calls back into
+    // the work-list helpers, so the single shared `workListStack` is safe to reuse.
+    void expandUseClosure(IRInst* seed, bool forceSeed)
+    {
+        workListStack.clear();
+        if (forceSeed)
+        {
+            expanded.add(seed);
+            workListStack.add(seed);
         }
+        else if (expanded.add(seed))
+        {
+            workListStack.add(seed);
+        }
+
+        while (workListStack.getCount() != 0)
+        {
+            auto inst = workListStack.getLast();
+            workListStack.removeLast();
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                enqueue(user);
+                if (expanded.add(user))
+                    workListStack.add(user);
+            }
+        }
+    }
+
+    void addToWorkList(IRInst* inst)
+    {
+        enqueue(inst);
+        expandUseClosure(inst, /*forceSeed*/ false);
     }
 
     static constexpr UInt kMaxIRSpecializationDepthBudget = 512;
@@ -374,20 +427,11 @@ struct SpecializationContext
         return false;
     }
 
-    // When a transformation makes a change to an instruction,
-    // we may need to re-consider transformations for instructions
-    // that use its value. In those cases we will call `addUsersToWorkList`
-    // on the instruction that is being modified or replaced.
-    //
-    void addUsersToWorkList(IRInst* inst)
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-
-            addToWorkList(user);
-        }
-    }
+    // When a transformation makes a change to an instruction, we may need to re-consider
+    // transformations for instructions that use its value. Callers invoke this at the point
+    // of mutation on the instruction being modified or replaced, so `inst`'s direct users are
+    // re-enqueued even if `inst`'s use closure was already walked earlier this drain.
+    void addUsersToWorkList(IRInst* inst) { expandUseClosure(inst, /*forceSeed*/ true); }
 
     // Of course, somewhere along the way we expect
     // to run into uses of `specialize(...)` instructions
@@ -1841,6 +1885,12 @@ struct SpecializationContext
     {
         if (!rootInst)
             return false;
+
+        // Reset the closure-walk memo for each drain. On-demand callers (`specializeChildInsts`)
+        // seed only a subtree root, which may be an instruction whose closure was already walked
+        // in an earlier drain; its forward use closure is the only way to reach users outside the
+        // subtree, so it must be walked afresh here rather than suppressed by a stale entry.
+        expanded.clear();
 
         addToWorkList(rootInst);
         return processSpecializationWorkList();
