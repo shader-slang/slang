@@ -1,13 +1,14 @@
-// Guards the CUDA prelude's fixed-width vector binary and comparison operators. The prelude spells
-// the components directly (`result.x = left.x op right.x; ...`) under preprocessor width dispatch;
-// a mis-dispatched width or a wrong component would show up here as a wrong buffer value. Both
-// backends are checked against the same expected results, and the CPU target uses a different
-// prelude, so a CUDA-only regression fails while the CPU run keeps passing.
+// Guards the CUDA prelude's fixed-width vector binary and comparison operators, at widths 2/3/4,
+// against per-component wrong-component and wrong-width mistakes. Each operand has asymmetric values
+// per component and a mixed comparison result, so an operator that assigned the wrong component,
+// dropped a component, or reused one component's result for another would produce a wrong buffer
+// value. Both targets are checked against the same expected results; the CPU target uses a
+// different prelude, so a CUDA-only regression fails while the CPU run keeps passing.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -46,13 +47,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float3 f3 = float3(1.5, 2.5, 3.5) + float3(0.5, 0.5, 0.5);
 
-    // 8-bit components with a negative operand are the one case where the operators' result depends
-    // on how a component is read, not merely on which component: `int8_t2` lowers to CUDA's `char2`,
-    // whose members are `signed char`, while the accessor path this change replaced reached them
-    // through a plain `char*`. On a target where plain `char` is unsigned, that path yielded 125 for
-    // `-6 >> 1` where the declared member type gives -3. Division, remainder and the comparisons
-    // divide the same way; the additive and bitwise operators agree either way because the store
-    // back into the component truncates the difference away.
+    // Floating-point `%` is per-component fmod, with a distinct quotient and a negative dividend per
+    // lane so a dropped or duplicated component is visible: fmod(7.5,2)=1.5, fmod(-7.5,2)=-1.5,
+    // fmod(8.5,3)=2.5.
+    float3 fmod3 = float3(7.5, -7.5, 8.5) % float3(2.0, 2.0, 3.0);
+
+    // 8-bit components with a negative operand: `int8_t2` lowers to CUDA's `char2`, whose members
+    // are `signed char`, so `-6 >> 1` is -3. This pins the signed reading of the declared member
+    // type, which is what distinguishes `>>`, `/`, `%` and the comparisons on a target where plain
+    // `char` is unsigned; `+`, `-`, `*` and the bitwise operators agree either way because the store
+    // back into the component truncates any difference away.
     int8_t2 c2 = int8_t2(-6, 7);
     int8_t2 cshr2 = c2 >> int8_t2(1, 1);
     int8_t2 cdiv2 = c2 / int8_t2(2, 2);
@@ -98,4 +102,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[31] = int(cmod2.y);    //BUF-NEXT: 3
     outputBuffer[32] = cneg2.x ? 1 : 0; //BUF-NEXT: 1
     outputBuffer[33] = cneg2.y ? 1 : 0; //BUF-NEXT: 0
+
+    outputBuffer[34] = int(fmod3.x * 2.0f); //BUF-NEXT: 3
+    outputBuffer[35] = int(fmod3.y * 2.0f); //BUF-NEXT: -3
+    outputBuffer[36] = int(fmod3.z * 2.0f); //BUF-NEXT: 5
 }
