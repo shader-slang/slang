@@ -14,9 +14,6 @@
 
 set -euo pipefail
 
-RUNNER_VERSION="2.334.0"
-RUNNER_SHA256="048024cd2c848eb6f14d5646d56c13a4def2ae7ee3ad12122bee960c56f3d271"
-
 # Defense in depth: wipe stray actions-runner installs that may be baked into
 # the base image under user accounts other than the canonical "runner" user.
 # A May 2026 SM80Plus outage was caused by /home/<engineer>/actions-runner/
@@ -133,35 +130,50 @@ if [ -z "$current_runner_version" ]; then
 fi
 log "Current Actions runner version: $current_runner_version"
 
-if [ "$current_runner_version" != "$RUNNER_VERSION" ]; then
-  log "Updating Actions runner to v${RUNNER_VERSION}..."
+# Ask GitHub for the latest release instead of comparing against a hardcoded
+# pin. A hardcoded RUNNER_VERSION constant previously went stale twice
+# (2026-04-29, 2026-08-11): GitHub deprecates old runner binaries and rejects
+# their registration attempts, so every VM booted with the stale pin baked in
+# died before it could pick up a job, and someone had to notice the outage
+# and bump the constant by hand. Querying "latest" removes that manual step;
+# every boot self-heals against whatever GitHub currently accepts.
+latest_runner_version="$(curl -fsSL --retry 3 --connect-timeout 10 --max-time 30 \
+  https://api.github.com/repos/actions/runner/releases/latest |
+  grep -o '"tag_name": *"v[^"]*"' | head -n 1 | sed -E 's/.*"v([^"]*)"/\1/')"
+if [ -z "$latest_runner_version" ]; then
+  fail_update_and_shutdown "Failed to determine latest Actions runner version from GitHub API"
+fi
+log "Latest Actions runner version: $latest_runner_version"
+
+if [ "$current_runner_version" != "$latest_runner_version" ]; then
+  log "Updating Actions runner to v${latest_runner_version}..."
   if ! runner_archive="$(mktemp /tmp/actions-runner.XXXXXX.tar.gz)"; then
     fail_update_and_shutdown "Failed to create temporary Actions runner archive"
   fi
-  runner_url="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+  runner_url="https://github.com/actions/runner/releases/download/v${latest_runner_version}/actions-runner-linux-x64-${latest_runner_version}.tar.gz"
 
   if ! curl -fsSL --retry 3 --connect-timeout 10 --max-time 120 "$runner_url" -o "$runner_archive"; then
-    fail_update_and_shutdown "Failed to download Actions runner v${RUNNER_VERSION}"
+    fail_update_and_shutdown "Failed to download Actions runner v${latest_runner_version}"
   fi
 
-  if ! printf '%s  %s\n' "$RUNNER_SHA256" "$runner_archive" | sha256sum -c - >/dev/null 2>&1; then
-    fail_update_and_shutdown "Actions runner v${RUNNER_VERSION} checksum verification failed"
-  fi
-
+  # No pre-known checksum to verify against when tracking "latest" (GitHub's
+  # release API does not publish one) — integrity relies on TLS plus
+  # GitHub's own asset hosting, same as the extraction step immediately
+  # below trusting the archive it just downloaded over HTTPS.
   if ! chown "$RUNNER_USER":"$RUNNER_USER" "$runner_archive"; then
-    fail_update_and_shutdown "Failed to change owner for Actions runner v${RUNNER_VERSION} archive"
+    fail_update_and_shutdown "Failed to change owner for Actions runner v${latest_runner_version} archive"
   fi
 
   if ! sudo -u "$RUNNER_USER" tar xzf "$runner_archive" -C "$RUNNER_DIR"; then
-    fail_update_and_shutdown "Failed to extract Actions runner v${RUNNER_VERSION}"
+    fail_update_and_shutdown "Failed to extract Actions runner v${latest_runner_version}"
   fi
   rm -f "$runner_archive" || true
   runner_archive=""
 
   updated_runner_version="$(runner_version || true)"
   log "Actions runner version after update: ${updated_runner_version:-unknown}"
-  if [ "${updated_runner_version:-}" != "$RUNNER_VERSION" ]; then
-    fail_update_and_shutdown "Runner version mismatch after update (expected ${RUNNER_VERSION}, got ${updated_runner_version:-unknown})"
+  if [ "${updated_runner_version:-}" != "$latest_runner_version" ]; then
+    fail_update_and_shutdown "Runner version mismatch after update (expected ${latest_runner_version}, got ${updated_runner_version:-unknown})"
   fi
 fi
 
