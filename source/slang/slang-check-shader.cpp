@@ -158,17 +158,11 @@ static SemanticDecl* lookUpSemanticDecl(
     return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
 }
 
-// A requirement that adds nothing beyond `stage` (e.g. a bare `[require(fragment)]`) is already
-// implied by the profile; propagating it would only make the "profile implicitly upgraded"
-// diagnostic list a redundant stage atom. `stageProjectedCaps` must already be the accessor
-// requirement projected onto a single stage (see `collectSemanticAccessorRequirement`).
-//
-// The test is capability-equivalence to the bare stage, i.e. implication in *both* directions,
-// not just `{stage} implies requirement`. One-way `implies` permits the left operand to hold
-// excess target/stage sets, so `{fragment}` would "imply" a target-restricting requirement like
-// `{fragment} & metal` — and we would then wrongly drop the `metal` restriction instead of
-// propagating it. Requiring the projection to also imply `{stage}` keeps only genuinely
-// stage-only requirements out of `outCaps`.
+// True when `stageProjectedCaps` (an accessor requirement already projected onto `stage`) is
+// equivalent to the bare stage and so adds nothing to enforce. Tested by implication in *both*
+// directions: one-way `{stage} implies req` also holds when `req` is strictly stronger than the
+// stage (e.g. adds a target restriction), so requiring `req implies {stage}` too keeps genuinely
+// stage-only requirements out while letting stronger ones through.
 static bool isStageOnlyRequirement(const CapabilitySet& stageProjectedCaps, Stage stage)
 {
     if (stageProjectedCaps.isEmpty() || stageProjectedCaps.isInvalid())
@@ -180,14 +174,14 @@ static bool isStageOnlyRequirement(const CapabilitySet& stageProjectedCaps, Stag
     return stageCaps.implies(stageProjectedCaps) && stageProjectedCaps.implies(stageCaps);
 }
 
-// General capability inference does not traverse from a semantic to the accessor it resolves to,
-// so a requirement like `fragmentshaderbarycentric` on the `SV_Barycentrics` getter would be lost.
-// A semantic accessor's `[require]` set can be a multi-stage disjunction — the `SV_Position` getter
-// carries `[require(fragment)] [require(geometry)]`, for example. We must not join that whole OR
-// set, or a fragment entry point would pick up the `geometry` atom it never uses. Project the
-// requirement onto the entry point's stage first (`join` with the stage singleton drops the
-// non-matching branches), then join that projection into `*outCaps` — but only when it adds
-// something beyond the stage itself (see `isStageOnlyRequirement`).
+// Fold a matched semantic accessor's `[require]` into the entry point's `*outCaps`, so the profile
+// check enforces a capability the semantic carries but general inference misses (it does not look
+// through a semantic to its accessor). Project the requirement onto the entry point's stage first
+// and join only what is strictly stronger than that stage context: a multi-stage requirement's
+// off-stage alternatives must not leak in (a fragment use of a getter declared for
+// `[require(fragment)] [require(geometry)]` must not pull in `geometry`), and a requirement equal
+// to the stage is already implied by the profile. Example: `SV_Barycentrics`, whose getter is
+// `[require(fragment, fragmentshaderbarycentric)]`, contributes `fragmentshaderbarycentric`.
 static void collectSemanticAccessorRequirement(Decl* member, Stage stage, CapabilitySet* outCaps)
 {
     SLANG_ASSERT(outCaps);

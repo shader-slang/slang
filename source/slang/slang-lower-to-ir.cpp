@@ -16470,15 +16470,12 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
         auto asFuncDecl = as<FuncDecl>(funcDeclRef.getDecl());
         SLANG_ASSERT(asFuncDecl);
-        // Prefer the entry point's inferred set (a superset of the function declaration's own),
-        // falling back to the declaration's set when this function isn't among the program's
-        // entry points or its entry-point set was never populated.
-        CapabilitySetVal* inferredCaps = nullptr;
-        if (auto found = entryPointInferredCaps.tryGetValue(asFuncDecl))
-            inferredCaps = *found;
-        if (!inferredCaps)
-            inferredCaps = asFuncDecl->inferredCapabilityRequirements;
-        CapabilitySet set{inferredCaps};
+        // Every layout entry point is one of the program's entry points (both come from the same
+        // component-type walk), so its inferred capability set — which can exceed the function
+        // declaration's own requirements — is always in the map.
+        auto found = entryPointInferredCaps.tryGetValue(asFuncDecl);
+        SLANG_RELEASE_ASSERT(found);
+        CapabilitySet set{*found};
         for (auto atomSet : set.getAtomSets())
         {
             for (auto atomVal : atomSet)
