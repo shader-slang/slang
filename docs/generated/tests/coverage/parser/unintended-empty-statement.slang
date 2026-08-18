@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00+00:00
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/02-parse-ast.md#error-recovery
-//META: doc_section_digest=d77311f11729ff9160bf3b891d099eac9213b11212656051fcd279c760cf9dba
+//META: doc_section_digest=ecd97134efc1fb844f5467e390d9248d7c2f8f41cabf069e67d46c245cea2ef3
 //META: purpose=Verifies a lone `;` as the body of an `if` emits the W20101 unintended-empty-statement warning (compile still succeeds).
 //META: intent=characterization
 //META: covers=source/slang/slang-parser.cpp

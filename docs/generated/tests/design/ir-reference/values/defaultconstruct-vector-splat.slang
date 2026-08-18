@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/values.md#defaultconstruct
-//META: doc_section_digest=65c5f74b8b60cae5accc8e29d64d6981f0e0ea38bc7041c98abf00508053c5e3
+//META: doc_section_digest=6c9e23cc7f3c01023f15f82c811288b4c32f6278bb00c875134897b51fe05502
 //META: purpose=Default-initialising a vector or matrix does not emit `defaultConstruct`; lowering decomposes the result type first and builds the concrete aggregate (`MakeVectorFromScalar` / `makeMatrixFromScalar`) from a zero literal.
 //META: intent=functional
 //META: pipeline_stage=lower
