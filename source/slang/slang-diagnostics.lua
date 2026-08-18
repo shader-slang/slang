@@ -3215,6 +3215,13 @@ warning(
     span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
+warning(
+    "modifier-not-applicable-here",
+    31232,
+    "modifier not applicable here",
+    span { loc = "modifier:Modifier", message = "modifier '~modifier' is not applicable here." }
+)
+
 -- Enums (320xx)
 
 err(

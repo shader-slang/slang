@@ -59,6 +59,44 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// The disposition an authored modifier-validity rule carries (shader-slang/slang#12558). These
+/// are the only three outcomes a rule can express; "no rule matched" is represented by the `false`
+/// return of the query functions below, not by a fourth enumerator.
+enum class ModifierValidityDisposition
+{
+    Allow,
+    /// Accept the modifier but diagnose a warning: a historically-tolerated combination we now
+    /// want to steer users away from (as opposed to `Error`, which rejects outright).
+    Warn,
+    Error,
+};
+
+/// Look up the modifier-validity table for `modifier` applied to `node` (a declaration,
+/// statement, or any other syntax node). If a rule matches, write its disposition to
+/// `outDisposition` and return true; return false if no rule applies (the deny-by-default case).
+/// This is the general bottleneck; a modifier on an expression naming a type delegates to
+/// `queryModifierValidityOnType`. The lookup scans only the rules that mention this modifier (via
+/// a bucket-by-modifier-tag index), not the whole table.
+bool queryModifierValidityOnNode(
+    Modifier* modifier,
+    SyntaxNodeBase* node,
+    ModifierValidityDisposition& outDisposition);
+
+/// Look up the modifier-validity table for `modifier` applied to `type` (the type axis).
+/// Mirrors `queryModifierValidityOnNode`.
+bool queryModifierValidityOnType(
+    Modifier* modifier,
+    Type* type,
+    ModifierValidityDisposition& outDisposition);
+
+/// Apply the deny-by-default policy for a `modifier` that matched no rule and was not otherwise
+/// resolved (a non-declaration node, or a declaration the legacy check leaves `Unhandled`). When
+/// its internal gate (`kEnableModifierDenyByDefaultDiagnostic`) is enabled it diagnoses at
+/// `modifier`'s location — a warning for the current language version, an error at Slang 202c —
+/// and returns true iff it diagnosed an error, in which case the caller should drop the modifier.
+/// The gate is currently disabled, so the function returns false without diagnosing.
+bool applyModifierDenyByDefault(SemanticsVisitor* visitor, Modifier* modifier);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
