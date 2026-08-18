@@ -2283,6 +2283,52 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
+    // Make-existential: a value can be implicitly boxed into an existential type `dyn IFoo`.
+    //
+    // The existential box does not participate in the subtype relation the way the interface
+    // does (`X` is not a subtype of `dyn IFoo`, and `dyn IFoo` does not conform to `IFoo` — see
+    // `checkAndConstructSubtypeWitness`), so boxing is a *distinct* coercion keyed on the
+    // interface-level conformance witness rather than a subtype witness to the box itself:
+    //
+    //   * concrete `X` where `X : IFoo`  →  `dyn IFoo`   (make-existential)
+    //   * `dyn IFrom` where `IFrom <: ITo`  →  `dyn ITo`  (existential upcast)
+    //
+    // The resulting `CastToSuperTypeExpr` carries the box type and lowers to `makeExistential`
+    // exactly as the old concrete-to-interface cast did (see `visitCastToSuperTypeExpr`).
+    if (auto toExistential = as<ExistentialType>(toType))
+    {
+        auto toInterfaceType = toExistential->getInterfaceType();
+
+        // Only single-interface boxes are formed here; a conjunction box (`dyn (IFoo & IBar)`)
+        // would need a multi-witness `makeExistential` that lowering does not model yet.
+        if (isInterfaceType(toInterfaceType))
+        {
+            // For a source that is itself an existential, box the interface it wraps so the
+            // conformance is checked interface-to-interface (`IFrom <: ITo`).
+            auto fromExistential = as<ExistentialType>(fromType);
+            Type* sourceInterfaceType =
+                fromExistential ? fromExistential->getInterfaceType() : fromType.type;
+
+            if (auto witness = tryGetSubtypeWitness(sourceInterfaceType, toInterfaceType))
+            {
+                // An existential-to-existential upcast lowers by walking the witness, which
+                // must be expanded into a transitive chain first (as the interface-to-interface
+                // cast at the general subtype path below does).
+                if (fromExistential)
+                    witness = normalizeSubtypeWitnessForInterfaceUpcast(sourceInterfaceType, witness);
+                if (outToExpr)
+                {
+                    *outToExpr = createCastToSuperTypeExpr(toType, fromExpr, witness);
+                    // The result of a make-existential is a fresh box value, never an l-value.
+                    (*outToExpr)->type.isLeftValue = false;
+                }
+                if (outCost)
+                    *outCost = kConversionCost_CastToInterface;
+                return true;
+            }
+        }
+    }
+
     // A type is always convertible to any of its supertypes.
     //
     if (auto witness = tryGetSubtypeWitness(fromType, toType))

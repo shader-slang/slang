@@ -5337,6 +5337,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     context.recursionDepth++;
     SLANG_DEFER(context.recursionDepth--);
 
+    // An existential value `dyn IFoo` has the same runtime representation (tag + `AnyValue`
+    // payload + witness table) as an interface-typed value, so it lays out identically. Unwrap to
+    // the interface here so it flows into the existing interface layout path below.
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+        type = existentialInterfaceType;
+
     if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
     {
         return *layoutResultPtr;

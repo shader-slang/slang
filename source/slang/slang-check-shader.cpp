@@ -620,6 +620,11 @@ static bool _collectExistentialSpecializationParamsRec(
         type = arrayType->getElementType();
     }
 
+    // An existential-typed leaf (`dyn IFoo`) introduces the same specialization slot as an
+    // interface-typed one; unwrap so it flows into the interface case below.
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+        type = existentialInterfaceType;
+
     if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
         return _collectExistentialSpecializationParamsRec(

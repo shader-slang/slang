@@ -2153,6 +2153,19 @@ bool isInterfaceType(Type* type)
     return false;
 }
 
+Type* getExistentialInterfaceType(Type* type)
+{
+    // Return the interface (or interface-conjunction) that `type` is the existential box of,
+    // i.e. `IFoo` for `dyn IFoo`, looking through any `ModifiedType` wrapper (e.g. the `no_diff`
+    // that `[Differentiable]` adds to non-differentiable slots). Returns null when `type` is not
+    // an existential box. Under the `IFoo` / `dyn IFoo` split, a *value* has an `ExistentialType`,
+    // never a bare interface type, so this is the check value-context code uses to recognize an
+    // openable existential (member-access bases, `is`/`as` operands, differentiable slots).
+    if (auto existentialType = as<ExistentialType>(unwrapModifiedType(type)))
+        return existentialType->getInterfaceType();
+    return nullptr;
+}
+
 EnumDecl* isEnumType(Type* type)
 {
     if (auto declRefType = as<DeclRefType>(type))
@@ -2167,6 +2180,10 @@ bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* 
     if (as<PtrTypeBase>(type))
         return true;
     if (isDeclRefTypeOf<InterfaceDecl>(type))
+        return true;
+    // An existential value `dyn IFoo` lowers to the same interface representation, which likewise
+    // has an unused bit pattern usable for `Optional<dyn IFoo>`.
+    if (getExistentialInterfaceType(type))
         return true;
     if (isDeclRefTypeOf<ClassDecl>(type))
         return true;
@@ -12618,6 +12635,13 @@ void SemanticsDeclHeaderVisitor::visitTypeDefDecl(TypeDefDecl* decl)
 {
     SemanticsVisitor visitor(withDeclToExcludeFromLookup(decl));
     decl->type = visitor.CheckProperType(decl->type);
+    // A `typealias` to an interface (or a conjunction of interfaces) names the interface *as a
+    // type*: it is dual-use, valid both as a generic constraint (`T : Alias`, where the interface
+    // itself is meant) and as a data type (`Alias x`, where the existential `dyn Alias` is meant).
+    // Store the interface rather than the eagerly-boxed existential so a constraint use still sees
+    // an interface; a data-type use re-forms the existential through its own proper-type coercion.
+    if (auto existentialType = as<ExistentialType>(decl->type.type))
+        decl->type.type = existentialType->getInterfaceType();
     checkVisibility(decl);
     propagateOptionalConstraintsThroughTypealias(decl);
 }
@@ -16700,6 +16724,11 @@ static bool _astTypeIncludesDynamicDispatch(
     // Peel ModifiedType wrappers (e.g. `const`, `volatile`).
     while (auto modifiedType = as<ModifiedType>(type))
         type = modifiedType->getBase();
+
+    // A `dyn IFoo` value carries the same dynamic-dispatch representation as an interface value;
+    // unwrap to the interface so the checks below apply to the boxed interface.
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+        type = existentialInterfaceType;
 
     if (auto declRefType = as<DeclRefType>(type))
     {

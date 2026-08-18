@@ -257,6 +257,10 @@ Type* SemanticsVisitor::InstantiateGenericType(
 
 bool isManagedType(Type* type)
 {
+    // A value of a COM-interface existential (`dyn IComInterface`) is as managed as one of the
+    // interface type itself; the managed-ness is a property of the wrapped interface.
+    if (auto existentialInterfaceType = getExistentialInterfaceType(type))
+        type = existentialInterfaceType;
     if (auto declRefValueType = as<DeclRefType>(type))
     {
         auto decl = declRefValueType->getDeclRef().getDecl();
@@ -493,6 +497,23 @@ TypeExp SemanticsVisitor::tryCoerceToProperType(TypeExp const& typeExp)
 TypeExp SemanticsVisitor::CheckProperType(TypeExp typeExp)
 {
     return CoerceToProperType(TranslateTypeNode(typeExp));
+}
+
+TypeExp SemanticsVisitor::checkInterfaceOrConjunctionType(TypeExp typeExp)
+{
+    // Translate the type without proper-type coercion: an operand of an interface conjunction
+    // (`IFoo & IBar`) names the interface *as an interface*, not as a data type, so it must not
+    // be boxed into an existential (`dyn IFoo`). Then require that it actually is an interface or
+    // conjunction of interfaces. `isValidGenericConstraintType` recognizes exactly that shape.
+    TypeExp result = TranslateTypeNode(typeExp);
+    if (result.type && !as<ErrorType>(result.type) && !isValidGenericConstraintType(result.type))
+    {
+        getSink()->diagnose(Diagnostics::ExpectedInterfaceOrConjunctionType{
+            .type = result.type,
+            .expr = result.exp});
+        result.type = m_astBuilder->getErrorType();
+    }
+    return result;
 }
 
 TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)

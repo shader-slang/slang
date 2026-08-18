@@ -1957,6 +1957,13 @@ public:
     // Check a type, and coerce it to be proper
     TypeExp CheckProperType(TypeExp typeExp);
 
+    // Check a type expression that must name an interface or a conjunction of interfaces (e.g.
+    // an operand of an interface conjunction `IFoo & IBar`). Unlike `CheckProperType`, this does
+    // *not* coerce the interface into an existential (`dyn IFoo`): the operand names the interface
+    // as an interface, not as a data type. Diagnoses anything that is not an interface or
+    // conjunction thereof.
+    TypeExp checkInterfaceOrConjunctionType(TypeExp typeExp);
+
     // For our purposes, a "usable" type is one that can be
     // used to declare a function parameter, variable, etc.
     // These turn out to be all the proper types except
