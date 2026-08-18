@@ -3,11 +3,15 @@
 
 Reads the tracking series (track.py's tracking/tracking.json) and compares the
 latest point — tonight's tip-of-tree (ToT) sweep — against the trailing median of
-the previous N points, per (workload, primary-timer). A metric that rises beyond
-both a relative and an absolute threshold is flagged: printed, emitted as a
-GitHub Actions ::error:: annotation + step-summary row, and (unless --no-fail)
-the process exits non-zero so the nightly job goes red. This catches the gradual
-drift a per-PR step gate structurally misses.
+the previous N points, per (workload, counter). "Counter" rather than "timer"
+throughout: the series is mixed-unit, carrying kb memory counters alongside the
+ms phase timers, and which one a value is decides both its formatting and its
+absolute floor.
+
+A metric that rises beyond both a relative and an absolute threshold is flagged:
+printed, emitted as a GitHub Actions ::error:: annotation + step-summary row,
+and (unless --no-fail) the process exits non-zero so the nightly job goes red.
+This catches the gradual drift a per-PR step gate structurally misses.
 
 Absolute compile times are runner-specific, so comparisons are restricted to
 points sharing the current point's runner fingerprint. If the latest point ran on
@@ -28,15 +32,52 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # allow running from any directory
 
 from lib import analyze, manifest
+# The exit codes live in slack_status because it is the consumer that must
+# stay stdlib-only, and importing them from there is what keeps the producer
+# and the classifier from drifting apart.
+from slack_status import EXIT_CANNOT_EVALUATE, EXIT_REGRESSION
+
+
+def abort(msg):
+    """Report `msg` and exit with EXIT_CANNOT_EVALUATE.
+
+    Use this for every "cannot judge this run" exit, never `raise
+    SystemExit(msg)`: the string form prints the same text but exits 1, which
+    is the REGRESSION code, and the Slack step then announces a >=10%
+    regression for a run that was never measured.
+    """
+    print(msg, file=sys.stderr)
+    raise SystemExit(EXIT_CANNOT_EVALUATE)
 
 
 def timers_for(workload):
-    """The timers worth alerting on for a workload: its manifest primary timers,
-    always including compileInner (the holistic signal)."""
+    """The ms timers worth alerting on for a workload: its manifest primary
+    timers, always including compileInner (the holistic signal).
+
+    Deliberately timers only, despite the mixed-unit series — memory counters
+    are declared nowhere per workload, so judged() is the single place the two
+    kinds are unioned."""
     spec = manifest.BY_NAME.get(workload)
     timers = set(spec.primary_timers) if spec else set()
     timers.add("compileInner")
     return timers
+
+
+def abs_floor_for(counter, ms_floor):
+    """The absolute-delta gate for a counter: `ms_floor` (the --abs argument)
+    for time, a fixed 1 MiB for the kb-unit memory counters — a few-KB wobble
+    on a ~200 MB value must not page anyone (the ratio gate is the primary
+    filter for both units)."""
+    return 1024.0 if analyze.unit_of(counter) == "kb" else ms_floor
+
+
+def judged(workload, counter):
+    """Whether the trend check judges this (workload, counter) series: the
+    workload's alert timers, plus EVERY kb-unit memory counter — memory
+    counters are not in any primary_timers list (they are synthesized by
+    canonical_runs, not declared per workload), and without this the memory
+    alert path would be unreachable."""
+    return counter in timers_for(workload) or analyze.unit_of(counter) == "kb"
 
 
 def emit_gha_command(line):
@@ -96,10 +137,10 @@ def check_threshold_order(rel, warn_rel):
     5-10% move fails the nightly, which is the alert fatigue the two-tier gate
     was added to remove."""
     if warn_rel >= rel:
-        raise SystemExit(f"--warn-rel ({warn_rel}) must be < --rel ({rel}): "
-                         f"the warning band sits below the error band, and a "
-                         f"pair that is equal or inverted silently promotes "
-                         f"every warning-level change to an error")
+        abort(f"--warn-rel ({warn_rel}) must be < --rel ({rel}): "
+              f"the warning band sits below the error band, and a "
+              f"pair that is equal or inverted silently promotes "
+              f"every warning-level change to an error")
 
 
 def main():
@@ -156,7 +197,7 @@ def main():
 
     tpath = os.path.join(args.results, "tracking", "tracking.json")
     if not os.path.exists(tpath):
-        raise SystemExit(f"no tracking series at {tpath}; run track.py rebuild first")
+        abort(f"no tracking series at {tpath}; run track.py rebuild first")
     series = analyze.read_json(tpath)
     pts = series.get("points", [])
     if len(pts) < 2:
@@ -167,8 +208,8 @@ def main():
     if args.label:
         cur_idx = next((i for i, p in enumerate(pts) if p.get("label") == args.label), None)
         if cur_idx is None:
-            raise SystemExit(f"--label {args.label}: no such point in the tracking series "
-                             f"(was track.py register run for it?)")
+            abort(f"--label {args.label}: no such point in the tracking series "
+                  f"(was track.py register run for it?)")
     else:
         cur_idx = len(pts) - 1
     current = pts[cur_idx]
@@ -214,8 +255,8 @@ def main():
     regressions = []
     warnings = []
     for key, cur in sorted(current.get("metrics", {}).items()):
-        wl, _, timer = key.partition("|")
-        if timer not in timers_for(wl):
+        wl, _, counter = key.partition("|")
+        if not judged(wl, counter):
             continue
         baseline = [p["metrics"][key] for p in window if key in p.get("metrics", {})]
         if len(baseline) < args.min_baseline:
@@ -225,32 +266,42 @@ def main():
             continue
         ratio = cur / med
         delta = cur - med
-        # args.abs is passed as the floor rather than read inside
-        # classify_metric so a per-counter floor can be substituted here
-        # without touching the classifier or its self-checks — the memory
-        # counters landing in this series want a 1 MiB floor, not 2 ms.
-        verdict = classify_metric(ratio, delta, args.rel, args.warn_rel, args.abs)
+        # The floor is PER COUNTER, not the flat --abs: this series carries
+        # kb-unit memory counters alongside ms timers, and a few-KB wobble on
+        # a ~200 MB value must not page anyone. classify_metric takes the
+        # floor as a parameter precisely so it can be substituted here, which
+        # is what keeps the two-tier gate and the unit-aware floor composable
+        # rather than one overwriting the other.
+        verdict = classify_metric(ratio, delta, args.rel, args.warn_rel,
+                                  abs_floor_for(counter, args.abs))
         if verdict == "error":
-            regressions.append((wl, timer, med, cur, ratio, delta))
+            regressions.append((wl, counter, med, cur, ratio, delta))
         elif verdict == "warning":
-            warnings.append((wl, timer, med, cur, ratio, delta))
+            warnings.append((wl, counter, med, cur, ratio, delta))
 
     regressions.sort(key=lambda r: -r[4])
     warnings.sort(key=lambda r: -r[4])
 
+    # The absolute floor is quoted per unit, and read back out of
+    # abs_floor_for rather than restated: the memory floor is not --abs, so a
+    # single "{args.abs} ms" would misreport the gate every memory counter is
+    # actually judged against.
+    mem_floor = analyze.fmt_qty("peakRssKb", abs_floor_for("peakRssKb", args.abs))
     print(f"baseline: trailing {len(window)} point(s) [{base_labels}], "
           f"median per metric; ERROR at ratio >= {args.rel}, WARNING at "
-          f">= {args.warn_rel}, both gated on >= {args.abs} ms\n")
+          f">= {args.warn_rel}, both gated on an absolute delta of "
+          f">= {args.abs} ms for timers / {mem_floor} for memory counters\n")
 
     # `warnings` is the ONLY key the workflow reads, and the only one it
     # needs: the Slack step distinguishes a warnings-only night from a clean
     # one, which the exit code alone cannot do since warnings deliberately do
     # not fail the job. A regression is already carried by the exit code
-    # (steps.trend.outcome == 'failure'), so an `errors` key would be a second
+    # (EXIT_REGRESSION), so an `errors` key would be a second
     # spelling of the same fact — one that no reader would notice going stale.
     #
     # This write must stay AHEAD of every path that leaves main() below — the
-    # clean-night `return` and the regression `SystemExit(1)`. Both are exits
+    # clean-night `return` and the regression `SystemExit(EXIT_REGRESSION)`.
+    # Both are exits
     # the workflow still reads the output on, and an unwritten key falls back
     # to the step's `|| '0'`, which reports a warnings-only night as clean:
     # the one state this key exists to distinguish. Classify, emit, then
@@ -267,21 +318,34 @@ def main():
                 f"(`{base_labels}`).")
         return
 
-    print(f"{'workload':20s}{'timer':26s}{'median':>10}{'current':>10}{'ratio':>8}{'Δms':>9}")
+    # Two tables (error tier then warning tier) with the header reflecting the
+    # worse of the two — from the two-tier gate; every VALUE rendered through
+    # analyze.fmt_qty — from memory tracking. Both halves are needed: this
+    # series now carries kb counters as well as ms timers, so the hard-coded
+    # "ms" formatting the two-tier tables originally used would print a
+    # 200 MB peak as "204800.0 ms". The column headers say "median"/"Δ"
+    # without a unit for the same reason — fmt_qty puts the unit on each value.
+    print(f"{'workload':20s}{'counter':26s}{'median':>12}{'current':>12}{'ratio':>8}{'Δ':>12}")
     rows = [f"### {'🔴' if regressions else '⚠️'} Compile-perf trend — " + current["label"],
             f"\nvs trailing {len(window)}-point median (`{base_labels}`), "
             f"runner `{cur_runner}`. ERROR ≥ {args.rel}×, WARNING ≥ {args.warn_rel}×.\n"]
 
     def table(items, kind, gha):
         rows.append(f"\n**{kind}** ({len(items)}):\n")
-        rows.append("| workload | timer | median (ms) | current (ms) | ratio | Δ ms |")
+        rows.append("| workload | counter | median | current | ratio | Δ |")
         rows.append("|---|---|--:|--:|--:|--:|")
-        for wl, timer, med, cur, ratio, delta in items:
-            print(f"{wl:20s}{timer:26s}{med:10.1f}{cur:10.1f}{ratio:7.2f}x{delta:+9.1f}")
-            emit_gha_command(f"::{gha} title=Perf {kind.lower()} {wl}/{timer}::"
-               f"{ratio:.2f}x ({med:.1f} -> {cur:.1f} ms, +{delta:.1f}) vs trailing median")
-            rows.append(f"| {wl} | {timer} | {med:.1f} | {cur:.1f} | "
-                        f"{ratio:.2f}× | +{delta:.1f} |")
+        for wl, counter, med, cur, ratio, delta in items:
+            print(f"{wl:20s}{counter:26s}{analyze.fmt_qty(counter, med):>12s}"
+                  f"{analyze.fmt_qty(counter, cur):>12s}{ratio:7.2f}x"
+                  f"{analyze.fmt_qty(counter, delta, signed=True):>12s}")
+            emit_gha_command(
+                f"::{gha} title=Perf {kind.lower()} {wl}/{counter}::"
+                f"{ratio:.2f}x ({analyze.fmt_qty(counter, med)} -> "
+                f"{analyze.fmt_qty(counter, cur)}, "
+                f"{analyze.fmt_qty(counter, delta, signed=True)}) vs trailing median")
+            rows.append(f"| {wl} | {counter} | {analyze.fmt_qty(counter, med)} | "
+                        f"{analyze.fmt_qty(counter, cur)} | {ratio:.2f}× | "
+                        f"{analyze.fmt_qty(counter, delta, signed=True)} |")
 
     if regressions:
         table(regressions, "Regressions", "error")
@@ -291,7 +355,35 @@ def main():
 
     print(f"\n{len(regressions)} regression(s), {len(warnings)} warning(s) flagged.")
     if regressions and not args.no_fail:
-        raise SystemExit(1)
+        raise SystemExit(EXIT_REGRESSION)
+
+
+# Import-time self-checks (the directory idiom): judged() and the per-unit
+# absolute floor ARE the memory alert path — if either regressed, memory
+# alerting would silently never fire.
+assert judged("minimal", "peakRssKb"), "kb counters must always be judged"
+assert judged("minimal", "compileInner"), "compileInner is always judged"
+assert not judged("minimal", "emitEntryPointsSourceFromIR"), \
+    "non-primary ms timers are not judged for workloads that do not list them"
+assert abs_floor_for("peakRssKb", 2.0) == 1024.0, "memory floor is 1 MiB"
+assert abs_floor_for("compileInner", 2.0) == 2.0, "time floor is --abs"
+
+# The two gates compose, and that composition is what the merge of the
+# two-tier gate and the unit-aware floor had to get right: a kb counter must
+# clear 1 MiB before EITHER tier fires, so a few-KB wobble is neither an error
+# nor a warning, while the same numeric delta in ms clears the 2 ms floor.
+assert classify_metric(1.20, 500.0, 1.10, 1.05,
+                       abs_floor_for("peakRssKb", 2.0)) is None, \
+    "a 500 KB move must not alert: it is below the 1 MiB memory floor"
+assert classify_metric(1.20, 2048.0, 1.10, 1.05,
+                       abs_floor_for("peakRssKb", 2.0)) == "error", \
+    "a 2 MiB move at 1.20x is over both the memory floor and the error ratio"
+assert classify_metric(1.07, 2048.0, 1.10, 1.05,
+                       abs_floor_for("peakRssKb", 2.0)) == "warning", \
+    "a 2 MiB move at 1.07x lands in the warning tier, not silence"
+assert classify_metric(1.20, 500.0, 1.10, 1.05,
+                       abs_floor_for("compileInner", 2.0)) == "error", \
+    "the SAME delta in ms is far over the 2 ms time floor — unit picks the gate"
 
 
 # Import-time self-checks over classify_metric, matching the directory idiom
@@ -337,13 +429,27 @@ assert classify_metric(0.5, -50.0, _REL, _WARN, _ABS) is None, \
 # the one-character regression this block exists to catch.
 check_threshold_order(_REL, _WARN)
 for _bad in ((_REL, _REL), (_WARN, _REL)):
+    # stderr is captured: abort() reports before it raises, and letting the
+    # fixture through would put its message on every run that merely imports
+    # this module. The capture is also the assertion — a silent abort would
+    # leave the operator with a bare exit code and no reason.
+    _buf = __import__("io").StringIO()
     try:
-        check_threshold_order(*_bad)
-    except SystemExit:
-        pass
+        with __import__("contextlib").redirect_stderr(_buf):
+            check_threshold_order(*_bad)
+    except SystemExit as _e:
+        assert _e.code == EXIT_CANNOT_EVALUATE, \
+            (f"check_threshold_order{_bad} must abort with "
+             f"EXIT_CANNOT_EVALUATE, not the regression code: a bad threshold "
+             f"pair is an operator error, and Slack reports the regression "
+             f"code as a >=10% regression")
+        assert "--warn-rel" in _buf.getvalue(), \
+            "an aborted run must say why, not just exit non-zero"
     else:
         raise AssertionError(f"check_threshold_order{_bad} must be rejected")
-del _REL, _WARN, _ABS, _bad
+# `_e` is not in the del list: `except ... as _e` unbinds it at the end of the
+# except block, so naming it here is a NameError, not tidiness.
+del _REL, _WARN, _ABS, _bad, _buf
 
 
 def _warnings_output_selfcheck():
@@ -365,7 +471,8 @@ def _warnings_output_selfcheck():
     The classifier checks above are pure and cannot see this. The write is the
     sole signal separating a warnings-only night from a clean one — warnings
     deliberately do not fail the job — so if a future edit moved it below the
-    clean-night `return` or the regression `SystemExit(1)`, that fallback
+    clean-night `return` or the regression `SystemExit(EXIT_REGRESSION)`,
+    that fallback
     would report a warnings-only night as a green "No regressions detected".
     Nothing else would notice.
 
@@ -400,13 +507,13 @@ def _warnings_output_selfcheck():
         # warning band only: reported, does not fail the job
         ({"minimal|compileInner": BASE * 1.07, "parse|compileInner": BASE},
          0, "warnings=1", "⚠️"),
-        # regression only: the write precedes SystemExit(1)
+        # regression only: the write precedes SystemExit(EXIT_REGRESSION)
         ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE},
-         1, "warnings=0", "🔴"),
+         EXIT_REGRESSION, "warnings=0", "🔴"),
         # both tiers at once: a regression outranks a warning in the header,
         # and the warning is still counted rather than swallowed by it
         ({"minimal|compileInner": BASE * 1.15, "parse|compileInner": BASE * 1.07},
-         1, "warnings=1", "🔴"),
+         EXIT_REGRESSION, "warnings=1", "🔴"),
     ]
 
     d = tempfile.mkdtemp(prefix="trend_selfcheck_")
@@ -470,6 +577,72 @@ def _warnings_output_selfcheck():
 
 _warnings_output_selfcheck()
 del _warnings_output_selfcheck
+
+
+def _abort_exit_code_selfcheck():
+    """Drive main()'s "cannot judge" exits and pin their code and diagnostic.
+
+    These are the two aborts behind the false-alert incident, and neither is
+    reachable from the pure classifier checks above — main() has to run for
+    them at all. The exit CODE is the assertion that matters: swapping either
+    abort() back to `raise SystemExit(f"...")` reproduces the message verbatim
+    while silently returning the code to 1, and nothing else here would see
+    it.
+    """
+    import contextlib
+    import io
+    import shutil
+    import tempfile
+
+    d = tempfile.mkdtemp(prefix="trend_abort_selfcheck_")
+    saved_argv = sys.argv
+    saved_actions = os.environ.get("GITHUB_ACTIONS")
+    try:
+        os.environ.pop("GITHUB_ACTIONS", None)
+        os.makedirs(os.path.join(d, "tracking"))
+        # Enough points that the missing-label case reaches the label lookup
+        # and aborts THERE, rather than at the earlier "not enough points"
+        # return, which is a clean exit and a different path entirely.
+        with analyze.open_output(os.path.join(d, "tracking", "tracking.json")) as fh:
+            json.dump({"runner": "r1",
+                       "points": [{"label": f"2026-01-0{i}-aaaaaaaaa",
+                                   "date": f"2026-01-0{i}", "kind": "daily",
+                                   "runner": "r1",
+                                   "metrics": {"minimal|compileInner": 100.0}}
+                                  for i in range(1, 6)]}, fh)
+
+        # (results dir, label, expected fragment of the diagnostic)
+        for results, label, want in (
+                (os.path.join(d, "no-such-dir"), "2026-01-09-zzzzzzzzz",
+                 "no tracking series"),
+                (d, "2026-01-09-not-a-real-label", "no such point")):
+            sys.argv = ["trend.py", "--results", results, "--label", label]
+            err, code = io.StringIO(), 0
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), \
+                        contextlib.redirect_stderr(err):
+                    main()
+            except SystemExit as e:
+                code = e.code
+            assert code == EXIT_CANNOT_EVALUATE, \
+                (f"trend abort fixture: --label {label} exited {code!r}, "
+                 f"expected EXIT_CANNOT_EVALUATE ({EXIT_CANNOT_EVALUATE}) — a "
+                 f"run that judged nothing must not exit with a code the Slack "
+                 f"step could read as a measured regression")
+            assert want in err.getvalue(), \
+                (f"trend abort fixture: --label {label} must say why it gave "
+                 f"up; got {err.getvalue()!r}")
+    finally:
+        sys.argv = saved_argv
+        if saved_actions is None:
+            os.environ.pop("GITHUB_ACTIONS", None)
+        else:
+            os.environ["GITHUB_ACTIONS"] = saved_actions
+        shutil.rmtree(d, ignore_errors=True)
+
+
+_abort_exit_code_selfcheck()
+del _abort_exit_code_selfcheck
 
 
 if __name__ == "__main__":

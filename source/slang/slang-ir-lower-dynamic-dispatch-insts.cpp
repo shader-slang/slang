@@ -584,6 +584,32 @@ struct TagOpsLoweringContext : public InstPassBase
     }
 };
 
+/// Returns the only payload-bearing type in `typeSet`, ignoring the zero-sized `none` element.
+///
+/// For example, `{Foo, none}` and `{Foo}` return `Foo`, while `{Foo, Bar, none}` and `{none}`
+/// return `nullptr`.
+///
+/// Untagged-union lowering uses this classification to store a single concrete payload directly;
+/// the surrounding tagged union continues to carry the `uint` tag that distinguishes `Foo` from
+/// `none` and participates in the existing subset/superset tag conversions.
+static IRType* tryGetSinglePayloadType(IRTypeSet* typeSet)
+{
+    IRType* payloadType = nullptr;
+    for (UInt i = 0; i < typeSet->getCount(); ++i)
+    {
+        auto element = typeSet->getElement(i);
+        if (as<IRNoneTypeElement>(element))
+            continue;
+
+        auto elementType = as<IRType>(element);
+        SLANG_RELEASE_ASSERT(elementType);
+        if (payloadType)
+            return nullptr;
+        payloadType = elementType;
+    }
+    return payloadType;
+}
+
 // This context lowers `TypeSet` instructions.
 struct UntaggedUnionLoweringContext : public InstPassBase
 {
@@ -704,6 +730,52 @@ struct UntaggedUnionLoweringContext : public InstPassBase
 
     void lowerUntaggedUnionType(IRUntaggedUnionType* untaggedUnionType)
     {
+        // `none` has no payload, so a set with one real type needs no AnyValue container. For
+        // example, `UntaggedUnion({Foo, none})` can store `Foo` directly while the tagged union's
+        // separate witness-table tag continues to record whether the value is `Foo` or `none`.
+        if (auto payloadType =
+                tryGetSinglePayloadType(cast<IRTypeSet>(untaggedUnionType->getSet())))
+        {
+            List<IRPackAnyValue*> packsToInspect;
+            for (auto use = untaggedUnionType->firstUse; use; use = use->nextUse)
+            {
+                if (auto pack = as<IRPackAnyValue>(use->getUser()))
+                {
+                    if (pack->getDataType() == untaggedUnionType)
+                        packsToInspect.add(pack);
+                }
+            }
+
+            untaggedUnionType->replaceUsesWith(payloadType);
+
+            // A pack into `{Foo, none}` either carries a `Foo` or supplies the irrelevant payload
+            // for the `none` tag. The first case is now `PackAnyValue<Foo>(foo)`; leave that
+            // identity for ordinary AnyValue marshalling to remove. In the second case, replace
+            // the old zero-sized placeholder with a well-formed default `Foo`, matching the
+            // representation expected by the now-direct payload field.
+            for (auto pack : packsToInspect)
+            {
+                auto value = pack->getValue();
+                auto valueStorageType = value->getDataType();
+                if (auto valueUnionType = as<IRUntaggedUnionType>(valueStorageType))
+                {
+                    if (auto valuePayloadType =
+                            tryGetSinglePayloadType(cast<IRTypeSet>(valueUnionType->getSet())))
+                        valueStorageType = valuePayloadType;
+                }
+                if (valueStorageType == payloadType)
+                    continue;
+
+                IRBuilder builder(pack);
+                builder.setInsertBefore(pack);
+                auto replacement = builder.emitDefaultConstruct(payloadType);
+                pack->replaceUsesWith(replacement);
+                pack->removeAndDeallocate();
+            }
+
+            return;
+        }
+
         // Type collections are replaced with `AnyValueType` large enough to hold
         // any of the types in the collection.
         //

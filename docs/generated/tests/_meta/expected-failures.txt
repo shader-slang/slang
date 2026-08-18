@@ -76,57 +76,12 @@ docs/generated/tests/conformance/types-vector-and-matrix/vector-swizzle-assign.s
 # lists this as supported.
 docs/generated/tests/conformance/expressions-member-access/matrix-mij-zero-based.slang
 
-# Pending: docs/generated/tests/_meta/findings/slangi-vm-colon-colon-static-access-bytecode-unimplemented.yaml
-# slangi VM aborts with "unimplemented: VM bytecode gen for inst"
-# on `EnumType::Name` static-access. Doc states `.` and `::` are
-# equivalent; `.` works in slangi, `::` does not.
-docs/generated/tests/conformance/expressions-member-access/static-dot-vs-colon-colon.slang
-
-# Pending: docs/generated/tests/_meta/findings/slangi-vm-optional-none-arg-wrong-value.yaml
-# slangi VM passes an `Optional<T>` argument given as `none` with a
-# garbage (truthy) hasValue, so the callee unwraps value 0 instead of
-# taking the no-value branch. CPU compute executes the same function
-# correctly; the bug is at the VM's argument-passing boundary. The
-# if-let test's negative case (b=-1) hits this and prints b=0.
-docs/generated/tests/design/name-resolution/scopes/if-let-unwrapped-visible-in-positive-branch.slang
-
 # Pending: docs/generated/tests/_meta/findings/slangi-vm-global-var-bytecode-unsupported.yaml
 # slangi VM aborts with "unsupported global inst for vm bytecode
 # emit" when any module-scope global variable is declared (e.g.
 # `static int x = 42;` in an enum extension). Doc Example 1 for
 # enum extensions uses this exact construct.
 docs/generated/tests/conformance/types-extension/enum-extension-static-members.slang
-# Surfaced on nightly run
-# https://github.com/shader-slang/slang/actions/runs/26800499333
-# (no tracking issue filed yet; entries are pending user triage).
-#
-# Cluster A — 2 SPIR-V tests exercise the targeted IR pass via
-# SPIR-V-illegal constructs: `RWStructuredBuffer<bool3>` puts
-# `OpTypeBool` inside a `StorageBuffer` `OpVariable`, which is invalid
-# per spec. The compiler is correct (it emits the expected
-# `OpLogicalAnd` / `OpLogicalOr`); the surrounding module fails SPIR-V
-# validation under the nightly's `SLANG_RUN_SPIRV_VALIDATION=1`.
-# Reproduces cross-platform. Test-content bugs awaiting regeneration.
-docs/generated/tests/design/target-pipelines/spirv/vector-logical-or.slang
-docs/generated/tests/design/target-pipelines/spirv/vector-logical-and-or.slang
-
-# Surfaced on nightly runs
-# https://github.com/shader-slang/slang/actions/runs/26800499333 ,
-# https://github.com/shader-slang/slang/actions/runs/26803788699 , and
-# https://github.com/shader-slang/slang/actions/runs/26934884546
-# (no tracking issue filed yet; pending user triage).
-#
-# Cluster C — tests that pass locally on macOS (even with the nightly's
-# env vars set) but fail in the slang-linux-clang-ci container.
-# Suspected causes: glibc-vs-libc printf NaN formatting; stricter Linux
-# spirv-val on OpTypeRuntimeArray; `-dump-ir` / multi-target text-emit
-# differences.
-#
-# These flip between FAILED and PASS across runs. On run 26934884546 the
-# four negative-index / prelude / nvapi entries passed (the workflow
-# treats a kept-but-passing entry as a failure), so they are removed; the
-# three below failed there and are kept.
-docs/generated/tests/design/ir-reference/types/array-unsized.slang
 
 # Surfaced on nightly run 26934884546 (Linux agentic suite):
 # https://github.com/shader-slang/slang/actions/runs/26934884546
@@ -141,47 +96,6 @@ docs/generated/tests/design/ir-reference/types/array-unsized.slang
 #    test. Removed 2026-08-05: the diagnostics-catalog bundle no longer
 #    generates that test, so the entry no longer resolved to a file.
 docs/generated/tests/conformance/types-pointer/pointer-arithmetic-spirv-emission.slang
-
-# Surfaced on nightly run 26936693099 (Linux agentic suite):
-# https://github.com/shader-slang/slang/actions/runs/26936693099
-# (no tracking issue filed yet; pending user triage). The test server
-# dies while running this `-dump-ir`-based test, reported as
-# `JSON RPC failure: waitForResult()` / `hasMessage()`. Only reproduces
-# under the slang-linux-clang-ci container; same `-dump-ir` text-emit
-# class as Cluster C. Test-vs-compiler cause still to be determined.
-docs/generated/tests/design/ir-reference/decorations/struct-with-many-field-decorations.slang
-
-# Re-added after nightly run 26997297493 surfaced this test as FAILED:
-# https://github.com/shader-slang/slang/actions/runs/26997297493
-# (no tracking issue filed yet; pending user triage).
-#
-# This entry was previously listed under Cluster C with a comment noting
-# that the cluster's tests "flip between FAILED and PASS across runs."
-# It was removed after run 26934884546 observed it passing (along with
-# three sibling tests) — a single-pass removal that the cluster's own
-# comment warned against ("let multiple consecutive clean runs drive
-# removal, not a single observed pass"). Re-adding here so the next
-# flip back to FAILED doesn't turn the nightly red again.
-docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-load-negative-index-literal.slang
-
-# Surfaced on nightly run 28004033987 (Linux agentic suite):
-# https://github.com/shader-slang/slang/actions/runs/28004033987
-# (no tracking issue filed yet; pending user triage). Test-server flake,
-# NOT a content bug: passes locally both standalone and under
-# `-use-test-server`. The CI "JSON RPC failure: waitForResult() /
-# hasMessage()" is the test server dying mid-batch (same class as the
-# sibling `rwstructured-buffer-load-negative-index-literal` and
-# `struct-with-many-field-decorations` entries above). Regeneration would
-# not help; kept here so the next flip to FAILED doesn't turn the nightly
-# red.
-docs/generated/tests/design/ir-reference/resources-and-atomics/rwstructured-buffer-getelementptr-negative-index-literal.slang
-
-# https://github.com/shader-slang/slang/issues/12440 — a `getStringHash`
-# argument that does not fold to a string literal kills slangc (SIGSEGV on
-# Linux, SIGBUS on macOS, no output) instead of reporting E41023. The check
-# that should catch it tests an unchecked cast, so it never fires.
-# Remove this entry when 12440 is fixed.
-docs/generated/tests/design/ir-reference/misc/string-hash-non-literal-diagnostic.slang
 
 # Pending: docs/generated/tests/_meta/findings/countof-on-array-returns-element-size.yaml
 # `countof(a)` on a static array folds to the element type's byte size
@@ -268,28 +182,6 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffe
 # triage.)
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
-# Pending: docs/generated/tests/_meta/findings/spirv-sample-decoration-missing-samplerateshading-capability.yaml
-# The `-target spirv-asm` directive this branch's fan-out pass added to
-# `sample-interpolation-emits-on-hlsl.slang` exposes a compiler bug rather
-# than a test bug: `sample` interpolation lowers to `OpDecorate ... Sample`
-# while the module declares only `OpCapability Shader`, so spirv-val rejects
-# it with "Operand 2 of Decorate requires one of these capabilities:
-# SampleRateShading". Only the 4th directive (`-target spirv-asm`, sub-test
-# `.3`) fails; the hlsl/glsl/metal directives pass and must keep reporting.
-# Remove this entry once the emitter declares the capability. (Will become a
-# tracking issue after human triage.)
-docs/generated/tests/design/ast-reference/modifiers/sample-interpolation-emits-on-hlsl.slang.3
-
-# https://github.com/shader-slang/slang/issues/12441 — SPIR-V emit produces
-# modules that fail spirv-val. `sample` interpolation writes
-# `OpDecorate ... Sample` without declaring the SampleRateShading capability;
-# and arithmetic on a value loaded from a `unorm`/`snorm` texture selects
-# `OpIAdd` for float data, because the `Attributed(Float, unorm)` element type
-# is not looked through when classifying. Both only fail where SPIR-V
-# validation is enabled, i.e. the nightly. Remove these entries when 12441 is
-# fixed.
-docs/generated/tests/coverage/emit/glsl-interpolation-modifiers.slang.1
-docs/generated/tests/coverage/emit/spirv-unorm-snorm-image-format-by-width.slang
 
 # https://github.com/shader-slang/slang/issues/12442 — render-test blanks the
 # HLSL prelude on the shared global session and never restores it, so these
@@ -305,6 +197,17 @@ docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditio
 # `-target hlsl` directive (`.2`) is affected -- the cuda and cpp directives in
 # the same file do not read the HLSL prelude and must keep reporting.
 docs/generated/tests/design/pipeline/06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang.2
+# Same leak, fifth victim, and the reason it was not listed with the others is
+# the same: it passed when it was generated. It asserts the guarded
+# `#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"` block, which is
+# exactly what the blanked prelude drops, so the `CHECK` for the `#ifdef` finds
+# nothing. Failed on nightly runs 31863743484, 31926143161 and 31993906894 with
+# the same FileCheck positions each time (`actual-output:7:34` scanning from,
+# `10:14` possible match), i.e. deterministic rather than flaky. Confirmed to be
+# the ordering leak and not the test: it passes alone under
+# `slang-test -use-test-server -server-count 1`, and fails in the same process
+# when a `-cpu` COMPARE_COMPUTE test is run before it.
+docs/generated/tests/design/target-pipelines/hlsl/nvapi-front-matter-defines-enable-macro.slang
 
 # https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
 # construction is rejected inside a generic function's array bound with
