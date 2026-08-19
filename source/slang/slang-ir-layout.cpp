@@ -484,7 +484,31 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AttributedType:
         {
             auto attributedType = cast<IRAttributedType>(type);
-            SLANG_ASSERT(attributedType->getAttr()->getOp() == kIROp_NoDiffAttr);
+            // The attributes that wrap a type are all layout-neutral: `no_diff`
+            // records differentiability, `unorm` / `snorm` record how a texel is
+            // interpreted, and `non_uniform` records that an index is not
+            // wave-uniform. None of them change size or alignment, so we measure
+            // the base type. Name the set rather than trusting it, so a future
+            // attribute that *does* affect layout has to come here first.
+            //
+            // A single `IRAttributedType` carries a list, not one attribute:
+            // `visitModifiedType` lowers every modifier on the AST type into one
+            // `getAttributedType(base, attrs)` call, so `unorm no_diff float` is
+            // one type with two attrs. Check all of them.
+            //
+            for (auto attr : attributedType->getAllAttrs())
+            {
+                switch (attr->getOp())
+                {
+                case kIROp_NoDiffAttr:
+                case kIROp_UNormAttr:
+                case kIROp_SNormAttr:
+                case kIROp_NonUniformAttr:
+                    break;
+                default:
+                    SLANG_UNEXPECTED("unhandled attribute on IRAttributedType in layout");
+                }
+            }
             return getSizeAndAlignment(
                 targetReq,
                 this,

@@ -6154,6 +6154,39 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         return createSimpleTypeLayout(SimpleLayoutInfo(), errorType, rules);
     }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        // We lay out a modified type as the type it modifies. This relies on
+        // every type modifier being layout-neutral, which holds for all three
+        // that exist: `unorm` and `snorm` say how a texel is interpreted, and
+        // `no_diff` records differentiability. None change size, alignment or
+        // resource usage, so `unorm float` lays out exactly as `float`. The
+        // matching IR-side assumption is asserted in `slang-ir-layout.cpp`.
+        //
+        // Reachable for any non-texture carrier, e.g. the element type of
+        // `RWStructuredBuffer<unorm float>`, which `createStructuredBufferTypeLayout`
+        // recurses into. Without this case that recursion falls through to the
+        // catch-all below, which is UB in a release build (issue #12535).
+        // Whether the modifier belongs on such a carrier at all is issue #8870;
+        // until it is rejected earlier, layout must not fall into that sink.
+        //
+        // Name the layout-neutral set here too, mirroring the IR side, so a
+        // future modifier that does affect layout has to come through both.
+        // `SLANG_UNEXPECTED` and not `SLANG_ASSERT`, because the latter is a
+        // `SLANG_ASSUME` in release builds -- which is the sink this whole case
+        // exists to keep types out of.
+        //
+        for (Index i = 0; i < modifiedType->getModifierCount(); ++i)
+        {
+            auto modifier = modifiedType->getModifier(i);
+            if (!as<UNormModifierVal>(modifier) && !as<SNormModifierVal>(modifier) &&
+                !as<NoDiffModifierVal>(modifier))
+            {
+                SLANG_UNEXPECTED("unhandled type modifier in layout");
+            }
+        }
+        return _createTypeLayout(context, modifiedType->getBase());
+    }
     else if (auto existentialSpecializedType = as<ExistentialSpecializedType>(type))
     {
         ExpandedSpecializationArgs args;
