@@ -658,6 +658,12 @@ class TestPendingApprovals(unittest.TestCase):
         self.assertIn("/pull/12345", html)
         self.assertIn("#12345", html)
 
+    def test_pr_link_points_to_changes_tab(self):
+        # Reviewers approving a run want to see the code, not the PR
+        # overview tab, so the link must land on the Files-changed view.
+        html = self._render([self._row(pr_number=12345)])
+        self.assertIn("/pull/12345/changes", html)
+
     def test_no_pr_number_renders_empty_cell(self):
         html = self._render([self._row(pr_number=None)])
         # Empty PR cell — no pull URL in the table
@@ -740,6 +746,98 @@ class TestPendingApprovals(unittest.TestCase):
         with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)):
             data = ci_health.fetch_pending_approvals("shader-slang/slang")
         self.assertIsNone(data["pending"][0]["pr_number"])
+
+    def test_pr_number_falls_back_to_head_lookup_for_fork_runs(self):
+        # A run triggered from a fork branch has an empty `pull_requests`
+        # field (GitHub only populates it for same-repo branches), so the PR
+        # number has to be found via a head owner/branch lookup instead.
+        run = {
+            "id": 1,
+            "created_at": "2026-08-11T00:00:00Z",
+            "event": "pull_request",
+            "pull_requests": [],
+            "head_branch": "fix-assoc-default-init-and-matrix-layout",
+            "head_repository": {"owner": {"login": "fknfilewalker"}},
+        }
+        calls = []
+
+        def fake_gh_api(endpoint):
+            calls.append(endpoint)
+            return [{"number": 12435}], None
+
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)), \
+                mock.patch.object(gh_api, "gh_api", side_effect=fake_gh_api):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertEqual(data["pending"][0]["pr_number"], 12435)
+        self.assertIn(
+            "head=fknfilewalker%3Afix-assoc-default-init-and-matrix-layout", calls[0]
+        )
+
+    def test_pr_number_head_lookup_skipped_for_non_pull_request_events(self):
+        # Only pull_request runs have a head branch worth resolving; a
+        # merge_group run's PR number comes from parse_merge_queue_pr_number
+        # elsewhere, not from this fallback.
+        run = {
+            "id": 1,
+            "created_at": "2026-08-11T00:00:00Z",
+            "event": "merge_group",
+            "pull_requests": [],
+            "head_branch": "gh-readonly-queue/master/pr-1-abcdef",
+            "head_repository": {"owner": {"login": "shader-slang"}},
+        }
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)), \
+                mock.patch.object(gh_api, "gh_api", side_effect=AssertionError("should not be called")):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertIsNone(data["pending"][0]["pr_number"])
+
+    def test_pr_number_head_lookup_returns_none_when_no_match(self):
+        run = {
+            "id": 1,
+            "created_at": "2026-08-11T00:00:00Z",
+            "event": "pull_request",
+            "pull_requests": [],
+            "head_branch": "some-branch",
+            "head_repository": {"owner": {"login": "someone"}},
+        }
+        with mock.patch.object(gh_api, "gh_api_list", side_effect=lambda e, k: ([run], None)), \
+                mock.patch.object(gh_api, "gh_api", side_effect=lambda e: ([], None)):
+            data = ci_health.fetch_pending_approvals("shader-slang/slang")
+
+        self.assertIsNone(data["pending"][0]["pr_number"])
+
+
+class TestFindPrNumberByHead(unittest.TestCase):
+    def test_returns_number_from_matching_pr(self):
+        with mock.patch.object(gh_api, "gh_api", side_effect=lambda e: ([{"number": 42}], None)):
+            self.assertEqual(
+                gh_api.find_pr_number_by_head("o/r", "someone", "topic"), 42
+            )
+
+    def test_returns_none_when_no_owner_or_branch(self):
+        self.assertIsNone(gh_api.find_pr_number_by_head("o/r", "", "topic"))
+        self.assertIsNone(gh_api.find_pr_number_by_head("o/r", "someone", ""))
+
+    def test_returns_none_on_api_error(self):
+        with mock.patch.object(gh_api, "gh_api", side_effect=lambda e: (None, "HTTP 502")):
+            self.assertIsNone(gh_api.find_pr_number_by_head("o/r", "someone", "topic"))
+
+    def test_branch_name_with_ampersand_is_url_encoded(self):
+        # An unencoded "&" in the branch name would split "head=owner:branch"
+        # into separate query parameters instead of one head value.
+        calls = []
+
+        def fake_gh_api(endpoint):
+            calls.append(endpoint)
+            return [{"number": 1}], None
+
+        with mock.patch.object(gh_api, "gh_api", side_effect=fake_gh_api):
+            gh_api.find_pr_number_by_head("o/r", "someone", "fix&hack")
+
+        self.assertIn("head=someone%3Afix%26hack", calls[0])
+        self.assertNotIn("head=someone:fix&hack", calls[0])
+
 
 class TestHealthApiBounds(unittest.TestCase):
     def test_recent_failures_query_is_bounded_by_created_range(self):
@@ -2336,6 +2434,20 @@ class TestPendingApprovalsLive(unittest.TestCase):
     def test_pending_approvals_placeholder_embeds_repo(self):
         html = self._health_html(repo="shader-slang/slang")
         self.assertIn('data-repo="shader-slang/slang"', html)
+
+    def test_pending_approvals_js_pr_link_points_to_changes_tab(self):
+        # Mirrors test_pr_link_points_to_changes_tab for the server-rendered
+        # table: the client-side widget builds the same link.
+        self.assertIn("/pull/' + p.pr_number + '/changes", ci_health.PENDING_APPROVALS_JS)
+
+    def test_pending_approvals_js_bounds_fork_pr_lookups(self):
+        # A burst of unresolved fork-branch runs must not fire one
+        # unauthenticated fetch per run — that can exceed GitHub's 60
+        # requests/hour anonymous rate limit. The client widget caps and
+        # deduplicates lookups by owner/branch before firing requests.
+        js = ci_health.PENDING_APPROVALS_JS
+        self.assertIn("MAX_HEAD_LOOKUPS", js)
+        self.assertIn("seenKeys", js)
 
     def test_pending_approvals_section_shows_loading_placeholder(self):
         # The placeholder div shows a loading message before JS runs.
