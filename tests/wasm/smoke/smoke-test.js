@@ -142,9 +142,12 @@ async function runSmokeTest() {
                 throw new Error(`Core builtin module source is missing: ${marker}`);
             }
         }
-        const glslSource = globalSession.getBuiltinModuleSource('glsl');
-        if (!glslSource.includes('#define highp')) {
-            throw new Error('GLSL builtin module source is missing expected content');
+        // Prefix-matching contract: names beginning with core/glsl select that module.
+        if (globalSession.getBuiltinModuleSource('core-extra') !== coreSource) {
+            throw new Error('Prefix-matched "core-extra" should return the same source as "core"');
+        }
+        if (!globalSession.getBuiltinModuleSource('glsl-450').includes('#define highp')) {
+            throw new Error('Prefix-matched "glsl-450" should return GLSL source');
         }
         if (globalSession.getBuiltinModuleSource('nonexistent') !== '') {
             throw new Error('Unknown builtin module name should return an empty string');
