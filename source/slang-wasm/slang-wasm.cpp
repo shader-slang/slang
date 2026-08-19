@@ -104,15 +104,11 @@ std::string GlobalSession::getBuiltinModuleSource(const std::string& moduleName)
     SlangResult result = Slang::getBuiltinModuleSource(
         Slang::UnownedStringSlice(moduleName.c_str()),
         blob.writeRef());
-    if (result != SLANG_OK)
-    {
-        g_error.type = std::string("INTERNAL");
-        g_error.result = result;
-        g_error.message = std::string("Failed to get the source of builtin module '") + moduleName +
-                          std::string("'");
-        return "";
-    }
-    return std::string((const char*)blob->getBufferPointer(), blob->getBufferSize());
+    // The callee always succeeds: an unrecognized name yields an empty blob, not a failure.
+    SLANG_ASSERT(result == SLANG_OK);
+    SLANG_UNUSED(result);
+    const char* data = (const char*)blob->getBufferPointer();
+    return data ? std::string(data, blob->getBufferSize()) : std::string();
 }
 
 Session::~Session()

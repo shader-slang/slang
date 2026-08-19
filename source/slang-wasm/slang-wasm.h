@@ -332,7 +332,9 @@ public:
 
     Session* createSession(int compileTarget);
 
-    // Returns the source of the builtin module "core" or "glsl", or an empty string otherwise.
+    // Returns the source of the builtin module "core" or "glsl". The name is matched by prefix,
+    // so "core-extra" also selects core. Any other name returns an empty string and does not
+    // set an error, so an empty result cannot be told apart from a failure via getLastError().
     std::string getBuiltinModuleSource(const std::string& moduleName);
 
     slang::IGlobalSession* interface() const { return m_interface; }
