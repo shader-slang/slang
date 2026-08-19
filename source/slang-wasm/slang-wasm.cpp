@@ -107,8 +107,7 @@ std::string GlobalSession::getBuiltinModuleSource(const std::string& moduleName)
     // The callee always succeeds: an unrecognized name yields an empty blob, not a failure.
     SLANG_ASSERT(result == SLANG_OK);
     SLANG_UNUSED(result);
-    const char* data = (const char*)blob->getBufferPointer();
-    return data ? std::string(data, blob->getBufferSize()) : std::string();
+    return std::string((const char*)blob->getBufferPointer(), blob->getBufferSize());
 }
 
 Session::~Session()
