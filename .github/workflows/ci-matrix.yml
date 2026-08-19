@@ -27,6 +27,13 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default for any job below that doesn't declare its own
+# elevated permissions (e.g. check-matrix, wait-for-human-priority). Jobs
+# that need more (id-token: write for GCP auth, statuses/pull-requests write,
+# etc.) declare it explicitly at the job level, which overrides this default.
+permissions:
+  contents: read
+
 jobs:
   # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
   # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the

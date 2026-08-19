@@ -255,7 +255,7 @@ jobs:
       #     is still the default branch (master), so without this guard a
       #     same-repo draft PR's /ci run would poison master cache keys.
       - name: Save sccache cache (master only)
-        if: github.ref == 'refs/heads/master' && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && env.IS_FORK_PR != 'true' && inputs.ref == '' && inputs.repository == ''
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/.cache/sccache

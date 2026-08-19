@@ -67,7 +67,7 @@ jobs:
         with:
           repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
           ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
-          persist-credentials: ${{ inputs.repository == '' }}
+          persist-credentials: false
           submodules: "recursive"
           # Need full history to diff PR changes against the base branch
           # for classifying sanitizer findings as PR-related vs pre-existing.
