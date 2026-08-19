@@ -884,6 +884,24 @@ struct TypeFlowSpecializationContext
     // join, not once per converged value: when N concrete types flow into one
     // existential the same sets recur constantly, and each call otherwise
     // re-walks the set and rebuilds a HashSet.
+    //
+    // Keying on a raw pointer is safe here, and the two properties it rests on
+    // are worth stating because a change to either would make a cache hit
+    // return a silently wrong type rather than crash:
+    //
+    //   * A set inst's address is never recycled within a run.
+    //     `IRInst::removeAndDeallocate` unregisters the inst from the
+    //     deduplication maps and detaches it, but never returns its storage to
+    //     the module's `MemoryArena`, which only reclaims on reset at teardown.
+    //     So a key left behind by a discarded set can never come to alias a
+    //     different live one.
+    //   * Mutating a set produces a *new* inst rather than editing one in
+    //     place: re-canonicalisation in `slang-ir.cpp` builds the replacement
+    //     with `getSet` and then `replaceUsesWith` + `removeAndDeallocate`s the
+    //     old one. So a live key's element list cannot change underneath us.
+    //
+    // This is the same pointer-identity property the fixpoint already depends
+    // on for its termination test, `areInfosEqual`.
     Dictionary<IRWitnessTableSet*, IRTaggedUnionType*> taggedUnionTypeCache;
 
     IRTaggedUnionType* makeTaggedUnionType(IRWitnessTableSet* tableSet)
@@ -1152,6 +1170,12 @@ struct TypeFlowSpecializationContext
         List<IRInst*>& merged = *module->getContainerPool().getList<IRInst>();
         merged.reserve(count1 + count2);
 
+        // The two branches below key on different things -- de-duplication on
+        // pointer identity, ordering on `getUniqueID` -- and they agree because
+        // the ID map is one-to-one. Elements are hash-consed, so equal members
+        // are pointer-equal; distinct insts always have distinct IDs. An ID tie
+        // therefore implies `a == b` and is taken by the early-out, so the
+        // `else` below can never be reached by a tie between distinct operands.
         UInt i = 0;
         UInt j = 0;
         while (i < count1 && j < count2)

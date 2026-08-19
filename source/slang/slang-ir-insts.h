@@ -5446,6 +5446,13 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
 
+    /// Build a set inst from elements that are *already* in canonical form.
+    ///
+    /// Same result as `getSet`, without the intermediate hash set and sort.
+    /// The caller must supply `sortedElements` strictly increasing by
+    /// `getUniqueID`, duplicate-free, and all global; a non-canonical list
+    /// yields a set that hash-consing cannot dedupe against its structural
+    /// equals. The definition checks what it can — see the comment there.
     IRSetBase* getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements);
     IRSetBase* getSingletonSet(IROp op, IRInst* element);
 
