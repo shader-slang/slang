@@ -9224,6 +9224,36 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         return false;
     }
 
+    /// Return the first structurally non-empty statement in a `switch` body, or null if there is
+    /// none. Mirrors the traversal in `hasSwitchCases`: `{ ... }` is unwrapped and a `SeqStmt` is
+    /// searched in order. Only `EmptyStmt` is treated as nothing, so `switch (x) { }` and
+    /// `switch (x) { ; }` both yield null, while `switch (x) { foo(); }` yields the `foo();`
+    /// statement. Anything else counts, including a declaration that emits no instructions --
+    /// consistent with how the sibling unreachable-code sites classify statements.
+    Stmt* findFirstNonEmptyStmt(Stmt* inStmt)
+    {
+        Stmt* stmt = inStmt;
+        while (auto blockStmt = as<BlockStmt>(stmt))
+        {
+            stmt = blockStmt->body;
+        }
+
+        if (!stmt || as<EmptyStmt>(stmt))
+            return nullptr;
+
+        if (auto seqStmt = as<SeqStmt>(stmt))
+        {
+            for (auto childStmt : seqStmt->stmts)
+            {
+                if (auto nonEmptyStmt = findFirstNonEmptyStmt(childStmt))
+                    return nonEmptyStmt;
+            }
+            return nullptr;
+        }
+
+        return stmt;
+    }
+
     // Given a statement that appears as (or in) the body
     // of a `switch` statement
     void lowerSwitchCases(Stmt* inStmt, SwitchStmtInfo* info)
@@ -9550,6 +9580,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             // If we don't have any case/default then nothing inside switch can be executed (other
             // than condition) so we are done.
+            //
+            // Control can enter a switch body only through the dispatch to a case/default label,
+            // so with no labels at all the whole body is unreachable. Warn about it rather than
+            // discarding it silently; an empty body discards nothing, so stay quiet there.
+            if (auto discardedStmt = findFirstNonEmptyStmt(stmt->body))
+                context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = discardedStmt});
             return;
         }
 

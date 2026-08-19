@@ -1642,6 +1642,12 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    // Must run before the getStringHash check below. `performTypeInlining` inlines a call into its
+    // caller but leaves the original callee behind, and that leftover body still holds a
+    // getStringHash on its own unfolded parameter. Checking first would reject legal code on the
+    // strength of a function that is about to be deleted here.
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
     if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc) &&
         targetProgram->getOptionSet().shouldRunNonEssentialValidation())
     {
@@ -1649,8 +1655,6 @@ Result linkAndOptimizeIR(
         // is not a string literal
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
-
-    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
 
     SLANG_PASS(lowerTuples, sink);
     if (sink->getErrorCount() != 0)
@@ -3455,8 +3459,11 @@ static SlangResult createArtifactFromIR(
             }
             else if (SLANG_FAILED(validationResult))
             {
-                // Whether a rejected module reaches the caller must not depend on the diagnostic's
-                // severity, so fail here rather than leaving it to the sink's abort.
+                // Disassemble the rejected SPIR-V into the diagnostic so the failure is legible,
+                // then report it. `SpirvValidationFailed` is `internal` severity, so this
+                // `diagnose()` aborts the compile by throwing; the abort unwinds to the
+                // API-boundary guard that catches it. The `return SLANG_FAIL` below is reached
+                // only if that severity is ever lowered below `Severity::Fatal`.
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
                 return SLANG_FAIL;

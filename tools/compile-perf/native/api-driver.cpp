@@ -18,7 +18,7 @@
 //     api-driver <libslang> session-create    --iters N
 //     api-driver <libslang> many-kernels      --dir DIR [--reflect]
 //     api-driver <libslang> module-graph      --dir DIR --root MODULENAME [--reflect]
-//     api-driver <libslang> module-graph-bin  --dir DIR --root MODULENAME
+//     api-driver <libslang> module-graph-bin  --dir DIR --root MODULENAME [--out-dir DIR]
 //     api-driver <libslang> specialize        --dir DIR --root MODULENAME [--impl-prefix P]
 //     api-driver <libslang> rt-composite      --dir DIR --root MODULENAME
 //
@@ -544,11 +544,18 @@ static std::vector<std::string> listSlangFiles(const std::string& dir, const cha
     return files;
 }
 
-// Creates a session targeting SPIR-V with `dir` (when non-empty) as the import
-// search path — the shape every workload here shares.
+// Creates a session targeting SPIR-V with `searchDirs` (the non-empty ones, in
+// order) as the import search path — the shape every workload here shares.
+//
+// A LIST rather than one directory because module-graph-bin separates the two
+// roles a directory can play: the corpus it reads sources from may be
+// caller-owned and must not be written to, so the .slang-module binaries it
+// produces land in a scratch directory instead. The timed session then has to
+// search both, binaries first, or import resolution would find the .slang
+// source next to it and defeat the workload's entire purpose.
 static SlangResult createSession(
     slang::IGlobalSession* globalSession,
-    const std::string& dir,
+    const std::vector<std::string>& searchDirs,
     slang::ISession** outSession)
 {
     slang::TargetDesc target = {};
@@ -558,11 +565,14 @@ static SlangResult createSession(
     slang::SessionDesc desc = {};
     desc.targets = &target;
     desc.targetCount = 1;
-    const char* searchPaths[] = {dir.c_str()};
-    if (!dir.empty())
+    std::vector<const char*> searchPaths;
+    for (const auto& d : searchDirs)
+        if (!d.empty())
+            searchPaths.push_back(d.c_str());
+    if (!searchPaths.empty())
     {
-        desc.searchPaths = searchPaths;
-        desc.searchPathCount = 1;
+        desc.searchPaths = searchPaths.data();
+        desc.searchPathCount = (SlangInt)searchPaths.size();
     }
     return globalSession->createSession(desc, outSession);
 }
@@ -725,7 +735,7 @@ static int runSessionCreate(CreateGlobalSessionFn createGlobalSession, int iters
         Slang::ComPtr<slang::ISession> session;
         {
             Scope s(timers, "apiCreateSession");
-            if (SLANG_FAILED(createSession(globalSession, "", session.writeRef())))
+            if (SLANG_FAILED(createSession(globalSession, {}, session.writeRef())))
             {
                 printf("error: createSession failed\n");
                 return 1;
@@ -762,7 +772,7 @@ static int runManyKernels(const LibSlang& lib, const std::string& dir, bool refl
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -834,7 +844,7 @@ static int runModuleGraph(
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -859,8 +869,12 @@ static int runModuleGraph(
     return 0;
 }
 
-// module-graph-bin: like module-graph, but the timed load resolves the DAG
-// from serialized .slang-module binaries instead of source — the import path
+// Serializes every module of the graph rooted at `root` into `outDir`, then
+// measures how long a fresh session takes to load that graph back from the
+// serialized binaries.
+//
+// It is like module-graph, but the timed load resolves the DAG from
+// .slang-module binaries instead of source — the import path
 // where the 2026-07-03 module-loading regression (#11952) lives, which
 // source-based loads do not exercise. Setup runs before the apiTotal scope
 // opens, so it does not count toward apiTotal, but its phases are still timed
@@ -868,7 +882,19 @@ static int runModuleGraph(
 // graph from source once and write every loaded module out with
 // IModule::writeToFile; then a FRESH session re-loads the root, letting
 // import resolution pick the binaries.
-static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const std::string& root)
+//
+// This is the only mode that WRITES, so it is the only one that takes an
+// `outDir`: the binaries go there rather than beside the sources, because
+// `dir` may be a corpus prepared elsewhere and handed to this run read-only
+// (bench.py --corpus). The timed session searches outDir BEFORE dir so an
+// import resolves to the binary; were the order reversed it would find the
+// .slang source sitting next to it and quietly measure a source load, which is
+// the one thing this workload exists to avoid measuring.
+static int runModuleGraphBin(
+    const LibSlang& lib,
+    const std::string& dir,
+    const std::string& outDir,
+    const std::string& root)
 {
     Timers timers;
 
@@ -887,7 +913,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
     // Setup pass: source load + serialize every module in the graph.
     {
         Slang::ComPtr<slang::ISession> setupSession;
-        if (SLANG_FAILED(createSession(globalSession, dir, setupSession.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, setupSession.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -919,7 +945,7 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
                         (int)i);
                     return 1;
                 }
-                std::string path = dir + "/" + name + ".slang-module";
+                std::string path = outDir + "/" + name + ".slang-module";
                 if (SLANG_FAILED(m->writeToFile(path.c_str())))
                 {
                     printf("error: writeToFile failed for %s\n", path.c_str());
@@ -930,11 +956,12 @@ static int runModuleGraphBin(const LibSlang& lib, const std::string& dir, const 
     }
 
     // Timed pass: fresh session; imports must now resolve to the binaries.
+    // outDir first — see this function's comment for why the order is load-bearing.
     Scope total(timers, "apiTotal");
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {outDir, dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -1014,7 +1041,7 @@ static int runSpecialize(
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -1139,7 +1166,7 @@ static int runRtComposite(const LibSlang& lib, const std::string& dir, const std
     Slang::ComPtr<slang::ISession> session;
     {
         Scope s(timers, "apiCreateSession");
-        if (SLANG_FAILED(createSession(globalSession, dir, session.writeRef())))
+        if (SLANG_FAILED(createSession(globalSession, {dir}, session.writeRef())))
         {
             printf("error: createSession failed\n");
             return 1;
@@ -1244,7 +1271,8 @@ int main(int argc, char** argv)
         printf("usage: api-driver <libslang> session-create    --iters N\n"
                "       api-driver <libslang> many-kernels      --dir DIR [--reflect]\n"
                "       api-driver <libslang> module-graph      --dir DIR --root NAME [--reflect]\n"
-               "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME\n"
+               "       api-driver <libslang> module-graph-bin  --dir DIR --root NAME "
+               "[--out-dir DIR]\n"
                "       api-driver <libslang> specialize        --dir DIR --root NAME "
                "[--impl-prefix P]\n"
                "       api-driver <libslang> rt-composite      --dir DIR --root NAME\n"
@@ -1294,7 +1322,13 @@ int main(int argc, char** argv)
     if (mode == "module-graph")
         return runModuleGraph(lib, dir, root, reflect);
     if (mode == "module-graph-bin")
-        return runModuleGraphBin(lib, dir, root);
+    {
+        // Defaults to --dir so the flag is optional for a hand-run driver;
+        // bench.py always passes it, and points it at scratch so a corpus
+        // handed to --corpus is never written into.
+        const char* outDir = argValue(argc, argv, "--out-dir");
+        return runModuleGraphBin(lib, dir, outDir ? outDir : dir, root);
+    }
     if (mode == "rt-composite")
         return runRtComposite(lib, dir, root);
     if (mode == "specialize")
