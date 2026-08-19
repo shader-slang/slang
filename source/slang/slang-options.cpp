@@ -990,6 +990,14 @@ void initCommandOptions(CommandOptions& options)
          "-llvm-features",
          "-llvm-features <a1,+enable,-disable,...>",
          "Sets a comma-separates list of architecture-specific features for the LLVM targets."},
+        {OptionKind::CudaNoInlineThreshold,
+         "-cuda-noinline-threshold",
+         "-cuda-noinline-threshold <n>",
+         "For the CUDA target family (CUDA, CUDA header, and PTX), mark any ordinary `__device__` "
+         "function whose IR body exceeds <n> instructions as `__noinline__`. This requests that "
+         "large functions not be duplicated into every call site, which can reduce ptxas compile "
+         "time. Defaults to 0, which disables the heuristic and leaves the emitted output "
+         "unchanged."},
     };
 
     _addOptions(makeConstArrayView(targetOpts), options);
@@ -3857,6 +3865,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::BindlessSpaceIndex:
         case OptionKind::SPIRVSamplerHeapStride:
         case OptionKind::SPIRVResourceHeapStride:
+        case OptionKind::CudaNoInlineThreshold:
             {
                 Int index = 0;
                 SLANG_RETURN_ON_FAIL(_expectUInt(arg, index));

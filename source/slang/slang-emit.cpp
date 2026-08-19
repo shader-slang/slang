@@ -38,6 +38,7 @@
 #include "slang-ir-com-interface.h"
 #include "slang-ir-coverage-instrument.h"
 #include "slang-ir-cuda-immutable-load.h"
+#include "slang-ir-cuda-noinline.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
@@ -2522,6 +2523,19 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(performForceInlining);
+
+    // For CUDA, optionally mark large `__device__` functions `__noinline__` to cut ptxas time.
+    // This runs after the last CUDA-applicable force-inlining so that call sites Slang chooses to
+    // inline have already been expanded (the pass also excludes any function that still carries a
+    // ForceInline request). It is gated to CUDA here because `IRNoInlineDecoration` is consumed by
+    // other backends too. The pass is a no-op unless `-cuda-noinline-threshold` is set positive.
+    if (isCUDATarget(targetRequest))
+    {
+        SLANG_PASS(
+            markLargeCUDADeviceFunctionsNoInline,
+            targetProgram,
+            targetProgram->getOptionSet().getIntOption(CompilerOptionName::CudaNoInlineThreshold));
+    }
 
     if (emitSpirvDirectly)
     {
