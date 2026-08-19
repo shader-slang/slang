@@ -495,6 +495,26 @@ def _reap_posix(proc, wait4=None):
     return _maxrss_to_kb(ru.ru_maxrss, sys.platform)
 
 
+def output_artifact_bytes(timed):
+    """Size in bytes of the artifact the timed command wrote to its `-o` path, or
+    None when there is no `-o` (api mode) or the file is absent (a failed compile).
+
+    A deterministic, machine-independent size signal to complement the noisy
+    downstream (nvrtc/dxc) wall time. Bytes rather than line count so it is
+    meaningful for binary (spv/dxil) artifacts as well as text ones.
+
+    Anchored on the guaranteed tail position: build_commands appends `-o <out>`
+    as the final pair of every non-api timed command, so reading `timed[-1]`
+    after a `-o` at `timed[-2]` cannot be fooled by a `-o` that some future
+    workload's flags carry earlier in the list."""
+    if len(timed) < 2 or timed[-2] != "-o":
+        return None
+    try:
+        return os.path.getsize(timed[-1])
+    except OSError:
+        return None
+
+
 def run_once(cmd):
     """Run one compile; return (rc, wall_ms, combined_text, rss_kb_or_None).
 
@@ -585,7 +605,8 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
             "workload": spec.name, "bucket": spec.bucket, "size": size,
             "mode": spec.mode, "ok": False, "setup_ok": False,
             "got_timers": False, "samples": samples, "warmup": warmup,
-            "wall_ms": None, "rss_kb": None, "memory": None, "timers": {},
+            "wall_ms": None, "rss_kb": None, "memory": None,
+            "output_bytes": None, "timers": {},
             "primary_timers": spec.primary_timers, "cmd": "",
             "error": "api-driver or libslang unavailable (see stderr)",
             "crash_codes": None,
@@ -670,6 +691,11 @@ def run_spec(slangc, spec, size, samples, warmup, src_root, out_root, api=None,
         "rss_kb": stats(rsses) if rsses else None,
         "memory": ({k: stats(v) for k, v in sorted(per_mem.items())}
                    if per_mem else None),
+        # Raw-captured for future/manual analysis; no in-tree consumer reads it
+        # yet (not promoted into the tracked/trended series). None unless the
+        # compile succeeded: a failed run may leave no -o file, or a stale one
+        # from a prior sample / persistent --gen-dir, whose size would misattribute.
+        "output_bytes": output_artifact_bytes(timed) if ok else None,
         "timers": {k: stats(v) for k, v in sorted(per_timer.items())},
         "primary_timers": spec.primary_timers,
         "cmd": " ".join(timed),
@@ -876,7 +902,8 @@ def main():
                     "mode": spec.mode, "ok": False, "setup_ok": False,
                     "got_timers": False, "samples": args.samples,
                     "warmup": args.warmup, "wall_ms": None, "rss_kb": None,
-                    "memory": None, "timers": {}, "primary_timers": spec.primary_timers,
+                    "memory": None, "output_bytes": None, "timers": {},
+                    "primary_timers": spec.primary_timers,
                     "cmd": "", "error": str(e), "crash_codes": None,
                 }
             rec["label"] = args.label
@@ -944,6 +971,23 @@ assert stats([1.0, None, 2.0])["samples"] == [1.0, 2.0], \
     "None samples are dropped from the archive, not merely uncounted"
 assert stats([1.0, None, 2.0])["n"] == 2
 del _s
+
+
+assert output_artifact_bytes(["slangc", "in.slang"]) is None, \
+    "no trailing -o (api mode) must yield None, not raise"
+assert output_artifact_bytes(["slangc", "in.slang", "-o"]) is None, \
+    "a dangling -o with no following path must yield None, not IndexError"
+assert output_artifact_bytes(["slangc", "-o", "x", "in.slang"]) is None, \
+    "a -o that is not the final pair must be ignored, not misattributed"
+assert output_artifact_bytes(["slangc", "-o", "/nonexistent/out.spv"]) is None, \
+    "a missing artifact (failed compile) must yield None, not raise"
+with tempfile.TemporaryDirectory() as _ob_dir:
+    _ob_f = os.path.join(_ob_dir, "out.spv")
+    with open(_ob_f, "wb") as _fh:
+        _fh.write(b"1234567")
+    assert output_artifact_bytes(["slangc", "-o", _ob_f]) == 7, \
+        "output_artifact_bytes must return the trailing -o file size in bytes"
+del _ob_dir, _ob_f, _fh
 
 
 # build_commands is pure, and two of its properties fail SILENTLY — as a wrong
