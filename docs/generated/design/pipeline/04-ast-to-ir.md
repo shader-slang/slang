@@ -504,7 +504,7 @@ Lowering errors flow through the same `DiagnosticSink` used by the rest
 of the front-end (see
 [../cross-cutting/diagnostics.md](../cross-cutting/diagnostics.md)).
 
-Two other lowering-time reports are worth knowing about because they
+Three other lowering-time reports are worth knowing about because they
 depend on facts only the lowering walk has:
 
 - **Statements before the first `case` label.** When `StmtLoweringVisitor`
@@ -514,7 +514,13 @@ depend on facts only the lowering walk has:
   `goto` into a body. Lowering warns once for the leading run with
   `Diagnostics::UnreachableCode`, tracked by the
   `warnedUnreachableBeforeFirstCase` flag on the switch-lowering info.
-  Previously these statements were silently dropped.
+- **A `switch` body with no `case` or `default` label at all.** The same
+  argument makes the whole body unreachable, but such a body never reaches
+  the walk above: `visitSwitchStmt` takes its no-cases early return before
+  `lowerSwitchCases` is called. That early return therefore reports
+  `Diagnostics::UnreachableCode` itself, using `findFirstNonEmptyStmt` to
+  name the first statement being discarded. A body that discards nothing
+  (`{ }`, `{ ; }`) stays silent.
 - **Runaway constructor-call lowering.** `visitInvokeExprImpl` counts its
   own recursion depth in `IRGenContext::invokeLoweringRecursionDepth` and,
   past `kMaxIRInvokeLoweringRecursionDepth` (128, line 5513), diagnoses

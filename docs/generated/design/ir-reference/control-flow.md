@@ -426,18 +426,23 @@ all diverge.
 
 ### Unreachable-code diagnostics come from lowering
 
-Two `Diagnostics::UnreachableCode` sites live in
+Three `Diagnostics::UnreachableCode` sites live in
 [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp),
-not in the semantic checker. `startBlockIfNeeded` (line 8205) is
+not in the semantic checker. `startBlockIfNeeded` is
 called before lowering each statement; if the current block is
 already terminated, the statement it is about to lower has no label
-to be branched to, so it diagnoses at line 8228 and then starts a
-fresh block anyway. `lowerSwitchCases` (line 9223) diagnoses at
-line 9315 for a statement that appears inside a `switch` body
+to be branched to, so it diagnoses and then starts a
+fresh block anyway. `lowerSwitchCases` diagnoses
+for a statement that appears inside a `switch` body
 before the first `case` or `default` label — Slang has no `goto`
 into a switch body, so control cannot reach such a statement — and
 sets `warnedUnreachableBeforeFirstCase` so the whole leading run
-warns once.
+warns once. `visitSwitchStmt` diagnoses at its no-cases early
+return, where the body has no `case` or `default` label at all: the
+same argument makes the whole body unreachable, and
+`findFirstNonEmptyStmt` supplies the first statement being discarded
+as the diagnostic's location. A body that discards nothing (`{ }`,
+`{ ; }`) stays silent.
 
 ### `discard`
 
