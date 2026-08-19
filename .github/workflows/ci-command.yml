@@ -88,7 +88,7 @@ jobs:
 
       - name: Comment on PR (refusal)
         if: steps.inflight.outputs.skip == 'true'
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
         with:
           token: ${{ secrets.SLANGBOT_PAT }}
           repository: shader-slang/slang
