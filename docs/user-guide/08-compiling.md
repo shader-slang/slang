@@ -1124,6 +1124,7 @@ meanings of their `CompilerOptionValue` encodings.
 | DenormalModeFp32 | Specifies how 32-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | DenormalModeFp64 | Specifies how 64-bit floating-point denormal values are handled. `intValue0` encodes a value from the `SlangFpDenormalMode` enum. |
 | UseMSVCStyleBitfieldPacking | When set uses MSVC-compatible bitfield packing rules instead of the default GLSL/Vulkan rules. `intValue0` specifies a bool value for the setting. |
+| CudaNoInlineThreshold | For the CUDA target family, mark any ordinary `__device__` function whose IR body exceeds a threshold as `__noinline__`, to reduce ptxas compile time. `intValue0` encodes the instruction-count threshold; 0 (the default) disables the heuristic. |
 
 ### Compiler Option ABI Stability
 
