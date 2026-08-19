@@ -28,6 +28,9 @@ concurrency:
 
 permissions:
   contents: read
+  id-token: write # forwarded to ci-matrix.yml's GCP Workload Identity build jobs
+  packages: read # forwarded to ci-matrix.yml's container-image build/test jobs
+  actions: read # forwarded to ci-matrix.yml's workflow-run-state check jobs
   statuses: write # post pending / final PR check
   pull-requests: write # comment refusal when CI already in-flight
 

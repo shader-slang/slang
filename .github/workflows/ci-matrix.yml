@@ -27,12 +27,21 @@ on:
         type: boolean
         default: false
 
-# Least-privilege default for any job below that doesn't declare its own
-# elevated permissions (e.g. check-matrix, wait-for-human-priority). Jobs
-# that need more (id-token: write for GCP auth, statuses/pull-requests write,
-# etc.) declare it explicitly at the job level, which overrides this default.
+# Ceiling for every job in this workflow: a job's own `permissions:` can only
+# restrict further, never exceed, what's granted here (GitHub Actions never
+# elevates permissions across a workflow_call boundary). This must be the
+# union of every scope any job below declares at the job level:
+#   - id-token: write   — GCP Workload Identity auth (Linux container builds,
+#                          WASM build, sanitizer)
+#   - packages: read    — pulling the (public) CI container images
+#   - actions: read     — check-cmdline-ref / check-capability-atoms-ref /
+#                          test-falcor / test-compile-regression /
+#                          test-benchmark querying workflow-run state
 permissions:
   contents: read
+  id-token: write
+  packages: read
+  actions: read
 
 jobs:
   # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
