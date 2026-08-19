@@ -27,6 +27,8 @@
 #endif
 
 #if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
 #include <slang-rhi/agility-sdk.h>
 #include <windows.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -917,6 +919,20 @@ int main(int argc, const char* const* argv)
     // Ignore SIGPIPE so that writing to a broken pipe returns EPIPE
     // instead of killing this process.
     signal(SIGPIPE, SIG_IGN);
+#endif
+
+#if defined(_WIN32)
+    // stdout is the JSON-RPC transport, so keep it in binary mode. The framed replies already
+    // bypass the CRT (Process::getStdStream(Out) -> WinPipeStream -> ::WriteFile, no CRLF
+    // translation), so they are unaffected; this guards the one writer that does go through the
+    // CRT stdout -- the SLANG_TEST_SERVER_GARBLE_ON_REQUEST hook's fwrite of a literal "\r\n\r\n"
+    // (see execute()), which text mode would mangle to "\r\r\n\r\r\n" and defeat the client's
+    // header framing.
+    if (_setmode(_fileno(stdout), _O_BINARY) == -1)
+    {
+        fputs("test-server: failed to set stdout to binary mode\n", stderr);
+        return 1;
+    }
 #endif
 
     return (int)Slang::TestToolUtil::getReturnCode(TestServer::_execute(argc, argv));
