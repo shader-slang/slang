@@ -709,6 +709,14 @@ Sets the target CPU for the LLVM target, enabling the extensions and features of
 Sets a comma-separates list of architecture-specific features for the LLVM targets. 
 
 
+<a id="cuda-noinline-threshold"></a>
+### -cuda-noinline-threshold
+
+**-cuda-noinline-threshold &lt;n&gt;**
+
+For the CUDA target family (CUDA, CUDA header, and PTX), mark any ordinary `__device__` function whose IR body exceeds &lt;n&gt; instructions as `__noinline__`. This requests that large functions not be duplicated into every call site, which can reduce ptxas compile time. Defaults to 0, which disables the heuristic and leaves the emitted output unchanged. 
+
+
 
 <a id="downstream"></a>
 ## Downstream

@@ -1307,6 +1307,14 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
+        CudaNoInlineThreshold =
+            158, // int: opt-in heuristic for the CUDA target family (CUDA source, CUDA header, and
+                 //   PTX). When set to a positive value N, ordinary `__device__` functions whose IR
+                 //   body exceeds N instructions are marked `__noinline__` in the emitted CUDA.
+                 //   This requests that large functions not be duplicated into every call site,
+                 //   which can cut ptxas compile time. Defaults to 0 (off), leaving emitted output
+                 //   unchanged.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
