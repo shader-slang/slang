@@ -5446,6 +5446,7 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
 
+    IRSetBase* getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements);
     IRSetBase* getSingletonSet(IROp op, IRInst* element);
 
     UInt getUniqueID(IRInst* inst);

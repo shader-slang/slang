@@ -7570,6 +7570,28 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
     return setBaseInst;
 }
 
+IRSetBase* IRBuilder::getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements)
+{
+    // Produces the same canonical form as `getSet`, but the caller has already
+    // put the elements in unique-ID order with duplicates removed, so neither
+    // the intermediate hash set nor the sort is needed.
+    //
+    // Precondition, which the caller owns: `sortedElements` is strictly
+    // increasing by `getUniqueID` and every element is global. It is not
+    // checked here, because `getUniqueID` assigns IDs lazily and so cannot be
+    // called from a validation-only loop without mutating the module.
+    //
+    // The one caller is the type-flow fixpoint's join, which merges the operand
+    // lists of two existing sets; those are canonical by construction, so the
+    // merge of them is too.
+    for (UInt i = 0; i < count; ++i)
+        if (sortedElements[i]->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("getSetFromSortedElements called with non-global operands");
+
+    return as<IRSetBase>(
+        emitIntrinsicInst(nullptr, op, count, const_cast<IRInst**>(sortedElements)));
+}
+
 IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
 {
     return getSet(op, {element});
