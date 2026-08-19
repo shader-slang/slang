@@ -101,17 +101,13 @@ Sections of the `expansion` string that are to be replaced are prefixed by the `
 * $G0-9 - Replaced by the type/value at that index of specialization
 * $S0-9 - The scalar type of the generic at the index.
 * $p - Used on texturing operations. Produces the combined texture sampler arguments as needed for GLSL.
+* $q - The counterpart of `$p` for a texture-only query (e.g. `GetDimensions`) on a combined texture-sampler. When the combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair, an extra sampler operand is injected at index 1; `$q` makes the positional `$N` (for N >= 1) accessors skip it so the outputs line up. Emits nothing, and is a no-op on a plain (non-combined) texture.
 * $C - The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format conversion required between the type associated by the resource and the backing ImageFormat. Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture writes that will do a format conversion.
 * $E - Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface access is byte addressed. $E will return the byte size of the *backing element*.
 * $c - When doing texture access in GLSL the result may need to be cast. In particular if the underlying texture is 'half' based, GLSL only accesses (read/write) as float. So we need to cast to a half type on output. When storing into a texture it is still the case the value written must be half - but we don't need to do any casting there as half is coerced to float without a problem.
 * $z - If we are calling a D3D texturing operation in the form t.Foo(s, ...), where `t` is a Texture&lt;T&gt;, then this is the step where we try to properly swizzle the output of the equivalent GLSL call into the right shape.
 * $N0-9 - Extract the element count from a vector argument so that we can use it in the constructed expression.
 * $V0-9 - Take an argument of some scalar/vector type and pad it out to a 4-vector with the same element type (this is the inverse of `$z`).
-* $a - We have an operation that needs to lower to either `atomic*` or `imageAtomic*` for GLSL, depending on whether its first operand is a subscript into an array. This `$a` is the first `a` in `atomic`, so we will replace it accordingly.
-* $A - We have an operand that represents the destination of an atomic operation in GLSL, and it should be lowered based on whether it is an ordinary l-value, or an image subscript. In the image subscript case this operand will turn into multiple arguments to the `imageAtomic*` function.
-* $XP - Ray tracing ray payload
-* $XC - Ray tracing callable payload
-* $XH - Ray tracing hit object attribute
 * $P - Type-based prefix as used for CUDA and C++ targets (I8 for int8_t, F32 - float etc)
 * $[0-9] - Access extra type or value operands passed explicitly after the format string in `__intrinsic_asm`. For type operands (e.g. generic type parameters like `T`), emits the type name. For value operands (e.g. generic integer parameters like `let N : int`), emits the value expression. The extra operands are listed as a comma-separated sequence after the format string literal. Indices are zero-based.
 

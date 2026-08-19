@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "vertexT",
@@ -562,10 +563,578 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "none",
+        "parameters": [
+            {
+                "name": "vertexT",
+                "binding": {"kind": "shaderResource", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "vertexS",
+                "binding": {"kind": "samplerState", "index": 0},
+                "type": {
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "vertexC",
+                "binding": {"kind": "constantBuffer", "index": 0},
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "vertexCA",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
+                            },
+                            {
+                                "name": "vertexCB",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                            },
+                            {
+                                "name": "vertexCC",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
+                            },
+                            {
+                                "name": "vertexCD",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 8, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 40, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "constantBuffer", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "fields": [
+                                {
+                                    "name": "vertexCA",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 12, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
+                                },
+                                {
+                                    "name": "vertexCB",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 4, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                                },
+                                {
+                                    "name": "vertexCC",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 12, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
+                                },
+                                {
+                                    "name": "vertexCD",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 2,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 8, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "uniform", "value": 40, "alignment": 16}
+                            ]
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 40, "elementStride": 0}
+                    },
+                    "sizes": [
+                        {"kind": "constantBuffer", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "fragmentT",
+                "binding": {"kind": "shaderResource", "index": 1},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "fragmentS",
+                "binding": {"kind": "samplerState", "index": 1},
+                "type": {
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "fragmentC",
+                "binding": {"kind": "constantBuffer", "index": 1},
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "fragmentCA",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
+                            },
+                            {
+                                "name": "fragmentCB",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                            },
+                            {
+                                "name": "fragmentCC",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
+                            },
+                            {
+                                "name": "fragmentCD",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 8, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 40, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "constantBuffer", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "fields": [
+                                {
+                                    "name": "fragmentCA",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 12, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
+                                },
+                                {
+                                    "name": "fragmentCB",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 4, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                                },
+                                {
+                                    "name": "fragmentCC",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 12, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
+                                },
+                                {
+                                    "name": "fragmentCD",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 2,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 8, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "uniform", "value": 40, "alignment": 16}
+                            ]
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 40, "elementStride": 0}
+                    },
+                    "sizes": [
+                        {"kind": "constantBuffer", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "sharedT",
+                "binding": {"kind": "shaderResource", "index": 2},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "sharedS",
+                "binding": {"kind": "samplerState", "index": 2},
+                "type": {
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "samplerState", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "sharedC",
+                "binding": {"kind": "constantBuffer", "index": 2},
+                "type": {
+                    "kind": "constantBuffer",
+                    "elementType": {
+                        "kind": "struct",
+                        "fields": [
+                            {
+                                "name": "sharedCA",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
+                            },
+                            {
+                                "name": "sharedCB",
+                                "type": {
+                                    "kind": "scalar",
+                                    "scalarType": "float32",
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 4, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                            },
+                            {
+                                "name": "sharedCC",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 3,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 12, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
+                            },
+                            {
+                                "name": "sharedCD",
+                                "type": {
+                                    "kind": "vector",
+                                    "elementCount": 2,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    },
+                                    "sizes": [
+                                        {"kind": "uniform", "value": 8, "alignment": 4}
+                                    ]
+                                },
+                                "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
+                            }
+                        ],
+                        "sizes": [
+                            {"kind": "uniform", "value": 40, "alignment": 16}
+                        ]
+                    },
+                    "containerVarLayout": {
+                        "binding": {"kind": "constantBuffer", "index": 0}
+                    },
+                    "elementVarLayout": {
+                        "type": {
+                            "kind": "struct",
+                            "fields": [
+                                {
+                                    "name": "sharedCA",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 12, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 0, "size": 12, "elementStride": 4}
+                                },
+                                {
+                                    "name": "sharedCB",
+                                    "type": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32",
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 4, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 12, "size": 4, "elementStride": 0}
+                                },
+                                {
+                                    "name": "sharedCC",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 3,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 12, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 16, "size": 12, "elementStride": 4}
+                                },
+                                {
+                                    "name": "sharedCD",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 2,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        },
+                                        "sizes": [
+                                            {"kind": "uniform", "value": 8, "alignment": 4}
+                                        ]
+                                    },
+                                    "binding": {"kind": "uniform", "offset": 32, "size": 8, "elementStride": 4}
+                                }
+                            ],
+                            "sizes": [
+                                {"kind": "uniform", "value": 40, "alignment": 16}
+                            ]
+                        },
+                        "binding": {"kind": "uniform", "offset": 0, "size": 40, "elementStride": 0}
+                    },
+                    "sizes": [
+                        {"kind": "constantBuffer", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "sharedTV",
+                "binding": {"kind": "shaderResource", "index": 3},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "sharedTF",
+                "binding": {"kind": "shaderResource", "index": 4},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "shaderResource", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "mainVS",
             "stage": "vertex",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "semanticName": "SV_POSITION",
                 "type": {
@@ -584,6 +1153,12 @@ standard output = {
         {
             "name": "mainFS",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},

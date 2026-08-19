@@ -483,8 +483,29 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         }
     case kIROp_AttributedType:
         {
+            // Only layout-transparent attributes may reach here: `unorm`/`snorm` select a
+            // texture image format at emit and `no_diff` carries no storage, so the type
+            // lays out as its base. Checked rather than assumed because the `Attr` family
+            // also holds storage-shaped members (`AlignedAttr`, `TypeAlignmentAttr`,
+            // `TypeSizeAttr`); none is attached to a *type* today -- `AlignedAttr` goes on
+            // an `IRLoad` -- and laying one of those out as its base would silently drop
+            // the property it exists to carry.
+            //
+            // Every attribute is checked, not just the first: `getAttributedType` takes a
+            // list and stores each as an operand, so `getAttr()` is only operand 1.
+            //
+            // SLANG_RELEASE_ASSERT, not SLANG_ASSERT: the latter compiles to SLANG_ASSUME
+            // in Release, which makes a violation undefined behaviour rather than a
+            // diagnosis -- the same construct whose `__builtin_unreachable()` produced the
+            // SIGSEGV this file's fix exists to stop.
             auto attributedType = cast<IRAttributedType>(type);
-            SLANG_ASSERT(attributedType->getAttr()->getOp() == kIROp_NoDiffAttr);
+            for (UInt i = 1; i < attributedType->getOperandCount(); ++i)
+            {
+                const auto attrOp = attributedType->getOperand(i)->getOp();
+                SLANG_RELEASE_ASSERT(
+                    attrOp == kIROp_NoDiffAttr || attrOp == kIROp_UNormAttr ||
+                    attrOp == kIROp_SNormAttr);
+            }
             return getSizeAndAlignment(
                 targetReq,
                 this,
