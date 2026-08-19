@@ -344,6 +344,19 @@ jobs:
   # other six consumers of build-windows-release-cl-x86_64-gpu's artifact
   # (dx/vk/cuda/rhi tests, MaterialX, compile-regression, benchmark) are
   # unaffected -- they keep using the eagerly-built, ungated artifact.
+  #
+  # If test-falcor fails on a stale/inaccessible artifact from this job
+  # (observed: the bridge relay's own GitHub API artifact lookup can fail
+  # for an unrelated attempt/token reason even when the artifact itself is
+  # neither expired nor deleted -- see PR #12614 discussion), GitHub's
+  # "Re-run failed jobs" will NOT rebuild here: re-run only ever
+  # propagates to jobs downstream of a failure, never to an upstream job
+  # that already succeeded (confirmed by a GitHub Actions maintainer,
+  # https://github.com/actions/runner/issues/1961). Use "Re-run all jobs"
+  # instead in that case, which forces this job to run fresh. This is a
+  # known, accepted cost: a real Falcor regression needing a code fix
+  # already forces a full re-run via a new commit, so this only affects
+  # the narrower case of a transient retry with no code change.
   build-windows-release-cl-x86_64-gpu-falcor:
     needs: [filter, falcor-build-approval-gate]
     if: needs.filter.outputs.should-run == 'true'
