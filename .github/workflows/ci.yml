@@ -328,6 +328,8 @@ jobs:
     environment: falcor-ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Only runs `echo`; no GITHUB_TOKEN scopes are needed.
+    permissions: {}
     steps:
       - name: Approved
         run: echo "Falcor rebuild approved."
