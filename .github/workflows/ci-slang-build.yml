@@ -50,6 +50,15 @@ on:
         required: false
         type: boolean
         default: false
+      artifact-name-suffix:
+        description: >-
+          Optional suffix appended to the build/tests artifact names, so a
+          second call site can produce distinctly-named artifacts from the
+          same build steps (e.g. a Falcor-only rebuild that must not share
+          an artifact name with the regular Windows-release build).
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -354,14 +363,14 @@ jobs:
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-name-suffix }}
           path: |
             build/dist-${{inputs.config}}/**/ZIP/slang/*
             build.em/Release
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-name-suffix }}
           path: artifacts-staging/
           retention-days: 1
 
