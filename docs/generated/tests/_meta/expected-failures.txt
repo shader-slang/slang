@@ -165,23 +165,16 @@ docs/generated/tests/design/target-pipelines/metal/append-buffer-params-carry-bu
 # after human triage.)
 docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
 
-# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
-# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
-# The emission fan-out for the `ref`-accessor claim reaches the last two
-# shader targets and both are broken: `-target metal` (directive `.1`) aborts
-# with the internal error "Unknown addressspace encountered", and
-# `-target spirv-asm` (directive `.2`) declares the accessor helper as
-# `OpTypeFunction %int %_ptr_Function_Cell` while calling it as
-# `OpFunctionCall %_ptr_Function_int`, so the module fails spirv-val.
-# The entries name the two sub-tests rather than the file because the file's
-# first directive (`-target hlsl`) still passes and must keep reporting.
-# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
-# flags these two sub-test names as unresolvable; the lint rule does not yet
-# know about slang-test's `<file>.<n>` sub-test naming. Remove these entries
-# when either back-end is fixed. (Will become a tracking issue after human
-# triage.)
-docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
+# shader-slang/slang#12492 fixes the `ref`-accessor lowering (#12487 / #9636):
+# the accessor no longer aborts Metal / emits invalid SPIR-V, and on pointer-less
+# targets its helper is inlined. That makes the `.1` (Metal) sub-test pass, so its
+# entry was removed. The SPIR-V (`.2`), GLSL, and WGSL directives still pin the
+# pre-fix shape (a surviving/pointer-returning `Cell_value_ref` helper), so they
+# now fail against the fixed compiler until the doc/test agents regenerate these
+# generated tests. They stay listed as awaiting-regeneration, not compiler bugs.
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property-wgsl.slang
 
 # https://github.com/shader-slang/slang/issues/12442 — render-test blanks the
 # HLSL prelude on the shared global session and never restores it, so these
