@@ -799,8 +799,7 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
     // diagnostic output.  The +1 below accounts for the sentinel advance
     // (m_nextLoc = endLoc + 1) that must also fit without wrapping.
     SLANG_RELEASE_ASSERT(
-        (uint64_t)beginLoc.getRaw() + (uint64_t)size + 1 <=
-        (uint64_t)SourceLoc::RawValue(-1));
+        (uint64_t)beginLoc.getRaw() + (uint64_t)size + 1 <= (uint64_t)SourceLoc::RawValue(-1));
 
     SourceLoc endLoc = beginLoc + size;
 
