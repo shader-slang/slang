@@ -1092,8 +1092,7 @@ SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
         if (!entry)
             break;
         loc = SourceLoc::fromRaw(
-            entry->originalBodyBeginLoc.getRaw() +
-            (loc.getRaw() - entry->range.begin.getRaw()));
+            entry->originalBodyBeginLoc.getRaw() + (loc.getRaw() - entry->range.begin.getRaw()));
         view = findSourceViewRecursively(loc);
     }
     return view;
