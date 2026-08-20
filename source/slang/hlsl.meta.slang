@@ -1301,11 +1301,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLayered<$T0>($0, ($1).x, int(($1).y))";
+                        __intrinsic_asm "$R0tex1DLayered<$F0>($0, ($1).x, int(($1).y))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLayered<$T0>($0, ($1).x, ($1).y, int(($1).z))";
+                        __intrinsic_asm "$R0tex2DLayered<$F0>($0, ($1).x, ($1).y, int(($1).z))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLayered<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
+                        __intrinsic_asm "$R0texCubemapLayered<$F0>($0, ($1).x, ($1).y, ($1).z, int(($1).w))";
                     default: __intrinsic_asm "invalid texture shape";
                     }
                 }
@@ -1314,13 +1314,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1D<$T0>($0, ($1))";
+                        __intrinsic_asm "$R0tex1D<$F0>($0, ($1))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2D<$T0>($0, ($1).x, ($1).y)";
+                        __intrinsic_asm "$R0tex2D<$F0>($0, ($1).x, ($1).y)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3D<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                        __intrinsic_asm "$R0tex3D<$F0>($0, ($1).x, ($1).y, ($1).z)";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemap<$T0>($0, ($1).x, ($1).y, ($1).z)";
+                        __intrinsic_asm "$R0texCubemap<$F0>($0, ($1).x, ($1).y, ($1).z)";
                     default: __intrinsic_asm "invalid texture shape";
                     }
                 }
@@ -2124,11 +2124,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($1).x, int(($1).y), ($2))";
+                        __intrinsic_asm "$R0tex1DLayeredLod<$F0>($0, ($1).x, int(($1).y), ($2))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
+                        __intrinsic_asm "$R0tex2DLayeredLod<$F0>($0, ($1).x, ($1).y, int(($1).z), ($2))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2))";
+                        __intrinsic_asm "$R0texCubemapLayeredLod<$F0>($0, ($1).x, ($1).y, ($1).z, int(($1).w), ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -2138,13 +2138,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLod<$T0>($0, ($1), ($2))";
+                        __intrinsic_asm "$R0tex1DLod<$F0>($0, ($1), ($2))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLod<$T0>($0, ($1).x, ($1).y, ($2))";
+                        __intrinsic_asm "$R0tex2DLod<$F0>($0, ($1).x, ($1).y, ($2))";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3DLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
+                        __intrinsic_asm "$R0tex3DLod<$F0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLod<$T0>($0, ($1).x, ($1).y, ($1).z, ($2))";
+                        __intrinsic_asm "$R0texCubemapLod<$F0>($0, ($1).x, ($1).y, ($1).z, ($2))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -2562,11 +2562,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLayered<$T0>($0, ($2).x, int(($2).y))";
+                        __intrinsic_asm "$R0tex1DLayered<$F0>($0, ($2).x, int(($2).y))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLayered<$T0>($0, ($2).x, ($2).y, int(($2).z))";
+                        __intrinsic_asm "$R0tex2DLayered<$F0>($0, ($2).x, ($2).y, int(($2).z))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLayered<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
+                        __intrinsic_asm "$R0texCubemapLayered<$F0>($0, ($2).x, ($2).y, ($2).z, int(($2).w))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -2576,13 +2576,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1D<$T0>($0, ($2))";
+                        __intrinsic_asm "$R0tex1D<$F0>($0, ($2))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2D<$T0>($0, ($2).x, ($2).y)";
+                        __intrinsic_asm "$R0tex2D<$F0>($0, ($2).x, ($2).y)";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3D<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                        __intrinsic_asm "$R0tex3D<$F0>($0, ($2).x, ($2).y, ($2).z)";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemap<$T0>($0, ($2).x, ($2).y, ($2).z)";
+                        __intrinsic_asm "$R0texCubemap<$F0>($0, ($2).x, ($2).y, ($2).z)";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -3697,11 +3697,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLayeredLod<$T0>($0, ($2).x, int(($2).y), ($3))";
+                        __intrinsic_asm "$R0tex1DLayeredLod<$F0>($0, ($2).x, int(($2).y), ($3))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLayeredLod<$T0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
+                        __intrinsic_asm "$R0tex2DLayeredLod<$F0>($0, ($2).x, ($2).y, int(($2).z), ($3))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLayeredLod<$T0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3))";
+                        __intrinsic_asm "$R0texCubemapLayeredLod<$F0>($0, ($2).x, ($2).y, ($2).z, int(($2).w), ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
@@ -3711,13 +3711,13 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                     switch(Shape.flavor)
                     {
                     case $(SLANG_TEXTURE_1D):
-                        __intrinsic_asm "tex1DLod<$T0>($0, ($2), ($3))";
+                        __intrinsic_asm "$R0tex1DLod<$F0>($0, ($2), ($3))";
                     case $(SLANG_TEXTURE_2D):
-                        __intrinsic_asm "tex2DLod<$T0>($0, ($2).x, ($2).y, ($3))";
+                        __intrinsic_asm "$R0tex2DLod<$F0>($0, ($2).x, ($2).y, ($3))";
                     case $(SLANG_TEXTURE_3D):
-                        __intrinsic_asm "tex3DLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
+                        __intrinsic_asm "$R0tex3DLod<$F0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     case $(SLANG_TEXTURE_CUBE):
-                        __intrinsic_asm "texCubemapLod<$T0>($0, ($2).x, ($2).y, ($2).z, ($3))";
+                        __intrinsic_asm "$R0texCubemapLod<$F0>($0, ($2).x, ($2).y, ($2).z, ($3))";
                     default:
                         __intrinsic_asm "<invalid intrinsic>";
                     }
