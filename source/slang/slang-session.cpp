@@ -908,54 +908,81 @@ Linkage::setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userD
     m_diagnosticCallbackData = userData;
 }
 
+// Resolve `loc` to a HumaneSourceLoc, or a default-constructed one if either `sm` or `loc`
+// is unavailable. `sm` is null for diagnostics raised against a sink that has no source
+// manager (e.g. command-line argument parsing, which runs before a Linkage exists); `loc`
+// is invalid for diagnostics that are not tied to any particular source position. Both are
+// legitimate inputs to this thunk, and a default HumaneSourceLoc (line/column 0, empty path)
+// is the documented "unavailable" encoding for SlangDiagnosticSpan, per its field comments
+// in slang.h.
+static HumaneSourceLoc resolveHumaneLoc(SourceManager* sm, SourceLoc loc)
+{
+    if (!sm || !loc.isValid())
+        return HumaneSourceLoc{};
+    return sm->getHumaneLoc(loc);
+}
+
+// Build the public SlangDiagnosticSpan from an already-resolved begin/end location and a
+// label. This is the field-mapping step shared by the primary span and every secondary span
+// in richDiagnosticThunk below, factored out so the two call sites can't drift apart.
+//
+// `beginLoc` must outlive the returned SlangDiagnosticSpan: `filename` points directly into
+// `beginLoc.pathInfo.foundPath`'s internal buffer rather than copying it, so the caller is
+// responsible for keeping `beginLoc` (or a copy of it) alive for as long as the span may be
+// read, as the callback's `SlangStructuredDiagnostic` documentation requires.
+static SlangDiagnosticSpan makeDiagnosticSpan(
+    const HumaneSourceLoc& beginLoc,
+    const HumaneSourceLoc& endLoc,
+    const String& message)
+{
+    SlangDiagnosticSpan result = {};
+    result.filename = beginLoc.pathInfo.foundPath.getBuffer();
+    result.startLine = (uint32_t)beginLoc.line;
+    result.startCol = (uint32_t)beginLoc.column;
+    result.endLine = (uint32_t)endLoc.line;
+    result.endCol = (uint32_t)endLoc.column;
+    result.message = message.getBuffer();
+    return result;
+}
+
 // Static thunk: converts GenericDiagnostic + SourceManager* into SlangStructuredDiagnostic
 // and forwards it to the user-supplied callback stored on the Linkage.
 /* static */
 void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* sm, void* userData)
 {
     auto* linkage = static_cast<Linkage*>(userData);
+
+    // installDiagnosticCallback() only wires this thunk in when m_diagnosticCallback is
+    // non-null at sink-creation time, but a single sink stays alive and keeps emitting
+    // diagnostics for the rest of that compile operation (e.g. the sink created once at
+    // the top of ComponentType::link() is reused across every diagnostic the link produces).
+    // The registered callback can itself call ISession::setDiagnosticCallback(nullptr, ...)
+    // to unregister — nothing prevents a user from doing so from inside the callback — which
+    // clears m_diagnosticCallback for the remaining diagnostics on this same sink. When that
+    // happens there is nothing left to forward to, so skip building the SlangStructuredDiagnostic
+    // payload entirely rather than calling through a null function pointer.
     if (!linkage->m_diagnosticCallback)
         return;
 
-    // Resolve the primary span location.
-    HumaneSourceLoc primaryBegin = (sm && diag.primarySpan.range.begin.isValid())
-                                       ? sm->getHumaneLoc(diag.primarySpan.range.begin)
-                                       : HumaneSourceLoc{};
-    HumaneSourceLoc primaryEnd = (sm && diag.primarySpan.range.end.isValid())
-                                     ? sm->getHumaneLoc(diag.primarySpan.range.end)
-                                     : HumaneSourceLoc{};
+    HumaneSourceLoc primaryBeginLoc = resolveHumaneLoc(sm, diag.primarySpan.range.begin);
+    HumaneSourceLoc primaryEndLoc = resolveHumaneLoc(sm, diag.primarySpan.range.end);
+    SlangDiagnosticSpan primarySpan =
+        makeDiagnosticSpan(primaryBeginLoc, primaryEndLoc, diag.primarySpan.message);
 
-    SlangDiagnosticSpan primarySpan = {};
-    primarySpan.filename = primaryBegin.pathInfo.foundPath.getBuffer();
-    primarySpan.startLine = (uint32_t)primaryBegin.line;
-    primarySpan.startCol = (uint32_t)primaryBegin.column;
-    primarySpan.endLine = (uint32_t)primaryEnd.line;
-    primarySpan.endCol = (uint32_t)primaryEnd.column;
-    primarySpan.message = diag.primarySpan.message.getBuffer();
-
-    // Resolve secondary spans.  Keep HumaneSourceLoc objects alive so that
-    // pathInfo.foundPath.getBuffer() pointers remain valid while we build the array.
-    // reserve() ensures no reallocation occurs during the loop, which would invalidate
-    // the getBuffer() pointers taken from earlier elements of secBeginLocs.
+    // Keep resolved begin locations alive in `secBeginLocs` so that the
+    // `pathInfo.foundPath.getBuffer()` pointers stashed into `secSpans` by
+    // makeDiagnosticSpan() remain valid after the loop exits. reserve() ensures neither
+    // List reallocates during the loop, which would otherwise invalidate pointers already
+    // taken from earlier elements.
     List<HumaneSourceLoc> secBeginLocs;
     List<SlangDiagnosticSpan> secSpans;
     secBeginLocs.reserve(diag.secondarySpans.getCount());
     secSpans.reserve(diag.secondarySpans.getCount());
     for (const DiagnosticSpan& sec : diag.secondarySpans)
     {
-        HumaneSourceLoc b = (sm && sec.range.begin.isValid()) ? sm->getHumaneLoc(sec.range.begin)
-                                                              : HumaneSourceLoc{};
-        HumaneSourceLoc e =
-            (sm && sec.range.end.isValid()) ? sm->getHumaneLoc(sec.range.end) : HumaneSourceLoc{};
-        secBeginLocs.add(b);
-        SlangDiagnosticSpan s = {};
-        s.filename = secBeginLocs.getLast().pathInfo.foundPath.getBuffer();
-        s.startLine = (uint32_t)b.line;
-        s.startCol = (uint32_t)b.column;
-        s.endLine = (uint32_t)e.line;
-        s.endCol = (uint32_t)e.column;
-        s.message = sec.message.getBuffer();
-        secSpans.add(s);
+        secBeginLocs.add(resolveHumaneLoc(sm, sec.range.begin));
+        HumaneSourceLoc endLoc = resolveHumaneLoc(sm, sec.range.end);
+        secSpans.add(makeDiagnosticSpan(secBeginLocs.getLast(), endLoc, sec.message));
     }
 
     SlangStructuredDiagnostic pub = {};
@@ -971,6 +998,9 @@ void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* 
 
 void Linkage::installDiagnosticCallback(DiagnosticSink& sink) const
 {
+    // No callback is registered, so there is nothing for richDiagnosticThunk to forward;
+    // leave the sink's callback unset rather than wiring up a thunk that would immediately
+    // no-op on every diagnostic.
     if (m_diagnosticCallback)
         sink.setRichCallback(richDiagnosticThunk, const_cast<Linkage*>(this));
 }
