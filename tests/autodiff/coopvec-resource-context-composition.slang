@@ -1,4 +1,9 @@
-//TEST:SIMPLE: -target spirv -entry computeMain -stage compute -o tests/autodiff/coopvec-resource-context-composition.spv
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -render-feature cooperative-vector -output-using-type -g0
+
+// CHECK: type: float
+// CHECK-NEXT: 1.000000
+// CHECK-NEXT: 0.000000
+// CHECK-NEXT: 3.000000
 
 // Resource legalization leaves an empty differential context for `Consumer` after hoisting its
 // resource field. Buffer-element lowering then copies between physical and logical versions of the
@@ -71,6 +76,12 @@ struct Model
     Consumer consumer;
 }
 
+//TEST_INPUT: set model.producer.gradient = ubuffer(data=[0.0 0.0], stride=4)
+//TEST_INPUT: set model.producer.resolution = 3
+//TEST_INPUT: set model.consumer.gradient = ubuffer(data=[0.0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0.0 0.0 0.0], stride=4)
+RWStructuredBuffer<float> outputBuffer;
+
 [Differentiable]
 half objective(no_diff Model model, float scale)
 {
@@ -86,4 +97,7 @@ void computeMain(uniform Model model)
 {
     var scale = diffPair(1.0);
     bwd_diff(objective)(model, scale, half(1.0));
+    outputBuffer[0] = model.producer.gradient[0];
+    outputBuffer[1] = model.producer.gradient[1];
+    outputBuffer[2] = model.consumer.gradient[0];
 }
