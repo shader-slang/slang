@@ -2,7 +2,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -vk
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -cuda
 
-//TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [anyValueSize(16)]
@@ -74,6 +74,8 @@ interface ICompositeConsumer
     float consumeArray(PairArray pairs);
     float consumeTuple(PairTuple pairs);
     float consumeOptional(OptionalPair pair);
+    float replacePair(inout ValuePair pair);
+    void replaceArray(inout PairArray pairs);
 }
 
 struct CompositeConsumer : ICompositeConsumer
@@ -99,6 +101,28 @@ struct CompositeConsumer : ICompositeConsumer
 
         let value = fwd_diff(readValue)(pair.value);
         return value.p * 10.0 + value.d;
+    }
+
+    float replacePair(inout ValuePair pair)
+    {
+        let incoming = fwd_diff(readValue)(pair);
+
+        // Change both the value and its concrete implementation. The witness wrapper must cast
+        // the incoming type-flow pair to the implementation parameter, then cast the updated
+        // nominal pair back through the wrapper-side pointer after the call.
+        pair = fwd_diff(makeSquaredValue)(diffPair(incoming.p + 1.0, incoming.d));
+        return incoming.p * 1000.0 + incoming.d * 100.0;
+    }
+
+    void replaceArray(inout PairArray pairs)
+    {
+        let first = fwd_diff(readValue)(pairs[0]);
+        let second = fwd_diff(readValue)(pairs[1]);
+
+        // This is the same write-back case nested inside an array. Make each output use the other
+        // concrete implementation so a stale or one-way conversion cannot satisfy the checks.
+        pairs[0] = fwd_diff(makeSquaredValue)(diffPair(first.p + 1.0, first.d));
+        pairs[1] = fwd_diff(makeLinearValue)(diffPair(second.p + 1.0, second.d));
     }
 }
 
@@ -129,4 +153,24 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[0] = consumer.consumeArray(arrayPairs); // CHECK: 110.0
     outputBuffer[1] = consumer.consumeTuple(tuplePairs); // CHECK: 313.5
     outputBuffer[2] = consumer.consumeOptional(optionalPair); // CHECK: 51.25
+
+    ValuePair inoutPair = fwd_diff(makeLinearValue)(diffPair(2.0, 0.5));
+    float incoming = consumer.replacePair(inoutPair);
+    let updated = fwd_diff(readValue)(inoutPair);
+
+    // `incoming` encodes (2, 0.5). The replacement is SquaredValueHolder(3), so reading it yields
+    // primal 9 and tangent 3. Observing both values here proves the wrapper wrote the pair back.
+    outputBuffer[3] = incoming + updated.p * 10.0 + updated.d; // CHECK: 2143
+
+    PairArray inoutPairs = {
+        fwd_diff(makeLinearValue)(diffPair(1.0, 0.25)),
+        fwd_diff(makeSquaredValue)(diffPair(2.0, 0.5))};
+    consumer.replaceArray(inoutPairs);
+    let updatedFirst = fwd_diff(readValue)(inoutPairs[0]);
+    let updatedSecond = fwd_diff(readValue)(inoutPairs[1]);
+
+    // The updated values are (4, 1) and (5, 2), including the nontrivial squared tangent.
+    outputBuffer[4] =
+        updatedFirst.p * 1000.0 + updatedFirst.d * 100.0 + updatedSecond.p * 10.0 + updatedSecond.d;
+    // CHECK: 4152
 }
