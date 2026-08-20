@@ -242,6 +242,13 @@ set_target_properties(copy_slang_headers PROPERTIES FOLDER "generated")
 
 set(slang_build_args
     USE_EXTRA_WARNINGS
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    # Report the effective LTO and standard-module-develop-build state via `slangc -v` (#12645).
+    # LTO must mirror the per-config IPO condition (INTERPROCEDURAL_OPTIMIZATION_{RELEASE,
+    # RELWITHDEBINFO} in cmake/SlangTarget.cmake), not the raw SLANG_ENABLE_RELEASE_LTO cache bool:
+    # a Debug binary gets no LTO even when that bool is ON.
+    "SLANG_BUILD_LTO_ENABLED=$<AND:$<BOOL:${SLANG_ENABLE_RELEASE_LTO}>,$<OR:$<CONFIG:Release>,$<CONFIG:RelWithDebInfo>>>"
+    "SLANG_BUILD_STANDARD_MODULE_DEVELOP=$<BOOL:${SLANG_STANDARD_MODULE_DEVELOP_BUILD}>"
     EXTRA_COMPILE_OPTIONS_PRIVATE
     # a warning is disabled for a memset boundary check.
     # everything looked fine and it is unclear why the checking fails
