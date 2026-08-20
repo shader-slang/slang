@@ -1521,9 +1521,21 @@ MacroInvocation::MacroInvocation(
         SourceLoc originalBodyBeginLoc = macro->tokens.m_tokens[0].loc;
         if (originalBodyBeginLoc.isValid())
         {
-            // Scan body tokens to find the span [originalBodyBeginLoc, bodyEnd] in the definition
-            // file. bodyEnd is inclusive (the loc of the last token, not one past it), so
-            // bodyRangeSize = bodyEnd - originalBodyBeginLoc + 1.
+            // Scan body tokens to find the span [originalBodyBeginLoc, bodyEnd] in the
+            // definition file.
+            //
+            // Invariant: all body-token locs come from a single #define in one source file,
+            // so they all lie in the same monotone region with locs >= originalBodyBeginLoc.
+            // This means the UInt subtraction (bodyEnd - originalBodyBeginLoc) never wraps
+            // and the arithmetic below is safe.
+            //
+            // bodyEnd is the START loc of the last token (not the end of its text). That is
+            // sufficient because diagnostic locs always anchor on token-start positions (the
+            // lexer stores the start of each token, never a mid-token interior loc), so a
+            // range that covers every token-start loc covers every diagnostic position.
+            //
+            // bodyRangeSize = (bodyEnd - originalBodyBeginLoc) + 1, where the +1 ensures the
+            // range is inclusive: a single-token body has size 1, not 0.
             SourceLoc bodyEnd = originalBodyBeginLoc;
             for (const Token& t : macro->tokens.m_tokens)
             {
@@ -1543,6 +1555,10 @@ MacroInvocation::MacroInvocation(
     }
 }
 
+// Remap the loc of a body token in-place, for use when emitting ordinary body tokens
+// through the expansion stream. See _remapBodyLoc for the pure query version, which
+// is called directly for the ## paste operator loc (where we need the remapped loc
+// without mutating the operator token itself).
 void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
 {
     token.loc = _remapBodyLoc(token.loc);
