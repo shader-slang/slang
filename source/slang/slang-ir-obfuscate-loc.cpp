@@ -117,8 +117,15 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 locPair.viewLoc = instWithLoc.loc;
                 locPairs.add(locPair);
 
-                // This is the current loc
+                // curLoc is the dedup key for the `if` above. It must always be the raw IR
+                // instruction loc (never the unmapped loc), because the apply loop compares
+                // instWithLoc.loc against pair.originalLoc, which is also the raw IR loc.
                 curLoc = instWithLoc.loc;
+
+                // viewLoc tracks the definition-file loc for SourceView lookups and hash
+                // computation. For expansion-range locs (which have no SourceView), viewLoc is
+                // updated to the unmapped loc below; for regular locs it stays equal to curLoc.
+                SourceLoc viewLoc = instWithLoc.loc;
 
                 // Ignore any core module locs in the hash
                 if (instWithLoc.loc.getRaw() < endCoreModuleLoc.getRaw())
@@ -126,25 +133,26 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     continue;
                 }
 
-                // If the loc isn't in the view, lookup the view it is in
-                if (sourceView == nullptr || !sourceView->getRange().contains(curLoc))
+                // If the viewLoc isn't in the view, lookup the view it is in
+                if (sourceView == nullptr || !sourceView->getRange().contains(viewLoc))
                 {
-                    sourceView = sourceManager->findSourceViewRecursively(curLoc);
+                    sourceView = sourceManager->findSourceViewRecursively(viewLoc);
                     if (sourceView == nullptr)
                     {
                         // The loc may be a per-invocation expansion-range loc produced by
                         // _maybeRemapBodyTokenLoc (a synthetic range with no SourceView).
                         // Walk the macro expansion side table to recover the definition-file loc.
-                        SourceLoc unmappedLoc = curLoc;
+                        SourceLoc unmappedLoc = viewLoc;
                         sourceView = sourceManager->findSourceViewThroughExpansion(unmappedLoc);
                         if (sourceView != nullptr)
                         {
-                            // Store the unmapped loc in viewLoc so the hash computation and
-                            // source-map loop can use findSourceViewRecursively without another
-                            // unmap. Do NOT modify originalLoc — the apply loop uses it as the
-                            // identity key to match IR instruction locs, which still carry the
-                            // raw expansion-range loc.
-                            curLoc = unmappedLoc;
+                            // Store the unmapped loc in viewLoc (local) and in the LocPair, so
+                            // the hash computation and the source-map loop can call
+                            // findSourceViewRecursively without another unmap.
+                            // Do NOT update curLoc — it is the dedup key for the outer `if`, and
+                            // must remain the raw IR expansion-range loc so that the next
+                            // instruction with the same loc is correctly identified as a duplicate.
+                            viewLoc = unmappedLoc;
                             locPairs.getLast().viewLoc = unmappedLoc;
                         }
                         else
@@ -166,7 +174,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // different line endings on different platforms (in particular linux/unix-like and
                 // windows). So we hash the line number/line offset to work around
 
-                const auto offset = sourceView->getRange().getOffset(curLoc);
+                const auto offset = sourceView->getRange().getOffset(viewLoc);
 
                 const auto sourceFile = sourceView->getSourceFile();
                 const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
