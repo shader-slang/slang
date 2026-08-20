@@ -65,7 +65,7 @@ default unless the user explicitly asks for the WSL/Linux version.
 ## Native Linux and macOS Tooling
 
 When working in this repository on native Linux or macOS, use the platform-native tools without
-the Windows `.exe` extension. For example, use `git`, `gh`, `cmake`, and `python`, not `git.exe`,
+the Windows `.exe` extension. For example, use `git`, `gh`, `cmake`, and `python3`, not `git.exe`,
 `gh.exe`, `cmake.exe`, or `python.exe`.
 
 ## Build, Test, and Development Commands
