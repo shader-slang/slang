@@ -37,10 +37,10 @@ jobs:
     # it reached. A cancelled job reports as a red X indistinguishable from a
     # real regression, so the cap was costing triage time on a suite that was
     # healthy. 45 was set in #11380 when the suite was first wired in; it has
-    # since grown past 6000 tests without the cap moving. Since this runs once a
-    # night, an over-generous cap costs nothing but the time a genuinely hung job
-    # takes to fail, while a tight one manufactures false alarms.
-    timeout-minutes: 90
+    # since grown past 6000 tests without the cap moving. 60 leaves roughly a
+    # third of the budget spare at current durations; if runs start creeping into
+    # the mid-50s, raise the cap again rather than trimming the suite to fit it.
+    timeout-minutes: 60
     permissions:
       id-token: write # Workload Identity for GCS-cached LLVM
       contents: read
