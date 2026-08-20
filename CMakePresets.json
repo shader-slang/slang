@@ -18,6 +18,16 @@
       }
     },
     {
+      "name": "dist-parity",
+      "inherits": "default",
+      "description": "Match the two settings that govern how the distributed binaries perform and what a standard module contains, which a default Release build diverges from (see #12645): SLANG_ENABLE_RELEASE_LTO=ON (release.yml sets it; a plain Release runs sema ~1.5x slower per nightly-mdl-perf-test.yml) and SLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF (release drops the neural module's unit-test sources). release.yml's other differences are deliberately left out as out of scope for a compile-parity build: SLANG_GENERATORS_PATH (cross-compile plumbing) and SLANG_ENABLE_EXAMPLES (build scope) do not affect slangc, and SLANG_SLANG_LLVM_FLAVOR only matters if you exercise the LLVM downstream backend. Build with 'dist-parity-release'.",
+      "binaryDir": "${sourceDir}/build.dist-parity",
+      "cacheVariables": {
+        "SLANG_ENABLE_RELEASE_LTO": "ON",
+        "SLANG_STANDARD_MODULE_DEVELOP_BUILD": "OFF"
+      }
+    },
+    {
       "name": "emscripten",
       "description": "Emscripten-based Wasm build",
       "generator": "Ninja Multi-Config",
@@ -181,6 +191,11 @@
       "name": "minSizeRel",
       "configurePreset": "default",
       "configuration": "MinSizeRel"
+    },
+    {
+      "name": "dist-parity-release",
+      "configurePreset": "dist-parity",
+      "configuration": "Release"
     },
     {
       "name": "vs2022-debug",
