@@ -10,11 +10,14 @@ name: Probe - windows-11-vs2026-arm image availability
 # migration completes rather than testing against the outgoing VS2022
 # image.
 #
-# common-setup's "Set up MSVC dev tools on Windows" step runs
-# ilammy/msvc-dev-cmd with no arch input, which auto-detects and targets
-# the host architecture — on this runner that resolves to native arm64,
-# not the amd64_arm64 cross-compile variant used by cmake-options.yml /
-# release.yml.
+# NOTE: common-setup's "Set up MSVC dev tools on Windows" step runs
+# ilammy/msvc-dev-cmd with no arch input. A first run of this workflow
+# (see run 32397832471) showed that default resolves to HostX64\x64 —
+# the x64-hosted, x64-target compiler running under Windows' x64-on-arm64
+# emulation — regardless of the actual host architecture, not a native
+# arm64 toolchain. This workflow therefore bypasses common-setup's MSVC
+# step and calls ilammy/msvc-dev-cmd directly with arch: arm64 to force
+# the native arm64-hosted, arm64-target compiler.
 
 on:
   workflow_dispatch:
@@ -46,14 +49,24 @@ jobs:
           [System.Environment]::OSVersion.VersionString
           Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture
 
-      - name: Setup
-        uses: ./.github/actions/common-setup
+      - name: Add bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
+
+      - name: Set up native arm64 MSVC dev tools
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        # See FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 note in common-setup/action.yml —
+        # this restates that same forced-Node24 workaround for the deprecated
+        # Node 20 bundle.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
-          os: windows
-          compiler: cl
-          platform: aarch64
-          config: debug
-          build-llvm: false
+          arch: arm64
+
+      - name: Install Ninja
+        run: choco install ninja
 
       - name: Report resolved cl.exe and cmake
         run: |
