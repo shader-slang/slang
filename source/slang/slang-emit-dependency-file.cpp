@@ -38,6 +38,36 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
     }
 }
 
+// A compiled `.slang-module` an `import` loads is recorded only as a module dependency, never a
+// file dependency, so `-depfile` omits it and consumers miss the rebuild edge to the importer.
+// Append each such module dependency, deduplicated against the file dependencies already emitted.
+static void _collectExtraModuleDependencyPaths(
+    EndToEndCompileRequest* compileRequest,
+    List<String>& outPaths)
+{
+    auto program = compileRequest->getFrontEndReq()->getGlobalAndEntryPointsComponentType();
+
+    HashSet<String> alreadyListedPaths;
+    int fileDependencyCount = compileRequest->getDependencyFileCount();
+    for (int i = 0; i < fileDependencyCount; ++i)
+        alreadyListedPaths.add(compileRequest->getDependencyFilePath(i));
+
+    for (auto module : program->getModuleDependencies())
+    {
+        // Classify on the file path; a source-loaded module has a `.slang` path already emitted.
+        const char* filePath = module->getFilePath();
+        if (!filePath || !UnownedStringSlice(filePath).endsWith(toSlice(".slang-module")))
+            continue;
+        // Emit the same identity representation `getDependencyFilePath` uses for file dependencies.
+        const char* emitPath = module->getUniqueIdentity();
+        if (!emitPath)
+            emitPath = filePath;
+        String emitPathString(emitPath);
+        if (alreadyListedPaths.add(emitPathString))
+            outPaths.add(emitPathString);
+    }
+}
+
 // Writes a "<output-file>: <dep> <dep...>" line to the stream.
 // When outputPath is empty (output to stdout), "-" is used as the make target placeholder.
 // writtenStdoutSentinel prevents duplicate "-: ..." lines across multiple call sites.
@@ -45,6 +75,7 @@ static void _writeDependencyStatement(
     Stream& stream,
     EndToEndCompileRequest* compileRequest,
     const String& outputPath,
+    const List<String>& extraModuleDependencyPaths,
     bool& writtenStdoutSentinel)
 {
     StringBuilder builder;
@@ -64,12 +95,22 @@ static void _writeDependencyStatement(
     _writeString(stream, ": ");
 
     int dependencyCount = compileRequest->getDependencyFileCount();
+    Index extraCount = extraModuleDependencyPaths.getCount();
+    Index totalCount = Index(dependencyCount) + extraCount;
+    Index writtenCount = 0;
     for (int dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
     {
         builder.clear();
         _escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
         _writeString(stream, builder.begin());
-        _writeString(stream, (dependencyIndex + 1 < dependencyCount) ? " " : "\n");
+        _writeString(stream, (++writtenCount < totalCount) ? " " : "\n");
+    }
+    for (auto& extraPath : extraModuleDependencyPaths)
+    {
+        builder.clear();
+        _escapeDependencyString(extraPath.begin(), builder);
+        _writeString(stream, builder.begin());
+        _writeString(stream, (++writtenCount < totalCount) ? " " : "\n");
     }
 }
 
@@ -89,6 +130,9 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
     auto linkage = compileRequest->getLinkage();
     auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();
 
+    List<String> extraModuleDependencyPaths;
+    _collectExtraModuleDependencyPaths(compileRequest, extraModuleDependencyPaths);
+
     bool writtenStdoutSentinel = false;
 
     // Iterate over all the targets and their outputs
@@ -104,6 +148,7 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
                     stream,
                     compileRequest,
                     targetInfo->wholeTargetOutputPath,
+                    extraModuleDependencyPaths,
                     writtenStdoutSentinel);
             }
         }
@@ -122,6 +167,7 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
                             stream,
                             compileRequest,
                             outputPath,
+                            extraModuleDependencyPaths,
                             writtenStdoutSentinel);
                     }
                 }
@@ -137,6 +183,7 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
             stream,
             compileRequest,
             compileRequest->m_containerOutputPath,
+            extraModuleDependencyPaths,
             writtenStdoutSentinel);
     }
 
