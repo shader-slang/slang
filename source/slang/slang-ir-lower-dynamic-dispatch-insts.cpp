@@ -20,7 +20,7 @@ namespace Slang
 struct ArgumentPackWorkItem
 {
     // The wrapper-side destination and concrete temporary used for an output-capable parameter.
-    // After the call, `adaptTypeFlowValue` performs the reverse structural conversion.
+    // After the call, `castTypeFlowValue` performs the reverse structural conversion.
     IRInst* dstArg = nullptr;
     IRInst* concreteArg = nullptr;
 };
@@ -65,7 +65,7 @@ IRInst* maybeUnpackArg(
             if (direction.kind != ParameterDirectionInfo::Kind::Out)
             {
                 auto initialValue =
-                    adaptTypeFlowValue(builder, builder->emitLoad(arg), paramValType);
+                    castTypeFlowValue(builder, builder->emitLoad(arg), paramValType);
                 builder->emitStore(tempVar, initialValue);
             }
 
@@ -81,7 +81,7 @@ IRInst* maybeUnpackArg(
             return tempVar;
         }
 
-        return adaptTypeFlowValue(builder, argVal, paramValType);
+        return castTypeFlowValue(builder, argVal, paramValType);
     }
 
     return arg;
@@ -153,12 +153,10 @@ IRFunc* emitWitnessTableWrapper(
         // Type of the parameter in the callee.
         auto funcParamType = targetFuncType->getParamType(i);
 
-        // If the implementation expects a concrete type
-        // (either in the form of a pointer for `out`/`inout` parameters,
-        // or in the form a value for `in` parameters, while
-        // the interface exposes an AnyValue type,
-        // we need to unpack the AnyValue argument to the appropriate
-        // concerete type.
+        // If the implementation expects a concrete type (either a pointer for `out`/`inout`
+        // parameters or a value for `in` parameters) while the interface exposes a structural
+        // type-flow type, cast the wrapper argument to the concrete type. Storage-level
+        // `AnyValueType` values are introduced later by `lowerUntaggedUnionTypes`.
         ArgumentPackWorkItem packWorkItem;
         auto newArg = maybeUnpackArg(builder, funcParamType, wrapperParam, packWorkItem);
         args.add(newArg);
@@ -172,7 +170,7 @@ IRFunc* emitWitnessTableWrapper(
     {
         auto wrapperValueType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
         auto concreteVal = builder->emitLoad(item.concreteArg);
-        auto packedVal = adaptTypeFlowValue(builder, concreteVal, wrapperValueType);
+        auto packedVal = castTypeFlowValue(builder, concreteVal, wrapperValueType);
         builder->emitStore(item.dstArg, packedVal);
     }
 
@@ -180,7 +178,7 @@ IRFunc* emitWitnessTableWrapper(
     if (call->getDataType() != funcTypeInInterface->getResultType())
     {
         auto adaptedResult =
-            adaptTypeFlowValue(builder, call, funcTypeInInterface->getResultType());
+            castTypeFlowValue(builder, call, funcTypeInInterface->getResultType());
         builder->emitReturn(adaptedResult);
     }
     else

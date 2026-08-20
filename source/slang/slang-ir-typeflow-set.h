@@ -24,9 +24,9 @@ void forEachInSet(IRModule* module, IRSetBase* info, F func)
     module->getContainerPool().free(&elements);
 }
 
-// Adapts a value between concrete types and the structural types produced by type-flow.
+// Casts a value between concrete types and the structural types produced by type-flow.
 // The conversion is recursive so semantic wrappers such as differential-pair info can be nested
 // inside arrays, tuples, and optionals without requiring call-boundary special cases.
-IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo);
+IRInst* castTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo);
 
 } // namespace Slang

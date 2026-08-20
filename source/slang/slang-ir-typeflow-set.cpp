@@ -96,13 +96,13 @@ IRInst* openOptional(IRModule* module, IRInst* arg, F innerFunc)
     return callResult;
 }
 
-// Adapt the value in `arg` to `destInfo`. Most existing callers perform an upcast into a larger
+// Cast the value in `arg` to `destInfo`. Most existing callers perform an upcast into a larger
 // type-flow set, but witness-table wrappers also use the same structural recursion in reverse to
 // recover the concrete parameter type expected by an implementation.
 //
-IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
+IRInst* castTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 {
-    // The adaptation process inserts the appropriate instructions
+    // The cast inserts the appropriate instructions
     // to make the argument's type match the type provided by `destInfo`.
     //
     // This process depends on the structure of arg and destInfo.
@@ -117,7 +117,7 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     {
         // Unwrap and upcast.
         auto destBase = (IRType*)unwrapAttributedType(destInfo);
-        return adaptTypeFlowValue(builder, arg, destBase);
+        return castTypeFlowValue(builder, arg, destBase);
     }
 
     auto argInfo = arg->getDataType();
@@ -155,9 +155,9 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             auto differentialArg = builder->emitDifferentialValuePairGetDifferential(
                 argPairInfo->getDifferentialInfo(),
                 arg);
-            auto primal = adaptTypeFlowValue(builder, primalArg, destPairType->getValueType());
+            auto primal = castTypeFlowValue(builder, primalArg, destPairType->getValueType());
             auto differentialType = getConcreteDifferentialType(builder, destPairType);
-            auto differential = adaptTypeFlowValue(builder, differentialArg, differentialType);
+            auto differential = castTypeFlowValue(builder, differentialArg, differentialType);
             return builder->emitMakeDifferentialPair(destPairType, primal, differential);
         }
 
@@ -168,9 +168,9 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             auto differentialArg = builder->emitDifferentialValuePairGetDifferential(
                 argPairInfo->getDifferentialInfo(),
                 arg);
-            auto primal = adaptTypeFlowValue(builder, primalArg, destPairInfo->getPrimalInfo());
+            auto primal = castTypeFlowValue(builder, primalArg, destPairInfo->getPrimalInfo());
             auto differential =
-                adaptTypeFlowValue(builder, differentialArg, destPairInfo->getDifferentialInfo());
+                castTypeFlowValue(builder, differentialArg, destPairInfo->getDifferentialInfo());
             return builder->emitMakeDifferentialValuePair(destPairInfo, primal, differential);
         }
     }
@@ -186,9 +186,9 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             auto differentialType = getConcreteDifferentialType(builder, argPairType);
             auto differential =
                 builder->emitDifferentialValuePairGetDifferential(differentialType, arg);
-            auto adaptedPrimal = adaptTypeFlowValue(builder, primal, destPairInfo->getPrimalInfo());
+            auto adaptedPrimal = castTypeFlowValue(builder, primal, destPairInfo->getPrimalInfo());
             auto adaptedDifferential =
-                adaptTypeFlowValue(builder, differential, destPairInfo->getDifferentialInfo());
+                castTypeFlowValue(builder, differential, destPairInfo->getDifferentialInfo());
             return builder->emitMakeDifferentialValuePair(
                 destPairInfo,
                 adaptedPrimal,
@@ -208,19 +208,19 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         if (argTUType != destTUType)
         {
             auto argTableTag = builder->emitGetTagFromTaggedUnion(arg);
-            auto reinterpretedTableTag = adaptTypeFlowValue(
+            auto reinterpretedTableTag = castTypeFlowValue(
                 builder,
                 argTableTag,
                 builder->getSetTagType(destTUType->getWitnessTableSet()));
 
             auto argTypeTag = builder->emitGetTypeTagFromTaggedUnion(arg);
-            auto reinterpretedTypeTag = adaptTypeFlowValue(
+            auto reinterpretedTypeTag = castTypeFlowValue(
                 builder,
                 argTypeTag,
                 builder->getSetTagType(destTUType->getTypeSet()));
 
             auto argVal = builder->emitGetValueFromTaggedUnion(arg);
-            auto reinterpretedVal = adaptTypeFlowValue(
+            auto reinterpretedVal = castTypeFlowValue(
                 builder,
                 argVal,
                 builder->getUntaggedUnionType(destTUType->getTypeSet()));
@@ -254,14 +254,14 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
         IRType* payloadType = typeSet->isSingleton() ? (IRType*)typeSet->getElement(0)
                                                      : builder->getUntaggedUnionType(typeSet);
-        auto payload = adaptTypeFlowValue(builder, arg, payloadType);
+        auto payload = castTypeFlowValue(builder, arg, payloadType);
         return builder->emitMakeTaggedUnion(destTaggedUnionType, typeTag, witnessTableTag, payload);
     }
     else if (as<IRTaggedUnionType>(argInfo))
     {
         // A concrete witness-table wrapper does not need the existential tag after dispatch has
         // selected the implementation. Extract the payload first, then continue adapting it.
-        return adaptTypeFlowValue(builder, builder->emitGetValueFromTaggedUnion(arg), destInfo);
+        return castTypeFlowValue(builder, builder->emitGetValueFromTaggedUnion(arg), destInfo);
     }
     else if (as<IRSetTagType>(argInfo) && as<IRSetTagType>(destInfo))
     {
@@ -277,6 +277,9 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             return builder->emitIntrinsicInst((IRType*)destInfo, kIROp_GetTagForSuperSet, 1, &arg);
         }
     }
+    // Type-flow unions are still semantic `UntaggedUnionType` values here. The later
+    // `lowerUntaggedUnionTypes` pass replaces them with storage-level `AnyValueType` values, so
+    // accepting `AnyValueType` here would blur the boundary between analysis and lowering.
     else if (as<IRUntaggedUnionType>(argInfo) && as<IRUntaggedUnionType>(destInfo))
     {
         // If the arg has a untagged union type, but the dest is a _different_ untagged union,
@@ -311,14 +314,6 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     {
         return builder->emitUnpackAnyValue(destInfo, arg);
     }
-    else if (as<IRAnyValueType>(argInfo) && !as<IRAnyValueType>(destInfo))
-    {
-        return builder->emitUnpackAnyValue(destInfo, arg);
-    }
-    else if (!as<IRAnyValueType>(argInfo) && as<IRAnyValueType>(destInfo))
-    {
-        return builder->emitPackAnyValue(destInfo, arg);
-    }
     else if (!as<IRUntaggedUnionType>(argInfo) && as<IRUntaggedUnionType>(destInfo))
     {
         // If the arg is not a collection-type, but the dest is a collection,
@@ -348,7 +343,7 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             for (IRIntegerValue i = 0; i < arraySize; i++)
             {
                 auto argElement = builder->emitGetElement(argElementType, arg, i);
-                auto adaptedElement = adaptTypeFlowValue(builder, argElement, destElementType);
+                auto adaptedElement = castTypeFlowValue(builder, argElement, destElementType);
                 adaptedElements[(Index)i] = adaptedElement;
             }
 
@@ -377,7 +372,7 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
                 auto argElementType = (IRType*)argTupleType->getOperand(i);
                 auto destElementType = (IRType*)destTupleType->getOperand(i);
                 auto argElement = builder->emitGetTupleElement(argElementType, arg, i);
-                auto adaptedElement = adaptTypeFlowValue(builder, argElement, destElementType);
+                auto adaptedElement = castTypeFlowValue(builder, argElement, destElementType);
                 adaptedElements[(Index)i] = adaptedElement;
             }
 
@@ -402,7 +397,7 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
                 builder->getModule(),
                 arg,
                 [destValueType](IRBuilder* b, IRInst* extractedValue)
-                { return (IRInst*)adaptTypeFlowValue(b, extractedValue, destValueType); });
+                { return (IRInst*)castTypeFlowValue(b, extractedValue, destValueType); });
         }
     }
     else if (as<IROptionalNoneType>(argInfo) && as<IROptionalType>(destInfo))

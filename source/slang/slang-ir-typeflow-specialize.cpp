@@ -5206,7 +5206,7 @@ struct TypeFlowSpecializationContext
         // phi parameter's type in C has the union type `TagType(WitnessTableSet{T1, T2,
         // T3})`
         //
-        // In this case, we use `adaptTypeFlowValue` to insert a conversion from
+        // In this case, we use `castTypeFlowValue` to insert a conversion from
         // TagType(WitnessTableSet{T1, T2}) -> TagType(WitnessTableSet{T1, T2, T3})
         // before passing the result as a phi argument.
         //
@@ -5249,7 +5249,7 @@ struct TypeFlowSpecializationContext
                         auto arg = unconditionalBranch->getArg(paramIndex);
                         IRBuilder builder(module);
                         builder.setInsertBefore(unconditionalBranch);
-                        auto newArg = adaptTypeFlowValue(&builder, arg, param->getDataType());
+                        auto newArg = castTypeFlowValue(&builder, arg, param->getDataType());
 
                         if (newArg != arg)
                         {
@@ -5283,7 +5283,7 @@ struct TypeFlowSpecializationContext
                         IRBuilder builder(module);
                         builder.setInsertBefore(returnInst);
                         auto newReturnVal =
-                            adaptTypeFlowValue(&builder, returnInst->getVal(), specializedType);
+                            castTypeFlowValue(&builder, returnInst->getVal(), specializedType);
                         if (newReturnVal != returnInst->getVal())
                         {
                             // Replace the return value with the reinterpreted value
@@ -6803,7 +6803,7 @@ struct TypeFlowSpecializationContext
         //    It is possible that the parameters in the callee have been specialized
         //    to accept a super-set of types compared to the arguments from this call site
         //
-        //    In this case, we adapt them using `adaptTypeFlowValue` before
+        //    In this case, we cast them using `castTypeFlowValue` before
         //    creating a new call inst
         //
 
@@ -7059,7 +7059,7 @@ struct TypeFlowSpecializationContext
             // We'll upcast any in-parameters.
             case ParameterDirectionInfo::Kind::In:
                 {
-                    callArgs.add(adaptTypeFlowValue(&argBuilder, arg, paramType));
+                    callArgs.add(castTypeFlowValue(&argBuilder, arg, paramType));
                     break;
                 }
 
@@ -7143,7 +7143,7 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getOperand(operandIndex);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
-            auto newArg = adaptTypeFlowValue(&builder, arg, field->getFieldType());
+            auto newArg = castTypeFlowValue(&builder, arg, field->getFieldType());
 
             if (arg != newArg)
             {
@@ -7177,7 +7177,7 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getOperand(i);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
-            auto newArg = adaptTypeFlowValue(&builder, arg, elementType);
+            auto newArg = castTypeFlowValue(&builder, arg, elementType);
 
             if (arg != newArg)
             {
@@ -7207,7 +7207,7 @@ struct TypeFlowSpecializationContext
         auto arg = inst->getOperand(0);
         IRBuilder builder(context);
         builder.setInsertBefore(inst);
-        auto newArg = adaptTypeFlowValue(&builder, arg, elementType);
+        auto newArg = castTypeFlowValue(&builder, arg, elementType);
 
         bool changed = false;
         if (arg != newArg)
@@ -7247,7 +7247,7 @@ struct TypeFlowSpecializationContext
             auto elementType = (IRType*)tupleType->getOperand(i);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
-            auto newArg = adaptTypeFlowValue(&builder, arg, elementType);
+            auto newArg = castTypeFlowValue(&builder, arg, elementType);
 
             if (arg != newArg)
             {
@@ -7293,7 +7293,7 @@ struct TypeFlowSpecializationContext
         else if (as<IRSetTagType>(inst->getWitnessTable()->getDataType()))
         {
             witnessTableTag =
-                adaptTypeFlowValue(&builder, inst->getWitnessTable(), makeTagType(tableSet));
+                castTypeFlowValue(&builder, inst->getWitnessTable(), makeTagType(tableSet));
         }
 
         // Create the appropriate any-value type
@@ -8018,7 +8018,7 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        auto specializedVal = adaptTypeFlowValue(&builder, inst->getVal(), ptrInfo);
+        auto specializedVal = castTypeFlowValue(&builder, inst->getVal(), ptrInfo);
 
         if (specializedVal != inst->getVal())
         {
@@ -8076,7 +8076,7 @@ struct TypeFlowSpecializationContext
                 }
 
                 // Adapt the element to match the destination type.
-                auto adaptedElement = adaptTypeFlowValue(&builder, sourceElement, destElemType);
+                auto adaptedElement = castTypeFlowValue(&builder, sourceElement, destElemType);
                 if (adaptedElement != sourceElement)
                     hasChanges = true;
 
