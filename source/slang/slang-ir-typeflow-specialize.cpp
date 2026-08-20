@@ -566,6 +566,12 @@ bool isConcreteType(IRInst* inst)
         }
     case kIROp_DifferentialPairType:
         return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
+    case kIROp_DifferentialPairInfoType:
+        // Like TaggedUnionType, this is already the concrete runtime representation selected for
+        // an abstract source value. Treating it as another abstract source type would recursively
+        // specialize every helper that accepts the representation. `getLoweredType` still owns
+        // the separate decision to recover a nominal pair when both components are singletons.
+        return true;
     case kIROp_AttributedType:
         return isConcreteType(cast<IRAttributedType>(inst)->getBaseType());
     case kIROp_TupleType:
@@ -708,18 +714,24 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
             // Consider a concrete derivative implementation that accepts
             // `DifferentialPair<ValueHolder>` through a dynamically dispatched function whose
             // corresponding parameter is `DifferentialPair<IValueHolder>`. Type-flow represents
-            // the abstract pair as a tuple of propagation information for its two components.
+            // the abstract pair with named propagation information for its two components.
+            // A differential-pair type stores only its primal element type and differentiability
+            // witness, so type-flow uses the primal element type as the structural mask for both
+            // components. Structural differential types preserve the primal's outer shape, while
+            // non-structural leaves such as interfaces flatten to a flat `UntaggedUnion`; concrete
+            // types below still determine the elements stored in those unions.
             // Seed the concrete argument in that same structural form so every producer agrees on
             // the representation consumed by `unionPropagationInfo`.
+            auto componentMask = paramPairType->getValueType();
             auto primalInfo = (IRType*)makeInfoForConcreteType(
                 module,
                 pairType->getValueType(),
-                paramPairType->getValueType());
+                componentMask);
             auto differentialInfo = (IRType*)makeInfoForConcreteType(
                 module,
                 getConcreteDifferentialType(&builder, pairType),
-                paramPairType->getValueType());
-            return builder.getTupleType(primalInfo, differentialInfo);
+                componentMask);
+            return builder.getDifferentialPairInfoType(primalInfo, differentialInfo);
         }
     }
 
@@ -1102,6 +1114,7 @@ struct TypeFlowSpecializationContext
             case kIROp_TaggedUnionType:
             case kIROp_UntaggedUnionType:
             case kIROp_ElementOfSetType:
+            case kIROp_DifferentialPairInfoType:
                 return inst->getDataType();
             }
         }
@@ -1196,8 +1209,9 @@ struct TypeFlowSpecializationContext
     // `typeUnionMask` is the declared type of the merge point (e.g., parameter type, field type,
     // return type). It determines how much structural decomposition to perform during union:
     //
-    // - If typeUnionMask is structural (Tuple, Array, Ptr, Optional, Attributed), and both infos
-    //   match that structure, recurse element-wise using typeUnionMask's sub-types as sub-masks.
+    // - If typeUnionMask is structural (Tuple, Array, Ptr, Optional, Attributed, or
+    //   DifferentialPair), and both infos match that structure, recurse element-wise using
+    //   typeUnionMask's sub-types as sub-masks.
     //
     // - If typeUnionMask is concrete, both infos should represent the same thing; return info1.
     //
@@ -1325,32 +1339,21 @@ struct TypeFlowSpecializationContext
 
         if (auto diffPairUnionMask = as<IRDifferentialPairType>(typeUnionMask))
         {
-            auto attr1 = as<IRTupleType>(info1);
-            auto attr2 = as<IRTupleType>(info2);
-            if (attr1 && attr2)
+            auto pairInfo1 = as<IRDifferentialPairInfoType>(info1);
+            auto pairInfo2 = as<IRDifferentialPairInfoType>(info2);
+            if (pairInfo1 && pairInfo2)
             {
                 IRBuilder builder(module);
-                List<IRType*> elementInfos;
-
-                elementInfos.add((IRType*)unionPropagationInfo(
-                    diffPairUnionMask->getValueType(),
-                    attr1->getOperand(0),
-                    attr2->getOperand(0)));
-
-                elementInfos.add((IRType*)unionPropagationInfo(
-                    diffPairUnionMask->getValueType(),
-                    attr1->getOperand(1),
-                    attr2->getOperand(1)));
-
-                return builder.getTupleType(elementInfos);
-            }
-
-            auto diffPair1 = as<IRDifferentialPairType>(info1);
-            auto diffPair2 = as<IRDifferentialPairType>(info2);
-            if (diffPair1 && diffPair2)
-            {
-                // Expect either a type or an ElementOfSetType.
-                // and either a  getWitness()
+                auto componentMask = diffPairUnionMask->getValueType();
+                auto primalInfo = (IRType*)unionPropagationInfo(
+                    componentMask,
+                    pairInfo1->getPrimalInfo(),
+                    pairInfo2->getPrimalInfo());
+                auto differentialInfo = (IRType*)unionPropagationInfo(
+                    componentMask,
+                    pairInfo1->getDifferentialInfo(),
+                    pairInfo2->getDifferentialInfo());
+                return builder.getDifferentialPairInfoType(primalInfo, differentialInfo);
             }
         }
 
@@ -2929,7 +2932,7 @@ struct TypeFlowSpecializationContext
             if (!diffInfo)
                 return none();
 
-            return builder.getTupleType(List<IRType*>({primalInfo, diffInfo}));
+            return builder.getDifferentialPairInfoType(primalInfo, diffInfo);
         }
         else if (!isGlobalInst(inst->getDataType()))
         {
@@ -2945,7 +2948,7 @@ struct TypeFlowSpecializationContext
             if (primalInfo->getSet()->isSingleton() && diffInfo->getSet()->isSingleton())
                 return none();
 
-            return builder.getTupleType(List<IRType*>({primalInfo, diffInfo}));
+            return builder.getDifferentialPairInfoType(primalInfo, diffInfo);
         }
         else
         {
@@ -2960,9 +2963,9 @@ struct TypeFlowSpecializationContext
         IRBuilder builder(module);
         if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
         {
-            if (auto pairType = as<IRTupleType>(pairInfo))
+            if (auto pairType = as<IRDifferentialPairInfoType>(pairInfo))
             {
-                return pairType->getOperand(0);
+                return pairType->getPrimalInfo();
             }
         }
 
@@ -2977,9 +2980,9 @@ struct TypeFlowSpecializationContext
         IRBuilder builder(module);
         if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
         {
-            if (auto pairType = as<IRTupleType>(pairInfo))
+            if (auto pairType = as<IRDifferentialPairInfoType>(pairInfo))
             {
-                return pairType->getOperand(1);
+                return pairType->getDifferentialInfo();
             }
         }
 
@@ -3764,6 +3767,14 @@ struct TypeFlowSpecializationContext
             return builder.getTupleType(newElementTypes);
         }
 
+        if (auto pairInfo = as<IRDifferentialPairInfoType>(typeLike))
+        {
+            IRBuilder builder(module);
+            return builder.getDifferentialPairInfoType(
+                (IRType*)substituteSetsInTypeLike(pairInfo->getPrimalInfo()),
+                (IRType*)substituteSetsInTypeLike(pairInfo->getDifferentialInfo()));
+        }
+
         if (auto optionalType = as<IROptionalType>(typeLike);
             optionalType && !isOptionalExistentialType(typeLike))
         {
@@ -3777,7 +3788,9 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             auto substitutedValueType =
                 (IRType*)substituteSetsInTypeLike(diffPairType->getValueType());
-            return builder.getTupleType(substitutedValueType, substitutedValueType);
+            return builder.getDifferentialPairInfoType(
+                substitutedValueType,
+                substitutedValueType);
         }
 
         return typeLike;
@@ -3828,6 +3841,14 @@ struct TypeFlowSpecializationContext
             return builder.getTupleType(newElementTypes);
         }
 
+        if (auto pairInfo = as<IRDifferentialPairInfoType>(type))
+        {
+            IRBuilder builder(module);
+            return builder.getDifferentialPairInfoType(
+                (IRType*)substituteSets(context, pairInfo->getPrimalInfo()),
+                (IRType*)substituteSets(context, pairInfo->getDifferentialInfo()));
+        }
+
         if (auto optionalType = as<IROptionalType>(type);
             optionalType && !isOptionalExistentialType(type))
         {
@@ -3841,7 +3862,9 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             auto substitutedValueType =
                 (IRType*)substituteSets(context, diffPairType->getValueType());
-            return builder.getTupleType(substitutedValueType, substitutedValueType);
+            return builder.getDifferentialPairInfoType(
+                substitutedValueType,
+                substitutedValueType);
         }
 
         return type;
@@ -5189,7 +5212,7 @@ struct TypeFlowSpecializationContext
         // phi parameter's type in C has the union type `TagType(WitnessTableSet{T1, T2,
         // T3})`
         //
-        // In this case, we use `upcastSet` to insert a cast from
+        // In this case, we use `adaptTypeFlowValue` to insert a conversion from
         // TagType(WitnessTableSet{T1, T2}) -> TagType(WitnessTableSet{T1, T2, T3})
         // before passing the result as a phi argument.
         //
@@ -5232,7 +5255,7 @@ struct TypeFlowSpecializationContext
                         auto arg = unconditionalBranch->getArg(paramIndex);
                         IRBuilder builder(module);
                         builder.setInsertBefore(unconditionalBranch);
-                        auto newArg = upcastSet(&builder, arg, param->getDataType());
+                        auto newArg = adaptTypeFlowValue(&builder, arg, param->getDataType());
 
                         if (newArg != arg)
                         {
@@ -5266,7 +5289,7 @@ struct TypeFlowSpecializationContext
                         IRBuilder builder(module);
                         builder.setInsertBefore(returnInst);
                         auto newReturnVal =
-                            upcastSet(&builder, returnInst->getVal(), specializedType);
+                            adaptTypeFlowValue(&builder, returnInst->getVal(), specializedType);
                         if (newReturnVal != returnInst->getVal())
                         {
                             // Replace the return value with the reinterpreted value
@@ -5545,18 +5568,15 @@ struct TypeFlowSpecializationContext
     // DifferentialPair<IValueHolder> whose two component infos have narrowed to LinearValueHolder.
     // The LinearValueHolder DifferentialPairType annotation supplies the already-registered pair
     // and its IDifferentiable witness. If either component still has multiple possibilities, the
-    // tuple remains the runtime-dispatch representation.
-    IRDifferentialPairType* tryGetSingletonDifferentialPairType(IRInst* info, IRInst* typeUnionMask)
+    // pair-info type remains the runtime-dispatch representation.
+    IRDifferentialPairType* tryGetSingletonDifferentialPairType(IRInst* info)
     {
-        if (!as<IRDifferentialPairType>(typeUnionMask))
+        auto pairInfo = as<IRDifferentialPairInfoType>(info);
+        if (!pairInfo)
             return nullptr;
 
-        auto tupleInfo = as<IRTupleType>(info);
-        if (!tupleInfo || tupleInfo->getOperandCount() != 2)
-            return nullptr;
-
-        auto primalType = tryGetSingletonConcreteType(tupleInfo->getOperand(0));
-        auto differentialType = tryGetSingletonConcreteType(tupleInfo->getOperand(1));
+        auto primalType = tryGetSingletonConcreteType(pairInfo->getPrimalInfo());
+        auto differentialType = tryGetSingletonConcreteType(pairInfo->getDifferentialInfo());
         if (!primalType || !differentialType)
             return nullptr;
 
@@ -5653,11 +5673,24 @@ struct TypeFlowSpecializationContext
                 return nullptr;
         }
 
-        if (auto tupleType = as<IRTupleType>(info))
+        if (auto pairInfo = as<IRDifferentialPairInfoType>(info))
         {
-            if (auto pairType = tryGetSingletonDifferentialPairType(info, typeUnionMask))
+            if (auto pairType = tryGetSingletonDifferentialPairType(info))
                 return pairType;
 
+            IRBuilder builder(module);
+            auto pairMask = as<IRDifferentialPairType>(typeUnionMask);
+            auto componentMask = pairMask ? pairMask->getValueType() : nullptr;
+            auto primalType = getLoweredType(pairInfo->getPrimalInfo(), componentMask);
+            auto differentialType = getLoweredType(pairInfo->getDifferentialInfo(), componentMask);
+            if (!primalType || !differentialType)
+                return nullptr;
+
+            return builder.getDifferentialPairInfoType(primalType, differentialType);
+        }
+
+        if (auto tupleType = as<IRTupleType>(info))
+        {
             IRBuilder builder(module);
             auto tupleMask = as<IRTupleType>(typeUnionMask);
             List<IRType*> specializedElements;
@@ -6019,8 +6052,14 @@ struct TypeFlowSpecializationContext
         else if (auto concreteType = tryGetSingletonConcreteType(thisInfo))
         {
             // A singleton existential can disappear as part of specializing a containing value,
-            // such as a DifferentialPair. Its payload extraction is then the identity operation.
-            SLANG_RELEASE_ASSERT(existential->getDataType() == concreteType);
+            // such as a DifferentialPair. Analysis can discover that singleton before the
+            // producer has been rewritten, so wait for a later specialization iteration rather
+            // than replacing an interface-typed value with a differently typed concrete result.
+            if (existential->getDataType() != concreteType)
+                return false;
+
+            // Once the producer has the concrete type, its payload extraction is the identity
+            // operation.
             inst->replaceUsesWith(existential);
             inst->removeAndDeallocate();
             return true;
@@ -6770,7 +6809,7 @@ struct TypeFlowSpecializationContext
         //    It is possible that the parameters in the callee have been specialized
         //    to accept a super-set of types compared to the arguments from this call site
         //
-        //    In this case, we just upcast them using `upcastSet` before
+        //    In this case, we adapt them using `adaptTypeFlowValue` before
         //    creating a new call inst
         //
 
@@ -7026,7 +7065,7 @@ struct TypeFlowSpecializationContext
             // We'll upcast any in-parameters.
             case ParameterDirectionInfo::Kind::In:
                 {
-                    callArgs.add(upcastSet(&argBuilder, arg, paramType));
+                    callArgs.add(adaptTypeFlowValue(&argBuilder, arg, paramType));
                     break;
                 }
 
@@ -7110,7 +7149,7 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getOperand(operandIndex);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
-            auto newArg = upcastSet(&builder, arg, field->getFieldType());
+            auto newArg = adaptTypeFlowValue(&builder, arg, field->getFieldType());
 
             if (arg != newArg)
             {
@@ -7144,7 +7183,7 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getOperand(i);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
-            auto newArg = upcastSet(&builder, arg, elementType);
+            auto newArg = adaptTypeFlowValue(&builder, arg, elementType);
 
             if (arg != newArg)
             {
@@ -7174,7 +7213,7 @@ struct TypeFlowSpecializationContext
         auto arg = inst->getOperand(0);
         IRBuilder builder(context);
         builder.setInsertBefore(inst);
-        auto newArg = upcastSet(&builder, arg, elementType);
+        auto newArg = adaptTypeFlowValue(&builder, arg, elementType);
 
         bool changed = false;
         if (arg != newArg)
@@ -7214,7 +7253,7 @@ struct TypeFlowSpecializationContext
             auto elementType = (IRType*)tupleType->getOperand(i);
             IRBuilder builder(context);
             builder.setInsertBefore(inst);
-            auto newArg = upcastSet(&builder, arg, elementType);
+            auto newArg = adaptTypeFlowValue(&builder, arg, elementType);
 
             if (arg != newArg)
             {
@@ -7259,7 +7298,8 @@ struct TypeFlowSpecializationContext
         }
         else if (as<IRSetTagType>(inst->getWitnessTable()->getDataType()))
         {
-            witnessTableTag = upcastSet(&builder, inst->getWitnessTable(), makeTagType(tableSet));
+            witnessTableTag =
+                adaptTypeFlowValue(&builder, inst->getWitnessTable(), makeTagType(tableSet));
         }
 
         // Create the appropriate any-value type
@@ -7294,8 +7334,7 @@ struct TypeFlowSpecializationContext
     bool specializeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
     {
         auto pairInfo = tryGetInfo(context, inst);
-        if (auto concretePairType =
-                tryGetSingletonDifferentialPairType(pairInfo, inst->getDataType()))
+        if (auto concretePairType = tryGetSingletonDifferentialPairType(pairInfo))
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
@@ -7316,14 +7355,18 @@ struct TypeFlowSpecializationContext
             inst->removeAndDeallocate();
             return true;
         }
-        if (as<IRTupleType>(pairInfo))
+
+        if (auto effectivePairInfo = as<IRDifferentialPairInfoType>(
+                getLoweredType(pairInfo, inst->getDataType())))
         {
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto newInst = builder.emitMakeTuple(inst->getPrimal(), inst->getDifferential());
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-            return true;
+            // Keep the semantic pair operation until the specialization fixed point is complete.
+            // Dispatcher construction still needs to distinguish this value from an ordinary
+            // two-element tuple when adapting concrete witness-table implementations.
+            if (inst->getDataType() != effectivePairInfo)
+            {
+                inst->setFullType(effectivePairInfo);
+                return true;
+            }
         }
 
         return false;
@@ -7335,57 +7378,21 @@ struct TypeFlowSpecializationContext
         // This matters for nested contexts: specializing a context field from an interface to a
         // tagged union recursively changes the outer tuple type, but does not otherwise update the
         // existing projections that read that field.
-        //
-        // An abstract DifferentialPair<T> is also represented as a tuple during type-flow. If it
-        // later narrows to one concrete pair type, replace the tuple projection with the matching
-        // pair operation as part of the same representation update.
-        auto pairType = as<IRDifferentialPairType>(inst->getTuple()->getDataType());
-        auto elementIndex = as<IRIntLit>(inst->getElementIndex());
-        if (!pairType)
-            return replaceType(context, inst);
-        if (!elementIndex)
-            return false;
-
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-
-        IRInst* result = nullptr;
-        switch (elementIndex->getValue())
-        {
-        case 0:
-            result = builder.emitDifferentialValuePairGetPrimal(
-                pairType->getValueType(),
-                inst->getTuple());
-            break;
-        case 1:
-            result = builder.emitDifferentialValuePairGetDifferential(
-                (IRType*)getConcreteDifferentialType(&builder, pairType),
-                inst->getTuple());
-            break;
-        default:
-            return false;
-        }
-
-        inst->replaceUsesWith(result);
-        inst->removeAndDeallocate();
-        return true;
+        return replaceType(context, inst);
     }
 
     bool specializeDifferentialPairGetDifferential(
         IRInst* context,
         IRDifferentialPairGetDifferential* inst)
     {
-        if (auto tupleType = as<IRTupleType>(inst->getBase()->getDataType()))
+        if (auto pairInfo = as<IRDifferentialPairInfoType>(inst->getBase()->getDataType()))
         {
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto newInst = builder.emitGetTupleElement(
-                (IRType*)getLoweredType(tupleType->getOperand(1)),
-                inst->getBase(),
-                1);
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-            return true;
+            auto differentialType = pairInfo->getDifferentialInfo();
+            if (inst->getDataType() != differentialType)
+            {
+                inst->setFullType(differentialType);
+                return true;
+            }
         }
 
         if (auto pairType = as<IRDifferentialPairType>(inst->getBase()->getDataType()))
@@ -7406,17 +7413,14 @@ struct TypeFlowSpecializationContext
 
     bool specializeDifferentialPairGetPrimal(IRInst* context, IRDifferentialPairGetPrimal* inst)
     {
-        if (auto tupleType = as<IRTupleType>(inst->getBase()->getDataType()))
+        if (auto pairInfo = as<IRDifferentialPairInfoType>(inst->getBase()->getDataType()))
         {
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto newInst = builder.emitGetTupleElement(
-                (IRType*)getLoweredType(tupleType->getOperand(0)),
-                inst->getBase(),
-                0);
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-            return true;
+            auto primalType = pairInfo->getPrimalInfo();
+            if (inst->getDataType() != primalType)
+            {
+                inst->setFullType(primalType);
+                return true;
+            }
         }
 
         if (auto pairType = as<IRDifferentialPairType>(inst->getBase()->getDataType()))
@@ -8020,7 +8024,7 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        auto specializedVal = upcastSet(&builder, inst->getVal(), ptrInfo);
+        auto specializedVal = adaptTypeFlowValue(&builder, inst->getVal(), ptrInfo);
 
         if (specializedVal != inst->getVal())
         {
@@ -8077,12 +8081,12 @@ struct TypeFlowSpecializationContext
                     sourceElement = source;
                 }
 
-                // Upcast the element to match destination type
-                auto upcastedElement = upcastSet(&builder, sourceElement, destElemType);
-                if (upcastedElement != sourceElement)
+                // Adapt the element to match the destination type.
+                auto adaptedElement = adaptTypeFlowValue(&builder, sourceElement, destElemType);
+                if (adaptedElement != sourceElement)
                     hasChanges = true;
 
-                newSourceElements.add(upcastedElement);
+                newSourceElements.add(adaptedElement);
             }
             else
             {
@@ -8303,7 +8307,11 @@ struct TypeFlowSpecializationContext
 
             return true;
         }
-        return false;
+        // Non-existential optionals still carry structural propagation information for their
+        // element. For example, Optional<DifferentialPair<IValueHolder>> can narrow to
+        // Optional<DifferentialPair<LinearValueHolder>>; the value projection must follow the
+        // specialized optional type just as an array or tuple element projection does.
+        return replaceType(context, inst);
     }
 
     bool specializeOptionalHasValue(IRInst* context, IROptionalHasValue* inst)
@@ -8588,6 +8596,102 @@ bool specializeDynamicInsts(
 {
     TypeFlowSpecializationContext
         context(module, target, sink, outerContext, shouldReportDynamicDispatchSites);
+    return context.processModule();
+}
+
+struct DifferentialPairInfoLoweringContext : InstPassBase
+{
+    DifferentialPairInfoLoweringContext(IRModule* module)
+        : InstPassBase(module)
+    {
+    }
+
+    IRType* getTupleType(IRDifferentialPairInfoType* pairInfo)
+    {
+        IRBuilder builder(module);
+        return builder.getTupleType(
+            pairInfo->getPrimalInfo(),
+            pairInfo->getDifferentialInfo());
+    }
+
+    bool processModule()
+    {
+        bool changed = false;
+
+        // Rewrite the semantic pair operations before replacing their types. Otherwise their
+        // ordinary differential-pair opcodes would become indistinguishable from malformed
+        // nominal pair operations whose result/base type happened to change to a tuple.
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                if (auto makePair = as<IRMakeDifferentialPair>(inst))
+                {
+                    if (auto pairInfo = as<IRDifferentialPairInfoType>(makePair->getDataType()))
+                    {
+                        IRBuilder builder(makePair);
+                        builder.setInsertBefore(makePair);
+                        auto tuple = builder.emitMakeTuple(
+                            getTupleType(pairInfo),
+                            {makePair->getPrimal(), makePair->getDifferential()});
+                        makePair->replaceUsesWith(tuple);
+                        makePair->removeAndDeallocate();
+                        changed = true;
+                    }
+                    return;
+                }
+
+                if (auto getPrimal = as<IRDifferentialPairGetPrimal>(inst))
+                {
+                    if (auto pairInfo =
+                            as<IRDifferentialPairInfoType>(getPrimal->getBase()->getDataType()))
+                    {
+                        IRBuilder builder(getPrimal);
+                        builder.setInsertBefore(getPrimal);
+                        auto projection = builder.emitGetTupleElement(
+                            pairInfo->getPrimalInfo(),
+                            getPrimal->getBase(),
+                            0);
+                        getPrimal->replaceUsesWith(projection);
+                        getPrimal->removeAndDeallocate();
+                        changed = true;
+                    }
+                    return;
+                }
+
+                if (auto getDifferential = as<IRDifferentialPairGetDifferential>(inst))
+                {
+                    if (auto pairInfo = as<IRDifferentialPairInfoType>(
+                            getDifferential->getBase()->getDataType()))
+                    {
+                        IRBuilder builder(getDifferential);
+                        builder.setInsertBefore(getDifferential);
+                        auto projection = builder.emitGetTupleElement(
+                            pairInfo->getDifferentialInfo(),
+                            getDifferential->getBase(),
+                            1);
+                        getDifferential->replaceUsesWith(projection);
+                        getDifferential->removeAndDeallocate();
+                        changed = true;
+                    }
+                }
+            });
+
+        processInstsOfType<IRDifferentialPairInfoType>(
+            kIROp_DifferentialPairInfoType,
+            [&](IRDifferentialPairInfoType* pairInfo)
+            {
+                pairInfo->replaceUsesWith(getTupleType(pairInfo));
+                pairInfo->removeAndDeallocate();
+                changed = true;
+            });
+
+        return changed;
+    }
+};
+
+bool lowerDifferentialPairInfoTypes(IRModule* module)
+{
+    DifferentialPairInfoLoweringContext context(module);
     return context.processModule();
 }
 

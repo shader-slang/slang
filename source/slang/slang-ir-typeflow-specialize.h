@@ -25,6 +25,11 @@ bool specializeDynamicInsts(
     SpecializationContext* context,
     bool shouldReportDynamicDispatchSites);
 
+// Lower the semantic differential-pair representation after specialization reaches its fixed
+// point. This must not run between type-flow iterations because dispatcher synthesis still needs
+// to distinguish a pair from an ordinary two-element tuple.
+bool lowerDifferentialPairInfoTypes(IRModule* module);
+
 bool isSetSpecializedGeneric(IRInst* callee);
 
 IROp getSetOpFromType(IRType* type);

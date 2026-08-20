@@ -1773,6 +1773,13 @@ struct SpecializationContext
             if (!iterChanged || sink->getErrorCount())
                 break;
         }
+
+        // Type-flow keeps abstract differential pairs in a semantic wrapper while the
+        // specialization loop and witness-table dispatcher synthesis are still active. Once the
+        // loop reaches its fixed point, lower that wrapper exactly once so later autodiff and tuple
+        // passes see only nominal concrete pairs or ordinary tuples.
+        if (!sink || sink->getErrorCount() == 0)
+            this->changed |= lowerDifferentialPairInfoTypes(module);
     }
 
     void addInstsToWorkListRec(IRInst* inst)
