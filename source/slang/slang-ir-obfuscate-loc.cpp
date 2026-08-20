@@ -34,7 +34,7 @@ struct LocPair
     /// The definition-file loc for source-map and hash purposes. Normally equals originalLoc,
     /// but for macro-body expansion-range locs it holds the unmapped definition-file loc
     /// (recovered via findSourceViewThroughExpansion) so that findSourceViewRecursively works.
-    SourceLoc viewLoc;
+    SourceLoc definitionLoc;
     SourceLoc obfuscatedLoc;
 };
 
@@ -112,9 +112,9 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
             {
                 LocPair locPair;
                 locPair.originalLoc = instWithLoc.loc;
-                // viewLoc starts equal to originalLoc; it is updated below if the loc is an
+                // definitionLoc starts equal to originalLoc; it is updated below if the loc is an
                 // expansion-range loc that must be unmapped to the definition-file loc.
-                locPair.viewLoc = instWithLoc.loc;
+                locPair.definitionLoc = instWithLoc.loc;
                 locPairs.add(locPair);
 
                 // curLoc is the dedup key for the `if` above. It must always be the raw IR
@@ -122,10 +122,10 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // instWithLoc.loc against pair.originalLoc, which is also the raw IR loc.
                 curLoc = instWithLoc.loc;
 
-                // viewLoc tracks the definition-file loc for SourceView lookups and hash
-                // computation. For expansion-range locs (which have no SourceView), viewLoc is
-                // updated to the unmapped loc below; for regular locs it stays equal to curLoc.
-                SourceLoc viewLoc = instWithLoc.loc;
+                // definitionLoc tracks the definition-file loc for SourceView lookups and hash
+                // computation. For expansion-range locs (which have no SourceView), definitionLoc
+                // is updated to the unmapped loc below; for regular locs it stays equal to curLoc.
+                SourceLoc definitionLoc = instWithLoc.loc;
 
                 // Ignore any core module locs in the hash
                 if (instWithLoc.loc.getRaw() < endCoreModuleLoc.getRaw())
@@ -133,27 +133,27 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     continue;
                 }
 
-                // If the viewLoc isn't in the view, lookup the view it is in
-                if (sourceView == nullptr || !sourceView->getRange().contains(viewLoc))
+                // If the definitionLoc isn't in the view, lookup the view it is in
+                if (sourceView == nullptr || !sourceView->getRange().contains(definitionLoc))
                 {
-                    sourceView = sourceManager->findSourceViewRecursively(viewLoc);
+                    sourceView = sourceManager->findSourceViewRecursively(definitionLoc);
                     if (sourceView == nullptr)
                     {
                         // The loc may be a per-invocation expansion-range loc produced by
                         // _maybeRemapBodyTokenLoc (a synthetic range with no SourceView).
                         // Walk the macro expansion side table to recover the definition-file loc.
-                        SourceLoc unmappedLoc = viewLoc;
+                        SourceLoc unmappedLoc = definitionLoc;
                         sourceView = sourceManager->findSourceViewThroughExpansion(unmappedLoc);
                         if (sourceView != nullptr)
                         {
-                            // Store the unmapped loc in viewLoc (local) and in the LocPair, so
-                            // the hash computation and the source-map loop can call
+                            // Store the unmapped loc in definitionLoc (local) and in the LocPair,
+                            // so the hash computation and the source-map loop can call
                             // findSourceViewRecursively without another unmap.
                             // Do NOT update curLoc — it is the dedup key for the outer `if`, and
                             // must remain the raw IR expansion-range loc so that the next
                             // instruction with the same loc is correctly identified as a duplicate.
-                            viewLoc = unmappedLoc;
-                            locPairs.getLast().viewLoc = unmappedLoc;
+                            definitionLoc = unmappedLoc;
+                            locPairs.getLast().definitionLoc = unmappedLoc;
                         }
                         else
                         {
@@ -174,7 +174,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // different line endings on different platforms (in particular linux/unix-like and
                 // windows). So we hash the line number/line offset to work around
 
-                const auto offset = sourceView->getRange().getOffset(viewLoc);
+                const auto offset = sourceView->getRange().getOffset(definitionLoc);
 
                 const auto sourceFile = sourceView->getSourceFile();
                 const auto lineIndex = sourceFile->calcLineIndexFromOffset(offset);
@@ -331,11 +331,11 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
         {
             const auto& pair = locPairs[i];
 
-            // First find the view. pair.viewLoc is the definition-file loc (unmapped from the
+            // First find the view. pair.definitionLoc is the definition-file loc (unmapped from the
             // expansion-range loc in the hash loop above), so findSourceViewRecursively works.
-            if (curView == nullptr || !curView->getRange().contains(pair.viewLoc))
+            if (curView == nullptr || !curView->getRange().contains(pair.definitionLoc))
             {
-                curView = sourceManager->findSourceViewRecursively(pair.viewLoc);
+                curView = sourceManager->findSourceViewRecursively(pair.definitionLoc);
                 SLANG_ASSERT(curView);
 
                 // Reset the current view path index, to being unset
@@ -348,7 +348,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
             }
 
             // Now get the location
-            const auto handleLoc = curView->getHandleLoc(pair.viewLoc);
+            const auto handleLoc = curView->getHandleLoc(pair.definitionLoc);
 
             Index sourceFileIndex = -1;
 

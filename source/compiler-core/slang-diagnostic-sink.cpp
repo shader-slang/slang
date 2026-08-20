@@ -433,10 +433,10 @@ static void _tokenLengthNoteDiagnostic(
     }
 }
 
-// Cap on macro-expansion chain depth when building diagnostic notes (see kMaxMacroExpansionDepth
-// in slang-source-loc.h). The same limit is used by findSourceViewThroughExpansion, so a chain
-// that terminates in that function also terminates here. The cap makes loop termination
-// unconditional under adversarial or malformed input; well-formed programs will never reach it.
+// Alias of SourceManager::kMaxMacroExpansionDepth so the loop bound reads as a named constant.
+// The same limit is used by findSourceViewThroughExpansion; a chain that terminates there also
+// terminates here without further notes. The cap makes loop termination unconditional under
+// adversarial or malformed input; well-formed programs never reach it.
 static constexpr int kMaxMacroExpansionDiagnosticDepth = SourceManager::kMaxMacroExpansionDepth;
 
 /// Build the sequence of "expanded from macro 'X'" and "see token-paste location" notes
@@ -574,8 +574,11 @@ static void formatDiagnosticWithExpansionChain(
             // and "see token-paste location" notes are stamped with their own ids. Both are
             // currently -1 (anonymous notes), but carrying the id explicitly makes the text
             // path future-proof if they are ever assigned distinct codes.
-            noteDiag.ErrorID = note.diagnosticInfo ? note.diagnosticInfo->id
-                                                   : MiscDiagnostics::seeExpandedFromMacro.id;
+            // appendMacroExpansionNotes always sets diagnosticInfo on every note it produces
+            // (seeExpandedFromMacro for macro-expansion notes, seeTokenPasteLocation for
+            // token-paste notes), so this field is never null here.
+            SLANG_ASSERT(note.diagnosticInfo);
+            noteDiag.ErrorID = note.diagnosticInfo->id;
             noteDiag.Message = note.message;
             noteDiag.loc = note.span.range.begin;
             noteDiag.severity = Severity::Note;
