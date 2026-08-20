@@ -1,0 +1,29 @@
+name: Probe - windows-11-vs2026-arm image availability
+
+# No-op capability probe for GitHub's upcoming windows-11-arm image
+# migration to Visual Studio 2026 (rollout 2026-09-21 through
+# 2026-09-30). This is Phase 1 of validating native (non-cross-compiled)
+# Windows-on-ARM builds: before investing in an actual build+test job, we
+# confirm the windows-11-vs2026-arm hosted label is dispatchable and
+# report basic host/toolchain identity. A real build/test trial follows
+# once this is proven to work.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 10
+    steps:
+      - name: Report host identity
+        shell: pwsh
+        run: |
+          echo "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+          [System.Environment]::OSVersion.VersionString
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture
+          where.exe cl.exe 2>$null
+          cmake --version
