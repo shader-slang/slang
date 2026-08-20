@@ -712,6 +712,29 @@ SlangResult _findFileInIncludePath(
     return SLANG_E_NOT_FOUND;
 }
 
+SemanticVersion NVRTCDownstreamCompilerUtil::resolveArchAgainstSupported(
+    SemanticVersion requested,
+    const List<int>& supportedAscending)
+{
+    if (supportedAscending.getCount() == 0)
+        return requested;
+
+    const auto toVersion = [](int arch) { return SemanticVersion(arch / 10, arch % 10); };
+
+    // Smallest supported architecture that satisfies the request. Rounding the
+    // other way would hand back something that does not provide what the code
+    // asked for.
+    for (Index i = 0; i < supportedAscending.getCount(); ++i)
+    {
+        const SemanticVersion candidate = toVersion(supportedAscending[i]);
+        if (candidate >= requested)
+            return candidate;
+    }
+
+    // Nothing supported satisfies it; the best available is the highest.
+    return toVersion(supportedAscending.getLast());
+}
+
 SlangResult NVRTCDownstreamCompiler::_getSupportedArchs(List<int>& outArchs)
 {
     outArchs.clear();
@@ -730,8 +753,9 @@ SlangResult NVRTCDownstreamCompiler::_getSupportedArchs(List<int>& outArchs)
         return SLANG_E_NOT_AVAILABLE;
     }
 
-    // NVRTC documents the result as ascending, but the callers below depend on
-    // it for the floor and ceiling, so do not take that on trust.
+    // NVRTC documents the result as ascending, and resolveArchAgainstSupported
+    // relies on that for both its scan and its "highest supported" fallback, so
+    // do not take it on trust.
     outArchs.sort();
     return SLANG_OK;
 }
@@ -1395,32 +1419,11 @@ SlangResult NVRTCDownstreamCompiler::compile(
         // exists to avoid.
         //
         // What the reported set adds is the upper bound and the exact
-        // membership:
-        //
-        //  * A requirement may name an architecture that does not exist, since
-        //    `__cuda_sm_version` takes an arbitrary version. Round down to the
-        //    greatest supported architecture that satisfies it, rather than
-        //    passing NVRTC something it will reject.
-        //  * A requirement above everything supported is clamped to the highest.
-        //    Passing it through fails the compile with an error naming the
-        //    architecture, which says nothing about the user's shader; clamping
-        //    means NVRTC instead reports the specific construct it cannot
-        //    compile, which is actionable.
+        // membership; see resolveArchAgainstSupported for the semantics.
         if (haveSupportedArchs)
         {
-            const auto toVersion = [](int arch) { return SemanticVersion(arch / 10, arch % 10); };
-
-            SemanticVersion resolved = toVersion(supportedArchs.getLast());
-            for (Index i = supportedArchs.getCount() - 1; i >= 0; --i)
-            {
-                const SemanticVersion candidate = toVersion(supportedArchs[i]);
-                if (candidate <= version)
-                {
-                    resolved = candidate;
-                    break;
-                }
-            }
-            version = resolved;
+            version =
+                NVRTCDownstreamCompilerUtil::resolveArchAgainstSupported(version, supportedArchs);
         }
 
         StringBuilder builder;
