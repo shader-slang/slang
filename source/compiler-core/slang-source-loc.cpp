@@ -1080,8 +1080,10 @@ void SourceManager::addSourceFileIfNotExist(const String& uniqueIdentity, Source
     m_sourceFileMap.addIfNotExists(uniqueIdentity, sourceFile);
 }
 
-// Use the shared depth limit from SourceManager. The cap makes loop termination unconditional
-// under adversarial or malformed input; a non-pathological source file will never reach it.
+// Cap on the expansion-unmap chain depth in findSourceViewThroughExpansion (see
+// kMaxMacroExpansionDepth in slang-source-loc.h). The same limit is used by the diagnostic note
+// builders so a chain that terminates here also terminates there. The cap makes loop termination
+// unconditional under adversarial or malformed input; well-formed programs will never reach it.
 static constexpr int kMaxMacroExpansionUnmapDepth = SourceManager::kMaxMacroExpansionDepth;
 
 SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
@@ -1104,11 +1106,14 @@ SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
     // The loc argument is updated in place so callers can use the remapped definition-file loc
     // with getHumaneLoc, getPathInfo, and related operations.
     //
-    // Why not fold this into findSourceViewRecursively as the default behavior? Callers such as
-    // the obfuscation pass (slang-ir-obfuscate-loc.cpp) and include-chain traversal
-    // (slang-compile-request.cpp) call findSourceViewRecursively explicitly without wanting
-    // expansion unmap, and the in-place loc mutation would be incorrect for them. Expansion
-    // unmap is only meaningful in diagnostic rendering, so we expose it as a distinct call.
+    // Why not fold this into findSourceViewRecursively as the default behavior? Several callers
+    // pass locs by value and compare them by identity — notably the obfuscation pass
+    // (slang-ir-obfuscate-loc.cpp, which matches IR instructions by their original loc) and the
+    // include-chain traversal (slang-compile-request.cpp). For those callers the in-place loc
+    // mutation would be incorrect. Expansion unmap is needed wherever locs derived from
+    // macro-body tokens must be displayed or serialized (diagnostics, the source-loc serializer,
+    // and the obfuscation pass's definition-file lookup), so we expose it as a distinct call that
+    // callers opt into explicitly.
     SourceView* view = findSourceViewRecursively(loc);
     for (int depth = 0; depth < kMaxMacroExpansionUnmapDepth && !view; ++depth)
     {

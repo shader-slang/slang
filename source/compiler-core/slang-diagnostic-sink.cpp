@@ -433,10 +433,10 @@ static void _tokenLengthNoteDiagnostic(
     }
 }
 
-// Use the shared depth limit from SourceManager (see slang-source-loc.h). The cap makes loop
-// termination unconditional under adversarial or malformed input; non-pathological programs won't
-// reach it. Using the same constant as kMaxMacroExpansionUnmapDepth ensures the chain walk never
-// requests more expansion-unmapping steps than findSourceViewThroughExpansion can provide.
+// Cap on macro-expansion chain depth when building diagnostic notes (see kMaxMacroExpansionDepth
+// in slang-source-loc.h). The same limit is used by findSourceViewThroughExpansion, so a chain
+// that terminates in that function also terminates here. The cap makes loop termination
+// unconditional under adversarial or malformed input; well-formed programs will never reach it.
 static constexpr int kMaxMacroExpansionDiagnosticDepth = SourceManager::kMaxMacroExpansionDepth;
 
 /// Build the sequence of "expanded from macro 'X'" and "see token-paste location" notes

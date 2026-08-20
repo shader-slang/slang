@@ -1514,8 +1514,10 @@ MacroInvocation::MacroInvocation(
     // We skip two cases where tracking is not useful:
     //   - Builtins: their body tokens have invalid locs (no definition file), so there is nothing
     //     meaningful to point back to.
-    //   - Empty macros: no body tokens means no remapping is needed and no expansion note would be
-    //     shown.
+    //   - Empty macros and macros whose first token has an invalid loc: the macro body contains
+    //     only the EndOfFile sentinel (HandleDefineDirective always appends one), and its loc is
+    //     checked by the `if (originalBodyBeginLoc.isValid())` guard below. If the sentinel loc
+    //     is invalid (as for a truly empty or builtin-injected macro), we skip registration.
     if (macro->tokens.m_tokens.getCount() > 0 && macroInvocationLoc.isValid())
     {
         SourceLoc originalBodyBeginLoc = macro->tokens.m_tokens[0].loc;

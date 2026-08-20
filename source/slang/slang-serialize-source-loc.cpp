@@ -46,11 +46,13 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
         return SerialSourceLocData::SourceLoc(0);
     }
 
-    // Look up the view it's from
-    SourceView* sourceView = m_sourceManager->findSourceView(sourceLoc);
+    // Look up the view it's from, resolving through any macro-expansion remapping so that
+    // body-token locs (which live in per-invocation expansion ranges with no SourceView) are
+    // mapped back to their definition-file locs before serialization.
+    SourceView* sourceView = m_sourceManager->findSourceViewThroughExpansion(sourceLoc);
     if (!sourceView)
     {
-        // If not found we just ingore
+        // If not found we just ignore
         return SerialSourceLocData::SourceLoc(0);
     }
 
@@ -72,7 +74,8 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
         }
     }
 
-    // We need to work out the line index
+    // We need to work out the line index; use the resolved sourceLoc (already unmapped by
+    // findSourceViewThroughExpansion above) for the offset computation.
 
     int offset = sourceView->getRange().getOffset(sourceLoc);
     int lineIndex = sourceFile->calcLineIndexFromOffset(offset);
