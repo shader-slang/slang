@@ -11,6 +11,10 @@ name: Probe - windows-11-vs2026-arm image availability
 on:
   workflow_dispatch:
 
+concurrency:
+  group: probe-windows-arm-vs2026
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -25,5 +29,22 @@ jobs:
           echo "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
           [System.Environment]::OSVersion.VersionString
           Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture
-          where.exe cl.exe 2>$null
           cmake --version
+
+      # cl.exe is not on PATH by default on GitHub-hosted Windows runners;
+      # the Visual Studio dev environment must be initialized first (see
+      # https://github.com/actions/runner-images/blob/main/images/windows/Windows11-VS2026-Arm64-Readme.md).
+      # -HostArch arm64 requests the native arm64-on-arm64 toolchain rather
+      # than the amd64-hosted cross-compiler, matching the native-build goal
+      # this probe exists to validate.
+      - name: Initialize VS dev shell and report cl.exe
+        shell: pwsh
+        run: |
+          $vsDevShell = & "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -prerelease -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
+            -find "Common7\Tools\Launch-VsDevShell.ps1"
+          & $vsDevShell -Arch arm64 -HostArch arm64
+
+          $cl = Get-Command cl.exe -ErrorAction Stop
+          Write-Host "cl.exe resolved at: $($cl.Source)"
+          cl.exe /Bv
