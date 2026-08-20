@@ -177,8 +177,7 @@ IRFunc* emitWitnessTableWrapper(
     // Pack return value if necessary.
     if (call->getDataType() != funcTypeInInterface->getResultType())
     {
-        auto adaptedResult =
-            castTypeFlowValue(builder, call, funcTypeInInterface->getResultType());
+        auto adaptedResult = castTypeFlowValue(builder, call, funcTypeInInterface->getResultType());
         builder->emitReturn(adaptedResult);
     }
     else
