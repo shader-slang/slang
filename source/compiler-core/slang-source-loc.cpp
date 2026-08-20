@@ -841,11 +841,15 @@ const SourceManager::MacroExpansionEntry* SourceManager::findMacroExpansion(Sour
     const SourceManager* manager = this;
     do
     {
+        // Only search this manager's m_macroExpansions if the loc falls within its source range.
+        // This is correct because registerMacroExpansion calls allocateSourceRange on the same
+        // manager, so every expansion range registered here lies within manager->getSourceRange().
         if (manager->getSourceRange().contains(loc) && manager->m_macroExpansions.getCount() > 0)
         {
             const auto& entries = manager->m_macroExpansions;
             // Binary search: entries are sorted by range.begin because allocateSourceRange is
-            // monotone — every call returns a range strictly above all previous ranges.
+            // monotone — every call returns a range strictly above all previous ranges — and
+            // registerMacroExpansion asserts this invariant at each insertion.
             // Use lo + (hi - lo) / 2 instead of (lo + hi) / 2 to avoid signed-index overflow.
             Index lo = 0, hi = entries.getCount();
             while (lo + 1 < hi)
