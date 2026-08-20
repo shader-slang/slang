@@ -46,13 +46,18 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
         return SerialSourceLocData::SourceLoc(0);
     }
 
-    // Look up the view it's from, resolving through any macro-expansion remapping so that
-    // body-token locs (which live in per-invocation expansion ranges with no SourceView) are
-    // mapped back to their definition-file locs before serialization.
-    SourceView* sourceView = m_sourceManager->findSourceViewThroughExpansion(sourceLoc);
+    // Look up the view it's from
+    SourceView* sourceView = m_sourceManager->findSourceView(sourceLoc);
     if (!sourceView)
     {
-        // If not found we just ignore
+        // If not found we just ignore.
+        // Note: macro-body expansion-range locs have no SourceView; they are intentionally
+        // discarded here because the container round-trip checker (slang-serialize-container.cpp)
+        // verifies locs using findSourceView on the *original* IR inst's loc, which would still
+        // be an expansion-range loc. If we serialized the unmapped loc here but the checker used
+        // the original loc, the two would not agree and the SLANG_ASSERT at line 717 would fire.
+        // Updating the serializer to produce the unmapped loc therefore requires a corresponding
+        // update to the checker — that is a separate, larger refactor.
         return SerialSourceLocData::SourceLoc(0);
     }
 
@@ -74,8 +79,7 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
         }
     }
 
-    // We need to work out the line index; use the resolved sourceLoc (already unmapped by
-    // findSourceViewThroughExpansion above) for the offset computation.
+    // We need to work out the line index
 
     int offset = sourceView->getRange().getOffset(sourceLoc);
     int lineIndex = sourceFile->calcLineIndexFromOffset(offset);

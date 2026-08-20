@@ -1115,9 +1115,9 @@ SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
     // (slang-ir-obfuscate-loc.cpp, which matches IR instructions by their original loc) and the
     // include-chain traversal (slang-compile-request.cpp). For those callers the in-place loc
     // mutation would be incorrect. Expansion unmap is needed wherever locs derived from
-    // macro-body tokens must be displayed or serialized (diagnostics, the source-loc serializer,
-    // and the obfuscation pass's definition-file lookup), so we expose it as a distinct call that
-    // callers opt into explicitly.
+    // macro-body tokens must be displayed (diagnostics, the rich renderer, and the obfuscation
+    // pass's definition-file lookup), so we expose it as a distinct call that callers opt into
+    // explicitly.
     SourceView* view = findSourceViewRecursively(loc);
     for (int depth = 0; depth < kMaxMacroExpansionUnmapDepth && !view; ++depth)
     {
