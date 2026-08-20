@@ -1329,14 +1329,15 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     {
-        // Ask the loaded NVRTC which architectures it actually accepts. This is
-        // authoritative where the ladder below is a hand-maintained guess, and
-        // it is the only way to know the *upper* bound — without it, requesting
-        // an architecture newer than this NVRTC understands is a hard failure
-        // at compile time with no way for a caller to have predicted it.
+        // Ask the loaded NVRTC which architectures it actually accepts. This
+        // supplies the *upper* bound, which nothing else here knows: requesting
+        // an architecture newer than this NVRTC understands is otherwise a hard
+        // failure at compile time, with no way for a caller to have predicted
+        // it. It also gives the exact set, so an intermediate requirement can be
+        // resolved to an architecture that really exists.
         //
-        // Absent on NVRTC older than CUDA 11.2, in which case we fall back to
-        // the version ladder.
+        // Absent on NVRTC older than CUDA 11.2, in which case every use below
+        // is skipped and behaviour is exactly as before.
         List<int> supportedArchs;
         const bool haveSupportedArchs =
             SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs)) && supportedArchs.getCount() > 0;
@@ -1346,14 +1347,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
         //
         SemanticVersion version(3);
 
-        if (haveSupportedArchs)
-        {
-            const int lowest = supportedArchs[0];
-            version = SemanticVersion(lowest / 10, lowest % 10);
-        }
         // Newer releases of NVRTC only support newer CUDA architectures.
-        else if (
-            m_desc.version.m_major > 12 ||
+        if (m_desc.version.m_major > 12 ||
             (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
         {
             // NVRTC 12.8+ warns about architectures prior to compute_75 being deprecated
@@ -1390,19 +1385,42 @@ SlangResult NVRTCDownstreamCompiler::compile(
             }
         }
 
-        // Do not ask for an architecture this NVRTC cannot assemble. Requesting
-        // one fails the whole compile with an error about the architecture,
-        // which tells the user nothing about their shader. Clamping instead
-        // means that if the code genuinely needs a newer architecture, NVRTC
-        // reports the specific construct it cannot compile, which is actionable.
+        // Resolve the request against the architectures NVRTC actually accepts.
+        //
+        // The ladder above is deliberately left in charge of the lower bound.
+        // On NVRTC 12.8+ its floor is a *policy* choice rather than a statement
+        // about capability -- pre-`compute_75` architectures are deprecated but
+        // still accepted, so they are still reported here, and taking the
+        // reported floor would reintroduce the deprecation warning that branch
+        // exists to avoid.
+        //
+        // What the reported set adds is the upper bound and the exact
+        // membership:
+        //
+        //  * A requirement may name an architecture that does not exist, since
+        //    `__cuda_sm_version` takes an arbitrary version. Round down to the
+        //    greatest supported architecture that satisfies it, rather than
+        //    passing NVRTC something it will reject.
+        //  * A requirement above everything supported is clamped to the highest.
+        //    Passing it through fails the compile with an error naming the
+        //    architecture, which says nothing about the user's shader; clamping
+        //    means NVRTC instead reports the specific construct it cannot
+        //    compile, which is actionable.
         if (haveSupportedArchs)
         {
-            const int highest = supportedArchs.getLast();
-            const SemanticVersion highestVersion(highest / 10, highest % 10);
-            if (version > highestVersion)
+            const auto toVersion = [](int arch) { return SemanticVersion(arch / 10, arch % 10); };
+
+            SemanticVersion resolved = toVersion(supportedArchs.getLast());
+            for (Index i = supportedArchs.getCount() - 1; i >= 0; --i)
             {
-                version = highestVersion;
+                const SemanticVersion candidate = toVersion(supportedArchs[i]);
+                if (candidate <= version)
+                {
+                    resolved = candidate;
+                    break;
+                }
             }
+            version = resolved;
         }
 
         StringBuilder builder;
