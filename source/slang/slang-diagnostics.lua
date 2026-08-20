@@ -4823,6 +4823,13 @@ err(
     span { loc = "location", message = "the current compilation target does not support ray tracing entry point parameters for the '~stage' stage" }
 )
 
+err(
+    "shader-record-global-not-supported-on-cuda",
+    39033,
+    "shader record global not supported on CUDA/OptiX",
+    span { loc = "decl:Decl", message = "the CUDA/OptiX target does not support a shader-record-attributed global shader parameter '~decl'; declare it as an entry point 'uniform' parameter instead so it is read from the shader binding table." }
+)
+
 warning(
     "register-modifier-but-no-vk-binding-nor-shift",
     39029,
