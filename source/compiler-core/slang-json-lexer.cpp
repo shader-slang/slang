@@ -161,7 +161,7 @@ JSONTokenType JSONLexer::advance()
         case '/':
             {
                 // We allow comments
-                const char nextChar = *m_cursor;
+                const char nextChar = *cursor;
 
                 if (nextChar == '/')
                 {

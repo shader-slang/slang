@@ -30,6 +30,7 @@ Compiling Code with Slang <08-compiling>
 Using the Reflection API <09-reflection>
 Supported Compilation Targets <09-targets>
 Link-time Specialization and Module Precompilation <10-link-time-specialization>
+Slang Source Packages <12-source-packages>
 Special Topics <a1-special-topics>
 Target-specific Features <a2-target-specific-features>
 Experimental Features <a3-experimental-features>

@@ -138,6 +138,15 @@ if(SLANG_ENABLE_SLANGI)
     )
 endif()
 
+slang_add_target(
+    slang-package
+    EXECUTABLE
+    LINK_WITH_PRIVATE core compiler-core
+    INSTALL
+    EXPORT_SET_NAME SlangTargets
+    PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
+)
+
 if(SLANG_ENABLE_GFX)
     #
     # GFX
@@ -420,8 +429,17 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-git.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-json.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-resolver.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-tool.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-types.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
+    )
+    target_include_directories(
+        slang-unit-test
+        PRIVATE ${slang_SOURCE_DIR}/tools/slang-package
     )
     # The unit tests include internal slang headers (e.g. slang-repro.h) that
     # transitively pull in FIDDLE / capability generated headers. The `slang`

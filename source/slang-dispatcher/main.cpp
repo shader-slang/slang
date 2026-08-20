@@ -72,6 +72,11 @@ static const SubcommandEntry kBuiltinSubcommands[] = {
      "Interpret Slang source (delegates to slangi)",
      delegateToExecutable,
      (void*)"slangi"},
+    {"package",
+     "Manage Slang source package dependencies",
+     delegateToExecutable,
+     (void*)"slang-package"},
+    {"pkg", "Alias for 'slang package'", delegateToExecutable, (void*)"slang-package"},
     {"help", "Show this help message", handleHelp, nullptr},
     {"version", "Show version information", handleVersion, nullptr},
 };
