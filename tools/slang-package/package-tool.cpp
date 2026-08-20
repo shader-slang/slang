@@ -86,7 +86,7 @@ static SlangResult _validateLockedDependency(
 
     VersionConstraint constraint;
     SemanticVersion lockedVersion;
-    SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.tag, constraint, outError));
+    SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
     if (SLANG_FAILED(parseReleaseTag(lockedPackage.tag, lockedVersion)) ||
         !constraint.matches(lockedVersion))
     {

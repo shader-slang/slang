@@ -29,17 +29,20 @@ The manifest declares the package and its source dependencies:
   "dependencies": {
     "noise": {
       "git": "https://github.com/example/slang-noise.git",
-      "tag": ">=v1.2.0 <v2.0.0"
+      "version": ">=1.2.0 <2.0.0"
     }
   }
 }
 ```
 
 Dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package publishers must
-treat as immutable. Fetching fails if a locked tag no longer identifies its locked commit. A
-dependency can name one exact tag or a space-separated intersection of `>`, `>=`, `<`, and `<=`
-comparisons. The resolver combines constraints from direct and transitive dependencies, chooses
-the highest satisfying version, and reports an error when no version satisfies the full graph.
+treat as immutable. Fetching fails if a locked tag no longer identifies its locked commit.
+
+A dependency uses either `version` or `tag`. `version` is a space-separated intersection of `>`,
+`>=`, `<`, and `<=` comparisons, or a single exact version, written without a `v` prefix. `tag`
+names one Git tag, including the `v` prefix. When both fields are present, `tag` wins. The
+resolver combines constraints from direct and transitive dependencies, chooses the highest
+satisfying version, and reports an error when no version satisfies the full graph.
 
 ## Locking and fetching
 

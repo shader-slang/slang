@@ -16,6 +16,7 @@ struct Dependency
 {
     String name;
     String git;
+    String version;
     String tag;
 };
 
@@ -71,6 +72,7 @@ struct TagCandidate
     SemanticVersion version;
 };
 
+/// Parse a version constraint written without a `v` prefix, such as `>=1.2.0 <2.0.0`.
 SlangResult parseVersionConstraint(
     const UnownedStringSlice& text,
     VersionConstraint& outConstraint,
@@ -82,6 +84,14 @@ inline SlangResult parseVersionConstraint(
 {
     return parseVersionConstraint(text.getUnownedSlice(), outConstraint, outError);
 }
+
+/// Convert a dependency's `tag` or `version` into a solver constraint.
+///
+/// `tag` names one Git release tag and wins over `version` when both are present.
+SlangResult parseDependencyConstraint(
+    const Dependency& dependency,
+    VersionConstraint& outConstraint,
+    String& outError);
 
 SlangResult parseReleaseTag(const UnownedStringSlice& tag, SemanticVersion& outVersion);
 inline SlangResult parseReleaseTag(const String& tag, SemanticVersion& outVersion)

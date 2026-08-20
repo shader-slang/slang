@@ -79,7 +79,7 @@ private:
     SlangResult addDependency(const Dependency& dependency, String& outError)
     {
         VersionConstraint constraint;
-        SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.tag, constraint, outError));
+        SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
 
         Index index = findPackage(dependency.name);
         if (index < 0)
