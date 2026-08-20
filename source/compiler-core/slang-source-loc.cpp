@@ -791,8 +791,17 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
 {
     // TODO: consider using atomics here
 
-
     SourceLoc beginLoc = m_nextLoc;
+
+    // Guard against SourceLoc address-space exhaustion. SourceLoc::RawValue is
+    // uint32_t; if this allocation would push m_nextLoc past the representable
+    // range, new ranges would alias existing ones and silently corrupt all
+    // diagnostic output.  The +1 below accounts for the sentinel advance
+    // (m_nextLoc = endLoc + 1) that must also fit without wrapping.
+    SLANG_RELEASE_ASSERT(
+        (uint64_t)beginLoc.getRaw() + (uint64_t)size + 1 <=
+        (uint64_t)SourceLoc::RawValue(-1));
+
     SourceLoc endLoc = beginLoc + size;
 
     // We need to be able to represent the location that is *at* the end of

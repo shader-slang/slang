@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 #define DECLARE_VAR UndefinedType x;
 
