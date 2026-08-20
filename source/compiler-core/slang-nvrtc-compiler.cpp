@@ -49,6 +49,14 @@ typedef struct _nvrtcProgram* nvrtcProgram;
     x(nvrtcResult, nvrtcGetProgramLog, (nvrtcProgram prog, char *log))\
     x(nvrtcResult, nvrtcAddNameExpression, (nvrtcProgram prog, const char * const name_expression)) \
     x(nvrtcResult, nvrtcGetLoweredName, (nvrtcProgram prog, const char *const name_expression, const char** lowered_name))
+
+// Entry points that are not present in every NVRTC we support, and so must not
+// be required for the library to load. `nvrtcGetSupportedArchs` and its
+// companion were added in CUDA 11.2; binding them through SLANG_NVRTC_FUNCS
+// would make Slang refuse to load anything older.
+#define SLANG_NVRTC_OPTIONAL_FUNCS(x) \
+    x(nvrtcResult, nvrtcGetNumSupportedArchs, (int* numArchs)) \
+    x(nvrtcResult, nvrtcGetSupportedArchs, (int* supportedArchs))
 // clang-format on
 
 } // namespace nvrtc
@@ -149,6 +157,17 @@ protected:
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
+    // Null when the loaded NVRTC predates them; see SLANG_NVRTC_OPTIONAL_FUNCS.
+    SLANG_NVRTC_OPTIONAL_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
+
+    /// Return the compute capabilities the loaded NVRTC actually accepts, as
+    /// `major * 10 + minor` values in ascending order.
+    ///
+    /// Returns SLANG_E_NOT_AVAILABLE if this NVRTC is too old to be asked,
+    /// which the caller must distinguish from "the list is empty": the former
+    /// means fall back to assumptions, the latter would mean NVRTC supports
+    /// nothing at all.
+    SlangResult _getSupportedArchs(List<int>& outArchs);
 
     // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT*
     // include cuda_fp16.h.
@@ -187,6 +206,13 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_GET_FUNC)
+
+    // Optional entry points are bound the same way but must not fail the load
+    // when absent; each is left null and guarded at the point of use.
+#define SLANG_NVTRC_GET_OPTIONAL_FUNC(ret, name, params) \
+    m_##name = (ret(*) params)library->findFuncByName(#name);
+
+    SLANG_NVRTC_OPTIONAL_FUNCS(SLANG_NVTRC_GET_OPTIONAL_FUNC)
 
     m_sharedLibrary = library;
 
@@ -684,6 +710,30 @@ SlangResult _findFileInIncludePath(
     }
 
     return SLANG_E_NOT_FOUND;
+}
+
+SlangResult NVRTCDownstreamCompiler::_getSupportedArchs(List<int>& outArchs)
+{
+    outArchs.clear();
+
+    if (!m_nvrtcGetNumSupportedArchs || !m_nvrtcGetSupportedArchs)
+        return SLANG_E_NOT_AVAILABLE;
+
+    int numArchs = 0;
+    if (m_nvrtcGetNumSupportedArchs(&numArchs) != NVRTC_SUCCESS || numArchs <= 0)
+        return SLANG_E_NOT_AVAILABLE;
+
+    outArchs.setCount(numArchs);
+    if (m_nvrtcGetSupportedArchs(outArchs.getBuffer()) != NVRTC_SUCCESS)
+    {
+        outArchs.clear();
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    // NVRTC documents the result as ascending, but the callers below depend on
+    // it for the floor and ceiling, so do not take that on trust.
+    outArchs.sort();
+    return SLANG_OK;
 }
 
 SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(
@@ -1279,13 +1329,31 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     {
+        // Ask the loaded NVRTC which architectures it actually accepts. This is
+        // authoritative where the ladder below is a hand-maintained guess, and
+        // it is the only way to know the *upper* bound — without it, requesting
+        // an architecture newer than this NVRTC understands is a hard failure
+        // at compile time with no way for a caller to have predicted it.
+        //
+        // Absent on NVRTC older than CUDA 11.2, in which case we fall back to
+        // the version ladder.
+        List<int> supportedArchs;
+        const bool haveSupportedArchs = SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs)) &&
+                                        supportedArchs.getCount() > 0;
+
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.
         //
         SemanticVersion version(3);
 
+        if (haveSupportedArchs)
+        {
+            const int lowest = supportedArchs[0];
+            version = SemanticVersion(lowest / 10, lowest % 10);
+        }
         // Newer releases of NVRTC only support newer CUDA architectures.
-        if (m_desc.version.m_major > 12 ||
+        else if (
+            m_desc.version.m_major > 12 ||
             (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
         {
             // NVRTC 12.8+ warns about architectures prior to compute_75 being deprecated
@@ -1319,6 +1387,21 @@ SlangResult NVRTCDownstreamCompiler::compile(
                 {
                     version = capabilityVersion.version;
                 }
+            }
+        }
+
+        // Do not ask for an architecture this NVRTC cannot assemble. Requesting
+        // one fails the whole compile with an error about the architecture,
+        // which tells the user nothing about their shader. Clamping instead
+        // means that if the code genuinely needs a newer architecture, NVRTC
+        // reports the specific construct it cannot compile, which is actionable.
+        if (haveSupportedArchs)
+        {
+            const int highest = supportedArchs.getLast();
+            const SemanticVersion highestVersion(highest / 10, highest % 10);
+            if (version > highestVersion)
+            {
+                version = highestVersion;
             }
         }
 
