@@ -27,6 +27,10 @@ void legalizeEntryPointVaryingParamsForCPU(
 
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
 
+// Diagnose `TraceRay` calls whose constant ray-flags argument carries a bit OptiX cannot express
+// per-ray (RAY_FLAG_SKIP_TRIANGLES / RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES). CUDA/OptiX target only.
+void diagnoseUnsupportedCUDARayFlags(IRModule* module, DiagnosticSink* sink);
+
 void legalizeEntryPointVaryingParamsForMetal(
     IRModule* module,
     DiagnosticSink* sink,

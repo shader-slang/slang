@@ -5681,6 +5681,13 @@ err(
 )
 
 err(
+    "ray-flag-unsupported-for-optix",
+    55215,
+    "ray flag not supported by the CUDA/OptiX target",
+    span { loc = "location", message = "ray flag '~flag' has no OptiX equivalent and cannot be expressed per-ray for the CUDA/OptiX target; OptiX controls triangle and procedural-primitive skipping at the pipeline/traversable level rather than per 'TraceRay' call." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",
