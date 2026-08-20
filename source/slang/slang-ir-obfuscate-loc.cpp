@@ -28,7 +28,13 @@ struct InstWithLoc
 
 struct LocPair
 {
+    /// The raw IR instruction loc, which may be a per-invocation macro expansion-range loc.
+    /// Used as the identity key to match IR instructions in the apply loop.
     SourceLoc originalLoc;
+    /// The definition-file loc for source-map and hash purposes. Normally equals originalLoc,
+    /// but for macro-body expansion-range locs it holds the unmapped definition-file loc
+    /// (recovered via findSourceViewThroughExpansion) so that findSourceViewRecursively works.
+    SourceLoc viewLoc;
     SourceLoc obfuscatedLoc;
 };
 
@@ -106,6 +112,9 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
             {
                 LocPair locPair;
                 locPair.originalLoc = instWithLoc.loc;
+                // viewLoc starts equal to originalLoc; it is updated below if the loc is an
+                // expansion-range loc that must be unmapped to the definition-file loc.
+                locPair.viewLoc = instWithLoc.loc;
                 locPairs.add(locPair);
 
                 // This is the current loc
@@ -130,10 +139,13 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                         sourceView = sourceManager->findSourceViewThroughExpansion(unmappedLoc);
                         if (sourceView != nullptr)
                         {
-                            // Store the unmapped loc so the source-map loop below can
-                            // resolve it via findSourceViewRecursively without another unmap.
+                            // Store the unmapped loc in viewLoc so the hash computation and
+                            // source-map loop can use findSourceViewRecursively without another
+                            // unmap. Do NOT modify originalLoc — the apply loop uses it as the
+                            // identity key to match IR instruction locs, which still carry the
+                            // raw expansion-range loc.
                             curLoc = unmappedLoc;
-                            locPairs.getLast().originalLoc = unmappedLoc;
+                            locPairs.getLast().viewLoc = unmappedLoc;
                         }
                         else
                         {
@@ -311,16 +323,12 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
         {
             const auto& pair = locPairs[i];
 
-            // First find the view
-            if (curView == nullptr || !curView->getRange().contains(pair.originalLoc))
+            // First find the view. pair.viewLoc is the definition-file loc (unmapped from the
+            // expansion-range loc in the hash loop above), so findSourceViewRecursively works.
+            if (curView == nullptr || !curView->getRange().contains(pair.viewLoc))
             {
-                // pair.originalLoc was already unmapped to the definition-file loc in
-                // the hash loop above (via findSourceViewThroughExpansion), so
-                // findSourceViewRecursively should always succeed here.
-                curView = sourceManager->findSourceViewRecursively(pair.originalLoc);
+                curView = sourceManager->findSourceViewRecursively(pair.viewLoc);
                 SLANG_ASSERT(curView);
-                if (curView == nullptr)
-                    continue;
 
                 // Reset the current view path index, to being unset
                 curViewSourceFileIndex = -1;
@@ -332,7 +340,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
             }
 
             // Now get the location
-            const auto handleLoc = curView->getHandleLoc(pair.originalLoc);
+            const auto handleLoc = curView->getHandleLoc(pair.viewLoc);
 
             Index sourceFileIndex = -1;
 
