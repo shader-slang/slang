@@ -777,12 +777,21 @@ bool DiagnosticSink::diagnoseRichImpl(
         outputBuffer.append(message);
     }
 
-    // Route to parent sink - let it render with its own settings but using the same source manager.
-    // The source manager must be passed because the parent may have a different source manager
-    // that cannot resolve the locations in this diagnostic (e.g., command line source locations
-    // are in a separate source manager from the main compilation source manager).
-    // Pass the original (un-decorated) diagnostic so the parent applies its own severity mapping
-    // and appends its own expansion notes, avoiding duplicate "expanded from macro" notes.
+    // Route to parent sink so it can render with its own settings (its own severity overrides,
+    // writer, and color mode). The source manager is passed explicitly because the parent may own
+    // a different SourceManager that cannot resolve locs from this compilation (e.g. command-line
+    // source locations live in a separate SourceManager).
+    //
+    // We pass the original (un-decorated) `diagnostic` rather than `effectiveDiagnostic` for two
+    // reasons:
+    //  1. The parent should apply its own severity mapping (its own -warnings-as-errors state may
+    //     differ from the child's), so it must receive the original severity, not the child's
+    //     effective severity.
+    //  2. effectiveDiagnostic.notes already contains expansion notes appended by this sink; if we
+    //     passed it, the parent's diagnoseRichImpl would call appendMacroExpansionNotes a second
+    //     time on top of the already-appended notes, producing duplicate "expanded from macro"
+    //     entries. Passing the original diagnostic lets the parent derive its own notes
+    //     independently.
     if (m_parentSink)
     {
         m_parentSink->diagnoseRichImpl(diagnostic, info, sourceManager);

@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
+//TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 // A macro invocation passed as the argument of another function-like macro.
 // INNER's body has the error and INNER is invoked as an argument to WRAP.
@@ -16,3 +17,4 @@ void test()
 
 //CHECK: undefined identifier 'UndefinedType'.
 //CHECK: expanded from macro 'INNER'
+// CHECK-NOT: expanded from macro 'WRAP'
