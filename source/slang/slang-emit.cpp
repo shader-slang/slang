@@ -2548,6 +2548,10 @@ Result linkAndOptimizeIR(
     //
     SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
 
+    // Empty-type legalization can leave `Void` placeholders in retained struct shapes. Remove
+    // those placeholders before they reach target-specific legalization and emission.
+    SLANG_PASS(cleanUpVoidType);
+
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
     // introducing explicit temporaries instead. Doing this at the IR level
