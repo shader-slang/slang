@@ -792,6 +792,14 @@ bool DiagnosticSink::diagnoseRichImpl(
     //     time on top of the already-appended notes, producing duplicate "expanded from macro"
     //     entries. Passing the original diagnostic lets the parent derive its own notes
     //     independently.
+    //
+    // The reason reason 2 is safe (i.e. the parent can re-derive the same notes without loss):
+    // appendMacroExpansionNotes is a pure function of (primarySpan.range.begin, sourceManager).
+    // Given the same primary loc and the same SourceManager, it always walks the same expansion
+    // chain and produces the same sequence of "expanded from macro" and "see token-paste location"
+    // notes. So the parent's independent call produces exactly one copy of the note set — no fewer
+    // (the chain is the same) and no more (only one call happens). This determinism invariant means
+    // we can safely let the parent re-derive the notes rather than forwarding them pre-built.
     if (m_parentSink)
     {
         m_parentSink->diagnoseRichImpl(diagnostic, info, sourceManager);
