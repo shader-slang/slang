@@ -2423,7 +2423,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
+        // Route the compatibility test through the same
+        // findIncompatibleCapabilityRequirements() that TargetRequest::checkCapabilities()
+        // uses for a target's own explicitly-requested capabilities, so a target's
+        // capabilities and an entry point's required capabilities are checked against each
+        // other by one shared rule instead of two independently-written incompatibility
+        // tests. The rest of this branch's diagnostic and provenance-note logic is
+        // unaffected -- only the yes/no compatibility question is unified here.
+        List<SourcedCapabilityRequirement> entryPointRequirement = {
+            {entryPointInferredCaps, CapabilitySource::EntryPointRequirement, String()}};
+        if (findIncompatibleCapabilityRequirements(targetCaps, entryPointRequirement).getCount() !=
+            0)
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided

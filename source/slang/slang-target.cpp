@@ -64,6 +64,14 @@ void TargetRequest::setTargetCaps(CapabilitySet capSet)
     cookedCapabilities = capSet;
 }
 
+// Returns true if this target uses GLSL-flavored capability semantics: either the target
+// literally emits GLSL, or it emits SPIRV via the GLSL-SPIRV pipeline (`-emit-spirv-via-glsl`,
+// the default when direct SPIRV emission is off). Both paths run source through glslang,
+// so both classify SPIRV version/extension capabilities the same way -- as `glsl_spirv_*`
+// atoms rather than the `spirv_*` atoms a direct-SPIRV target uses (see
+// `getTargetCaps()`, which performs that atom conversion for exactly the targets this
+// function returns true for). A target emitting SPIRV directly skips glslang entirely and
+// so keeps the plain `spirv_*` atoms.
 bool TargetRequest::isGLSLBasedTarget()
 {
     switch (getTarget())
@@ -259,45 +267,28 @@ CapabilitySet TargetRequest::getTargetCaps()
 
 void TargetRequest::checkCapabilities(DiagnosticSink* sink)
 {
-    if (!sink)
-        return;
+    // Every call site (currently only `FrontEndCompileRequest::checkEntryPoints()`) has a
+    // live sink to diagnose into; a null sink here would mean a caller silently wants no
+    // diagnostics, which is not a supported way to call this function.
+    SLANG_RELEASE_ASSERT(sink);
 
-    // For GLSL-based targets, SPIRV version and extension atoms are intentionally
-    // converted to their GLSL-SPIRV equivalents by getTargetCaps(), so they are
-    // not an error here.
     bool isGLSLTarget = isGLSLBasedTarget();
-
     auto cookedCaps = getTargetCaps();
-    auto& targetOptionSet = getOptionSet();
-
-    // Capabilities inherited from the session-level option set (via inheritFrom) are
-    // intentionally broad — a multi-backend application may set e.g. hlsl_nvapi at
-    // the session level to enable it for D3D12 targets while also compiling for
-    // Vulkan/SPIRV in the same session.  Only flag capabilities that were explicitly
-    // requested for this specific target, not ones that arrived via session inheritance.
-    auto sessionCapArray = getLinkage()->m_optionSet.getArray(CompilerOptionName::Capability);
-    auto isSessionLevelCap = [&](const CompilerOptionValue& atomVal) -> bool
-    {
-        for (const auto& sessionAtom : sessionCapArray)
-        {
-            if (sessionAtom.kind != atomVal.kind)
-                continue;
-            if (atomVal.kind == CompilerOptionValueKind::Int
-                    ? sessionAtom.intValue == atomVal.intValue
-                    : sessionAtom.stringValue == atomVal.stringValue)
-                return true;
-        }
-        return false;
-    };
 
     // Use the user-specified CodeGenTarget for the diagnostic so the error says e.g.
     // "incompatible with compilation target 'spirv'" even when the GLSL-SPIRV pipeline
     // is in use (where cookedCaps.getCompileTarget() would return 'glsl').
     auto userTargetName = TypeTextUtil::getCompileTargetName(asExternal(getTarget()));
 
-    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    // Gather every explicitly requested `-capability` for this target as a
+    // `SourcedCapabilityRequirement`. `atomVal.capabilitySource` was set when the entry was
+    // produced (`CompilerOptionSet::load`/`addCapabilityAtom`) and survives `inheritFrom`
+    // unchanged, so it already says whether this specific entry was requested at session
+    // scope or for this target -- no need to reconstruct that by comparing option sets.
+    List<SourcedCapabilityRequirement> requirements;
+    for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        // Decode the option value into a name string and a CapabilitySet.
+        // Decode the option value into a display name and a CapabilitySet.
         // decodeCapabilityOption returns an empty set for unknown/invalid entries.
         String requestedCapName;
         switch (atomVal.kind)
@@ -323,27 +314,43 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         if (toAdd.isEmpty())
             continue;
 
-        // Skip capabilities that came from the session level (not target-specific).
-        if (isSessionLevelCap(atomVal))
-            continue;
-
-        // For GLSL-SPIRV pipeline targets, SPIRV version/extension caps are intentionally
-        // converted to their glsl_spirv_* equivalents by getTargetCaps(); not an error.
-        // Use containsKey rather than getCompileTarget() to avoid relying on dictionary
-        // iteration order when a capability spans multiple target families.
+        // For GLSL-SPIRV pipeline targets, SPIRV version caps are intentionally converted
+        // to their glsl_spirv_* equivalents by getTargetCaps() (see isGLSLBasedTarget()'s
+        // comment), so they are not an error here.
+        //
+        // TODO(https://github.com/shader-slang/slang/issues/NNNN): this exemption is
+        // broader than the conversion it is meant to mirror. getTargetCaps() only
+        // converts SPIRV *version* atoms, but this test also exempts SPIRV *extension*
+        // atoms via the same "belongs to the spirv target family" check, so a SPIRV
+        // extension capability requested on a GLSL-based target is silently dropped by
+        // both getTargetCaps() and this check instead of being flagged. That mismatch
+        // predates this function (getTargetCaps() has always silently dropped
+        // incompatible explicit capability requests) and needs its own fix to
+        // getTargetCaps()'s conversion/exemption logic; narrowing just this test would
+        // just move where the silent drop happens.
         if (isGLSLTarget && toAdd.getCapabilityTargetSets().containsKey(CapabilityAtom::spirv))
             continue;
 
-        if (!cookedCaps.isIncompatibleWith(toAdd))
+        requirements.add({toAdd, atomVal.capabilitySource, requestedCapName});
+    }
+
+    for (auto& incompatible : findIncompatibleCapabilityRequirements(cookedCaps, requirements))
+    {
+        // A session-level capability request is a "use this if it applies" broadcast to
+        // every target in the session (see CapabilitySource::SessionOption), not a binding
+        // requirement on this particular target, so it is expected -- not an error -- for
+        // it to be incompatible here. A target-level request, by contrast, names this exact
+        // target, so an incompatible one is a real mistake (most likely a mismatched
+        // -target/-capability pairing) and must be diagnosed.
+        if (incompatible.source == CapabilitySource::SessionOption)
             continue;
 
-        // The requested capability is incompatible with the code-gen target.
         maybeDiagnose(
             sink,
             getLinkage()->m_optionSet,
             DiagnosticCategory::Capability,
             Diagnostics::RequestedCapabilityIncompatibleWithTarget{
-                .requestedCap = requestedCapName,
+                .requestedCap = incompatible.label,
                 .target = String(userTargetName)});
     }
 }

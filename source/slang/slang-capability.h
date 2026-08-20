@@ -519,6 +519,72 @@ bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
     const List<CapabilityName>& requestedCapabilities,
     CapabilityAtom targetVersionFamily);
 
+//
+// Capability provenance
+//
+// A `CapabilitySet` on its own only says *what* capabilities are present or required; it
+// says nothing about *where* that requirement came from. That is fine for the pure algebra
+// (`join`, `implies`, `isIncompatibleWith`, ...), but validation code that checks whether
+// capability sets from different parts of a compile are consistent with one another needs
+// to know their origin, both to explain a failure to the user and to apply the correct
+// combination policy (some sources are binding requirements, others are best-effort
+// requests that may legitimately not apply to every target). `CapabilitySource` and
+// `SourcedCapabilityRequirement` below carry that origin as a value paired with a
+// `CapabilitySet`, the same way `Decl::capabilityRequirementProvenance` pairs a decl's
+// `inferredCapabilityRequirements` with the call sites that produced them.
+//
+
+/// Identifies which part of a compile produced a capability requirement that is being
+/// checked against a target's capabilities.
+enum class CapabilitySource
+{
+    /// The capability was requested at session scope, via
+    /// `SessionDesc::compilerOptionEntries`. A session may be shared by targets for
+    /// several different backends (e.g. a D3D12 target and a Vulkan target compiled from
+    /// the same session), so a session-level capability request is a "use this if it
+    /// applies" broadcast, not a binding requirement on every target: it is entirely
+    /// expected for it to be incompatible with some of the session's targets.
+    SessionOption,
+
+    /// The capability was requested for one specific target, via `-capability` on the
+    /// command line, `TargetDesc::compilerOptionEntries`, or `addTargetCapability`. Unlike
+    /// a session-level request, this is a binding requirement on that target: the user
+    /// named this exact target, so an incompatible request is a real error (most likely a
+    /// mismatched `-target`/`-capability` pairing) rather than an expected multi-target
+    /// broadcast.
+    TargetOption,
+
+    /// The capability set is what an entry point (or its transitive call graph) requires,
+    /// via an explicit `[require(...)]` or inferred from the bodies it calls into.
+    EntryPointRequirement,
+};
+
+/// One capability requirement being checked against a target's capabilities, paired with
+/// where it came from (`source`) and a human-readable label identifying the specific
+/// capability/entity it came from (e.g. the requested capability's name, or the entry
+/// point's name), for use in diagnostics.
+struct SourcedCapabilityRequirement
+{
+    CapabilitySet caps;
+    CapabilitySource source;
+    String label;
+};
+
+/// Check each entry of `requirements` against `targetCaps` and return the entries that are
+/// incompatible with it. This is the single place that answers "is a capability
+/// requirement from a given source compatible with this target's capabilities", so that
+/// callers checking capability sets from different sources against a target (for example,
+/// `TargetRequest::checkCapabilities` checking a target's own explicitly-requested
+/// capabilities for self-consistency, and `validateEntryPoint` checking an entry point's
+/// required capabilities against its target) apply one shared compatibility check instead
+/// of each re-deriving it. It does not itself decide which sources should be diagnosed as
+/// errors versus silently tolerated (e.g. `CapabilitySource::SessionOption`'s best-effort
+/// semantics) -- that policy belongs to the caller, which knows what diagnostic, if any, is
+/// appropriate for its context.
+List<SourcedCapabilityRequirement> findIncompatibleCapabilityRequirements(
+    CapabilitySet const& targetCaps,
+    List<SourcedCapabilityRequirement> const& requirements);
+
 void printDiagnosticArg(StringBuilder& sb, CapabilityAtom atom);
 void printDiagnosticArg(StringBuilder& sb, CapabilityName name);
 void printDiagnosticArg(StringBuilder& sb, const CapabilityAtomSet& atomSet);

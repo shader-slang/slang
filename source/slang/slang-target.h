@@ -161,9 +161,13 @@ public:
 
     void setTargetCaps(CapabilitySet capSet);
 
-    /// Validate that any explicitly requested capabilities are compatible with the code-gen target.
-    /// May emit an error diagnostic for each incompatible capability, unless capability
-    /// checking is suppressed by compiler options (e.g. -ignore-capabilities).
+    /// Validate that any capabilities explicitly requested *for this target*
+    /// (`CapabilitySource::TargetOption`) are compatible with the code-gen target,
+    /// emitting an error diagnostic for each one that is not, unless capability checking is
+    /// suppressed by compiler options (e.g. -ignore-capabilities). Capabilities requested at
+    /// session scope (`CapabilitySource::SessionOption`) are not checked here: see the
+    /// comment on that enumerator for why a session-wide request being incompatible with
+    /// one particular target is expected, not an error.
     void checkCapabilities(DiagnosticSink* sink);
 
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
