@@ -572,6 +572,12 @@ struct SourceManager
     // Initialize a source manager, with an optional parent
     void initialize(SourceManager* parent, ISlangFileSystemExt* fileSystemExt);
 
+    /// Maximum number of macro expansion levels the diagnostic system will traverse.
+    /// Both the chain walker in slang-diagnostic-sink.cpp and the loc unmapper in
+    /// slang-source-loc.cpp use this constant so the two limits stay in sync and the unmapper
+    /// never gives up before the diagnostic walker does.
+    static constexpr int kMaxMacroExpansionDepth = 1024;
+
     /// Allocate a range of SourceLoc locations, these can be used to identify a specific location
     /// in the source
     SourceRange allocateSourceRange(UInt size);
@@ -617,16 +623,25 @@ struct SourceManager
     /// allocateSourceRange guarantees this under normal use).
     const MacroExpansionEntry* findMacroExpansion(SourceLoc loc) const;
 
-    /// Given a loc that may be in a per-invocation expansion range (i.e., a remapped body-token
-    /// loc where no SourceView exists), find the SourceView that covers the original
-    /// definition-file loc and update loc to that original loc in place.
+    /// Find the SourceView for a loc that may be in a per-invocation macro expansion range,
+    /// and update loc to the original definition-file location in place.
     ///
-    /// This is the correct query to use when you need a SourceView for any loc that may have
-    /// passed through the macro expansion side table. Contrast with findSourceViewRecursively,
-    /// which only handles the older SourceView-based remapping (e.g. #line directives and token
-    /// paste) and will return nullptr for expansion-range locs.
+    /// Use this in diagnostic rendering (and analogous contexts) when the loc may be a remapped
+    /// body-token loc for which no SourceView exists. The function walks the macro expansion side
+    /// table to recover the definition-file loc, then delegates to findSourceViewRecursively.
+    ///
+    /// Do NOT use this as a general-purpose replacement for findSourceViewRecursively. The in-place
+    /// mutation of loc is a side effect intentionally used by diagnostic callers that need the
+    /// remapped loc for further operations (e.g. getHumaneLoc after the call). Callers that do
+    /// not need expansion unmap — such as include-chain traversal or obfuscation passes — should
+    /// call findSourceViewRecursively directly.
     ///
     /// Returns nullptr if no SourceView can be found even after exhausting the expansion chain.
+    /// When nullptr is returned, loc has been updated to the deepest successfully-unmapped
+    /// definition-file loc (the loc for which the final findSourceViewRecursively call returned
+    /// nullptr). Callers that only need the loc value (e.g. to build a diagnostic note span) may
+    /// use it safely; callers that need to read source content via a SourceView should treat a
+    /// nullptr return as "no displayable source context."
     SourceView* findSourceViewThroughExpansion(SourceLoc& loc) const;
 
     /// Returns the loc for start of next allocation

@@ -433,12 +433,11 @@ static void _tokenLengthNoteDiagnostic(
     }
 }
 
-// Maximum number of levels to walk in the macro-expansion/token-paste chain when building
-// diagnostic notes. A non-pathological program won't reach this depth; the cap makes the loop
-// unconditionally terminating under adversarial or malformed input.
-// Must not exceed kMaxMacroExpansionUnmapDepth (in slang-source-loc.cpp) so the chain walk never
-// requests more unmapping steps than findSourceViewThroughExpansion can provide.
-static constexpr int kMaxMacroExpansionDiagnosticDepth = 1024;
+// Use the shared depth limit from SourceManager (see slang-source-loc.h). The cap makes loop
+// termination unconditional under adversarial or malformed input; non-pathological programs won't
+// reach it. Using the same constant as kMaxMacroExpansionUnmapDepth ensures the chain walk never
+// requests more expansion-unmapping steps than findSourceViewThroughExpansion can provide.
+static constexpr int kMaxMacroExpansionDiagnosticDepth = SourceManager::kMaxMacroExpansionDepth;
 
 /// Walk the mixed macro-expansion/token-paste provenance chain rooted at `primaryLoc` and append a
 /// note for each level. This produces the "expanded from macro 'X'" and "see token-paste location"

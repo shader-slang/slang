@@ -814,6 +814,11 @@ SourceRange SourceManager::registerMacroExpansion(
     // the m_macroExpansions list stays sorted by range.begin — the invariant that
     // findMacroExpansion's binary search relies on.
     SourceRange range = allocateSourceRange(bodyRangeSize);
+    // Assert the sortedness invariant so a violation is caught at the append site rather than
+    // silently producing incorrect binary-search results later.
+    SLANG_ASSERT(
+        m_macroExpansions.getCount() == 0 ||
+        range.begin.getRaw() > m_macroExpansions.getLast().range.begin.getRaw());
     MacroExpansionEntry entry;
     entry.range = range;
     entry.macroName = macroName;
@@ -1067,24 +1072,35 @@ void SourceManager::addSourceFileIfNotExist(const String& uniqueIdentity, Source
     m_sourceFileMap.addIfNotExists(uniqueIdentity, sourceFile);
 }
 
-// Maximum number of macro expansion levels to unmap when looking for a SourceView.
-// A non-pathological source file will never reach this depth; the cap exists solely
-// to make the loop termination unconditional under adversarial or malformed input.
-// Must be >= kMaxMacroExpansionDiagnosticDepth (defined in slang-diagnostic-sink.cpp)
-// so that findSourceViewThroughExpansion never gives up before the diagnostic walkers do.
-static constexpr int kMaxMacroExpansionUnmapDepth = 1024;
+// Use the shared depth limit from SourceManager. The cap makes loop termination unconditional
+// under adversarial or malformed input; a non-pathological source file will never reach it.
+static constexpr int kMaxMacroExpansionUnmapDepth = SourceManager::kMaxMacroExpansionDepth;
 
 SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
 {
-    // Strategy: a loc that lives in a per-invocation expansion range (range.begin..range.end
-    // registered by registerMacroExpansion) has no SourceView — the range was allocated
-    // synthetically, not from a real source file. We unmap it back to the original
-    // definition-file loc using the offset formula:
+    // Problem: when a SourceLoc lives in a per-invocation expansion range (allocated by
+    // registerMacroExpansion), findSourceViewRecursively returns nullptr. No SourceView was
+    // created for the synthetic range — only the definition file has a SourceView. Diagnostic
+    // rendering needs a SourceView to read source lines and compute humane (file:line:column)
+    // locations, so we must map the loc back to the definition file.
+    //
+    // Solution strategy: the offset of loc within the per-invocation range
+    // (loc - entry->range.begin) corresponds to the same token offset within the definition body
+    // (measured from entry->originalBodyBeginLoc). So we recover the definition-file loc with:
     //
     //   originalLoc = entry->originalBodyBeginLoc + (loc - entry->range.begin)
     //
-    // and then retry findSourceViewRecursively. Each step peels one expansion level; we stop
-    // when we find a view or when we exhaust the expansion chain.
+    // and retry findSourceViewRecursively. If the macro body was itself defined inside another
+    // macro expansion, the recovered loc still won't have a SourceView, and we iterate again
+    // to peel the next level. We stop when we find a view or exhaust the expansion chain.
+    // The loc argument is updated in place so callers can use the remapped definition-file loc
+    // with getHumaneLoc, getPathInfo, and related operations.
+    //
+    // Why not fold this into findSourceViewRecursively as the default behavior? Callers such as
+    // the obfuscation pass (slang-ir-obfuscate-loc.cpp) and include-chain traversal
+    // (slang-compile-request.cpp) call findSourceViewRecursively explicitly without wanting
+    // expansion unmap, and the in-place loc mutation would be incorrect for them. Expansion
+    // unmap is only meaningful in diagnostic rendering, so we expose it as a distinct call.
     SourceView* view = findSourceViewRecursively(loc);
     for (int depth = 0; depth < kMaxMacroExpansionUnmapDepth && !view; ++depth)
     {

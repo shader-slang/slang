@@ -916,6 +916,9 @@ String renderDiagnosticMachineReadable(
         if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
         {
             SourceLoc spanBegin = span.range.begin;
+            // spanBegin may be a macro-expansion-range loc with no SourceView; use
+            // findSourceViewThroughExpansion to unmap it back to the definition-file loc (and
+            // update spanBegin in place) before reading the source line below.
             SourceView* view = sm->findSourceViewThroughExpansion(spanBegin);
             if (view)
             {
