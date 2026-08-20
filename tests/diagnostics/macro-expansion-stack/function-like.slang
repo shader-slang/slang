@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
-//TEST:SIMPLE(filecheck=NOCHECK):-target spirv -enable-machine-readable-diagnostics
+//TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 // Case 1: error is in the macro body, not the argument.
 // The "expanded from" note should point back to the call site.
@@ -25,7 +25,7 @@ void test2()
 }
 
 //CHECK: undefined identifier 'UndefinedArgType'.
-// NOCHECK-NOT: expanded from macro 'PASS_THRU'
+// CHECK-NOT: expanded from macro 'PASS_THRU'
 
 // Case 3: a macro invoked as an argument to another macro, with the error
 // inside the inner macro's body.  The chain should still show

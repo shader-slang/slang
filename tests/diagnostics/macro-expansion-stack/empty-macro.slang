@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
-//TEST:SIMPLE(filecheck=NOCHECK):-target spirv -enable-machine-readable-diagnostics
+//TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 // An empty-body macro: no per-invocation expansion view is created because
 // macro->tokens.m_tokens.getCount() == 0. An error at the call site of EMPTY
@@ -12,4 +12,4 @@ void test()
 }
 
 //CHECK: undefined identifier 'UndefinedType'
-// NOCHECK-NOT: expanded from macro 'EMPTY'
+// CHECK-NOT: expanded from macro 'EMPTY'
