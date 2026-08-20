@@ -92,7 +92,6 @@ half objective(no_diff Model model, float scale)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-[require(spvCooperativeVectorNV)]
 void computeMain(uniform Model model)
 {
     var scale = diffPair(1.0);
