@@ -110,30 +110,38 @@ SLANG_UNIT_TEST(PackageVersionConstraint)
     VersionConstraint constraint;
     String error;
     SLANG_CHECK(SLANG_SUCCEEDED(
-        parseVersionConstraint(UnownedStringSlice(">=v1.2.0 <v2.0.0"), constraint, error)));
+        parseVersionConstraint(UnownedStringSlice(">=1.2.0 <2.0.0"), constraint, error)));
     SLANG_CHECK(constraint.matches(SemanticVersion(1, 2, 0)));
     SLANG_CHECK(constraint.matches(SemanticVersion(1, 9, 9)));
     SLANG_CHECK(!constraint.matches(SemanticVersion(1, 1, 9)));
     SLANG_CHECK(!constraint.matches(SemanticVersion(2, 0, 0)));
 
     SLANG_CHECK(
-        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("v1.4.0"), constraint, error)));
+        SLANG_SUCCEEDED(parseVersionConstraint(UnownedStringSlice("1.4.0"), constraint, error)));
     SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
     SLANG_CHECK(!constraint.matches(SemanticVersion(1, 4, 1)));
 
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice(">=v1.0"), constraint, error)));
+        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice(">=1.0"), constraint, error)));
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^v1.2.0"), constraint, error)));
+        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("^1.2.0"), constraint, error)));
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice(">=1.2.0"), constraint, error)));
-    SLANG_CHECK(SLANG_FAILED(
-        parseVersionConstraint(UnownedStringSlice("v1.2.0 v1.3.0"), constraint, error)));
+        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice(">=v1.2.0"), constraint, error)));
+    SLANG_CHECK(
+        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("1.2.0 1.3.0"), constraint, error)));
     SLANG_CHECK(SLANG_SUCCEEDED(
-        parseVersionConstraint(UnownedStringSlice("<=v2.0.0 >=v1.0.0"), constraint, error)));
+        parseVersionConstraint(UnownedStringSlice("<=2.0.0 >=1.0.0"), constraint, error)));
     SLANG_CHECK(constraint.matches(SemanticVersion(1, 5, 0)));
     SLANG_CHECK(
-        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("> v1.2.0"), constraint, error)));
+        SLANG_FAILED(parseVersionConstraint(UnownedStringSlice("> 1.2.0"), constraint, error)));
+
+    Dependency tagged;
+    tagged.name = "noise";
+    tagged.version = ">=9.0.0";
+    tagged.tag = "v1.4.0";
+    SLANG_CHECK(SLANG_SUCCEEDED(parseDependencyConstraint(tagged, constraint, error)));
+    SLANG_CHECK(constraint.matches(SemanticVersion(1, 4, 0)));
+    SLANG_CHECK(!constraint.matches(SemanticVersion(9, 0, 0)));
 }
 
 SLANG_UNIT_TEST(PackageManifestJSON)
@@ -146,7 +154,7 @@ SLANG_UNIT_TEST(PackageManifestJSON)
                                 "  \"dependencies\": {\n"
                                 "    \"noise\": {\n"
                                 "      \"git\": \"https://example.com/noise.git\",\n"
-                                "      \"tag\": \">=v1.2.0 <v2.0.0\"\n"
+                                "      \"version\": \">=1.2.0 <2.0.0\"\n"
                                 "    }\n"
                                 "  }\n"
                                 "}\n";
@@ -165,11 +173,29 @@ SLANG_UNIT_TEST(PackageManifestJSON)
     SLANG_CHECK(manifest.exports[0] == "src");
     SLANG_CHECK(manifest.dependencies.getCount() == 1);
     SLANG_CHECK(manifest.dependencies[0].name == "noise");
-    SLANG_CHECK(manifest.dependencies[0].tag == ">=v1.2.0 <v2.0.0");
+    SLANG_CHECK(manifest.dependencies[0].version == ">=1.2.0 <2.0.0");
+    SLANG_CHECK(manifest.dependencies[0].tag.getLength() == 0);
+
+    const String taggedText = "{\n"
+                              "  \"name\": \"root\",\n"
+                              "  \"version\": \"0.1.0\",\n"
+                              "  \"exports\": [\"src\"],\n"
+                              "  \"dependencies\": {\n"
+                              "    \"noise\": {\n"
+                              "      \"git\": \"https://example.com/noise.git\",\n"
+                              "      \"version\": \">=9.0.0\",\n"
+                              "      \"tag\": \"v1.4.0\"\n"
+                              "    }\n"
+                              "  }\n"
+                              "}\n";
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(readManifestText("tagged.json", taggedText, manifest, error)));
+    SLANG_CHECK(manifest.dependencies[0].version == ">=9.0.0");
+    SLANG_CHECK(manifest.dependencies[0].tag == "v1.4.0");
 
     const String unsafeGitText =
         "{\"name\":\"root\",\"version\":\"0.1.0\",\"exports\":[\"src\"],"
-        "\"dependencies\":{\"bad\":{\"git\":\"ext::sh -c bad\",\"tag\":\"v1.0.0\"}}}";
+        "\"dependencies\":{\"bad\":{\"git\":\"ext::sh -c bad\",\"version\":\"1.0.0\"}}}";
     SLANG_CHECK(SLANG_FAILED(readManifestText("unsafe-git.json", unsafeGitText, manifest, error)));
 
     const String unsafeExportText =
@@ -261,14 +287,14 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
     Dependency aToB;
     aToB.name = "b";
     aToB.git = bRepository;
-    aToB.tag = ">=v1.2.0";
+    aToB.version = ">=1.2.0";
     aManifest.dependencies.add(aToB);
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(aRepository, "slang-package.json"), aManifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(aRepository, "v1.0.0")));
 
     aManifest.version = "2.0.0";
-    aManifest.dependencies[0].tag = ">=v9.0.0";
+    aManifest.dependencies[0].version = ">=9.0.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(aRepository, "slang-package.json"), aManifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(aRepository, "v2.0.0")));
@@ -280,12 +306,12 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
     Dependency rootToA;
     rootToA.name = "a";
     rootToA.git = aRepository;
-    rootToA.tag = ">=v1.0.0";
+    rootToA.version = ">=1.0.0";
     rootManifest.dependencies.add(rootToA);
     Dependency rootToB;
     rootToB.name = "b";
     rootToB.git = bRepository;
-    rootToB.tag = "<v1.5.0";
+    rootToB.version = "<1.5.0";
     rootManifest.dependencies.add(rootToB);
 
     PackageTool::LockFile lock;
@@ -361,7 +387,7 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
         error)));
     SLANG_CHECK(!File::exists(editableRoot));
 
-    rootManifest.dependencies[1].tag = "<v1.4.0";
+    rootManifest.dependencies[1].version = "<1.4.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(rootDirectory, "slang-package.json"), rootManifest, error)));
     SLANG_CHECK(SLANG_FAILED(executeInDirectory(
@@ -370,21 +396,23 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
         lockedFetchArguments,
         error)));
 
-    rootManifest.dependencies[1].tag = "<v1.2.0";
+    rootManifest.dependencies[1].version = "<1.2.0";
     error = String();
     SLANG_CHECK(SLANG_FAILED(resolveDependencies(rootDirectory, rootManifest, lock, error)));
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("No release tag satisfies")) >= 0);
 
     aManifest.version = "1.1.0";
-    aManifest.dependencies[0].tag = "<v1.2.0";
+    aManifest.dependencies[0].version = "<1.2.0";
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(aRepository, "slang-package.json"), aManifest, error)));
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(aRepository, "v1.1.0")));
 
     rootManifest.dependencies.clear();
-    rootToB.tag = ">=v1.4.0";
+    rootToB.version = ">=1.4.0";
+    rootToB.tag = String();
     rootManifest.dependencies.add(rootToB);
+    rootToA.version = String();
     rootToA.tag = "v1.1.0";
     rootManifest.dependencies.add(rootToA);
     error = String();

@@ -100,6 +100,33 @@ static SlangResult _readRequiredString(
     return SLANG_OK;
 }
 
+static SlangResult _readOptionalString(
+    JSONContainer* container,
+    const JSONValue& object,
+    const char* key,
+    String& outValue,
+    String& outError)
+{
+    JSONValue value = _find(container, object, key);
+    if (!value.isValid())
+    {
+        outValue = String();
+        return SLANG_OK;
+    }
+    if (value.getKind() != JSONValue::Kind::String)
+    {
+        outError = String("Field '") + key + "' must be a string.";
+        return SLANG_FAIL;
+    }
+    outValue = container->getString(value);
+    if (outValue.getLength() == 0)
+    {
+        outError = String("Field '") + key + "' cannot be empty.";
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 bool isValidPackageName(const String& name)
 {
     if (name.getLength() == 0)
@@ -226,9 +253,11 @@ static SlangResult _readDependencies(
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(
-            _readRequiredString(container, pair.value, "tag", dependency.tag, outError));
+            _readOptionalString(container, pair.value, "version", dependency.version, outError));
+        SLANG_RETURN_ON_FAIL(
+            _readOptionalString(container, pair.value, "tag", dependency.tag, outError));
         VersionConstraint ignored;
-        SLANG_RETURN_ON_FAIL(parseVersionConstraint(dependency.tag, ignored, outError));
+        SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, ignored, outError));
         for (const auto& existing : outDependencies)
         {
             if (existing.name == dependency.name)
@@ -305,8 +334,16 @@ static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
     writer.startObject(SourceLoc());
     _writeKey(writer, "git");
     writer.addStringValue(dependency.git.getUnownedSlice(), SourceLoc());
-    _writeKey(writer, "tag");
-    writer.addStringValue(dependency.tag.getUnownedSlice(), SourceLoc());
+    if (dependency.version.getLength() != 0)
+    {
+        _writeKey(writer, "version");
+        writer.addStringValue(dependency.version.getUnownedSlice(), SourceLoc());
+    }
+    if (dependency.tag.getLength() != 0)
+    {
+        _writeKey(writer, "tag");
+        writer.addStringValue(dependency.tag.getUnownedSlice(), SourceLoc());
+    }
     writer.endObject(SourceLoc());
 }
 

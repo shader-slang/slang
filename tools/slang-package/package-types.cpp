@@ -36,19 +36,16 @@ static bool _isDecimalVersion(const UnownedStringSlice& text)
 
 static SlangResult _parseVersion(const UnownedStringSlice& text, SemanticVersion& outVersion)
 {
-    UnownedStringSlice versionText = text;
-    if (versionText.getLength() > 0 && versionText[0] == 'v')
-        versionText = versionText.tail(1);
-    if (!_isDecimalVersion(versionText))
+    if (!_isDecimalVersion(text))
         return SLANG_FAIL;
-    return SemanticVersion::parse(versionText, outVersion);
+    return SemanticVersion::parse(text, outVersion);
 }
 
 SlangResult parseReleaseTag(const UnownedStringSlice& tag, SemanticVersion& outVersion)
 {
     if (tag.getLength() < 2 || tag[0] != 'v')
         return SLANG_FAIL;
-    return _parseVersion(tag, outVersion);
+    return _parseVersion(tag.tail(1), outVersion);
 }
 
 bool VersionConstraint::matches(const SemanticVersion& version) const
@@ -92,7 +89,7 @@ SlangResult parseVersionConstraint(
     StringUtil::splitOnWhitespace(text, terms);
     if (terms.getCount() == 0)
     {
-        outError = "A dependency tag constraint cannot be empty.";
+        outError = "A dependency version constraint cannot be empty.";
         return SLANG_FAIL;
     }
 
@@ -120,26 +117,56 @@ SlangResult parseVersionConstraint(
             predicate.comparison = VersionComparison::Less;
             versionText = term.tail(1);
         }
-        else if (terms.getCount() == 1 && term.startsWith("v"))
+        else if (terms.getCount() == 1)
         {
             predicate.comparison = VersionComparison::Equal;
             versionText = term;
         }
         else
         {
-            outError = String("Invalid dependency tag constraint: ") + String(text);
+            outError = String("Invalid dependency version constraint: ") + String(text);
             return SLANG_FAIL;
         }
 
-        if (!versionText.startsWith("v") ||
+        if (versionText.startsWith("v") ||
             SLANG_FAILED(_parseVersion(versionText, predicate.version)))
         {
-            outError = String("Invalid semantic version in tag constraint: ") + String(term);
+            outError = String("Invalid semantic version in version constraint: ") + String(term);
             return SLANG_FAIL;
         }
         outConstraint.predicates.add(predicate);
     }
     return SLANG_OK;
+}
+
+SlangResult parseDependencyConstraint(
+    const Dependency& dependency,
+    VersionConstraint& outConstraint,
+    String& outError)
+{
+    if (dependency.tag.getLength() != 0)
+    {
+        SemanticVersion version;
+        if (SLANG_FAILED(parseReleaseTag(dependency.tag, version)))
+        {
+            outError = String("Dependency tag must be a release tag vMAJOR.MINOR.PATCH: ") +
+                       dependency.tag;
+            return SLANG_FAIL;
+        }
+        outConstraint.predicates.clear();
+        VersionPredicate predicate;
+        predicate.comparison = VersionComparison::Equal;
+        predicate.version = version;
+        outConstraint.predicates.add(predicate);
+        return SLANG_OK;
+    }
+
+    if (dependency.version.getLength() == 0)
+    {
+        outError = String("Dependency '") + dependency.name + "' requires 'version' or 'tag'.";
+        return SLANG_FAIL;
+    }
+    return parseVersionConstraint(dependency.version, outConstraint, outError);
 }
 
 } // namespace PackageTool
