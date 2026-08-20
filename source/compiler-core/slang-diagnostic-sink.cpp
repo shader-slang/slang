@@ -482,6 +482,7 @@ static void appendMacroExpansionNotes(
                 &arg);
             DiagnosticNote note;
             note.message = msg.produceString();
+            note.diagnosticInfo = &MiscDiagnostics::seeExpandedFromMacro;
             SourceLoc spanLoc = entry->callSiteLoc;
             sm->findSourceViewThroughExpansion(spanLoc); // unmap in-place; ignore returned view
             note.span.range = SourceRange{spanLoc, spanLoc + (Int)macroName.getLength()};
@@ -513,6 +514,7 @@ static void appendMacroExpansionNotes(
                 nullptr);
             DiagnosticNote note;
             note.message = msg.produceString();
+            note.diagnosticInfo = &MiscDiagnostics::seeTokenPasteLocation;
             note.span.range = SourceRange{initiatingLoc};
             notes.add(std::move(note));
             // Walk from the pre-unmap initiating loc so the next iteration can find an expansion
@@ -565,7 +567,12 @@ static void formatDiagnosticWithExpansionChain(
             HumaneSourceLoc noteHumaneLoc = sourceManager->getHumaneLoc(note.span.range.begin);
 
             Diagnostic noteDiag;
-            noteDiag.ErrorID = MiscDiagnostics::seeExpandedFromMacro.id;
+            // Use the originating diagnostic's id from DiagnosticNote so "expanded from macro"
+            // and "see token-paste location" notes are stamped with their own ids. Both are
+            // currently -1 (anonymous notes), but carrying the id explicitly makes the text
+            // path future-proof if they are ever assigned distinct codes.
+            noteDiag.ErrorID = note.diagnosticInfo ? note.diagnosticInfo->id
+                                                   : MiscDiagnostics::seeExpandedFromMacro.id;
             noteDiag.Message = note.message;
             noteDiag.loc = note.span.range.begin;
             noteDiag.severity = Severity::Note;
