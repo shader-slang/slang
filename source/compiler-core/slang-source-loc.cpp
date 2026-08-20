@@ -1134,7 +1134,11 @@ HumaneSourceLoc SourceManager::getHumaneLoc(SourceLoc loc, SourceLocType type)
 
 PathInfo SourceManager::getPathInfo(SourceLoc loc, SourceLocType type)
 {
-    SourceView* sourceView = findSourceViewRecursively(loc);
+    // Use findSourceViewThroughExpansion so that per-invocation macro-expansion-range
+    // locs (which have no SourceView) are unmapped to the definition-file loc before
+    // the path is queried.  Without this, any body-token loc remapped by
+    // _maybeRemapBodyTokenLoc would silently return PathInfo::makeUnknown().
+    SourceView* sourceView = findSourceViewThroughExpansion(loc);
     if (sourceView)
     {
         return sourceView->getPathInfo(loc, type);

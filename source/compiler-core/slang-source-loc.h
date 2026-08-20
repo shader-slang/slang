@@ -626,15 +626,18 @@ struct SourceManager
     /// Find the SourceView for a loc that may be in a per-invocation macro expansion range,
     /// and update loc to the original definition-file location in place.
     ///
-    /// Use this in diagnostic rendering (and analogous contexts) when the loc may be a remapped
-    /// body-token loc for which no SourceView exists. The function walks the macro expansion side
-    /// table to recover the definition-file loc, then delegates to findSourceViewRecursively.
+    /// Use this whenever the loc may be a remapped body-token loc produced by
+    /// _maybeRemapBodyTokenLoc — such locs have no SourceView, so a plain
+    /// findSourceViewRecursively call returns nullptr for them. This function walks the macro
+    /// expansion side table to recover the definition-file loc, then delegates to
+    /// findSourceViewRecursively.
     ///
-    /// Do NOT use this as a general-purpose replacement for findSourceViewRecursively. The in-place
-    /// mutation of loc is a side effect intentionally used by diagnostic callers that need the
-    /// remapped loc for further operations (e.g. getHumaneLoc after the call). Callers that do
-    /// not need expansion unmap — such as include-chain traversal or obfuscation passes — should
-    /// call findSourceViewRecursively directly.
+    /// Use this instead of findSourceViewRecursively when the loc may be a macro body-token loc
+    /// and the caller also needs the original definition-file loc after the call (e.g. to pass
+    /// to getHumaneLoc or to build a source-map entry). Callers that only need the SourceView
+    /// and do not use the updated loc value can call this equally well; the in-place mutation is
+    /// simply unused in that case. Callers whose locs are guaranteed to never be expansion-range
+    /// locs (e.g. include-chain traversal) may call findSourceViewRecursively directly.
     ///
     /// Returns nullptr if no SourceView can be found even after exhausting the expansion chain.
     /// When nullptr is returned, loc has been updated to the deepest successfully-unmapped
@@ -652,7 +655,12 @@ struct SourceManager
     SourceFile* createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
     SourceFile* createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
 
-    /// Get the humane source location
+    /// Get the humane source location for `loc`.
+    ///
+    /// If `loc` is a per-invocation macro-expansion-range loc (produced by
+    /// _maybeRemapBodyTokenLoc in the preprocessor), it is transparently unmapped
+    /// to the original definition-file position before the line/column is computed.
+    /// Callers do not need to pre-process the loc; this method handles all cases.
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
     /// Get the path associated with a location

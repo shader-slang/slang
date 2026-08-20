@@ -1539,8 +1539,16 @@ MacroInvocation::MacroInvocation(
             SourceLoc bodyEnd = originalBodyBeginLoc;
             for (const Token& t : macro->tokens.m_tokens)
             {
-                if (t.type != TokenType::EndOfFile && t.loc.isValid() && t.loc > bodyEnd)
-                    bodyEnd = t.loc;
+                if (t.type != TokenType::EndOfFile && t.loc.isValid())
+                {
+                    // Assert the monotone ordering: every body token must have
+                    // loc >= originalBodyBeginLoc (the first token's loc). This guards
+                    // the body-range arithmetic below, where subtracting
+                    // originalBodyBeginLoc from an arbitrary token loc must not wrap.
+                    SLANG_ASSERT(t.loc >= originalBodyBeginLoc);
+                    if (t.loc > bodyEnd)
+                        bodyEnd = t.loc;
+                }
             }
             m_bodyTokenRange = SourceRange{originalBodyBeginLoc, bodyEnd};
 
@@ -1568,8 +1576,17 @@ SourceLoc MacroInvocation::_remapBodyLoc(SourceLoc loc) const
 {
     if (m_expansionRange.begin.isValid() && m_bodyTokenRange.contains(loc))
     {
-        return SourceLoc::fromRaw(
+        SourceLoc result = SourceLoc::fromRaw(
             m_expansionRange.begin.getRaw() + (loc.getRaw() - m_bodyTokenRange.begin.getRaw()));
+        // Idempotency: the result must land in m_expansionRange, not m_bodyTokenRange.
+        // This is guaranteed by construction because allocateSourceRange is the single
+        // monotone allocator for all SourceLoc ranges — expansion ranges and body ranges
+        // are pairwise disjoint. If a token loc were ever double-remapped, the second
+        // call's m_bodyTokenRange.contains check would fail (the remapped loc is outside
+        // the body range) and the loc would be returned unchanged. The assert below
+        // verifies the first-remap invariant: the result is inside the expansion range.
+        SLANG_ASSERT(m_expansionRange.contains(result));
+        return result;
     }
     return loc;
 }

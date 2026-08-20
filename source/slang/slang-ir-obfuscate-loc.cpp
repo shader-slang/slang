@@ -121,11 +121,25 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 if (sourceView == nullptr || !sourceView->getRange().contains(curLoc))
                 {
                     sourceView = sourceManager->findSourceViewRecursively(curLoc);
-                    SLANG_ASSERT(sourceView);
-                    // If there is no source view we can't apply to the hash
                     if (sourceView == nullptr)
                     {
-                        continue;
+                        // The loc may be a per-invocation expansion-range loc produced by
+                        // _maybeRemapBodyTokenLoc (a synthetic range with no SourceView).
+                        // Walk the macro expansion side table to recover the definition-file loc.
+                        SourceLoc unmappedLoc = curLoc;
+                        sourceView = sourceManager->findSourceViewThroughExpansion(unmappedLoc);
+                        if (sourceView != nullptr)
+                        {
+                            // Store the unmapped loc so the source-map loop below can
+                            // resolve it via findSourceViewRecursively without another unmap.
+                            curLoc = unmappedLoc;
+                            locPairs.getLast().originalLoc = unmappedLoc;
+                        }
+                        else
+                        {
+                            // Genuinely unknown loc — skip it from the hash.
+                            continue;
+                        }
                     }
 
                     const auto pathInfo = sourceView->getViewPathInfo();
@@ -300,8 +314,13 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
             // First find the view
             if (curView == nullptr || !curView->getRange().contains(pair.originalLoc))
             {
+                // pair.originalLoc was already unmapped to the definition-file loc in
+                // the hash loop above (via findSourceViewThroughExpansion), so
+                // findSourceViewRecursively should always succeed here.
                 curView = sourceManager->findSourceViewRecursively(pair.originalLoc);
                 SLANG_ASSERT(curView);
+                if (curView == nullptr)
+                    continue;
 
                 // Reset the current view path index, to being unset
                 curViewSourceFileIndex = -1;
