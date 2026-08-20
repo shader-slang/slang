@@ -40,3 +40,4 @@ void test3()
 
 //CHECK: undefined identifier 'UndefinedInnerType'.
 //CHECK: expanded from macro 'INNER_MACRO'
+// CHECK-NOT: expanded from macro 'OUTER_MACRO'
