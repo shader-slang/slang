@@ -723,10 +723,8 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
             // Seed the concrete argument in that same structural form so every producer agrees on
             // the representation consumed by `unionPropagationInfo`.
             auto componentMask = paramPairType->getValueType();
-            auto primalInfo = (IRType*)makeInfoForConcreteType(
-                module,
-                pairType->getValueType(),
-                componentMask);
+            auto primalInfo =
+                (IRType*)makeInfoForConcreteType(module, pairType->getValueType(), componentMask);
             auto differentialInfo = (IRType*)makeInfoForConcreteType(
                 module,
                 getConcreteDifferentialType(&builder, pairType),
@@ -3788,9 +3786,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             auto substitutedValueType =
                 (IRType*)substituteSetsInTypeLike(diffPairType->getValueType());
-            return builder.getDifferentialPairInfoType(
-                substitutedValueType,
-                substitutedValueType);
+            return builder.getDifferentialPairInfoType(substitutedValueType, substitutedValueType);
         }
 
         return typeLike;
@@ -3862,9 +3858,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             auto substitutedValueType =
                 (IRType*)substituteSets(context, diffPairType->getValueType());
-            return builder.getDifferentialPairInfoType(
-                substitutedValueType,
-                substitutedValueType);
+            return builder.getDifferentialPairInfoType(substitutedValueType, substitutedValueType);
         }
 
         return type;
@@ -7356,8 +7350,8 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        if (auto effectivePairInfo = as<IRDifferentialPairInfoType>(
-                getLoweredType(pairInfo, inst->getDataType())))
+        if (auto effectivePairInfo =
+                as<IRDifferentialPairInfoType>(getLoweredType(pairInfo, inst->getDataType())))
         {
             // Keep the semantic pair operation until the specialization fixed point is complete.
             // Dispatcher construction still needs to distinguish this value from an ordinary
@@ -8609,9 +8603,7 @@ struct DifferentialPairInfoLoweringContext : InstPassBase
     IRType* getTupleType(IRDifferentialPairInfoType* pairInfo)
     {
         IRBuilder builder(module);
-        return builder.getTupleType(
-            pairInfo->getPrimalInfo(),
-            pairInfo->getDifferentialInfo());
+        return builder.getTupleType(pairInfo->getPrimalInfo(), pairInfo->getDifferentialInfo());
     }
 
     bool processModule()

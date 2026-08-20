@@ -71,8 +71,7 @@ IRInst* maybeUnpackArg(
 
             // `BorrowIn` is read-only. `Out`, `BorrowInOut`, and `Ref` can update the value and
             // therefore require the symmetric conversion after the concrete call.
-            if (
-                direction.kind == ParameterDirectionInfo::Kind::Out ||
+            if (direction.kind == ParameterDirectionInfo::Kind::Out ||
                 direction.kind == ParameterDirectionInfo::Kind::BorrowInOut ||
                 direction.kind == ParameterDirectionInfo::Kind::Ref)
             {

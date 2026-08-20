@@ -150,16 +150,12 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             // A witness-table implementation receives its nominal pair type. Project the two
             // semantic components and adapt each independently; this remains correct when either
             // component is itself a composite type-flow value.
-            auto primalArg = builder->emitDifferentialValuePairGetPrimal(
-                argPairInfo->getPrimalInfo(),
-                arg);
+            auto primalArg =
+                builder->emitDifferentialValuePairGetPrimal(argPairInfo->getPrimalInfo(), arg);
             auto differentialArg = builder->emitDifferentialValuePairGetDifferential(
                 argPairInfo->getDifferentialInfo(),
                 arg);
-            auto primal = adaptTypeFlowValue(
-                builder,
-                primalArg,
-                destPairType->getValueType());
+            auto primal = adaptTypeFlowValue(builder, primalArg, destPairType->getValueType());
             auto differentialType = getConcreteDifferentialType(builder, destPairType);
             auto differential = adaptTypeFlowValue(builder, differentialArg, differentialType);
             return builder->emitMakeDifferentialPair(destPairType, primal, differential);
@@ -167,20 +163,14 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
         if (auto destPairInfo = as<IRDifferentialPairInfoType>(destInfo))
         {
-            auto primalArg = builder->emitDifferentialValuePairGetPrimal(
-                argPairInfo->getPrimalInfo(),
-                arg);
+            auto primalArg =
+                builder->emitDifferentialValuePairGetPrimal(argPairInfo->getPrimalInfo(), arg);
             auto differentialArg = builder->emitDifferentialValuePairGetDifferential(
                 argPairInfo->getDifferentialInfo(),
                 arg);
-            auto primal = adaptTypeFlowValue(
-                builder,
-                primalArg,
-                destPairInfo->getPrimalInfo());
-            auto differential = adaptTypeFlowValue(
-                builder,
-                differentialArg,
-                destPairInfo->getDifferentialInfo());
+            auto primal = adaptTypeFlowValue(builder, primalArg, destPairInfo->getPrimalInfo());
+            auto differential =
+                adaptTypeFlowValue(builder, differentialArg, destPairInfo->getDifferentialInfo());
             return builder->emitMakeDifferentialValuePair(destPairInfo, primal, differential);
         }
     }
@@ -191,21 +181,14 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         {
             // Preserve pair identity until the specialization fixed point is complete. The later
             // pair-info lowering pass chooses the ordinary tuple layout in one place.
-            auto primal = builder->emitDifferentialValuePairGetPrimal(
-                argPairType->getValueType(),
-                arg);
+            auto primal =
+                builder->emitDifferentialValuePairGetPrimal(argPairType->getValueType(), arg);
             auto differentialType = getConcreteDifferentialType(builder, argPairType);
-            auto differential = builder->emitDifferentialValuePairGetDifferential(
-                differentialType,
-                arg);
-            auto adaptedPrimal = adaptTypeFlowValue(
-                builder,
-                primal,
-                destPairInfo->getPrimalInfo());
-            auto adaptedDifferential = adaptTypeFlowValue(
-                builder,
-                differential,
-                destPairInfo->getDifferentialInfo());
+            auto differential =
+                builder->emitDifferentialValuePairGetDifferential(differentialType, arg);
+            auto adaptedPrimal = adaptTypeFlowValue(builder, primal, destPairInfo->getPrimalInfo());
+            auto adaptedDifferential =
+                adaptTypeFlowValue(builder, differential, destPairInfo->getDifferentialInfo());
             return builder->emitMakeDifferentialValuePair(
                 destPairInfo,
                 adaptedPrimal,
@@ -231,18 +214,16 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
                 builder->getSetTagType(destTUType->getWitnessTableSet()));
 
             auto argTypeTag = builder->emitGetTypeTagFromTaggedUnion(arg);
-            auto reinterpretedTypeTag =
-                adaptTypeFlowValue(
-                    builder,
-                    argTypeTag,
-                    builder->getSetTagType(destTUType->getTypeSet()));
+            auto reinterpretedTypeTag = adaptTypeFlowValue(
+                builder,
+                argTypeTag,
+                builder->getSetTagType(destTUType->getTypeSet()));
 
             auto argVal = builder->emitGetValueFromTaggedUnion(arg);
-            auto reinterpretedVal =
-                adaptTypeFlowValue(
-                    builder,
-                    argVal,
-                    builder->getUntaggedUnionType(destTUType->getTypeSet()));
+            auto reinterpretedVal = adaptTypeFlowValue(
+                builder,
+                argVal,
+                builder->getUntaggedUnionType(destTUType->getTypeSet()));
             return builder->emitMakeTaggedUnion(
                 destTUType,
                 reinterpretedTypeTag,
@@ -264,24 +245,17 @@ IRInst* adaptTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
         auto typeSet = destTaggedUnionType->getTypeSet();
         auto witnessTableSet = destTaggedUnionType->getWitnessTableSet();
-        auto typeTag = builder->emitGetTagOfElementInSet(
-            builder->getSetTagType(typeSet),
-            argInfo,
-            typeSet);
+        auto typeTag =
+            builder->emitGetTagOfElementInSet(builder->getSetTagType(typeSet), argInfo, typeSet);
         auto witnessTableTag = builder->emitGetTagOfElementInSet(
             builder->getSetTagType(witnessTableSet),
             witnessTable,
             witnessTableSet);
 
-        IRType* payloadType = typeSet->isSingleton()
-                                  ? (IRType*)typeSet->getElement(0)
-                                  : builder->getUntaggedUnionType(typeSet);
+        IRType* payloadType = typeSet->isSingleton() ? (IRType*)typeSet->getElement(0)
+                                                     : builder->getUntaggedUnionType(typeSet);
         auto payload = adaptTypeFlowValue(builder, arg, payloadType);
-        return builder->emitMakeTaggedUnion(
-            destTaggedUnionType,
-            typeTag,
-            witnessTableTag,
-            payload);
+        return builder->emitMakeTaggedUnion(destTaggedUnionType, typeTag, witnessTableTag, payload);
     }
     else if (as<IRTaggedUnionType>(argInfo))
     {
