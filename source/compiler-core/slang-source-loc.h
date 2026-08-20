@@ -576,37 +576,57 @@ struct SourceManager
     /// in the source
     SourceRange allocateSourceRange(UInt size);
 
-    /// A lightweight record of one macro invocation. Stored in a flat side table so the diagnostic
-    /// renderer can emit "expanded from macro 'X'" notes without creating a SourceFile or
-    /// SourceView per invocation.
+    /// A lightweight record of one macro invocation. Stored in a flat side table on the
+    /// SourceManager so the diagnostic renderer can emit "expanded from macro 'X'" notes without
+    /// creating a SourceFile or SourceView per invocation. Entries are appended in allocation order
+    /// and sorted by range.begin (which is monotone from allocateSourceRange), enabling binary
+    /// search in findMacroExpansion.
     struct MacroExpansionEntry
     {
-        SourceRange range;     ///< Tiny range of remapped source locs for this invocation's body.
+        /// Per-invocation source range. Body tokens are remapped into this range so each
+        /// invocation's tokens are distinguishable from tokens of other invocations of the same
+        /// macro.
+        SourceRange range;
         String macroName;      ///< Macro name, for "expanded from macro 'X'" note.
         SourceLoc callSiteLoc; ///< Where this macro was invoked (may itself be in an outer range).
-        SourceLoc bodyBegin;   ///< Original loc of the first body token; allows recovering the
-                               ///< original loc from a remapped one:
-                               ///<   originalLoc = bodyBegin + (remappedLoc - range.begin)
+        /// Original loc of the first body token in the macro definition file. Used to recover the
+        /// pre-remap definition-file loc from a remapped per-invocation loc:
+        ///   originalLoc = originalBodyBeginLoc + (remappedLoc - range.begin)
+        SourceLoc originalBodyBeginLoc;
     };
 
-    /// Register one macro invocation. Allocates a tiny source range of bodyRangeSize bytes,
-    /// appends the entry to m_macroExpansions, and returns the allocated range. The preprocessor
-    /// remaps body token locs into this range so each invocation's tokens are distinguishable.
-    /// bodyBegin is the original loc of the first body token.
+    /// Register one macro invocation for diagnostic backtracing.
+    ///
+    /// The preprocessor calls this once per invocation (when body tracking is enabled). It
+    /// allocates a per-invocation source range of bodyRangeSize bytes, records the macro name and
+    /// call-site location alongside it, and returns the allocated range. The preprocessor then
+    /// remaps body-token locs into this range so the diagnostic renderer can later look up which
+    /// invocation each token came from and walk the call-site chain.
+    ///
+    /// bodyRangeSize must equal `lastBodyTokenLoc - firstBodyTokenLoc + 1`.
     SourceRange registerMacroExpansion(
         const String& macroName,
         SourceLoc callSiteLoc,
-        SourceLoc bodyBegin,
+        SourceLoc originalBodyBeginLoc,
         UInt bodyRangeSize);
 
     /// Return the MacroExpansionEntry whose range contains loc, searching this manager and its
     /// parents. Returns nullptr if loc does not fall in any registered expansion range.
+    ///
+    /// Requires: entries in m_macroExpansions are sorted by range.begin (monotone from
+    /// allocateSourceRange guarantees this under normal use).
     const MacroExpansionEntry* findMacroExpansion(SourceLoc loc) const;
 
-    /// Like findSourceViewRecursively but also walks through macro expansion side-table entries
-    /// when no SourceView owns loc. Updates loc in-place to the un-remapped definition-file loc
-    /// when such unmapping occurs. Returns nullptr if no SourceView can be found even after
-    /// exhausting the expansion chain.
+    /// Given a loc that may be in a per-invocation expansion range (i.e., a remapped body-token
+    /// loc where no SourceView exists), find the SourceView that covers the original
+    /// definition-file loc and update loc to that original loc in place.
+    ///
+    /// This is the correct query to use when you need a SourceView for any loc that may have
+    /// passed through the macro expansion side table. Contrast with findSourceViewRecursively,
+    /// which only handles the older SourceView-based remapping (e.g. #line directives and token
+    /// paste) and will return nullptr for expansion-range locs.
+    ///
+    /// Returns nullptr if no SourceView can be found even after exhausting the expansion chain.
     SourceView* findSourceViewThroughExpansion(SourceLoc& loc) const;
 
     /// Returns the loc for start of next allocation

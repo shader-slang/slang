@@ -433,130 +433,154 @@ static void _tokenLengthNoteDiagnostic(
     }
 }
 
-/// Find the SourceView for loc, walking through macro expansion side-table entries when
-/// findSourceViewRecursively returns null (because loc is in a remapped expansion range with no
-/// SourceView). Updates loc in-place to the original (un-remapped) loc on success.
-static SourceView* findSourceViewThroughMacroExpansion(SourceManager* sm, SourceLoc& loc)
+// Maximum number of levels to walk in the macro-expansion/token-paste chain when building
+// diagnostic notes. A non-pathological program won't reach this depth; the cap makes the loop
+// unconditionally terminating under adversarial or malformed input.
+// Must not exceed kMaxMacroExpansionUnmapDepth (in slang-source-loc.cpp) so the chain walk never
+// requests more unmapping steps than findSourceViewThroughExpansion can provide.
+static constexpr int kMaxMacroExpansionDiagnosticDepth = 1024;
+
+/// Walk the mixed macro-expansion/token-paste provenance chain rooted at `primaryLoc` and append a
+/// note for each level. This produces the "expanded from macro 'X'" and "see token-paste location"
+/// notes shown below the primary diagnostic message.
+///
+/// The chain has two kinds of steps:
+///  - Macro-expansion step: currentLoc falls in a per-invocation expansion range registered with
+///    SourceManager::registerMacroExpansion. The entry gives us the call-site loc for the note
+///    and the macro name for the message.
+///  - Token-paste step: currentLoc belongs to a TokenPaste SourceView (created when ## pastes two
+///    tokens). The view's initiating loc points to where the ## operator appeared.
+///
+/// At each step the un-remapped call-site/initiating loc is used as the note span so the renderer
+/// has a real source location. The walk continues from the original (pre-unmap) loc so that the
+/// next iteration can find the next entry in the chain.
+///
+/// Preconditions: sm must not be null; primaryLoc must be valid.
+/// Call sites must guard with `if (sm && primaryLoc.isValid())` before calling.
+static void appendMacroExpansionNotes(
+    SourceManager* sm,
+    SourceLoc primaryLoc,
+    List<DiagnosticNote>& notes)
 {
-    return sm ? sm->findSourceViewThroughExpansion(loc) : nullptr;
+    SLANG_ASSERT(sm);
+    SLANG_ASSERT(primaryLoc.isValid());
+
+    SourceLoc currentLoc = primaryLoc;
+    for (int depth = 0; depth < kMaxMacroExpansionDiagnosticDepth; ++depth)
+    {
+        if (const auto* entry = sm->findMacroExpansion(currentLoc))
+        {
+            // Macro-expansion step: emit an "expanded from macro 'X'" note at the call site.
+            // The call-site loc may itself be in an expansion range, so unmap it to get a real
+            // source location that the renderer can display.
+            const String& macroName = entry->macroName;
+            DiagnosticArg arg(macroName);
+            StringBuilder msg;
+            formatDiagnosticMessage(
+                msg,
+                MiscDiagnostics::seeExpandedFromMacro.messageFormat,
+                1,
+                &arg);
+            DiagnosticNote note;
+            note.message = msg.produceString();
+            SourceLoc spanLoc = entry->callSiteLoc;
+            sm->findSourceViewThroughExpansion(spanLoc); // unmap in-place; ignore returned view
+            note.span.range = SourceRange{spanLoc, spanLoc + (Int)macroName.getLength()};
+            notes.add(std::move(note));
+            // Walk from the original (pre-unmap) call-site loc so the next iteration sees it
+            // in the context of the outer expansion chain.
+            currentLoc = entry->callSiteLoc;
+        }
+        else
+        {
+            // Token-paste step: check if currentLoc is in a TokenPaste SourceView. If so, emit a
+            // "see token-paste location" note pointing to the ## operator's source location.
+            SourceView* currentView = sm->findSourceViewRecursively(currentLoc);
+            if (!currentView || !currentView->getInitiatingSourceLoc().isValid())
+                break; // no initiating loc — end of chain
+            if (currentView->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste)
+                break; // not a token-paste view — end of chain
+
+            SourceLoc initiatingLoc = currentView->getInitiatingSourceLoc();
+            // The initiating loc may be in an expansion range; unmap it so the note span is valid.
+            if (!sm->findSourceViewThroughExpansion(initiatingLoc))
+                break; // initiating loc unmaps to nowhere — stop rather than show a bad span
+
+            StringBuilder msg;
+            formatDiagnosticMessage(
+                msg,
+                MiscDiagnostics::seeTokenPasteLocation.messageFormat,
+                0,
+                nullptr);
+            DiagnosticNote note;
+            note.message = msg.produceString();
+            note.span.range = SourceRange{initiatingLoc};
+            notes.add(std::move(note));
+            // Walk from the pre-unmap initiating loc so the next iteration can find an expansion
+            // side-table entry if the token-paste itself was inside a macro invocation.
+            currentLoc = currentView->getInitiatingSourceLoc();
+        }
+    }
 }
 
-static void formatDiagnostic(DiagnosticSink* sink, Diagnostic const& diagnostic, StringBuilder& sb)
+/// Format `diagnostic` — including its "expanded from macro" / "see token-paste" expansion notes
+/// — to a human-readable string in `sb`.
+///
+/// This is the text-rendering entry point for the legacy Diagnostic path (as opposed to the rich
+/// GenericDiagnostic path used by diagnoseRichImpl). It shares the expansion-note logic with the
+/// rich path via appendMacroExpansionNotes so that both renderers always show the same chain.
+static void formatDiagnosticWithExpansionChain(
+    DiagnosticSink* sink,
+    Diagnostic const& diagnostic,
+    StringBuilder& sb)
 {
     auto sourceManager = sink->getSourceManager();
 
+    // Resolve the primary diagnostic location through any macro expansion remapping.
+    // findSourceViewThroughExpansion updates sourceLoc in-place to the definition-file loc;
+    // sourceLoc and sourceView must be used together thereafter (both refer to the unmapped loc).
     SourceView* sourceView = nullptr;
     HumaneSourceLoc humaneLoc;
     auto sourceLoc = diagnostic.loc;
+    if (sourceManager)
     {
-        if (sourceManager)
+        sourceView = sourceManager->findSourceViewThroughExpansion(sourceLoc);
+        if (sourceView)
+            humaneLoc = sourceView->getHumaneLoc(sourceLoc);
+    }
+
+    // Emit the primary diagnostic line.
+    formatDiagnostic(humaneLoc, diagnostic, sink->getFlags(), sb);
+
+    // Emit "expanded from macro 'X'" / "see token-paste location" notes for each level in the
+    // provenance chain. appendMacroExpansionNotes is also called by the rich (machine-readable)
+    // path — both go through it so the two renderers always show the same chain.
+    if (sourceManager && diagnostic.loc.isValid())
+    {
+        List<DiagnosticNote> notes;
+        appendMacroExpansionNotes(sourceManager, diagnostic.loc, notes);
+        for (const auto& note : notes)
         {
-            sourceView = findSourceViewThroughMacroExpansion(sourceManager, sourceLoc);
-            if (sourceView)
-            {
-                humaneLoc = sourceView->getHumaneLoc(sourceLoc);
-            }
-        }
+            // Resolve the note's span location to a humaneLoc for text rendering.
+            // The span loc was already unmapped by appendMacroExpansionNotes.
+            HumaneSourceLoc noteHumaneLoc = sourceManager->getHumaneLoc(note.span.range.begin);
 
-        formatDiagnostic(humaneLoc, diagnostic, sink->getFlags(), sb);
-
-        {
-            // Walk the mixed macro-expansion/token-paste chain starting from the diagnostic loc.
-            // MacroExpansion levels are found via the SourceManager side table (no SourceViews);
-            // TokenPaste levels are found via the existing SourceView initiating-loc chain.
-            SourceLoc currentLoc = diagnostic.loc;
-            for (int expansionDepth = 0; expansionDepth < 1024; ++expansionDepth)
-            {
-                // Check the macro expansion side table first.
-                const SourceManager::MacroExpansionEntry* macroEntry =
-                    sourceManager ? sourceManager->findMacroExpansion(currentLoc) : nullptr;
-                if (macroEntry)
-                {
-                    SourceLoc callSiteLoc = macroEntry->callSiteLoc;
-                    SourceView* callSiteView =
-                        sourceManager
-                            ? findSourceViewThroughMacroExpansion(sourceManager, callSiteLoc)
-                            : nullptr;
-                    if (!callSiteView)
-                        break;
-
-                    StringBuilder msg;
-                    DiagnosticArg arg(macroEntry->macroName);
-                    formatDiagnosticMessage(
-                        msg,
-                        MiscDiagnostics::seeExpandedFromMacro.messageFormat,
-                        1,
-                        &arg);
-
-                    Diagnostic initiationDiagnostic;
-                    initiationDiagnostic.ErrorID = MiscDiagnostics::seeExpandedFromMacro.id;
-                    initiationDiagnostic.Message = msg.produceString();
-                    initiationDiagnostic.loc = callSiteLoc;
-                    initiationDiagnostic.severity = MiscDiagnostics::seeExpandedFromMacro.severity;
-
-                    formatDiagnostic(
-                        callSiteView->getHumaneLoc(callSiteLoc),
-                        initiationDiagnostic,
-                        sink->getFlags(),
-                        sb);
-
-                    currentLoc = macroEntry->callSiteLoc;
-                    continue;
-                }
-
-                // Fall back to the TokenPaste SourceView path.
-                SourceView* currentView =
-                    sourceManager ? sourceManager->findSourceViewRecursively(currentLoc) : nullptr;
-                if (!currentView || !currentView->getInitiatingSourceLoc().isValid())
-                    break;
-                if (currentView->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste)
-                    break;
-
-                SourceLoc initiatingLoc = currentView->getInitiatingSourceLoc();
-                SourceView* initiatingView =
-                    sourceManager
-                        ? findSourceViewThroughMacroExpansion(sourceManager, initiatingLoc)
-                        : nullptr;
-                if (!initiatingView)
-                    break;
-
-                StringBuilder msg;
-                formatDiagnosticMessage(
-                    msg,
-                    MiscDiagnostics::seeTokenPasteLocation.messageFormat,
-                    0,
-                    nullptr);
-
-                Diagnostic initiationDiagnostic;
-                initiationDiagnostic.ErrorID = MiscDiagnostics::seeTokenPasteLocation.id;
-                initiationDiagnostic.Message = msg.produceString();
-                initiationDiagnostic.loc = initiatingLoc;
-                initiationDiagnostic.severity = MiscDiagnostics::seeTokenPasteLocation.severity;
-
-                formatDiagnostic(
-                    initiatingView->getHumaneLoc(initiatingLoc),
-                    initiationDiagnostic,
-                    sink->getFlags(),
-                    sb);
-
-                // Walk from the original (pre-unmap) initiating loc so the next iteration
-                // can find the macro expansion side-table entry if needed.
-                currentLoc = currentView->getInitiatingSourceLoc();
-            }
+            Diagnostic noteDiag;
+            noteDiag.ErrorID = MiscDiagnostics::seeExpandedFromMacro.id;
+            noteDiag.Message = note.message;
+            noteDiag.loc = note.span.range.begin;
+            noteDiag.severity = Severity::Note;
+            formatDiagnostic(noteHumaneLoc, noteDiag, sink->getFlags(), sb);
         }
     }
 
-    // If we are a language server, output additional token length info.
+    // Language-server extras: token length hint and source-line annotation.
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::LanguageServer))
-    {
         _tokenLengthNoteDiagnostic(sink, sourceView, sourceLoc, sb);
-    }
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::SourceLocationLine) &&
         diagnostic.loc.isValid())
-    {
         _sourceLocationNoteDiagnostic(sink, sourceView, sourceLoc, sb);
-    }
 
     if (sourceView && sink->isFlagSet(DiagnosticSink::Flag::VerbosePath))
     {
@@ -683,69 +707,6 @@ bool DiagnosticSink::diagnoseRichImpl(
     return diagnoseRichImpl(diagnostic, info, getSourceManager());
 }
 
-/// Walk the mixed macro-expansion/token-paste chain rooted at `primaryLoc` and append a note for
-/// each level. MacroExpansion levels are found via the SourceManager side table; TokenPaste levels
-/// are found via the existing SourceView initiating-loc chain.
-static void appendMacroExpansionNotes(
-    SourceManager* sm,
-    SourceLoc primaryLoc,
-    List<DiagnosticNote>& notes)
-{
-    if (!sm || !primaryLoc.isValid())
-        return;
-
-    SourceLoc currentLoc = primaryLoc;
-    for (int expansionDepth = 0; expansionDepth < 1024; ++expansionDepth)
-    {
-        // Check the macro expansion side table first.
-        if (const auto* entry = sm->findMacroExpansion(currentLoc))
-        {
-            const String& macroName = entry->macroName;
-            DiagnosticArg arg(macroName);
-            StringBuilder msg;
-            formatDiagnosticMessage(
-                msg,
-                MiscDiagnostics::seeExpandedFromMacro.messageFormat,
-                1,
-                &arg);
-            DiagnosticNote note;
-            note.message = msg.produceString();
-            // The note span must use a real (non-expansion-range) loc so the rich diagnostic
-            // renderer can find source context. Unmap the call-site loc if needed.
-            SourceLoc spanLoc = entry->callSiteLoc;
-            findSourceViewThroughMacroExpansion(sm, spanLoc);
-            note.span.range = SourceRange{spanLoc, spanLoc + (Int)macroName.getLength()};
-            notes.add(std::move(note));
-            currentLoc = entry->callSiteLoc;
-            continue;
-        }
-
-        // Fall back to the TokenPaste SourceView path.
-        SourceView* view = sm->findSourceViewRecursively(currentLoc);
-        if (!view || !view->getInitiatingSourceLoc().isValid())
-            break;
-        if (view->getSourceFile()->getPathInfo().type != PathInfo::Type::TokenPaste)
-            break;
-
-        SourceLoc initiatingLoc = view->getInitiatingSourceLoc();
-        SourceView* initiatingView = findSourceViewThroughMacroExpansion(sm, initiatingLoc);
-        if (!initiatingView)
-            break;
-
-        StringBuilder msg;
-        formatDiagnosticMessage(
-            msg,
-            MiscDiagnostics::seeTokenPasteLocation.messageFormat,
-            0,
-            nullptr);
-        DiagnosticNote note;
-        note.message = msg.produceString();
-        note.span.range = SourceRange{initiatingLoc};
-        notes.add(std::move(note));
-        currentLoc = view->getInitiatingSourceLoc();
-    }
-}
-
 bool DiagnosticSink::diagnoseRichImpl(
     const GenericDiagnostic& diagnostic,
     const DiagnosticInfo* info,
@@ -766,12 +727,17 @@ bool DiagnosticSink::diagnoseRichImpl(
     GenericDiagnostic effectiveDiagnostic = diagnostic;
     effectiveDiagnostic.severity = effectiveSeverity;
 
-    // Append notes for any macro expansion chain rooted at the primary location.
-    // This gives the user "expanded from macro 'X'" notes for each nesting level.
-    appendMacroExpansionNotes(
-        sourceManager,
-        effectiveDiagnostic.primarySpan.range.begin,
-        effectiveDiagnostic.notes);
+    // Append "expanded from macro 'X'" / "see token-paste location" notes for any provenance chain
+    // rooted at the primary location. The guard is required because sourceManager may be null when
+    // the sink was created without one (e.g. for command-line error messages), and because a
+    // diagnostic may genuinely have no source location (e.g. internal compiler errors).
+    if (sourceManager && effectiveDiagnostic.primarySpan.range.begin.isValid())
+    {
+        appendMacroExpansionNotes(
+            sourceManager,
+            effectiveDiagnostic.primarySpan.range.begin,
+            effectiveDiagnostic.notes);
+    }
 
     if (effectiveSeverity >= Severity::Error)
     {
@@ -906,7 +872,7 @@ bool DiagnosticSink::diagnoseImpl(
         diagnostic.severity = info.severity;
 
         // If so, pass the error string along to them
-        formatDiagnostic(this, diagnostic, messageBuilder);
+        formatDiagnosticWithExpansionChain(this, diagnostic, messageBuilder);
     }
 
     return diagnoseImpl(info, messageBuilder.getUnownedSlice());

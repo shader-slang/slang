@@ -807,15 +807,18 @@ SourceRange SourceManager::allocateSourceRange(UInt size)
 SourceRange SourceManager::registerMacroExpansion(
     const String& macroName,
     SourceLoc callSiteLoc,
-    SourceLoc bodyBegin,
+    SourceLoc originalBodyBeginLoc,
     UInt bodyRangeSize)
 {
+    // allocateSourceRange is monotone: the new range.begin is always > all previous ranges, so
+    // the m_macroExpansions list stays sorted by range.begin — the invariant that
+    // findMacroExpansion's binary search relies on.
     SourceRange range = allocateSourceRange(bodyRangeSize);
     MacroExpansionEntry entry;
     entry.range = range;
     entry.macroName = macroName;
     entry.callSiteLoc = callSiteLoc;
-    entry.bodyBegin = bodyBegin;
+    entry.originalBodyBeginLoc = originalBodyBeginLoc;
     m_macroExpansions.add(std::move(entry));
     return range;
 }
@@ -828,12 +831,13 @@ const SourceManager::MacroExpansionEntry* SourceManager::findMacroExpansion(Sour
         if (manager->getSourceRange().contains(loc) && manager->m_macroExpansions.getCount() > 0)
         {
             const auto& entries = manager->m_macroExpansions;
-            // Binary search: entries are ordered by range.begin (monotone from
-            // allocateSourceRange).
+            // Binary search: entries are sorted by range.begin because allocateSourceRange is
+            // monotone — every call returns a range strictly above all previous ranges.
+            // Use lo + (hi - lo) / 2 instead of (lo + hi) / 2 to avoid signed-index overflow.
             Index lo = 0, hi = entries.getCount();
             while (lo + 1 < hi)
             {
-                Index mid = (lo + hi) >> 1;
+                Index mid = lo + (hi - lo) / 2;
                 if (entries[mid].range.begin.getRaw() <= loc.getRaw())
                     lo = mid;
                 else
@@ -1063,16 +1067,33 @@ void SourceManager::addSourceFileIfNotExist(const String& uniqueIdentity, Source
     m_sourceFileMap.addIfNotExists(uniqueIdentity, sourceFile);
 }
 
+// Maximum number of macro expansion levels to unmap when looking for a SourceView.
+// A non-pathological source file will never reach this depth; the cap exists solely
+// to make the loop termination unconditional under adversarial or malformed input.
+// Must be >= kMaxMacroExpansionDiagnosticDepth (defined in slang-diagnostic-sink.cpp)
+// so that findSourceViewThroughExpansion never gives up before the diagnostic walkers do.
+static constexpr int kMaxMacroExpansionUnmapDepth = 1024;
+
 SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
 {
+    // Strategy: a loc that lives in a per-invocation expansion range (range.begin..range.end
+    // registered by registerMacroExpansion) has no SourceView — the range was allocated
+    // synthetically, not from a real source file. We unmap it back to the original
+    // definition-file loc using the offset formula:
+    //
+    //   originalLoc = entry->originalBodyBeginLoc + (loc - entry->range.begin)
+    //
+    // and then retry findSourceViewRecursively. Each step peels one expansion level; we stop
+    // when we find a view or when we exhaust the expansion chain.
     SourceView* view = findSourceViewRecursively(loc);
-    for (int depth = 0; depth < 64 && !view; ++depth)
+    for (int depth = 0; depth < kMaxMacroExpansionUnmapDepth && !view; ++depth)
     {
         const MacroExpansionEntry* entry = findMacroExpansion(loc);
         if (!entry)
             break;
         loc = SourceLoc::fromRaw(
-            entry->bodyBegin.getRaw() + (loc.getRaw() - entry->range.begin.getRaw()));
+            entry->originalBodyBeginLoc.getRaw() +
+            (loc.getRaw() - entry->range.begin.getRaw()));
         view = findSourceViewRecursively(loc);
     }
     return view;
