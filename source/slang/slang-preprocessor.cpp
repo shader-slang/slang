@@ -1520,6 +1520,12 @@ MacroInvocation::MacroInvocation(
     //     is invalid (as for a truly empty or builtin-injected macro), we skip registration.
     if (macro->tokens.m_tokens.getCount() > 0 && macroInvocationLoc.isValid())
     {
+        // m_tokens[0] is the first body token (HandleDefineDirective appends the EndOfFile
+        // sentinel *after* all body tokens, so token 0 is never the sentinel unless the macro
+        // is truly empty). The source-location allocator is monotone — each new token gets a
+        // strictly higher raw loc than all previous tokens in the same source file — so token 0
+        // has the lowest loc among all body tokens. The SLANG_ASSERT inside the scan loop below
+        // verifies this assumption for every body token at runtime.
         SourceLoc originalBodyBeginLoc = macro->tokens.m_tokens[0].loc;
         if (originalBodyBeginLoc.isValid())
         {
