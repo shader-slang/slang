@@ -1338,8 +1338,8 @@ SlangResult NVRTCDownstreamCompiler::compile(
         // Absent on NVRTC older than CUDA 11.2, in which case we fall back to
         // the version ladder.
         List<int> supportedArchs;
-        const bool haveSupportedArchs = SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs)) &&
-                                        supportedArchs.getCount() > 0;
+        const bool haveSupportedArchs =
+            SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs)) && supportedArchs.getCount() > 0;
 
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.
