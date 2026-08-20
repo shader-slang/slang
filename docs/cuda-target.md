@@ -132,6 +132,8 @@ Slang has some preliminary support for TextureSampler type - a combined Texture 
 
 Load is only supported for Texture1D, and the mip map selection argument is ignored. This is because there is tex1Dfetch and no higher dimensional equivalents. CUDA also only allows such access if the backing array is linear memory - meaning the bound texture cannot have mip maps - thus making the mip map parameter superfluous anyway. RWTexture does allow Load on other texture types.
 
+Reading a half-typed read-only texture (e.g. `Texture2D<half4>`) is not supported on CUDA. `Load` lowers to the `tex*fetch_int<T>` CUDA-prelude templates and `SampleLevel` lowers to the `tex*Lod<T>` CUDA runtime built-ins; neither is defined for `__half` types (both are float/uint/int only), so a half texel is rejected at compile time with an error. Use a float texture instead - CUDA widens f16-format data to f32 on read for free, and you can narrow the result back to half in-shader if needed.
+
 ## RWTexture
 
 RWTexture types are converted into CUsurfObject type.
