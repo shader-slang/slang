@@ -439,23 +439,19 @@ static void _tokenLengthNoteDiagnostic(
 // requests more expansion-unmapping steps than findSourceViewThroughExpansion can provide.
 static constexpr int kMaxMacroExpansionDiagnosticDepth = SourceManager::kMaxMacroExpansionDepth;
 
-/// Walk the mixed macro-expansion/token-paste provenance chain rooted at `primaryLoc` and append a
-/// note for each level. This produces the "expanded from macro 'X'" and "see token-paste location"
-/// notes shown below the primary diagnostic message.
+/// Build the sequence of "expanded from macro 'X'" and "see token-paste location" notes
+/// that appear below the primary diagnostic message, and append them to `notes`.
 ///
-/// The chain has two kinds of steps:
-///  - Macro-expansion step: currentLoc falls in a per-invocation expansion range registered with
-///    SourceManager::registerMacroExpansion. The entry gives us the call-site loc for the note
-///    and the macro name for the message.
-///  - Token-paste step: currentLoc belongs to a TokenPaste SourceView (created when ## pastes two
-///    tokens). The view's initiating loc points to where the ## operator appeared.
+/// Starting from `primaryLoc`, the function walks the provenance chain — through macro
+/// call-site links and token-paste operator locations — and emits one note per level. Each
+/// note's span points to the call site or paste-operator location so the renderer can
+/// display the originating source line. The walk continues until the chain terminates (no
+/// further macro expansion or token-paste level exists) or until the depth cap is reached.
 ///
-/// At each step the un-remapped call-site/initiating loc is used as the note span so the renderer
-/// has a real source location. The walk continues from the original (pre-unmap) loc so that the
-/// next iteration can find the next entry in the chain.
+/// Both the human-readable (text) and machine-readable (rich) diagnostic renderers call
+/// this function so the two paths always produce the same note sequence.
 ///
 /// Preconditions: sm must not be null; primaryLoc must be valid.
-/// Call sites must guard with `if (sm && primaryLoc.isValid())` before calling.
 static void appendMacroExpansionNotes(
     SourceManager* sm,
     SourceLoc primaryLoc,
@@ -502,9 +498,14 @@ static void appendMacroExpansionNotes(
                 break; // not a token-paste view — end of chain
 
             SourceLoc initiatingLoc = currentView->getInitiatingSourceLoc();
-            // The initiating loc may be in an expansion range; unmap it so the note span is valid.
+            // Unmap the initiating loc in case it is in an expansion range. If no SourceView
+            // can be found even after following the expansion chain (e.g. the ## operator
+            // appeared inside a macro that is not tracked, or the chain terminates without a
+            // definition-file backing), there is no displayable source context for this note.
+            // We stop the walk rather than emitting a note with an unresolvable location,
+            // which would produce a confusing or misleading diagnostic message.
             if (!sm->findSourceViewThroughExpansion(initiatingLoc))
-                break; // initiating loc unmaps to nowhere — stop rather than show a bad span
+                break;
 
             StringBuilder msg;
             formatDiagnosticMessage(
@@ -537,9 +538,11 @@ static void formatDiagnosticWithExpansionChain(
 {
     auto sourceManager = sink->getSourceManager();
 
-    // Resolve the primary diagnostic location through any macro expansion remapping.
-    // findSourceViewThroughExpansion updates sourceLoc in-place to the definition-file loc;
-    // sourceLoc and sourceView must be used together thereafter (both refer to the unmapped loc).
+    // A DiagnosticSink may operate without a SourceManager — e.g., a command-line argument
+    // error sink processes string messages with no source file backing. In that case, loc
+    // resolution and expansion-note emission are skipped and the diagnostic is emitted with
+    // an empty humane loc (no file/line/column context). This is the correct contract: the
+    // caller supplied a sink without source context, and no context should be invented.
     SourceView* sourceView = nullptr;
     HumaneSourceLoc humaneLoc;
     auto sourceLoc = diagnostic.loc;

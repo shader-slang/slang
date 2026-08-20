@@ -623,28 +623,26 @@ struct SourceManager
     /// allocateSourceRange guarantees this under normal use).
     const MacroExpansionEntry* findMacroExpansion(SourceLoc loc) const;
 
-    /// Find the SourceView for a loc that may be in a per-invocation macro expansion range,
-    /// and update loc to the original definition-file location in place.
+    /// Return the SourceView that covers the definition-file position for `loc`, resolving
+    /// through any macro expansion remapping. On return, `loc` is updated in-place to the
+    /// resolved definition-file location.
     ///
-    /// Use this whenever the loc may be a remapped body-token loc produced by
-    /// _maybeRemapBodyTokenLoc — such locs have no SourceView, so a plain
-    /// findSourceViewRecursively call returns nullptr for them. This function walks the macro
-    /// expansion side table to recover the definition-file loc, then delegates to
-    /// findSourceViewRecursively.
+    /// Call this function whenever `loc` may have originated inside a macro body — for example
+    /// when it is a diagnostic primary span, a note span, an IR instruction's source loc, or
+    /// any loc that may have been produced during macro expansion. Locs in those contexts may
+    /// refer to a per-invocation tracking range that has no direct SourceView; this function
+    /// maps such a loc back to its origin in the macro definition file and returns the SourceView
+    /// for that location.
     ///
-    /// Use this instead of findSourceViewRecursively when the loc may be a macro body-token loc
-    /// and the caller also needs the original definition-file loc after the call (e.g. to pass
-    /// to getHumaneLoc or to build a source-map entry). Callers that only need the SourceView
-    /// and do not use the updated loc value can call this equally well; the in-place mutation is
-    /// simply unused in that case. Callers whose locs are guaranteed to never be expansion-range
-    /// locs (e.g. include-chain traversal) may call findSourceViewRecursively directly.
+    /// Use findSourceViewRecursively instead when the loc is guaranteed to be a standard
+    /// non-expansion loc (e.g. a loc read directly from an include-chain SourceView, or
+    /// an IR loc that predates macro expansion tracking).
     ///
-    /// Returns nullptr if no SourceView can be found even after exhausting the expansion chain.
-    /// When nullptr is returned, loc has been updated to the deepest successfully-unmapped
-    /// definition-file loc (the loc for which the final findSourceViewRecursively call returned
-    /// nullptr). Callers that only need the loc value (e.g. to build a diagnostic note span) may
-    /// use it safely; callers that need to read source content via a SourceView should treat a
-    /// nullptr return as "no displayable source context."
+    /// Returns nullptr when the loc cannot be resolved to any SourceView. When nullptr is
+    /// returned, loc holds the deepest definition-file loc that was reached. Callers that only
+    /// need the loc value (e.g. to build a diagnostic note span) may use it safely; callers
+    /// that need to read source content via a SourceView should treat a nullptr return as
+    /// "no displayable source context."
     SourceView* findSourceViewThroughExpansion(SourceLoc& loc) const;
 
     /// Returns the loc for start of next allocation
