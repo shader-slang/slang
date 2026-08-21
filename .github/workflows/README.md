@@ -91,32 +91,33 @@ required will still run on a queue entry, but a failure there does not stop the
 merge, and the run is left on the temporary `gh-readonly-queue/...` branch that
 is deleted right after — so check the workflow's own run list, not the PR.
 
-| Workflow                          | Per-PR | Merge queue | Purpose                                                    |
-| --------------------------------- | ------ | ----------- | ---------------------------------------------------------- |
-| `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.       |
-| `check-actionlint.yml`            | yes    | yes         | Lints the workflow YAML in this directory.                 |
-| `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.          |
-| `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                  |
-| `check-submodules.yml`            | yes    | yes         | Verifies `external/**` submodule pins are reachable.       |
-| `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed.  |
-| `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                     |
-| `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.           |
-| `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.   |
-| `check-spirv-generated.yml`       | yes    | no          | Verifies committed SPIR-V generated files are current.     |
-| `check-container-consistency.yml` | yes    | no          | Verifies the container workflows pin the same image.       |
-| `reuse-compliance.yml`            | yes    | no          | REUSE/SPDX license-header check.                           |
-| `claude-pr-review.yml`            | yes    | no          | Automated review of the PR diff. Advisory.                 |
-| `check-ir-version.yml`            | after  | `CI`        | Reports the IR-version result as a PR comment (see below). |
+| Workflow                          | Per-PR | Merge queue | Purpose                                                   |
+| --------------------------------- | ------ | ----------- | --------------------------------------------------------- |
+| `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.      |
+| `check-actionlint.yml`            | yes    | yes         | Lints the workflow YAML in this directory.                |
+| `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.         |
+| `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                 |
+| `check-submodules.yml`            | yes    | yes         | Verifies `external/**` submodule pins are reachable.      |
+| `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed. |
+| `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                    |
+| `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.          |
+| `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.  |
+| `check-spirv-generated.yml`       | yes    | no          | Verifies committed SPIR-V generated files are current.    |
+| `check-container-consistency.yml` | yes    | no          | Verifies the container workflows pin the same image.      |
+| `reuse-compliance.yml`            | yes    | no          | REUSE/SPDX license-header check.                          |
+| `claude-pr-review.yml`            | yes    | no          | Automated review of the PR diff. Advisory.                |
 
 Two gates live as jobs **inside** `ci.yml` rather than as their own files, so
 they can reuse an artifact CI already built: `check-cmdline-ref` and
 `check-capability-atoms-ref`, which verify the generated reference docs still
 match their sources.
 
-`check-ir-version.yml` is the relay pattern: the check itself runs inside CI,
-which uploads its result as an artifact; the separate workflow then fires on CI's
-completion and posts the PR comment, because commenting needs a token the build
-job — possibly running a fork's code — must not hold.
+One more file belongs to this group without appearing in the table, because it
+has neither trigger: `check-ir-version.yml` runs on `workflow_run`, after a CI
+run completes. It is the relay pattern — the IR-version check itself runs inside
+CI, which uploads its result as an artifact, and this workflow then posts the PR
+comment, because commenting needs a token the build job (possibly running a
+fork's code) must not hold.
 
 ## 2. Reusable building blocks (`workflow_call`)
 
