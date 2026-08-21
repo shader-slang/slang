@@ -4,15 +4,6 @@ This directory holds Slang's GitHub Actions workflows. This README is a
 big-picture map: it groups the 62 workflow files by **when they run** and **what
 job they do**, so you can find the right file without opening each one.
 
-For narrower, deeper documentation see:
-
-- [`../../docs/ci.md`](../../docs/ci.md) — prose notes on the build/test CI
-  (LLVM caching, sccache, which runners run the full test suite).
-- [`pr-board-sync.md`](pr-board-sync.md) — architecture of the `pr-*` family
-  that keeps the "Slang PR Tracking" ProjectsV2 board in sync.
-- [`../pr-board-sync-templates/README.md`](../pr-board-sync-templates/README.md)
-  — copy-me caller templates for onboarding another repo to the board sync.
-
 > **Keeping this current:** the tables below are a hand-maintained snapshot;
 > nothing regenerates them. When you add, remove, or rename a workflow — or
 > change its trigger — update the matching row in the same PR. The `name:` and
