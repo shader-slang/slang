@@ -10,6 +10,24 @@
 namespace Slang
 {
 
+// The scalar ops copied verbatim into one AnyValue payload word (`int`/`float` via
+// `bit_cast<uint>`, `uint` directly). Leaves needing normalization, sub-word masking, or
+// 64-bit splitting (`bool`, `half`, `int64_t`, ...) are excluded. `countWordScalarLeaves`
+// and both `marshalBasicType` overrides share this one classifier so whole-object
+// bulk-copy eligibility cannot diverge from what the per-leaf store actually does.
+static bool isVerbatimWordScalar(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_FloatType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // This is a subpass of generics lowering IR transformation.
 // This pass generates packing/unpacking functions for `AnyValue`s,
 // and replaces all `IRPackAnyValue` and `IRUnpackAnyValue` with calls to these
@@ -356,25 +374,26 @@ struct AnyValueMarshallingContext
         virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteVar)
             override
         {
+            if (isVerbatimWordScalar(dataType->getOp()))
+            {
+                ensureOffsetAt4ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    auto dstVal = dataType->getOp() == kIROp_UIntType
+                                      ? srcVal
+                                      : builder->emitBitCast(builder->getUIntType(), srcVal);
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr, dstVal);
+                }
+                advanceOffset(4);
+                return;
+            }
             switch (dataType->getOp())
             {
-            case kIROp_IntType:
-            case kIROp_FloatType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcVal = builder->emitLoad(concreteVar);
-                        auto dstVal = builder->emitBitCast(builder->getUIntType(), srcVal);
-                        auto dstAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, dstVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
             case kIROp_BoolType:
                 {
                     ensureOffsetAt4ByteBoundary();
@@ -395,21 +414,6 @@ struct AnyValueMarshallingContext
                             anyValueVar,
                             anyValInfo->fieldKeys[fieldOffset]);
                         builder->emitStore(dstAddr, dstVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
-            case kIROp_UIntType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcVal = builder->emitLoad(concreteVar);
-                        auto dstAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, srcVal);
                     }
                     advanceOffset(4);
                     break;
@@ -742,12 +746,10 @@ struct AnyValueMarshallingContext
     // byte-equivalent and must stay on the field-wise path.
     IRIntegerValue countWordScalarLeaves(IRType* type)
     {
+        if (isVerbatimWordScalar(type->getOp()))
+            return 1;
         switch (type->getOp())
         {
-        case kIROp_IntType:
-        case kIROp_UIntType:
-        case kIROp_FloatType:
-            return 1;
         case kIROp_EnumType:
             return countWordScalarLeaves(cast<IREnumType>(type)->getTagType());
         case kIROp_VectorType:
@@ -917,25 +919,25 @@ struct AnyValueMarshallingContext
         virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteVar)
             override
         {
+            if (isVerbatimWordScalar(dataType->getOp()))
+            {
+                ensureOffsetAt4ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto srcVal = builder->emitLoad(srcAddr);
+                    if (dataType->getOp() != kIROp_UIntType)
+                        srcVal = builder->emitBitCast(dataType, srcVal);
+                    builder->emitStore(concreteVar, srcVal);
+                }
+                advanceOffset(4);
+                return;
+            }
             switch (dataType->getOp())
             {
-            case kIROp_IntType:
-            case kIROp_FloatType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        auto srcVal = builder->emitLoad(srcAddr);
-                        srcVal = builder->emitBitCast(dataType, srcVal);
-                        builder->emitStore(concreteVar, srcVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
             case kIROp_BoolType:
                 {
                     ensureOffsetAt4ByteBoundary();
@@ -949,21 +951,6 @@ struct AnyValueMarshallingContext
                         srcVal = builder->emitNeq(
                             srcVal,
                             builder->getIntValue(builder->getUIntType(), 0));
-                        builder->emitStore(concreteVar, srcVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
-            case kIROp_UIntType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        auto srcVal = builder->emitLoad(srcAddr);
                         builder->emitStore(concreteVar, srcVal);
                     }
                     advanceOffset(4);
