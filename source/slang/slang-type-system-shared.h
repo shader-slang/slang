@@ -96,8 +96,6 @@ enum class SamplerStateFlavor : uint8_t
     SamplerComparisonState,
 };
 
-const int kCoreModule_MaxVectorElementCount = 4;
-
 const int kCoreModule_ResourceAccessReadOnly = 0;
 const int kCoreModule_ResourceAccessReadWrite = 1;
 const int kCoreModule_ResourceAccessWriteOnly = 2;

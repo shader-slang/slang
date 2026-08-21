@@ -10124,11 +10124,8 @@ T dot(vector<T, N> x, vector<T, N> y)
     case wgsl: __intrinsic_asm "dot";
     default:
         T result = T(0);
-        // The assert reports the bad width at the `dot` call, but it runs after the unroller, so the
-        // loop condition has to carry the bound too or a forced unroll fails first and hides it.
-        static_assert(N <= $(kCoreModule_MaxVectorElementCount), "dot is only implemented for vectors of up to 4 elements");
         [ForceUnroll]
-        for(int i = 0; i < N && i < $(kCoreModule_MaxVectorElementCount); ++i)
+        for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
     }
@@ -10199,10 +10196,8 @@ T dot(vector<T, N> x, vector<T, N> y)
         }
     }
     default:
-        // Not force-unrolled, unlike the floating-point overload above: GLSL and Metal have no
-        // native integer `dot` and so reach this arm too, making the change of emitted code wider
-        // than for floating point. See shader-slang/slang#12396.
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;

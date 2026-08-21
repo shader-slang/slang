@@ -626,7 +626,7 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
     // backends.
     // 0-vectors are used internally to represent conditional varying values.
     const IRIntegerValue minCount = 0;
-    const IRIntegerValue maxCount = kCoreModule_MaxVectorElementCount;
+    const IRIntegerValue maxCount = 4;
     if ((elementCount < minCount) || (elementCount > maxCount))
     {
         sink->diagnose(Diagnostics::VectorWithInvalidElementCountEncountered{

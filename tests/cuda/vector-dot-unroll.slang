@@ -33,10 +33,14 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     float3 d = float3(inputBuffer[7], inputBuffer[8], inputBuffer[9]);
     float4 e = float4(inputBuffer[10], inputBuffer[11], inputBuffer[12], inputBuffer[13]);
     float4 f = float4(inputBuffer[14], inputBuffer[15], inputBuffer[16], inputBuffer[17]);
-    // `vector<T,0>` is a legal width used internally for conditional varying values, so it has to
-    // survive the `i < 4` bound as well; it folds to a constant with no loop.
+    // `vector<T,0>` is a legal width used internally for conditional varying values; it folds to a
+    // constant with no loop.
     vector<float, 0> g = (vector<float, 0>)0.0f;
-    outputBuffer[0] = dot(a, b) + dot(c, d) + dot(e, f) + dot(g, g);
+    // The integer `dot` fallback is force-unrolled too, and like float it has no native C-like arm,
+    // so it must lower to component arithmetic rather than a `_slang_vector_get_element` loop.
+    int3 h = int3((int)inputBuffer[0], (int)inputBuffer[1], (int)inputBuffer[2]);
+    int3 k = int3((int)inputBuffer[3], (int)inputBuffer[4], (int)inputBuffer[5]);
+    outputBuffer[0] = dot(a, b) + dot(c, d) + dot(e, f) + dot(g, g) + (float)dot(h, k);
 }
 
 // CUDA-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y;
@@ -48,6 +52,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CPP-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z + x_{{[0-9]+}}.w * y_{{[0-9]+}}.w;
 
 // CUDA-DAG: return 0.0f;
+// CPP-DAG: return 0.0f;
+
+// CUDA-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z;
+// CPP-DAG: return x_{{[0-9]+}}.x * y_{{[0-9]+}}.x + x_{{[0-9]+}}.y * y_{{[0-9]+}}.y + x_{{[0-9]+}}.z * y_{{[0-9]+}}.z;
 
 // CUDA_NO_LOOP-NOT: for(;;)
 // CUDA_NO_LOOP-NOT: _slang_vector_get_element
