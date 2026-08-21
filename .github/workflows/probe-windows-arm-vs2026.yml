@@ -51,7 +51,13 @@ permissions:
 jobs:
   probe:
     runs-on: windows-11-vs2026-arm
-    timeout-minutes: 120
+    # The LLVM-from-source build alone ran 1h45m and was still actively
+    # compiling (96.7% through the object count, at clangFrontendTool.lib)
+    # when the prior 120-minute timeout killed it (run 32452521546) — this
+    # preview ARM64 image builds LLVM+Clang noticeably slower than the
+    # "20-40 minutes on other platforms" estimate in setup-llvm-from-gcs's
+    # comment. Not a hang; just needs more wall-clock headroom.
+    timeout-minutes: 180
     defaults:
       run:
         shell: bash
