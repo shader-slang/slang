@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="650" viewBox="0 0 1180 650" role="img" aria-label="Metal intersection function table resource and closest hit dispatch zoom">
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="650" viewBox="0 0 1180 650" role="img" aria-label="Metal TraceProgramDescriptor resource layout and closest hit dispatch zoom">
   <style>
     .title { font: 700 20px sans-serif; fill: #202020; }
     .panelTitle { font: 700 15px sans-serif; fill: #202020; }
@@ -36,15 +36,15 @@
     </marker>
   </defs>
 
-  <text x="34" y="38" class="title">Ordinary intersection_function_table lowering</text>
+  <text x="34" y="38" class="title">TraceProgramDescriptor lowering with intersection_function_table</text>
 
-  <rect x="34" y="70" width="444" height="486" class="iftBox"/>
-  <text x="58" y="100" class="panelTitle">intersection_function_table resource</text>
-  <text x="58" y="122" class="small">One shader-visible object with function entries and resource bindings.</text>
+  <rect x="34" y="70" width="444" height="406" class="iftBox"/>
+  <text x="58" y="100" class="panelTitle">TraceProgramDescriptor layout</text>
+  <text x="58" y="122" class="small">One logical descriptor lowers to separate Metal resource objects.</text>
 
-  <rect x="62" y="152" width="388" height="118" class="table"/>
-  <text x="84" y="178" class="label">IFT entries</text>
-  <text x="84" y="200" class="small">native Metal traversal table</text>
+  <rect x="62" y="148" width="388" height="118" class="table"/>
+  <text x="84" y="174" class="label">intersection_function_table</text>
+  <text x="84" y="196" class="small">candidate-hit functions used by Metal traversal</text>
   <rect x="84" y="218" width="78" height="28" class="header"/>
   <text x="104" y="236" class="tiny">index</text>
   <rect x="162" y="218" width="240" height="28" class="header"/>
@@ -54,36 +54,35 @@
   <rect x="162" y="246" width="240" height="18" class="hitCell"/>
   <text x="238" y="259" class="tiny">CandidateHit1</text>
 
-  <rect x="62" y="292" width="388" height="58" class="buffer"/>
-  <text x="84" y="318" class="label">buffer slot 0</text>
-  <text x="204" y="318" class="small">generated descriptor data</text>
-  <text x="84" y="338" class="tiny">records, slot maps, bindless handles</text>
+  <rect x="62" y="276" width="388" height="58" class="buffer"/>
+  <text x="84" y="302" class="label">buffer resource</text>
+  <text x="204" y="302" class="small">generated descriptor data</text>
+  <text x="84" y="322" class="tiny">records, slot maps, bindless handles</text>
 
-  <rect x="62" y="372" width="120" height="92" class="miss"/>
-  <text x="82" y="398" class="label">VFT 0</text>
-  <text x="82" y="420" class="small">Miss</text>
-  <text x="82" y="440" class="tiny">missIndex</text>
+  <rect x="62" y="354" width="120" height="92" class="miss"/>
+  <text x="82" y="380" class="label">VFT 0</text>
+  <text x="82" y="402" class="small">Miss</text>
+  <text x="82" y="422" class="tiny">missIndex</text>
 
-  <rect x="196" y="372" width="120" height="92" class="closest"/>
-  <text x="216" y="398" class="label">VFT 1</text>
-  <text x="216" y="420" class="small">ClosestHit</text>
-  <text x="216" y="440" class="tiny">logicalHitSlot</text>
+  <rect x="196" y="354" width="120" height="92" class="closest"/>
+  <text x="216" y="380" class="label">VFT 1</text>
+  <text x="216" y="402" class="small">ClosestHit</text>
+  <text x="216" y="422" class="tiny">logicalHitSlot</text>
 
-  <rect x="330" y="372" width="120" height="92" class="callable"/>
-  <text x="350" y="398" class="label">VFT 2</text>
-  <text x="350" y="420" class="small">Callable</text>
-  <text x="350" y="440" class="tiny">callable index</text>
+  <rect x="330" y="354" width="120" height="92" class="callable"/>
+  <text x="350" y="380" class="label">VFT 2</text>
+  <text x="350" y="402" class="small">Callable</text>
+  <text x="350" y="422" class="tiny">callable index</text>
 
-  <rect x="62" y="488" width="388" height="42" class="note"/>
-  <text x="84" y="506" class="redText">IFT entries do not dispatch Miss or ClosestHit.</text>
-  <text x="84" y="522" class="small">Those are generated visible-function dispatches.</text>
+  <rect x="62" y="494" width="388" height="42" class="note"/>
+  <text x="84" y="512" class="redText">IFT entries do not dispatch Miss or ClosestHit.</text>
+  <text x="84" y="528" class="small">Those stages use separate visible-function-table resources.</text>
 
   <path d="M450 214 C510 214 500 142 560 142" class="arrow"/>
-  <path d="M256 372 C380 332 470 298 560 298" class="greenArrow"/>
+  <path d="M256 354 C380 332 470 298 560 298" class="greenArrow"/>
   <text x="494" y="132" class="small">zoom in</text>
-  <text x="416" y="284" class="greenText">aligned by mapping</text>
 
-  <rect x="560" y="70" width="586" height="486" class="zoomBox"/>
+  <rect x="560" y="70" width="586" height="360" class="zoomBox"/>
   <text x="584" y="100" class="panelTitle">Dispatch zoom: ClosestHit VFT and IFT entries</text>
 
   <rect x="584" y="126" width="536" height="54" class="buffer"/>
@@ -96,7 +95,7 @@
   <text x="606" y="258" class="small">indexed by logicalHitSlot</text>
 
   <rect x="606" y="276" width="72" height="28" class="header"/>
-  <text x="630" y="294" class="tiny">slot</text>
+  <text x="611" y="294" class="tiny">logicHitSlot</text>
   <rect x="678" y="276" width="126" height="28" class="header"/>
   <text x="706" y="294" class="tiny">ClosestHit</text>
 
@@ -117,46 +116,46 @@
 
   <rect x="874" y="214" width="246" height="204" class="table"/>
   <text x="896" y="238" class="label">IFT entries</text>
-  <text x="896" y="258" class="small">host maps each slot to a native IFT index</text>
+  <text x="896" y="258" class="small">logicHitSlot maps 1:1 to IFT index</text>
 
-  <rect x="896" y="276" width="58" height="28" class="header"/>
-  <text x="913" y="294" class="tiny">slot</text>
-  <rect x="954" y="276" width="70" height="28" class="header"/>
-  <text x="969" y="294" class="tiny">IFT index</text>
-  <rect x="1024" y="276" width="74" height="28" class="header"/>
+  <rect x="896" y="276" width="68" height="28" class="header"/>
+  <text x="899" y="294" class="tiny">logicHitSlot</text>
+  <rect x="964" y="276" width="64" height="28" class="header"/>
+  <text x="973" y="294" class="tiny">IFT index</text>
+  <rect x="1028" y="276" width="70" height="28" class="header"/>
   <text x="1038" y="294" class="tiny">function</text>
 
-  <rect x="896" y="304" width="58" height="32" class="header"/>
-  <text x="918" y="325" class="tiny">0</text>
-  <rect x="954" y="304" width="70" height="32" class="hitCell"/>
-  <text x="973" y="325" class="tiny">idxA</text>
-  <rect x="1024" y="304" width="74" height="32" class="hitCell"/>
+  <rect x="896" y="304" width="68" height="32" class="header"/>
+  <text x="924" y="325" class="tiny">0</text>
+  <rect x="964" y="304" width="64" height="32" class="hitCell"/>
+  <text x="980" y="325" class="tiny">idxA</text>
+  <rect x="1028" y="304" width="70" height="32" class="hitCell"/>
   <text x="1034" y="325" class="tiny">CandFn0</text>
 
-  <rect x="896" y="336" width="58" height="32" class="header"/>
-  <text x="918" y="357" class="tiny">1</text>
-  <rect x="954" y="336" width="70" height="32" class="cell"/>
-  <text x="973" y="357" class="tiny">idxB</text>
-  <rect x="1024" y="336" width="74" height="32" class="cell"/>
+  <rect x="896" y="336" width="68" height="32" class="header"/>
+  <text x="924" y="357" class="tiny">1</text>
+  <rect x="964" y="336" width="64" height="32" class="cell"/>
+  <text x="980" y="357" class="tiny">idxB</text>
+  <rect x="1028" y="336" width="70" height="32" class="cell"/>
   <text x="1034" y="357" class="tiny">CandFn1</text>
 
-  <rect x="896" y="368" width="58" height="32" class="header"/>
-  <text x="918" y="389" class="tiny">2</text>
-  <rect x="954" y="368" width="70" height="32" class="hitCell"/>
-  <text x="973" y="389" class="tiny">idxC</text>
-  <rect x="1024" y="368" width="74" height="32" class="hitCell"/>
+  <rect x="896" y="368" width="68" height="32" class="header"/>
+  <text x="924" y="389" class="tiny">2</text>
+  <rect x="964" y="368" width="64" height="32" class="hitCell"/>
+  <text x="980" y="389" class="tiny">idxC</text>
+  <rect x="1028" y="368" width="70" height="32" class="hitCell"/>
   <text x="1034" y="389" class="tiny">CandFn2</text>
 
   <path d="M830 320 C846 320 858 320 874 320" class="greenBiArrow"/>
   <path d="M830 384 C846 384 858 384 874 384" class="greenBiArrow"/>
   <text x="830" y="202" class="greenText">1:1 mapping, not equality</text>
 
-  <rect x="584" y="432" width="536" height="120" class="note"/>
-  <text x="606" y="454" class="redText">Metal native index = geometryIntersectionFunctionTableOffset</text>
-  <text x="606" y="472" class="redText">+ instanceIntersectionFunctionTableOffset.</text>
-  <text x="606" y="492" class="small">idxA/B/C are native IFT indices.</text>
-  <text x="606" y="510" class="small">Host setup maps each native IFT entry to one logical hit slot;</text>
-  <text x="606" y="526" class="small">the selected candidate and ClosestHit describe the same hit group.</text>
+  <rect x="584" y="450" width="536" height="112" class="note"/>
+  <text x="606" y="472" class="redText">IFT index = geometryIntersectionFunctionTableOffset</text>
+  <text x="606" y="490" class="redText">+ instanceIntersectionFunctionTableOffset.</text>
+  <text x="606" y="510" class="small">idxA/B/C are IFT indices.</text>
+  <text x="606" y="528" class="small">Host setup maps each IFT entry to one logicHitSlot;</text>
+  <text x="606" y="546" class="small">the selected candidate and ClosestHit describe the same hit group.</text>
 
-  <text x="58" y="604" class="caption">The whole IFT resource carries function entries plus buffer and visible-function bindings; the zoom shows the only paired dispatch: candidate hit and ClosestHit.</text>
+  <text x="58" y="604" class="caption">The descriptor groups separate IFT, visible-function-table, and buffer resources; the zoom shows the paired candidate-hit and ClosestHit dispatch.</text>
 </svg>

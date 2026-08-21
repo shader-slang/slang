@@ -28,11 +28,11 @@
   <rect x="82" y="192" width="64" height="28" class="header"/>
   <text x="97" y="210" class="tiny">row/col</text>
   <rect x="146" y="192" width="86" height="28" class="header"/>
-  <text x="173" y="210" class="tiny">slot 0</text>
+  <text x="173" y="210" class="tiny">col 0</text>
   <rect x="232" y="192" width="86" height="28" class="header"/>
-  <text x="259" y="210" class="tiny">slot 1</text>
+  <text x="259" y="210" class="tiny">col 1</text>
   <rect x="318" y="192" width="86" height="28" class="header"/>
-  <text x="345" y="210" class="tiny">slot 2</text>
+  <text x="345" y="210" class="tiny">col 2</text>
   <rect x="404" y="192" width="36" height="28" class="header"/>
   <text x="414" y="210" class="tiny">...</text>
 

@@ -55,8 +55,11 @@ slot = instanceContribution
 - Use Metal function tables or function buffers only for traversal-time
   any-hit/custom-intersection behavior.
 - Avoid exposing Metal's ordered template tag lists as the main Slang user
-  model. Slang should derive Metal tags from trace context, hit group context,
-  primitive kind, motion mode, and descriptor choice.
+  model. Slang should derive Metal tags from trace-wide traversal requirements,
+  reachable stage operations, primitive constraints, and descriptor lowering.
+- Use `AccelerationStructure` for the portable two-level topology. Reserve
+  `MultiLevelAccelerationStructure<N>` for Metal: `N == 1` is direct primitive-AS traversal,
+  while `N >= 2` enables instancing and an explicit maximum level count.
 - Represent the target-specific binding object with
   `TraceProgramDescriptor<ProgramLayout>`. On D3D/Vulkan it corresponds to
   host-side SBT data; on Metal it lowers to the shader-visible function table

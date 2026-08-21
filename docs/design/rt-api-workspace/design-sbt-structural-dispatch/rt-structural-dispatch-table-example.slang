@@ -1,9 +1,4 @@
-// Part 3 alternative example: structural dispatch table usage.
-//
-// This sketch asks the shader author to provide the selection structure that is
-// otherwise implicit in a native SBT. Metal can lower that structure to ordinary
-// shader-side post-intersect code, while D3D/Vulkan can lower or reflect it as
-// ordinary miss/hit-group entry points.
+// Structural ray-tracing API proof of concept.
 
 import rt_pipeline;
 
@@ -12,43 +7,54 @@ struct RadiancePayload
     float4 color;
 }
 
-struct SphereHitAttributes
+struct SphereIntersectionAttributes
 {
     float2 uv;
 }
 
+struct PrimaryHitRecord {}
+struct PrimaryMissRecord {}
+
 struct PrimaryTraceContext : rt::ITraceContext
 {
     typealias Payload = RadiancePayload;
-    typealias ASKind = rt::InstanceAS;
+    typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
-
-    static const rt::RayDataTags dataTags =
-        rt::RayDataTags::Triangle | rt::RayDataTags::Curve;
-    static const int maxLevels = 0;
 }
 
-struct PrimaryTriangleContext : rt::IHitContextFor<PrimaryTraceContext>
+struct PrimaryTriangleContext : rt::IHitContext
 {
     typealias TraceContext = PrimaryTraceContext;
     typealias Primitive = rt::TrianglePrimitive;
+    typealias Record = PrimaryHitRecord;
 }
 
-struct PrimaryCurveContext : rt::IHitContextFor<PrimaryTraceContext>
+struct PrimaryCurveContext : rt::IHitContext
 {
     typealias TraceContext = PrimaryTraceContext;
     typealias Primitive = rt::CurvePrimitive;
+    typealias Record = PrimaryHitRecord;
 }
 
-struct PrimarySphereContext : rt::IHitContextFor<PrimaryTraceContext>
+struct PrimarySphereContext : rt::IHitContext
 {
     typealias TraceContext = PrimaryTraceContext;
-    typealias Primitive = rt::BoundingBoxPrimitive;
+    typealias Primitive = rt::BoundingBoxPrimitive<SphereIntersectionAttributes>;
+    typealias Record = PrimaryHitRecord;
 }
 
-struct PrimaryMiss : rt::IMissShader<PrimaryTraceContext>
+struct PrimaryMissContext : rt::IMissGroupContext
 {
-    void operator()(rt::MissInput<PrimaryTraceContext> input)
+    typealias TraceContext = PrimaryTraceContext;
+    typealias Record = PrimaryMissRecord;
+}
+
+// Each stage is a named struct entry-point candidate. Its invoke() method is
+// retained and adapted only when the stage is selected explicitly or through a
+// concrete program layout.
+struct PrimaryMiss : rt::IMissShader<PrimaryMissContext>
+{
+    void invoke(rt::MissInput<PrimaryMissContext> input)
     {
         input.payload.color = float4(0.0, 0.0, 0.0, 1.0);
     }
@@ -56,7 +62,7 @@ struct PrimaryMiss : rt::IMissShader<PrimaryTraceContext>
 
 struct PrimaryTriangleClosestHit : rt::IClosestHitShader<PrimaryTriangleContext>
 {
-    void operator()(rt::ClosestHitInput<PrimaryTriangleContext> input)
+    void invoke(rt::ClosestHitInput<PrimaryTriangleContext> input)
     {
         input.payload.color =
             float4(input.triangle.barycentricCoord, input.distance, 1.0);
@@ -74,98 +80,83 @@ struct PrimaryTriangleAnyHit : rt::IAnyHitShader<PrimaryTriangleContext>
     }
 }
 
-
-
-
 struct PrimaryCurveClosestHit : rt::IClosestHitShader<PrimaryCurveContext>
 {
-    void operator()(rt::ClosestHitInput<PrimaryCurveContext> input)
+    void invoke(rt::ClosestHitInput<PrimaryCurveContext> input)
     {
         input.payload.color = float4(input.curve.parameter, input.distance, 0.0, 1.0);
     }
 }
 
-struct PrimarySphereIntersection : rt::IIntersectionShader<PrimarySphereContext, SphereHitAttributes>
+struct PrimarySphereIntersection
+    : rt::IIntersectionShader<PrimarySphereContext>
 {
-    typealias Attributes = SphereHitAttributes;
-
-    rt::IntersectionReturn<PrimarySphereContext, Attributes> operator()(
-        rt::IntersectionInput<PrimarySphereContext> input)
+    void invoke(rt::IntersectionInput<PrimarySphereContext> input)
     {
-        rt::IntersectionReturn<PrimarySphereContext, Attributes> result;
-        result.acceptIntersection = input.opaque;
-        result.continueSearch = true;
-        result.distance = 1.0;
-        result.attributes.uv = float2(0.25, 0.75);
-        return result;
+        SphereIntersectionAttributes attributes;
+        attributes.uv = float2(0.25, 0.75);
+        input.reportHit(1.0, attributes);
     }
 }
 
 struct PrimarySphereClosestHit : rt::IClosestHitShader<PrimarySphereContext>
 {
-    void operator()(rt::ClosestHitInput<PrimarySphereContext> input)
+    void invoke(rt::ClosestHitInput<PrimarySphereContext> input)
     {
-        SphereHitAttributes attr = input.getCustomAttributes<SphereHitAttributes>();
-        input.payload.color = float4(attr.uv, input.distance, 1.0);
+        SphereIntersectionAttributes attributes = input.attributes;
+        input.payload.color = float4(attributes.uv, input.distance, 1.0);
     }
 }
 
-// These are compiled shader-slot IDs, not scene geometry IDs. The compiled
-// program has a finite set of hit groups. D3D/Vulkan select these slots through
-// native SBT indexing, and Metal lowering synthesizes the same indexing formula
-// after intersector::intersect(...) returns.
-typealias PrimaryTriangleHitSlot = rt::HitGroupSlot<0>;
-typealias PrimaryCurveHitSlot = rt::HitGroupSlot<1>;
-typealias PrimarySphereHitSlot = rt::HitGroupSlot<2>;
-
-struct PrimaryProgram : rt::TraceProgram
+// Slots are indices within their respective logical SBT sections.
+struct PrimaryMissGroup : rt::IMissGroup
 {
-    typealias TraceContext = PrimaryTraceContext;
-
-    typealias MissGroups = rt::MissGroupList<
-        TraceContext,
-
-        // dispatch.missIndex == 0
-        rt::MissGroup<
-            TraceContext,
-            rt::MissSlot<0>,
-            PrimaryMiss>>;
-
-    typealias HitGroups = rt::HitGroupList<
-        TraceContext,
-
-        // hit slot 0. Runtime geometry/ray-type data may select this slot.
-        rt::HitGroup<
-            TraceContext,
-            PrimaryTriangleHitSlot,
-            PrimaryTriangleContext,
-            PrimaryTriangleClosestHit,
-            PrimaryTriangleAnyHit,
-            rt::NoAttributes,
-            rt::NoIntersection<PrimaryTriangleContext>>,
-
-        // hit slot 1. Runtime geometry/ray-type data may select this slot.
-        rt::HitGroup<
-            TraceContext,
-            PrimaryCurveHitSlot,
-            PrimaryCurveContext,
-            PrimaryCurveClosestHit,
-            rt::NoAnyHit<PrimaryCurveContext>,
-            rt::NoAttributes,
-            rt::NoIntersection<PrimaryCurveContext>>,
-
-        // hit slot 2. Runtime geometry/ray-type data may select this slot.
-        rt::HitGroup<
-            TraceContext,
-            PrimarySphereHitSlot,
-            PrimarySphereContext,
-            PrimarySphereClosestHit,
-            rt::NoAnyHit<PrimarySphereContext>,
-            SphereHitAttributes,
-            PrimarySphereIntersection>>;
+    typealias Slot = rt::MissSlot<0>;
+    typealias Context = PrimaryMissContext;
+    typealias Miss = PrimaryMiss;
 }
 
-rt::AccelerationStructure<rt::InstanceAS, rt::NoMotion> gScene;
+struct PrimaryTriangleGroup : rt::IHitGroup
+{
+    typealias Slot = rt::HitGroupSlot<0>;
+    typealias Context = PrimaryTriangleContext;
+    typealias ClosestHit = PrimaryTriangleClosestHit;
+    typealias AnyHit = PrimaryTriangleAnyHit;
+    typealias Intersection = rt::NoIntersection<PrimaryTriangleContext>;
+}
+
+struct PrimaryCurveGroup : rt::IHitGroup
+{
+    typealias Slot = rt::HitGroupSlot<1>;
+    typealias Context = PrimaryCurveContext;
+    typealias ClosestHit = PrimaryCurveClosestHit;
+    typealias AnyHit = rt::NoAnyHit<PrimaryCurveContext>;
+    typealias Intersection = rt::NoIntersection<PrimaryCurveContext>;
+}
+
+struct PrimarySphereGroup : rt::IHitGroup
+{
+    typealias Slot = rt::HitGroupSlot<2>;
+    typealias Context = PrimarySphereContext;
+    typealias ClosestHit = PrimarySphereClosestHit;
+    typealias AnyHit = rt::NoAnyHit<PrimarySphereContext>;
+    typealias Intersection = PrimarySphereIntersection;
+}
+
+struct PrimaryTraceProgramLayout : rt::ITraceProgramLayout
+{
+    typealias TraceContext = PrimaryTraceContext;
+    typealias MissGroups = rt::MissGroupList<TraceContext, PrimaryMissGroup>;
+    typealias HitGroups = rt::HitGroupList<
+        TraceContext,
+        PrimaryTriangleGroup,
+        PrimaryCurveGroup,
+        PrimarySphereGroup>;
+    typealias CallableGroups = rt::NoCallableGroups<TraceContext>;
+}
+
+rt::AccelerationStructure gScene;
+rt::TraceProgramDescriptor<PrimaryTraceProgramLayout> gPrimaryDescriptor;
 
 rt::RayDesc makePrimaryRay(uint2 pixel)
 {
@@ -185,77 +176,36 @@ void rayGenMain()
     rt::RayTraversalDesc desc;
     desc.ray = makePrimaryRay(pixel);
     desc.instanceMask = 0xff;
-
-    rt::RayDispatch dispatch;
-    dispatch.sbtOffset = 0;
-    dispatch.sbtStride = 3;
-    dispatch.missIndex = 0;
+    desc.sbtOffset = 0;
+    desc.sbtStride = 3;
+    desc.missIndex = 0;
 
     RadiancePayload payload;
     payload.color = float4(0.0, 0.0, 0.0, 1.0);
 
-    rt::RayTracer<PrimaryProgram> tracer;
-    tracer.trace(desc, gScene, dispatch, payload);
+    rt::RayTracer<PrimaryTraceProgramLayout> tracer;
+    tracer.trace(desc, gScene, gPrimaryDescriptor, payload);
 }
-
-
 
 // Conceptual Metal lowering:
 //
-// metalIntersector.set_geometry_multiplier(dispatch.sbtStride);
-// metalIntersector.set_base_id(dispatch.sbtOffset);
-// result = metalIntersector.intersect(desc.ray, gScene, ...);
-//
+// result = intersector.intersect(desc.ray, gScene, descriptor.ift, ...);
 // if (result.type == none)
 // {
-//     switch (dispatch.missIndex)
-//     {
-//     case 0: PrimaryMiss()(MissInput<PrimaryTraceContext>(payload)); break;
-//     }
+//     descriptor.missFunctions[desc.missIndex](payload, descriptor.recordData);
 // }
 // else
 // {
-//     uint geometryContribution =
-//         __rtGetGeometryContribution<PrimaryProgram>(result);
-//     uint instanceContribution =
-//         __rtGetInstanceContribution<PrimaryProgram>(result);
-//     uint slot = getHitGroupSlot(
-//         dispatch, geometryContribution, instanceContribution);
-//
-//     switch (slot)
-//     {
-//     case 0:
-//         PrimaryTriangleClosestHit()(
-//             ClosestHitInput<PrimaryTriangleContext>(payload, result));
-//         break;
-//     case 1:
-//         PrimaryCurveClosestHit()(
-//             ClosestHitInput<PrimaryCurveContext>(payload, result));
-//         break;
-//     case 2:
-//         PrimarySphereClosestHit()(
-//             ClosestHitInput<PrimarySphereContext>(payload, result));
-//         break;
-//     }
+//     uint hitSlot = getHitGroupSlot(
+//         desc,
+//         getGeometryContribution(result),
+//         getInstanceContribution(result));
+//     descriptor.closestHitFunctions[hitSlot](
+//         payload,
+//         result,
+//         descriptor.recordData);
 // }
 //
-// Conceptual D3D/Vulkan lowering:
-//
-// - dispatch.sbtOffset, dispatch.sbtStride, and dispatch.missIndex lower to
-//   native trace parameters.
-// - MissGroups[0] becomes the native miss shader for miss slot 0.
-// - HitGroups[0..2] become native SBT hit groups with closest-hit, optional
-//   any-hit, and optional intersection entry points.
-// - Existing host-side SBT construction can keep using the same slot numbers.
-//
-// Metal consistency requirement:
-//
-// - For intersection_function_buffer, dispatch.sbtStride must be the value used
-//   with set_geometry_multiplier(...), and dispatch.sbtOffset must be the value
-//   used with set_base_id(...). The synthesized closest-hit slot and Metal's IFB
-//   record index are then the same.
-// - For ordinary intersection_function_table, Metal has no shader-side base ID
-//   or geometry multiplier. It can use this model only when the acceleration
-//   structure's function-table offsets are already baked to the same slot
-//   numbers, or when the trace uses the restricted stride/offset pattern that
-//   those baked offsets represent.
+// The descriptor specializes to the Metal IFT, visible-function tables, and
+// generated record-data buffer. D3D/Vulkan instead reuse desc's native SBT
+// parameters and emit the selected structs as ordinary ray-tracing stages.

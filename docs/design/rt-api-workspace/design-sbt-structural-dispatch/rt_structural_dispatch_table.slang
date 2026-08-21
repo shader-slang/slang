@@ -1,169 +1,154 @@
-// Draft Slang-side structural ray dispatch table.
-//
-// This fragment adds structural dispatch cases to the rt_pipeline module. The
-// cases can lower in two ways:
-//
-// - Metal: generate a post-intersect closest-hit/miss dispatch switch.
-// - D3D/Vulkan: generate or reflect native miss/hit-group entry points.
+// Structural shader-binding-table layout for the rt_pipeline proof of concept.
 
 implementing rt_pipeline;
 
 namespace rt
 {
 
-public interface IHitGroupSlot
+public interface IShaderGroupSlot
 {
     static const int index;
 }
 
-public struct HitGroupSlot<let indexValue : int> : IHitGroupSlot
+public struct ShaderGroupSlot<let indexValue : int> : IShaderGroupSlot
 {
     public static const int index = indexValue;
 }
 
-public interface IMissSlot
-{
-    static const int index;
-}
-
-public struct MissSlot<let indexValue : int> : IMissSlot
-{
-    public static const int index = indexValue;
-}
-
-public struct RayDispatch
-{
-    // D3D: RayContributionToHitGroupIndex.
-    // Vulkan: sbtRecordOffset.
-    // Metal IFB: intersector::set_base_id(...).
-    public uint sbtOffset;
-
-    // D3D: MultiplierForGeometryContributionToHitGroupIndex.
-    // Vulkan: sbtRecordStride.
-    // Metal IFB: intersector::set_geometry_multiplier(...).
-    public uint sbtStride;
-
-    public uint missIndex;
-}
+// Section-specific names improve readability while sharing one slot contract.
+public typealias HitGroupSlot<let indexValue : int> = ShaderGroupSlot<indexValue>;
+public typealias MissSlot<let indexValue : int> = ShaderGroupSlot<indexValue>;
+public typealias CallableSlot<let indexValue : int> = ShaderGroupSlot<indexValue>;
 
 public uint getHitGroupSlot(
-    RayDispatch dispatch,
+    RayTraversalDesc desc,
     uint geometryContribution,
     uint instanceContribution)
 {
-    return instanceContribution + geometryContribution * dispatch.sbtStride +
-        dispatch.sbtOffset;
+    return instanceContribution + geometryContribution * desc.sbtStride + desc.sbtOffset;
 }
 
-public interface IHitGroup<TTraceContext : ITraceContext>
+public interface IHitGroup
 {
+    associatedtype Slot : IShaderGroupSlot;
+    associatedtype Context : IHitContext;
+    associatedtype ClosestHit : IClosestHitShader<Context>;
+    associatedtype AnyHit : IAnyHitShader<Context>;
+    associatedtype Intersection : IIntersectionStage<Context>;
 }
 
-public interface IMissGroup<TTraceContext : ITraceContext>
+public interface IMissGroup
 {
+    associatedtype Slot : IShaderGroupSlot;
+    associatedtype Context : IMissGroupContext;
+    associatedtype Miss : IMissShader<Context>;
 }
 
-public struct HitGroup<
-    TTraceContext : ITraceContext,
-    TSlot : IHitGroupSlot,
-    TContext : IHitContextFor<TTraceContext>,
-    TClosestHit : IClosestHitShader<TContext>,
-    TAnyHit : IAnyHitShader<TContext>,
-    TIntersectionAttributes,
-    TIntersection : IIntersectionShader<TContext, TIntersectionAttributes>>
-    : IHitGroup<TTraceContext>
+public interface ICallableGroup
 {
-    public typealias Slot = TSlot;
-    public typealias Context = TContext;
-    public typealias ClosestHit = TClosestHit;
-    public typealias AnyHit = TAnyHit;
-    public typealias IntersectionAttributes = TIntersectionAttributes;
-    public typealias Intersection = TIntersection;
+    associatedtype Slot : IShaderGroupSlot;
+    associatedtype Context : ICallableGroupContext;
+    associatedtype Callable : ICallableShader<Context>;
 }
 
-public struct MissGroup<
-    TTraceContext : ITraceContext,
-    TSlot : IMissSlot,
-    TMiss : IMissShader<TTraceContext>>
-    : IMissGroup<TTraceContext>
-{
-    public typealias Slot = TSlot;
-    public typealias Miss = TMiss;
-}
-
-public interface IHitGroupList<TTraceContext : ITraceContext>
+public interface IHitGroupList<TraceContext>
+    where TraceContext : ITraceContext
 {
     static const int count;
 }
 
-public interface IMissGroupList<TTraceContext : ITraceContext>
+public interface IMissGroupList<TraceContext>
+    where TraceContext : ITraceContext
 {
     static const int count;
 }
 
-public struct HitGroupList<
-    TTraceContext : ITraceContext,
-    each TGroup : IHitGroup<TTraceContext>>
-    : IHitGroupList<TTraceContext>
+public interface ICallableGroupList<TraceContext>
+    where TraceContext : ITraceContext
 {
-    public static const int count = countof(TGroup);
+    static const int count;
 }
 
-public struct MissGroupList<
-    TTraceContext : ITraceContext,
-    each TGroup : IMissGroup<TTraceContext>>
-    : IMissGroupList<TTraceContext>
+public struct HitGroupList<TraceContext, each Group> : IHitGroupList<TraceContext>
+    where TraceContext : ITraceContext
+    where Group : IHitGroup
+    where expand each Group.Context.TraceContext == TraceContext
 {
-    public static const int count = countof(TGroup);
+    public static const int count = countof(Group);
 }
 
-public interface TraceProgram
+public struct MissGroupList<TraceContext, each Group> : IMissGroupList<TraceContext>
+    where TraceContext : ITraceContext
+    where Group : IMissGroup
+    where expand each Group.Context.TraceContext == TraceContext
+{
+    public static const int count = countof(Group);
+}
+
+public struct CallableGroupList<TraceContext, each Group> : ICallableGroupList<TraceContext>
+    where TraceContext : ITraceContext
+    where Group : ICallableGroup
+    where expand each Group.Context.TraceContext == TraceContext
+{
+    public static const int count = countof(Group);
+}
+
+public struct NoHitGroups<TraceContext> : IHitGroupList<TraceContext>
+    where TraceContext : ITraceContext
+{
+    public static const int count = 0;
+}
+
+public struct NoMissGroups<TraceContext> : IMissGroupList<TraceContext>
+    where TraceContext : ITraceContext
+{
+    public static const int count = 0;
+}
+
+public struct NoCallableGroups<TraceContext> : ICallableGroupList<TraceContext>
+    where TraceContext : ITraceContext
+{
+    public static const int count = 0;
+}
+
+public interface ITraceProgramLayout
 {
     associatedtype TraceContext : ITraceContext;
     associatedtype MissGroups : IMissGroupList<TraceContext>;
     associatedtype HitGroups : IHitGroupList<TraceContext>;
+    associatedtype CallableGroups : ICallableGroupList<TraceContext>;
 }
 
-uint __rtGetInstanceContribution<TProgram : TraceProgram>(
-    IntersectionResult<
-        TProgram.TraceContext.ASKind,
-        TProgram.TraceContext.dataTags,
-        TProgram.TraceContext.Motion,
-        TProgram.TraceContext.maxLevels> intersectionResult);
+// A ParameterBlock-like shader-visible resource. Its physical fields are
+// selected after ProgramLayout specialization and differ by target.
+public struct TraceProgramDescriptor<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+{}
 
-uint __rtGetGeometryContribution<TProgram : TraceProgram>(
-    IntersectionResult<
-        TProgram.TraceContext.ASKind,
-        TProgram.TraceContext.dataTags,
-        TProgram.TraceContext.Motion,
-        TProgram.TraceContext.maxLevels> intersectionResult);
-
-public struct RayTracer<TProgram : TraceProgram>
+public struct RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
 {
     public void trace(
         RayTraversalDesc desc,
-        AccelerationStructure<TProgram.TraceContext.ASKind, TProgram.TraceContext.Motion> scene,
-        RayDispatch dispatch,
-        inout TProgram.TraceContext.Payload payload)
+        ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
     {
-        __rtTraceRayWithProgram<TProgram>(desc, scene, dispatch, payload);
+        __rtTraceRayWithProgram<ProgramLayout>(
+            desc,
+            accelerationStructure,
+            descriptor,
+            payload);
     }
 }
 
-void __rtTraceRayWithProgram<TProgram : TraceProgram>(
+// Compiler-known structural trace marker. D3D/Vulkan reuse the existing
+// TraceRay path; Metal uses ProgramLayout to synthesize traversal and dispatch.
+void __rtTraceRayWithProgram<ProgramLayout>(
     RayTraversalDesc desc,
-    AccelerationStructure<TProgram.TraceContext.ASKind, TProgram.TraceContext.Motion> scene,
-    RayDispatch dispatch,
-    inout TProgram.TraceContext.Payload payload);
+    ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
+    TraceProgramDescriptor<ProgramLayout> descriptor,
+    inout ProgramLayout.TraceContext.Payload payload)
+    where ProgramLayout : ITraceProgramLayout;
 
 } // namespace rt
-
-
-
-
-
-// ClostHit -> TRIANGLE/PROC
-struct TriClosetHit : IClosetHit<Context>
-{
-    ///
-}

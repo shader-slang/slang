@@ -6,6 +6,8 @@ to D3D/Vulkan's native shader binding table model.
 Start with [PROPOSAL.md](PROPOSAL.md) for the formal draft design, including
 problem diagrams, API sketches, and migration examples. Use
 [TUTORIAL.md](TUTORIAL.md) for a step-by-step user-facing walkthrough.
+[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) turns the proposal into ordered
+compiler and shader-module work packages with tests and exit criteria.
 [SESSION_CONTEXT.md](SESSION_CONTEXT.md) records the compact context and
 candidate-selection rationale for the draft PR.
 
@@ -87,7 +89,6 @@ Each group is assigned a slot:
 typealias PrimaryTriangleHitSlot = rt::HitGroupSlot<0>;
 
 rt::HitGroup<
-    TraceContext,
     PrimaryTriangleHitSlot,
     PrimaryTriangleContext,
     PrimaryTriangleClosestHit,
@@ -257,9 +258,10 @@ Conceptually, reflection for a trace program exposes:
 TraceProgram
     TraceContext
         Payload type
-        Acceleration-structure kind
+        AccelerationStructure type
         Motion mode
-        Metal data tags / max levels
+
+    Inferred Metal tag signature
 
     MissGroups[]
         slot index
@@ -273,7 +275,7 @@ TraceProgram
         any-hit shader symbol, or none
         intersection shader symbol, or none
         intersection attribute type
-        required Metal intersection tags
+        primitive-specific data requirements
 ```
 
 ### D3D/Vulkan Host Flow

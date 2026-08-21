@@ -211,7 +211,7 @@ TraceProgram
         closest-hit shader
         any-hit shader, or none
         intersection shader, or built-in
-        required Metal traversal tags
+        inferred primitive-specific Metal data requirements
 
     MissGroups[]
         slot

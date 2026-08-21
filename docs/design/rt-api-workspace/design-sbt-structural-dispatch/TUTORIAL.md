@@ -82,21 +82,21 @@ The trace context names the payload type and target-independent traversal shape.
 struct PrimaryTraceContext : rt::ITraceContext
 {
     typealias Payload = RadiancePayload;
-    typealias ASKind = rt::InstanceAS;
+    typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
-
-    static const rt::RayDataTags dataTags =
-        rt::RayDataTags::Triangle | rt::RayDataTags::Curve;
-    static const int maxLevels = 0;
 }
 ```
+
+Primitive-specific Metal data tags are not declared in the trace context. The compiler infers
+`triangle_data` and `curve_data` from reachable uses of properties such as `input.triangle` and
+`input.curve`.
 
 ### Difference from the Old Model
 
 Shader code:
-Old code often relies on target builtins and entry-point signatures to imply
-payload, attribute, and acceleration-structure shape. The new API makes that
-shape explicit in a type.
+Old code often relies on target builtins and entry-point signatures to imply payload and
+acceleration-structure shape. The new API makes the shared shape explicit in a type, while
+primitive-specific data requirements are inferred from stage code.
 
 Host code:
 The host can use `TraceContext` reflection to validate that the bound
@@ -110,17 +110,17 @@ primitive kind and a per-record data type. Miss and callable groups use parallel
 context types.
 
 ```slang
-struct PrimaryTriangleContext : rt::IHitGroupContext
+struct PrimaryTriangleContext : rt::IHitContext
 {
     typealias TraceContext = PrimaryTraceContext;
     typealias Primitive = rt::TrianglePrimitive;
     typealias Record = PrimaryHitRecord;
 }
 
-struct PrimarySphereContext : rt::IHitGroupContext
+struct PrimarySphereContext : rt::IHitContext
 {
     typealias TraceContext = PrimaryTraceContext;
-    typealias Primitive = rt::BoundingBoxPrimitive;
+    typealias Primitive = rt::BoundingBoxPrimitive<SphereHitAttributes>;
     typealias Record = PrimaryHitRecord;
 }
 
@@ -197,22 +197,20 @@ struct SphereHitAttributes
 }
 
 struct PrimarySphereIntersection
-    : rt::IIntersectionShader<PrimarySphereContext, SphereHitAttributes>
+    : rt::IIntersectionShader<PrimarySphereContext>
 {
-    typealias Attributes = SphereHitAttributes;
-
-    rt::IntersectionReturn<PrimarySphereContext, Attributes> invoke(
-        rt::IntersectionInput<PrimarySphereContext> input)
+    void invoke(rt::IntersectionInput<PrimarySphereContext> input)
     {
-        rt::IntersectionReturn<PrimarySphereContext, Attributes> result;
-        result.acceptIntersection = input.opaque;
-        result.continueSearch = true;
-        result.distance = 1.0;
-        result.attributes.uv = float2(0.25, 0.75);
-        return result;
+        SphereHitAttributes attributes;
+        attributes.uv = float2(0.25, 0.75);
+        input.reportHit(1.0, attributes);
     }
 }
 ```
+
+`reportHit` submits one candidate to traversal and returns whether it was accepted. An
+*Intersection* may call it zero, one, or multiple times. If the hit group contains *AnyHit*, that
+stage evaluates every non-opaque reported candidate.
 
 ### Difference from the Old Model
 
@@ -244,7 +242,6 @@ struct PrimaryTriangleGroup : rt::IHitGroup
     typealias Context = PrimaryTriangleContext;
     typealias ClosestHit = PrimaryTriangleClosestHit;
     typealias AnyHit = PrimaryTriangleAnyHit;
-    typealias IntersectionAttributes = rt::NoAttributes;
     typealias Intersection = rt::NoIntersection<PrimaryTriangleContext>;
 }
 
@@ -253,7 +250,6 @@ struct PrimarySphereGroup : rt::IHitGroup
     typealias Context = PrimarySphereContext;
     typealias ClosestHit = PrimarySphereClosestHit;
     typealias AnyHit = rt::NoAnyHit<PrimarySphereContext>;
-    typealias IntersectionAttributes = SphereHitAttributes;
     typealias Intersection = PrimarySphereIntersection;
 }
 ```
