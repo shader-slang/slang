@@ -1423,15 +1423,18 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
         // Resolve the request against the architectures NVRTC actually accepts.
         //
-        // The ladder above is deliberately left in charge of the lower bound.
-        // On NVRTC 12.8+ its floor is a *policy* choice rather than a statement
-        // about capability -- pre-`compute_75` architectures are deprecated but
-        // still accepted, so they are still reported here, and taking the
-        // reported floor would reintroduce the deprecation warning that branch
-        // exists to avoid.
+        // The ladder above proposes a *policy* floor, not a capability one. On
+        // NVRTC 12.8+ it picks `compute_75` because architectures below that are
+        // deprecated rather than removed -- they are still reported here, so
+        // taking the reported floor would reintroduce the deprecation warning
+        // that branch exists to avoid.
         //
-        // What the reported set adds is the upper bound and the exact
-        // membership; see resolveArchAgainstSupported for the semantics.
+        // The reported set then bounds that proposal from above and snaps it to
+        // a real member. Note this can *raise* the floor as well as cap the
+        // request: if a future NVRTC genuinely drops `sm_75` and reports a
+        // minimum of 80, the ladder's 7.5 is rounded up to 8.0, because there is
+        // no longer an architecture matching the policy. See
+        // resolveArchAgainstSupported for the resolution semantics.
         if (haveSupportedArchs)
         {
             version =
