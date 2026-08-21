@@ -71,8 +71,21 @@ edits its triggers. Check the file itself before relying on it.
 ### 1a. Both per-PR and merge queue (`pull_request` + `merge_group`)
 
 These seven files declare both triggers, so each one runs twice per change: once
-on the open PR, and again on the queue's tentative merge commit. This is the set
-that actually gates the merge.
+on the open PR, and again on the queue's tentative merge commit.
+
+Running in the merge queue is **not** the same as blocking the merge. Only
+_required status checks_ do that, and which checks are required is branch
+protection configuration — it lives in repo settings, not in this directory. As
+configured today, `master` requires exactly three contexts: **`check-ci`** (the
+aggregate job in `ci.yml`), **`check-formatting`** (the job in
+`check-formatting.yml`), and **`SlangPy Tests`** (the external status posted by
+the run that `ci-slangpy-trigger-test.yml` dispatches). Everything else in this
+table runs in the queue but is advisory there: if `check-actionlint.yml`,
+`check-python-core.yml`, `check-submodules.yml`, or `check-workflow-scripts.yml`
+fails on a queue entry, the queue still merges it once those three pass, and the
+failed run is left on the temporary `gh-readonly-queue/...` branch that is
+deleted right after — so nothing goes red on the PR or on `master`. Look in the
+workflow's own run list in the Actions tab to find one.
 
 | Workflow                      | Per-PR trigger                        | Merge-queue trigger | Other triggers      | Purpose                                                                                                                   |
 | ----------------------------- | ------------------------------------- | ------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -225,7 +238,7 @@ invoke one.
 | `release.yml`                     | `push` tag `v20XX.N*` (+ manual)                    | Builds and publishes the release binaries for every supported os/platform and attaches them to the release.                                                                                |
 | `release-linux-glibc-2-27.yml`    | `push` tag `v20XX.N*`, nightly 02:00 UTC (+ manual) | Extra Linux release build against glibc 2.27 (ubuntu18/gcc11) for older distros.                                                                                                           |
 | `release-linux-glibc-2-28.yml`    | `push` tag `v20XX.N*`, nightly 02:00 UTC (+ manual) | Extra Linux release build against glibc 2.28.                                                                                                                                              |
-| `container-publish-images.yml` | `push`/`pull_request` on `docker/**` (+ manual)     | Builds and pushes the Linux CI container images to GHCR. PRs validate the tag/version contract only — they never build a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `container-publish-images.yml`    | `push`/`pull_request` on `docker/**` (+ manual)     | Builds and pushes the Linux CI container images to GHCR. PRs validate the tag/version contract only — they never build a Dockerfile, since that would run PR code on a self-hosted runner. |
 | `perf-push-benchmark-results.yml` | `push` to master (+ manual)                         | Builds master on the benchmark runner and pushes MDL benchmark numbers to the results repo.                                                                                                |
 
 See the `/slang-release-process` skill (`.claude/skills/slang-release-process/`)
