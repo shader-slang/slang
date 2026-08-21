@@ -30,7 +30,11 @@ struct NVRTCDownstreamCompilerUtil
     /// nothing about the user's shader, whereas compiling against the highest
     /// available makes NVRTC report the specific construct it cannot compile.
     ///
-    /// Returns `requested` unchanged if `supportedAscending` is empty.
+    /// Returns `requested` unchanged if `supportedAscending` is empty. The
+    /// in-tree caller cannot pass an empty list -- `_getSupportedArchs` only
+    /// succeeds with a non-empty one -- but this is a public helper with its
+    /// own contract, and returning the request untouched is the only answer
+    /// that cannot invent an architecture.
     static SemanticVersion resolveArchAgainstSupported(
         SemanticVersion requested,
         const List<int>& supportedAscending);

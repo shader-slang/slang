@@ -163,10 +163,17 @@ protected:
     /// Return the compute capabilities the loaded NVRTC actually accepts, as
     /// `major * 10 + minor` values in ascending order.
     ///
-    /// Returns SLANG_E_NOT_AVAILABLE if this NVRTC is too old to be asked,
-    /// which the caller must distinguish from "the list is empty": the former
-    /// means fall back to assumptions, the latter would mean NVRTC supports
-    /// nothing at all.
+    /// This function owns the decision of whether an answer is usable, so that
+    /// callers have exactly one thing to test. On SLANG_OK the list is
+    /// guaranteed non-empty; anything else means "no usable answer, fall back"
+    /// and carries no further meaning.
+    ///
+    /// SLANG_E_NOT_AVAILABLE therefore covers both the expected case -- an
+    /// NVRTC predating these entry points -- and a successful query reporting
+    /// no architectures. The latter is not a state Slang could act on if it
+    /// occurred, and folding it here is deliberate rather than an oversight:
+    /// distinguishing it would give every caller a second case to handle for no
+    /// behavioural difference.
     SlangResult _getSupportedArchs(List<int>& outArchs);
 
     // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT*
@@ -742,6 +749,10 @@ SlangResult NVRTCDownstreamCompiler::_getSupportedArchs(List<int>& outArchs)
     if (!m_nvrtcGetNumSupportedArchs || !m_nvrtcGetSupportedArchs)
         return SLANG_E_NOT_AVAILABLE;
 
+    // A successful query reporting no architectures would mean this NVRTC can
+    // compile for nothing at all. Treated as "no usable answer" rather than
+    // asserted, because the value comes from a loaded library rather than from
+    // our own invariants.
     int numArchs = 0;
     if (m_nvrtcGetNumSupportedArchs(&numArchs) != NVRTC_SUCCESS || numArchs <= 0)
         return SLANG_E_NOT_AVAILABLE;
@@ -1362,9 +1373,10 @@ SlangResult NVRTCDownstreamCompiler::compile(
         //
         // Absent on NVRTC older than CUDA 11.2, in which case every use below
         // is skipped and behaviour is exactly as before.
+        // On success the list is non-empty; _getSupportedArchs owns that
+        // guarantee, so there is nothing further to test here.
         List<int> supportedArchs;
-        const bool haveSupportedArchs =
-            SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs)) && supportedArchs.getCount() > 0;
+        const bool haveSupportedArchs = SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs));
 
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.

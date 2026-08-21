@@ -1,6 +1,6 @@
 // unit-test-nvrtc-arch-resolve.cpp
 
-#include "../../source/compiler-core/slang-nvrtc-compiler.h"
+#include "compiler-core/slang-nvrtc-compiler.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
