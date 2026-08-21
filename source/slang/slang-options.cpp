@@ -1555,6 +1555,7 @@ struct OptionsParser
     SlangResult _parseProfile(const CommandLineArg& arg);
     SlangResult _parseHelp(const CommandLineArg& arg);
     SlangResult _readStdin(List<Byte>& outSource);
+    SlangResult _createModuleInspectionSession(ComPtr<slang::ISession>& outSession);
 
     SlangSession* m_session = nullptr;
     SlangCompileRequest* m_compileRequest = nullptr;
@@ -2706,6 +2707,25 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     }
 
     return SLANG_OK;
+}
+
+// Seeds the inspection session with the options already parsed onto the outer active linkage.
+// Those options must carry over, or a module that imports an experimental standard module fails the
+// experimental-feature gate despite `-experimental-feature` being given. Only options parsed
+// *before* the inspection action are on the linkage — the dump/info handlers run inline as their
+// argument is consumed — so a flag placed after the action is not inherited.
+SlangResult OptionsParser::_createModuleInspectionSession(ComPtr<slang::ISession>& outSession)
+{
+    // `optionsData` owns the string storage the serialized entries reference, so it must outlive
+    // the createSession call; createSession copies the strings into the new session's own option
+    // set.
+    SerializedOptionsData optionsData;
+    m_requestImpl->getLinkage()->m_optionSet.serialize(&optionsData);
+
+    auto desc = slang::SessionDesc();
+    desc.compilerOptionEntries = optionsData.entries.getBuffer();
+    desc.compilerOptionEntryCount = (uint32_t)optionsData.entries.getCount();
+    return m_session->createSession(desc, outSession.writeRef());
 }
 
 SlangResult OptionsParser::_parse(int argc, char const* const* argv)
@@ -3867,9 +3887,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 CommandLineArg fileName;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
-                auto desc = slang::SessionDesc();
                 ComPtr<slang::ISession> session;
-                m_session->createSession(desc, session.writeRef());
+                SLANG_RETURN_ON_FAIL(_createModuleInspectionSession(session));
                 ComPtr<slang::IBlob> diagnostics;
 
                 // Coerce Slang to load from the given file, without letting it automatically
@@ -3952,9 +3971,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 CommandLineArg fileName;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
-                auto desc = slang::SessionDesc();
                 ComPtr<slang::ISession> session;
-                m_session->createSession(desc, session.writeRef());
+                SLANG_RETURN_ON_FAIL(_createModuleInspectionSession(session));
                 ComPtr<slang::IBlob> diagnostics;
 
                 FileStream file;
