@@ -20,6 +20,7 @@
 // declaration order, so `ContinuesAfterAThrow` below is registered last on purpose:
 // it is what proves the driver carried on rather than dying at the throwing test.
 
+#include "core/slang-exception.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstdlib>
@@ -71,6 +72,38 @@ SLANG_UNIT_TEST(harnessSelfCheckSurvivesAThrowingTest)
 // escaped the per-test handler, this line would never be reached and CI would not see
 // its `ok`. That carry-on property is the half of the handler's contract that the
 // non-zero exit alone does not pin.
+// A `Slang::Exception` must be reported with its message. This is the case the
+// driver's handler exists for and the one a `std::exception`-only catch would miss:
+// `SLANG_ASSERT` routes through `handleSignal`, which throws `InternalError` and
+// friends -- all derived from `Slang::Exception`, which does not derive from
+// `std::exception` and carries its text in `Message` rather than `what()`.
+//
+// Thrown directly rather than by firing an assert, because what `SLANG_ASSERT` does
+// depends on the `SLANG_ASSERT` environment variable (see the table in CLAUDE.md) and
+// a self-check should not vary with it. The type thrown is the type an assert throws.
+SLANG_UNIT_TEST(harnessSelfCheckReportsASlangExceptionMessage)
+{
+    if (!selfCheckArmed())
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    throw Slang::InternalError("deliberate self-check slang exception");
+}
+
+// A failure reported through `message()` rather than `addResult` must still fail the
+// test. The driver classifies `RunError` and `TestFailure` as failures, which is a
+// deliberate choice nothing else in the suite drives.
+SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedRunError)
+{
+    if (!selfCheckArmed())
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    getTestReporter()->message(TestMessageType::RunError, "deliberate self-check run error");
+}
+
 SLANG_UNIT_TEST(harnessSelfCheckContinuesAfterAThrow)
 {
     if (!selfCheckArmed())

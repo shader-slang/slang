@@ -13,6 +13,7 @@
 // through the same global list in `tools/unit-test`, so all this driver has to
 // do is supply an `ITestReporter` and run what registered itself.
 
+#include "core/slang-exception.h"
 #include "core/slang-string.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -177,6 +178,10 @@ int main(int argc, char** argv)
 
     UnitTestContext context = {};
     context.slangGlobalSession = globalSession.get();
+    // `slang-test` fills these with real paths for the plugin tests. Nothing in this
+    // suite reads either -- these tests build IR and AST in memory rather than touching
+    // the filesystem -- so a placeholder suffices. A test that ever needs a real working
+    // directory has to set these up properly rather than rely on ".".
     context.workDirectory = ".";
     context.executableDirectory = ".";
 
@@ -214,10 +219,23 @@ int main(int argc, char** argv)
         {
             testModule->getTestFunc(i)(&context);
         }
+        catch (const Slang::Exception& e)
+        {
+            // This is the case the handler exists for, and it has to come first.
+            // `SLANG_ASSERT` routes through `handleSignal`, which throws `InternalError`,
+            // `InvalidOperationException` or `AbortCompilationException` -- all derived
+            // from `Slang::Exception`, which does *not* derive from `std::exception` and
+            // carries its text in `Message` rather than `what()`. Catching only
+            // `std::exception` would drop every real assertion into the bare `catch (...)`
+            // below and lose the message, which is the outcome this reporting exists to
+            // prevent.
+            printf(
+                "    FAILED: uncaught exception escaped the test body: %s\n",
+                e.Message.getBuffer());
+            reporter.addResult(TestResult::Fail);
+        }
         catch (const std::exception& e)
         {
-            // Print `what()` where there is one: a bare "an exception escaped" line
-            // leaves a CI failure undiagnosable without attaching a debugger.
             printf("    FAILED: uncaught exception escaped the test body: %s\n", e.what());
             reporter.addResult(TestResult::Fail);
         }

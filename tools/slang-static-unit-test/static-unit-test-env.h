@@ -71,6 +71,10 @@ public:
     ///
     /// Returns null if the source failed to compile; pass `outDiagnostics` to
     /// recover the compiler's message in that case.
+    ///
+    /// The returned pointer is borrowed, not owned: the `Linkage`'s module cache owns
+    /// the module, so a caller must not release it, and it stays valid only for as
+    /// long as this environment does.
     Module* checkModuleFromSource(
         const char* moduleName,
         const char* source,
@@ -125,11 +129,15 @@ public:
     /// `addExportedVoidFunction` for `keepLayoutsAlive`.
     IRFunc* addVoidFunctionWithLayout(const char* name);
 
-    /// Add a top-level `void()` function whose body holds a *weak* reference to
-    /// `target` via `kIROp_WeakUse`. A weak operand must not keep its referent alive
-    /// -- that is the whole point of the kind -- so this pairs with
-    /// `addVoidFunctionCalling`, whose ordinary call operand does.
-    IRFunc* addVoidFunctionWeaklyReferencing(const char* name, bool keepAlive, IRFunc* target);
+    /// Add a *live* `kIROp_WeakUse` whose single operand is `target`, and return it.
+    ///
+    /// `WeakUse` is hoistable, so it lands at module scope rather than inside any
+    /// function body; it is decorated `[KeepAlive]` here so that it is a liveness root
+    /// in its own right. That is what makes it useful as a fixture: the referent's
+    /// fate then depends only on whether the operand is classified weak. A weak
+    /// operand must not keep its referent alive -- if the classification were dropped,
+    /// `target` would be marked live and survive.
+    IRInst* addLiveWeakUseOf(IRFunc* target);
 
     /// Add a two-block `void()` function whose second block takes a parameter that
     /// nothing reads, passed as a branch argument from the first. DCE removes such a

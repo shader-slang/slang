@@ -162,18 +162,23 @@ IRFunc* IRFixtureBuilder::addVoidFunctionWithLayout(const char* name)
     return func;
 }
 
-IRFunc* IRFixtureBuilder::addVoidFunctionWeaklyReferencing(
-    const char* name,
-    bool keepAlive,
-    IRFunc* target)
+IRInst* IRFixtureBuilder::addLiveWeakUseOf(IRFunc* target)
 {
     SLANG_RELEASE_ASSERT(target);
     SLANG_RELEASE_ASSERT(target->getParent() == m_module->getModuleInst());
 
-    IRFunc* func = beginVoidFunction(name);
-    m_builder.getWeakUse(target);
-    endVoidFunction(func, keepAlive);
-    return func;
+    m_builder.setInsertInto(m_module.get());
+
+    // Hoistable, so this is placed at module scope regardless of the insert location.
+    IRInst* weakUse = m_builder.getWeakUse(target);
+
+    // Without this the `WeakUse` is itself dead, and `target` would be removed for
+    // that reason alone -- which would make any test built on it pass whether or not
+    // weak operands are honoured. Keeping the `WeakUse` alive is what isolates the
+    // behaviour under test.
+    m_builder.addKeepAliveDecoration(weakUse);
+
+    return weakUse;
 }
 
 IRFunc* IRFixtureBuilder::addVoidFunctionWithUnusedBlockParam(const char* name, bool keepAlive)

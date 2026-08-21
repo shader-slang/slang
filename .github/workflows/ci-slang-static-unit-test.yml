@@ -143,7 +143,25 @@ jobs:
             exit 1
           fi
 
-          "$test_path"
+          "$test_path" | tee ordinary.log
+          # `tee` masks the binary's status, so read it from PIPESTATUS.
+          if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+            echo "::error::the ordinary run failed"
+            exit 1
+          fi
+
+          # The self-checks below ignore themselves in an ordinary run, which is what
+          # exercises SLANG_IGNORE_TEST and the driver's Ignored tally. Assert that
+          # rather than assume it: if Ignored were scored as Pass, the run would still
+          # be green and the skip would simply vanish from the summary.
+          if ! grep -qE "skip[[:space:]]+harnessSelfCheck" ordinary.log; then
+            echo "::error::no self-check reported as skipped; SLANG_IGNORE_TEST may be misclassified"
+            exit 1
+          fi
+          if ! grep -qE "[1-9][0-9]* ignored" ordinary.log; then
+            echo "::error::ignored tests were not counted in the summary"
+            exit 1
+          fi
 
           # The suite above is written to pass, so passing does not prove the harness
           # can report a failure. Drive the failure paths deliberately and require the
@@ -181,6 +199,22 @@ jobs:
             echo "::error::the run did not continue past a test that threw"
             exit 1
           fi
+          # A Slang::Exception -- what SLANG_ASSERT actually throws -- must be reported
+          # with its message. It does not derive from std::exception, so a handler that
+          # caught only that would drop this into the message-less fallback.
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckReportsASlangExceptionMessage" selfcheck.log; then
+            echo "::error::a Slang::Exception escaping a test body was not reported as a failure"
+            exit 1
+          fi
+          if ! grep -q "deliberate self-check slang exception" selfcheck.log; then
+            echo "::error::the Slang::Exception message was not reported"
+            exit 1
+          fi
+          # A failure reported through message() rather than addResult must still fail.
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckFailsOnAReportedRunError" selfcheck.log; then
+            echo "::error::a RunError reported via message() did not fail the test"
+            exit 1
+          fi
           # The exception detail has to reach the log, or such a failure is not
           # diagnosable without attaching a debugger.
           if ! grep -q "deliberate self-check exception" selfcheck.log; then
@@ -197,6 +231,12 @@ jobs:
           cat filter.log
           if [[ $filter_status -eq 0 ]]; then
             echo "::error::an unmatched filter reported success instead of failing"
+            exit 1
+          fi
+          # ...and for the stated reason. A non-zero exit alone would also be produced
+          # by the binary failing to start.
+          if ! grep -q "matched none of the" filter.log; then
+            echo "::error::the unmatched filter failed for some reason other than the filter"
             exit 1
           fi
 

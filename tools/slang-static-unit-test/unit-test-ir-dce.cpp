@@ -265,11 +265,18 @@ SLANG_UNIT_TEST(irDeadCodeEliminationDoesNotKeepAWeaklyReferencedFunction)
     IRFixtureBuilder builder(env.getSessionImpl());
 
     IRFunc* target = builder.addVoidFunction("weaklyReferencedFunc", /* keepAlive: */ false);
-    builder.addVoidFunctionWeaklyReferencing("rootFunc", /* keepAlive: */ true, target);
+    builder.addVoidFunction("rootFunc", /* keepAlive: */ true);
+    builder.addLiveWeakUseOf(target);
     SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_Func) == 2);
 
     SLANG_CHECK(eliminateDeadCode(builder.getModule()));
 
+    // The `WeakUse` has to survive, or the test proves nothing: `weaklyReferencedFunc`
+    // would then be unreferenced by anything live and removed for the ordinary reason.
+    SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_WeakUse) == 1);
+
+    // So this assertion turns entirely on the operand being classified weak. Drop that
+    // classification and `weaklyReferencedFunc` is marked live and survives.
     List<String> names = builder.getFunctionNames();
     SLANG_CHECK_ABORT(names.getCount() == 1);
     SLANG_CHECK(names[0] == "rootFunc");
