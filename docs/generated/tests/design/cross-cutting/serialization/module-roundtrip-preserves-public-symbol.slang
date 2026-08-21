@@ -14,14 +14,21 @@
 // The test writes a module holding one public function and then reads
 // the container with `-dump-module`; the CHECKs require the reloaded IR
 // to still carry the mangled [export(...)] name, the [nameHint("lerp01")]
-// decoration and the four-operand Func type. None of those survive unless
-// the write and read paths agree on the serialized form.
+// decoration, the `func %lerp01` symbol itself and its four-operand Func
+// type. None of those survive unless the write and read paths agree on
+// the serialized form.
 //
 // A `public` declaration no longer carries a [public] decoration in the
 // IR: #12304 removed the PublicModifier arm of addLinkageDecoration so
 // that public empty structs stop being retained in CPU/CUDA emit (#8125).
 // External linkage is still recorded, by the [export(...)] name checked
 // below, so the round-trip claim this test exists for is unaffected.
+//
+// That [public] CHECK was removed by hand, as a deliberate exception to
+// the no-hand-edits rule for generated bundles in _meta/regenerate.md.
+// The durable fix belongs in this bundle's prompt: the cited doc section
+// never claimed a [public] decoration, so regeneration should not produce
+// that assertion again.
 
 //TEST:COMPILE: docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang -o docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
 //TEST:SIMPLE(filecheck=CHECK): -dump-module docs/generated/tests/design/cross-cutting/serialization/module-roundtrip-preserves-public-symbol.slang-module
