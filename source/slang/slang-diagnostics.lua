@@ -5707,6 +5707,20 @@ err(
 )
 
 err(
+    "optix-hit-attribute-type-not-supported",
+    55216,
+    "unsupported hit attribute type for ReportHit on OptiX",
+    span { loc = "location", message = "the hit attribute type passed to 'ReportHit' cannot be lowered to OptiX attribute registers; each scalar field must fit in one 32-bit register ('float', 'bool', and 8/16/32-bit signed or unsigned integers, and vectors/arrays/matrices of those) — 'double', 'half', and 64-bit types are not supported." }
+)
+
+err(
+    "optix-hit-attribute-too-large",
+    55217,
+    "hit attribute exceeds the OptiX attribute register limit",
+    span { loc = "location", message = "the hit attribute passed to 'ReportHit' requires ~registerCount:int 32-bit attribute registers, but OptiX supports at most 8 (32 bytes)." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

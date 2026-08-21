@@ -1657,6 +1657,13 @@ local insts = {
 	-- Operand 0: register index (int literal)
 	-- Operand 1: value to write (uint32)
 	{ setOptiXPayloadRegister = { min_operands = 2 } },
+	-- Write side of a portable `ReportHit(tHit, hitKind, attributes)` call for OptiX.
+	-- Operand 0: tHit (float). Operand 1: hitKind (uint). The remaining operands are the
+	-- aggregate's scalar attribute leaves, produced by the CUDA varying-param legalization
+	-- pass, which flattens `attributes` field-wise (one operand per OptiX attribute register)
+	-- mirroring the read side (`emitOptiXAttributeFetch`). The CUDA emitter renders this as a
+	-- single `optixReportIntersection(tHit, hitKind, a0..aN)`.
+	{ reportOptiXIntersection = { min_operands = 2 } },
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{

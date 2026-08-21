@@ -1818,6 +1818,17 @@ Result linkAndOptimizeIR(
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
     }
 
+    // `ReportHit` is [ForceInline], so its `kIROp_ReportOptiXIntersection` marker now appears at
+    // each call site after `performForceInlining`. Flatten its aggregate attribute operand into
+    // scalar OptiX attribute-register leaves after the post-inline DCE above (so the dead
+    // specialized core-module `ReportHit` body is gone and each marker is diagnosed only once) but
+    // before the generic empty-type / resource legalization passes below, which do not understand
+    // the aggregate operand.
+    if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader)
+    {
+        SLANG_PASS(legalizeOptiXReportIntersectionsForCUDA, sink);
+    }
+
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
