@@ -1449,6 +1449,49 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     }
 }
 
+// Return true when `inst` is a module-scope aggregate literal (`MakeArray`/`MakeStruct`/
+// `MakeArrayFromElement`) whose every use is a constituent of another such aggregate. Under that
+// condition the inst is only ever emitted inside an outer aggregate's brace initializer list — a
+// context where an initializer-list value is valid — so it is safe to fold inline, unlike a
+// function-body aggregate whose value may appear in a general expression context. Folding matters
+// because the alternative — emitting the inst as its own named module-scope declaration — makes the
+// outer aggregate's initializer reference it by name, which is an illegal cross-declaration
+// reference in a static initializer on some targets (a dynamic `__device__` initializer NVRTC
+// rejects on CUDA, an inter-`var<private>` reference on WGSL).
+static bool isModuleScopeAggregateUsedOnlyAsConstituent(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_MakeArray:
+    case kIROp_MakeStruct:
+    case kIROp_MakeArrayFromElement:
+        break;
+    default:
+        return false;
+    }
+
+    if (!inst->getParent() || inst->getParent()->getOp() != kIROp_ModuleInst)
+        return false;
+
+    // A use-less module-scope aggregate has no constituent context to fold into, so keep it as a
+    // declaration rather than folding it away.
+    if (!inst->firstUse)
+        return false;
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        switch (use->getUser()->getOp())
+        {
+        case kIROp_MakeArray:
+        case kIROp_MakeStruct:
+        case kIROp_MakeArrayFromElement:
+            break;
+        default:
+            return false;
+        }
+    }
+    return true;
+}
+
 bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 {
     // Certain opcodes should never/always be folded in
@@ -1530,15 +1573,18 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     // HACK: don't fold these in because we currently lower
     // them to initializer lists, which aren't allowed in
-    // general expression contexts.
-    //
+    // general expression contexts. Exception: a module-scope aggregate used only as a constituent
+    // of another aggregate is always emitted inside an aggregate initializer list, where folding is
+    // safe (see isModuleScopeAggregateUsedOnlyAsConstituent). That helper matches only MakeArray/
+    // MakeStruct/MakeArrayFromElement, so SwizzleSet/MakeCoopVector below always fall through to
+    // false.
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_SwizzleSet:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeCoopVector:
 
-        return false;
+        return isModuleScopeAggregateUsedOnlyAsConstituent(inst);
     }
 
     // Instructions with specific result *types* will usually

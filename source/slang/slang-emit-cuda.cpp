@@ -1318,9 +1318,15 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             IRType* elementType = arrayType->getElementType();
 
-            // Emit braces for the FixedArray struct.
-
+            // A Slang array lowers to `struct FixedArray<T,N> { T m_data[N]; }`, so its initializer
+            // needs a brace for the struct around `_emitInitializerList`'s brace for the `m_data`
+            // member; a single brace is ambiguous for nested arrays. CUDA has no
+            // MakeArrayFromElement case: it inherits CPPSourceEmitter's, which applies the same
+            // struct brace and emits each element through the virtual `emitOperand`, so any
+            // CUDA-specific element formatting is preserved.
+            m_writer->emit("{ ");
             _emitInitializerList(elementType, inst->getOperands(), Index(inst->getOperandCount()));
+            m_writer->emit(" }");
 
             return true;
         }
