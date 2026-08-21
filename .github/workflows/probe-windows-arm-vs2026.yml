@@ -144,6 +144,16 @@ jobs:
           ls -la "${LLVM_DIR}"
           find "${LLVM_DIR}" -iname "ClangConfig.cmake" -o -iname "LLVMConfig.cmake"
 
+      # build-llvm.sh (invoked by setup-llvm-from-gcs) always builds LLVM in
+      # Release config and links it against the release CRT statically
+      # (LLVM_USE_CRT_RELEASE=MT). Building slang-llvm in Debug config here
+      # linked it against the debug CRT (MTd_StaticDebug) instead, which
+      # MSVC's linker rejects outright: run 32474615637 failed with 4210
+      # LNK2038 "_ITERATOR_DEBUG_LEVEL"/"RuntimeLibrary" mismatches between
+      # LLVMSupport.lib (Release CRT) and slang-llvm-builder.cpp.obj (Debug
+      # CRT). ci-slang-sanitizer.yml's USE_SYSTEM_LLVM job builds Slang with
+      # the releaseWithDebugInfo preset for the same reason. Switch this
+      # trial's LLVM-dependent steps to RelWithDebInfo to match.
       - name: Reconfigure CMake with USE_SYSTEM_LLVM
         run: |
           cmake --fresh -B build \
@@ -155,12 +165,12 @@ jobs:
             -DClang_DIR="${Clang_DIR}/lib/cmake/clang"
 
       - name: Build slang-llvm
-        run: cmake --build build --config Debug --target slang-llvm
+        run: cmake --build build --config RelWithDebInfo --target slang-llvm
 
       - name: Smoke test slang-llvm presence
         run: |
-          bin_dir=$(pwd)/build/Debug/bin
-          lib_dir=$(pwd)/build/Debug/lib
+          bin_dir=$(pwd)/build/RelWithDebInfo/bin
+          lib_dir=$(pwd)/build/RelWithDebInfo/lib
           if [[ ! -f "$bin_dir/slang-llvm.dll" && ! -f "$lib_dir/slang-llvm.dll" ]]; then
             echo "ERROR: expected slang-llvm.dll in $bin_dir or $lib_dir"
             ls -la "$bin_dir" || true
@@ -171,12 +181,12 @@ jobs:
 
       - name: Rebuild slangc and slang-test against slang-llvm
         run: |
-          cmake --build build --config Debug --target slangc
-          cmake --build build --config Debug --target slang-test
+          cmake --build build --config RelWithDebInfo --target slangc
+          cmake --build build --config RelWithDebInfo --target slang-test
 
       - name: Smoke test slangc -v (with slang-llvm)
         run: |
-          bin_dir=$(pwd)/build/Debug/bin
+          bin_dir=$(pwd)/build/RelWithDebInfo/bin
           "$bin_dir/slangc.exe" -v
 
       # -emit-cpu-via-llvm routes CPU/host-callable codegen through the
@@ -188,6 +198,6 @@ jobs:
       # downstream-cl.exe execution path, not slang-llvm's JIT.
       - name: Smoke test via slang-test (slang-llvm JIT backend)
         run: |
-          bin_dir=$(pwd)/build/Debug/bin
+          bin_dir=$(pwd)/build/RelWithDebInfo/bin
           export PATH="$bin_dir:$PATH"
           "$bin_dir/slang-test.exe" tests/llvm/printf.slang
