@@ -1521,15 +1521,26 @@ static void addLinkageDecoration(
     }
 }
 
+/// Return true when the linkage decoration for `decl` will carry a hashed name rather than
+/// `decl`'s mangled name verbatim.
+///
+/// Care is needed around the core module as it is only compiled once and *without* obfuscation,
+/// so any linkage name to the core module *shouldn't* have obfuscation applied to it.
+///
+/// This is the single source of truth for that policy. `addLinkageDecoration` applies it, and
+/// `tryBorrowInterfaceFromOwningModule` consults it to decide whether the name it looks a symbol
+/// up by can match the name the linkage decoration will end up carrying.
+static bool isLinkageNameObfuscated(IRGenContext* context, Decl* decl)
+{
+    return context->shared->m_obfuscateCode && !isFromCoreModule(decl);
+}
+
 static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     const String mangledName = getMangledName(context->astBuilder, decl);
 
     // Obfuscate the mangled names if necessary.
-    //
-    // Care is needed around the core module as it is only compiled once and *without* obfuscation,
-    // so any linkage name to the core module *shouldn't* have obfuscation applied to it.
-    if (context->shared->m_obfuscateCode && !isFromCoreModule(decl))
+    if (isLinkageNameObfuscated(context, decl))
     {
         const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
 
@@ -12128,14 +12139,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (!isDeclInDifferentModule(context, decl))
             return false;
 
-        // `addLinkageDecoration` hashes the mangled name when this request
-        // obfuscates, except for core-module decls, which are compiled once and
-        // never obfuscated. In that one combination -- obfuscating a reference to
-        // a non-core module -- the declaration would carry the hashed name while
-        // the symbol we found carries the original, so prelink would not match
-        // them up. Derive from the AST instead; correctness first, and obfuscated
-        // builds are not the workload this optimises.
-        if (context->shared->m_obfuscateCode && !isFromCoreModule(decl))
+        // In one combination -- obfuscating a reference to a non-core module --
+        // the declaration emitted below would carry a hashed name while the symbol
+        // we look up carries the original. Derive from the AST instead;
+        // correctness first, and obfuscated builds are not the workload this
+        // optimises.
+        //
+        // The policy is read from `isLinkageNameObfuscated` rather than restated
+        // here, because this reading of it and the one inside
+        // `addLinkageDecoration` have to agree. If they ever disagree the result
+        // is not a missed optimisation: `prelinkIR` pairs the declaration with the
+        // queued symbol by mangled name and dereferences the lookup without a null
+        // check, so the mismatch surfaces as a crash in a later pass.
+        if (isLinkageNameObfuscated(context, decl))
             return false;
 
         auto owningModule = getModule(decl);
@@ -12158,17 +12174,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // "nothing to borrow" -- handled by falling through to AST derivation --
         // rather than an assumption about ordering that would fail silently.
         IRInst* borrowedSymbol = nullptr;
-        IRInterfaceType* borrowedInterface = nullptr;
         for (auto symbol : symbols)
         {
-            if (auto interfaceType = as<IRInterfaceType>(getGenericReturnVal(symbol)))
+            if (as<IRInterfaceType>(getGenericReturnVal(symbol)))
             {
                 borrowedSymbol = symbol;
-                borrowedInterface = interfaceType;
                 break;
             }
         }
-        if (!borrowedInterface)
+        if (!borrowedSymbol)
             return false;
 
         NestedContext declContext(this);
@@ -12180,28 +12194,53 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto declVal = finishOuterGenerics(declBuilder, declInterface, declGeneric);
         addLinkageDecoration(declSubContext, declInterface, decl);
 
-        // `visitInheritanceDecl` reads this off the interface while lowering a
-        // witness table, to decide whether to keep the table alive with an
-        // `[HLSLExport]` decoration -- and that happens before `prelinkIR`
-        // supplies the definition. A declaration carrying only linkage would
-        // silently take the wrong branch for a conformance to an imported COM
-        // interface. It is the only decoration lowering reads off an interface
-        // type before prelink.
+        // Which decorations the declaration has to carry, and why these are the
+        // only ones.
         //
-        // Copied with its GUID operand, not re-created: the decoration is not a
-        // flag. `addComInterfaceDecoration` is its only construction path
-        // (`slang-ir-insts.h:5333`) and always stores the GUID as operand 0,
-        // which `CPPSourceEmitter::emitComInterface` reads back and asserts is 32
-        // characters (`slang-emit-cpp.cpp:716`). The operand is therefore an
-        // invariant of the decoration, not something to test for.
-        if (auto comDecoration = borrowedInterface->findDecoration<IRComInterfaceDecoration>())
+        // `prelinkIR` does not merge into the declaration. It clones the owning
+        // module's definition, calls `replaceUsesWith`, and then
+        // `removeAndDeallocate`s the declaration, so the interface that survives
+        // is the clone and it carries every decoration the owning module gave it.
+        // After prelink the two paths therefore agree no matter what is attached
+        // here, and only a reader that runs *before* prelink can tell the
+        // difference.
+        //
+        // Searching for reads of a decoration off an `IRInterfaceType` during
+        // AST-to-IR lowering turns up one: `visitInheritanceDecl` reads
+        // `IRComInterfaceDecoration` off the interface while lowering a witness
+        // table, to decide whether to keep that table alive with an
+        // `[HLSLExport]` decoration. A declaration carrying only linkage would
+        // silently take the wrong branch there for a conformance to an imported
+        // COM interface, so this one is reproduced.
+        //
+        // The derivation path below additionally attaches a name hint,
+        // `IRAnyValueSizeDecoration`, `IRSpecializeDecoration`,
+        // `IRBuiltinDecoration` and the target-intrinsic decorations. Those are
+        // deliberately not reproduced -- nothing between here and `prelinkIR`
+        // reads them off an interface, and the clone supplies them afterwards.
+        // A new decoration that lowering *does* read off an interface has to be
+        // added here as well, and nothing outside this comment will say so.
+        //
+        // The GUID is read from the same AST modifier the derivation path uses
+        // rather than off the borrowed IR, so the two paths cannot disagree about
+        // it.
+        if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
         {
-            auto guid = as<IRStringLit>(comDecoration->getOperand(0));
-            SLANG_RELEASE_ASSERT(guid && "ComInterface decoration without its GUID operand");
-            declBuilder->addComInterfaceDecoration(declInterface, guid->getStringSlice());
+            declBuilder->addComInterfaceDecoration(
+                declInterface,
+                comInterfaceAttr->guid.getUnownedSlice());
         }
 
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
+
+        // `prelinkIR` pairs the declaration with the queued symbol by mangled name
+        // and dereferences that lookup without a null check, so a name mismatch is
+        // a crash in a later pass rather than a missed optimisation here. Both
+        // halves are in hand at this point, which is the only place the failure can
+        // still be attributed to the code that caused it.
+        SLANG_RELEASE_ASSERT(
+            getMangledName(declVal) == getMangledName(borrowedSymbol) &&
+            "borrowed interface declaration and its prelink symbol disagree on the mangled name");
 
         context->shared->externalSymbolsToPrelink.add(borrowedSymbol);
         outVal = LoweredValInfo::simple(declVal);
