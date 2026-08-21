@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: probe-windows-arm-vs2026
+  group: ci-probe-windows-arm-vs2026
   cancel-in-progress: true
 
 permissions:

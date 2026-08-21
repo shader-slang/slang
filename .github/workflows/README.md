@@ -201,12 +201,12 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 7. Manual only
 
-| Workflow                         | Purpose                                                      |
-| -------------------------------- | ------------------------------------------------------------ |
-| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.      |
-| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases.  |
-| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.             |
-| `probe-windows-arm-vs2026.yml`   | Capability probe for the VS2026 Windows-on-ARM hosted image. |
+| Workflow                          | Purpose                                                      |
+| --------------------------------- | ------------------------------------------------------------ |
+| `ci-retry.yml`                    | Waits for a run to finish, then reruns its failed jobs.      |
+| `perf-compile-release-sweep.yml`  | Backfills compile-performance history across past releases.  |
+| `check-spirv-tools.yml`           | Placeholder for a SPIRV-Tools tip-of-tree check.             |
+| `ci-probe-windows-arm-vs2026.yml` | Capability probe for the VS2026 Windows-on-ARM hosted image. |
 
 ## 8. Composite actions
 
