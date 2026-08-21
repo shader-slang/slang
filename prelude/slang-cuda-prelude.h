@@ -4345,6 +4345,7 @@ shader appropriately.
 struct UniformEntryPointParams;
 struct UniformState;
 
+// ---------------------- Ray-tracing types (always defined) ---------------------
 // RayDesc is a plain POD that shaders may use as ordinary data (ray math) without
 // any OptiX call, so it must be defined for every CUDA/PTX program, not only ray
 // tracing ones. It is emitted via `__target_intrinsic(cuda, RayDesc)` in

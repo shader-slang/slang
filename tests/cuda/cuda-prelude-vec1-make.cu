@@ -36,9 +36,6 @@ __global__ void testVec1MakeHelpers(
     fp8E5M2Output[0] = make___nv_fp8_e5m21(fp8E5M2Input[0]);
 }
 
-// Regression guard for #12638: RayDesc must be usable as plain data with OptiX
-// disabled. This translation unit does not define SLANG_CUDA_ENABLE_OPTIX, so
-// this only compiles if RayDesc lives outside the OptiX guard in the prelude.
 __global__ void testRayDescIsDefinedWithoutOptiX(float3* out)
 {
     RayDesc ray;
