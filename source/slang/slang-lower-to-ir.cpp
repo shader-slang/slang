@@ -9520,7 +9520,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             else
             {
                 auto argVal = lowerRValueExpr(context, argExpr);
-                args.add(argVal.val);
+                args.add(getSimpleVal(context, argVal));
             }
         }
         builder->emitIntrinsicInst(
