@@ -822,6 +822,14 @@ class UncheckedAttribute : public AttributeBase
     FIDDLE(...)
 
     Scope* scope = nullptr;
+
+    // The ordered identifier segments of a qualified attribute name, e.g. `a`, `b` for
+    // `[a::b(...)]`. This is populated only when the attribute name was written with `::`
+    // qualification; a plain `[name(...)]` leaves it empty. `keywordName` still holds the flat
+    // underscore-folded spelling (e.g. `a_b`) that resolves builtin attributes such as
+    // `[vk::binding]`; these segments let the checker fall back to a scoped lookup when that flat
+    // spelling does not name a known attribute (see `lookUpAttributeDecl`).
+    List<NameLoc> qualifiedNameSegments;
 };
 
 // A GLSL layout qualifier whose value has not yet been resolved or validated.

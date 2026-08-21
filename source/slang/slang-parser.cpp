@@ -938,7 +938,18 @@ void addModifier(ModifiableSyntaxNode* syntax, Modifier* modifier)
 
 //
 // '::'? identifier ('::' identifier)*
-static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken)
+//
+// Returns a single token whose name is the flat, underscore-folded spelling of the (possibly
+// qualified) attribute name, e.g. `a::b` becomes `a_b` and a leading `::` becomes a leading `_`.
+// The fold is intentional: builtin qualified attributes such as `[vk::binding]` are registered
+// under flat names (`vk_binding`), so folding lets them resolve by name. To let the checker also
+// resolve a *user-defined* attribute that lives inside a namespace (which has no flat registered
+// name), the ordered identifier segments are additionally reported via `outSegments`, which is
+// left empty for an unqualified name.
+static Token parseAttributeName(
+    Parser* parser,
+    Token& outOriginalLastToken,
+    List<NameLoc>& outSegments)
 {
     const SourceLoc scopedIdSourceLoc = parser->tokenReader.peekLoc();
 
@@ -959,6 +970,8 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken)
         return firstIdentifier;
     }
 
+    outSegments.add(NameLoc(firstIdentifier));
+
     // Build up scoped string
     StringBuilder scopedIdentifierBuilder;
     if (initialTokenType == TokenType::Scope)
@@ -974,6 +987,7 @@ static Token parseAttributeName(Parser* parser, Token& outOriginalLastToken)
 
         const Token nextIdentifier(parser->ReadToken(TokenType::Identifier));
         outOriginalLastToken = nextIdentifier;
+        outSegments.add(NameLoc(nextIdentifier));
         scopedIdentifierBuilder.append(nextIdentifier.getContent());
     }
 
@@ -1011,13 +1025,15 @@ static void ParseSquareBracketAttributes(Parser* parser, Modifier*** ioModifierL
         //
 
         Token originalLastToken;
-        Token nameToken = parseAttributeName(parser, originalLastToken);
+        List<NameLoc> qualifiedNameSegments;
+        Token nameToken = parseAttributeName(parser, originalLastToken, qualifiedNameSegments);
 
         UncheckedAttribute* modifier = parser->astBuilder->create<UncheckedAttribute>();
         modifier->keywordName = nameToken.getName();
         modifier->loc = originalLastToken.getLoc();
         modifier->scope = parser->currentScope;
         modifier->originalIdentifierToken = originalLastToken;
+        modifier->qualifiedNameSegments = _Move(qualifiedNameSegments);
 
         if (AdvanceIf(parser, TokenType::LParent))
         {

@@ -160,7 +160,217 @@ static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
     return true;
 }
 
-AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
+// Return the `AttributeDecl` defined by a user-defined attribute `struct` (i.e. `struct
+// NameAttribute` marked `[__AttributeUsage(...)]`), or null if `structDecl` does not carry
+// `[__AttributeUsage]` and so may not be used as an attribute.
+static AttributeDecl* _getAttributeDeclFromUserDefinedAttributeStruct(
+    SemanticsVisitor* visitor,
+    StructDecl* structDecl)
+{
+    if (!structDecl)
+        return nullptr;
+
+    ensureDecl(visitor, structDecl, DeclCheckState::ModifiersChecked);
+    auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
+    if (!attrUsageAttr)
+        return nullptr;
+
+    return attrUsageAttr->attributeDecl;
+}
+
+// Look up a single name directly in `container`, and — when `container` is a namespace — in all of
+// its sibling scopes as well, so that a name declared in any fragment of a namespace that was split
+// across multiple `namespace X { ... }` blocks (possibly in different modules) is found. This
+// mirrors the merged-namespace member lookup that `_lookupStaticMember` performs for `X::member`
+// expressions: it walks `ownedScope->nextSibling`, skips scopes that are only transitively imported
+// into the current module, and deduplicates. `fromScope` supplies the current module for that
+// import-visibility check. Returns the raw `LookupResult`, which may be empty, single, or
+// overloaded — the caller decides how to treat an overload (e.g. as ambiguity).
+LookupResult SemanticsVisitor::lookUpDirectMemberIncludingNamespaceSiblings(
+    Name* name,
+    ContainerDecl* container,
+    Scope* fromScope,
+    LookupMask mask)
+{
+    LookupResult result;
+    if (auto namespaceDecl = as<NamespaceDeclBase>(container))
+    {
+        auto namespaceModule = getModuleDecl(namespaceDecl);
+        auto thisModule = fromScope ? getModuleDecl(fromScope->containerDecl) : namespaceModule;
+        HashSet<ContainerDecl*> processedScopes;
+        for (auto scope = namespaceDecl->ownedScope; scope; scope = scope->nextSibling)
+        {
+            auto siblingNamespace = as<NamespaceDeclBase>(scope->containerDecl);
+            if (!siblingNamespace)
+                continue;
+            // Skip a sibling that belongs to a module only transitively imported here.
+            if (thisModule != namespaceModule && namespaceModule != getModuleDecl(siblingNamespace))
+                continue;
+            if (!processedScopes.add(siblingNamespace))
+                continue;
+            AddToLookupResult(
+                result,
+                lookUpDirectAndTransparentMembers(
+                    m_astBuilder,
+                    this,
+                    name,
+                    siblingNamespace,
+                    DeclRef(siblingNamespace),
+                    mask,
+                    getDeclToExcludeFromLookup()));
+        }
+    }
+    else
+    {
+        result = lookUpDirectAndTransparentMembers(
+            m_astBuilder,
+            this,
+            name,
+            container,
+            DeclRef(container),
+            mask,
+            getDeclToExcludeFromLookup());
+    }
+    return result;
+}
+
+// Resolve the final segment of a qualified attribute name within a resolved container declaration
+// (a namespace, module, or aggregate type). Mirrors the two name-based lookups used for an
+// unqualified attribute: first a direct `AttributeDecl` named `lastSegment`, then a `struct` named
+// `lastSegment + "Attribute"` carrying `[__AttributeUsage]`. Sets `outAmbiguous` when a lookup
+// finds multiple candidates of the expected kind, so the caller can reject the reference rather
+// than silently picking one. Returns null (with `outAmbiguous` false) when nothing matches.
+AttributeDecl* SemanticsVisitor::lookUpAttributeDeclInContainer(
+    Name* lastSegmentName,
+    ContainerDecl* container,
+    Scope* fromScope,
+    bool& outAmbiguous)
+{
+    outAmbiguous = false;
+    if (!lastSegmentName || !container)
+        return nullptr;
+
+    {
+        LookupResult result = lookUpDirectMemberIncludingNamespaceSiblings(
+            lastSegmentName,
+            container,
+            fromScope,
+            LookupMask::Attribute);
+        if (result.isOverloaded())
+        {
+            outAmbiguous = true;
+            return nullptr;
+        }
+        if (result.isValid())
+        {
+            if (auto attributeDecl = as<AttributeDecl>(result.item.declRef.getDecl()))
+                return attributeDecl;
+        }
+    }
+
+    auto structNameObj =
+        m_astBuilder->getGlobalSession()->getNameObj(lastSegmentName->text + "Attribute");
+    LookupResult structResult = lookUpDirectMemberIncludingNamespaceSiblings(
+        structNameObj,
+        container,
+        fromScope,
+        LookupMask::type);
+    if (structResult.isOverloaded())
+    {
+        outAmbiguous = true;
+        return nullptr;
+    }
+    if (!structResult.isValid())
+        return nullptr;
+
+    auto structDecl = as<StructDecl>(structResult.item.declRef.getDecl());
+    return _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl);
+}
+
+// Add every `ContainerDecl` candidate in `result` to `outContainers`; a qualifier segment can
+// resolve to several containers (a namespace merged across imported modules). Non-container
+// candidates are ignored.
+static void _collectContainerCandidates(
+    LookupResult const& result,
+    List<ContainerDecl*>& outContainers)
+{
+    if (!result.isValid())
+        return;
+    if (result.isOverloaded())
+    {
+        for (auto& item : result.items)
+        {
+            if (auto container = as<ContainerDecl>(item.declRef.getDecl()))
+                outContainers.add(container);
+        }
+    }
+    else if (auto container = as<ContainerDecl>(result.item.declRef.getDecl()))
+    {
+        outContainers.add(container);
+    }
+}
+
+// Resolve a qualified attribute name (e.g. `[my_namespace::Example(...)]`) by walking its
+// namespace/type qualifier segments and resolving the final segment as an attribute in the
+// resulting container. Reached only after the flat folded-name lookups fail to produce a usable
+// attribute, so builtin qualified attributes (`[vk::binding]`, registered under the flat name
+// `vk_binding`) never take this path.
+AttributeDecl* SemanticsVisitor::lookUpQualifiedAttributeDecl(
+    List<NameLoc> const& segments,
+    Scope* scope)
+{
+    if (segments.getCount() < 2)
+        return nullptr;
+
+    // A qualifier can resolve to multiple containers (a namespace merged across imported modules),
+    // so carry the full set of candidates forward. The first segment uses ordinary scoped lookup,
+    // which walks up to module/global scope.
+    List<ContainerDecl*> containers;
+    _collectContainerCandidates(
+        lookUp(m_astBuilder, this, segments[0].name, scope, LookupMask::Default),
+        containers);
+
+    for (Index i = 1; i + 1 < segments.getCount(); ++i)
+    {
+        List<ContainerDecl*> next;
+        for (auto container : containers)
+        {
+            _collectContainerCandidates(
+                lookUpDirectMemberIncludingNamespaceSiblings(
+                    segments[i].name,
+                    container,
+                    scope,
+                    LookupMask::Default),
+                next);
+        }
+        containers = _Move(next);
+    }
+
+    // Resolve the final segment in each candidate container. If any candidate is itself ambiguous,
+    // or two candidates yield different attributes, the reference is ambiguous: give up and leave
+    // the existing "unknown attribute" warning rather than picking one arbitrarily.
+    AttributeDecl* found = nullptr;
+    for (auto container : containers)
+    {
+        bool ambiguous = false;
+        auto attributeDecl =
+            lookUpAttributeDeclInContainer(segments.getLast().name, container, scope, ambiguous);
+        if (ambiguous)
+            return nullptr;
+        if (attributeDecl)
+        {
+            if (found && found != attributeDecl)
+                return nullptr;
+            found = attributeDecl;
+        }
+    }
+    return found;
+}
+
+AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(
+    Name* attributeName,
+    Scope* scope,
+    List<NameLoc> const& qualifiedNameSegments)
 {
     if (!attributeName)
         return nullptr;
@@ -226,26 +436,32 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     LookupResult lookupResult =
         lookUp(m_astBuilder, this, attributeDeclNameObj, scope, LookupMask::type);
     //
-    // If we didn't find a matching type name, then we give up.
+    // As with the direct-attribute lookup above, an overloaded flat name is ambiguous and terminal.
     //
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
+    if (lookupResult.isOverloaded())
         return nullptr;
-
-
-    // We only allow a `struct` type to be used as an attribute
-    // if the type itself has an `[AttributeUsage(...)]` attribute
-    // attached to it.
     //
-    auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
-    if (!structDecl)
-        return nullptr;
+    // If we found a matching type name, use it if it is a valid user-defined attribute struct.
+    //
+    if (lookupResult.isValid())
+    {
+        auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
+        if (auto attributeDecl = _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl))
+            return attributeDecl;
+    }
 
-    ensureDecl(structDecl, DeclCheckState::ModifiersChecked);
-    auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
-    if (!attrUsageAttr)
-        return nullptr;
+    // The flat, underscore-folded name did not produce a usable attribute. If the attribute name
+    // was written with `::` qualification (e.g. `[my_namespace::Example(...)]`), the fold destroyed
+    // the qualifier structure, so fall back to a scoped lookup that walks the namespace/type
+    // qualifiers. This is only reached when the flat lookups above fail to produce a usable
+    // attribute, so builtin qualified attributes such as `[vk::binding]` (registered under the flat
+    // name `vk_binding`) are unaffected.
+    if (qualifiedNameSegments.getCount() > 1)
+    {
+        return lookUpQualifiedAttributeDecl(qualifiedNameSegments, scope);
+    }
 
-    return attrUsageAttr->attributeDecl;
+    return nullptr;
 }
 
 bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
@@ -1428,7 +1644,8 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     auto attrName = uncheckedAttr->getKeywordName();
-    auto attrDecl = lookUpAttributeDecl(attrName, uncheckedAttr->scope);
+    auto attrDecl =
+        lookUpAttributeDecl(attrName, uncheckedAttr->scope, uncheckedAttr->qualifiedNameSegments);
 
     if (!attrDecl)
     {
