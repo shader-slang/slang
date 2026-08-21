@@ -16,6 +16,13 @@ namespace shared_ns
     {
         return 0;
     }
+
+    // Same attribute name as in the imported fragment, making a qualified reference ambiguous.
+    [__AttributeUsage(_AttributeTargets.Function)]
+    struct AmbiguousAttribute
+    {
+        int iParam;
+    };
 }
 
 // The attribute lives in the imported fragment of `shared_ns`; resolving it requires searching the
@@ -24,5 +31,14 @@ namespace shared_ns
 [shared_ns::Imported(1)]
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+
+// `Ambiguous` is defined in two sibling fragments of `shared_ns` (here and in the imported module),
+// so the qualified reference must be rejected rather than silently resolved to one of them.
+// CHECK: warning{{.*}}31000
+// CHECK: unknown attribute 'shared_ns_Ambiguous'
+[shared_ns::Ambiguous(2)]
+void usesAmbiguous()
 {
 }

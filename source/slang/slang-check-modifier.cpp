@@ -184,7 +184,8 @@ static AttributeDecl* _getAttributeDeclFromUserDefinedAttributeStruct(
 // mirrors the merged-namespace member lookup that `_lookupStaticMember` performs for `X::member`
 // expressions: it walks `ownedScope->nextSibling`, skips scopes that are only transitively imported
 // into the current module, and deduplicates. `fromScope` supplies the current module for that
-// import-visibility check. The single valid result is returned, or null on no/overloaded matches.
+// import-visibility check. Returns the raw `LookupResult`, which may be empty, single, or
+// overloaded — the caller decides how to treat an overload (e.g. as ambiguity).
 LookupResult SemanticsVisitor::lookUpDirectMemberIncludingNamespaceSiblings(
     Name* name,
     ContainerDecl* container,
@@ -434,9 +435,14 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(
     LookupResult lookupResult =
         lookUp(m_astBuilder, this, attributeDeclNameObj, scope, LookupMask::type);
     //
+    // As with the direct-attribute lookup above, an overloaded flat name is ambiguous and terminal.
+    //
+    if (lookupResult.isOverloaded())
+        return nullptr;
+    //
     // If we found a matching type name, use it if it is a valid user-defined attribute struct.
     //
-    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    if (lookupResult.isValid())
     {
         auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
         if (auto attributeDecl = _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl))
