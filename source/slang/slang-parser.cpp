@@ -6475,6 +6475,9 @@ Decl* Parser::ParseGLSLInterfaceBlock()
 static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 {
     EnumCaseDecl* decl = parser->astBuilder->create<EnumCaseDecl>();
+
+    decl->modifiers = ParseModifiers(parser);
+
     parser->FillPosition(decl);
 
     decl->nameAndLoc = expectIdentifier(parser);
