@@ -102,9 +102,8 @@ between them that can abandon the invocation, all execute exactly the
 same number of times. A basic block has one entry and one exit, so
 reaching any instruction in it means reaching all of them.
 
-The `someFunction` example above therefore emits three counters, not
-seven — one for the entry block, one for the loop body, and one for
-`main`:
+The `someFunction` example above therefore emits two counters for its
+six markers — one for the entry block, one for the loop body:
 
 ```slang
 void someFunction(uint N)
