@@ -17,8 +17,10 @@ struct NVRTCDownstreamCompilerUtil
 
     /// Pick the architecture to ask NVRTC for, given what it reports it accepts.
     ///
-    /// `supportedAscending` is NVRTC's own list, as `major * 10 + minor` in
-    /// ascending order. A requirement need not name a real architecture --
+    /// `supportedAscending` is NVRTC's own list, as `major * 10 + minor`.
+    /// Ascending order is a **precondition**, relied on by both the scan and the
+    /// "highest supported" fallback; `_getSupportedArchs` guarantees it by
+    /// sorting whatever NVRTC returns. A requirement need not name a real architecture --
     /// `__cuda_sm_version` takes an arbitrary version -- so the answer is the
     /// smallest supported architecture that *satisfies* `requested`:
     /// `8.1` against `{80, 86, 89, 90}` resolves to `8.6`, not `8.0`, because

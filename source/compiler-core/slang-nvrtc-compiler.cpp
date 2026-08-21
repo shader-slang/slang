@@ -764,9 +764,16 @@ SlangResult NVRTCDownstreamCompiler::_getSupportedArchs(List<int>& outArchs)
         return SLANG_E_NOT_AVAILABLE;
     }
 
-    // NVRTC documents the result as ascending, and resolveArchAgainstSupported
-    // relies on that for both its scan and its "highest supported" fallback, so
-    // do not take it on trust.
+    // resolveArchAgainstSupported requires ascending order -- both its forward
+    // scan and its "highest supported" fallback depend on it -- and this is the
+    // single point that guarantees it. NVRTC documents its result as ascending,
+    // so this sort is normally a no-op; it is here so the helper's precondition
+    // is enforced by us rather than assumed of a third party.
+    //
+    // The paths below and this ordering guarantee are exercised only indirectly:
+    // reaching them needs a loaded NVRTC, which GPU-less CI does not have. The
+    // resolution logic itself is separated into resolveArchAgainstSupported for
+    // exactly that reason, and is unit-tested there without an NVRTC.
     outArchs.sort();
     return SLANG_OK;
 }
