@@ -1,5 +1,6 @@
 // unit-test-enum-reflection.cpp
 
+#include "core/slang-string.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
@@ -13,7 +14,11 @@ using namespace Slang;
 SLANG_UNIT_TEST(enumReflection)
 {
     const char* userSourceBody = R"(
+        [__AttributeUsage(_AttributeTargets.EnumCase)]
+        struct DisplayNameAttribute { string name; }
+
         enum Mode {
+            [DisplayName("First mode")]
             A,
             B = 123 * 4,
             C = B + 5
@@ -67,7 +72,15 @@ SLANG_UNIT_TEST(enumReflection)
     auto value = getDefaultValueInt(case0);
     SLANG_CHECK(strcmp(case0->getName(), "A") == 0 && value == 0);
 
+    auto displayName = case0->findUserAttributeByName(globalSession, "DisplayName");
+    SLANG_CHECK_ABORT(displayName != nullptr);
+    SLANG_CHECK(case0->getUserAttributeCount() == 1);
+    size_t nameSize = 0;
+    const char* nameArg = displayName->getArgumentValueString(0, &nameSize);
+    SLANG_CHECK(nameArg != nullptr && UnownedStringSlice(nameArg, nameSize) == "First mode");
+
     auto case1 = enumType->getFieldByIndex(1);
+    SLANG_CHECK(case1->getUserAttributeCount() == 0);
     value = getDefaultValueInt(case1);
     SLANG_CHECK(strcmp(case1->getName(), "B") == 0 && value == 123 * 4);
 

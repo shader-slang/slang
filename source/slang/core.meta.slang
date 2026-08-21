@@ -4736,6 +4736,7 @@ enum _AttributeTargets
     Var = $((int) UserDefinedAttributeTargets::Var), /// Global and local variables and constants.
     Function = $((int) UserDefinedAttributeTargets::Function), /// Functions or member functions.
     Param = $((int) UserDefinedAttributeTargets::Param), /// Function parameters.
+    EnumCase = $((int) UserDefinedAttributeTargets::EnumCase), /// Individual enum members; distinct from `Var`.
 };
 
 /// Mark a struct type as a user defined attribute type.
