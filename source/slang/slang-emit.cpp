@@ -2257,6 +2257,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDAHeader:
         {
             SLANG_PASS(legalizeEntryPointVaryingParamsForCUDA, codeGenContext->getSink());
+            SLANG_PASS(diagnoseUnsupportedCUDARayFlags, codeGenContext->getSink());
         }
         break;
 

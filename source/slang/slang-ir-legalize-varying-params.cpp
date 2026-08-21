@@ -2577,6 +2577,80 @@ void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* si
     context.processModule(module, sink);
 }
 
+// The exhaustive set of HLSL RAY_FLAG bits with no OptixRayFlags counterpart: OptiX defines bits
+// 0..7 and bit 10 (0x400), so 0x100 and 0x200 are the only currently-defined HLSL flags that cannot
+// be expressed per-ray. Named-set form so the diagnostic can identify the offending flag and never
+// fires on an undefined bit.
+static const struct
+{
+    IRIntegerValue bit;
+    char const* name;
+} kOptixUnsupportedRayFlags[] = {
+    {0x100, "RAY_FLAG_SKIP_TRIANGLES"},
+    {0x200, "RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES"},
+};
+
+// Diagnose a `TraceRay` call whose ray-flags argument is a compile-time constant carrying a bit
+// OptiX cannot express (see `kOptixUnsupportedRayFlags`); such a flag would otherwise be emitted
+// verbatim into `optixTrace(...)` as an invalid `OptixRayFlags` value with no error
+// (shader-slang/slang#12629).
+//
+// `TraceRay`'s CUDA arm lowers to a callee whose body is a single `IRGenericAsm("optixTrace")`
+// terminator (hlsl.meta.slang), and the call survives inlining, so the trace call is identified by
+// that intrinsic-asm text on its resolved callee. Only a constant ray-flags operand is inspected; a
+// value not constant-foldable at the call site cannot be checked here.
+void diagnoseUnsupportedCUDARayFlags(IRModule* module, DiagnosticSink* sink)
+{
+    // `RayFlags` is the second `TraceRay` parameter, so call argument index 1.
+    static const UInt kRayFlagsArgIndex = 1;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+
+                auto calleeInst = call->getCallee();
+                if (auto specialize = as<IRSpecialize>(calleeInst))
+                    calleeInst = specialize->getBase();
+                auto callee = as<IRFunc>(calleeInst);
+                if (!callee)
+                    continue;
+
+                auto firstBlock = callee->getFirstBlock();
+                if (!firstBlock)
+                    continue;
+                auto genAsm = as<IRGenericAsm>(firstBlock->getTerminator());
+                if (!genAsm || genAsm->getAsm() != UnownedStringSlice("optixTrace"))
+                    continue;
+
+                if (call->getArgCount() <= kRayFlagsArgIndex)
+                    continue;
+                auto flagsLit = as<IRIntLit>(call->getArg(kRayFlagsArgIndex));
+                if (!flagsLit)
+                    continue;
+                IRIntegerValue flags = flagsLit->getValue();
+
+                for (const auto& unsupported : kOptixUnsupportedRayFlags)
+                {
+                    if (flags & unsupported.bit)
+                        sink->diagnose(Diagnostics::RayFlagUnsupportedForOptix{
+                            .flag = String(unsupported.name),
+                            .location = call->sourceLoc});
+                }
+            }
+        }
+    }
+}
+
 void depointerizeInputParams(IRFunc* entryPointFunc)
 {
     List<IRParam*> workList;
