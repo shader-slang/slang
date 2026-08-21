@@ -4991,10 +4991,10 @@ struct ICoverageTracingMetadata : public ISlangCastable
         {0x8e, 0x21, 0x3f, 0x7b, 0x82, 0xa3, 0xd9, 0x51})
 
     /// Number of runtime counter slots in the synthesized coverage
-    /// buffer. This can differ from `getEntryCount()` once a coverage
-    /// mode has counterless metadata entries, shares one counter across
-    /// several source entries, or reports entries whose counts are
-    /// derived from other counters.
+    /// buffer. This is smaller than `getEntryCount()`: line coverage
+    /// shares one counter across the source entries of a straight-line
+    /// region. Size the counter readback buffer from this value, never
+    /// from the entry count.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getCounterCount() = 0;
 
     /// Populate `outInfo` with attribution info for source coverage
@@ -5023,10 +5023,10 @@ struct ICoverageTracingMetadata : public ISlangCastable
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getBufferInfo(CoverageBufferInfo* outInfo) = 0;
 
     /// Number of source coverage entries available through
-    /// `getEntryInfo`. The current line/function/branch producers have
-    /// one entry per counter, but future source-region coverage may
-    /// expose entries that do not map one-to-one with runtime counter
-    /// slots.
+    /// `getEntryInfo`. Every coverage marker produces one entry, so
+    /// this is NOT the number of runtime counters: several entries may
+    /// name the same `counterIndex`. Use `getCounterCount()` to size
+    /// the readback buffer.
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getEntryCount() = 0;
 };
     #define SLANG_UUID_ICoverageTracingMetadata ICoverageTracingMetadata::getTypeGuid()

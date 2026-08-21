@@ -690,6 +690,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         // to catch.
         List<uint32_t> lineSlots;
         List<uint32_t> dedicatedSlots;
+        Index lineEntryCount = 0;
         for (uint32_t i = 0; i < allModesCoverage->getEntryCount(); ++i)
         {
             slang::CoverageEntryInfo entry;
@@ -700,6 +701,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
             if (entry.kind == slang::CoverageEntryKind::Line)
             {
                 seenLine = true;
+                lineEntryCount++;
                 if (lineSlots.indexOf(entry.counterIndex) < 0)
                     lineSlots.add(entry.counterIndex);
             }
@@ -725,9 +727,11 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(
             lineSlots.getCount() + dedicatedSlots.getCount() ==
             (Index)allModesCoverage->getCounterCount());
-        // Coalescing must actually have happened: more line entries than
-        // line slots.
-        SLANG_CHECK(lineSlots.getCount() < (Index)allModesCoverage->getEntryCount());
+        // Coalescing must actually have happened. Compare against the
+        // line-entry count specifically: `getEntryCount()` includes the
+        // function and branch entries asserted above, so it would exceed
+        // the line-slot count even if line coalescing regressed entirely.
+        SLANG_CHECK(lineSlots.getCount() < lineEntryCount);
     }
 
     // Argument validation on the serializer.

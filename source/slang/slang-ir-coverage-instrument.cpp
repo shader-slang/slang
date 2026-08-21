@@ -840,6 +840,34 @@ static bool isCoverageMarkerOp(IROp op)
     }
 }
 
+// Return the function body that `callee` will actually enter, or null
+// when the target cannot be resolved statically — an interface method
+// dispatched through a witness table, for instance. Callers must treat
+// null conservatively, since an unresolvable body could do anything.
+//
+// The `specialize` unwrapping matters because coverage instrumentation
+// runs before `specializeModule`: a call to a generic such as
+// `dot(a, b)` reaches this pass as `call specialize(%dot, Float, 3)(...)`
+// rather than as a direct call to an `IRFunc`. Reporting that as
+// unresolvable would split a coalescing region at every generic call —
+// which is most numeric code — for no correctness benefit, because the
+// generic's body is right there to analyze.
+static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
+{
+    callee = getResolvedInstForDecorations(callee);
+    if (auto func = as<IRFunc>(callee))
+        return func;
+    if (auto specialize = as<IRSpecialize>(callee))
+    {
+        // `findInnerMostGenericReturnVal` peels every nested
+        // `IRGeneric` layer, so a multi-parameter generic resolves in
+        // one step.
+        if (auto generic = as<IRGeneric>(getResolvedInstForDecorations(specialize->getOperand(0))))
+            return as<IRFunc>(findInnerMostGenericReturnVal(generic));
+    }
+    return nullptr;
+}
+
 // Decides whether a call can fail to return to its caller, so that
 // coverage coalescing knows when a straight-line run of markers is
 // really straight-line.
@@ -877,37 +905,6 @@ static bool isCoverageMarkerOp(IROp op)
 // return to their caller, so this analysis cannot see them. There is
 // no `[noreturn]` concept in the IR to key off. Marking them in the
 // core module is the principled fix and is tracked separately.
-// Resolve the function body that a call will actually enter, seeing
-// through the `specialize` wrapper that a call to a generic function
-// still carries at this point in the pipeline.
-//
-// Coverage instrumentation runs before `specializeModule`, so a call
-// to a generic such as `dot(a, b)` reaches this pass as
-// `call specialize(%dot, Float, 3)(...)` rather than as a direct call
-// to an `IRFunc`. Treating that as an unknown target would split a
-// coalescing run at every generic call — which is most numeric code —
-// for no correctness benefit, because the generic's body is right
-// there to analyze.
-//
-// Returns null only when the target genuinely cannot be resolved
-// statically, such as an interface method dispatched through a witness
-// table; the caller handles that conservatively.
-static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
-{
-    callee = getResolvedInstForDecorations(callee);
-    if (auto func = as<IRFunc>(callee))
-        return func;
-    if (auto specialize = as<IRSpecialize>(callee))
-    {
-        // `findInnerMostGenericReturnVal` peels every nested
-        // `IRGeneric` layer, so a multi-parameter generic resolves in
-        // one step.
-        if (auto generic = as<IRGeneric>(getResolvedInstForDecorations(specialize->getOperand(0))))
-            return as<IRFunc>(findInnerMostGenericReturnVal(generic));
-    }
-    return nullptr;
-}
-
 struct CoverageFunctionExitAnalysis
 {
     // `true` when the function may abandon the invocation instead of
