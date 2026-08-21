@@ -91,21 +91,22 @@ required will still run on a queue entry, but a failure there does not stop the
 merge, and the run is left on the temporary `gh-readonly-queue/...` branch that
 is deleted right after — so check the workflow's own run list, not the PR.
 
-| Workflow                          | Per-PR | Merge queue | Purpose                                                   |
-| --------------------------------- | ------ | ----------- | --------------------------------------------------------- |
-| `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.      |
-| `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.         |
-| `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                 |
-| `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed. |
-| `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                    |
-| `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                |
-| `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.      |
-| `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.          |
-| `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.  |
-| `check-spirv-generated.yml`       | yes    | no          | Verifies committed SPIR-V generated files are current.    |
-| `check-container-consistency.yml` | yes    | no          | Verifies the container workflows pin the same image.      |
-| `reuse-compliance.yml`            | yes    | no          | REUSE/SPDX license-header check.                          |
-| `claude-pr-review.yml`            | yes    | no          | Automated review of the PR diff. Advisory.                |
+| Workflow                          | Per-PR | Merge queue | Purpose                                                                                               |
+| --------------------------------- | ------ | ----------- | ----------------------------------------------------------------------------------------------------- |
+| `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.                                                  |
+| `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.                                                     |
+| `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                                                             |
+| `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed.                                             |
+| `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                                                                |
+| `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                                                            |
+| `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.                                                  |
+| `check-doc-gaps.yml`              | yes    | no          | Hard-gates the generated-doc structural lint; reports the doc-gap queue as advisory. Also runs daily. |
+| `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.                                                      |
+| `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.                                              |
+| `check-spirv-generated.yml`       | yes    | no          | Verifies committed SPIR-V generated files are current.                                                |
+| `check-container-consistency.yml` | yes    | no          | Verifies the container workflows pin the same image.                                                  |
+| `reuse-compliance.yml`            | yes    | no          | REUSE/SPDX license-header check.                                                                      |
+| `claude-pr-review.yml`            | yes    | no          | Automated review of the PR diff. Advisory.                                                            |
 
 Two gates live as jobs **inside** `ci.yml` rather than as their own files, so
 they can reuse an artifact CI already built: `check-cmdline-ref` and
@@ -200,11 +201,12 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 7. Manual only
 
-| Workflow                         | Purpose                                                     |
-| -------------------------------- | ----------------------------------------------------------- |
-| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.     |
-| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases. |
-| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.            |
+| Workflow                         | Purpose                                                      |
+| -------------------------------- | ------------------------------------------------------------ |
+| `ci-retry.yml`                   | Waits for a run to finish, then reruns its failed jobs.      |
+| `perf-compile-release-sweep.yml` | Backfills compile-performance history across past releases.  |
+| `check-spirv-tools.yml`          | Placeholder for a SPIRV-Tools tip-of-tree check.             |
+| `probe-windows-arm-vs2026.yml`   | Capability probe for the VS2026 Windows-on-ARM hosted image. |
 
 ## 8. Composite actions
 
