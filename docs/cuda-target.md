@@ -262,6 +262,13 @@ Since Slang supports up to 4 wide vectors Slang has to build on CUDAs half suppo
 
 One area where this optimization isn't fully used is in comparisons - as in effect Slang treats all the vector/matrix half comparisons as if they are scalar. This could be perhaps be improved on in the future. Doing so would require using features that are not directly available in the CUDA headers.
 
+Fast Math
+=========
+
+When compiling with `-fp-mode fast`, Slang will define `SLANG_CUDA_ENABLE_FAST_MATH` when `slang-cuda-prelude.h` is included. This redirects the single-precision transcendental wrappers that have a fast approximate CUDA intrinsic (`sin`, `cos`, `sincos`, `tan`, `log`, `log2`, `log10`, `exp`, `pow`) to their `__*f` forms (`__sinf`, `__cosf`, and so on), which can substantially reduce the emitted instruction count at the cost of reduced accuracy. This trade-off is why it is opt-in; without `-fp-mode fast` every wrapper keeps its default form.
+
+Wrappers with no `__*f` fast intrinsic (`exp2`, `atan2`, `asin`, `acos`, `atan`, `sqrt`, and the hyperbolic functions) are not redirected by this define — they keep their existing standard-library implementation — as do all double-precision (`F64_*`) wrappers, since CUDA provides no approximate double intrinsics.
+
 Wave Intrinsics
 ===============
 

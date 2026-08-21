@@ -398,6 +398,18 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     return Super::calcTypeName(type, target, out);
 }
 
+void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+{
+    Super::emitFrontMatterImpl(targetReq);
+
+    // Must precede the prelude, which is emitted immediately after this front
+    // matter and gates its transcendental wrappers on this define.
+    if (getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Fast)
+    {
+        m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
+    }
+}
+
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
     IRInst* inst,
     char const* uniformSemanticSpelling,
