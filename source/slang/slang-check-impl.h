@@ -2223,9 +2223,25 @@ public:
         Scope* scope,
         List<NameLoc> const& qualifiedNameSegments);
 
+    // Look up a name directly in `container`, plus in all merged-namespace sibling scopes when
+    // `container` is a namespace (honoring cross-module import visibility). `fromScope` supplies
+    // the current module for that visibility check.
+    LookupResult lookUpDirectMemberIncludingNamespaceSiblings(
+        Name* name,
+        ContainerDecl* container,
+        Scope* fromScope,
+        LookupMask mask);
+
     // Resolve the final segment of a qualified attribute name as an attribute declared directly in
     // `container` (either a builtin `AttributeDecl` or a user-defined `struct <name>Attribute`).
-    AttributeDecl* lookUpAttributeDeclInContainer(Name* lastSegmentName, ContainerDecl* container);
+    // `fromScope` supplies the current module for merged-namespace import-visibility filtering.
+    // Sets `outAmbiguous` when the lookup is ambiguous (multiple matches), so the caller rejects
+    // it.
+    AttributeDecl* lookUpAttributeDeclInContainer(
+        Name* lastSegmentName,
+        ContainerDecl* container,
+        Scope* fromScope,
+        bool& outAmbiguous);
 
     // Resolve a `::`-qualified attribute name by walking its namespace/type qualifier segments.
     AttributeDecl* lookUpQualifiedAttributeDecl(List<NameLoc> const& segments, Scope* scope);
