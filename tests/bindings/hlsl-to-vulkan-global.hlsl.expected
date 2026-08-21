@@ -3,6 +3,7 @@ standard error = {
 }
 standard output = {
 {
+    "version": "1.1",
     "parameters": [
         {
             "name": "a",
@@ -56,10 +57,73 @@ standard output = {
             }
         }
     ],
+    "globalScope": {
+        "kind": "constantBuffer",
+        "binding": {"kind": "descriptorTableSlot", "index": 0},
+        "parameters": [
+            {
+                "name": "a",
+                "binding": {"kind": "uniform", "offset": 0, "size": 4, "elementStride": 0},
+                "type": {
+                    "kind": "scalar",
+                    "scalarType": "int32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                }
+            },
+            {
+                "name": "b",
+                "binding": {"kind": "uniform", "offset": 4, "size": 4, "elementStride": 0},
+                "type": {
+                    "kind": "scalar",
+                    "scalarType": "float32",
+                    "sizes": [
+                        {"kind": "uniform", "value": 4, "alignment": 4}
+                    ]
+                }
+            },
+            {
+                "name": "t",
+                "binding": {"kind": "descriptorTableSlot", "index": 0},
+                "type": {
+                    "kind": "resource",
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    },
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            },
+            {
+                "name": "sampler",
+                "binding": {"kind": "descriptorTableSlot", "index": 1},
+                "type": {
+                    "kind": "samplerState",
+                    "sizes": [
+                        {"kind": "descriptorTableSlot", "value": 1}
+                    ]
+                }
+            }
+        ]
+    },
     "entryPoints": [
         {
             "name": "main",
             "stage": "fragment",
+            "scope": {
+                "kind": "none",
+                "parameters": [
+
+                ]
+            },
             "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
