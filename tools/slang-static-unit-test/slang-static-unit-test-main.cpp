@@ -199,7 +199,15 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    printf("\n%d passed, %d failed\n", reporter.passedTestCount, reporter.failedTestCount);
+    // Ignored tests are reported explicitly. Counting them separately from passes is
+    // only half the job: leaving them out of the summary makes a skipped test invisible
+    // rather than merely not-a-pass, which is the same silent-success failure the
+    // zero-tests and empty-filter checks exist to prevent.
+    printf(
+        "\n%d passed, %d failed, %d ignored\n",
+        reporter.passedTestCount,
+        reporter.failedTestCount,
+        reporter.ignoredTestCount);
 
     testModule->destroy();
     return reporter.failedTestCount == 0 ? 0 : 1;

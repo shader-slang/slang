@@ -92,7 +92,7 @@ becomes expressible:
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addVoidFunction("keptFunc", /* keepAlive: */ true);
     builder.addVoidFunction("deadFunc", /* keepAlive: */ false);

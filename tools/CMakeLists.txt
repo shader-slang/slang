@@ -473,12 +473,12 @@ endif()
 #
 # Unit tests that call non-exported `source/slang` entry points directly.
 #
-# These are separate from `slang-unit-test` because of how they link, not what
-# they test. `slang-unit-test` is a shared library loaded by
-# `slang-test`, so it can only reach symbols exported from libslang-compiler,
-# and those entry points carry no export annotation. Linking the
-# compiler statically into an executable makes them resolve at link time with no
-# annotation and no change to `source/slang`.
+# These are separate from `slang-unit-test` because of how they link, not what they
+# test. `slang-unit-test` is a shared library loaded by `slang-test`, so it can reach
+# only the symbols libslang-compiler exports — and the entry points these tests need
+# carry no export annotation, so they are not among them. Linking the compiler
+# statically into an executable resolves them at link time instead, with no annotation
+# and no change to `source/slang`.
 #
 # The target is therefore only defined for a static build. Under
 # SLANG_LIB_TYPE=SHARED the link would fail by design, so guarding the

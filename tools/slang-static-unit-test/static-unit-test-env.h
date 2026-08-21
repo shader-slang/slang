@@ -30,7 +30,7 @@ class Session;
 /// Per-test environment holding a `Linkage` and the internal compiler handles
 /// tests need. Construct one per test.
 ///
-/// Constructing an `StaticUnitTestEnv` is cheap (on the order of microseconds)
+/// Constructing a `StaticUnitTestEnv` is cheap (on the order of microseconds)
 /// because the expensive work — loading the core module — happens once when the
 /// process creates its global session, and that session is shared with every
 /// test through `UnitTestContext::slangGlobalSession`. Prefer one environment
@@ -44,9 +44,18 @@ public:
     /// that the test harness passes in.
     explicit StaticUnitTestEnv(UnitTestContext* context);
 
-    /// Return the internal `Session`, which IR construction needs in order to
-    /// create an `IRModule`.
-    Session* getSession() const;
+    /// Return the internal `Session` — the process-wide object that owns IR
+    /// allocation — which is what `IRModule::create` needs.
+    ///
+    /// Note that this is *not* the `slang::ISession` this environment created.
+    /// Slang uses "session" for both: `Linkage` implements the public
+    /// `ISession` and is per-environment, while `Session` is the global one
+    /// shared by every environment in the process. This forwards to
+    /// `Linkage::getSessionImpl()`, and is named after it for that reason. The
+    /// per-test isolation this class provides is isolation of the `Linkage`;
+    /// the `Session` behind it is deliberately shared, because loading the core
+    /// module into one per test is what would make the suite slow.
+    Session* getSessionImpl() const;
 
     /// Return the `ASTBuilder` owned by this environment's `Linkage`, used to
     /// construct types and other AST values directly.
@@ -101,9 +110,9 @@ public:
 
     /// Add a top-level `GlobalParam` of type `float`, with a name hint.
     ///
-    /// Global parameters are kept alive by `IRDeadCodeEliminationOptions` regardless of
-    /// whether anything refers to them, so an unreferenced one is the smallest fixture
-    /// that tells the two settings of `keepGlobalParamsAlive` apart.
+    /// `IRDeadCodeEliminationOptions::keepGlobalParamsAlive` — on by default — keeps
+    /// global parameters even when nothing refers to them, so an unreferenced one is the
+    /// smallest fixture that tells the two settings of that flag apart.
     IRGlobalParam* addGlobalParam(const char* name);
 
     IRModule* getModule() const { return m_module.get(); }
@@ -131,6 +140,14 @@ public:
     String dump() const;
 
 private:
+    /// Create a `void()` top-level function named `name` and open an entry block
+    /// for its body, leaving the builder inserting into that block. Paired with
+    /// `endVoidFunction`, which terminates it.
+    IRFunc* beginVoidFunction(const char* name);
+
+    /// Terminate the block opened by `beginVoidFunction` and apply `keepAlive`.
+    void endVoidFunction(IRFunc* func, bool keepAlive);
+
     // Declaration order matters: the constructor initializes `m_builder` from
     // `m_module.get()`, and members are initialized in declaration order rather
     // than in the order the initializer list happens to name them. Declaring

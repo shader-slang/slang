@@ -22,7 +22,7 @@ using namespace Slang;
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addVoidFunction("keptFunc", /* keepAlive: */ true);
     builder.addVoidFunction("deadFunc", /* keepAlive: */ false);
@@ -44,7 +44,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addVoidFunction("liveFunc", /* keepAlive: */ true);
     SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 1);
@@ -61,7 +61,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead)
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addVoidFunction("dead0", /* keepAlive: */ false);
     builder.addVoidFunction("kept", /* keepAlive: */ true);
@@ -81,16 +81,26 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions)
 SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addVoidFunction("kept", /* keepAlive: */ true);
     builder.addVoidFunction("dead", /* keepAlive: */ false);
 
     SLANG_CHECK(eliminateDeadCode(builder.getModule()));
-    const Int afterFirstRun = builder.countGlobalInsts(kIROp_Func);
+
+    // Pin *which* function survived, not merely how many. Comparing the second run
+    // against the first run's own output would hold even if the first run had wrongly
+    // removed `kept` as well: the count would be 0 both times, the second run would
+    // report no change, and every assertion would pass.
+    List<String> afterFirstRun = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(afterFirstRun.getCount() == 1);
+    SLANG_CHECK(afterFirstRun[0] == "kept");
 
     SLANG_CHECK(!eliminateDeadCode(builder.getModule()));
-    SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == afterFirstRun);
+
+    List<String> afterSecondRun = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(afterSecondRun.getCount() == 1);
+    SLANG_CHECK(afterSecondRun[0] == "kept");
 }
 
 // A function with no decoration of its own survives when a live function calls
@@ -101,7 +111,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
 SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     IRFunc* callee = builder.addVoidFunction("calleeFunc", /* keepAlive: */ false);
     builder.addVoidFunctionCalling("rootFunc", /* keepAlive: */ true, callee);
@@ -125,7 +135,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
 SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     IRFunc* leaf = builder.addVoidFunction("leafFunc", /* keepAlive: */ false);
     IRFunc* middle = builder.addVoidFunctionCalling("middleFunc", /* keepAlive: */ false, leaf);
@@ -151,12 +161,15 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
 SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedGlobalParamByDefault)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addGlobalParam("unusedParam");
     SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_GlobalParam) == 1);
 
-    eliminateDeadCode(builder.getModule());
+    // Nothing is removed, so the pass reports no change -- asserted here for the same
+    // reason as elsewhere in this file, since a pass that always claims to have changed
+    // something would never let a fixpoint loop terminate.
+    SLANG_CHECK(!eliminateDeadCode(builder.getModule()));
 
     SLANG_CHECK(builder.countGlobalInsts(kIROp_GlobalParam) == 1);
 }
@@ -167,7 +180,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedGlobalParamByDefault)
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedGlobalParamWhenNotKeptAlive)
 {
     StaticUnitTestEnv env(unitTestContext);
-    IRFixtureBuilder builder(env.getSession());
+    IRFixtureBuilder builder(env.getSessionImpl());
 
     builder.addGlobalParam("unusedParam");
     SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_GlobalParam) == 1);

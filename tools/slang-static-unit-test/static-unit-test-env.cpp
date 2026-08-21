@@ -31,7 +31,7 @@ StaticUnitTestEnv::StaticUnitTestEnv(UnitTestContext* context)
     m_linkage = static_cast<Linkage*>(m_session.get());
 }
 
-Session* StaticUnitTestEnv::getSession() const
+Session* StaticUnitTestEnv::getSessionImpl() const
 {
     return m_linkage->getSessionImpl();
 }
@@ -79,7 +79,7 @@ IRFixtureBuilder::IRFixtureBuilder(Session* session)
 {
 }
 
-IRFunc* IRFixtureBuilder::addVoidFunction(const char* name, bool keepAlive)
+IRFunc* IRFixtureBuilder::beginVoidFunction(const char* name)
 {
     m_builder.setInsertInto(m_module.get());
 
@@ -87,16 +87,29 @@ IRFunc* IRFixtureBuilder::addVoidFunction(const char* name, bool keepAlive)
     func->setFullType(m_builder.getFuncType(0, nullptr, m_builder.getVoidType()));
     m_builder.addNameHintDecoration(func, UnownedStringSlice(name));
 
-    // A function needs an entry block with a terminator to be well-formed.
+    // A function needs an entry block with a terminator to be well-formed. The block
+    // is opened here and terminated by `endVoidFunction`, so a caller can emit a body
+    // in between.
     m_builder.setInsertInto(func);
     m_builder.emitBlock();
+
+    return func;
+}
+
+void IRFixtureBuilder::endVoidFunction(IRFunc* func, bool keepAlive)
+{
     m_builder.emitReturn();
 
     if (keepAlive)
     {
         m_builder.addKeepAliveDecoration(func);
     }
+}
 
+IRFunc* IRFixtureBuilder::addVoidFunction(const char* name, bool keepAlive)
+{
+    IRFunc* func = beginVoidFunction(name);
+    endVoidFunction(func, keepAlive);
     return func;
 }
 
@@ -113,22 +126,9 @@ IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAliv
     SLANG_RELEASE_ASSERT(calleeType->getParamCount() == 0);
     SLANG_RELEASE_ASSERT(calleeType->getResultType()->getOp() == kIROp_VoidType);
 
-    m_builder.setInsertInto(m_module.get());
-
-    IRFunc* func = m_builder.createFunc();
-    func->setFullType(m_builder.getFuncType(0, nullptr, m_builder.getVoidType()));
-    m_builder.addNameHintDecoration(func, UnownedStringSlice(name));
-
-    m_builder.setInsertInto(func);
-    m_builder.emitBlock();
+    IRFunc* func = beginVoidFunction(name);
     m_builder.emitCallInst(m_builder.getVoidType(), callee, 0, nullptr);
-    m_builder.emitReturn();
-
-    if (keepAlive)
-    {
-        m_builder.addKeepAliveDecoration(func);
-    }
-
+    endVoidFunction(func, keepAlive);
     return func;
 }
 
