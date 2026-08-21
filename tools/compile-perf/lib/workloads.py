@@ -729,6 +729,14 @@ def gen_vector_ops(n):
     instantiations. That makes it a usable signal for changes to those
     operators.
 
+    The body cycles through six operator families, so that the workload stays a
+    signal for the whole surface rather than one corner of it. In `i % 6` order:
+    float4 arithmetic, float3 arithmetic with a divide, int4 bitwise and shift,
+    float4 comparison with `select`, float3 comparison with `select`, and int4
+    modulo. The prelude defines binary, comparison and unary operators
+    separately and per element type, so exercising only one family would leave
+    most of it unmeasured.
+
     Scaling null: n scales operator instantiations and the emitted output is
     O(n); ideal cost is O(n).
     """
@@ -754,6 +762,10 @@ def gen_vector_ops(n):
         elif k == 4:
             s.append(f"    bool3 n{i} = c >= d;\n    c = select(n{i}, c, d);\n")
         else:
+            # The addend varies the divisor per iteration so the modulo is not a
+            # repeated identical expression. Nothing here is executed -- this is
+            # compile-only -- so it is not a divide-by-zero guard; it exists to
+            # keep each instantiation distinct rather than CSE-able.
             s.append(f"    iacc = iacc % (ib + int4({i % 7 + 1}));\n")
     s.append("    outBuf[tid.x] = acc.x + c.x + float(iacc.x);\n}\n")
     return {"vector_ops.slang": "".join(s)}
