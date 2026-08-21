@@ -1,10 +1,25 @@
 name: Check GitHub Actions Workflows
 
+# actionlint is invoked bare below, so it discovers and lints exactly
+# .github/workflows/*.yml, using .github/actionlint.yaml as its config. Its
+# verdict therefore cannot be changed by a PR that touches nothing else, so the
+# pull_request paths: filter below keeps it off the majority of PRs, freeing a
+# GitHub-hosted runner slot against the org's concurrency cap.
+#
+# There is deliberately no merge_group trigger: this check is not a required
+# status check, so a failure in the queue would not block the merge, and the run
+# would be discarded with the temporary gh-readonly-queue branch. Its result is
+# also per-file -- a PR merging ahead in the queue cannot change it -- so the
+# re-run would add nothing. If this ever becomes a required check, it needs the
+# merge_group trigger back AND the paths: filter replaced by an in-job early-out
+# (see ci.yml's filter job), because a path-skipped required check never reports
+# and blocks the PR forever.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-  merge_group:
-    types: [checks_requested]
+    paths:
+      - ".github/workflows/**"
+      - ".github/actionlint.yaml"
   workflow_dispatch:
 
 permissions:
