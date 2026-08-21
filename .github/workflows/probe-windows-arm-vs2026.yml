@@ -1,12 +1,42 @@
 name: Probe - windows-11-vs2026-arm image availability
 
-# No-op capability probe for GitHub's upcoming windows-11-arm image
-# migration to Visual Studio 2026 (rollout 2026-09-21 through
-# 2026-09-30). This is Phase 1 of validating native (non-cross-compiled)
-# Windows-on-ARM builds: before investing in an actual build+test job, we
-# confirm the windows-11-vs2026-arm hosted label is dispatchable and
-# report basic host/toolchain identity. A real build/test trial follows
-# once this is proven to work.
+# Capability probe for GitHub's upcoming windows-11-arm image migration
+# to Visual Studio 2026 (rollout 2026-09-21 through 2026-09-30). We
+# currently only cross-compile Windows aarch64 (windows-latest x64 host
+# + amd64_arm64 arch) and never execute the resulting binaries in CI —
+# see PR #12641. This workflow validates a genuinely native
+# (non-cross-compiled) build+run path on windows-11-vs2026-arm directly,
+# so we land on the toolchain that will be the default before the
+# migration completes rather than testing against the outgoing VS2022
+# image.
+#
+# NOTE: common-setup's "Set up MSVC dev tools on Windows" step runs
+# ilammy/msvc-dev-cmd with no arch input. A first run of this workflow
+# (see run 32397832471) showed that default resolves to HostX64\x64 —
+# the x64-hosted, x64-target compiler running under Windows' x64-on-arm64
+# emulation — regardless of the actual host architecture, not a native
+# arm64 toolchain. This workflow therefore bypasses common-setup's MSVC
+# step and calls ilammy/msvc-dev-cmd directly with arch: arm64 to force
+# the native arm64-hosted, arm64-target compiler.
+#
+# slang-test's CPU-backend smoke test initially crashed silently on this
+# native toolchain (exit code 1, empty stdout/stderr): the downstream
+# cl.exe/link.exe used to compile CPU-target test code was still being
+# resolved as x64 via WinVisualStudioUtil::calcExecuteCompilerArgs, which
+# selected the vcvarsall.bat architecture purely from SLANG_PTR_IS_32/64
+# and so always chose "x86_amd64" on any 64-bit host. Fixed in
+# slang-win-visual-studio-util.cpp by checking SLANG_PROCESSOR_ARM_64
+# first (see PR #12657 discussion, run 32448295786 confirming the fix).
+#
+# The slang-llvm build steps below are a follow-up spike for issue
+# #12675: slang-llvm is not built for windows/aarch64 anywhere in the
+# release pipeline today. No prebuilt LLVM exists in the GCS cache
+# (gs://slang-ci-cache) for the windows-aarch64 platform key, so
+# setup-llvm-from-gcs always falls through to building LLVM from source
+# via external/build-llvm.sh (typically 20-40 minutes on other
+# platforms). This workflow does not write to that cache: upload in
+# setup-llvm-from-gcs is gated on github.ref == master pushes, which a
+# workflow_dispatch on a feature branch never satisfies.
 
 on:
   workflow_dispatch:
@@ -21,30 +51,137 @@ permissions:
 jobs:
   probe:
     runs-on: windows-11-vs2026-arm
-    timeout-minutes: 10
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
     steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+
       - name: Report host identity
         shell: pwsh
         run: |
           echo "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
           [System.Environment]::OSVersion.VersionString
           Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture
-          cmake --version
 
-      # cl.exe is not on PATH by default on GitHub-hosted Windows runners;
-      # the Visual Studio dev environment must be initialized first (see
-      # https://github.com/actions/runner-images/blob/main/images/windows/Windows11-VS2026-Arm64-Readme.md).
-      # -HostArch arm64 requests the native arm64-on-arm64 toolchain rather
-      # than the amd64-hosted cross-compiler, matching the native-build goal
-      # this probe exists to validate.
-      - name: Initialize VS dev shell and report cl.exe
+      - name: Add bash to PATH
         shell: pwsh
         run: |
-          $vsDevShell = & "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe" `
-            -latest -prerelease -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
-            -find "Common7\Tools\Launch-VsDevShell.ps1"
-          & $vsDevShell -Arch arm64 -HostArch arm64
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
-          $cl = Get-Command cl.exe -ErrorAction Stop
-          Write-Host "cl.exe resolved at: $($cl.Source)"
-          cl.exe /Bv
+      - name: Set up native arm64 MSVC dev tools
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        # See FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 note in common-setup/action.yml —
+        # this restates that same forced-Node24 workaround for the deprecated
+        # Node 20 bundle.
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          arch: arm64
+
+      - name: Install Ninja
+        run: choco install ninja
+
+      - name: Report resolved cl.exe and cmake
+        run: |
+          where cl.exe
+          cl.exe 2>&1 | head -5 || true
+          cmake --version
+          ninja --version
+
+      - name: Configure CMake (default preset, native arm64)
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_USE_SCCACHE=OFF \
+            -DSLANG_ENABLE_CUDA=0
+
+      - name: Build slangc
+        run: cmake --build build --config Debug --target slangc
+
+      - name: Smoke test slangc
+        run: |
+          bin_dir=$(pwd)/build/Debug/bin
+          if [[ ! -f "$bin_dir/slangc.exe" ]]; then
+            echo "ERROR: expected slangc.exe at $bin_dir"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+          "$bin_dir/slangc.exe" -v
+
+      - name: Build slang-test
+        run: cmake --build build --config Debug --target slang-test
+
+      - name: Smoke test via slang-test (CPU target)
+        run: |
+          bin_dir=$(pwd)/build/Debug/bin
+          export PATH="$bin_dir:$PATH"
+          "$bin_dir/slang-test.exe" tests/language-feature/lambda/lambda-0.slang
+
+      - name: Setup LLVM (build from source, no windows-aarch64 GCS cache exists yet)
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: windows
+          compiler: cl
+          platform: aarch64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
+      - name: Report LLVM install layout
+        run: |
+          ls -la "${LLVM_DIR}"
+          find "${LLVM_DIR}" -iname "ClangConfig.cmake" -o -iname "LLVMConfig.cmake"
+
+      - name: Reconfigure CMake with USE_SYSTEM_LLVM
+        run: |
+          cmake --fresh -B build \
+            --preset default \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_USE_SCCACHE=OFF \
+            -DSLANG_ENABLE_CUDA=0 \
+            -DLLVM_DIR="${LLVM_DIR}/lib/cmake/llvm" \
+            -DClang_DIR="${Clang_DIR}/lib/cmake/clang"
+
+      - name: Build slang-llvm
+        run: cmake --build build --config Debug --target slang-llvm
+
+      - name: Smoke test slang-llvm presence
+        run: |
+          bin_dir=$(pwd)/build/Debug/bin
+          lib_dir=$(pwd)/build/Debug/lib
+          if [[ ! -f "$bin_dir/slang-llvm.dll" && ! -f "$lib_dir/slang-llvm.dll" ]]; then
+            echo "ERROR: expected slang-llvm.dll in $bin_dir or $lib_dir"
+            ls -la "$bin_dir" || true
+            ls -la "$lib_dir" || true
+            exit 1
+          fi
+          echo "slang-llvm.dll built successfully"
+
+      - name: Rebuild slangc and slang-test against slang-llvm
+        run: |
+          cmake --build build --config Debug --target slangc
+          cmake --build build --config Debug --target slang-test
+
+      - name: Smoke test slangc -v (with slang-llvm)
+        run: |
+          bin_dir=$(pwd)/build/Debug/bin
+          "$bin_dir/slangc.exe" -v
+
+      # -emit-cpu-via-llvm routes CPU/host-callable codegen through the
+      # slang-llvm backend specifically (see
+      # _extractReflectionTestRequirements in slang-test-main.cpp, which
+      # tags any test using this flag as depending on SLANG_PASS_THROUGH_LLVM
+      # and skips it if slang-llvm isn't available) — unlike the plain
+      # -cpu target smoke-tested above, which goes through the
+      # downstream-cl.exe execution path, not slang-llvm's JIT.
+      - name: Smoke test via slang-test (slang-llvm JIT backend)
+        run: |
+          bin_dir=$(pwd)/build/Debug/bin
+          export PATH="$bin_dir:$PATH"
+          "$bin_dir/slang-test.exe" tests/llvm/printf.slang
