@@ -8,7 +8,7 @@
 //TEST:SIMPLE(filecheck=CUDA):-target cuda -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CPP):-target cpp -stage compute -entry computeMain
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 // --- Byte-compatible on every target: 16 bytes, all 4-byte float leaves, densely
@@ -131,6 +131,182 @@ IMatrix makeMatrix(int id)
     }
 }
 
+// Reject: a non-word scalar leaf. `HasBool` is boxed at its exact layout size, so only
+// the leaf kind fails the fast path — `bool` is normalized, not a verbatim word.
+
+[anyValueSize(12)]
+interface IScalarLeaf
+{
+    int measure();
+}
+
+struct HasBool : IScalarLeaf
+{
+    float a;
+    bool flag;
+    float c;
+    int measure() { return int(a) + (flag ? 100 : 0) + int(c); }
+}
+
+struct HasBoolAlt : IScalarLeaf
+{
+    bool flag;
+    float a;
+    float b;
+    int measure() { return (flag ? 10 : 0) + int(a) + int(b); }
+}
+
+IScalarLeaf makeScalarLeaf(int id)
+{
+    if (id == 0)
+    {
+        HasBool h;
+        h.a = 1;
+        h.flag = true;
+        h.c = 3;
+        return h;
+    }
+    else
+    {
+        HasBoolAlt h;
+        h.flag = true;
+        h.a = 2;
+        h.b = 4;
+        return h;
+    }
+}
+
+// Correctness coverage of the field-wise 64-bit split/reassembly path. Both 32-bit halves
+// of `big` are nonzero and both observed in `measure()`, so dropping either word fails.
+
+[anyValueSize(16)]
+interface IWideScalar
+{
+    int measure();
+}
+
+struct HasI64 : IWideScalar
+{
+    int64_t big;
+    float pad;
+    int measure() { return int(big) + int(big >> 32) + int(pad); }
+}
+
+struct HasI64Alt : IWideScalar
+{
+    float pad;
+    int64_t big;
+    int measure() { return int(big) + int(big >> 32) + int(pad); }
+}
+
+IWideScalar makeWideScalar(int id)
+{
+    if (id == 0)
+    {
+        HasI64 h;
+        h.big = (7LL << 32) + 5LL;
+        h.pad = 3;
+        return h;
+    }
+    else
+    {
+        HasI64Alt h;
+        h.big = (2LL << 32) + 9LL;
+        h.pad = 1;
+        return h;
+    }
+}
+
+// Reject: a transitively-empty aggregate. Without the guard the whole-object bit-cast
+// hits a value `legalizeEmptyTypes` split into a non-simple tuple and aborts, so a
+// regression fails the compile rather than only missing the -NOT.
+
+struct Empty
+{
+}
+
+[anyValueSize(8)]
+interface IEmpty
+{
+    int measure();
+}
+
+struct HasEmpty : IEmpty
+{
+    float a;
+    Empty e;
+    float b;
+    int measure() { return int(a) + int(b); }
+}
+
+struct HasEmpty2 : IEmpty
+{
+    Empty e;
+    float x;
+    float y;
+    int measure() { return int(x) + int(y); }
+}
+
+IEmpty makeEmpty(int id)
+{
+    if (id == 0)
+    {
+        HasEmpty h;
+        h.a = 3;
+        h.b = 4;
+        return h;
+    }
+    else
+    {
+        HasEmpty2 h;
+        h.x = 5;
+        h.y = 6;
+        return h;
+    }
+}
+
+// Reject: an inexact fit. `InexactSmall` (4 bytes) is smaller than its 12-byte box, so a
+// bulk copy would leave the high payload words the field-wise path zero-inits undefined.
+// `InexactBig` (12 bytes) fits exactly and fast-paths, as a positive control.
+
+[anyValueSize(12)]
+interface IInexact
+{
+    int measure();
+}
+
+struct InexactBig : IInexact
+{
+    float a;
+    float b;
+    float c;
+    int measure() { return int(a) + int(b) + int(c); }
+}
+
+struct InexactSmall : IInexact
+{
+    float a;
+    int measure() { return int(a); }
+}
+
+IInexact makeInexact(int id)
+{
+    if (id == 0)
+    {
+        InexactBig s;
+        s.a = 2;
+        s.b = 3;
+        s.c = 4;
+        return s;
+    }
+    else
+    {
+        InexactSmall s;
+        s.a = 13;
+        return s;
+    }
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
@@ -153,6 +329,39 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     IMatrix d = makeMatrix(1);
     outputBuffer[4] = d.measure();
     // CHECK: 7
+
+    // Reject-path conformers: correctness must survive the field-wise round-trip.
+    IScalarLeaf e = makeScalarLeaf(0);
+    outputBuffer[5] = e.measure();
+    // CHECK: 104
+
+    IScalarLeaf f = makeScalarLeaf(1);
+    outputBuffer[6] = f.measure();
+    // CHECK: 16
+
+    IWideScalar ws0 = makeWideScalar(0);
+    outputBuffer[7] = ws0.measure();
+    // CHECK: 15
+
+    IWideScalar ws1 = makeWideScalar(1);
+    outputBuffer[8] = ws1.measure();
+    // CHECK: 12
+
+    IEmpty g = makeEmpty(0);
+    outputBuffer[9] = g.measure();
+    // CHECK: 7
+
+    IEmpty h = makeEmpty(1);
+    outputBuffer[10] = h.measure();
+    // CHECK: 11
+
+    IInexact i = makeInexact(0);
+    outputBuffer[11] = i.measure();
+    // CHECK: 9
+
+    IInexact j = makeInexact(1);
+    outputBuffer[12] = j.measure();
+    // CHECK: 13
 }
 
 // Each check is anchored to a specific pack/unpack function via CHECK-LABEL so the
@@ -225,3 +434,85 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CPP-NOT: slang_bit_cast<AnyValue24>
 // CPP-LABEL: unpackAnyValue24_1(AnyValue24
 // CPP-NOT: slang_bit_cast<MatB_0>
+
+// The generated function-name suffix (`_i`) depends on marshalling-function emission
+// order, so the labels below match it with a `{{[0-9]+}}` regex and bind each function
+// by its concrete parameter/return type instead, so an unrelated conformer added later
+// cannot shift a suffix and cause a false failure.
+
+// IScalarLeaf (bool leaf, above): the -NOT targets only the whole-object cast; the
+// field-wise bodies still contain per-leaf `slang_bit_cast<uint>`, which is the safe path.
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasBool_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: HasBool_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<HasBool_0>
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasBoolAlt_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: HasBoolAlt_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<HasBoolAlt_0>
+
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasBool_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: HasBool_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<HasBool_0>
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasBoolAlt_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: HasBoolAlt_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<HasBoolAlt_0>
+
+// IWideScalar (int64 leaf, above): the split path must stay field-wise.
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasI64_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: HasI64_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<HasI64_0>
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasI64Alt_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: HasI64Alt_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<HasI64Alt_0>
+
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasI64_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: HasI64_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<HasI64_0>
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasI64Alt_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: HasI64Alt_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<HasI64Alt_0>
+
+// IEmpty (empty-aggregate leaf, above): pack/unpack must stay field-wise.
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: HasEmpty_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<HasEmpty_0>
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty2_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: HasEmpty2_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<HasEmpty2_0>
+
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: HasEmpty_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<HasEmpty_0>
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(HasEmpty2_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: HasEmpty2_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<HasEmpty2_0>
+
+// IInexact (above): InexactBig fits and fast-paths (control); InexactSmall must not.
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(InexactBig_0
+// CUDA: slang_bit_cast<AnyValue
+// CUDA-LABEL: InexactBig_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA: slang_bit_cast<InexactBig_0>
+// CUDA-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(InexactSmall_0
+// CUDA-NOT: slang_bit_cast<AnyValue
+// CUDA-LABEL: InexactSmall_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CUDA-NOT: slang_bit_cast<InexactSmall_0>
+
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(InexactBig_0
+// CPP: slang_bit_cast<AnyValue
+// CPP-LABEL: InexactBig_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP: slang_bit_cast<InexactBig_0>
+// CPP-LABEL: packAnyValue{{[0-9]+}}_{{[0-9]+}}(InexactSmall_0
+// CPP-NOT: slang_bit_cast<AnyValue
+// CPP-LABEL: InexactSmall_0 unpackAnyValue{{[0-9]+}}_{{[0-9]+}}(AnyValue
+// CPP-NOT: slang_bit_cast<InexactSmall_0>
