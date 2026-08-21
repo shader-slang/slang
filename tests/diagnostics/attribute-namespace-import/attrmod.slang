@@ -10,4 +10,12 @@ namespace shared_ns
     {
         int iParam;
     };
+
+    // A second attribute whose name is also defined in the importing module's fragment of this
+    // namespace, so a qualified reference to it is ambiguous.
+    [__AttributeUsage(_AttributeTargets.Function)]
+    public struct AmbiguousAttribute
+    {
+        int iParam;
+    };
 }
