@@ -2304,6 +2304,10 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Unconditional (unlike `checkUnsupportedInst` below): rejecting an
+    // un-lowerable texture atomic must not depend on the optimization level.
+    SLANG_PASS(checkUnsupportedTextureAtomic, targetRequest, sink);
+
     // Legalize constant buffer loads.
     switch (target)
     {

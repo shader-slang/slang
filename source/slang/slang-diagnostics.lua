@@ -5359,6 +5359,13 @@ err(
 )
 
 err(
+    "atomic-on-texture-not-supported-on-target",
+    41405,
+    "atomic operation on a texture is not supported on this target",
+    span { loc = "location", message = "atomic operations on a texture are not supported for target '~target:CodeGenTarget'." }
+)
+
+err(
     "invalid-atomic-destination-pointer",
     41403,
     "invalid atomic destination",

@@ -147,6 +147,16 @@ static bool instReferencesStringType(IRInst* inst)
     return false;
 }
 
+// An `IRImageSubscript` at the root of the atomic's pointer is the canonical
+// representation of an atomic on `RWTexture[coord]`.
+static bool isAtomicOnTextureTexel(IRInst* inst)
+{
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (!atomic)
+        return false;
+    return as<IRImageSubscript>(getRootAddr(atomic->getPtr())) != nullptr;
+}
+
 void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
 {
     // Khronos targets (SPIR-V and GLSL) and WGSL cannot place an
@@ -259,6 +269,49 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                     checkUnsupportedInst(target, innerFunc, sink);
                 break;
             }
+        default:
+            break;
+        }
+    }
+}
+
+static void checkUnsupportedTextureAtomic(TargetRequest* target, IRFunc* func, DiagnosticSink* sink)
+{
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (isAtomicOnTextureTexel(inst))
+            {
+                auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+                sink->diagnose(Diagnostics::AtomicOnTextureNotSupportedOnTarget{
+                    .target = target->getTarget(),
+                    .location = loc});
+            }
+        }
+    }
+}
+
+// CUDA/PTX has no surface-atomic intrinsic, so an atomic on a texture texel
+// would emit an `atomicAdd` on an opaque `CUsurfObject`. Kept out of
+// `checkUnsupportedInst` and scheduled unconditionally so it still runs under
+// `-minimum-slang-optimization`.
+void checkUnsupportedTextureAtomic(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    if (!isCUDATarget(target))
+        return;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        switch (globalInst->getOp())
+        {
+        case kIROp_Func:
+            checkUnsupportedTextureAtomic(target, as<IRFunc>(globalInst), sink);
+            break;
+        case kIROp_Generic:
+            if (auto innerFunc = as<IRFunc>(findGenericReturnVal(as<IRGeneric>(globalInst))))
+                checkUnsupportedTextureAtomic(target, innerFunc, sink);
+            break;
         default:
             break;
         }

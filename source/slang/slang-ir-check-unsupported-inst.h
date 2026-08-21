@@ -7,4 +7,6 @@ class DiagnosticSink;
 class TargetRequest;
 
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
+
+void checkUnsupportedTextureAtomic(IRModule* module, TargetRequest* target, DiagnosticSink* sink);
 } // namespace Slang
