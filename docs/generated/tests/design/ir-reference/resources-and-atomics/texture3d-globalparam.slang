@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T09:40:00+00:00
-//META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#shader-io
-//META: doc_section_digest=8ae4aee9e798a45d3d949726815fc6daf4a5c5bd25c7402ac42fe2646d68088c
+//META: doc_section_digest=212a9e3fd4ca324be91b034872f2b7a9afdb1fe8ac5acfc9f068664d69c3e326
 //META: purpose=A module-scope `Texture3D` parameter surfaces as a `global_param` whose result type is `TextureType(..., TextureShape3DType, ...)`.
 //META: intent=expansion
 //META: pipeline_stage=lower

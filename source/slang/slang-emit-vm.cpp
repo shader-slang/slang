@@ -173,7 +173,11 @@ public:
 
     VMOperand addConstantValue(IRConstant* inst)
     {
-        VMOperand operand;
+        // Zero-initialize for the same reason ensureInst does: the VoidLit and PtrLit
+        // arms below never call setType, so without this their operand would carry an
+        // indeterminate `type` (and `padding`) that writeInst copies byte-for-byte
+        // into the code buffer. Zeroing makes the unset `type` a well-defined General.
+        VMOperand operand = {};
         operand.sectionId = kSlangByteCodeSectionConstants;
 
         // Align constantSection.
@@ -184,6 +188,13 @@ public:
             &sizeAlignment);
         alignConstSection(sizeAlignment.alignment);
 
+        // Reserve-then-fill contract: offset and size are recorded here, before the
+        // switch. Every arm that falls through to the shared `return operand` below must
+        // then append exactly `operand.size` bytes to constantSection. (StringLit is the
+        // exception: it returns early with a separate strings-section operand and does not
+        // use this reservation.) An arm that under-fills leaves the reserved slot unbacked,
+        // which is the #11375/#11402 bug: the next constant overlaps this one, and a
+        // trailing under-filled constant reads past the section end at run time.
         operand.offset = (uint32_t)byteCodeBuilder.constantSection.getCount();
         operand.size = sizeAlignment.size;
 
@@ -235,8 +246,36 @@ public:
                 byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeof(value));
                 break;
             }
+        case kIROp_BoolLit:
+            {
+                // Widen to int64_t and append the low `sizeAlignment.size` bytes. This is
+                // correct only on a little-endian host, where the 0/1 value lives in the
+                // low bytes regardless of the width the type-layout pass picks for bool,
+                // and only while that width does not exceed sizeof(int64_t) (asserted).
+                SLANG_ASSERT(sizeAlignment.size <= (IRIntegerValue)sizeof(int64_t));
+                int64_t value = static_cast<IRBoolLit*>(inst)->getValue() ? 1 : 0;
+                byteCodeBuilder.constantSection.addRange((uint8_t*)&value, sizeAlignment.size);
+                // OperandDataType has no boolean tag. Bool is laid out in 4 bytes, so tagging
+                // it Int32 would make the disassembler render it as an integer (`i32(...)`);
+                // General keeps it an untyped `const:` rather than mislabeling it.
+                operand.setType(OperandDataType::General);
+                break;
+            }
         case kIROp_VoidLit:
+            // A void constant is zero bytes wide, so the reserved slot is already the
+            // right (empty) size and there is nothing to append.
             break;
+        default:
+            {
+                // The only IRConstant op (the `Constant` block in slang-ir-insts.lua) not
+                // handled above is BlobLit, which VM emission does not support. This is a
+                // live guard, not just future-proofing: rather than reserve a slot and
+                // leave it unbacked (the #11375 bug), fail loudly at emit time. Name the
+                // op so a future unsupported constant is identified in the report.
+                StringBuilder sb;
+                sb << "unhandled IRConstant op in VM emitter: " << getIROpInfo(inst->getOp()).name;
+                SLANG_UNEXPECTED(sb.getBuffer());
+            }
         }
         return operand;
     }
@@ -655,17 +694,29 @@ public:
             break;
         case kIROp_Store:
             {
+                auto storeInst = as<IRStore>(inst);
+                IRBuilder builder(inst);
+
+                // A HostVM store must have a typed destination. NativePtr/ComPtr are opaque handle
+                // values and RawPointer is untyped, so none is a valid store destination here.
+                auto pointeeType =
+                    tryGetPointedToType(&builder, storeInst->getPtr()->getDataType());
+                SLANG_RELEASE_ASSERT(pointeeType);
+
+                // Use the destination type to determine how many bytes the store writes. For
+                // example, StringType has no configured HostVM size, but a NativeString field is
+                // pointer-sized.
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
                     codeGenContext->getTargetReq(),
-                    inst->getOperand(1)->getDataType(),
+                    pointeeType,
                     &sizeAlignment);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
                     (uint32_t)sizeAlignment.getStride(),
-                    ensureInst(inst->getOperand(0)),
-                    ensureInst(inst->getOperand(1)));
+                    ensureInst(storeInst->getPtr()),
+                    ensureInst(storeInst->getVal()));
             }
             break;
         case kIROp_Add:

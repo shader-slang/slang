@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T08:00:00Z
-//META: source_commit=2964da04de136705348240f2bd9affa5f3818226
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=source/slang/slang-diagnostics.lua
-//META: doc_section_digest=0000000000000000000000000000000000000000000000000000000000000000
+//META: doc_section_digest=cdd3835077699bfa9a49945707eb4f75bf3d9fa21ba0fc08d49f08349414f217
 //META: purpose=Fires diagnostic E41402 (static-assertion-condition-not-constant) - static assertion condition not compile-time constant
 //META: intent=negative
 //META: pipeline_stage=emit
@@ -21,4 +21,4 @@ void main(uniform bool b) {
     static_assert(b, "needs constant");
 }
 
-// CHECK: E41402
+//CHECK: E41402

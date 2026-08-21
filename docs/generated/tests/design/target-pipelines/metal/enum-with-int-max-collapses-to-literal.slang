@@ -1,17 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T18:00:00Z
-//META: source_commit=781ed4aac159d764c5350d082058d68d4f91b785
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/metal.md#phase-a-link-and-entry-point-prep
-//META: doc_section_digest=b2ff965a1c32917299c5e0ef14afe738fe74346646f6a636a4ebd2b31af21501
-//META: purpose=Boundary: an enum whose enumerator value is signed `int` MAX (2147483647) collapses through `lowerEnumType` to the integer literal in Metal text — the enumerator name (`MaxVal`) does not survive.
+//META: doc_section_digest=a070776046b78ae88c4449b095d1d0e5fe4aab3b00228002fc1b2b19d4bdde8d
+//META: purpose=Boundary: an enumerator whose value is signed `int` MAX (2147483647) collapses through `lowerEnumType` to that decimal literal in the Metal text.
 //META: intent=boundary
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary axis: enum at the signed-int MAX edge.
-// `lowerEnumType` (Phase A) rewrites `E.MaxVal` to `int(2147483647)`
-// directly in the emitted Metal text.
+// Probes `lowerEnumType` at the signed-int MAX edge: the enumerator value
+// is the largest representable `int`, so any truncation or re-widening in
+// the lowering would change the emitted number. The kernel adds the
+// enumerator to a dispatch-derived value (so constant folding cannot drop
+// it) and CHECK asserts the exact decimal `2147483647` reaches the MSL
+// while the `MaxVal` name does not.
 
 //TEST:SIMPLE(filecheck=CHECK):-target metal -entry main -stage compute
 

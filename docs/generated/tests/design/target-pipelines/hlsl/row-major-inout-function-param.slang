@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T20:31:07+00:00
-//META: source_commit=019ec0e5ddac1c14fbad141a3f03d50cf8a5e022
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/hlsl.md#wrapstructuredbuffersofmatrices
-//META: doc_section_digest=68e6f8fe2ef26c5eb509b197e00cfd6b92f20ff7baca61aabbd1d7d712edf820
+//META: doc_section_digest=8041b8729de3f94a856ac55d2d8461ddffd491518349fcd47c2422a784e25a3a
 //META: purpose=Boundary: a function parameter typed `inout row_major float4x4` carries the row_major qualifier through to the emitted HLSL function signature.
 //META: intent=boundary
 //META: pipeline_stage=emit

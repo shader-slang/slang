@@ -110,10 +110,26 @@ public:
         Error,   ///< In an error state - no further packets can be read
     };
 
+    /// Why the connection entered ReadState::Error.
+    ///
+    /// ReadState answers whether another packet can be read; this answers whether the peer
+    /// disappeared or sent bytes that are not an HTTP-framed packet. Callers must keep those
+    /// cases separate: reconnecting can recover from the former, but retries cannot repair a
+    /// protocol disagreement.
+    enum class ReadError
+    {
+        None,
+        Stream,        ///< Reading from the backing stream failed.
+        InvalidHeader, ///< A complete header arrived but did not parse.
+        UnexpectedEnd, ///< The stream ended partway through a packet.
+    };
+
     /// Update state
     SlangResult update();
     /// Get the current read staet
     ReadState getReadState() const { return m_readState; }
+    /// Get the cause when the current read state is Error.
+    ReadError getReadError() const { return m_readError; }
     /// Get the read header
     const HTTPHeader& getReadHeader() const
     {
@@ -155,12 +171,13 @@ public:
     HTTPPacketConnection(BufferedReadStream* readStream, Stream* writeStream);
 
 protected:
-    SlangResult _updateReadResult(SlangResult res)
+    SlangResult _setReadError(SlangResult res, ReadError error)
     {
         if (SLANG_FAILED(res) && SLANG_SUCCEEDED(m_readResult))
         {
             m_readState = ReadState::Error;
             m_readResult = res;
+            m_readError = error;
         }
         return res;
     }
@@ -172,6 +189,7 @@ protected:
     HTTPHeader m_readHeader;
 
     ReadState m_readState;
+    ReadError m_readError;
 
     RefPtr<BufferedReadStream> m_readStream;
     RefPtr<Stream> m_writeStream;

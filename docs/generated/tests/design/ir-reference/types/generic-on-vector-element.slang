@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T13:50:00+00:00
-//META: source_commit=1e0d460c1cb410005c4f775ba11fbc803cc8c16d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/types.md#spir-v-literals-and-kinds
-//META: doc_section_digest=17e2a9383b03933bbfbe7aafa284636b66be9843616143d8755f421765182be6
+//META: doc_section_digest=ef66016fdd706005d0d8fa43c10be7a90ee7d5b5099b8b6fab751a3d3d27cc5e
 //META: purpose=Stress: an instantiation of a generic with a Vec type-argument still surfaces the type_t kind on the generic param.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc says `type_t` represents `IRType`-valued operands such
-// as generic arguments. Even when the generic is instantiated at a
-// non-trivial type (`float3` here), the generic-param's kind in
-// the IR dump is `type_t`.
+// an instantiation of a generic with a Vec type-argument still
+// surfaces the type_t kind on the generic param. Even when the generic
+// is instantiated at a non-trivial type (`float3` here), the generic-
+// param's kind in the IR dump is `type_t`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

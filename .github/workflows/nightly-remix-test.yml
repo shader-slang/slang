@@ -66,7 +66,10 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         # msvc-dev-cmd has no Node 24 release yet (upstream ilammy/msvc-dev-cmd#105);
-        # force its node20 runtime onto node24 to clear the deprecation warning.
+        # run its node20 bundle on the node24 runtime. This restates the
+        # deprecation annotation ("forced to run on Node.js 24") rather than
+        # silencing it — the point is to exercise the runtime that survives the
+        # retirement, so a break surfaces now instead of when Node 20 is removed.
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -107,14 +110,32 @@ jobs:
             exit 1
           fi
 
-      # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
+      # Clone dxvk-remix at a pinned commit.
+      #
+      # The pin is load-bearing, not just a reproducibility nicety.
+      # dxvk-remix 673dc2af ("[HdRemix] Use USD without Python") switched
+      # the OpenUSD dependency to the `open_usd` packman package, which is
+      # published only to NVIDIA's internal NVGTL remote. `packman pull`
+      # then fails with "the environment variable 'NVM_GTLAPI_TOKEN' must
+      # be set to use NVGTL", which public CI cannot and should not
+      # satisfy. a6c0b547 is the last commit this workflow ran green
+      # against. See shader-slang/slang#12617.
+      #
+      # To bump: pick a dxvk-remix commit whose packman-external.xml
+      # resolves entirely from the public remotes (cloudfront /
+      # rtx-remix-external), then re-run this workflow to confirm.
       - name: Clone dxvk-remix repository
+        env:
+          DXVK_REMIX_COMMIT: a6c0b547306a8d3c97630de58c27635173b12c9a
         run: |
-          echo "Cloning dxvk-remix repository..."
-          git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          echo "Cloning dxvk-remix at $DXVK_REMIX_COMMIT..."
+          git init -q dxvk-remix
           cd dxvk-remix
-          commit=$(git rev-parse HEAD)
-          echo "Using dxvk-remix commit: $commit"
+          git remote add origin https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          git fetch -q --depth 1 origin "$DXVK_REMIX_COMMIT"
+          git checkout -q FETCH_HEAD
+          git submodule update --init --recursive --depth 1
+          echo "Using dxvk-remix commit: $(git rev-parse HEAD)"
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages

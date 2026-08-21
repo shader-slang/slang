@@ -1,37 +1,40 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:32:24+00:00
-//META: source_commit=330c9a8d807b9f9352e4754f466d1244ae681cff
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/differentiation.md#detachderivative
-//META: doc_section_digest=4ef79db8cd0b400370a0c8b9af0f015486f7700806d087a1543bda7c79ef3d9a
-//META: purpose=detach(x) inside a differentiable function lowers to detachDerivative(%x).
+//META: doc_section_digest=01132bdcdbc1c50944722b06abe5d963b03cd1175d44d81a16fc40d947d9c916
+//META: purpose=The core-module detach<T>(T x) intrinsic lowers to a detachDerivative inst whose single operand is the value being detached and whose result type is that value's type.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// `detach(x)` inside a `[ForwardDifferentiable]` body lowers to a
-// `detachDerivative(%x)` IR value whose result type is the operand
-// type and whose semantics return the operand unchanged but block
-// derivative propagation.
+// Verifies the first of the two documented source spellings of the opcode: the
+// `detach<T>` intrinsic. Inside the differentiable function the parameter `%x`
+// is fed to `detach` and the result is multiplied back with `%x`, so the dump
+// keeps both the detached and the undetached use of the same value. CHECK
+// requires the detach line to name `%x` directly as its operand and to carry
+// the operand's own type `Float`, which is the "returns its operand unchanged"
+// half of the claim at IR level.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 uniform float a;
+uniform float d;
 uniform RWStructuredBuffer<float> buf;
 
-[ForwardDifferentiable]
+[Differentiable]
 float f(float x)
 {
-    // detach(x) blocks derivative propagation through the first factor;
-    // the derivative of f comes only through the second `x`.
-    return detach(x) * x;
+    return x * detach(x);
 }
 
 [numthreads(1, 1, 1)]
 void main()
 {
-    buf[0] = __fwd_diff(f)(DifferentialPair<float>(a, 1.0)).d;
+    buf[0] = __fwd_diff(f)(DifferentialPair<float>(a, d)).d;
 }
 
-// CHECK: func %f
-// CHECK: Float{{.*}}= detachDerivative(%x)
+// CHECK: func %f{{.*}}: Func(Float, Float)
+// CHECK: let [[DET:%[A-Za-z0-9_]+]] : Float = detachDerivative(%x)
+// CHECK: = mul(%x, [[DET]])

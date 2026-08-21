@@ -180,6 +180,7 @@ public:
 
     int getTypeBits(IRType* type)
     {
+        type = (IRType*)unwrapAttributedType(type);
         switch (type->getOp())
         {
         case kIROp_BoolType:
@@ -271,6 +272,18 @@ public:
 
         case kIROp_RateQualifiedType:
             llvmType = getValueType(as<IRRateQualifiedType>(type)->getValueType());
+            break;
+
+        case kIROp_AttributedType:
+            // An attribute records a semantic property of the type (`unorm`,
+            // `snorm`, `no_diff`) and never a change to its representation, so
+            // the value is emitted as its base type. A `unorm float` loaded
+            // from a texture or read out of a structured buffer reaches here
+            // with the attribute still attached; every other backend unwraps it
+            // the same way (see the `kIROp_AttributedType` cases in
+            // slang-emit-spirv.cpp, slang-emit-c-like.cpp and
+            // slang-emit-wgsl.cpp).
+            llvmType = getValueType(as<IRAttributedType>(type)->getBaseType());
             break;
 
         case kIROp_PtrType:
@@ -548,6 +561,11 @@ public:
     // Returns true for any type that translates into an aggregate type in LLVM.
     bool isAggregateType(IRType* type)
     {
+        // An attributed type classifies as whatever it wraps -- the attribute is a semantic
+        // marker, so `unorm S` is as much an aggregate as `S`. Unwrapped here rather than at
+        // the six call sites, because one that forgot would put an aggregate on the scalar
+        // load/store/return path and miscompile silently.
+        type = (IRType*)unwrapAttributedType(type);
         switch (type->getOp())
         {
         case kIROp_ArrayType:
@@ -1158,6 +1176,7 @@ struct LLVMEmitter
 
         auto minSize = std::min(dstSizeAlignment.size, srcSizeAlignment.size);
 
+        type = (IRType*)unwrapAttributedType(type);
         switch (type->getOp())
         {
         case kIROp_ArrayType:
@@ -1238,6 +1257,7 @@ struct LLVMEmitter
         bool isVolatile = false)
     {
         IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
+        valType = (IRType*)unwrapAttributedType(valType);
         switch (valType->getOp())
         {
         case kIROp_BoolType:
@@ -1288,6 +1308,7 @@ struct LLVMEmitter
     {
         IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
 
+        valType = (IRType*)unwrapAttributedType(valType);
         switch (valType->getOp())
         {
         case kIROp_BoolType:
@@ -2175,7 +2196,10 @@ struct LLVMEmitter
         case kIROp_GetStringHash:
             {
                 auto getStringHashInst = cast<IRGetStringHash>(inst);
-                auto stringLit = getStringHashInst->getStringLit();
+                // Checked, unlike `getStringLit()`. CPU-like targets skip
+                // `checkGetStringHashInsts` altogether, so this test is the only thing between a
+                // non-literal operand and reading another instruction's storage as string data.
+                auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
                 if (stringLit)
                 {

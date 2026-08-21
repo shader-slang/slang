@@ -1,19 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=4430d3efb9516cd383356961351a223b29ad1c948e7c5ea9bf0a36d832a4b940
-//META: purpose=Boundary - a TEXCOORDn with the index baked into the semantic name (TEXCOORD3) lowers to semantic("TEXCOORD3", -1:Int); the index is fused with the name rather than carried in the second operand.
+//META: doc_section_digest=53ad1d566b89727f915f7a684edad14e039800bbbb1330d913ea0c67195afd17
+//META: purpose=Boundary - a TEXCOORD with a trailing digit (TEXCOORD3) lowers to semantic("TEXCOORD3", -1 : Int); the digit stays fused with the name operand.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Boundary - the doc records semantic with two operands
-// (semanticNameOperand, semanticIndexOperand). When the user
-// writes `TEXCOORD3` the trailing digit becomes part of the name
-// operand and the explicit index operand remains -1; this pins
-// that observed encoding for a non-zero-index semantic.
+// Verifies which of the two `semantic` operands carries an index written in
+// the source. Writing `TEXCOORD3` keeps the digit inside the name string
+// and leaves the index operand at -1, so the CHECK pins both operands
+// together - asserting only the name would not distinguish this encoding
+// from a split `("TEXCOORD", 3)` form.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

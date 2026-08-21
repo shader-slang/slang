@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#inlining-and-optimization
-//META: doc_section_digest=99f72cda245d99360168c24acf24a82fd577e139a911dfa073addcf5493b365a
+//META: doc_section_digest=920c2eb81b315af907f28c1ce483b160e67a9a325de3473075b6cc826161fb7b
 //META: purpose=Two helper functions with opposing inlining hints ([ForceInline] vs [noinline]) each surface their own decoration, independent of the other.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists ForceInline and noInline as two distinct opcodes
-// in the same category. Confirm they coexist on different
-// functions in the same module without interference.
+// Verifies that the inlining decorations are per-function properties rather
+// than a module-wide policy. Two helpers with opposite hints are called
+// from the same entry point and the CHECK-DAG lines assert both decorations
+// coexist, which a shared or last-one-wins representation could not
+// satisfy.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

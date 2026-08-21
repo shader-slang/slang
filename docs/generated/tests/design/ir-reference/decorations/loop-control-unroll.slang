@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=d7cf9915ec0da5de567edb118ec898dd57bb3e7b5414db216254906018825537
-//META: purpose=An [unroll] attribute on a for-loop emits a loopControl decoration on the loop with mode operand 1.
+//META: doc_section_digest=4b61bbe5577fdd277138f6c76e47bb415b4e0d9c6365f3fd1961205026f01739
+//META: purpose=An [unroll] attribute on a for-loop emits a loopControl decoration on the loop with mode operand 0.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Per the doc table for `loopControl`: "Records loop-control mode
-// (unroll, loop, ...)". The mode operand is an IRConstant — the
-// concrete encoding is observable: [unroll] => mode 1 in the
-// current dump, [loop] => mode 0.
+// Verifies the `loopControl` row on the unroll side: the attribute becomes
+// a decoration on the loop inst whose single constant operand records the
+// mode. The CHECK pins the literal 0, which is the value the dump prints
+// for `[unroll]` and which the `[loop]` sibling test distinguishes from 1.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
@@ -27,4 +27,4 @@ void main(uint3 tid : SV_DispatchThreadID)
     buf[0] = s;
 }
 
-// CHECK: [loopControl({{[0-9]+}} : Int)]
+// CHECK: [loopControl(0 : Int)]

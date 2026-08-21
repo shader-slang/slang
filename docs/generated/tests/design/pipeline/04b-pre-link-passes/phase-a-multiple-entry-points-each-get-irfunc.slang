@@ -1,20 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-a-ast-walk-and-ir-emission
-//META: doc_section_digest=e1b449b7fcdd81d8efc3a0ebc0902561859fb0966734d156746b5be25c2fee00
-//META: purpose=Phase A row A6 calls lowerFrontEndEntryPointToIR once per entry point so the entry-point IRFunc skeleton exists before the full declaration walk.
+//META: doc_section_digest=66b9b0ad1e435e5d64e2372e5eedf6745238e43195f17a70dd348156a613b908
+//META: purpose=Phase A iterates lowerFrontEndEntryPointToIR (A6) over every entry point of the translation unit, so a second [shader("compute")] entry also survives to the LOWER-TO-IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Phase A iterates `for entryPoint in translationUnit.entryPoints`
-// (row A6). Compiling with `-entry main` produces the `main` IRFunc.
-// A second `[shader("compute")]` entry point in the same module
-// also gets lowered (so the declaration walk in A7 can reference
-// it); both `func %main` and `func %other` appear in LOWER-TO-IR
-// (the other entry stays alive because it carries `[entryPoint(...)]`).
+// Verifies that A6 is a per-element iteration over the translation unit's
+// entry-point list rather than a single-entry step. The module declares two
+// compute entry points but only `main` is requested on the command line;
+// both `func %other` and `func %main` still appear in the post-Phase-D
+// snapshot, which is only possible if each entry point was lowered.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

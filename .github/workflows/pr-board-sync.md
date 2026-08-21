@@ -109,22 +109,27 @@ merge-queued PRs.
 | Source              | Assignee             | Auto-requested reviewer                                      | Comment |
 | ------------------- | -------------------- | ------------------------------------------------------------ | ------- |
 | **Internal**        | PR author            | none                                                         | none |
-| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot note naming the assignee; may suggest a higher-signal collaborator without `@` |
+| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot automated notice naming the assignee (explicitly: do not reply); may FYI a higher-signal collaborator without `@` |
 
 **Pick order** (Community/Bot assignee / shepherd):
 
-1. Linked-issue assignee who is in the owners team.
-2. Top **committer-signal** owner from changed files.
+1. Linked-issue assignee who is **source-internal for this repository** (member
+   of `source_internal_team`, or of a sibling `source-internal-*` team whose
+   `Scope:` includes this repo — the same criteria used for Source Internal).
+2. Top **committer-signal** owner from changed files (still gated by the owners
+   team: `pr-owners` for Community, `bot-pr-owners` for Bot).
 3. Maintainer team member (or `fallback_assignee`).
 
-The owners allowlist (`pr-owners` for Community, `bot-pr-owners` for Bot) gates
-who may be chosen as shepherd. Auto-request is that shepherd only when they are
-not the PR author, not on the ignored-reviewers list, and no real reviewer is
-already requested. A collaborator with stronger committer signal than the
-auto-requested reviewer (or the top other collaborator when nobody was
-auto-requested) may be named in the assignment comment as a suggested
-additional reviewer, but is never `requestReviewers`'d — so they are not
-notified unless someone follows up.
+Linked-issue inheritance and committer-signal use different allowlists on
+purpose: an Internal person who owns the issue should shepherd the PR even when
+they are not on `pr-owners` / `bot-pr-owners`. Auto-request is that shepherd only
+when they are not the PR author, not on the ignored-reviewers list, and no real
+reviewer is already requested. A collaborator with stronger committer signal than
+the auto-requested reviewer (or the top other collaborator when nobody was
+auto-requested) may be named in the assignment comment as an optional additional
+reviewer for a human to consider, but is never `requestReviewers`'d — so they are
+not notified unless someone follows up. The comment is labeled as an automated
+notice and asks recipients not to reply.
 
 **Community PRs** also co-assign the external author (separate API call, best-effort).
 

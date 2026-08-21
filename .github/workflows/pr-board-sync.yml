@@ -7,10 +7,11 @@ name: PR Board Sync (reusable)
 #   - advances its Status (In Review / Revising / Snagged / Approved / Done)
 #     on the event-driven happy path,
 #   - backfills the assignee + auto-requested reviewer (an Internal PR's author;
-#     otherwise a linked-issue owner, else the top committer-signal owner, else
-#     the maintainer) and auto-requests that shepherd only when they are not the
-#     author / not ignored / no real reviewer already present; a higher-signal
-#     collaborator is suggested in a PR comment (no @), never auto-requested,
+#     otherwise a linked-issue assignee who is source-internal for this repo,
+#     else the top committer-signal owner, else the maintainer) and auto-requests
+#     that shepherd only when they are not the author / not ignored / no real
+#     reviewer already present; a higher-signal collaborator is suggested in a
+#     PR comment (no @), never auto-requested,
 #   - when a PR has an owner, assigns any still-unassigned linked (closing)
 #     issues to that same owner (the PR's primary assignee, not the co-assigned
 #     community author), and
@@ -154,11 +155,11 @@ on:
         type: string
         default: "bmillsNV"
       owners_team:
-        description: "org/team-slug whose members may be inherited as a Community PR's assignee from a linked issue."
+        description: "org/team-slug whose members may be chosen as a Community PR's assignee/reviewer from the committer-signal ranking (not used for linked-issue inheritance; that uses source_internal_team)."
         type: string
         default: "shader-slang/pr-owners"
       bot_owners_team:
-        description: "org/team-slug whose members may be inherited as a Bot PR's assignee from a linked issue."
+        description: "org/team-slug whose members may be chosen as a Bot PR's assignee/reviewer from the committer-signal ranking (not used for linked-issue inheritance; that uses source_internal_team)."
         type: string
         default: "shader-slang/bot-pr-owners"
       maintainer_team:
@@ -911,6 +912,19 @@ jobs:
               return x instanceof Set ? x : new Set(x || []);
             }
 
+            // Case-insensitive membership in a Set/iterable of logins. Matches
+            // isInternalLogin: a null/undefined members set means "unknown" and
+            // yields false (no linked-issue inheritance), while an empty set is
+            // a successful read of a family nobody is on.
+            function _setHasCI(members, login) {
+              if (!login || !members) return false;
+              const lower = login.toLowerCase();
+              for (const m of members) {
+                if ((m || "").toLowerCase() === lower) return true;
+              }
+              return false;
+            }
+
             // Among committersBySignal (highest first), pick the first collaborator
             // who is not the author / shepherd / auto-requested reviewer / bot and
             // who outranks the auto-requested reviewer. committersBySignal must be
@@ -960,7 +974,9 @@ jobs:
             // Body for the one-shot comment posted when a Community/Bot PR is
             // first auto-assigned. Mentions the assignee (already notified by
             // GitHub's assign event) but never @-mentions the suggested
-            // reviewer, so the suggestion does not ping them.
+            // reviewer, so the suggestion does not ping them. Wording is
+            // informational only: clear that the note is automated and that
+            // recipients must not reply (so bot authors do not treat it as a task).
             // autoRequestedReviewer must be the login we actually intend to
             // requestReviewers (or null). autoRequestedHasSignal is true only
             // when that login appears in committersBySignal; otherwise we avoid
@@ -970,29 +986,39 @@ jobs:
               autoRequestedReviewer, autoRequestedHasSignal,
             }) {
               let body =
-                `**PR board sync:** auto-assigned @${assignee} as shepherd ` +
-                `for this ${source} PR.`;
+                `<!-- pr-board-sync-assignment -->\n` +
+                `**Automated notice** (PR board sync) — do not reply to this comment.\n\n` +
+                `Auto-assigned @${assignee} as shepherd for this ${source} PR.`;
               if (suggestedReviewer) {
                 if (autoRequestedReviewer && autoRequestedHasSignal) {
                   body +=
-                    `\n\nCommitter signal on the changed files is higher for ` +
-                    `${suggestedReviewer} than for the auto-requested reviewer ` +
-                    `(${autoRequestedReviewer}) — consider requesting a review ` +
-                    `from them as well. They were not auto-requested.`;
+                    `\n\nFYI for maintainers: committer signal on the changed ` +
+                    `files is higher for ${suggestedReviewer} than for the ` +
+                    `auto-requested reviewer (${autoRequestedReviewer}). They ` +
+                    `were not auto-requested; a human may optionally add them ` +
+                    `as a reviewer.`;
                 } else {
                   // Assignee (and author / auto-requested when present) were
                   // excluded from the pick, so this is highest among remaining
                   // eligible collaborators — not among all collaborators.
                   body +=
-                    `\n\nCommitter signal on the changed files is highest for ` +
-                    `${suggestedReviewer} among collaborators other than the ` +
-                    `assignee — consider requesting a review from them. They ` +
-                    `were not auto-requested.`;
+                    `\n\nFYI for maintainers: committer signal on the changed ` +
+                    `files is highest for ${suggestedReviewer} among ` +
+                    `collaborators other than the assignee. They were not ` +
+                    `auto-requested; a human may optionally add them as a ` +
+                    `reviewer.`;
                 }
               }
               return body;
             }
 
+            // Pick assignee + auto-requested reviewer for a Community/Bot PR.
+            // Priority: (1) linked-issue assignee who is source-internal for this
+            // repo, (2) top committer-signal login in the owners team, (3)
+            // maintainer. `internalMembers` is the repo's effective Internal set
+            // (base source-internal team + scoped siblings); null means the
+            // roster was unreadable and linked-issue inheritance is skipped.
+            // Distinct from `owners`, which still gates committer-signal picks.
             function selectAssigneeAndReviewers(opts) {
               const {
                 issueAssignees = [],
@@ -1003,6 +1029,7 @@ jobs:
                 botAuthors = [],
               } = opts;
               const owners = _toSet(opts.owners);
+              const internalMembers = opts.internalMembers;
               const collaborators = _toSet(opts.collaborators);
               const ignoredLower = new Set([..._toSet(opts.ignoredReviewers)].map((r) => r.toLowerCase()));
               const excluded = (author || "").toLowerCase();
@@ -1010,12 +1037,13 @@ jobs:
               // Linked-issue assignees who are the PR author are skipped here; they
               // can still become shepherd via ownerCommitters if they are on the
               // owners team.
-              const issueOwnerAssignees = issueAssignees.filter(
-                (a) => owners.has(a) && a.toLowerCase() !== excluded && !a.toLowerCase().endsWith("[bot]"));
+              const issueInternalAssignees = issueAssignees.filter(
+                (a) => _setHasCI(internalMembers, a)
+                  && a.toLowerCase() !== excluded && !a.toLowerCase().endsWith("[bot]"));
               const ownerCommitters = committersBySignal.filter((c) => owners.has(c));
 
               let assignee;
-              if (issueOwnerAssignees.length) assignee = issueOwnerAssignees[0];
+              if (issueInternalAssignees.length) assignee = issueInternalAssignees[0];
               else if (ownerCommitters.length) assignee = ownerCommitters[0];
               else assignee = maintainer;
 
@@ -1472,18 +1500,18 @@ jobs:
               }
             }
 
-            // Backfill a PR's assignee + reviewers (issue-owner -> committer-signal
-            // owner -> maintainer). For Community/Bot: auto-request the shepherd
-            // only when they are not the PR author, not ignored, and no real
-            // reviewer is already present; a collaborator with stronger committer
-            // signal than that auto-requested reviewer (or the top collaborator
-            // when nobody was auto-requested) is named in a one-shot comment, not
-            // auto-requested. Internal PRs go to the author with no requested
-            // reviewer and no comment. PR assignment is idempotent: only ever
-            // touches an UNASSIGNED PR (so the comment also fires at most once).
-            // Linked-issue assignment is also idempotent: only unassigned issues
-            // are updated, including when the PR was assigned earlier or the
-            // issue was linked later.
+            // Backfill a PR's assignee + reviewers (linked-issue Internal assignee
+            // -> committer-signal owner -> maintainer). For Community/Bot:
+            // auto-request the shepherd only when they are not the PR author, not
+            // ignored, and no real reviewer is already present; a collaborator
+            // with stronger committer signal than that auto-requested reviewer (or
+            // the top collaborator when nobody was auto-requested) is named in a
+            // one-shot comment, not auto-requested. Internal PRs go to the author
+            // with no requested reviewer and no comment. PR assignment is
+            // idempotent: only ever touches an UNASSIGNED PR (so the comment also
+            // fires at most once). Linked-issue assignment is also idempotent:
+            // only unassigned issues are updated, including when the PR was
+            // assigned earlier or the issue was linked later.
             async function postAssignmentComment(number, {
               source, assignee, suggestedReviewer,
               autoRequestedReviewer, autoRequestedHasSignal,
@@ -1525,14 +1553,23 @@ jobs:
                 // Internal: the author drives; assign them, request no reviewers.
                 assignee = info.authorLogin;
               } else {
-                // Community/Bot: full committer-signal selection against the
-                // relevant owners pool, with the maintainer as the final fallback.
+                // Community/Bot: inherit a linked-issue assignee who is
+                // source-internal for this repo; else committer-signal against the
+                // relevant owners pool; maintainer is the final fallback.
                 const ownersTeam =
                   (source === process.env.SOURCE_BOT) ? BOT_OWNERS_TEAM : OWNERS_TEAM;
-                const [owners, collaborators, maintainer] = await Promise.all([
+                const [owners, collaborators, maintainer, internalMembers] = await Promise.all([
                   listTeamMembers(ownersTeam),
                   repoCollaborators(),
                   resolveMaintainer(),
+                  loadSourceInternalIndex({
+                    teamSpec: SOURCE_INTERNAL_TEAM,
+                    listOrgTeams,
+                    tryListTeamMembers,
+                    warnOnce,
+                    parseTeamScopeRepos,
+                    isSourceInternalFamilySlug,
+                  }).then((family) => internalMembersForRepo(context.repo.repo, family)),
                 ]);
                 const ranking = await computeCommitterRanking(
                   ghAdapter, `${context.repo.owner}/${context.repo.repo}`, info.authorLogin, {
@@ -1553,6 +1590,7 @@ jobs:
                     issueAssignees: info.issueAssignees,
                     committersBySignal: ranking,
                     owners,
+                    internalMembers,
                     collaborators,
                     author: info.authorLogin,
                     maintainer,

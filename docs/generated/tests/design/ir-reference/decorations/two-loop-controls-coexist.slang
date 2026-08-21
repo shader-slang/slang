@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#loop-and-branch-hints
-//META: doc_section_digest=d7cf9915ec0da5de567edb118ec898dd57bb3e7b5414db216254906018825537
-//META: purpose=Two for-loops decorated with different loop-control attributes ([unroll] vs [loop]) each get their own loopControl decoration, demonstrating that two such decorations coexist in the same function.
+//META: doc_section_digest=4b61bbe5577fdd277138f6c76e47bb415b4e0d9c6365f3fd1961205026f01739
+//META: purpose=Two for-loops decorated with different loop-control attributes ([unroll] vs [loop]) each get their own loopControl decoration with the matching mode.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `loopControl` as having a per-loop `modeOperand:
-// IRConstant`. Two adjacent for-loops with distinct attributes
-// should both surface their decorations; the dump records each
-// at the appropriate loop site.
+// Verifies that `loopControl` is attached per loop inst and keeps its own
+// mode. Two adjacent loops in one function use opposite attributes and the
+// CHECK-DAG lines pin both mode integers (0 and 1), so a lowering that
+// attached the first hint to both loops would fail.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

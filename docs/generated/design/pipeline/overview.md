@@ -98,6 +98,21 @@ blocks and branches while ordinary statements emit instructions into
 the current block; expressions become SSA value instructions, with
 block parameters carrying values across control-flow edges.
 
+Block parameters are the IR's phi form. Lowering emits them directly
+where an expression itself forks control flow — `?:` and the
+short-circuiting `&&` / `||` branch into a join block that takes the
+result as a parameter — while an ordinary local variable becomes a
+`var` with stores that the `constructSSA` call at the end of
+`generateIRForTranslationUnit` promotes into the same form; that call
+sits in the mandatory pass block and runs at every optimization level.
+The form does not reach a back-end, though: `eliminatePhis` in
+[slang-emit.cpp](../../../../source/slang/slang-emit.cpp) moves the IR
+back out of SSA form, replacing block parameters with explicit
+temporaries, so an `OpPhi` in emitted SPIR-V is the work of the
+downstream SPIR-V optimizer — which runs only when the optimization
+level is above `None` — and not a block parameter carried through to
+emit.
+
 Driven by:
 
 - [slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
@@ -116,6 +131,20 @@ transformations between lowering and emit. The
 160 `slang-ir-*.cpp` files implementing analyses, validations,
 specializations, legalizations, and target-specific lowerings.
 
+*Target-sensitive* means the pass list itself branches, not merely
+that emit spells one neutral shape differently: whole passes are
+guarded by target predicates inside `linkAndOptimizeIR` — a Khronos
+target routed through GLSL text runs
+`legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL`, the
+direct-SPIR-V path runs a set no other target sees, and the PyTorch
+binding target runs `generatePyTorchCppBinding`. Differences that are
+only a matter of spelling are settled later, in the emitter: one
+`[numthreads(16, 1, 1)]` entry point reaches HLSL as
+`numthreads(16, 1, 1)`, GLSL as `local_size_x = 16, ...`, SPIR-V as
+`OpExecutionMode ... LocalSize 16 1 1`, and WGSL as
+`@workgroup_size(16, 1, 1)`, while Metal and CUDA print no group size
+at all.
+
 Driven by:
 
 - [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) (orchestrator)
@@ -129,7 +158,11 @@ Detail: [05-ir-passes.md](05-ir-passes.md).
 `TargetRequest`. Textual targets go to `emitEntryPointsSourceFromIR`
 ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 2746 at
 `source_commit`), which picks a C-like source emitter — HLSL, GLSL,
-Metal, WGSL, C++, CUDA, or Torch glue. Binary and non-source targets
+Metal, WGSL, C++, CUDA, or Torch glue. Torch glue is the exception in
+that list: the PyTorch binding target generates C++ wrappers only for
+functions marked `[TorchEntryPoint]` (or synthesized from
+`[AutoPyBindCUDA]`), so `-target torch` on an ordinary compute entry
+point has nothing to bind. Binary and non-source targets
 (direct SPIR-V, downstream-compiled DXIL/DXBC/metallib/PTX, LLVM IR /
 native via `slang-llvm`, and VM bytecode) are dispatched separately.
 
@@ -162,7 +195,11 @@ The high-level objects that orchestrate the stages above live in
   `source_commit`) calls `checkTranslationUnit` once per unchecked
   translation unit, adding each checked module to the
   `LoadedModuleDictionary` so that later `import` decls can find it,
-  and finishes with `checkEntryPoints()` before lowering.
+  and finishes with `checkEntryPoints()` before lowering. A unit is
+  registered only once it has been checked, so an `import` resolves
+  against a sibling translation unit of the same request only when
+  that unit precedes it; a unit added afterwards is not visible to
+  it.
 - [slang-end-to-end-request.h](../../../../source/slang/slang-end-to-end-request.h)
   declares `EndToEndCompileRequest`, which is what a single `slangc`
   invocation (or `slang::ICompileRequest`) becomes. Its
