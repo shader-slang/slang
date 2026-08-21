@@ -2218,7 +2218,17 @@ public:
 
     DeclRef<VarDeclBase> tryGetIntOrEnumSpecializationConstant(Expr* expr);
 
-    AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
+    AttributeDecl* lookUpAttributeDecl(
+        Name* attributeName,
+        Scope* scope,
+        List<NameLoc> const& qualifiedNameSegments);
+
+    // Resolve the final segment of a qualified attribute name as an attribute declared directly in
+    // `container` (either a builtin `AttributeDecl` or a user-defined `struct <name>Attribute`).
+    AttributeDecl* lookUpAttributeDeclInContainer(Name* lastSegmentName, ContainerDecl* container);
+
+    // Resolve a `::`-qualified attribute name by walking its namespace/type qualifier segments.
+    AttributeDecl* lookUpQualifiedAttributeDecl(List<NameLoc> const& segments, Scope* scope);
 
     bool hasFloatArgs(Attribute* attr, int numArgs);
     bool hasIntArgs(Attribute* attr, int numArgs);

@@ -160,7 +160,129 @@ static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
     return true;
 }
 
-AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope* scope)
+// Given a `struct` type used as a user-defined attribute (i.e. `struct NameAttribute` marked
+// `[__AttributeUsage(...)]`), return the `AttributeDecl` it defines, or null if `structDecl` is not
+// a valid user-defined attribute type. This is the shared tail of the name-based lookup and the
+// namespace-scoped fallback below: both find a candidate `struct` and then must confirm it carries
+// `[__AttributeUsage]` before treating it as an attribute.
+static AttributeDecl* _getAttributeDeclFromUserDefinedAttributeStruct(
+    SemanticsVisitor* visitor,
+    StructDecl* structDecl)
+{
+    if (!structDecl)
+        return nullptr;
+
+    ensureDecl(visitor, structDecl, DeclCheckState::ModifiersChecked);
+    auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
+    if (!attrUsageAttr)
+        return nullptr;
+
+    return attrUsageAttr->attributeDecl;
+}
+
+// Resolve the final segment of a qualified attribute name within an already-resolved container
+// declaration (a namespace, module, or aggregate type). Mirrors the two name-based lookups used
+// for an unqualified attribute: first a direct `AttributeDecl` named `lastSegment`, then a `struct`
+// named `lastSegment + "Attribute"` that carries `[__AttributeUsage]`. Returns null if neither
+// exists in `container`.
+AttributeDecl* SemanticsVisitor::lookUpAttributeDeclInContainer(
+    Name* lastSegmentName,
+    ContainerDecl* container)
+{
+    if (!lastSegmentName || !container)
+        return nullptr;
+
+    // Direct attribute declaration (e.g. a builtin `attribute_syntax` living in a namespace).
+    {
+        LookupResult result = lookUpDirectAndTransparentMembers(
+            m_astBuilder,
+            this,
+            lastSegmentName,
+            container,
+            DeclRef(container),
+            LookupMask::Attribute,
+            getDeclToExcludeFromLookup());
+        if (result.isValid() && !result.isOverloaded())
+        {
+            if (auto attributeDecl = as<AttributeDecl>(result.item.declRef.getDecl()))
+                return attributeDecl;
+        }
+    }
+
+    // A user-defined attribute `struct <name>Attribute`.
+    auto structNameObj =
+        m_astBuilder->getGlobalSession()->getNameObj(lastSegmentName->text + "Attribute");
+    LookupResult structResult = lookUpDirectAndTransparentMembers(
+        m_astBuilder,
+        this,
+        structNameObj,
+        container,
+        DeclRef(container),
+        LookupMask::type,
+        getDeclToExcludeFromLookup());
+    if (!structResult.isValid() || structResult.isOverloaded())
+        return nullptr;
+
+    auto structDecl = as<StructDecl>(structResult.item.declRef.getDecl());
+    return _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl);
+}
+
+// Resolve a qualified attribute name (e.g. `[my_namespace::Example(...)]`) by walking its
+// namespace/type qualifier segments and then resolving the final segment as an attribute inside the
+// resulting container. `segments` holds the ordered identifier parts (`my_namespace`, `Example`).
+//
+// This is only reached after the flat, underscore-folded name-based lookup has already failed, so
+// it never affects builtin qualified attributes such as `[vk::binding]` (which resolve via the
+// folded `vk_binding` name). It exists because the parser folds `my_namespace::Example` into the
+// single flat identifier `my_namespace_Example`, which is not the name of any declaration; the
+// user's attribute is actually `my_namespace::ExampleAttribute`, reachable only by a scoped lookup.
+AttributeDecl* SemanticsVisitor::lookUpQualifiedAttributeDecl(
+    List<NameLoc> const& segments,
+    Scope* scope)
+{
+    // The final segment names the attribute; every earlier segment is a container qualifier.
+    if (segments.getCount() < 2)
+        return nullptr;
+
+    // Resolve the first qualifier segment by ordinary scoped lookup, which proceeds up to the
+    // module/global scope so a top-level container name is found regardless of where the attribute
+    // is applied.
+    ContainerDecl* container = nullptr;
+    {
+        LookupResult firstResult =
+            lookUp(m_astBuilder, this, segments[0].name, scope, LookupMask::Default);
+        if (!firstResult.isValid() || firstResult.isOverloaded())
+            return nullptr;
+        container = as<ContainerDecl>(firstResult.item.declRef.getDecl());
+        if (!container)
+            return nullptr;
+    }
+
+    // Walk any intermediate qualifier segments as members of the current container.
+    for (Index i = 1; i + 1 < segments.getCount(); ++i)
+    {
+        LookupResult result = lookUpDirectAndTransparentMembers(
+            m_astBuilder,
+            this,
+            segments[i].name,
+            container,
+            DeclRef(container),
+            LookupMask::Default,
+            getDeclToExcludeFromLookup());
+        if (!result.isValid() || result.isOverloaded())
+            return nullptr;
+        container = as<ContainerDecl>(result.item.declRef.getDecl());
+        if (!container)
+            return nullptr;
+    }
+
+    return lookUpAttributeDeclInContainer(segments.getLast().name, container);
+}
+
+AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(
+    Name* attributeName,
+    Scope* scope,
+    List<NameLoc> const& qualifiedNameSegments)
 {
     if (!attributeName)
         return nullptr;
@@ -226,26 +348,26 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     LookupResult lookupResult =
         lookUp(m_astBuilder, this, attributeDeclNameObj, scope, LookupMask::type);
     //
-    // If we didn't find a matching type name, then we give up.
+    // If we found a matching type name, use it if it is a valid user-defined attribute struct.
     //
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
-        return nullptr;
+    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    {
+        auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
+        if (auto attributeDecl = _getAttributeDeclFromUserDefinedAttributeStruct(this, structDecl))
+            return attributeDecl;
+    }
 
+    // The flat, underscore-folded name did not resolve. If the attribute name was written with
+    // `::` qualification (e.g. `[my_namespace::Example(...)]`), the fold destroyed the qualifier
+    // structure, so fall back to a scoped lookup that walks the namespace/type qualifiers. This is
+    // only reached when the folded lookups above miss, so builtin qualified attributes such as
+    // `[vk::binding]` (registered under the flat name `vk_binding`) are unaffected.
+    if (qualifiedNameSegments.getCount() > 1)
+    {
+        return lookUpQualifiedAttributeDecl(qualifiedNameSegments, scope);
+    }
 
-    // We only allow a `struct` type to be used as an attribute
-    // if the type itself has an `[AttributeUsage(...)]` attribute
-    // attached to it.
-    //
-    auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
-    if (!structDecl)
-        return nullptr;
-
-    ensureDecl(structDecl, DeclCheckState::ModifiersChecked);
-    auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
-    if (!attrUsageAttr)
-        return nullptr;
-
-    return attrUsageAttr->attributeDecl;
+    return nullptr;
 }
 
 bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
@@ -1428,7 +1550,8 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     }
 
     auto attrName = uncheckedAttr->getKeywordName();
-    auto attrDecl = lookUpAttributeDecl(attrName, uncheckedAttr->scope);
+    auto attrDecl =
+        lookUpAttributeDecl(attrName, uncheckedAttr->scope, uncheckedAttr->qualifiedNameSegments);
 
     if (!attrDecl)
     {
