@@ -27,10 +27,10 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // layout so the buffer participates in
 // `collectGlobalUniformParameters` packaging on targets that need it
 // (CPU, CUDA), and rewrites coverage marker ops into atomic adds. The
-// current line/function/branch producers assign one direct counter slot
-// per marker op; the metadata keeps entry count and counter count
-// separate so later source-region coverage can use shared or derived
-// counters. Marker kind selects the emitted source-entry metadata:
+// line producer coalesces markers that provably execute together onto
+// one counter slot and one runtime probe, so entry count and counter
+// count differ; function and branch producers keep one dedicated slot
+// per marker. Marker kind selects the emitted source-entry metadata:
 // line, function, branch, and later region coverage all share this
 // path. The pass writes the resulting source coverage entries and the
 // chosen buffer binding into
