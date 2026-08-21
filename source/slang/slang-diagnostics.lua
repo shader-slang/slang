@@ -3192,6 +3192,13 @@ warning(
     span { loc = "modifier:Modifier", message = "constexpr is treated as const" }
 )
 
+err(
+    "builtin-only-modifier-on-non-core-decl",
+    31228,
+    "builtin-only modifier on a non-core-module declaration",
+    span { loc = "modifier:Modifier", message = "'~modifier' can only be applied to declarations in the core module" }
+)
+
 -- 3123x - Modifiers and Deprecation (part 2)
 
 err(
