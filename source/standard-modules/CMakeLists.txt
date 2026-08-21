@@ -51,7 +51,6 @@ add_custom_target(
 )
 set_target_properties(generate_standard_module_config_header PROPERTIES FOLDER "generated")
 
-# Build the neural module
 add_subdirectory(neural)
 
 # Build experimental modules
@@ -62,3 +61,6 @@ add_subdirectory(numerics)
 
 # Build the experimental functional module.
 add_subdirectory(functional)
+
+# Build the structural ray-tracing module.
+add_subdirectory(raytracing)
