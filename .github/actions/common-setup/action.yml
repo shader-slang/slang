@@ -44,6 +44,21 @@ runs:
       # retirement, so a break surfaces now instead of when Node 20 is removed.
       env:
         FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      with:
+        # With no arch input, msvc-dev-cmd always resolves the x64-hosted,
+        # x64-target compiler (HostX64\x64) regardless of the runner's
+        # actual host architecture. On a native arm64 Windows host
+        # (windows-11-vs2026-arm) that silently builds x64 binaries under
+        # Windows' x64-on-arm64 emulation instead of native arm64 code,
+        # which among other things breaks slang-test's -cpu backend: it
+        # compiles generated C++ through this same downstream cl.exe/link.exe
+        # into a DLL that gets LoadLibrary'd in-process, so an x64 DLL fails
+        # to load into a native arm64 process (see the matching
+        # SLANG_PROCESSOR_ARM_64 fix in slang-win-visual-studio-util.cpp for
+        # the equivalent problem in Slang's own downstream-compiler
+        # invocation). Force arch: arm64 on a native arm64 Windows host so
+        # the toolchain matches the host.
+        arch: ${{ (inputs.os == 'windows' && inputs.platform == 'aarch64') && 'arm64' || '' }}
 
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'
