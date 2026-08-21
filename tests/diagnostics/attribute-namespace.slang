@@ -1,10 +1,8 @@
 // attribute-namespace.slang
 
-// Regression test for shader-slang/slang#12668: a user-defined attribute declared inside a
-// `namespace` can be applied through its qualified path `[my_namespace::Example(...)]`, not only
-// via `using namespace` + the unqualified form. Before the fix the parser folded the qualified
-// name into the flat identifier `my_namespace_Example`, the attribute failed to resolve, and the
-// compiler emitted `warning E31000: unknown attribute` and silently dropped the attribute.
+// A user-defined attribute declared inside a `namespace` must be applicable through its qualified
+// path `[my_namespace::Example(...)]`, including across a nested namespace. See
+// shader-slang/slang#12668.
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main -stage compute -no-codegen
 
@@ -17,12 +15,31 @@ namespace my_namespace
     };
 }
 
-// The qualified path must resolve the in-namespace attribute: the folded name for a failed
-// resolution ('my_namespace_Example') must never appear in the diagnostics.
+// A failed resolution would report the folded name 'my_namespace_Example'; asserting its absence
+// confirms the qualified path resolved.
 // CHECK-NOT: my_namespace_Example
 [my_namespace::Example(1)]
 [numthreads(1, 1, 1)]
 void main(uint3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+
+// A nested namespace exercises walking an intermediate qualifier segment.
+namespace outer
+{
+    namespace inner
+    {
+        [__AttributeUsage(_AttributeTargets.Function)]
+        struct NestedAttribute
+        {
+            int iParam;
+        };
+    }
+}
+
+// CHECK-NOT: outer_inner_Nested
+[outer::inner::Nested(3)]
+void usesNested()
 {
 }
 

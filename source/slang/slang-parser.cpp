@@ -970,8 +970,6 @@ static Token parseAttributeName(
         return firstIdentifier;
     }
 
-    // This is a qualified name: record each identifier segment in order while we build up the
-    // flat folded spelling.
     outSegments.add(NameLoc(firstIdentifier));
 
     // Build up scoped string
