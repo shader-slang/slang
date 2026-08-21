@@ -706,12 +706,25 @@ def gen_codegen(n):
     s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
     s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
     s.append("    float x = outBuf[tid.x];\n    float acc = x;\n")
+    # Transcendental-free by design: sin/cos expand to ~135 PTX instrs each on
+    # CUDA and would swamp the emitted downstream output (shader-slang/slang#12621).
+    # The retained non-linear sqrt(abs(acc)) keeps the recurrence non-affine, so
+    # the O(n) chain this workload exists to scale cannot fold to a closed form.
     for i in range(n):
         s.append(
-            f"    acc = acc * 1.0009 + sin(acc + {i}.0) * 0.5 - cos(acc * 0.5) * 0.25 + sqrt(abs(acc) + {i + 1}.0);\n"
+            f"    acc = fma(acc, 1.0009, {i}.0) + fma(acc, 0.5, {i + 1}.0) * 0.25 + sqrt(abs(acc) + {i + 1}.0);\n"
         )
     s.append("    outBuf[tid.x] = acc;\n}\n")
     return {"codegen.slang": "".join(s)}
+
+
+# gen_codegen's body is nightly-only, like the smoke-checked generators above; pin
+# its transcendental-free shape so a broken f-string or a re-introduced sin/cos
+# (the #12621 regression) fails at import rather than as a lost data point.
+_cg_src = gen_codegen(1)["codegen.slang"]
+assert "acc = fma(acc, 1.0009," in _cg_src \
+    and "sin(" not in _cg_src and "cos(" not in _cg_src
+del _cg_src
 
 
 def gen_module_link(n):
