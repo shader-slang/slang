@@ -161,18 +161,23 @@ jobs:
             echo "::error::harness self-check passed; deliberately failing tests did not fail the run"
             exit 1
           fi
-          if ! grep -q "FAIL   harnessSelfCheckReportsAFailingCheck" selfcheck.log; then
+          # These match whitespace loosely on purpose: the driver prints its label in a
+          # fixed-width field (`printf("  %-6s %s\\n", ...)` in
+          # slang-static-unit-test-main.cpp), and pinning the exact column count here
+          # would turn a harmless formatting change into a CI failure. The labels and
+          # test names are what carry meaning.
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckReportsAFailingCheck" selfcheck.log; then
             echo "::error::a failed SLANG_CHECK was not reported as a failure"
             exit 1
           fi
-          if ! grep -q "FAIL   harnessSelfCheckSurvivesAThrowingTest" selfcheck.log; then
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckSurvivesAThrowingTest" selfcheck.log; then
             echo "::error::an exception escaping a test body was not reported as a failure"
             exit 1
           fi
           # Registered after the throwing test, so its `ok` is what proves the driver
           # carried on rather than dying at the throw. Without this the non-zero exit
           # alone would not distinguish "reported and continued" from "died".
-          if ! grep -q "ok     harnessSelfCheckContinuesAfterAThrow" selfcheck.log; then
+          if ! grep -qE "ok[[:space:]]+harnessSelfCheckContinuesAfterAThrow" selfcheck.log; then
             echo "::error::the run did not continue past a test that threw"
             exit 1
           fi

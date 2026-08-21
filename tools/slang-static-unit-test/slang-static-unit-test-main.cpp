@@ -79,15 +79,34 @@ public:
     {
         printf("    %s\n", message);
 
-        // A `RunError` says the test did not actually run correctly, which is a
-        // failure however it arrived. Printing it and leaving the test scored as a
-        // pass is the silent-success shape this suite exists to avoid.
-        if (type == TestMessageType::RunError)
+        // Named exhaustively for the same reason as `recordResult`: leaving message
+        // types to an implicit "advisory" default is how a message that reports a
+        // real problem ends up scored as a pass.
+        switch (type)
+        {
+        case TestMessageType::Info:
+            // Advisory only, by definition.
+            break;
+        case TestMessageType::TestFailure:
+            // "Describes how a test failure took place" -- so a test that emits one
+            // has failed, whether or not it also reached `addResult`. Callers in the
+            // existing suite pair the two, and this makes the pairing unnecessary
+            // rather than assumed.
             m_currentTestFailed = true;
+            break;
+        case TestMessageType::RunError:
+            // "An error that caused a test not to actually correctly run."
+            m_currentTestFailed = true;
+            break;
+        }
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL endTest() override
     {
+        // The self-check step in ci-slang-static-unit-test.yml greps this line for
+        // `FAIL`/`ok` followed by a test name. It matches whitespace loosely, so the
+        // field width here can change without breaking it -- but the labels themselves
+        // are load-bearing.
         const char* label = m_currentTestFailed ? "FAIL" : (m_currentTestIgnored ? "skip" : "ok");
         printf("  %-6s %s\n", label, m_currentTestName);
         if (m_currentTestFailed)

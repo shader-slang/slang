@@ -355,3 +355,35 @@ SLANG_UNIT_TEST(irTrimOptimizableTypesRemovesAnUnusedField)
     SLANG_CHECK(trimOptimizableTypes(builder.getModule()));
     SLANG_CHECK(countFields(structType) == 0);
 }
+
+// `useFastAnalysis` selects a cheaper side-effect analysis. For module shapes like
+// these -- functions with no side effects to analyse -- it is expected to reach the
+// same answer as the precise path, and this pins that: same fixture, same outcome,
+// flag on.
+//
+// It deliberately does not claim more. Distinguishing the two paths properly needs a
+// fixture whose purity determination actually differs between them, which is a
+// different kind of fixture from anything `IRFixtureBuilder` builds today. This test
+// is the honest half of that: it catches a fast path that starts disagreeing on the
+// simple shapes, and says nothing about the shapes where disagreement is the point.
+SLANG_UNIT_TEST(irDeadCodeEliminationFastAnalysisAgreesOnSideEffectFreeFunctions)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    IRFunc* callee = builder.addVoidFunction("calleeFunc", /* keepAlive: */ false);
+    builder.addVoidFunctionCalling("rootFunc", /* keepAlive: */ true, callee);
+    builder.addVoidFunction("deadFunc", /* keepAlive: */ false);
+
+    IRDeadCodeEliminationOptions options;
+    options.useFastAnalysis = true;
+    SLANG_CHECK(eliminateDeadCode(builder.getModule(), options));
+
+    // Identical to what irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot asserts
+    // with the flag off.
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 2);
+    SLANG_CHECK(names.contains("rootFunc"));
+    SLANG_CHECK(names.contains("calleeFunc"));
+    SLANG_CHECK(!names.contains("deadFunc"));
+}
