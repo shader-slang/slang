@@ -2,6 +2,16 @@ name: CI Falcor Test Workflow
 
 on:
   workflow_call:
+    inputs:
+      slang-artifact-name:
+        description: >-
+          Name of the slang-tests-* artifact for the test-falcor job to
+          fetch. Defaults to the regular Windows-release artifact; the
+          caller can point this at a separately-built artifact instead
+          (see build-windows-release-cl-x86_64-gpu-falcor in ci.yml).
+        required: false
+        type: string
+        default: slang-tests-windows-x86_64-cl-release
 
 permissions:
   actions: read
@@ -12,10 +22,16 @@ jobs:
     timeout-minutes: 100
     runs-on: [Linux, self-hosted, X64, falcor-bridge]
     # Vet-and-approve gate: this job runs PR-controlled code on the internal
-    # bridge VM, so it is gated behind the `falcor-ci` environment (required
-    # reviewers = the `ci-approvers` team). A PR by a team member runs
-    # automatically; anyone else's run waits for a one-click approval.
-    environment: falcor-ci
+    # bridge VM, so approval (required reviewers = the `ci-approvers` team)
+    # is required before it runs. The `environment: falcor-ci` gate lives on
+    # falcor-build-approval-gate in ci.yml (upstream of this job, via
+    # build-windows-release-cl-x86_64-gpu-falcor), not here directly --
+    # GitHub charges one approval prompt per job that references an
+    # environment, so putting the gate on both the build and this job would
+    # mean two separate approval clicks per PR for one Falcor run. A PR by a
+    # team member runs automatically; anyone else's run waits for the one
+    # upstream approval, which also covers this job since it cannot start
+    # until the gated build produces its artifact.
     defaults:
       run:
         shell: bash
@@ -23,7 +39,7 @@ jobs:
       - name: Run external CI
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          SLANG_CI_ARTIFACT_NAME: slang-tests-windows-x86_64-cl-release
+          SLANG_CI_ARTIFACT_NAME: ${{ inputs.slang-artifact-name }}
         run: |
           set -euo pipefail
           /opt/slang-ci/run-external-ci

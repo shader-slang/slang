@@ -379,7 +379,9 @@ SLANG_API void spAddBuiltins(
     char const* sourcePath,
     char const* sourceString)
 {
+    SLANG_ALLOW_DEPRECATED_BEGIN
     session->addBuiltins(sourcePath, sourceString);
+    SLANG_ALLOW_DEPRECATED_END
 }
 
 SLANG_API void spSessionSetSharedLibraryLoader(
