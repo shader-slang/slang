@@ -135,10 +135,7 @@ jobs:
   # diverge — set the variable → get the GCP UID; unset → get the hosted UID.
   build-linux-debug-gcc-x86_64:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build-container.yml
     # id-token is never part of the default GITHUB_TOKEN even when the repo
     # default is "write"; it must be requested explicitly for the reusable
@@ -187,10 +184,7 @@ jobs:
   # (never part of the default GITHUB_TOKEN); it is harmless on GitHub-hosted.
   build-linux-release-gcc-wasm:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     permissions:
       id-token: write
@@ -214,10 +208,7 @@ jobs:
   # default GITHUB_TOKEN); it is harmless on GitHub-hosted.
   sanitizer-linux-clang-x86_64:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     permissions:
       # Required by ci-slang-sanitizer.yml's GCP Workload Identity auth step;
@@ -231,10 +222,7 @@ jobs:
   # macOS builds
   build-macos-debug-clang-aarch64:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -245,10 +233,7 @@ jobs:
 
   build-macos-release-clang-aarch64:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -260,10 +245,7 @@ jobs:
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -275,10 +257,7 @@ jobs:
 
   build-linux-release-gcc-aarch64:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -291,10 +270,7 @@ jobs:
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -305,10 +281,7 @@ jobs:
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter, wait-for-human-priority]
-    if: >-
-      needs.filter.outputs.should-run == 'true' &&
-      (needs.wait-for-human-priority.result == 'success' ||
-       needs.wait-for-human-priority.result == 'skipped')
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -324,7 +297,7 @@ jobs:
   # plain job instead, with the build depending on it.
   falcor-build-approval-gate:
     needs: [filter]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     environment: falcor-ci
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -359,7 +332,7 @@ jobs:
   # the narrower case of a transient retry with no code change.
   build-windows-release-cl-x86_64-gpu-falcor:
     needs: [filter, falcor-build-approval-gate]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -372,7 +345,7 @@ jobs:
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: debug
@@ -380,7 +353,7 @@ jobs:
 
   test-linux-debug-gcc-x86_64-rhi:
     needs: [filter, build-linux-debug-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-rhi-test-container.yml
     with:
       config: debug
@@ -395,7 +368,7 @@ jobs:
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-rhi-test-container.yml
     with:
       config: release
@@ -405,7 +378,7 @@ jobs:
   # execute after CUDA coopmat moves to Ampere-only mma.sync PTX.
   test-linux-release-gcc-x86_64-sm80:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
@@ -420,7 +393,7 @@ jobs:
   # complements the GPU-runner jobs.
   test-linux-release-gcc-x86_64-cpu:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -435,7 +408,7 @@ jobs:
   # macOS tests
   test-macos-debug-clang-aarch64:
     needs: [filter, build-macos-debug-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: macos
@@ -448,7 +421,7 @@ jobs:
 
   test-macos-debug-clang-aarch64-rhi:
     needs: [filter, build-macos-debug-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: macos
@@ -459,7 +432,7 @@ jobs:
 
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: macos
@@ -472,7 +445,7 @@ jobs:
 
   test-macos-release-clang-aarch64-rhi:
     needs: [filter, build-macos-release-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: macos
@@ -484,7 +457,7 @@ jobs:
   # Linux ARM64 tests (GitHub-hosted, CPU only)
   test-linux-debug-gcc-aarch64:
     needs: [filter, build-linux-debug-gcc-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -496,7 +469,7 @@ jobs:
 
   test-linux-release-gcc-aarch64:
     needs: [filter, build-linux-release-gcc-aarch64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -514,7 +487,7 @@ jobs:
   # The three jobs run concurrently on separate runners.
   test-windows-debug-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -528,7 +501,7 @@ jobs:
 
   test-windows-debug-cl-x86_64-gpu-vk:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -542,7 +515,7 @@ jobs:
 
   test-windows-debug-cl-x86_64-gpu-cuda:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -556,7 +529,7 @@ jobs:
 
   test-windows-debug-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: windows
@@ -567,7 +540,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -581,7 +554,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu-vk:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -595,7 +568,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu-cuda:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -609,7 +582,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu-rhi:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-rhi-test.yml
     with:
       os: windows
@@ -621,7 +594,7 @@ jobs:
   # MaterialX integration test (Windows only for initial validation).
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     uses: ./.github/workflows/ci-materialx-regression-test.yml
     with:
       os: windows
@@ -637,7 +610,7 @@ jobs:
   # Comment /regenerate-cmdline-ref on the PR to auto-fix a failure.
   check-cmdline-ref:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -680,7 +653,7 @@ jobs:
   # of building slang-capability-generator again from scratch.
   check-capability-atoms-ref:
     needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -725,7 +698,7 @@ jobs:
 
   test-falcor:
     needs: [filter, build-windows-release-cl-x86_64-gpu-falcor]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     permissions:
       contents: read
       actions: read
@@ -735,7 +708,7 @@ jobs:
 
   test-compile-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     permissions:
       contents: read
       actions: read
@@ -743,7 +716,7 @@ jobs:
 
   test-benchmark:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
+    if: false # TEMPORARY: disabled to save CI capacity for the #11147 repro PR
     permissions:
       contents: read
       actions: read
