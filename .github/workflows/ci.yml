@@ -306,6 +306,20 @@ jobs:
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
 
+  static-unit-test-macos-debug-clang-aarch64:
+    needs: [filter, wait-for-human-priority]
+    if: >-
+      needs.filter.outputs.should-run == 'true' &&
+      (needs.wait-for-human-priority.result == 'success' ||
+       needs.wait-for-human-priority.result == 'skipped')
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
   static-unit-test-windows-debug-cl-x86_64:
     needs: [filter, wait-for-human-priority]
     if: >-
@@ -802,6 +816,7 @@ jobs:
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
         static-unit-test-linux-debug-gcc-aarch64,
+        static-unit-test-macos-debug-clang-aarch64,
         static-unit-test-windows-debug-cl-x86_64,
         test-windows-release-cl-x86_64-gpu-dx,
         test-windows-release-cl-x86_64-gpu-vk,

@@ -1,12 +1,16 @@
 name: CI Static Unit Tests
 
-# Builds and runs `slang-static-unit-test`, the unit tests that call `source/slang`
-# points directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
+# Builds and runs `slang-static-unit-test`, the unit tests that call non-exported
+# `source/slang` entry points directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
 # different configuration from every other CI build, so this is a separate
 # workflow rather than an option on ci-slang-build.yml.
 #
 # It builds only the `slang-static-unit-test` target rather than everything, which
 # is roughly a third of the compile work of a full build.
+#
+# One job per host toolchain -- gcc on Linux, clang on macOS, cl on Windows -- since
+# what varies between them is the compiler these tests are built with, not the code
+# under test.
 #
 # These tests do not touch a GPU, so they run on GitHub-hosted runners. Keeping
 # them off the self-hosted Windows pool avoids competing for runners with the

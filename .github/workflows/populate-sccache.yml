@@ -43,6 +43,7 @@ jobs:
             "sccache-windows-cl-x86_64-release-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
             "sccache-static-unit-test-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-static-unit-test-macos-clang-aarch64-debug-${CURRENT_COMMIT}"
             "sccache-static-unit-test-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
           )
 
@@ -208,6 +209,20 @@ jobs:
       platform: aarch64
       config: debug
       runs-on: '["ubuntu-24.04-arm"]'
+      save-sccache: true
+
+  populate-static-unit-test-macos:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
+    permissions:
+      contents: read
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
       save-sccache: true
 
   populate-static-unit-test-windows:

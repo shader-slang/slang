@@ -8,8 +8,8 @@
 // the compiler statically (`SLANG_LIB_TYPE=STATIC`). See
 // `docs/design/static-linked-unit-testing.md`.
 
-#ifndef SLANG_TOOLS_INTERNALS_TEST_ENV_H
-#define SLANG_TOOLS_INTERNALS_TEST_ENV_H
+#ifndef SLANG_TOOLS_STATIC_UNIT_TEST_ENV_H
+#define SLANG_TOOLS_STATIC_UNIT_TEST_ENV_H
 
 #include "core/slang-list.h"
 #include "core/slang-string.h"
@@ -142,4 +142,4 @@ private:
 
 } // namespace Slang
 
-#endif // SLANG_TOOLS_INTERNALS_TEST_ENV_H
+#endif // SLANG_TOOLS_STATIC_UNIT_TEST_ENV_H

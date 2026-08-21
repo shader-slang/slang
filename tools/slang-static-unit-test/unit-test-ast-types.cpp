@@ -107,6 +107,10 @@ SLANG_UNIT_TEST(astMangledTypeNamesDistinguishDistinctTypes)
     SLANG_CHECK(float3Name.getLength() > 0);
     SLANG_CHECK(float3Name != float4Name);
     SLANG_CHECK(float3Name != int3Name);
+    // The third pair matters too: a regression that collapsed `float4` and `int3`
+    // onto one name while leaving `float3` distinct from both would satisfy the two
+    // checks above and still break the contract.
+    SLANG_CHECK(float4Name != int3Name);
 
     // Mangling is deterministic: the same type mangles identically every time.
     SLANG_CHECK(getMangledTypeName(astBuilder, float3) == float3Name);
