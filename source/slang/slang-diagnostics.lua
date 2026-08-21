@@ -5597,6 +5597,13 @@ err(
 )
 
 err(
+    "multisampled-texture-not-supported-on-target",
+    55215,
+    "multisampled texture is not supported on this target",
+    span { loc = "location", message = "'~type:IRInst' is a multisampled texture, which is not supported by the current code generation target" }
+)
+
+err(
     "unsupported-recursion",
     55201,
     "recursion not allowed",
