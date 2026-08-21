@@ -9,15 +9,18 @@ on:
       - ".gitmodules"
       - ".github/workflows/check-submodules.yml"
       - "extras/check-submodule-commits.sh"
-  merge_group:
-    types: [checks_requested]
 
 # This check is not a required status check, so a path-skipped job on an
 # unrelated PR is harmless — it simply never reports, and nothing waits on it.
 # The pull_request paths: filter above therefore restricts the work to PRs that
-# actually touch a submodule pointer, the workflow, or the script. merge_group
-# has no paths: filter (GitHub ignores paths: on merge_group), so the check
-# re-runs over every submodule in the queue as a final gate.
+# actually touch a submodule pointer, the workflow, or the script.
+#
+# There is deliberately no merge_group trigger. GitHub ignores paths: on
+# merge_group, so the check used to re-run over every submodule for every queue
+# entry -- and since it is not required, a failure there could not block the
+# merge, and the run was discarded with the temporary gh-readonly-queue branch.
+# Requiring it instead is not an option while the paths: filter above exists: a
+# path-skipped required check never reports and blocks the PR forever.
 jobs:
   check-submodules:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true

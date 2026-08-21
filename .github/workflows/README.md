@@ -94,12 +94,12 @@ is deleted right after — so check the workflow's own run list, not the PR.
 | Workflow                          | Per-PR | Merge queue | Purpose                                                   |
 | --------------------------------- | ------ | ----------- | --------------------------------------------------------- |
 | `ci.yml`                          | yes    | yes         | Build + test umbrella; aggregates into one gate job.      |
-| `check-actionlint.yml`            | yes    | yes         | Lints the workflow YAML in this directory.                |
 | `check-formatting.yml`            | yes    | yes         | Checks formatting; comment `/format` to auto-fix.         |
 | `check-python-core.yml`           | yes    | yes         | Compile-checks the repo's Python scripts.                 |
-| `check-submodules.yml`            | yes    | yes         | Verifies `external/**` submodule pins are reachable.      |
 | `check-workflow-scripts.yml`      | yes    | yes         | Unit-tests the JavaScript the board-sync workflows embed. |
 | `ci-slangpy-trigger-test.yml`     | yes    | yes         | Runs SlangPy's CI against this change.                    |
+| `check-actionlint.yml`            | yes    | no          | Lints the workflow YAML in this directory.                |
+| `check-submodules.yml`            | yes    | no          | Verifies `external/**` submodule pins are reachable.      |
 | `check-pr-label.yml`              | yes    | no          | Requires exactly one `pr:` classification label.          |
 | `check-toc.yml`                   | yes    | no          | Checks the user-guide TOC; `/regenerate-toc` auto-fixes.  |
 | `check-spirv-generated.yml`       | yes    | no          | Verifies committed SPIR-V generated files are current.    |
