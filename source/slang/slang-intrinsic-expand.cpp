@@ -335,6 +335,28 @@ static Index parseNumber(const char*& cursor, const char* end)
     return n;
 }
 
+// Return the texture element type of `arg` as a plain scalar/vector, stripping the
+// texture wrapper and any `unorm`/`snorm` attribute (an attributed `float3` element
+// must still be seen as a 3-component vector by the `$F`/`$R` width markers).
+static IRType* getTextureElementType(IRInst* arg)
+{
+    IRType* type = arg->getDataType();
+    if (auto baseTextureType = as<IRTextureType>(type))
+        type = baseTextureType->getElementType();
+    return (IRType*)unwrapAttributedType(type);
+}
+
+// If `type` is a 3-component vector, return it (so callers can read its element
+// type); otherwise null. CUDA's texture-fetch family instantiates only scalar / 2- /
+// 4-component results, so a 3-component fetch must be widened and its result narrowed.
+static IRVectorType* asThreeComponentVector(IRType* type)
+{
+    if (auto vectorType = as<IRVectorType>(type);
+        vectorType && getIntVal(vectorType->getElementCount()) == 3)
+        return vectorType;
+    return nullptr;
+}
+
 const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
 {
     const char* const end = m_text.end();
@@ -792,6 +814,48 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             }
         }
         break;
+
+    case 'F':
+        {
+            // Like `$T<n>` (texture element type), but widens a 3-component vector to 4
+            // components. CUDA's texture-fetch template family instantiates only scalar / 2- /
+            // 4-component result types, never 3-component; `$R` narrows the 4-vector back.
+            Index argIndex = parseNat() + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT(m_argCount > argIndex);
+
+            IRType* type = getTextureElementType(m_args[argIndex].get());
+            if (auto vectorType = asThreeComponentVector(type))
+            {
+                m_emitter->emitVectorTypeName(vectorType->getElementType(), 4);
+            }
+            else
+            {
+                m_emitter->emitType(type);
+            }
+        }
+        break;
+
+    case 'R':
+        {
+            // Narrow counterpart of `$F`. All four `_slang_vector_reshape` template arguments
+            // are spelled explicitly because the helper's source-vector parameters are
+            // non-deduced (`GetVectorTypeImpl<>::type`).
+            Index argIndex = parseNat() + m_argIndexOffset;
+            SLANG_RELEASE_ASSERT(m_argCount > argIndex);
+
+            IRType* type = getTextureElementType(m_args[argIndex].get());
+            if (auto vectorType = asThreeComponentVector(type))
+            {
+                m_writer->emit("_slang_vector_reshape<");
+                m_emitter->emitType(vectorType->getElementType());
+                m_writer->emit(", 3, ");
+                m_emitter->emitType(vectorType->getElementType());
+                m_writer->emit(", 4>(");
+                m_openParenCount++;
+            }
+        }
+        break;
+
     case 'P':
         // Type-based prefix as used for CUDA and C++ targets
         {
