@@ -1201,6 +1201,16 @@ class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
     FIDDLE(...)
 };
 
+// GLSL `layout(early_fragment_tests) in;`. Attached to the standalone `EmptyDecl` by the parser;
+// the checker lifts it onto the fragment entry point as an `EarlyDepthStencilAttribute` (mirroring
+// how `local_size_*` becomes a `NumThreadsAttribute`), because a standalone `layout(...) in;` is an
+// entry-point property rather than a modifier on any particular declaration.
+FIDDLE()
+class GLSLLayoutEarlyFragmentTestsAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 

@@ -2009,6 +2009,33 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // In GLSL, `layout(early_fragment_tests) in;` is a standalone declaration (an EmptyDecl
+    // sibling of the entry point) rather than an attribute on the fragment function. The parser
+    // records it as a GLSLLayoutEarlyFragmentTestsAttribute on that EmptyDecl; here we lift it onto
+    // the fragment entry point as the canonical EarlyDepthStencilAttribute, so the existing
+    // lower->IREarlyDepthStencilDecoration->emit chain (shared with HLSL `[earlydepthstencil]`)
+    // carries it to every target unchanged. This mirrors how `local_size_*` is lifted to a
+    // NumThreadsAttribute below.
+    if (stage == Stage::Fragment && !entryPointFuncDecl->findModifier<EarlyDepthStencilAttribute>())
+    {
+        // Use getParentDecl (not the raw parentDecl) so a generic fragment entry point resolves to
+        // the module/namespace holding the standalone `layout(...) in;` EmptyDecl rather than the
+        // enclosing GenericDecl.
+        if (auto parentDecl = getParentDecl(entryPointFuncDecl))
+        {
+            for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+            {
+                if (emptyDecl->findModifier<GLSLLayoutEarlyFragmentTestsAttribute>())
+                {
+                    auto earlyDepthStencil =
+                        getCurrentASTBuilder()->create<EarlyDepthStencilAttribute>();
+                    addModifier(entryPointFuncDecl, earlyDepthStencil);
+                    break;
+                }
+            }
+        }
+    }
+
     // For compute, mesh, and amplification (task) entry points using GLSL
     // syntax, the thread group size is specified via layout(local_size_x = N)
     // on a sibling EmptyDecl rather than via [numthreads] on the entry point
