@@ -32,7 +32,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     uint width = 0;
     uint height = 0;
     uint depth = 0;
-    // CUDA cannot query these outputs, but the mip-level array overload requires them.
+    // Array overloads require elements and mip-level overloads require numberOfLevels,
+    // but CUDA cannot query either output.
     uint elements = 0;
     uint numberOfLevels = 0;
     
