@@ -3459,8 +3459,11 @@ static SlangResult createArtifactFromIR(
             }
             else if (SLANG_FAILED(validationResult))
             {
-                // Whether a rejected module reaches the caller must not depend on the diagnostic's
-                // severity, so fail here rather than leaving it to the sink's abort.
+                // Disassemble the rejected SPIR-V into the diagnostic so the failure is legible,
+                // then report it. `SpirvValidationFailed` is `internal` severity, so this
+                // `diagnose()` aborts the compile by throwing; the abort unwinds to the
+                // API-boundary guard that catches it. The `return SLANG_FAIL` below is reached
+                // only if that severity is ever lowered below `Severity::Fatal`.
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
                 return SLANG_FAIL;
