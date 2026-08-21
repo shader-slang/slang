@@ -123,15 +123,15 @@ because they reuse an already-built artifact instead of building again:
 ## 2. Reusable building blocks (`workflow_call`)
 
 These have no trigger of their own — they are called by `ci.yml`, the nightlies,
-`cmake-options.yml`, or `populate-sccache.yml` to build or test one matrix
+`cmake-options.yml`, or `sccache-populate.yml` to build or test one matrix
 entry. Edit one of these to change how that kind of build or test runs
 everywhere at once. The `*-container` variants run inside the Linux CI container
-images published by `publish-ci-container-images.yml`.
+images published by `container-publish-images.yml`.
 
 | Workflow                            | Called by                                    | Purpose                                                                                  |
 | ----------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `ci-slang-build.yml`                | `ci.yml`, `populate-sccache.yml`             | Build Slang (and optionally LLVM) for one os/compiler/platform/config entry.             |
-| `ci-slang-build-container.yml`      | `ci.yml`, `populate-sccache.yml`             | Same, inside the Linux CI container.                                                     |
+| `ci-slang-build.yml`                | `ci.yml`, `sccache-populate.yml`             | Build Slang (and optionally LLVM) for one os/compiler/platform/config entry.             |
+| `ci-slang-build-container.yml`      | `ci.yml`, `sccache-populate.yml`             | Same, inside the Linux CI container.                                                     |
 | `ci-slang-test.yml`                 | `ci.yml`                                     | Run `slang-test` for one platform, with CPU-only / GPU-API-only / GPU-tier variants.     |
 | `ci-slang-test-container.yml`       | `ci.yml`                                     | Run `slang-test` on the containerized self-hosted GPU pool.                              |
 | `ci-rhi-test.yml`                   | `ci.yml`                                     | Run the slang-rhi test suite for one platform.                                           |
@@ -153,7 +153,7 @@ Keep caches warm and keep an eye on CI itself. None of these gate a PR.
 | Workflow                   | Cadence                                             | Purpose                                                                                            |
 | -------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `ci-health.yml`            | every 15 min (+ manual)                             | Samples GitHub-hosted runner-cap saturation and publishes a CI health signal.                      |
-| `populate-sccache.yml`     | every 30 min (+ manual)                             | Builds master through the reusable build workflows purely to populate the sccache entries PRs hit. |
+| `sccache-populate.yml`     | every 30 min (+ manual)                             | Builds master through the reusable build workflows purely to populate the sccache entries PRs hit. |
 | `ci-retry-yielded-bot.yml` | `workflow_run` after `CI`, hourly at :17 (+ manual) | Reruns bot CI runs that yielded their runner slot to human/merge-queue work.                       |
 
 ## 4. Nightly / daily
@@ -197,7 +197,7 @@ particular signal (and, for fork PRs, the only one that carries secrets). Read
 | `pr-review-fork-bridge.yml` | `pull_request_review`                                        | Stage 1 of the fork-review relay: unprivileged, no checkout, just completes so stage 2 can fire.                             |
 | `pr-review-fork-apply.yml`  | `workflow_run` after the bridge                              | Stage 2: runs the board sync in the privileged base-repo context for fork-PR reviews.                                        |
 | `pr-sweep-nightly.yml`      | nightly 07:00 UTC (+ manual)                                 | Sweep-mode backstop over every open PR.                                                                                      |
-| `add-issue-labels.yml`      | `issues` opened (+ manual)                                   | Labels new issues `Dev Opened` when the author is in the `shader-slang/dev` team.                                            |
+| `issue-add-labels.yml`      | `issues` opened (+ manual)                                   | Labels new issues `Dev Opened` when the author is in the `shader-slang/dev` team.                                            |
 | `claude.yml`                | `issue_comment`, `issues`, `pull_request_review*` (+ manual) | The `@claude` assistant: responds to mentions on issues/PRs and to the `claude` issue label.                                 |
 | `claude-ci-analysis.yml`    | `workflow_dispatch`                                          | Given a failed run ID and PR number, analyzes the failure, produces a fix, and pushes it to the PR branch.                   |
 
@@ -225,8 +225,8 @@ invoke one.
 | `release.yml`                     | `push` tag `v20XX.N*` (+ manual)                    | Builds and publishes the release binaries for every supported os/platform and attaches them to the release.                                                                                |
 | `release-linux-glibc-2-27.yml`    | `push` tag `v20XX.N*`, nightly 02:00 UTC (+ manual) | Extra Linux release build against glibc 2.27 (ubuntu18/gcc11) for older distros.                                                                                                           |
 | `release-linux-glibc-2-28.yml`    | `push` tag `v20XX.N*`, nightly 02:00 UTC (+ manual) | Extra Linux release build against glibc 2.28.                                                                                                                                              |
-| `publish-ci-container-images.yml` | `push`/`pull_request` on `docker/**` (+ manual)     | Builds and pushes the Linux CI container images to GHCR. PRs validate the tag/version contract only — they never build a Dockerfile, since that would run PR code on a self-hosted runner. |
-| `push-benchmark-results.yml`      | `push` to master (+ manual)                         | Builds master on the benchmark runner and pushes MDL benchmark numbers to the results repo.                                                                                                |
+| `container-publish-images.yml` | `push`/`pull_request` on `docker/**` (+ manual)     | Builds and pushes the Linux CI container images to GHCR. PRs validate the tag/version contract only — they never build a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `perf-push-benchmark-results.yml` | `push` to master (+ manual)                         | Builds master on the benchmark runner and pushes MDL benchmark numbers to the results repo.                                                                                                |
 
 See the `/slang-release-process` skill (`.claude/skills/slang-release-process/`)
 for the human-side release checklist that drives these.
@@ -236,7 +236,7 @@ for the human-side release checklist that drives these.
 | Workflow                         | Trigger             | Purpose                                                                               |
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------------------- |
 | `ci-retry.yml`                   | `workflow_dispatch` | Waits for a given run ID to finish, then reruns just its failed jobs.                 |
-| `compile-perf-release-sweep.yml` | `workflow_dispatch` | Backfills the compile-performance history by sweeping past releases in a date window. |
+| `perf-compile-release-sweep.yml` | `workflow_dispatch` | Backfills the compile-performance history by sweeping past releases in a date window. |
 | `check-spirv-tools.yml`          | `workflow_dispatch` | Placeholder for a future "SPIRV-Tools tip-of-tree" check; currently a no-op echo job. |
 
 ## 10. Composite actions
