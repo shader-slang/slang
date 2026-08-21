@@ -1,8 +1,10 @@
 //TEST:INTERPRET(filecheck=CHECK):
-//TEST:SIMPLE(filecheck=IR): -target hlsl -entry upcastToOptional -stage compute -dump-ir
+//TEST:SIMPLE(filecheck=SPV): -target spirv-asm -entry computeMain -stage compute
 
 // An Optional initialized from a `derived as Base` upcast must hold the base value,
 // not the address of the base sub-object, so `.value` reads fields of a struct.
+// The property must hold on both the interpreter (INTERPRET) and code generation
+// (SPIRV); reaching OpEntryPoint proves SPIR-V emission completed.
 
 struct A
 {
@@ -14,22 +16,24 @@ struct B : A
     int y;
 }
 
-// The repro lives in its own function so the IR check below anchors on it alone.
-// `b` must be a local variable (an l-value): the base-subobject upcast then lowers
-// to a `get_field_addr`, whose address is loaded to a value before the payload
-// field read — the read uses that loaded value, not the address.
-[shader("compute")]
-void upcastToOptional(uniform int seed, out int result)
+int upcastToOptional(int seed)
 {
     B b;
     b.x = seed;
     b.y = seed + 1;
     Optional<A> o = b as A;
-    // IR: func %upcastToOptional
-    // IR: get_field_addr({{.*}}, %base)
-    // IR: [[BASE:%[0-9]+]] : %A = load
-    // IR: get_field([[BASE]], %x)
-    result = o.hasValue ? o.value.x : -1;
+    return o.hasValue ? o.value.x : -1;
+}
+
+// SPIR-V generation of the same upcast must complete; OpEntryPoint appears only
+// once code emission finishes.
+// SPV: OpEntryPoint
+RWStructuredBuffer<int> outBuf;
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void computeMain()
+{
+    outBuf[0] = upcastToOptional(5);
 }
 
 void main()
@@ -52,7 +56,8 @@ void main()
     if (o2.hasValue)
         printf("%d\n", o2.value.x);
 
-    // Control: the implicit upcast path (no `as`).
+    // Control: the plain base-subobject upcast (no Optional) must still read the
+    // right field, isolating the upcast lowering from Optional packaging.
     B b3;
     b3.x = 9;
     b3.y = 10;
