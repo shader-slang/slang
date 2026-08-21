@@ -2115,11 +2115,18 @@ def lint_gap_intake_report(
     The cross-check that matters is against the *live* gap queue rather
     than against a sibling report: unlike remediation, whose work list is
     the review report next to it, intake's work list is recomputed from
-    the test bundles every run. So a row naming a gap the suite does not
-    report is an error (it would write a decision about nothing into the
-    ledger), while a gap the suite reports and the report does not
-    mention is a warning (the operator may be working through a document
-    in batches).
+    the test bundles every run. So a row naming a gap that is neither in
+    that queue nor already recorded in the ledger is an error (it would
+    write a decision about nothing), while a gap the suite reports and the
+    report does not mention is a warning (the operator may be working
+    through a document in batches).
+
+    Both halves of that first test are needed, because acting on a gap is
+    what removes it from the queue. A gap's id is derived from the prose
+    of its `## Doc gaps observed` row, so once the document is fixed and
+    the bundle README is regenerated without that row, the id stops being
+    reported. Checking the queue alone would turn every report red at
+    exactly the moment its work landed.
 
     Returns (issues, front_matter_dict_or_None).
     """
@@ -2256,16 +2263,24 @@ def lint_gap_intake_report(
                 f" {len(table)} row(s)",
             )
         )
+    ledger_gaps = load_doc_gap_state().get("gaps", {})
     for gid in sorted(seen - queue_ids):
+        # A decided gap has left the queue by design, so its row is a
+        # completed record rather than a decision about nothing. Only a row
+        # naming an id the ledger has never heard of is unactionable, and
+        # that is the one `cmd_mark_gap_intake` must not be handed: it reads
+        # `queue[gid]` for the entry's `kind` and `summary`.
+        if _gap_status(gid, ledger_gaps) != "open":
+            continue
         issues.append(
             LintIssue(
                 rel,
                 "error",
-                f"action row {gid} names a gap the test suite does not report"
-                f" against {target}",
+                f"action row {gid} names a gap that is neither in the live"
+                f" queue for {target} nor recorded in the ledger, so there is"
+                " no gap to write a decision about",
             )
         )
-    ledger_gaps = load_doc_gap_state().get("gaps", {})
     unaddressed = sorted(
         gid
         for gid in queue_ids - seen
@@ -2340,8 +2355,17 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
     intake_at = _yaml_to_str(fm["intake_at"])
     model = _yaml_to_str(fm["intake_model"])
     report_rel = _report_rel(report_path)
+    written = 0
     for row in table:
         gid = row["Gap ID"]
+        # Lint accepts a row whose gap has already been decided and has
+        # therefore dropped out of the queue, so re-running this on a report
+        # that already landed arrives here with nothing left to look up.
+        # Keeping the recorded entry is also the honest choice: rebuilding it
+        # is impossible without `queue[gid]`, and the stored `decided_at` /
+        # `decided_by_model` say when the call was actually made.
+        if gid not in queue:
+            continue
         status = row["Action"].lower()
         entry = {
             "status": status,
@@ -2364,8 +2388,11 @@ def cmd_mark_gap_intake(args, manifest: Manifest) -> int:
         if finding:
             entry["finding_id"] = finding
         gaps[gid] = entry
+        written += 1
     save_doc_gap_state(state)
-    print(f"marked gap intake: {args.doc} ({len(table)} gap(s))")
+    already = len(table) - written
+    note = f", {already} already recorded" if already else ""
+    print(f"marked gap intake: {args.doc} ({written} gap(s){note})")
     return 0
 
 
@@ -2837,6 +2864,74 @@ def cmd_selftest(args, manifest: Manifest) -> int:
         "ledger rejects a wrong schema_version",
         any("schema_version" in m for m in lint_state({}, version=2)),
         True,
+    )
+
+    # -- lint_gap_intake_report vs the ledger -------------------------
+    # Acting on a gap is what removes it from the live queue, so the queue
+    # alone cannot tell "this row named nothing" from "this row's work
+    # landed". Neither branch is reachable from the committed corpus: every
+    # action row there names a gap the ledger has already decided, so the
+    # error never fires and the accept-anyway path is indistinguishable from
+    # a plain pass. An inversion here would either wave through a report
+    # that hands `mark-gap-intake` an id it will KeyError on, or turn every
+    # worked report permanently red.
+    import tempfile
+
+    def lint_report(gid: str, ledger: dict) -> list[str]:
+        report = (
+            "---\n"
+            "gap_intake_report: true\n"
+            'intake_model: "claude-opus-5[1m]"\n'
+            "intake_at: 2026-08-11T16:42:39Z\n"
+            "target_doc: ast-reference/values.md\n"
+            f"target_doc_source_commit_before: {'0' * 40}\n"
+            f"target_doc_source_commit_after: {'1' * 40}\n"
+            "gap_count: 1\n"
+            "actions:\n"
+            "  fixed: 1\n"
+            "  rejected_bogus: 0\n"
+            "  rejected_out_of_scope: 0\n"
+            "  deferred: 0\n"
+            "  escalated_to_finding: 0\n"
+            "---\n\n"
+            "## Actions\n\n"
+            "| Gap ID | Action | Evidence | Fix summary |\n"
+            "| --- | --- | --- | --- |\n"
+            f"| {gid} | fixed | `source/slang/x.h:1` says so | edited it |\n"
+        )
+        saved = DOC_GAP_STATE_PATH.read_text(encoding="utf-8")
+        try:
+            DOC_GAP_STATE_PATH.write_text(
+                json.dumps({"schema_version": 1, "gaps": ledger}), encoding="utf-8"
+            )
+            with tempfile.TemporaryDirectory() as _rd:
+                p = Path(_rd) / "r.gap-intake.md"
+                p.write_text(report, encoding="utf-8")
+                found, _fm = lint_gap_intake_report(p, manifest)
+                return [i.message for i in found if i.severity == "error"]
+        finally:
+            DOC_GAP_STATE_PATH.write_text(saved, encoding="utf-8")
+
+    absent = "d" * 12
+    decided = {
+        "status": "fixed",
+        "target_doc": "docs/generated/design/ast-reference/values.md",
+        "kind": "missing-example",
+        "decided_at": "2026-08-11T00:00:00Z",
+        "rationale": "because",
+    }
+    check(
+        "intake rejects a row naming a gap no one has heard of",
+        any("no gap to write a decision about" in m for m in lint_report(absent, {})),
+        True,
+    )
+    check(
+        "intake accepts a row whose gap the ledger already decided",
+        any(
+            "no gap to write a decision about" in m
+            for m in lint_report(absent, {absent: decided})
+        ),
+        False,
     )
 
     # -- lint_liquid_safe ---------------------------------------------

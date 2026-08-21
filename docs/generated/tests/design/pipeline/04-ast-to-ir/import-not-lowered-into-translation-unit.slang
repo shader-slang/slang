@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#inputs-and-outputs
-//META: doc_section_digest=6d1d3a37481672b8a356906f20fb2005b4a78520639dfcf9741ecae812c8ed40
+//META: doc_section_digest=51cd307451e57824ff6e611b882f6c834f023977ef696226f1a783598a50b7b9
 //META: purpose=References to symbols defined in an imported module (e.g. the core module) appear in the lowered IR with `[import("...")]` decorations rather than as full function bodies; the doc says "The lowering step does NOT include the IR for imported modules".
 //META: intent=functional
 //META: pipeline_stage=lower
