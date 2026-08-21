@@ -10,6 +10,24 @@
 namespace Slang
 {
 
+// The scalar ops copied verbatim into one AnyValue payload word (`int`/`float` via
+// `bit_cast<uint>`, `uint` directly). Leaves needing normalization, sub-word masking, or
+// 64-bit splitting (`bool`, `half`, `int64_t`, ...) are excluded. `countWordScalarLeaves`
+// and both `marshalBasicType` overrides share this one classifier so whole-object
+// bulk-copy eligibility cannot diverge from what the per-leaf store actually does.
+static bool isVerbatimWordScalar(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_IntType:
+    case kIROp_UIntType:
+    case kIROp_FloatType:
+        return true;
+    default:
+        return false;
+    }
+}
+
 // This is a subpass of generics lowering IR transformation.
 // This pass generates packing/unpacking functions for `AnyValue`s,
 // and replaces all `IRPackAnyValue` and `IRUnpackAnyValue` with calls to these
@@ -356,25 +374,26 @@ struct AnyValueMarshallingContext
         virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteVar)
             override
         {
+            if (isVerbatimWordScalar(dataType->getOp()))
+            {
+                ensureOffsetAt4ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    auto dstVal = dataType->getOp() == kIROp_UIntType
+                                      ? srcVal
+                                      : builder->emitBitCast(builder->getUIntType(), srcVal);
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr, dstVal);
+                }
+                advanceOffset(4);
+                return;
+            }
             switch (dataType->getOp())
             {
-            case kIROp_IntType:
-            case kIROp_FloatType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcVal = builder->emitLoad(concreteVar);
-                        auto dstVal = builder->emitBitCast(builder->getUIntType(), srcVal);
-                        auto dstAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, dstVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
             case kIROp_BoolType:
                 {
                     ensureOffsetAt4ByteBoundary();
@@ -395,21 +414,6 @@ struct AnyValueMarshallingContext
                             anyValueVar,
                             anyValInfo->fieldKeys[fieldOffset]);
                         builder->emitStore(dstAddr, dstVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
-            case kIROp_UIntType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcVal = builder->emitLoad(concreteVar);
-                        auto dstAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, srcVal);
                     }
                     advanceOffset(4);
                     break;
@@ -722,6 +726,136 @@ struct AnyValueMarshallingContext
         }
     };
 
+    // Count the leaves of `type`, requiring every one to be a 4-byte scalar whose
+    // bit pattern is marshalled verbatim into a `uint` payload slot; return -1 if any
+    // leaf is not such a scalar. A word scalar is packed by
+    // `TypePackingContext::marshalBasicType` as a plain `bit_cast<uint>` store with no
+    // normalization, sub-word masking, 64-bit splitting, or target-specific handling,
+    // so a whole-object copy of it reproduces the field-wise store exactly.
+    //
+    // Consider `struct Circle { float3 center; float radius; }`: its four `float`
+    // leaves each become one `field[k] = bit_cast<uint>(...)`, so this returns 4.
+    // Types with a `bool` (normalized to 0/1), a `half`/`int8`/`int64`/pointer/
+    // `DescriptorHandle` leaf, or a resource handle return -1 because their per-leaf
+    // marshalling is not a verbatim word copy.
+    //
+    // Matrices also return -1: `emitMarshallingCode` walks a column-major matrix
+    // column-by-column, but the emitted C++/CUDA `Matrix<T,R,C>` stores rows
+    // contiguously, so a whole-object copy would reorder the elements even though the
+    // leaf count and size match. Whole-object marshalling of matrices is therefore not
+    // byte-equivalent and must stay on the field-wise path.
+    IRIntegerValue countWordScalarLeaves(IRType* type)
+    {
+        if (isVerbatimWordScalar(type->getOp()))
+            return 1;
+        switch (type->getOp())
+        {
+        case kIROp_EnumType:
+            return countWordScalarLeaves(cast<IREnumType>(type)->getTagType());
+        case kIROp_VectorType:
+            {
+                auto vecType = cast<IRVectorType>(type);
+                auto elementLeaves = countWordScalarLeaves(vecType->getElementType());
+                if (elementLeaves < 0)
+                    return -1;
+                return elementLeaves * getIntVal(vecType->getElementCount());
+            }
+        case kIROp_ArrayType:
+            {
+                auto arrType = cast<IRArrayType>(type);
+                auto elementLeaves = countWordScalarLeaves(arrType->getElementType());
+                if (elementLeaves < 0)
+                    return -1;
+                auto total = elementLeaves * getIntVal(arrType->getElementCount());
+                // Reject an empty (zero-leaf) aggregate: it carries no payload words,
+                // but `legalizeEmptyTypes` still splits a value containing it into a
+                // non-simple tuple, and a whole-object bit-cast has no type-legalization
+                // handler for such an operand (it would abort with "non-simple operand").
+                return total > 0 ? total : -1;
+            }
+        case kIROp_StructType:
+            {
+                IRIntegerValue total = 0;
+                for (auto field : cast<IRStructType>(type)->getFields())
+                {
+                    auto fieldLeaves = countWordScalarLeaves(field->getFieldType());
+                    if (fieldLeaves < 0)
+                        return -1;
+                    total += fieldLeaves;
+                }
+                // See the array case: reject empty aggregates so a value that
+                // legalization would split never reaches the whole-object bit-cast.
+                return total > 0 ? total : -1;
+            }
+        default:
+            return -1;
+        }
+    }
+
+    // Return true when boxing `type` into `anyValueType` can be a single whole-object
+    // bit-cast instead of the per-leaf `emitMarshallingCode` walk.
+    //
+    // This holds only on the C-family source emitters whose prelude defines
+    // `slang_bit_cast` over arbitrary types (CUDA/OptiX and CPU/C++, which share one
+    // emitter — but not the CPU-via-LLVM path, where an aggregate bit-cast is not a
+    // valid instruction), and only when `type` is byte-compatible with the flat `uint`
+    // payload:
+    //   1. every leaf is a 4-byte scalar marshalled verbatim (`countWordScalarLeaves`);
+    //   2. `type` has no interior alignment padding in its *emitted* layout — the
+    //      target C/CUDA ABI size equals `4 * (leaf count)`. This must use the emitted
+    //      layout rules, not the natural rules: the per-leaf walk packs leaves densely
+    //      at a 4-byte stride (and the box size is inferred with natural rules), but the
+    //      whole-object copy moves the type in its emitted ABI layout. For example
+    //      `struct { float a; float4 b; }` is dense under natural rules (size 20) yet
+    //      the emitted CUDA `float4` is 16-byte aligned, giving `sizeof == 32` with a
+    //      12-byte gap after `a`; the ABI-size check rejects it, the natural-size check
+    //      would not; and
+    //   3. that emitted size equals the payload byte size, so the copy neither
+    //      over-reads the payload nor leaves high payload words that the field-wise
+    //      path zero-initializes; and
+    //   4. `type`'s emitted alignment is no stricter than the payload's. The payload is
+    //      an array of `uint`, so it is 4-byte aligned; `slang_bit_cast<T>` reads its
+    //      argument through a `T*`, so a `T` needing stricter alignment (e.g. CUDA's
+    //      `float4`, which is 16-byte aligned) would be dereferenced through an
+    //      under-aligned pointer. This is what distinguishes an all-`float4` type on
+    //      CUDA (rejected, 16-byte aligned) from CPP (accepted, C-rules 4-byte aligned).
+    bool canBulkCopyMarshal(IRType* type, IRIntegerValue anyValueSize)
+    {
+        auto targetReq = targetProgram->getTargetReq();
+
+        // The whole-object `slang_bit_cast` is only emittable by the C++/CUDA source
+        // emitters. The LLVM CPU path lowers to an aggregate LLVM bit-cast, which is
+        // invalid, so exclude it explicitly.
+        bool cLikeSourceEmitter =
+            (isCUDATarget(targetReq) || isCPUTarget(targetReq)) && !isCPUTargetViaLLVM(targetReq);
+        if (!cLikeSourceEmitter)
+            return false;
+
+        auto leafCount = countWordScalarLeaves(type);
+        if (leafCount < 0)
+            return false;
+
+        // Use the emitted C/CUDA ABI layout (the same rules the target emitter uses),
+        // not the natural layout, so interior alignment padding is visible here.
+        auto rules =
+            isCUDATarget(targetReq) ? IRTypeLayoutRules::getCUDA() : IRTypeLayoutRules::getC();
+        IRSizeAndAlignment layout;
+        if (SLANG_FAILED(getSizeAndAlignment(targetReq, rules, type, &layout)))
+            return false;
+        if (layout.size == IRSizeAndAlignment::kIndeterminateSize || layout.size <= 0)
+            return false;
+
+        // The payload is a `uint` array (4-byte aligned); a stricter-aligned `type`
+        // would be read through an under-aligned pointer by `slang_bit_cast` (condition 4).
+        const int kPayloadAlignment = 4;
+        if (layout.alignment > kPayloadAlignment)
+            return false;
+
+        // No interior padding (condition 2) and an exact fit against the box
+        // (condition 3), so `bit_cast<AnyValueN>` reproduces the field-wise payload.
+        return layout.size == leafCount * 4 && layout.size == anyValueSize;
+    }
+
     IRFunc* generatePackingFunc(IRType* type, IRAnyValueType* anyValueType)
     {
         IRBuilder builder(module);
@@ -745,6 +879,13 @@ struct AnyValueMarshallingContext
         builder.emitBlock();
 
         auto param = builder.emitParam(type);
+
+        if (canBulkCopyMarshal(type, getIntVal(anyValueType->getSize())))
+        {
+            builder.emitReturn(builder.emitBitCast(anyValInfo->type, param));
+            return func;
+        }
+
         auto concreteTypedVar = builder.emitVar(type);
         builder.emitStore(concreteTypedVar, param);
         auto resultVar = builder.emitVar(anyValInfo->type);
@@ -778,25 +919,25 @@ struct AnyValueMarshallingContext
         virtual void marshalBasicType(IRBuilder* builder, IRType* dataType, IRInst* concreteVar)
             override
         {
+            if (isVerbatimWordScalar(dataType->getOp()))
+            {
+                ensureOffsetAt4ByteBoundary();
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto srcVal = builder->emitLoad(srcAddr);
+                    if (dataType->getOp() != kIROp_UIntType)
+                        srcVal = builder->emitBitCast(dataType, srcVal);
+                    builder->emitStore(concreteVar, srcVal);
+                }
+                advanceOffset(4);
+                return;
+            }
             switch (dataType->getOp())
             {
-            case kIROp_IntType:
-            case kIROp_FloatType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        auto srcVal = builder->emitLoad(srcAddr);
-                        srcVal = builder->emitBitCast(dataType, srcVal);
-                        builder->emitStore(concreteVar, srcVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
             case kIROp_BoolType:
                 {
                     ensureOffsetAt4ByteBoundary();
@@ -810,21 +951,6 @@ struct AnyValueMarshallingContext
                         srcVal = builder->emitNeq(
                             srcVal,
                             builder->getIntValue(builder->getUIntType(), 0));
-                        builder->emitStore(concreteVar, srcVal);
-                    }
-                    advanceOffset(4);
-                    break;
-                }
-            case kIROp_UIntType:
-                {
-                    ensureOffsetAt4ByteBoundary();
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto srcAddr = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        auto srcVal = builder->emitLoad(srcAddr);
                         builder->emitStore(concreteVar, srcVal);
                     }
                     advanceOffset(4);
@@ -1160,6 +1286,13 @@ struct AnyValueMarshallingContext
         builder.emitBlock();
 
         auto param = builder.emitParam(anyValInfo->type);
+
+        if (canBulkCopyMarshal(type, getIntVal(anyValueType->getSize())))
+        {
+            builder.emitReturn(builder.emitBitCast(type, param));
+            return func;
+        }
+
         auto anyValueVar = builder.emitVar(anyValInfo->type);
         builder.emitStore(anyValueVar, param);
         auto resultVar = builder.emitVar(type);
