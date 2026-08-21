@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="820" viewBox="0 0 1120 820" role="img" aria-label="D3D and Vulkan SBT dispatch compared with Metal user-specified post-trace dispatch">
+  <style>
+    .title { font: 700 22px sans-serif; fill: #202020; }
+    .subtitle { font: 700 16px sans-serif; fill: #202020; }
+    .label { font: 14px sans-serif; fill: #202020; }
+    .small { font: 12px sans-serif; fill: #333333; }
+    .tiny { font: 11px sans-serif; fill: #333333; }
+    .note { font: 12px sans-serif; fill: #6b2f00; }
+    .gapLabel { font: 700 18px sans-serif; fill: #8a1f17; }
+    .gapNote { font: 14px sans-serif; fill: #8a1f17; }
+    .box { fill: #f8fbff; stroke: #336699; stroke-width: 1.5; rx: 7; }
+    .calc { fill: #f0f6ff; stroke: #336699; stroke-width: 1.5; rx: 7; }
+    .table { fill: #ffffff; stroke: #2f7d45; stroke-width: 1.5; rx: 7; }
+    .tableHeader { fill: #eaf7ef; stroke: #2f7d45; stroke-width: 1; }
+    .row { fill: #ffffff; stroke: #b8d9c2; stroke-width: 1; }
+    .rowAlt { fill: #f8fcf9; stroke: #b8d9c2; stroke-width: 1; }
+    .selected { fill: #fff3cf; stroke: #c98200; stroke-width: 2; }
+    .metal { fill: #fffaf2; stroke: #a65f00; stroke-width: 1.5; rx: 7; }
+    .metalHeader { fill: #fff0d8; stroke: #a65f00; stroke-width: 1; }
+    .problem { fill: #fff4f4; stroke: #b42318; stroke-width: 1.5; rx: 7; }
+    .gapBox { fill: #ffe4e0; stroke: #b42318; stroke-width: 2.5; rx: 8; }
+    .arrow { stroke: #333333; stroke-width: 1.8; marker-end: url(#arrow); fill: none; }
+    .arrowBlue { stroke: #336699; stroke-width: 1.8; marker-end: url(#arrowBlue); fill: none; }
+    .arrowGreen { stroke: #2f7d45; stroke-width: 1.8; marker-end: url(#arrowGreen); fill: none; }
+    .arrowOrange { stroke: #a65f00; stroke-width: 1.8; marker-end: url(#arrowOrange); fill: none; }
+    .dash { stroke: #777777; stroke-width: 1.6; stroke-dasharray: 5 4; marker-end: url(#arrow); fill: none; }
+    .gapArrow { stroke: #b42318; stroke-width: 2.2; stroke-dasharray: 7 4; marker-end: url(#arrowRed); fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#333333"/>
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#336699"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2f7d45"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#a65f00"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#b42318"/>
+    </marker>
+  </defs>
+
+  <text x="36" y="38" class="title">Dispatch model gap</text>
+  <text x="36" y="62" class="small">D3D/Vulkan have native SBT dispatch for pipeline stages. Metal has traversal dispatch for custom intersection functions,</text>
+  <text x="36" y="80" class="small">but miss and closest-hit are ordinary post-trace shader logic.</text>
+
+  <text x="36" y="105" class="subtitle">D3D / Vulkan: driver or hardware dispatches through SBT records</text>
+
+  <rect x="40" y="130" width="210" height="125" class="box"/>
+  <text x="70" y="158" class="label">Ray-generation shader</text>
+  <text x="62" y="185" class="small">TraceRay / OpTraceRayKHR</text>
+  <text x="62" y="210" class="tiny">missIndex = 1</text>
+  <text x="62" y="229" class="tiny">sbtOffset = 2</text>
+  <text x="62" y="248" class="tiny">sbtStride = 3</text>
+
+  <rect x="292" y="130" width="275" height="125" class="calc"/>
+  <text x="326" y="158" class="label">Native index calculation</text>
+  <text x="312" y="188" class="small">hitSlot = instanceContribution</text>
+  <text x="337" y="207" class="small">+ geometryContribution * sbtStride</text>
+  <text x="337" y="226" class="small">+ sbtOffset</text>
+  <text x="312" y="247" class="tiny">example: 0 + 1 * 3 + 2 = hit slot 5</text>
+
+  <path d="M250 192 L292 192" class="arrowBlue"/>
+
+  <rect x="610" y="100" width="450" height="250" class="table"/>
+  <text x="635" y="126" class="label">Shader Binding Table, host-created</text>
+
+  <rect x="635" y="145" width="165" height="28" class="tableHeader"/>
+  <text x="650" y="164" class="small">Miss table</text>
+  <rect x="635" y="173" width="165" height="25" class="row"/>
+  <text x="650" y="190" class="tiny">Miss[0] background</text>
+  <rect x="635" y="198" width="165" height="25" class="selected"/>
+  <text x="650" y="215" class="tiny">Miss[1] shadow miss</text>
+  <rect x="635" y="223" width="165" height="25" class="row"/>
+  <text x="650" y="240" class="tiny">Miss[2] debug miss</text>
+
+  <rect x="835" y="145" width="195" height="28" class="tableHeader"/>
+  <text x="850" y="164" class="small">Hit-group table</text>
+  <rect x="835" y="173" width="195" height="24" class="row"/>
+  <text x="850" y="190" class="tiny">Slot 0: CH triangle matte</text>
+  <rect x="835" y="197" width="195" height="24" class="rowAlt"/>
+  <text x="850" y="214" class="tiny">Slot 1: CH triangle alpha + AH</text>
+  <rect x="835" y="221" width="195" height="24" class="row"/>
+  <text x="850" y="238" class="tiny">Slot 2: CH curve</text>
+  <rect x="835" y="245" width="195" height="24" class="rowAlt"/>
+  <text x="850" y="262" class="tiny">Slot 3: CH material A</text>
+  <rect x="835" y="269" width="195" height="24" class="row"/>
+  <text x="850" y="286" class="tiny">Slot 4: CH material B</text>
+  <rect x="835" y="293" width="195" height="36" class="selected"/>
+  <text x="850" y="309" class="tiny">Slot 5: CH sphere</text>
+  <text x="850" y="323" class="tiny">         + AH + Intersection</text>
+
+  <path d="M567 192 C585 175 595 165 610 159" class="arrowGreen"/>
+  <path d="M567 225 C590 275 605 303 835 311" class="arrowGreen"/>
+
+  <rect x="610" y="372" width="450" height="72" class="box"/>
+  <text x="635" y="400" class="label">Selected native stages</text>
+  <text x="635" y="422" class="small">Miss[1] if no hit. HitGroup[5] dispatches intersection, any-hit,</text>
+  <text x="635" y="438" class="small">and closest-hit as native pipeline stages.</text>
+  <path d="M835 329 L835 372" class="arrowGreen"/>
+
+  <path d="M650 444 C620 458 610 476 595 496" class="gapArrow"/>
+  <rect x="90" y="458" width="545" height="78" class="gapBox"/>
+  <text x="112" y="488" class="gapLabel">gap: closest-hit dispatch changes ownership</text>
+  <text x="112" y="516" class="gapNote">D3D/Vulkan: host SBT records. Metal: user-specified shader code.</text>
+  <path d="M595 520 C650 548 695 564 730 580" class="gapArrow"/>
+
+  <text x="36" y="562" class="subtitle">Metal: users write miss and closest-hit dispatch after intersect()</text>
+
+  <rect x="40" y="590" width="225" height="120" class="metal"/>
+  <text x="68" y="618" class="label">Ray-generation shader</text>
+  <text x="62" y="645" class="small">intersector.intersect(...)</text>
+  <text x="62" y="670" class="tiny">returns intersection_result</text>
+  <text x="62" y="689" class="tiny">no native miss / closest-hit call</text>
+
+  <rect x="315" y="590" width="230" height="120" class="table"/>
+  <text x="346" y="619" class="label">intersection_result</text>
+  <text x="342" y="646" class="small">hit or none</text>
+  <text x="342" y="669" class="small">distance, ids, tags</text>
+  <text x="342" y="692" class="small">used by user code</text>
+
+  <rect x="600" y="580" width="280" height="140" class="problem"/>
+  <text x="630" y="607" class="label">User-specified post-trace dispatch</text>
+  <text x="622" y="636" class="small">if result.none:</text>
+  <text x="652" y="656" class="small">miss(payload)</text>
+  <text x="622" y="680" class="small">else:</text>
+  <text x="652" y="700" class="small">switch geometry/material/ray type</text>
+
+  <rect x="315" y="742" width="565" height="48" class="metal"/>
+  <text x="335" y="763" class="note">Metal function table/buffer can dispatch AnyHit and Intersection during traversal,</text>
+  <text x="335" y="781" class="note">but not Miss or ClosestHit.</text>
+
+  <path d="M265 650 L315 650" class="arrowOrange"/>
+  <path d="M545 650 L600 650" class="arrowOrange"/>
+  <path d="M152 710 C210 790 260 795 315 790" class="dash"/>
+</svg>

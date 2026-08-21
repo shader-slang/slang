@@ -1105,6 +1105,32 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         return;
                     }
 
+                    // A subtype constraint can contribute a base only when its subject matches
+                    // `selfType`. Check that subject before fully checking the constraint: its
+                    // super-type may contain a generic application whose constraints query the
+                    // inheritance currently being computed. An unrelated sibling must not trigger
+                    // that re-entrant query. Equality constraints are excluded because either
+                    // endpoint can match and full checking may normalize their direction.
+                    if (!constraintDecl->isEqualityConstraint)
+                    {
+                        DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
+                        if (!SubstitutionSet(lookedUpConstraint).findLookupDeclRef())
+                        {
+                            lookedUpConstraint =
+                                astBuilder->getLookupDeclRef(conformingWitness, constraintDecl)
+                                    .as<GenericTypeConstraintDecl>();
+                            if (!lookedUpConstraint)
+                                return;
+                        }
+
+                        Type* lookedUpSub = getSub(astBuilder, lookedUpConstraint);
+                        if (lookedUpSub &&
+                            !lookedUpSub->getCanonicalType()->equals(selfType->getCanonicalType()))
+                        {
+                            return;
+                        }
+                    }
+
                     ensureDecl(&visitor, constraintDecl, DeclCheckState::CanSpecializeGeneric);
 
                     DeclRef<GenericTypeConstraintDecl> lookedUpConstraint = constraintDeclRef;
