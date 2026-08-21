@@ -11,8 +11,8 @@
 // Building the module by hand removes the scaffolding: place exactly two
 // functions, decorate one, run the pass, and assert which one survived.
 
-#include "internals-test-env.h"
 #include "slang/slang-ir-dce.h"
+#include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -21,7 +21,7 @@ using namespace Slang;
 // unreferenced function with it is retained.
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     builder.addVoidFunction("keptFunc", /* keepAlive: */ true);
@@ -43,7 +43,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 // pass that always claims to have changed something is a real defect.
 SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     builder.addVoidFunction("liveFunc", /* keepAlive: */ true);
@@ -60,7 +60,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationReportsNoChangeWhenNothingIsDead)
 // single-function test and fail this one.
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     builder.addVoidFunction("dead0", /* keepAlive: */ false);
@@ -80,7 +80,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAllDeadFunctions)
 // nothing further to remove.
 SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     builder.addVoidFunction("kept", /* keepAlive: */ true);
@@ -100,7 +100,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationIsIdempotent)
 // leave every test above green and fail only this one.
 SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     IRFunc* callee = builder.addVoidFunction("calleeFunc", /* keepAlive: */ false);
@@ -124,7 +124,7 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsFunctionReachableFromLiveRoot)
 // root would keep the intermediate but drop the function beyond it.
 SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     IRFunc* leaf = builder.addVoidFunction("leafFunc", /* keepAlive: */ false);
@@ -132,9 +132,49 @@ SLANG_UNIT_TEST(irDeadCodeEliminationKeepsTransitivelyReachableFunction)
     builder.addVoidFunctionCalling("rootFunc", /* keepAlive: */ true, middle);
     SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 3);
 
+    // Note the inverted assertion relative to the test above, which expects a change:
+    // there, `deadFunc` is genuinely dead and gets removed. Here all three functions are
+    // live, nothing is removed, and the pass reports no change -- its return value
+    // accumulates only from removals.
     SLANG_CHECK(!eliminateDeadCode(builder.getModule()));
 
     List<String> names = builder.getFunctionNames();
     SLANG_CHECK_ABORT(names.getCount() == 3);
     SLANG_CHECK(names.contains("leafFunc"));
+}
+
+// The tests above all turn on reachability. This pair pins an *option* instead:
+// `keepGlobalParamsAlive` defaults to true, so an unreferenced global parameter
+// survives an ordinary run. Shader parameters rely on that to reach reflection even
+// when no code reads them, and nothing else here would notice if the default were
+// flipped.
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedGlobalParamByDefault)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSession());
+
+    builder.addGlobalParam("unusedParam");
+    SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_GlobalParam) == 1);
+
+    eliminateDeadCode(builder.getModule());
+
+    SLANG_CHECK(builder.countGlobalInsts(kIROp_GlobalParam) == 1);
+}
+
+// ...and with the flag off the same parameter is removed. Paired with the test above,
+// this pins the flag itself rather than only the value it happens to default to: a
+// change that ignored the option would fail exactly one of the two.
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedGlobalParamWhenNotKeptAlive)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSession());
+
+    builder.addGlobalParam("unusedParam");
+    SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_GlobalParam) == 1);
+
+    IRDeadCodeEliminationOptions options;
+    options.keepGlobalParamsAlive = false;
+    SLANG_CHECK(eliminateDeadCode(builder.getModule(), options));
+
+    SLANG_CHECK(builder.countGlobalInsts(kIROp_GlobalParam) == 0);
 }

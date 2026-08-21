@@ -42,8 +42,8 @@ jobs:
             "sccache-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-release-${CURRENT_COMMIT}"
             "sccache-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
-            "sccache-internals-static-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
-            "sccache-internals-static-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
+            "sccache-static-unit-test-linux-gcc-aarch64-debug-${CURRENT_COMMIT}"
+            "sccache-static-unit-test-windows-cl-x86_64-debug-${CURRENT_COMMIT}"
           )
 
           MISSING=0
@@ -193,13 +193,13 @@ jobs:
       build-llvm: true
       save-sccache: true
 
-  # Populate the separate cache namespace used by the internals unit tests. A
+  # Populate the separate cache namespace used by the statically linked unit tests. A
   # static build shares no objects with the shared builds above, so these need
   # their own entries.
-  populate-internals-test-linux-aarch64:
+  populate-static-unit-test-linux-aarch64:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-internals-test.yml
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
     permissions:
       contents: read
     with:
@@ -210,10 +210,10 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       save-sccache: true
 
-  populate-internals-test-windows:
+  populate-static-unit-test-windows:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    uses: ./.github/workflows/ci-slang-internals-test.yml
+    uses: ./.github/workflows/ci-slang-static-unit-test.yml
     permissions:
       contents: read
     with:

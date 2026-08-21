@@ -12,10 +12,10 @@
 // (no target code generation) and then walk the resulting `ModuleDecl`
 // directly.
 
-#include "internals-test-env.h"
 #include "slang/slang-ast-builder.h"
 #include "slang/slang-mangle.h"
 #include "slang/slang-module.h"
+#include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -44,7 +44,7 @@ T* findMemberDecl(ModuleDecl* moduleDecl, const char* name)
 // written in the source.
 SLANG_UNIT_TEST(checkedModuleExposesTopLevelDeclarations)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
 
     String diagnostics;
     Module* module = env.checkModuleFromSource(
@@ -66,7 +66,7 @@ SLANG_UNIT_TEST(checkedModuleExposesTopLevelDeclarations)
 // would corrupt any buffer written by a host application.
 SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
 
     Module* module = env.checkModuleFromSource(
         "checkedStructPreservesFieldOrderAndTypes",
@@ -112,7 +112,7 @@ SLANG_UNIT_TEST(checkedStructPreservesFieldOrderAndTypes)
 // would let one overload satisfy a reference to the other.
 SLANG_UNIT_TEST(checkedOverloadsMangleDistinctly)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
 
     Module* module = env.checkModuleFromSource(
         "checkedOverloadsMangleDistinctly",
@@ -142,7 +142,7 @@ SLANG_UNIT_TEST(checkedOverloadsMangleDistinctly)
 // module means checking actually succeeded.
 SLANG_UNIT_TEST(checkedModuleReportsDiagnosticOnInvalidSource)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
 
     String diagnostics;
     Module* module = env.checkModuleFromSource(

@@ -1,11 +1,11 @@
-name: CI Internals Unit Tests
+name: CI Static Unit Tests
 
-# Builds and runs `slang-internals-test`, the unit tests that call `source/slang`
-# internals directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
+# Builds and runs `slang-static-unit-test`, the unit tests that call `source/slang`
+# points directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
 # different configuration from every other CI build, so this is a separate
 # workflow rather than an option on ci-slang-build.yml.
 #
-# It builds only the `slang-internals-test` target rather than everything, which
+# It builds only the `slang-static-unit-test` target rather than everything, which
 # is roughly a third of the compile work of a full build.
 #
 # These tests do not touch a GPU, so they run on GitHub-hosted runners. Keeping
@@ -37,7 +37,7 @@ on:
         default: false
 
 jobs:
-  internals-test:
+  static-unit-test:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 60
     permissions:
@@ -64,7 +64,7 @@ jobs:
           fetch-depth: "250"
           fetch-tags: true
 
-      # This cache key deliberately carries an `internals-static` component and
+      # This cache key deliberately carries a `static-unit-test` component and
       # so shares nothing with the keys used by ci-slang-build.yml. A static
       # build cannot reuse objects from a shared build: SLANG_DYNAMIC and
       # SLANG_DYNAMIC_EXPORT are defined only for SHARED, STB_IMAGE_STATIC only
@@ -77,9 +77,9 @@ jobs:
         uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
-          key: sccache-internals-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          key: sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
-            sccache-internals-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+            sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
 
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
@@ -95,7 +95,7 @@ jobs:
           config: ${{ inputs.config }}
           build-llvm: false
 
-      - name: Build slang-internals-test
+      - name: Build slang-static-unit-test
         run: |
           cmake_launcher_defines=()
           if [[ -n "${sccache_path:-}" ]]; then
@@ -117,24 +117,24 @@ jobs:
             -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
             "${cmake_launcher_defines[@]}"
 
-          cmake --build build --config "$cmake_config" --target slang-internals-test
+          cmake --build build --config "$cmake_config" --target slang-static-unit-test
 
           if [[ -n "${sccache_path:-}" ]]; then
             sccache --show-stats || true
           fi
 
-      - name: Run slang-internals-test
+      - name: Run slang-static-unit-test
         run: |
           # RUNNER_OS is provided by the runner, so nothing from the workflow
           # inputs is interpolated into this script.
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            test_path="$bin_dir/slang-internals-test.exe"
+            test_path="$bin_dir/slang-static-unit-test.exe"
           else
-            test_path="$bin_dir/slang-internals-test"
+            test_path="$bin_dir/slang-static-unit-test"
           fi
 
           if [[ ! -f "$test_path" ]]; then
-            echo "::error::expected slang-internals-test at $test_path"
+            echo "::error::expected slang-static-unit-test at $test_path"
             ls -la "$bin_dir" || true
             exit 1
           fi
@@ -149,4 +149,4 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
-          key: sccache-internals-static-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          key: sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}

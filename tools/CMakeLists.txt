@@ -471,12 +471,12 @@ if(SLANG_ENABLE_REPLAYER)
 endif()
 
 #
-# Unit tests for `source/slang` internals.
+# Unit tests that call non-exported `source/slang` entry points directly.
 #
-# These are separate from `slang-unit-test` because they call internal compiler
-# entry points directly. `slang-unit-test` is a shared library loaded by
+# These are separate from `slang-unit-test` because of how they link, not what
+# they test. `slang-unit-test` is a shared library loaded by
 # `slang-test`, so it can only reach symbols exported from libslang-compiler,
-# and internal symbols in `source/slang` carry no export annotation. Linking the
+# and those entry points carry no export annotation. Linking the
 # compiler statically into an executable makes them resolve at link time with no
 # annotation and no change to `source/slang`.
 #
@@ -494,7 +494,7 @@ if(
     AND SLANG_LIB_TYPE STREQUAL "STATIC"
 )
     slang_add_target(
-        slang-internals-test
+        slang-static-unit-test
         EXECUTABLE
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
@@ -509,7 +509,7 @@ if(
     # as PRIVATE link dependencies so their include directories do not
     # propagate; expose them here, as `slang-unit-test` does.
     target_include_directories(
-        slang-internals-test
+        slang-static-unit-test
         PRIVATE
             $<TARGET_PROPERTY:slang-capability-defs,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:slang-fiddle-output,INTERFACE_INCLUDE_DIRECTORIES>

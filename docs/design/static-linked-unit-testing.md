@@ -1,6 +1,6 @@
-# Unit-testing compiler internals
+# Statically Linked Unit Testing
 
-This document describes `slang-internals-test`: what it is for, why it is a
+This document describes `slang-static-unit-test`: what it is for, why it is a
 separate executable, and how to add tests to it.
 
 ## The problem
@@ -13,11 +13,11 @@ diagnostics and generated code. They cannot look at compiler state.
 
 `slang-unit-test` tests are C++ and can call into the library directly, but they
 are hosted in a shared library that `slang-test` loads at runtime. That restricts
-them to symbols exported from `libslang-compiler`. Internal declarations in
+them to symbols exported from `libslang-compiler`. Non-exported declarations in
 `source/slang` — IR passes, AST utilities, mangling, serialization — carry no
 export annotation and are compiled with hidden visibility, so a plugin test
 cannot link against `eliminateDeadCode` or `IRBuilder`. This is why existing unit
-tests that want to reach compiler internals go through the public C API and
+tests that want to reach those entry points go through the public C API and
 construct a full `Session` even when the thing under test is much smaller.
 
 Some behaviour is impractical to test either way. Consider the contract of global
@@ -29,13 +29,17 @@ distinction is observable.
 
 ## The approach
 
-`slang-internals-test` is an executable that links the compiler **statically**.
+`slang-static-unit-test` is an executable that links the compiler **statically**.
 Static linkage resolves internal symbols at link time, so no export annotation
 or source change is needed: `#include "slang/slang-ir-dce.h"` and call
 `eliminateDeadCode` directly.
 
-It is defined only when `SLANG_LIB_TYPE=STATIC`. Under a shared build the link
-would fail by design, so the target simply does not exist there.
+It is defined only when `SLANG_LIB_TYPE=STATIC`, with `SLANG_ENABLE_TESTS` and
+`SLANG_ENABLE_SLANG_RHI` both on. Under a shared build the link would fail by
+design, so the target simply does not exist there. The RHI condition is not a
+dependency of these tests -- they never touch the RHI -- it is inherited from
+the `unit-test` object library they share with `slang-unit-test`, whose own
+guard requires it.
 
 ### Why a separate executable rather than static-linking `slang-unit-test`
 
@@ -55,14 +59,14 @@ same translation units being linked into two artifacts.
 
 Tests use `SLANG_UNIT_TEST` and `SLANG_CHECK` exactly as they do in
 `slang-unit-test`; registration goes through the same list in `tools/unit-test`.
-Two helpers in `internals-test-env.h` cover the common needs.
+Two helpers in `static-unit-test-env.h` cover the common needs.
 
-`InternalsTestEnv` owns a `Linkage` and exposes the internal handles:
+`StaticUnitTestEnv` owns a `Linkage` and exposes the internal handles:
 
 ```cpp
 SLANG_UNIT_TEST(astVectorTypesAreDeduplicated)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
 
     Type* floatType = astBuilder->getFloatType();
@@ -87,7 +91,7 @@ becomes expressible:
 ```cpp
 SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedFunction)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     IRFixtureBuilder builder(env.getSession());
 
     builder.addVoidFunction("keptFunc", /* keepAlive: */ true);
@@ -107,7 +111,7 @@ behaved unexpectedly rather than only that a number was wrong.
 write assertions against the dump text, as its format is not a stable contract.
 
 To test against AST or IR that the frontend actually produced, use
-`InternalsTestEnv::checkModuleFromSource`, which runs the frontend only:
+`StaticUnitTestEnv::checkModuleFromSource`, which runs the frontend only:
 
 ```cpp
 Module* module = env.checkModuleFromSource("myTest", "struct Point { float x; }\n");
@@ -132,18 +136,18 @@ assertions.
 | --- | --- |
 | Language behaviour, target codegen, diagnostics | `.slang` test under `tests/` |
 | Public API behaviour, reflection, compilation requests | `slang-unit-test` |
-| An IR pass contract, AST invariants, mangling, checker output | `slang-internals-test` |
+| An IR pass contract, AST invariants, mangling, checker output | `slang-static-unit-test` |
 
-`slang-internals-test` is for what the other two cannot reach. It is not a
+`slang-static-unit-test` is for what the other two cannot reach. It is not a
 replacement for either, and existing tests have no reason to move into it.
 
 ## Building and running
 
 ```bash
 cmake --preset default -DSLANG_LIB_TYPE=STATIC
-cmake --build build --config Debug --target slang-internals-test
-./build/Debug/bin/slang-internals-test
+cmake --build build --config Debug --target slang-static-unit-test
+./build/Debug/bin/slang-static-unit-test
 
 # Run a subset while iterating; the argument is a substring filter.
-./build/Debug/bin/slang-internals-test irDeadCode
+./build/Debug/bin/slang-static-unit-test irDeadCode
 ```

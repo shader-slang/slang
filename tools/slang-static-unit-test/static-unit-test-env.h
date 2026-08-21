@@ -1,11 +1,12 @@
-// internals-test-env.h
+// static-unit-test-env.h
 //
-// Helpers for unit tests that exercise `source/slang` internals directly.
+// Helpers for unit tests that call non-exported `source/slang` entry points
+// directly.
 //
-// These tests run in the `slang-internals-test` executable rather than the
-// `slang-unit-test` plugin, because reaching internal symbols requires linking
+// These tests run in the `slang-static-unit-test` executable rather than the
+// `slang-unit-test` plugin, because reaching non-exported symbols requires linking
 // the compiler statically (`SLANG_LIB_TYPE=STATIC`). See
-// `docs/design/internals-unit-testing.md`.
+// `docs/design/static-linked-unit-testing.md`.
 
 #ifndef SLANG_TOOLS_INTERNALS_TEST_ENV_H
 #define SLANG_TOOLS_INTERNALS_TEST_ENV_H
@@ -29,19 +30,19 @@ class Session;
 /// Per-test environment holding a `Linkage` and the internal compiler handles
 /// tests need. Construct one per test.
 ///
-/// Constructing an `InternalsTestEnv` is cheap (on the order of microseconds)
+/// Constructing an `StaticUnitTestEnv` is cheap (on the order of microseconds)
 /// because the expensive work — loading the core module — happens once when the
 /// process creates its global session, and that session is shared with every
 /// test through `UnitTestContext::slangGlobalSession`. Prefer one environment
 /// per test over sharing a single one: the isolation is essentially free, and
 /// sharing mutable compiler state between tests is what makes a suite
 /// order-dependent.
-class InternalsTestEnv
+class StaticUnitTestEnv
 {
 public:
     /// Create a session (and therefore a `Linkage`) from the global session
     /// that the test harness passes in.
-    explicit InternalsTestEnv(UnitTestContext* context);
+    explicit StaticUnitTestEnv(UnitTestContext* context);
 
     /// Return the internal `Session`, which IR construction needs in order to
     /// create an `IRModule`.
@@ -98,15 +99,31 @@ public:
     /// as something live refers to it.
     IRFunc* addVoidFunctionCalling(const char* name, bool keepAlive, IRFunc* callee);
 
+    /// Add a top-level `GlobalParam` of type `float`, with a name hint.
+    ///
+    /// Global parameters are kept alive by `IRDeadCodeEliminationOptions` regardless of
+    /// whether anything refers to them, so an unreferenced one is the smallest fixture
+    /// that tells the two settings of `keepGlobalParamsAlive` apart.
+    IRGlobalParam* addGlobalParam(const char* name);
+
     IRModule* getModule() const { return m_module.get(); }
 
-    /// Count top-level instructions with the given opcode.
+    /// Count the direct children of the module inst whose opcode is `op`.
+    ///
+    /// This is every module-level instruction -- types, global variables and witness
+    /// tables as well as functions -- not only functions, so an opcode that also occurs
+    /// among those will be counted there too.
     Int countGlobalInsts(IROp op) const;
 
-    /// Return the name hints of the top-level functions currently in the
-    /// module. Prefer asserting on these over a bare count: a failure then
-    /// reports which function unexpectedly survived or vanished, rather than
-    /// only that a number was wrong.
+    /// Return the name hints of the top-level functions currently in the module.
+    /// Prefer asserting on these over a bare count: a failure then reports which
+    /// function unexpectedly survived or vanished, rather than only that a number was
+    /// wrong.
+    ///
+    /// A function with no `IRNameHintDecoration` is omitted rather than reported under
+    /// a placeholder, so this matches `countGlobalInsts(kIROp_Func)` only while every
+    /// function in the fixture is named. `addVoidFunction` and `addVoidFunctionCalling`
+    /// always add a name hint; a fixture that builds a function by hand may not.
     List<String> getFunctionNames() const;
 
     /// Disassemble the module. Intended for diagnosing a failing test, not for

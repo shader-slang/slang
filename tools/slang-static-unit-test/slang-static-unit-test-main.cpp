@@ -1,12 +1,12 @@
-// slang-internals-test-main.cpp
+// slang-static-unit-test-main.cpp
 //
-// Driver for the internals unit tests.
+// Driver for the statically linked unit tests.
 //
 // The existing `slang-unit-test` tests are hosted in a shared library that
 // `slang-test` loads at runtime, which restricts them to symbols exported from
-// `libslang-compiler`. Internals tests instead live in this executable, which
-// links the compiler statically so that ordinary internal symbols in
-// `source/slang` resolve at link time without any export annotation.
+// `libslang-compiler`. These tests instead live in this executable, which links
+// the compiler statically so that non-exported symbols in `source/slang`
+// resolve at link time without any export annotation.
 //
 // The test-authoring surface is unchanged: tests use `SLANG_UNIT_TEST` and
 // `SLANG_CHECK` exactly as they do in `slang-unit-test`. Registration goes
@@ -121,7 +121,7 @@ extern "C" IUnitTestModule* slangUnitTestGetModule();
 int main(int argc, char** argv)
 {
     // Optional substring filter, so a developer can run a single test while
-    // iterating: `slang-internals-test irDeadCode`.
+    // iterating: `slang-static-unit-test irDeadCode`.
     const char* filter = (argc > 1) ? argv[1] : nullptr;
 
     // Creating the global session loads and parses the core module, which
@@ -165,7 +165,24 @@ int main(int argc, char** argv)
 
         selectedCount++;
         reporter.startTest(testName);
-        testModule->getTestFunc(i)(&context);
+
+        // These tests call compiler entry points directly, and a failed `SLANG_ASSERT` or
+        // `SLANG_RELEASE_ASSERT` throws by default (see the assertion-behaviour table in
+        // CLAUDE.md). The `SLANG_UNIT_TEST` wrapper catches only `AbortTestException`, so
+        // anything else would escape this loop and tear the process down mid-suite:
+        // `endTest()` would never run for this test, the remaining selected tests would
+        // never run, and the pass/fail summary would be lost. Report it as one failed test
+        // and carry on, so the run still says which test broke and how the rest fared.
+        try
+        {
+            testModule->getTestFunc(i)(&context);
+        }
+        catch (...)
+        {
+            printf("    FAILED: uncaught exception escaped the test body\n");
+            reporter.addResult(TestResult::Fail);
+        }
+
         reporter.endTest();
     }
 

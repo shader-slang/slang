@@ -10,9 +10,9 @@
 // type differs from itself, in ways that surface far from the cause. These tests
 // pin that invariant at its source.
 
-#include "internals-test-env.h"
 #include "slang/slang-ast-builder.h"
 #include "slang/slang-mangle.h"
+#include "static-unit-test-env.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -21,7 +21,7 @@ using namespace Slang;
 // agrees with pointer identity.
 SLANG_UNIT_TEST(astVectorTypesAreDeduplicated)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
 
     Type* floatType = astBuilder->getFloatType();
@@ -35,19 +35,30 @@ SLANG_UNIT_TEST(astVectorTypesAreDeduplicated)
     SLANG_CHECK(first->equals(second));
 }
 
-// Deduplication keys on the element count as a value, not on the identity of
-// the `IntVal` object, so two separately-created literals for 3 still produce
-// one type.
-SLANG_UNIT_TEST(astVectorDeduplicationKeysOnElementCountValue)
+// `getVectorType` canonicalizes a constant element count to `int` before consulting
+// the type cache, so a count spelled `uint` 3 and one spelled `int` 3 name the same
+// vector type.
+//
+// Note what this test deliberately does *not* do: calling `getIntVal(intType, 3)`
+// twice would prove nothing, because `getIntVal` deduplicates on (type, value) and
+// would hand back the same object both times. The assertion would then hold whether
+// or not the canonicalization existed. Two different *types* are what produce two
+// genuinely distinct `ConstantIntVal`s of equal value.
+SLANG_UNIT_TEST(astVectorDeduplicationCanonicalizesElementCountType)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
 
     Type* floatType = astBuilder->getFloatType();
-    Type* intType = astBuilder->getIntType();
+    IntVal* intThree = astBuilder->getIntVal(astBuilder->getIntType(), 3);
+    IntVal* uintThree = astBuilder->getIntVal(astBuilder->getUIntType(), 3);
 
-    Type* first = astBuilder->getVectorType(floatType, astBuilder->getIntVal(intType, 3));
-    Type* second = astBuilder->getVectorType(floatType, astBuilder->getIntVal(intType, 3));
+    // Guards the premise. If these were the same object, the check below would pass
+    // for a reason that has nothing to do with canonicalization.
+    SLANG_CHECK_ABORT(intThree != uintThree);
+
+    Type* first = astBuilder->getVectorType(floatType, intThree);
+    Type* second = astBuilder->getVectorType(floatType, uintThree);
 
     SLANG_CHECK(first == second);
 }
@@ -57,7 +68,7 @@ SLANG_UNIT_TEST(astVectorDeduplicationKeysOnElementCountValue)
 // much would pass the tests above.
 SLANG_UNIT_TEST(astDistinctVectorTypesAreNotEqual)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
 
     Type* floatType = astBuilder->getFloatType();
@@ -79,7 +90,7 @@ SLANG_UNIT_TEST(astDistinctVectorTypesAreNotEqual)
 // mangled name would let one definition silently satisfy a reference to another.
 SLANG_UNIT_TEST(astMangledTypeNamesDistinguishDistinctTypes)
 {
-    InternalsTestEnv env(unitTestContext);
+    StaticUnitTestEnv env(unitTestContext);
     ASTBuilder* astBuilder = env.getASTBuilder();
 
     Type* floatType = astBuilder->getFloatType();

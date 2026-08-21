@@ -1,6 +1,6 @@
-// internals-test-env.cpp
+// static-unit-test-env.cpp
 
-#include "internals-test-env.h"
+#include "static-unit-test-env.h"
 
 #include "slang/slang-ast-builder.h"
 #include "slang/slang-module.h"
@@ -9,7 +9,7 @@
 namespace Slang
 {
 
-InternalsTestEnv::InternalsTestEnv(UnitTestContext* context)
+StaticUnitTestEnv::StaticUnitTestEnv(UnitTestContext* context)
 {
     // The target choice is arbitrary for tests that never generate code, but a
     // session needs at least one target to be well-formed.
@@ -31,17 +31,17 @@ InternalsTestEnv::InternalsTestEnv(UnitTestContext* context)
     m_linkage = static_cast<Linkage*>(m_session.get());
 }
 
-Session* InternalsTestEnv::getSession() const
+Session* StaticUnitTestEnv::getSession() const
 {
     return m_linkage->getSessionImpl();
 }
 
-ASTBuilder* InternalsTestEnv::getASTBuilder() const
+ASTBuilder* StaticUnitTestEnv::getASTBuilder() const
 {
     return m_linkage->getASTBuilder();
 }
 
-Module* InternalsTestEnv::checkModuleFromSource(
+Module* StaticUnitTestEnv::checkModuleFromSource(
     const char* moduleName,
     const char* source,
     String* outDiagnostics)
@@ -67,6 +67,10 @@ Module* InternalsTestEnv::checkModuleFromSource(
         *outDiagnostics = String((const char*)diagnostics->getBufferPointer());
     }
 
+    // `Module` is the concrete internal implementation of the public `slang::IModule`,
+    // the same relationship as `Linkage` to `ISession` in the constructor above, so this
+    // downcast is sound for any `IModule` this linkage produced. The pointer is borrowed:
+    // the linkage's module cache owns it, so this environment must not release it.
     return static_cast<Module*>(module);
 }
 
@@ -98,6 +102,17 @@ IRFunc* IRFixtureBuilder::addVoidFunction(const char* name, bool keepAlive)
 
 IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAlive, IRFunc* callee)
 {
+    // The call emitted below is only well-formed if `callee` is a `void()` function
+    // belonging to this module. Getting that wrong produces malformed IR that fails
+    // somewhere inside a later pass, which reads as a bug in the pass under test rather
+    // than a bad fixture, so check it here where the caller's mistake is still visible.
+    SLANG_RELEASE_ASSERT(callee);
+    SLANG_RELEASE_ASSERT(callee->getParent() == m_module->getModuleInst());
+    auto calleeType = as<IRFuncType>(callee->getFullType());
+    SLANG_RELEASE_ASSERT(calleeType);
+    SLANG_RELEASE_ASSERT(calleeType->getParamCount() == 0);
+    SLANG_RELEASE_ASSERT(calleeType->getResultType()->getOp() == kIROp_VoidType);
+
     m_builder.setInsertInto(m_module.get());
 
     IRFunc* func = m_builder.createFunc();
@@ -115,6 +130,16 @@ IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAliv
     }
 
     return func;
+}
+
+IRGlobalParam* IRFixtureBuilder::addGlobalParam(const char* name)
+{
+    m_builder.setInsertInto(m_module.get());
+
+    IRGlobalParam* param = m_builder.createGlobalParam(m_builder.getFloatType());
+    m_builder.addNameHintDecoration(param, UnownedStringSlice(name));
+
+    return param;
 }
 
 Int IRFixtureBuilder::countGlobalInsts(IROp op) const
