@@ -318,11 +318,16 @@ SLANG_UNIT_TEST(PackageResolverTransitiveRange)
     SLANG_CHECK_ABORT(
         SLANG_SUCCEEDED(resolveDependencies(rootDirectory, rootManifest, lock, error)));
     SLANG_CHECK(lock.packages.getCount() == 2);
+    bool foundB = false;
     for (const auto& package : lock.packages)
     {
         if (package.name == "b")
+        {
+            foundB = true;
             SLANG_CHECK(package.tag == "v1.4.0");
+        }
     }
+    SLANG_CHECK(foundB);
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         writeManifest(Path::combine(rootDirectory, "slang-package.json"), rootManifest, error)));

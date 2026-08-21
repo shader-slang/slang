@@ -330,6 +330,7 @@ static void _writeKey(JSONWriter& writer, const char* key)
 
 static void _writeDependency(JSONWriter& writer, const Dependency& dependency)
 {
+    SLANG_RELEASE_ASSERT(isValidPackageName(dependency.name));
     writer.addUnquotedKey(dependency.name.getUnownedSlice(), SourceLoc());
     writer.startObject(SourceLoc());
     _writeKey(writer, "git");
@@ -460,6 +461,7 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
     writer.startObject(SourceLoc());
     for (const auto& package : lock.packages)
     {
+        SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
         writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
         writer.startObject(SourceLoc());
         _writeKey(writer, "git");

@@ -1,4 +1,5 @@
-# Slang Source Packages
+Slang Source Packages
+=====================
 
 The `slang package` command manages source dependencies stored in Git repositories. The short form
 `slang pkg` accepts the same commands. Package management does not change Slang's `import` syntax

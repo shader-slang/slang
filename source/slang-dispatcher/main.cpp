@@ -329,7 +329,7 @@ static int delegateToExecutable(
 {
     const char* executableName = extra ? (const char*)extra : nullptr;
     String toolName = executableName ? String(executableName) : (String("slang-") + name);
-    String argv0 = String("slang-") + name;
+    String argv0 = executableName ? toolName : (String("slang-") + name);
 
     int exitCode = 1;
     LaunchResult result = launchTool(ctx, toolName, argv0.getBuffer(), argc, argv, exitCode);

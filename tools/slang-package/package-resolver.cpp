@@ -24,7 +24,6 @@ class Resolver
 {
 public:
     static const Index kMaxPackageCount = 256;
-    static const Index kMaxResolutionDepth = 64;
     static const Index kMaxCandidateAttempts = 4096;
 
     String projectRoot;
@@ -43,7 +42,7 @@ public:
         for (const auto& dependency : rootManifest.dependencies)
             SLANG_RETURN_ON_FAIL(addDependency(dependency, outError));
 
-        SLANG_RETURN_ON_FAIL(search(0, outError));
+        SLANG_RETURN_ON_FAIL(search(outError));
         outLock = LockFile();
         for (const auto& package : packages)
         {
@@ -149,8 +148,13 @@ private:
             return SLANG_FAIL;
         }
         SemanticVersion manifestVersion;
-        SLANG_RETURN_ON_FAIL(
-            SemanticVersion::parse(outManifest.version.getUnownedSlice(), manifestVersion));
+        if (SLANG_FAILED(
+                SemanticVersion::parse(outManifest.version.getUnownedSlice(), manifestVersion)))
+        {
+            outError = String("Manifest for package '") + package.name +
+                       "' has an invalid semantic version: " + outManifest.version;
+            return SLANG_FAIL;
+        }
         if (manifestVersion != candidate.version)
         {
             outError = String("Manifest version for package '") + package.name +
@@ -160,13 +164,8 @@ private:
         return SLANG_OK;
     }
 
-    SlangResult search(Index depth, String& outError)
+    SlangResult search(String& outError)
     {
-        if (depth > kMaxResolutionDepth)
-        {
-            outError = "Dependency graph exceeds the resolution depth limit.";
-            return SLANG_FAIL;
-        }
         Index unresolvedIndex = -1;
         for (Index i = 0; i < packages.getCount(); ++i)
         {
@@ -221,7 +220,7 @@ private:
                     break;
                 }
             }
-            if (!dependencyConflict && SLANG_SUCCEEDED(search(depth + 1, candidateError)))
+            if (!dependencyConflict && SLANG_SUCCEEDED(search(candidateError)))
                 return SLANG_OK;
 
             lastCandidateError = candidateError;

@@ -4,6 +4,7 @@
 //TEST:DISPATCHER(filecheck=FLAG): package --help
 //TEST:DISPATCHER(filecheck=PKG_FLAG): pkg --help
 //TEST:DISPATCHER(filecheck=BAD): package definitely-not-a-command
+//TEST:DISPATCHER(filecheck=PKG_BAD): pkg definitely-not-a-command
 
 // PACKAGE: result code = 0
 // PACKAGE: Usage: slang-package <command>
@@ -19,3 +20,6 @@
 
 // BAD: result code = 1
 // BAD: slang-package: error: Invalid command or arguments
+
+// PKG_BAD: result code = 1
+// PKG_BAD: slang-package: error: Invalid command or arguments
