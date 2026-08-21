@@ -1,5 +1,3 @@
-// attribute-namespace.slang
-
 // A user-defined attribute declared inside a `namespace` must be applicable through its qualified
 // path `[my_namespace::Example(...)]`, including across a nested namespace. See
 // shader-slang/slang#12668.

@@ -2243,7 +2243,6 @@ public:
         Scope* fromScope,
         bool& outAmbiguous);
 
-    // Resolve a `::`-qualified attribute name by walking its namespace/type qualifier segments.
     AttributeDecl* lookUpQualifiedAttributeDecl(List<NameLoc> const& segments, Scope* scope);
 
     bool hasFloatArgs(Attribute* attr, int numArgs);
