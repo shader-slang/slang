@@ -29,16 +29,21 @@ struct DeadCodeEliminationContext
     // there could be new DCE opportunities.
     bool phiRemoved = false;
 
+    // `scratchData` doubles as DCE's per-iteration live mark: an inst stamped with the current
+    // `liveEpoch` is live. It is shared, uninitialized-on-entry scratch that other passes leave
+    // arbitrary values in (e.g. the unbounded inst indices `slang-serialize-ir.cpp` writes), so
+    // `processInst` must zero the subtree before stamping — otherwise a stale value could be
+    // misread as a live mark.
+    UInt64 liveEpoch = 0;
+
     // Querying whether an instruction has been
     // determined to be live is easy.
-    // To speedup the test, we use the
-    // `scratchData` field of each inst as the marker.
     //
     bool isInstAlive(IRInst* inst)
     {
         if (!inst)
             return false;
-        return inst->scratchData != 0;
+        return inst->scratchData == liveEpoch;
     }
 
     // We are going to do an iterative analysis
@@ -68,9 +73,9 @@ struct DeadCodeEliminationContext
         if (!inst)
             return;
 
-        if (!inst->scratchData)
+        if (inst->scratchData != liveEpoch)
         {
-            inst->scratchData = 1;
+            inst->scratchData = liveEpoch;
             workList.add(inst);
         }
     }
@@ -91,10 +96,12 @@ struct DeadCodeEliminationContext
 
         module->invalidateAllAnalysis();
 
+        // Establish the zero baseline that `liveEpoch` relies on (see its declaration).
+        initializeScratchData(root);
+
         for (;;)
         {
-            // Clear the `alive` bits by initializing all scratchData to 0.
-            initializeScratchData(root);
+            ++liveEpoch;
 
             workList.clear();
 
