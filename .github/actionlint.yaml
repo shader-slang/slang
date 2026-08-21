@@ -13,10 +13,10 @@ self-hosted-runner:
     - regression-test
     - SM80Plus
     - vulkancts
-    # Hosted GitHub partner-runner label for the VS2026 advance-testing
-    # image (used by the native Windows ARM64 build/test jobs in ci.yml).
-    # Not yet in actionlint's bundled known-labels dataset since it is a
-    # newly added hosted label, not a self-hosted one — allowlisting it
-    # here is the supported workaround until actionlint's dataset
-    # catches up.
+    # Hosted GitHub partner-runner label for the Windows 11 ARM64 with
+    # Visual Studio 2026 image, GA since 2026-08-19 (used by the native
+    # Windows ARM64 build/test jobs in ci.yml). Not yet in actionlint's
+    # bundled known-labels dataset since it is a newly added hosted
+    # label, not a self-hosted one — allowlisting it here is the
+    # supported workaround until actionlint's dataset catches up.
     - windows-11-vs2026-arm

@@ -58,7 +58,13 @@ runs:
         # the equivalent problem in Slang's own downstream-compiler
         # invocation). Force arch: arm64 on a native arm64 Windows host so
         # the toolchain matches the host.
-        arch: ${{ (inputs.os == 'windows' && inputs.platform == 'aarch64') && 'arm64' || '' }}
+        #
+        # msvc-dev-cmd's own x64 default only applies when its arch input is
+        # entirely omitted from the step — an explicitly empty string is
+        # still a provided value and is passed through to vcvarsall as-is,
+        # which does not select x64. Every non-aarch64 Windows caller must
+        # therefore get an explicit "x64" here, not "".
+        arch: ${{ (inputs.os == 'windows' && inputs.platform == 'aarch64') && 'arm64' || 'x64' }}
 
     - name: Install dependencies (Linux only)
       if: inputs.os == 'linux'
