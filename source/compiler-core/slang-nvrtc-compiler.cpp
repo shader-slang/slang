@@ -15,6 +15,8 @@
 #include "slang-artifact-util.h"
 #include "slang-com-helper.h"
 
+#include <atomic>
+
 namespace nvrtc
 {
 
@@ -168,6 +170,12 @@ protected:
     bool m_optixIncludeSearched = false;
     // Holds location of where include (for optix.h) is found.
     String m_optixIncludePath;
+
+    // Number of compiles this (process-lived, per-session) instance has started, used to gate
+    // NVRTC automatic precompiled headers: PCH only pays off from the second compile onward, so we
+    // enable `-pch` once this counter shows a prior compile. `compile()` may run on several threads
+    // at once, so the counter is atomic.
+    std::atomic<uint32_t> m_compileCount{0};
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
@@ -1330,6 +1338,28 @@ SlangResult NVRTCDownstreamCompiler::compile(
         builder << char('0' + version.m_minor);
 
         cmdLine.addArg(builder);
+    }
+
+    // NVRTC 12.8+ can automatically create and reuse a precompiled header for the leading run of
+    // preprocessing directives in a translation unit (`-pch`). The tools emit the CUDA prelude as a
+    // leading `#include "slang-cuda-prelude.h"` (see
+    // TestToolUtil::setSessionDefaultPreludeFromExePath), so the whole prelude sits before NVRTC's
+    // PCH "header stop point" and is precompiled once, then reused. Measured on NVRTC 12.9: a small
+    // kernel drops from ~104 ms to ~22 ms on the second and later compiles in a process. The PCH
+    // heap is process-global and its 256 MB default already covers the prelude's ~27 MB
+    // requirement, so no heap-sizing API calls are needed.
+    //
+    // The first compile in a process only pays the cost of building the PCH with nothing to reuse
+    // it, which is a net slowdown for one-shot use (e.g. the `slangc` CLI). We therefore enable
+    // `-pch` only after this instance has already started a compile; `fetch_add` returns the
+    // previous count, so the first compile skips it and every subsequent compile opts in.
+    if (m_desc.version.m_major > 12 ||
+        (m_desc.version.m_major == 12 && m_desc.version.m_minor >= 8))
+    {
+        if (m_compileCount.fetch_add(1) > 0)
+        {
+            cmdLine.addArg("-pch");
+        }
     }
 
     List<const char*> headers;

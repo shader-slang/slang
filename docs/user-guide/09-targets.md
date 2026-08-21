@@ -391,6 +391,21 @@ OptiX supports use of constant memory storage for ray tracing pipelines, where a
 OptiX uses a shader table for managing kernels and hit groups, and allows kernels to access the bytes of their shader table entry via a pointer.
 Similar to the compute pipeline, application code can layer many different policies on top of these mechanisms.
 
+### Speeding Up Repeated NVRTC Compilation with Precompiled Headers
+
+When Slang emits CUDA, a large prelude is placed at the top of the generated source, and NVRTC re-parses it on every compilation.
+NVRTC 12.8 and later can precompile that prelude once and reuse it across compilations in the same process via automatic precompiled headers (the `-pch` compile option), which can substantially reduce the per-shader compile time for the second and subsequent compilations.
+
+When you compile with `-target ptx`, Slang drives NVRTC itself and enables `-pch` automatically on NVRTC 12.8+ (from the second compilation onward, since the first builds the precompiled header). No action is required from your application for this path.
+
+When you compile with `-target cuda`, Slang hands you CUDA source and your application drives NVRTC. To benefit from precompiled headers there:
+
+- Present the Slang CUDA prelude to NVRTC as a leading `#include` of `slang-cuda-prelude.h` rather than as inlined text, so the whole prelude sits before NVRTC's precompiled-header "stop point" (the first token that is not part of a preprocessing directive).
+- Pass `-pch` in the option list to `nvrtcCompileProgram`.
+- The precompiled-header heap is process-global and has a default that already covers the Slang prelude, so no heap sizing is normally needed. If a compilation reports `NVRTC_ERROR_PCH_CREATE_HEAP_EXHAUSTED` from `nvrtcGetPCHCreateStatus`, grow the heap once by calling `nvrtcSetPCHHeapSize(nvrtcGetPCHHeapSizeRequired(...))` and retry; do not call `nvrtcSetPCHHeapSize` proactively before each compilation, because doing so frees any existing precompiled header and defeats reuse.
+
+The precompiled header is keyed on the compilation options, so it is safe to reuse across compilations that differ only in their shader body; NVRTC recreates it automatically when the options or the leading directives change.
+
 ## CPU Compute
 
 > #### Note
