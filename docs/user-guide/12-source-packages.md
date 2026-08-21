@@ -11,6 +11,7 @@ A package uses these conventional paths:
 
 ```text
 slang-package.json
+LICENSE
 src/
 tests/
 docs/
@@ -27,6 +28,7 @@ The manifest declares the package and its source dependencies:
   "name": "my-shaders",
   "version": "0.1.0",
   "exports": ["src"],
+  "license_files": ["LICENSE"],
   "dependencies": {
     "noise": {
       "git": "https://github.com/example/slang-noise.git",
@@ -35,6 +37,10 @@ The manifest declares the package and its source dependencies:
   }
 }
 ```
+
+Every path in `license_files` must name a non-empty license file in the package repository.
+`slang package init` creates a `LICENSE` placeholder that must be replaced before validation
+succeeds.
 
 Dependency versions come from Git tags named `vMAJOR.MINOR.PATCH`, which package publishers must
 treat as immutable. Fetching fails if a locked tag no longer identifies its locked commit.
@@ -62,6 +68,18 @@ control characters.
 
 After fetching, `.slang/search-paths` lists the source roots to pass to `slangc` with `-I`. Paths in
 this file are relative to the package root and are not added to compiler sessions automatically.
+
+## Validating packages
+
+`slang package validate` checks the current package and every materialized package reachable
+through `slang-package-lock.json`. It validates each manifest and license file, requires all source
+exports to exist, and rejects module import paths exported by more than one package.
+
+Each `.slang` file that is not below a module's companion directory is a primary module file. Its
+first declaration must be `module NAME;`, where `NAME` matches the filename. Namespace directories
+do not form part of the declaration. For example, `src/acme/noise.slang` declares `module noise;`.
+Every `.slang` file below `src/acme/noise/` belongs to that module and must instead begin with
+`implementing noise;`.
 
 ## Creating and editing packages
 

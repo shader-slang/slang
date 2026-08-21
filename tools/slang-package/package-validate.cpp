@@ -1,0 +1,548 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "package-validate.h"
+
+#include "compiler-core/slang-lexer.h"
+#include "core/slang-io.h"
+#include "package-json.h"
+#include "package-lock.h"
+#include "package-types.h"
+
+namespace Slang
+{
+namespace PackageTool
+{
+
+static const char* const kManifestName = "slang-package.json";
+static const char* const kLockName = "slang-package-lock.json";
+static const char* const kLicensePlaceholder =
+    "Replace this file with the package license before publishing.\n";
+static const Index kMaxSourceFileCount = 16384;
+static const Index kMaxSourceDirectoryCount = 4096;
+
+const char* getLicensePlaceholderText()
+{
+    return kLicensePlaceholder;
+}
+
+struct DirectoryEntry
+{
+    Path::Type type;
+    String name;
+};
+
+class DirectoryEntryCollector : public Path::Visitor
+{
+public:
+    List<DirectoryEntry> entries;
+
+    virtual void accept(Path::Type type, const UnownedStringSlice& filename) override
+    {
+        DirectoryEntry entry;
+        entry.type = type;
+        entry.name = filename;
+        entries.add(entry);
+    }
+};
+
+struct SourceFileCollection
+{
+    String canonicalRoot;
+    List<String> relativePaths;
+    List<String> visitedDirectories;
+};
+
+static bool _isPathWithin(const String& canonicalRoot, const String& canonicalPath)
+{
+    if (canonicalPath == canonicalRoot)
+        return true;
+    UnownedStringSlice root = canonicalRoot.getUnownedSlice();
+    UnownedStringSlice path = canonicalPath.getUnownedSlice();
+    return path.startsWith(root) && path.getLength() > root.getLength() &&
+           Path::isDelimiter(path[root.getLength()]);
+}
+
+/// Collect each `.slang` file under an export without following a directory outside that export.
+static SlangResult _collectSourceFilesRec(
+    const String& exportRoot,
+    const String& relativeDirectory,
+    SourceFileCollection& ioCollection,
+    String& outError)
+{
+    String directory =
+        relativeDirectory.getLength() ? Path::combine(exportRoot, relativeDirectory) : exportRoot;
+    String canonicalDirectory;
+    if (SLANG_FAILED(Path::getCanonical(directory, canonicalDirectory)))
+    {
+        outError = String("Cannot canonicalize source directory: ") + directory;
+        return SLANG_FAIL;
+    }
+    if (!_isPathWithin(ioCollection.canonicalRoot, canonicalDirectory))
+    {
+        outError = String("Source directory escapes its package export: ") + directory;
+        return SLANG_FAIL;
+    }
+    if (ioCollection.visitedDirectories.contains(canonicalDirectory))
+        return SLANG_OK;
+    if (ioCollection.visitedDirectories.getCount() >= kMaxSourceDirectoryCount)
+    {
+        outError = String("Package source tree exceeds the directory limit: ") + exportRoot;
+        return SLANG_FAIL;
+    }
+    ioCollection.visitedDirectories.add(canonicalDirectory);
+
+    DirectoryEntryCollector collector;
+    if (SLANG_FAILED(Path::find(directory, nullptr, &collector)))
+    {
+        outError = String("Cannot enumerate source directory: ") + directory;
+        return SLANG_FAIL;
+    }
+    collector.entries.sort([](const DirectoryEntry& left, const DirectoryEntry& right)
+                           { return left.name < right.name; });
+    for (const auto& entry : collector.entries)
+    {
+        String relativePath = relativeDirectory.getLength()
+                                  ? Path::combine(relativeDirectory, entry.name)
+                                  : entry.name;
+        if (entry.type == Path::Type::Directory)
+        {
+            SLANG_RETURN_ON_FAIL(
+                _collectSourceFilesRec(exportRoot, relativePath, ioCollection, outError));
+        }
+        else if (
+            entry.type == Path::Type::File &&
+            relativePath.getUnownedSlice().endsWithCaseInsensitive(".slang"))
+        {
+            String canonicalPath;
+            if (SLANG_FAILED(
+                    Path::getCanonical(Path::combine(exportRoot, relativePath), canonicalPath)) ||
+                !_isPathWithin(ioCollection.canonicalRoot, canonicalPath))
+            {
+                outError = String("Source file escapes its package export: ") +
+                           Path::combine(exportRoot, relativePath);
+                return SLANG_FAIL;
+            }
+            if (ioCollection.relativePaths.getCount() >= kMaxSourceFileCount)
+            {
+                outError = String("Package source tree exceeds the file limit: ") + exportRoot;
+                return SLANG_FAIL;
+            }
+            ioCollection.relativePaths.add(relativePath);
+        }
+    }
+    return SLANG_OK;
+}
+
+static String _normalizePath(const String& path)
+{
+    StringBuilder result;
+    for (auto c : path.getUnownedSlice())
+        result.append(c == '\\' ? '/' : c);
+    return result.produceString();
+}
+
+static String _canonicalModuleName(const String& name)
+{
+    String normalized = _normalizePath(name);
+    Index separator = normalized.getUnownedSlice().lastIndexOf('/');
+    UnownedStringSlice simpleName = separator < 0
+                                        ? normalized.getUnownedSlice()
+                                        : normalized.getUnownedSlice().tail(separator + 1);
+    if (simpleName.endsWithCaseInsensitive(".slang"))
+        simpleName = simpleName.head(simpleName.getLength() - 6);
+
+    StringBuilder result;
+    for (auto c : simpleName)
+        result.append(c == '-' ? '_' : c);
+    return result.produceString();
+}
+
+enum class ModuleHeaderKind
+{
+    Module,
+    Implementing,
+};
+
+/// Read the required first `module` or `implementing` declaration from a Slang source file.
+static SlangResult _readModuleHeader(
+    const String& path,
+    ModuleHeaderKind& outKind,
+    String& outName,
+    String& outError)
+{
+    String contents;
+    if (SLANG_FAILED(File::readAllText(path, contents)))
+    {
+        outError = String("Cannot read Slang source file: ") + path;
+        return SLANG_FAIL;
+    }
+
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink(&sourceManager, Lexer::sourceLocationLexer);
+    SourceFile* sourceFile =
+        sourceManager.createSourceFileWithString(PathInfo::makePath(path), contents);
+    SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+    NamePool namePool;
+    Lexer lexer;
+    lexer.initialize(sourceView, &sink, &namePool, sourceManager.getMemoryArena());
+    TokenList tokens = lexer.lexAllSemanticTokens();
+    TokenReader reader(tokens);
+
+    Token declaration = reader.advanceToken();
+    if (declaration.type != TokenType::Identifier)
+    {
+        outError =
+            String("Slang package source must start with 'module' or 'implementing': ") + path;
+        return SLANG_FAIL;
+    }
+    if (declaration.getContent() == "module")
+        outKind = ModuleHeaderKind::Module;
+    else if (declaration.getContent() == "implementing")
+        outKind = ModuleHeaderKind::Implementing;
+    else
+    {
+        outError =
+            String("Slang package source must start with 'module' or 'implementing': ") + path;
+        return SLANG_FAIL;
+    }
+
+    Token name = reader.advanceToken();
+    if (name.type == TokenType::StringLiteral)
+        outName = getFileNameTokenValue(name);
+    else if (name.type == TokenType::Identifier)
+        outName = name.getContent();
+    else
+    {
+        outError = String("Module declaration must name its module: ") + path;
+        return SLANG_FAIL;
+    }
+    if (Path::hasPath(outName))
+    {
+        outError = String("Module declaration must use a simple name: ") + path;
+        return SLANG_FAIL;
+    }
+    if (reader.advanceToken().type != TokenType::Semicolon)
+    {
+        outError = String("Module declaration must use a simple name followed by ';': ") + path;
+        return SLANG_FAIL;
+    }
+    outName = _canonicalModuleName(outName);
+    return SLANG_OK;
+}
+
+struct ModuleLocation
+{
+    String canonicalImport;
+    String packageName;
+    String path;
+};
+
+/// Find the primary module file whose same-named directory contains `relativePath`.
+static String _findOwningModule(
+    const String& relativePath,
+    const List<String>& normalizedSourcePaths)
+{
+    String normalized = _normalizePath(relativePath);
+    List<UnownedStringSlice> components;
+    Path::split(normalized.getUnownedSlice(), components);
+    String prefix;
+    for (Index i = 0; i + 1 < components.getCount(); ++i)
+    {
+        String candidate = prefix.getLength()
+                               ? Path::combine(prefix, String(components[i]) + ".slang")
+                               : String(components[i]) + ".slang";
+        candidate = _normalizePath(candidate);
+        if (normalizedSourcePaths.contains(candidate))
+            return candidate;
+        prefix = prefix.getLength() ? Path::combine(prefix, components[i]) : String(components[i]);
+    }
+    return String();
+}
+
+static SlangResult _addModule(
+    const String& packageName,
+    const String& exportRoot,
+    const String& relativePath,
+    List<ModuleLocation>& ioModules,
+    String& outError)
+{
+    String normalizedImport = _normalizePath(Path::getPathWithoutExt(relativePath));
+    StringBuilder canonicalImportBuilder;
+    for (auto c : normalizedImport.getUnownedSlice())
+        canonicalImportBuilder.append(c == '-' ? '_' : c);
+    String canonicalImport = canonicalImportBuilder.produceString();
+    String fullPath = Path::combine(exportRoot, relativePath);
+    for (const auto& existing : ioModules)
+    {
+        if (existing.canonicalImport == canonicalImport)
+        {
+            outError = String("Module '") + canonicalImport + "' is exported by both package '" +
+                       existing.packageName + "' (" + existing.path + ") and package '" +
+                       packageName + "' (" + fullPath + ").";
+            return SLANG_FAIL;
+        }
+    }
+    ModuleLocation location;
+    location.canonicalImport = canonicalImport;
+    location.packageName = packageName;
+    location.path = fullPath;
+    ioModules.add(location);
+    return SLANG_OK;
+}
+
+/// Validate declaration placement in one export and add each primary module to the flat index.
+static SlangResult _validateExport(
+    const String& packageName,
+    const String& exportRoot,
+    List<ModuleLocation>& ioModules,
+    String& outError)
+{
+    SlangPathType exportType;
+    if (SLANG_FAILED(Path::getPathType(exportRoot, &exportType)) ||
+        exportType != SLANG_PATH_TYPE_DIRECTORY)
+    {
+        outError = String("Package export is not a directory: ") + exportRoot;
+        return SLANG_FAIL;
+    }
+
+    SourceFileCollection collection;
+    if (SLANG_FAILED(Path::getCanonical(exportRoot, collection.canonicalRoot)))
+    {
+        outError = String("Cannot canonicalize package export: ") + exportRoot;
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(_collectSourceFilesRec(exportRoot, String(), collection, outError));
+    List<String> normalizedSourcePaths;
+    for (const auto& relativePath : collection.relativePaths)
+        normalizedSourcePaths.add(_normalizePath(relativePath));
+
+    for (const auto& relativePath : collection.relativePaths)
+    {
+        String owner = _findOwningModule(relativePath, normalizedSourcePaths);
+        bool isPrimary = owner.getLength() == 0;
+        String expectedName = _canonicalModuleName(isPrimary ? relativePath : owner);
+        String fullPath = Path::combine(exportRoot, relativePath);
+        ModuleHeaderKind kind;
+        String declaredName;
+        SLANG_RETURN_ON_FAIL(_readModuleHeader(fullPath, kind, declaredName, outError));
+        if (isPrimary && kind != ModuleHeaderKind::Module)
+        {
+            outError = String("Primary module file must start with 'module ") + expectedName +
+                       ";': " + fullPath;
+            return SLANG_FAIL;
+        }
+        if (!isPrimary && kind != ModuleHeaderKind::Implementing)
+        {
+            outError = String("Companion module file must start with 'implementing ") +
+                       expectedName + ";': " + fullPath;
+            return SLANG_FAIL;
+        }
+        if (declaredName != expectedName)
+        {
+            outError = String("Module declaration name '") + declaredName +
+                       "' does not match expected name '" + expectedName + "': " + fullPath;
+            return SLANG_FAIL;
+        }
+        if (isPrimary)
+            SLANG_RETURN_ON_FAIL(
+                _addModule(packageName, exportRoot, relativePath, ioModules, outError));
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _validateLicenseFiles(
+    const String& packageRoot,
+    const Manifest& manifest,
+    String& outError)
+{
+    if (manifest.licenseFiles.getCount() == 0)
+    {
+        outError = String("Package manifest must list at least one file in 'license_files': ") +
+                   packageRoot;
+        return SLANG_FAIL;
+    }
+    String canonicalPackageRoot;
+    if (SLANG_FAILED(Path::getCanonical(packageRoot, canonicalPackageRoot)))
+    {
+        outError = String("Cannot canonicalize package root: ") + packageRoot;
+        return SLANG_FAIL;
+    }
+    for (const auto& relativePath : manifest.licenseFiles)
+    {
+        String path = Path::combine(packageRoot, relativePath);
+        SlangPathType type;
+        if (SLANG_FAILED(Path::getPathType(path, &type)) || type != SLANG_PATH_TYPE_FILE)
+        {
+            outError = String("Package license file does not exist: ") + path;
+            return SLANG_FAIL;
+        }
+        String canonicalPath;
+        if (SLANG_FAILED(Path::getCanonical(path, canonicalPath)) ||
+            !_isPathWithin(canonicalPackageRoot, canonicalPath))
+        {
+            outError = String("Package license file escapes its package: ") + path;
+            return SLANG_FAIL;
+        }
+        String contents;
+        if (SLANG_FAILED(File::readAllText(path, contents)) || contents.trim().getLength() == 0)
+        {
+            outError = String("Package license file is empty or unreadable: ") + path;
+            return SLANG_FAIL;
+        }
+        if (contents.getUnownedSlice().indexOf(UnownedStringSlice(kLicensePlaceholder).trim()) >= 0)
+        {
+            outError =
+                String("Replace the generated license placeholder before validating: ") + path;
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _validatePackageTree(
+    const String& packageRoot,
+    const Manifest& manifest,
+    List<ModuleLocation>& ioModules,
+    String& outError)
+{
+    SLANG_RETURN_ON_FAIL(_validateLicenseFiles(packageRoot, manifest, outError));
+    if (manifest.exports.getCount() == 0)
+    {
+        outError =
+            String("Package manifest must export at least one source directory: ") + packageRoot;
+        return SLANG_FAIL;
+    }
+    String canonicalPackageRoot;
+    if (SLANG_FAILED(Path::getCanonical(packageRoot, canonicalPackageRoot)))
+    {
+        outError = String("Cannot canonicalize package root: ") + packageRoot;
+        return SLANG_FAIL;
+    }
+    for (const auto& relativeExport : manifest.exports)
+    {
+        String exportRoot = Path::combine(packageRoot, relativeExport);
+        String canonicalExportRoot;
+        if (SLANG_FAILED(Path::getCanonical(exportRoot, canonicalExportRoot)) ||
+            !_isPathWithin(canonicalPackageRoot, canonicalExportRoot))
+        {
+            outError = String("Package export escapes its package: ") + exportRoot;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(_validateExport(manifest.name, exportRoot, ioModules, outError));
+    }
+    return SLANG_OK;
+}
+
+static SlangResult _readMaterializedManifest(
+    const String& projectRoot,
+    const LockedPackage& package,
+    Manifest& outManifest,
+    String& outError)
+{
+    String packageRoot =
+        Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+    if (SLANG_FAILED(
+            readManifest(Path::combine(packageRoot, kManifestName), outManifest, outError)))
+    {
+        outError = String("Cannot validate materialized package '") + package.name +
+                   "'. Run 'slang package fetch --locked'. " + outError;
+        return SLANG_FAIL;
+    }
+    return validateLockedPackageManifest(package, outManifest, outError);
+}
+
+SlangResult validateProject(const String& projectRoot, String& outError)
+{
+    Manifest rootManifest;
+    SLANG_RETURN_ON_FAIL(
+        readManifest(Path::combine(projectRoot, kManifestName), rootManifest, outError));
+
+    List<ModuleLocation> modules;
+    SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, outError));
+
+    String lockPath = Path::combine(projectRoot, kLockName);
+    if (rootManifest.dependencies.getCount() == 0 && !File::exists(lockPath))
+        return SLANG_OK;
+    if (!File::exists(lockPath))
+    {
+        outError = "Package dependencies require slang-package-lock.json.";
+        return SLANG_FAIL;
+    }
+
+    LockFile lock;
+    SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    List<Manifest> packageManifests;
+    packageManifests.setCount(lock.packages.getCount());
+    for (Index i = 0; i < lock.packages.getCount(); ++i)
+        SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
+            projectRoot,
+            lock.packages[i],
+            packageManifests[i],
+            outError));
+
+    List<bool> reachable;
+    reachable.setCount(lock.packages.getCount());
+    for (auto& value : reachable)
+        value = false;
+    List<Index> pending;
+    for (const auto& dependency : rootManifest.dependencies)
+    {
+        Index index;
+        SLANG_RETURN_ON_FAIL(validateLockedDependency(dependency, lock, index, outError));
+        if (!reachable[index])
+        {
+            reachable[index] = true;
+            pending.add(index);
+        }
+    }
+    for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
+    {
+        Index index = pending[pendingIndex];
+        const LockedPackage& package = lock.packages[index];
+        const Manifest& manifest = packageManifests[index];
+        for (const auto& dependency : manifest.dependencies)
+        {
+            Index dependencyIndex;
+            SLANG_RETURN_ON_FAIL(
+                validateLockedDependency(dependency, lock, dependencyIndex, outError));
+            if (!reachable[dependencyIndex])
+            {
+                reachable[dependencyIndex] = true;
+                pending.add(dependencyIndex);
+            }
+        }
+
+        String lockedRoot =
+            Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+        String editableRoot =
+            Path::combine(Path::combine(projectRoot, ".slang", "edit"), package.name);
+        SlangPathType editableType;
+        String sourceRoot = SLANG_SUCCEEDED(Path::getPathType(editableRoot, &editableType)) &&
+                                    editableType == SLANG_PATH_TYPE_DIRECTORY
+                                ? editableRoot
+                                : lockedRoot;
+        Manifest sourceManifest;
+        SLANG_RETURN_ON_FAIL(
+            readManifest(Path::combine(sourceRoot, kManifestName), sourceManifest, outError));
+        if (sourceManifest.name != package.name)
+        {
+            outError = String("Package source manifest has the wrong name: ") + sourceRoot;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(_validatePackageTree(sourceRoot, sourceManifest, modules, outError));
+    }
+    for (Index i = 0; i < reachable.getCount(); ++i)
+    {
+        if (!reachable[i])
+        {
+            outError =
+                String("Lock file contains unreachable package '") + lock.packages[i].name + "'.";
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
+}
+
+} // namespace PackageTool
+} // namespace Slang

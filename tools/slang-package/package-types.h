@@ -25,6 +25,7 @@ struct Manifest
     String name;
     String version;
     List<String> exports;
+    List<String> licenseFiles;
     List<Dependency> dependencies;
 };
 

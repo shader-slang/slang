@@ -5,7 +5,9 @@
 #include "core/slang-io.h"
 #include "package-git.h"
 #include "package-json.h"
+#include "package-lock.h"
 #include "package-resolver.h"
+#include "package-validate.h"
 
 #include <stdio.h>
 
@@ -27,6 +29,7 @@ static void _printHelp()
         "  init             Create a package manifest and standard directories.\n"
         "  fetch [--locked] Materialize dependencies from the lock file.\n"
         "  update           Re-resolve dependencies and update the lock file.\n"
+        "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Create an editable dependency checkout.\n"
         "  unedit <name>    Remove an editable checkout.\n"
         "  help             Show this help text.\n");
@@ -50,51 +53,6 @@ static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
             return &package;
     }
     return nullptr;
-}
-
-static Index _findLockedPackageIndex(const LockFile& lock, const String& name)
-{
-    for (Index i = 0; i < lock.packages.getCount(); ++i)
-    {
-        if (lock.packages[i].name == name)
-            return i;
-    }
-    return -1;
-}
-
-static SlangResult _validateLockedDependency(
-    const Dependency& dependency,
-    const LockFile& lock,
-    Index& outPackageIndex,
-    String& outError)
-{
-    outPackageIndex = _findLockedPackageIndex(lock, dependency.name);
-    if (outPackageIndex < 0)
-    {
-        outError = String("Lock file does not contain dependency '") + dependency.name +
-                   "'. Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-
-    const LockedPackage& lockedPackage = lock.packages[outPackageIndex];
-    if (lockedPackage.git != dependency.git)
-    {
-        outError = String("Lock file uses a different Git URL for dependency '") + dependency.name +
-                   "'. Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-
-    VersionConstraint constraint;
-    SemanticVersion lockedVersion;
-    SLANG_RETURN_ON_FAIL(parseDependencyConstraint(dependency, constraint, outError));
-    if (SLANG_FAILED(parseReleaseTag(lockedPackage.tag, lockedVersion)) ||
-        !constraint.matches(lockedVersion))
-    {
-        outError = String("Locked tag no longer satisfies dependency '") + dependency.name +
-                   "'. Run 'slang package update'.";
-        return SLANG_FAIL;
-    }
-    return SLANG_OK;
 }
 
 static SlangResult _writeSearchPaths(
@@ -199,7 +157,7 @@ static SlangResult _validateLockAgainstManifest(
     for (const auto& dependency : manifest.dependencies)
     {
         Index packageIndex;
-        SLANG_RETURN_ON_FAIL(_validateLockedDependency(dependency, lock, packageIndex, outError));
+        SLANG_RETURN_ON_FAIL(validateLockedDependency(dependency, lock, packageIndex, outError));
         if (!reachablePackages[packageIndex])
         {
             reachablePackages[packageIndex] = true;
@@ -226,28 +184,12 @@ static SlangResult _validateLockAgainstManifest(
             manifestText,
             packageManifest,
             outError));
-        if (packageManifest.name != package.name)
-        {
-            outError = String("Locked package manifest has a different name: ") + package.name;
-            return SLANG_FAIL;
-        }
-        SemanticVersion tagVersion;
-        SemanticVersion manifestVersion;
-        if (SLANG_FAILED(parseReleaseTag(package.tag, tagVersion)) ||
-            SLANG_FAILED(SemanticVersion::parse(
-                packageManifest.version.getUnownedSlice(),
-                manifestVersion)) ||
-            tagVersion != manifestVersion)
-        {
-            outError =
-                String("Locked package manifest version does not match its tag: ") + package.name;
-            return SLANG_FAIL;
-        }
+        SLANG_RETURN_ON_FAIL(validateLockedPackageManifest(package, packageManifest, outError));
         for (const auto& dependency : packageManifest.dependencies)
         {
             Index dependencyIndex;
             SLANG_RETURN_ON_FAIL(
-                _validateLockedDependency(dependency, lock, dependencyIndex, outError));
+                validateLockedDependency(dependency, lock, dependencyIndex, outError));
             if (!reachablePackages[dependencyIndex])
             {
                 reachablePackages[dependencyIndex] = true;
@@ -298,6 +240,14 @@ static SlangResult _init(const String& projectRoot, String& outError)
 
     manifest.version = "0.1.0";
     manifest.exports.add("src");
+    manifest.licenseFiles.add("LICENSE");
+    String licensePath = Path::combine(projectRoot, "LICENSE");
+    if (!File::exists(licensePath) &&
+        SLANG_FAILED(File::writeAllText(licensePath, getLicensePlaceholderText())))
+    {
+        outError = String("Cannot create license placeholder: ") + licensePath;
+        return SLANG_FAIL;
+    }
     SLANG_RETURN_ON_FAIL(writeManifest(manifestPath, manifest, outError));
     fprintf(stdout, "Initialized package '%s'.\n", manifest.name.getBuffer());
     return SLANG_OK;
@@ -341,6 +291,13 @@ static SlangResult _update(const String& projectRoot, String& outError)
     SLANG_RETURN_ON_FAIL(writeLockFile(Path::combine(projectRoot, kLockName), lock, outError));
     SLANG_RETURN_ON_FAIL(_materialize(projectRoot, lock, outError));
     fprintf(stdout, "Updated %lld package(s).\n", (long long)lock.packages.getCount());
+    return SLANG_OK;
+}
+
+static SlangResult _validate(const String& projectRoot, String& outError)
+{
+    SLANG_RETURN_ON_FAIL(validateProject(projectRoot, outError));
+    fprintf(stdout, "Package and locked dependencies are valid.\n");
     return SLANG_OK;
 }
 
@@ -437,6 +394,8 @@ SlangResult executeInDirectory(
     }
     if (command == "update" && argc == 2)
         return _update(projectRoot, outError);
+    if (command == "validate" && argc == 2)
+        return _validate(projectRoot, outError);
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)

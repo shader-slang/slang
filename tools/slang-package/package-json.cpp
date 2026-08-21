@@ -185,7 +185,7 @@ static bool _isCommitHash(const String& commit)
     return true;
 }
 
-static SlangResult _readStringArray(
+static SlangResult _readRelativePathArray(
     JSONContainer* container,
     const JSONValue& object,
     const char* key,
@@ -193,9 +193,14 @@ static SlangResult _readStringArray(
     String& outError)
 {
     JSONValue value = _find(container, object, key);
+    if (!value.isValid())
+    {
+        outError = String("Missing required field '") + key + "'.";
+        return SLANG_FAIL;
+    }
     if (value.getKind() != JSONValue::Kind::Array)
     {
-        outError = String("Required field '") + key + "' must be an array.";
+        outError = String("Field '") + key + "' must be an array.";
         return SLANG_FAIL;
     }
     outValues.clear();
@@ -209,8 +214,16 @@ static SlangResult _readStringArray(
         String path = container->getString(item);
         if (!_isSafeRelativePath(path))
         {
-            outError = String("Export paths must be non-empty relative paths: ") + path;
+            outError = String("Entries in '") + key + "' must be non-empty relative paths: " + path;
             return SLANG_FAIL;
+        }
+        for (const auto& existing : outValues)
+        {
+            if (existing == path)
+            {
+                outError = String("Duplicate entry in '") + key + "': " + path;
+                return SLANG_FAIL;
+            }
         }
         outValues.add(path);
     }
@@ -290,8 +303,18 @@ static SlangResult _readManifest(ParsedJSON& json, Manifest& outManifest, String
         outError = String("Invalid package version: ") + outManifest.version;
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(
-        _readStringArray(json.container, json.root, "exports", outManifest.exports, outError));
+    SLANG_RETURN_ON_FAIL(_readRelativePathArray(
+        json.container,
+        json.root,
+        "exports",
+        outManifest.exports,
+        outError));
+    SLANG_RETURN_ON_FAIL(_readRelativePathArray(
+        json.container,
+        json.root,
+        "license_files",
+        outManifest.licenseFiles,
+        outError));
     SLANG_RETURN_ON_FAIL(
         _readDependencies(json.container, json.root, outManifest.dependencies, outError));
     return SLANG_OK;
@@ -358,6 +381,8 @@ SlangResult writeManifest(const String& path, const Manifest& manifest, String& 
     writer.addStringValue(manifest.version.getUnownedSlice(), SourceLoc());
     _writeKey(writer, "exports");
     _writeStringArray(writer, manifest.exports);
+    _writeKey(writer, "license_files");
+    _writeStringArray(writer, manifest.licenseFiles);
     _writeKey(writer, "dependencies");
     writer.startObject(SourceLoc());
     for (const auto& dependency : manifest.dependencies)
@@ -410,7 +435,7 @@ static SlangResult _readLockedPackage(
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(
-        _readStringArray(container, pair.value, "exports", outPackage.exports, outError));
+        _readRelativePathArray(container, pair.value, "exports", outPackage.exports, outError));
 
     return SLANG_OK;
 }
