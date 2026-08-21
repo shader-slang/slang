@@ -16,15 +16,15 @@ Texture2D<float> cudaT2D;
 Texture3D<float> cudaT3D;
 //TEST_INPUT: TextureCube(size=16, content = one, mipMaps=2):name cudaTCube
 TextureCube<float> cudaTCube;
-//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=3):name cudaT2DArray
+//TEST_INPUT: Texture2D(size=4, content = one, arrayLength=3, mipMaps=2):name cudaT2DArray
 Texture2DArray<float> cudaT2DArray;
-//TEST_INPUT: TextureCube(size=16, content = one, arrayLength=1):name cudaTCubeArray
+//TEST_INPUT: TextureCube(size=16, content = one, arrayLength=1, mipMaps=2):name cudaTCubeArray
 TextureCubeArray<float> cudaTCubeArray;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name cudaOutputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name cudaOutputBuffer
 RWStructuredBuffer<uint> cudaOutputBuffer;
 
-[numthreads(10, 1, 1)]
+[numthreads(12, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
@@ -32,7 +32,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     uint width = 0;
     uint height = 0;
     uint depth = 0;
-    // The mip-level overload requires this output, but CUDA cannot currently query the mip count.
+    // CUDA cannot query these outputs, but the mip-level array overload requires them.
+    uint elements = 0;
     uint numberOfLevels = 0;
     
     switch (idx)
@@ -69,7 +70,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         {
             // Test 2D array texture width and height
             // Note: We don't test array size since txq.array_size is not implemented
-            cudaT2DArray.GetDimensions(width, height, depth);
+            cudaT2DArray.GetDimensions(width, height, elements);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
@@ -77,7 +78,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         {
             // Test Cube array texture width and height
             // Note: We don't test array size since txq.array_size is not implemented
-            cudaTCubeArray.GetDimensions(width, height, depth);
+            cudaTCubeArray.GetDimensions(width, height, elements);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }
@@ -99,13 +100,28 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         {
             // Test 3D texture width, height and depth at mip level 1
             cudaT3D.GetDimensions(1, width, height, depth, numberOfLevels);
-            cudaOutputBuffer[idx] = ((0xff & width) << 16) | ((0xff & height) << 8) | (0xff & depth);
+            cudaOutputBuffer[idx] = ((0xff & width) << 16) | ((0xff & height) << 8) |
+                                    (0xff & depth);
             break;
         }
         case 9:
         {
             // Test Cube texture width and height at mip level 1
             cudaTCube.GetDimensions(1, width, height, numberOfLevels);
+            cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
+            break;
+        }
+        case 10:
+        {
+            // Test 2D array texture width and height at mip level 1
+            cudaT2DArray.GetDimensions(1, width, height, elements, numberOfLevels);
+            cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
+            break;
+        }
+        case 11:
+        {
+            // Test Cube array texture width and height at mip level 1
+            cudaTCubeArray.GetDimensions(1, width, height, elements, numberOfLevels);
             cudaOutputBuffer[idx] = ((0xff & width) << 8) | (0xff & height);
             break;
         }

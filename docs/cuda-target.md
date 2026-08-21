@@ -328,7 +328,8 @@ Some features are not available because they cannot be mapped with appropriate b
 * Does not currently support combined 'TextureSampler'. A Texture behaves equivalently to a TextureSampler and Samplers are ignored.
 * Half type is not currently supported
 * `GetDimensions` only supports querying texture width, height, and depth, including at a specified
-  mip level. Its array-size and mip-level-count output parameters are currently written as zero.
+  mip level. Its array-size, mip-level-count, and sample-count output parameters are currently
+  written as zero.
 
 Language aspects
 ================
