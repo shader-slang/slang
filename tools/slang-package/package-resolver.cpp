@@ -20,18 +20,13 @@ struct ResolutionPackage
     LockedPackage locked;
 };
 
-class Resolver
+class GitPackageResolverSource : public IPackageResolverSource
 {
 public:
-    static const Index kMaxPackageCount = 256;
-    static const Index kMaxCandidateAttempts = 4096;
-
     String projectRoot;
     String cacheRoot;
-    List<ResolutionPackage> packages;
-    Index candidateAttemptCount = 0;
 
-    SlangResult resolve(const Manifest& rootManifest, LockFile& outLock, String& outError)
+    SlangResult initialize(String& outError)
     {
         cacheRoot = Path::combine(projectRoot, ".slang", "cache");
         if (!Path::createDirectoryRecursive(cacheRoot))
@@ -39,6 +34,52 @@ public:
             outError = String("Cannot create package cache directory: ") + cacheRoot;
             return SLANG_FAIL;
         }
+        return SLANG_OK;
+    }
+
+    virtual SlangResult listReleaseTags(
+        const String&,
+        const String& git,
+        List<TagCandidate>& outCandidates,
+        String& outError) override
+    {
+        return PackageTool::listReleaseTags(git, outCandidates, outError);
+    }
+
+    virtual SlangResult loadManifest(
+        const String& packageName,
+        const String& git,
+        const TagCandidate& candidate,
+        Manifest& outManifest,
+        String& outError) override
+    {
+        String repositoryPath = Path::combine(cacheRoot, packageName);
+        SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, git, repositoryPath, outError));
+
+        String manifestText;
+        SLANG_RETURN_ON_FAIL(readFileAtRevision(
+            repositoryPath,
+            candidate.commit,
+            "slang-package.json",
+            manifestText,
+            outError));
+        String sourceName = git + "@" + candidate.tag + ":slang-package.json";
+        return readManifestText(sourceName, manifestText, outManifest, outError);
+    }
+};
+
+class Resolver
+{
+public:
+    static const Index kMaxPackageCount = 256;
+    static const Index kMaxCandidateAttempts = 4096;
+
+    IPackageResolverSource* source = nullptr;
+    List<ResolutionPackage> packages;
+    Index candidateAttemptCount = 0;
+
+    SlangResult resolve(const Manifest& rootManifest, LockFile& outLock, String& outError)
+    {
         for (const auto& dependency : rootManifest.dependencies)
             SLANG_RETURN_ON_FAIL(addDependency(dependency, outError));
 
@@ -129,18 +170,8 @@ private:
         Manifest& outManifest,
         String& outError)
     {
-        String repositoryPath = Path::combine(cacheRoot, package.name);
-        SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, package.git, repositoryPath, outError));
-
-        String manifestText;
-        SLANG_RETURN_ON_FAIL(readFileAtRevision(
-            repositoryPath,
-            candidate.commit,
-            "slang-package.json",
-            manifestText,
-            outError));
-        String sourceName = package.git + "@" + candidate.tag + ":slang-package.json";
-        SLANG_RETURN_ON_FAIL(readManifestText(sourceName, manifestText, outManifest, outError));
+        SLANG_RETURN_ON_FAIL(
+            source->loadManifest(package.name, package.git, candidate, outManifest, outError));
         if (outManifest.name != package.name)
         {
             outError = String("Package name '") + outManifest.name +
@@ -180,7 +211,8 @@ private:
 
         ResolutionPackage unresolved = packages[unresolvedIndex];
         List<TagCandidate> candidates;
-        SLANG_RETURN_ON_FAIL(listReleaseTags(unresolved.git, candidates, outError));
+        SLANG_RETURN_ON_FAIL(
+            source->listReleaseTags(unresolved.name, unresolved.git, candidates, outError));
         String lastCandidateError;
         for (const auto& candidate : candidates)
         {
@@ -235,15 +267,27 @@ private:
     }
 };
 
+SlangResult resolveDependenciesWithSource(
+    const Manifest& manifest,
+    IPackageResolverSource& source,
+    LockFile& outLock,
+    String& outError)
+{
+    Resolver resolver;
+    resolver.source = &source;
+    return resolver.resolve(manifest, outLock, outError);
+}
+
 SlangResult resolveDependencies(
     const String& projectRoot,
     const Manifest& manifest,
     LockFile& outLock,
     String& outError)
 {
-    Resolver resolver;
-    resolver.projectRoot = projectRoot;
-    return resolver.resolve(manifest, outLock, outError);
+    GitPackageResolverSource source;
+    source.projectRoot = projectRoot;
+    SLANG_RETURN_ON_FAIL(source.initialize(outError));
+    return resolveDependenciesWithSource(manifest, source, outLock, outError);
 }
 
 } // namespace PackageTool

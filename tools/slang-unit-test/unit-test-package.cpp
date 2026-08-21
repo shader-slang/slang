@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "core/slang-io.h"
-#include "core/slang-process-util.h"
-#include "package-git.h"
 #include "package-json.h"
 #include "package-resolver.h"
 #include "package-tool.h"
@@ -32,75 +30,6 @@ static SlangResult _makeTemporaryDirectory(TemporaryDirectory& outDirectory)
         File::generateTemporary(UnownedStringSlice("slang-package-test"), outDirectory.path));
     SLANG_RETURN_ON_FAIL(File::remove(outDirectory.path));
     return Path::createDirectoryRecursive(outDirectory.path) ? SLANG_OK : SLANG_FAIL;
-}
-
-static SlangResult _runGit(const List<String>& arguments, ExecuteResult& outResult)
-{
-    CommandLine commandLine;
-    commandLine.setExecutableLocation(ExecutableLocation(ExecutableLocation::Type::Name, "git"));
-    for (const auto& argument : arguments)
-        commandLine.addArg(argument);
-    return ProcessUtil::execute(commandLine, outResult);
-}
-
-static SlangResult _runGitChecked(const List<String>& arguments)
-{
-    ExecuteResult result;
-    SLANG_RETURN_ON_FAIL(_runGit(arguments, result));
-    return result.resultCode == 0 ? SLANG_OK : SLANG_FAIL;
-}
-
-static SlangResult _commitAndTag(
-    const String& repository,
-    const String& tag,
-    bool annotated = false)
-{
-    List<String> arguments;
-    arguments.add("-C");
-    arguments.add(repository);
-    arguments.add("add");
-    arguments.add(".");
-    SLANG_RETURN_ON_FAIL(_runGitChecked(arguments));
-
-    arguments.clear();
-    arguments.add("-C");
-    arguments.add(repository);
-    arguments.add("-c");
-    arguments.add("user.name=Slang Package Test");
-    arguments.add("-c");
-    arguments.add("user.email=slang-package-test@example.com");
-    arguments.add("commit");
-    arguments.add("-q");
-    arguments.add("-m");
-    arguments.add(tag);
-    SLANG_RETURN_ON_FAIL(_runGitChecked(arguments));
-
-    arguments.clear();
-    arguments.add("-C");
-    arguments.add(repository);
-    arguments.add("tag");
-    if (annotated)
-    {
-        arguments.add("-a");
-        arguments.add("-m");
-        arguments.add(tag);
-    }
-    arguments.add(tag);
-    return _runGitChecked(arguments);
-}
-
-static SlangResult _initializeRepository(const String& repository)
-{
-    SLANG_RETURN_ON_FAIL(Path::createDirectoryRecursive(repository) ? SLANG_OK : SLANG_FAIL);
-    List<String> arguments;
-    arguments.add("-c");
-    arguments.add("init.defaultBranch=main");
-    arguments.add("-c");
-    arguments.add("init.templateDir=");
-    arguments.add("init");
-    arguments.add("-q");
-    arguments.add(repository);
-    return _runGitChecked(arguments);
 }
 
 } // namespace
@@ -233,194 +162,224 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(!File::exists(Path::combine(invalidRoot, "slang-package.json")));
 }
 
-SLANG_UNIT_TEST(PackageResolverTransitiveRange)
+SLANG_UNIT_TEST(PackageToolLockedFetchUsesJSONLockName)
 {
-    List<String> versionArguments;
-    versionArguments.add("--version");
-    ExecuteResult versionResult;
-    if (SLANG_FAILED(_runGit(versionArguments, versionResult)))
-    {
-        SLANG_IGNORE_TEST;
-    }
-    SLANG_CHECK_ABORT(versionResult.resultCode == 0);
-
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
-    const String bRepository = Path::combine(temp.path, "b");
-    const String aRepository = Path::combine(temp.path, "a");
-    const String rootDirectory = Path::combine(temp.path, "root");
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(bRepository)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_initializeRepository(aRepository)));
-    SLANG_CHECK_ABORT(Path::createDirectoryRecursive(rootDirectory));
 
+    const char* initArguments[] = {"slang-package", "init"};
     String error;
-    Manifest bManifest;
-    bManifest.name = "b";
-    bManifest.version = "1.2.0";
-    bManifest.exports.add("src");
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(bRepository, "slang-package.json"), bManifest, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(bRepository, "v1.2.0")));
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
 
-    bManifest.version = "1.4.0";
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(bRepository, "slang-package.json"), bManifest, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(bRepository, "v1.4.0", true)));
+    const char* fetchArguments[] = {"slang-package", "fetch", "--locked"};
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-lock.json")) >= 0);
+}
 
-    List<TagCandidate> bCandidates;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(listReleaseTags(bRepository, bCandidates, error)));
-    List<String> revisionArguments;
-    revisionArguments.add("-C");
-    revisionArguments.add(bRepository);
-    revisionArguments.add("rev-parse");
-    revisionArguments.add("v1.4.0^{commit}");
-    ExecuteResult revisionResult;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_runGit(revisionArguments, revisionResult)));
-    SLANG_CHECK_ABORT(revisionResult.resultCode == 0);
-    SLANG_CHECK_ABORT(bCandidates.getCount() == 2);
-    SLANG_CHECK(bCandidates[0].commit == revisionResult.standardOutput.trim());
+namespace
+{
 
-    Manifest aManifest;
-    aManifest.name = "a";
-    aManifest.version = "1.0.0";
-    aManifest.exports.add("src");
-    Dependency aToB;
-    aToB.name = "b";
-    aToB.git = bRepository;
-    aToB.version = ">=1.2.0";
-    aManifest.dependencies.add(aToB);
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(aRepository, "slang-package.json"), aManifest, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(aRepository, "v1.0.0")));
+struct InMemoryRelease
+{
+    String git;
+    TagCandidate candidate;
+    Manifest manifest;
+};
 
-    aManifest.version = "2.0.0";
-    aManifest.dependencies[0].version = ">=9.0.0";
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(aRepository, "slang-package.json"), aManifest, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(aRepository, "v2.0.0")));
+class InMemoryPackageSource : public IPackageResolverSource
+{
+public:
+    List<InMemoryRelease> releases;
 
-    Manifest rootManifest;
-    rootManifest.name = "root";
-    rootManifest.version = "0.1.0";
-    rootManifest.exports.add("src");
-    Dependency rootToA;
-    rootToA.name = "a";
-    rootToA.git = aRepository;
-    rootToA.version = ">=1.0.0";
-    rootManifest.dependencies.add(rootToA);
-    Dependency rootToB;
-    rootToB.name = "b";
-    rootToB.git = bRepository;
-    rootToB.version = "<1.5.0";
-    rootManifest.dependencies.add(rootToB);
+    void addRelease(const String& git, const Manifest& manifest)
+    {
+        InMemoryRelease release;
+        release.git = git;
+        release.manifest = manifest;
+        release.candidate.tag = String("v") + manifest.version;
+        release.candidate.commit = release.candidate.tag;
+        SLANG_RELEASE_ASSERT(SLANG_SUCCEEDED(
+            SemanticVersion::parse(manifest.version.getUnownedSlice(), release.candidate.version)));
+        releases.add(release);
+    }
 
-    PackageTool::LockFile lock;
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(resolveDependencies(rootDirectory, rootManifest, lock, error)));
-    SLANG_CHECK(lock.packages.getCount() == 2);
-    bool foundB = false;
+    virtual SlangResult listReleaseTags(
+        const String&,
+        const String& git,
+        List<TagCandidate>& outCandidates,
+        String& outError) override
+    {
+        outCandidates.clear();
+        for (const auto& release : releases)
+        {
+            if (release.git == git)
+                outCandidates.add(release.candidate);
+        }
+        if (outCandidates.getCount() == 0)
+        {
+            outError = String("No in-memory releases for ") + git;
+            return SLANG_FAIL;
+        }
+        outCandidates.sort([](const TagCandidate& left, const TagCandidate& right)
+                           { return left.version > right.version; });
+        return SLANG_OK;
+    }
+
+    virtual SlangResult loadManifest(
+        const String&,
+        const String& git,
+        const TagCandidate& candidate,
+        Manifest& outManifest,
+        String& outError) override
+    {
+        for (const auto& release : releases)
+        {
+            if (release.git == git && release.candidate.tag == candidate.tag)
+            {
+                outManifest = release.manifest;
+                return SLANG_OK;
+            }
+        }
+        outError = String("Missing in-memory manifest for ") + git + "@" + candidate.tag;
+        return SLANG_FAIL;
+    }
+};
+
+static Manifest _makeManifest(const char* name, const char* version)
+{
+    Manifest manifest;
+    manifest.name = name;
+    manifest.version = version;
+    manifest.exports.add("src");
+    return manifest;
+}
+
+static void _addDependency(
+    Manifest& manifest,
+    const char* name,
+    const char* git,
+    const char* version)
+{
+    Dependency dependency;
+    dependency.name = name;
+    dependency.git = git;
+    dependency.version = version;
+    manifest.dependencies.add(dependency);
+}
+
+static const LockedPackage* _findLockedPackage(const PackageTool::LockFile& lock, const char* name)
+{
     for (const auto& package : lock.packages)
     {
-        if (package.name == "b")
-        {
-            foundB = true;
-            SLANG_CHECK(package.tag == "v1.4.0");
-        }
+        if (package.name == name)
+            return &package;
     }
-    SLANG_CHECK(foundB);
+    return nullptr;
+}
 
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(rootDirectory, "slang-package.json"), rootManifest, error)));
-    const char* updateArguments[] = {"slang-package", "update"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        rootDirectory,
-        SLANG_COUNT_OF(updateArguments),
-        updateArguments,
-        error)));
+} // namespace
 
-    String searchPaths;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        File::readAllText(Path::combine(rootDirectory, ".slang", "search-paths"), searchPaths)));
-    const String aSearchPath = Path::combine(Path::combine(".slang", "packages", "a"), "src");
-    const String bSearchPath = Path::combine(Path::combine(".slang", "packages", "b"), "src");
-    SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(aSearchPath.getUnownedSlice()) >= 0);
-    SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(bSearchPath.getUnownedSlice()) >= 0);
+SLANG_UNIT_TEST(PackageResolverTransitiveRange)
+{
+    InMemoryPackageSource source;
+    source.addRelease("memory:b", _makeManifest("b", "1.2.0"));
+    source.addRelease("memory:b", _makeManifest("b", "1.4.0"));
 
-    const String lockPath = Path::combine(rootDirectory, "slang-package.lock");
-    PackageTool::LockFile completeLock;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLockFile(lockPath, completeLock, error)));
-    PackageTool::LockFile incompleteLock = completeLock;
-    for (Index i = 0; i < incompleteLock.packages.getCount(); ++i)
-    {
-        if (incompleteLock.packages[i].name == "b")
-        {
-            incompleteLock.packages.removeAt(i);
-            break;
-        }
-    }
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLockFile(lockPath, incompleteLock, error)));
-    const char* lockedFetchArguments[] = {"slang-package", "fetch", "--locked"};
-    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
-        rootDirectory,
-        SLANG_COUNT_OF(lockedFetchArguments),
-        lockedFetchArguments,
-        error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLockFile(lockPath, completeLock, error)));
+    Manifest a1 = _makeManifest("a", "1.0.0");
+    _addDependency(a1, "b", "memory:b", ">=1.2.0");
+    source.addRelease("memory:a", a1);
+    Manifest a2 = _makeManifest("a", "2.0.0");
+    _addDependency(a2, "b", "memory:b", ">=9.0.0");
+    source.addRelease("memory:a", a2);
 
-    const char* editArguments[] = {"slang-package", "edit", "b"};
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        executeInDirectory(rootDirectory, SLANG_COUNT_OF(editArguments), editArguments, error)));
-    const String editableRoot = Path::combine(rootDirectory, Path::combine(".slang", "edit", "b"));
-    const String editableManifest = Path::combine(editableRoot, "slang-package.json");
-    String editableManifestText;
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(editableManifest, editableManifestText)));
-    SLANG_CHECK_ABORT(
-        SLANG_SUCCEEDED(File::writeAllText(editableManifest, editableManifestText + "\n")));
+    Manifest root = _makeManifest("root", "0.1.0");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    _addDependency(root, "b", "memory:b", "<1.5.0");
 
-    const char* uneditArguments[] = {"slang-package", "unedit", "b"};
-    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
-        rootDirectory,
-        SLANG_COUNT_OF(uneditArguments),
-        uneditArguments,
-        error)));
-    SLANG_CHECK(File::exists(editableManifest));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(editableManifest, editableManifestText)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
-        rootDirectory,
-        SLANG_COUNT_OF(uneditArguments),
-        uneditArguments,
-        error)));
-    SLANG_CHECK(!File::exists(editableRoot));
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    SLANG_CHECK(lock.packages.getCount() == 2);
+    const LockedPackage* a = _findLockedPackage(lock, "a");
+    const LockedPackage* b = _findLockedPackage(lock, "b");
+    SLANG_CHECK(a && a->tag == "v1.0.0");
+    SLANG_CHECK(b && b->tag == "v1.4.0");
+}
 
-    rootManifest.dependencies[1].version = "<1.4.0";
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(rootDirectory, "slang-package.json"), rootManifest, error)));
-    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
-        rootDirectory,
-        SLANG_COUNT_OF(lockedFetchArguments),
-        lockedFetchArguments,
-        error)));
+SLANG_UNIT_TEST(PackageResolverCompatibleSelfCycle)
+{
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a", "1.0.0");
+    _addDependency(a, "a", "memory:a", ">=1.0.0");
+    source.addRelease("memory:a", a);
+    Manifest root = _makeManifest("root", "0.1.0");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
 
-    rootManifest.dependencies[1].version = "<1.2.0";
-    error = String();
-    SLANG_CHECK(SLANG_FAILED(resolveDependencies(rootDirectory, rootManifest, lock, error)));
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    SLANG_CHECK(lock.packages.getCount() == 1);
+    const LockedPackage* lockedA = _findLockedPackage(lock, "a");
+    SLANG_CHECK_ABORT(lockedA);
+    SLANG_CHECK(lockedA->tag == "v1.0.0");
+}
+
+SLANG_UNIT_TEST(PackageResolverCompatibleCycle)
+{
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a", "1.0.0");
+    _addDependency(a, "b", "memory:b", ">=1.0.0");
+    source.addRelease("memory:a", a);
+    Manifest b = _makeManifest("b", "1.0.0");
+    _addDependency(b, "a", "memory:a", ">=1.0.0");
+    source.addRelease("memory:b", b);
+    Manifest root = _makeManifest("root", "0.1.0");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    SLANG_CHECK(lock.packages.getCount() == 2);
+}
+
+SLANG_UNIT_TEST(PackageResolverCycleBacktracksEarlierSelection)
+{
+    InMemoryPackageSource source;
+    source.addRelease("memory:a", _makeManifest("a", "1.0.0"));
+    source.addRelease("memory:a", _makeManifest("a", "2.0.0"));
+    Manifest b = _makeManifest("b", "1.0.0");
+    _addDependency(b, "a", "memory:a", "<2.0.0");
+    source.addRelease("memory:b", b);
+    Manifest root = _makeManifest("root", "0.1.0");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+    _addDependency(root, "b", "memory:b", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(resolveDependenciesWithSource(root, source, lock, error)));
+    const LockedPackage* lockedA = _findLockedPackage(lock, "a");
+    SLANG_CHECK_ABORT(lockedA);
+    SLANG_CHECK(lockedA->tag == "v1.0.0");
+}
+
+SLANG_UNIT_TEST(PackageResolverRejectsUnsatisfiableCycle)
+{
+    InMemoryPackageSource source;
+    Manifest a = _makeManifest("a", "1.0.0");
+    _addDependency(a, "b", "memory:b", ">=1.0.0");
+    source.addRelease("memory:a", a);
+    Manifest b = _makeManifest("b", "1.0.0");
+    _addDependency(b, "a", "memory:a", ">=2.0.0");
+    source.addRelease("memory:b", b);
+    Manifest root = _makeManifest("root", "0.1.0");
+    _addDependency(root, "a", "memory:a", ">=1.0.0");
+
+    PackageTool::LockFile lock;
+    String error;
+    SLANG_CHECK(SLANG_FAILED(resolveDependenciesWithSource(root, source, lock, error)));
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("No release tag satisfies")) >= 0);
-
-    aManifest.version = "1.1.0";
-    aManifest.dependencies[0].version = "<1.2.0";
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
-        writeManifest(Path::combine(aRepository, "slang-package.json"), aManifest, error)));
-    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_commitAndTag(aRepository, "v1.1.0")));
-
-    rootManifest.dependencies.clear();
-    rootToB.version = ">=1.4.0";
-    rootToB.tag = String();
-    rootManifest.dependencies.add(rootToB);
-    rootToA.version = String();
-    rootToA.tag = "v1.1.0";
-    rootManifest.dependencies.add(rootToA);
-    error = String();
-    SLANG_CHECK(SLANG_FAILED(resolveDependencies(rootDirectory, rootManifest, lock, error)));
-    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("transitive constraint")) >= 0);
 }

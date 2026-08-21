@@ -15,7 +15,7 @@ namespace PackageTool
 {
 
 static const char* const kManifestName = "slang-package.json";
-static const char* const kLockName = "slang-package.lock";
+static const char* const kLockName = "slang-package-lock.json";
 
 static void _printHelp()
 {
@@ -319,7 +319,7 @@ static SlangResult _fetch(const String& projectRoot, bool lockedOnly, String& ou
     {
         if (lockedOnly)
         {
-            outError = "fetch --locked requires slang-package.lock.";
+            outError = "fetch --locked requires slang-package-lock.json.";
             return SLANG_FAIL;
         }
         SLANG_RETURN_ON_FAIL(resolveDependencies(projectRoot, manifest, lock, outError));

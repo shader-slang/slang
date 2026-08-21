@@ -47,9 +47,10 @@ satisfying version, and reports an error when no version satisfies the full grap
 
 ## Locking and fetching
 
-`slang package fetch` resolves a project without a lockfile, writes `slang-package.lock`, and checks
-out every direct and transitive dependency under `.slang/packages/`. The generated lockfile records
-the exact tag and commit for every package. Later fetches use those commits without resolving again.
+`slang package fetch` resolves a project without a lockfile, writes `slang-package-lock.json`, and
+checks out every direct and transitive dependency under `.slang/packages/`. The generated lockfile
+records the exact tag and commit for every package. Later fetches use those commits without
+resolving again.
 
 Use `slang package fetch --locked` in CI to require an existing compatible lockfile. Use
 `slang package update` to query tags and resolve a new lockfile deliberately.

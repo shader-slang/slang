@@ -437,6 +437,12 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )
+    if(NOT SLANG_ENABLE_PACKAGE_GIT_TESTS)
+        set_source_files_properties(
+            ${slang_SOURCE_DIR}/tools/slang-unit-test/unit-test-package-git.cpp
+            PROPERTIES HEADER_FILE_ONLY ON
+        )
+    endif()
     target_include_directories(
         slang-unit-test
         PRIVATE ${slang_SOURCE_DIR}/tools/slang-package
