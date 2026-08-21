@@ -623,6 +623,10 @@ void initCommandOptions(CommandOptions& options)
          "-trace-coverage",
          nullptr,
          "Instrument the shader with per-statement line coverage counters. "
+         "Statements that provably execute together share one counter and one "
+         "runtime probe, which keeps instrumented shader code small without "
+         "changing reported per-line results; the manifest therefore reports "
+         "fewer counters than source entries. "
          "When writing compiled output to a file, slangc also emits "
          "`<output>.coverage-manifest.json` mapping source coverage entries to counters."},
         {OptionKind::TraceFunctionCoverage,

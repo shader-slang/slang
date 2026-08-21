@@ -840,6 +840,251 @@ static bool isCoverageMarkerOp(IROp op)
     }
 }
 
+// Decides whether a call can fail to return to its caller, so that
+// coverage coalescing knows when a straight-line run of markers is
+// really straight-line.
+//
+// Coalescing replaces several line markers with a single probe, which
+// is only sound when reaching the probe proves every marker it stands
+// for also executed. Inside one basic block that holds automatically
+// for ordinary code, because a block has a single entry and a single
+// exit. It stops holding when an instruction in the middle of the
+// block can abandon the invocation, since the instructions after it
+// then execute fewer times than the ones before it. Consider:
+//
+//     void maybeKill(float v) { if (v < 0.5f) discard; }
+//
+//     float4 main(float2 uv : TEXCOORD) : SV_Target
+//     {
+//         float a = uv.x + 1.0f;   // marker 1
+//         maybeKill(a);            // marker 2
+//         float c = a + 3.0f;      // marker 3
+//         return float4(c);        // marker 4
+//     }
+//
+// All four markers sit in `main`'s entry block, but when `maybeKill`
+// discards, markers 1 and 2 have executed and markers 3 and 4 have
+// not. Coalescing all four onto one counter would misreport one side
+// or the other, so the run must be split at the call.
+//
+// Results are memoized per function, and the analysis is a fixpoint
+// over the call graph so an exit deep in a callee still splits the
+// caller's run.
+//
+// Known gap: the ray-tracing hit terminators (`IgnoreHit`,
+// `AcceptHitAndEndSearch`) end the invocation at the target level, but
+// Slang's IR models them as ordinary `void` core-module functions that
+// return to their caller, so this analysis cannot see them. There is
+// no `[noreturn]` concept in the IR to key off. Marking them in the
+// core module is the principled fix and is tracked separately.
+// Resolve the function body that a call will actually enter, seeing
+// through the `specialize` wrapper that a call to a generic function
+// still carries at this point in the pipeline.
+//
+// Coverage instrumentation runs before `specializeModule`, so a call
+// to a generic such as `dot(a, b)` reaches this pass as
+// `call specialize(%dot, Float, 3)(...)` rather than as a direct call
+// to an `IRFunc`. Treating that as an unknown target would split a
+// coalescing run at every generic call — which is most numeric code —
+// for no correctness benefit, because the generic's body is right
+// there to analyze.
+//
+// Returns null only when the target genuinely cannot be resolved
+// statically, such as an interface method dispatched through a witness
+// table; the caller handles that conservatively.
+static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
+{
+    callee = getResolvedInstForDecorations(callee);
+    if (auto func = as<IRFunc>(callee))
+        return func;
+    if (auto specialize = as<IRSpecialize>(callee))
+    {
+        // `findInnerMostGenericReturnVal` peels every nested
+        // `IRGeneric` layer, so a multi-parameter generic resolves in
+        // one step.
+        if (auto generic = as<IRGeneric>(getResolvedInstForDecorations(specialize->getOperand(0))))
+            return as<IRFunc>(findInnerMostGenericReturnVal(generic));
+    }
+    return nullptr;
+}
+
+struct CoverageFunctionExitAnalysis
+{
+    // `true` when the function may abandon the invocation instead of
+    // returning normally to its caller.
+    Dictionary<IRFunc*, bool> mayNotReturnCache;
+    // Functions currently being computed, used to break call cycles.
+    HashSet<IRFunc*> inProgress;
+
+    // Returns true when executing `inst` may fail to reach the next
+    // instruction in its own block.
+    bool mayNotFallThrough(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Discard:
+        case kIROp_Abort:
+            return true;
+        case kIROp_Call:
+            {
+                auto callee = getStaticallyResolvedCallee(cast<IRCall>(inst)->getCallee());
+                // An unresolved callee is an indirect or not-yet-
+                // specialized dispatch (coverage instrumentation runs
+                // before `specializeModule`). We cannot see its body,
+                // so assume the worst and split the run: an extra
+                // probe costs emitted code, a missing split costs
+                // correctness.
+                if (!callee)
+                    return true;
+                return mayNotReturn(callee);
+            }
+        default:
+            return false;
+        }
+    }
+
+    // Returns true when `func` may abandon the invocation rather than
+    // returning to its caller.
+    bool mayNotReturn(IRFunc* func)
+    {
+        if (auto found = mayNotReturnCache.tryGetValue(func))
+            return *found;
+
+        // A function with no body is an unlinked declaration. Every
+        // core-module function that can exit an invocation carries a
+        // body by the time this pass runs (linking happens earlier in
+        // `emitEntryPoints`), so a body-less callee here is an
+        // external/host symbol that returns normally.
+        if (!func->getFirstBlock())
+        {
+            mayNotReturnCache[func] = false;
+            return false;
+        }
+
+        // Recursion is rejected for GPU targets by
+        // `checkForRecursiveFunctions` later in the pipeline. Treat a
+        // cycle as returning so the fixpoint terminates; a recursive
+        // program that reaches here is already ill-formed.
+        if (!inProgress.add(func))
+            return false;
+
+        bool result = false;
+        bool sawNormalExit = false;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+            {
+                // `IRGenericAsm` is how `__intrinsic_asm` lowers, and it
+                // carries return semantics: it ends the function and
+                // hands the value back, exactly like `IRReturn`. Most
+                // core-module math (`dot`, `lerp`, ...) exits this way,
+                // so counting it as a normal exit is what keeps a call
+                // to an ordinary intrinsic from splitting every run.
+                if (inst->getOp() == kIROp_Return || inst->getOp() == kIROp_GenericAsm)
+                    sawNormalExit = true;
+                if (!result && mayNotFallThrough(inst))
+                    result = true;
+            }
+        }
+        // A body with no normal exit anywhere never returns to its
+        // caller, which covers an unconditional exit and a
+        // non-terminating loop.
+        if (!sawNormalExit)
+            result = true;
+
+        inProgress.remove(func);
+        mayNotReturnCache[func] = result;
+        return result;
+    }
+};
+
+// Assign a counter slot to every collected marker op, coalescing line
+// markers that provably execute together.
+//
+// Line markers in the same basic block, with nothing between them that
+// can abandon the invocation, all execute exactly the same number of
+// times, so they can share one counter and one runtime probe. That is
+// what shrinks emitted shader code: probe count, not counter width, is
+// what scales SPIR-V size.
+//
+// `outSlots[i]` is the counter index for `markerOps[i]`, and
+// `outEmitsProbe[i]` selects the single marker per group that emits
+// the runtime counter update. The probe is placed at the *last* marker
+// of the group so that reaching it proves every earlier marker in the
+// group executed; placing it first would over-report when the group is
+// entered but abandoned partway.
+//
+// Function and branch markers always take a dedicated slot: they are
+// already one probe per function or per arm, and their counts carry
+// per-site meaning that sharing would destroy.
+static void assignCoverageCounterSlots(
+    List<IRInst*> const& markerOps,
+    List<UInt>& outSlots,
+    List<bool>& outEmitsProbe,
+    UInt& outCounterCount)
+{
+    CoverageFunctionExitAnalysis exitAnalysis;
+
+    outSlots.setCount(markerOps.getCount());
+    outEmitsProbe.setCount(markerOps.getCount());
+    for (Index i = 0; i < markerOps.getCount(); ++i)
+        outEmitsProbe[i] = true;
+
+    UInt nextSlot = 0;
+    // Index of the marker that currently owns the open group, or -1
+    // when no group is open.
+    Index openGroup = -1;
+
+    for (Index i = 0; i < markerOps.getCount(); ++i)
+    {
+        auto markerOp = markerOps[i];
+        if (markerOp->getOp() != kIROp_IncrementCoverageCounter)
+        {
+            // Non-line markers neither join nor continue a group, and
+            // they cannot break one: they lower to a counter update,
+            // which always falls through.
+            outSlots[i] = nextSlot++;
+            continue;
+        }
+
+        bool joinsOpenGroup = false;
+        if (openGroup >= 0)
+        {
+            auto previousOp = markerOps[openGroup];
+            if (previousOp->getParent() == markerOp->getParent())
+            {
+                // Same block: the run continues unless something
+                // between the two markers can abandon the invocation.
+                joinsOpenGroup = true;
+                for (auto inst = previousOp->getNextInst(); inst && inst != markerOp;
+                     inst = inst->getNextInst())
+                {
+                    if (exitAnalysis.mayNotFallThrough(inst))
+                    {
+                        joinsOpenGroup = false;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (joinsOpenGroup)
+        {
+            // Hand the probe forward to this marker: the group's probe
+            // always sits at its last marker.
+            outSlots[i] = outSlots[openGroup];
+            outEmitsProbe[openGroup] = false;
+        }
+        else
+        {
+            outSlots[i] = nextSlot++;
+        }
+        openGroup = i;
+    }
+
+    outCounterCount = nextSlot;
+}
+
 // Collect every coverage marker op in the module. Deterministic traversal:
 // module-scope insts in declaration order, then each function's blocks in
 // order, then each block's insts in position order.
@@ -1037,15 +1282,27 @@ struct CoverageInstrumenter
         }
     }
 
-    // Lower a single coverage marker op to an atomic add on
-    // `coverageBuffer[slot]`. Appends the source-entry metadata that
-    // currently points at this direct counter slot, then removes the
-    // marker op.
-    void lowerMarkerOp(IRInst* markerOp, UInt slot)
+    // Lower a single coverage marker op, recording its source-entry
+    // metadata against `slot` and then removing the marker op.
+    //
+    // `emitRuntimeProbe` selects whether this marker also emits the
+    // counter update. Coalesced line markers share one slot and one
+    // probe, so only the last marker of a group emits it while the
+    // others contribute metadata alone — that is what removes probe
+    // sequences from the emitted shader. Every marker still produces
+    // its own entry, so per-line reporting is unchanged.
+    void lowerMarkerOp(IRInst* markerOp, UInt slot, bool emitRuntimeProbe)
     {
         CoverageTracingEntry entry;
         populateEntryForMarker(markerOp, slot, entry);
         outMetadata.m_coverageEntries.add(entry);
+
+        if (!emitRuntimeProbe)
+        {
+            SLANG_ASSERT(!markerOp->hasUses());
+            markerOp->removeAndDeallocate();
+            return;
+        }
 
         IRBuilder builder(module);
         builder.setInsertBefore(markerOp);
@@ -1109,7 +1366,11 @@ struct CoverageInstrumenter
 
     void run(List<IRInst*> const& markerOps)
     {
-        const auto counterCount = markerOps.getCount();
+        List<UInt> slots;
+        List<bool> emitsProbe;
+        UInt coalescedCounterCount = 0;
+        assignCoverageCounterSlots(markerOps, slots, emitsProbe, coalescedCounterCount);
+        const auto counterCount = (Index)coalescedCounterCount;
         // This concerns the counter *index* type, which is independent of
         // the per-slot storage width recorded just below: the public
         // metadata stores counter indices as uint32_t because the
@@ -1144,14 +1405,14 @@ struct CoverageInstrumenter
         default:
             SLANG_UNEXPECTED("coverage counter element type must be uint or uint64_t");
         }
-        outMetadata.m_coverageEntries.reserve(counterCount);
-        // Each marker op gets its own slot: the op's identity IS the
-        // UID, and we assign a consecutive index in traversal order.
-        // Several source entries may later share counters when region
-        // coverage is added; this pass already keeps entry count and
-        // counter count separate through the public metadata API.
-        for (Index slot = 0; slot < counterCount; ++slot)
-            lowerMarkerOp(markerOps[slot], UInt(slot));
+        outMetadata.m_coverageEntries.reserve(markerOps.getCount());
+        // Every marker produces one source entry, but line markers that
+        // provably execute together share a counter slot, so entry count
+        // and counter count now genuinely differ. The public metadata API
+        // has always kept the two separate; hosts size the readback buffer
+        // from the counter count and attribute results per entry.
+        for (Index i = 0; i < markerOps.getCount(); ++i)
+            lowerMarkerOp(markerOps[i], slots[i], emitsProbe[i]);
     }
 };
 

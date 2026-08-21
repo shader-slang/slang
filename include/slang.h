@@ -4877,11 +4877,25 @@ struct CoverageEntryInfo
 
     /// Counter slot used by this entry, or
     /// `kInvalidCoverageCounterIndex` when the entry has no runtime
-    /// counter. The current line/function/branch producers use one
-    /// direct counter per entry. Future source-region coverage may use
-    /// `kInvalidCoverageCounterIndex` for entries whose count is
-    /// derived from other counters or represented through tail-extended
-    /// fields.
+    /// counter.
+    ///
+    /// This is NOT unique per entry. Line coverage coalesces entries
+    /// that provably execute together (those in one basic block with
+    /// nothing between them that can abandon the invocation) onto a
+    /// single counter, which is what keeps instrumented shader code
+    /// small. Several entries therefore report the same
+    /// `counterIndex`, and `getCounterCount()` is correspondingly
+    /// smaller than the entry count.
+    ///
+    /// Read results per entry (`counters[entry.counterIndex]` for each
+    /// entry), never per counter: a counter does not identify one
+    /// source location. Sizing a readback buffer from the entry count
+    /// rather than the counter count is a bug.
+    ///
+    /// Function and branch entries always use a dedicated counter.
+    /// Future coverage modes may use `kInvalidCoverageCounterIndex`
+    /// for entries whose count is derived from other counters or
+    /// represented through tail-extended fields.
     uint32_t counterIndex = kInvalidCoverageCounterIndex;
 
     /// Semantic kind of this source coverage entry.

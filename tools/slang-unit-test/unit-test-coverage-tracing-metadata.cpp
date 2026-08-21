@@ -235,7 +235,20 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         const uint32_t entryCount = coverage->getEntryCount();
         SLANG_CHECK(entryCount > 0);
 
+        // Line coverage coalesces the entries of a straight-line region
+        // onto a single counter, so entries outnumber counters and at
+        // least one slot is shared. This is the contract hosts depend on:
+        // size the readback buffer from the counter count, and accumulate
+        // per entry rather than per counter. The shader above has several
+        // straight-line runs (the `accum` init followed by the `for`, and
+        // each switch-case body), so the inequality is not incidental.
+        SLANG_CHECK(entryCount > counterCount);
+
         bool seenAnyStartColumn = false;
+        List<uint32_t> entriesPerCounter;
+        entriesPerCounter.setCount((Index)counterCount);
+        for (uint32_t i = 0; i < counterCount; ++i)
+            entriesPerCounter[(Index)i] = 0;
         for (uint32_t i = 0; i < entryCount; ++i)
         {
             slang::CoverageEntryInfo entry;
@@ -254,8 +267,14 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
             SLANG_CHECK(entry.branchSiteID == 0);
             SLANG_CHECK(entry.branchArmID == 0);
             SLANG_CHECK(entry.branchArmKind == slang::CoverageBranchArmKind::Unknown);
+            entriesPerCounter[(Index)entry.counterIndex]++;
         }
         SLANG_CHECK(seenAnyStartColumn);
+
+        bool sawSharedCounter = false;
+        for (uint32_t i = 0; i < counterCount; ++i)
+            sawSharedCounter = sawSharedCounter || entriesPerCounter[(Index)i] > 1;
+        SLANG_CHECK(sawSharedCounter);
     };
 
     auto cpuBundle = createMetadataBundle(SLANG_CPP_SOURCE, "sm_5_0");
@@ -663,29 +682,52 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         bool seenLine = false;
         bool seenFunction = false;
         bool seenBranch = false;
-        List<uint32_t> seenCounterSlots;
+        // Line entries may legitimately share a slot: coalescing points
+        // every entry of a straight-line region at one counter. Function
+        // and branch entries must not — each names a distinct site whose
+        // count would be destroyed by sharing — and no slot may be used
+        // by more than one mode, which is the collision this block exists
+        // to catch.
+        List<uint32_t> lineSlots;
+        List<uint32_t> dedicatedSlots;
         for (uint32_t i = 0; i < allModesCoverage->getEntryCount(); ++i)
         {
             slang::CoverageEntryInfo entry;
             SLANG_CHECK(allModesCoverage->getEntryInfo(i, &entry) == SLANG_OK);
             SLANG_CHECK(entry.counterIndex != slang::kInvalidCoverageCounterIndex);
             SLANG_CHECK(entry.counterIndex < allModesCoverage->getCounterCount());
-            for (auto seenCounterSlot : seenCounterSlots)
-                SLANG_CHECK(seenCounterSlot != entry.counterIndex);
-            seenCounterSlots.add(entry.counterIndex);
 
             if (entry.kind == slang::CoverageEntryKind::Line)
+            {
                 seenLine = true;
-            else if (entry.kind == slang::CoverageEntryKind::Function)
-                seenFunction = true;
-            else if (entry.kind == slang::CoverageEntryKind::Branch)
-                seenBranch = true;
+                if (lineSlots.indexOf(entry.counterIndex) < 0)
+                    lineSlots.add(entry.counterIndex);
+            }
+            else
+            {
+                if (entry.kind == slang::CoverageEntryKind::Function)
+                    seenFunction = true;
+                else if (entry.kind == slang::CoverageEntryKind::Branch)
+                    seenBranch = true;
+                SLANG_CHECK(dedicatedSlots.indexOf(entry.counterIndex) < 0);
+                dedicatedSlots.add(entry.counterIndex);
+            }
         }
 
         SLANG_CHECK(seenLine);
         SLANG_CHECK(seenFunction);
         SLANG_CHECK(seenBranch);
-        SLANG_CHECK(seenCounterSlots.getCount() == allModesCoverage->getEntryCount());
+        // The two namespaces must not overlap.
+        for (auto lineSlot : lineSlots)
+            SLANG_CHECK(dedicatedSlots.indexOf(lineSlot) < 0);
+        // Every counter is accounted for by exactly one mode, so the
+        // distinct slots across both namespaces cover the whole buffer.
+        SLANG_CHECK(
+            lineSlots.getCount() + dedicatedSlots.getCount() ==
+            (Index)allModesCoverage->getCounterCount());
+        // Coalescing must actually have happened: more line entries than
+        // line slots.
+        SLANG_CHECK(lineSlots.getCount() < (Index)allModesCoverage->getEntryCount());
     }
 
     // Argument validation on the serializer.

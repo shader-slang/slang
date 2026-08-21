@@ -60,11 +60,15 @@ or other IR cloning creates multiple executable copies that map to the
 same source location, those entries keep distinct counter slots; LCOV
 export aggregates line entries by `(file, line)`, function entries by
 function name, and branch entries by `(line, branch_site, branch_arm)`.
-Hosts should always map entries to counters through
+Hosts must always map entries to counters through
 `CoverageEntryInfo::counterIndex` rather than assuming entry index
-equals counter index — future source-region coverage may add ranged
-entries with shared or derived counters without changing the binding
-contract. (`getBufferInfo()` remains available as a legacy
+equals counter index: line coverage already shares one counter across
+the entries of a straight-line region, so the entry count and
+`getCounterCount()` differ. Size the readback buffer from
+`getCounterCount()`, and accumulate per entry rather than per counter —
+a counter does not identify a single source location. Future
+source-region coverage may add ranged entries with derived counters
+without changing the binding contract. (`getBufferInfo()` remains available as a legacy
 coverage-specific binding query for ABI compatibility; new hosts
 should bind through `ISyntheticResourceMetadata`, which also reports
 the CPU/CUDA marshaling locations.)
