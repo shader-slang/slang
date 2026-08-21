@@ -714,6 +714,51 @@ def gen_codegen(n):
     return {"codegen.slang": "".join(s)}
 
 
+def gen_vector_ops(n):
+    """Dense fixed-width vector operator traffic, deliberately free of
+    transcendentals.
+
+    The other codegen workloads use ``sin``/``cos`` as body filler. That is
+    harmless for Slang-side timing, but on the downstream side those two calls
+    dominate everything else -- they expand to hundreds of PTX instructions each
+    -- so a downstream measurement taken on them reports the cost of libdevice's
+    transcendentals rather than of whatever the workload is named for.
+
+    This one uses only vector arithmetic, comparison and selection, so its
+    downstream cost is the prelude's fixed-width operator definitions and their
+    instantiations. That makes it a usable signal for changes to those
+    operators.
+
+    Scaling null: n scales operator instantiations and the emitted output is
+    O(n); ideal cost is O(n).
+    """
+    s = [_HEADER, _buf()]
+    s.append("StructuredBuffer<float4> inBuf;\n")
+    s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
+    s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
+    s.append("    float4 a = inBuf[tid.x];\n")
+    s.append("    float4 b = inBuf[tid.x + 1];\n")
+    s.append("    float3 c = a.xyz;\n    float3 d = b.xyz;\n")
+    s.append("    int4 ia = int4(a);\n    int4 ib = int4(b);\n")
+    s.append("    float4 acc = a;\n    int4 iacc = ia;\n")
+    for i in range(n):
+        k = i % 6
+        if k == 0:
+            s.append(f"    acc = (acc + b) * (a - b) + {float(i) + 1.0}f;\n")
+        elif k == 1:
+            s.append(f"    c = (c * d) - (d / (abs(c) + {float(i) + 1.0}f));\n")
+        elif k == 2:
+            s.append(f"    iacc = (iacc + ib) ^ (ia & ib) | (ib >> 1);\n")
+        elif k == 3:
+            s.append(f"    bool4 m{i} = acc < b;\n    acc = select(m{i}, acc, b);\n")
+        elif k == 4:
+            s.append(f"    bool3 n{i} = c >= d;\n    c = select(n{i}, c, d);\n")
+        else:
+            s.append(f"    iacc = iacc % (ib + int4({i % 7 + 1}));\n")
+    s.append("    outBuf[tid.x] = acc.x + c.x + float(iacc.x);\n}\n")
+    return {"vector_ops.slang": "".join(s)}
+
+
 def gen_module_link(n):
     """n importable modules plus a main that imports and uses all of them. The
     harness precompiles each module to .slang-module, then compiles main against
