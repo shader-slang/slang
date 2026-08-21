@@ -41,8 +41,8 @@ void usesNested()
 {
 }
 
-// Negative control: a genuinely undefined qualified attribute must still warn, proving the new
-// scoped fallback does not silence real errors.
+// Negative control: a genuinely undefined qualified attribute must still warn — the qualified-name
+// fallback must not silence real errors.
 // CHECK: warning{{.*}}31000
 // CHECK: unknown attribute 'my_namespace_Nonexistent'
 [my_namespace::Nonexistent(1)]
