@@ -74,6 +74,12 @@ jobs:
       # Keep macOS option sweeps from building DXC from source. The
       # SLANG_DXC_BUILD_FROM_SOURCE matrix entry still tests OFF.
       SLANG_CI_DXC_BUILD_FROM_SOURCE: ${{ inputs.os == 'macos' && '-DSLANG_DXC_BUILD_FROM_SOURCE=OFF' || '' }}
+      # Whether this matrix entry can *run* what it builds. Both steps that execute a
+      # built binary are gated on it, so the platform exclusions live in one place
+      # rather than being repeated in each `if:` and having to be kept in lockstep by
+      # hand. The build step deliberately does not use this: cross-compiled entries
+      # still build, they just cannot run the result.
+      SLANG_CI_CAN_RUN_BUILT_BINARY: ${{ (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '') }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
@@ -195,11 +201,12 @@ jobs:
         run: cmake --build build --config "$cmake_config"
 
       # slang-static-unit-test only exists when SLANG_LIB_TYPE=STATIC, which is
-      # exactly this matrix entry. The windows-aarch64 entries cross-compile on
-      # an x64 runner and cannot execute what they build, so they are excluded
-      # with the same guard the slangc version check uses.
+      # exactly this matrix entry. Runnability -- the windows-aarch64 entries
+      # cross-compile on an x64 runner and cannot execute what they build -- is
+      # handled by the shared predicate, which the slangc version check below uses
+      # too.
       - name: Run slang-static-unit-test (${{ matrix.option }})
-        if: matrix.option == 'SLANG_LIB_TYPE' && (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '')
+        if: matrix.option == 'SLANG_LIB_TYPE' && env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
         run: |
           # RUNNER_OS is provided by the runner, so nothing from the workflow
           # inputs is interpolated into this script.
@@ -216,7 +223,7 @@ jobs:
           "$test_path"
 
       - name: Verify slangc version (${{ matrix.option }})
-        if: (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '')
+        if: env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
         run: |
           slangc_enabled=$(
             sed -n 's/^SLANG_ENABLE_SLANGC:[^=]*=//p' build/CMakeCache.txt \

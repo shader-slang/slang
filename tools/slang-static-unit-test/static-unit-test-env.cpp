@@ -55,10 +55,19 @@ Module* StaticUnitTestEnv::checkModuleFromSource(
     }
     m_usedModuleNames.add(moduleName);
 
+    // `loadModuleFromSourceString` takes a path separately from the module name, and
+    // uses it for the source locations in diagnostics. These sources are in memory and
+    // have no file, so synthesize one from the name rather than passing the bare name:
+    // `outDiagnostics` is how tests read diagnostics back, and "myTest.slang(3): error"
+    // reads as a location while "myTest(3): error" reads as nothing in particular.
+    StringBuilder pathBuilder;
+    pathBuilder << moduleName << ".slang";
+    const String path = pathBuilder.produceString();
+
     ComPtr<slang::IBlob> diagnostics;
     slang::IModule* module = m_session->loadModuleFromSourceString(
         moduleName,
-        moduleName,
+        path.getBuffer(),
         source,
         diagnostics.writeRef());
 
@@ -130,6 +139,89 @@ IRFunc* IRFixtureBuilder::addVoidFunctionCalling(const char* name, bool keepAliv
     m_builder.emitCallInst(m_builder.getVoidType(), callee, 0, nullptr);
     endVoidFunction(func, keepAlive);
     return func;
+}
+
+IRFunc* IRFixtureBuilder::addExportedVoidFunction(const char* name)
+{
+    IRFunc* func = beginVoidFunction(name);
+    endVoidFunction(func, /* keepAlive: */ false);
+    m_builder.addExportDecoration(func, UnownedStringSlice(name));
+    return func;
+}
+
+IRFunc* IRFixtureBuilder::addVoidFunctionWithLayout(const char* name)
+{
+    IRFunc* func = beginVoidFunction(name);
+    endVoidFunction(func, /* keepAlive: */ false);
+
+    // An empty layout is enough: `keepLayoutsAlive` tests only for the presence of an
+    // `IRLayoutDecoration`, not for anything the layout says.
+    IRTypeLayout::Builder layoutBuilder(&m_builder);
+    m_builder.addLayoutDecoration(func, layoutBuilder.build());
+
+    return func;
+}
+
+IRFunc* IRFixtureBuilder::addVoidFunctionWeaklyReferencing(
+    const char* name,
+    bool keepAlive,
+    IRFunc* target)
+{
+    SLANG_RELEASE_ASSERT(target);
+    SLANG_RELEASE_ASSERT(target->getParent() == m_module->getModuleInst());
+
+    IRFunc* func = beginVoidFunction(name);
+    m_builder.getWeakUse(target);
+    endVoidFunction(func, keepAlive);
+    return func;
+}
+
+IRFunc* IRFixtureBuilder::addVoidFunctionWithUnusedBlockParam(const char* name, bool keepAlive)
+{
+    m_builder.setInsertInto(m_module.get());
+
+    IRFunc* func = m_builder.createFunc();
+    func->setFullType(m_builder.getFuncType(0, nullptr, m_builder.getVoidType()));
+    m_builder.addNameHintDecoration(func, UnownedStringSlice(name));
+
+    m_builder.setInsertInto(func);
+    IRBlock* entryBlock = m_builder.emitBlock();
+    IRBlock* secondBlock = m_builder.emitBlock();
+
+    // The parameter is never read, so DCE removes it and then reruns -- which also
+    // requires rewriting the branch in the entry block that supplies its argument.
+    m_builder.setInsertInto(secondBlock);
+    m_builder.emitParam(m_builder.getIntType());
+    m_builder.emitReturn();
+
+    m_builder.setInsertInto(entryBlock);
+    IRInst* arg = m_builder.getIntValue(m_builder.getIntType(), 7);
+    m_builder.emitBranch(secondBlock, 1, &arg);
+
+    if (keepAlive)
+    {
+        m_builder.addKeepAliveDecoration(func);
+    }
+
+    return func;
+}
+
+IRStructType* IRFixtureBuilder::addOptimizableStructWithUnusedField(const char* name)
+{
+    m_builder.setInsertInto(m_module.get());
+
+    IRStructType* structType = m_builder.createStructType();
+    m_builder.addNameHintDecoration(structType, UnownedStringSlice(name));
+
+    IRStructKey* fieldKey = m_builder.createStructKey();
+    m_builder.addNameHintDecoration(fieldKey, UnownedStringSlice("unusedField"));
+    m_builder.createStructField(structType, fieldKey, m_builder.getIntType());
+
+    // Without this decoration `trimOptimizableTypes` skips the type entirely, so it is
+    // what makes the pass consider the struct at all.
+    m_builder.addDecoration(structType, kIROp_OptimizableTypeDecoration);
+
+    return structType;
 }
 
 IRGlobalParam* IRFixtureBuilder::addGlobalParam(const char* name)

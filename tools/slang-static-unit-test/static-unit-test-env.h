@@ -115,6 +115,32 @@ public:
     /// smallest fixture that tells the two settings of that flag apart.
     IRGlobalParam* addGlobalParam(const char* name);
 
+    /// Add a top-level `void()` function carrying `[Export]`, and nothing else that
+    /// would keep it alive. `IRDeadCodeEliminationOptions::keepExportsAlive` is what
+    /// decides its fate, so this is the smallest fixture that tells that flag apart.
+    IRFunc* addExportedVoidFunction(const char* name);
+
+    /// Add a top-level `void()` function carrying an (empty) layout decoration, and
+    /// nothing else that would keep it alive. The counterpart of
+    /// `addExportedVoidFunction` for `keepLayoutsAlive`.
+    IRFunc* addVoidFunctionWithLayout(const char* name);
+
+    /// Add a top-level `void()` function whose body holds a *weak* reference to
+    /// `target` via `kIROp_WeakUse`. A weak operand must not keep its referent alive
+    /// -- that is the whole point of the kind -- so this pairs with
+    /// `addVoidFunctionCalling`, whose ordinary call operand does.
+    IRFunc* addVoidFunctionWeaklyReferencing(const char* name, bool keepAlive, IRFunc* target);
+
+    /// Add a two-block `void()` function whose second block takes a parameter that
+    /// nothing reads, passed as a branch argument from the first. DCE removes such a
+    /// parameter and then reruns its work list -- the one path in the pass that
+    /// iterates more than once.
+    IRFunc* addVoidFunctionWithUnusedBlockParam(const char* name, bool keepAlive);
+
+    /// Add a top-level struct with one unreferenced field, marked
+    /// `[OptimizableType]` so `trimOptimizableTypes` will consider it.
+    IRStructType* addOptimizableStructWithUnusedField(const char* name);
+
     IRModule* getModule() const { return m_module.get(); }
 
     /// Count the direct children of the module inst whose opcode is `op`.

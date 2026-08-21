@@ -191,3 +191,167 @@ SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedGlobalParamWhenNotKeptAl
 
     SLANG_CHECK(builder.countGlobalInsts(kIROp_GlobalParam) == 0);
 }
+
+// `keepExportsAlive` is off by default, so an unreferenced `[Export]` function is
+// removed on an ordinary run and kept when the flag is set. Linkage decorations are
+// what a separately-compiled module needs to survive, so the two settings answer
+// genuinely different questions and neither is universally right.
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedExportByDefault)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    builder.addExportedVoidFunction("exportedFunc");
+    SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_Func) == 1);
+
+    SLANG_CHECK(eliminateDeadCode(builder.getModule()));
+    SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 0);
+}
+
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedExportWhenAsked)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    builder.addExportedVoidFunction("exportedFunc");
+
+    IRDeadCodeEliminationOptions options;
+    options.keepExportsAlive = true;
+    SLANG_CHECK(!eliminateDeadCode(builder.getModule(), options));
+
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 1);
+    SLANG_CHECK(names[0] == "exportedFunc");
+}
+
+// The same pairing for `keepLayoutsAlive`. Layout decorations are what reflection
+// reads, so a pass run with the flag set must not drop the instructions carrying them.
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesUnreferencedLayoutByDefault)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    builder.addVoidFunctionWithLayout("laidOutFunc");
+    SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_Func) == 1);
+
+    SLANG_CHECK(eliminateDeadCode(builder.getModule()));
+    SLANG_CHECK(builder.countGlobalInsts(kIROp_Func) == 0);
+}
+
+SLANG_UNIT_TEST(irDeadCodeEliminationKeepsUnreferencedLayoutWhenAsked)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    builder.addVoidFunctionWithLayout("laidOutFunc");
+
+    IRDeadCodeEliminationOptions options;
+    options.keepLayoutsAlive = true;
+    SLANG_CHECK(!eliminateDeadCode(builder.getModule(), options));
+
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 1);
+    SLANG_CHECK(names[0] == "laidOutFunc");
+}
+
+// A weak operand must not hold its referent alive. This is the mechanism behind
+// `isWeakReferenceOperand`, and it is the exact inverse of the reachability tests
+// above: an ordinary call operand keeps a callee, a `WeakUse` operand must not.
+// Without a test, a change that stopped consulting `isWeakReferenceOperand` would
+// look like "DCE got more conservative" rather than a defect.
+SLANG_UNIT_TEST(irDeadCodeEliminationDoesNotKeepAWeaklyReferencedFunction)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    IRFunc* target = builder.addVoidFunction("weaklyReferencedFunc", /* keepAlive: */ false);
+    builder.addVoidFunctionWeaklyReferencing("rootFunc", /* keepAlive: */ true, target);
+    SLANG_CHECK_ABORT(builder.countGlobalInsts(kIROp_Func) == 2);
+
+    SLANG_CHECK(eliminateDeadCode(builder.getModule()));
+
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 1);
+    SLANG_CHECK(names[0] == "rootFunc");
+}
+
+// Removing an unused block parameter is the one path that makes the pass iterate its
+// work list more than once (`phiRemoved` in slang-ir-dce.cpp): the parameter goes, and
+// the branch argument feeding it has to go with it. A regression in that rerun loop --
+// or in its termination -- would leave every other test in this file green.
+SLANG_UNIT_TEST(irDeadCodeEliminationRemovesAnUnusedBlockParameter)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    IRFunc* func = builder.addVoidFunctionWithUnusedBlockParam("rootFunc", /* keepAlive: */ true);
+
+    // `IRInstList` has no count, so tally by walking.
+    auto countBlockParams = [](IRFunc* f)
+    {
+        Int total = 0;
+        for (IRBlock* block : f->getBlocks())
+            for (IRParam* param : block->getParams())
+            {
+                SLANG_UNUSED(param);
+                total++;
+            }
+        return total;
+    };
+
+    SLANG_CHECK_ABORT(countBlockParams(func) == 1);
+
+    SLANG_CHECK(eliminateDeadCode(builder.getModule()));
+
+    SLANG_CHECK(countBlockParams(func) == 0);
+
+    // The function itself is a live root, so it must survive its parameter's removal.
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 1);
+    SLANG_CHECK(names[0] == "rootFunc");
+}
+
+// The `IRInst*` overload runs the pass rooted at one instruction rather than the whole
+// module. Nothing else here covers it, so a change that broke rooted runs -- or that
+// let one escape its root and edit the rest of the module -- would go unnoticed.
+SLANG_UNIT_TEST(irDeadCodeEliminationOnASingleRootLeavesTheRestOfTheModuleAlone)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    IRFunc* rooted =
+        builder.addVoidFunctionWithUnusedBlockParam("rootedFunc", /* keepAlive: */ true);
+    builder.addVoidFunction("untouchedDeadFunc", /* keepAlive: */ false);
+
+    SLANG_CHECK(eliminateDeadCode(rooted));
+
+    // The dead function is outside the root, so a rooted run must not have removed it.
+    List<String> names = builder.getFunctionNames();
+    SLANG_CHECK_ABORT(names.getCount() == 2);
+    SLANG_CHECK(names.contains("untouchedDeadFunc"));
+}
+
+// `trimOptimizableTypes` is a separate entry point from `eliminateDeadCode`, and drops
+// unreferenced fields from a struct marked `[OptimizableType]`.
+SLANG_UNIT_TEST(irTrimOptimizableTypesRemovesAnUnusedField)
+{
+    StaticUnitTestEnv env(unitTestContext);
+    IRFixtureBuilder builder(env.getSessionImpl());
+
+    auto countFields = [](IRStructType* t)
+    {
+        Int total = 0;
+        for (IRStructField* field : t->getFields())
+        {
+            SLANG_UNUSED(field);
+            total++;
+        }
+        return total;
+    };
+
+    IRStructType* structType = builder.addOptimizableStructWithUnusedField("Optimizable");
+    SLANG_CHECK_ABORT(countFields(structType) == 1);
+
+    SLANG_CHECK(trimOptimizableTypes(builder.getModule()));
+    SLANG_CHECK(countFields(structType) == 0);
+}

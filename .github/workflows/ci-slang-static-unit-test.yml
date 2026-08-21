@@ -146,22 +146,40 @@ jobs:
           "$test_path"
 
           # The suite above is written to pass, so passing does not prove the harness
-          # can report a failure. Drive the failure path deliberately and require the
+          # can report a failure. Drive the failure paths deliberately and require the
           # binary to notice: a driver that always exited 0, or that scored a failed
           # check as a pass, would keep every job above green while catching nothing.
-          echo "--- harness self-check: a failing test must fail the run ---"
+          echo "--- harness self-check: failures must fail the run, and not stop it ---"
           set +e
-          SLANG_STATIC_UNIT_TEST_SELFCHECK=1 "$test_path" harnessReportsAFailingCheck \
+          SLANG_STATIC_UNIT_TEST_SELFCHECK=1 "$test_path" harnessSelfCheck \
             > selfcheck.log 2>&1
           selfcheck_status=$?
           set -e
           cat selfcheck.log
+
           if [[ $selfcheck_status -eq 0 ]]; then
-            echo "::error::harness self-check passed; a deliberately failing test did not fail the run"
+            echo "::error::harness self-check passed; deliberately failing tests did not fail the run"
             exit 1
           fi
-          if ! grep -q "FAIL" selfcheck.log; then
-            echo "::error::harness self-check exited non-zero but reported no FAIL line"
+          if ! grep -q "FAIL   harnessSelfCheckReportsAFailingCheck" selfcheck.log; then
+            echo "::error::a failed SLANG_CHECK was not reported as a failure"
+            exit 1
+          fi
+          if ! grep -q "FAIL   harnessSelfCheckSurvivesAThrowingTest" selfcheck.log; then
+            echo "::error::an exception escaping a test body was not reported as a failure"
+            exit 1
+          fi
+          # Registered after the throwing test, so its `ok` is what proves the driver
+          # carried on rather than dying at the throw. Without this the non-zero exit
+          # alone would not distinguish "reported and continued" from "died".
+          if ! grep -q "ok     harnessSelfCheckContinuesAfterAThrow" selfcheck.log; then
+            echo "::error::the run did not continue past a test that threw"
+            exit 1
+          fi
+          # The exception detail has to reach the log, or such a failure is not
+          # diagnosable without attaching a debugger.
+          if ! grep -q "deliberate self-check exception" selfcheck.log; then
+            echo "::error::the escaping exception's what() was not reported"
             exit 1
           fi
 

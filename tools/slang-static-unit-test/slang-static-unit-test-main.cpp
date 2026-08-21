@@ -74,9 +74,16 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL addExecutionTime(double) override {}
 
-    virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType, const char* message) override
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    message(TestMessageType type, const char* message) override
     {
         printf("    %s\n", message);
+
+        // A `RunError` says the test did not actually run correctly, which is a
+        // failure however it arrived. Printing it and leaving the test scored as a
+        // pass is the silent-success shape this suite exists to avoid.
+        if (type == TestMessageType::RunError)
+            m_currentTestFailed = true;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL endTest() override
@@ -92,20 +99,30 @@ public:
     }
 
 private:
-    /// Classify a result the same way regardless of which entry point reported
-    /// it. Only `Fail` is a failure; `Ignored` is tracked separately so a test
-    /// that skips itself is not silently tallied as a pass.
+    /// Classify a result the same way regardless of which entry point reported it.
+    ///
+    /// Every state is named rather than falling to a `default`, because "not
+    /// recognised" defaulting to "passed" is exactly how a broken test slips through.
+    /// `Pass` is the only outcome this suite can produce that is genuinely a pass:
+    /// `ExpectedFail` and `PendingRetry` belong to `slang-test`'s expected-failure
+    /// and retry machinery, which this driver does not implement, and
+    /// `Uninitialized` means no result was ever recorded. None of the three can
+    /// arise here, so treating them as failures costs nothing today and keeps the
+    /// guarantee true by construction if one ever does.
     void recordResult(TestResult result)
     {
         switch (result)
         {
-        case TestResult::Fail:
-            m_currentTestFailed = true;
+        case TestResult::Pass:
             break;
         case TestResult::Ignored:
             m_currentTestIgnored = true;
             break;
-        default:
+        case TestResult::Fail:
+        case TestResult::ExpectedFail:
+        case TestResult::PendingRetry:
+        case TestResult::Uninitialized:
+            m_currentTestFailed = true;
             break;
         }
     }
