@@ -398,6 +398,21 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     return Super::calcTypeName(type, target, out);
 }
 
+void CUDASourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+{
+    Super::emitFrontMatterImpl(targetReq);
+
+    // The `-fp-mode fast` option is honored for CUDA by emitting a define that
+    // the prelude (emitted immediately after this front matter) uses to redirect
+    // the transcendental wrappers that have a hardware-approximate `__*f` form
+    // (F32_cos -> __cosf, etc.). This is precision-affecting, so it is strictly
+    // opt-in behind the flag.
+    if (getTargetProgram()->getOptionSet().getFloatingPointMode() == FloatingPointMode::Fast)
+    {
+        m_writer->emit("#define SLANG_CUDA_ENABLE_FAST_MATH 1\n");
+    }
+}
+
 void CUDASourceEmitter::emitLayoutSemanticsImpl(
     IRInst* inst,
     char const* uniformSemanticSpelling,

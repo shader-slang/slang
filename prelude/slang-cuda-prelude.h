@@ -2017,19 +2017,35 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_round(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sin(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __sinf(f);
+#else
     return ::sinf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_cos(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __cosf(f);
+#else
     return ::cosf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL void F32_sincos(float f, float* s, float* c)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    __sincosf(f, s, c);
+#else
     ::sincosf(f, s, c);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_tan(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __tanf(f);
+#else
     return ::tanf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_asin(float f)
 {
@@ -2069,23 +2085,41 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_atanh(float f)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log2(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __log2f(f);
+#else
     return ::log2f(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __logf(f);
+#else
     return ::logf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_log10(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __log10f(f);
+#else
     return ::log10f(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_exp2(float f)
 {
+    // No `__exp2f` fast intrinsic exists in CUDA (only base-e `__expf` and
+    // base-10 `__exp10f`), so exp2 stays precise even under fast math.
     return ::exp2f(f);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_exp(float f)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __expf(f);
+#else
     return ::expf(f);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_abs(float f)
 {
@@ -2136,7 +2170,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_max(float a, float b)
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_pow(float a, float b)
 {
+#ifdef SLANG_CUDA_ENABLE_FAST_MATH
+    return __powf(a, b);
+#else
     return ::powf(a, b);
+#endif
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_fmod(float a, float b)
 {
