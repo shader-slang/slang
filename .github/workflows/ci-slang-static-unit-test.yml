@@ -145,6 +145,38 @@ jobs:
 
           "$test_path"
 
+          # The suite above is written to pass, so passing does not prove the harness
+          # can report a failure. Drive the failure path deliberately and require the
+          # binary to notice: a driver that always exited 0, or that scored a failed
+          # check as a pass, would keep every job above green while catching nothing.
+          echo "--- harness self-check: a failing test must fail the run ---"
+          set +e
+          SLANG_STATIC_UNIT_TEST_SELFCHECK=1 "$test_path" harnessReportsAFailingCheck \
+            > selfcheck.log 2>&1
+          selfcheck_status=$?
+          set -e
+          cat selfcheck.log
+          if [[ $selfcheck_status -eq 0 ]]; then
+            echo "::error::harness self-check passed; a deliberately failing test did not fail the run"
+            exit 1
+          fi
+          if ! grep -q "FAIL" selfcheck.log; then
+            echo "::error::harness self-check exited non-zero but reported no FAIL line"
+            exit 1
+          fi
+
+          # A filter matching nothing must also be an error, not a silent empty run.
+          echo "--- harness self-check: an unmatched filter must fail the run ---"
+          set +e
+          "$test_path" __no_such_test__ > filter.log 2>&1
+          filter_status=$?
+          set -e
+          cat filter.log
+          if [[ $filter_status -eq 0 ]]; then
+            echo "::error::an unmatched filter reported success instead of failing"
+            exit 1
+          fi
+
       # Populate the cache from the default branch only, mirroring
       # ci-slang-build.yml. Pull-request runs restore but never save, so a PR
       # cannot poison the cache for everyone else.

@@ -20,6 +20,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <exception>
 
 using namespace Slang;
 
@@ -176,6 +177,13 @@ int main(int argc, char** argv)
         try
         {
             testModule->getTestFunc(i)(&context);
+        }
+        catch (const std::exception& e)
+        {
+            // Print `what()` where there is one: a bare "an exception escaped" line
+            // leaves a CI failure undiagnosable without attaching a debugger.
+            printf("    FAILED: uncaught exception escaped the test body: %s\n", e.what());
+            reporter.addResult(TestResult::Fail);
         }
         catch (...)
         {
