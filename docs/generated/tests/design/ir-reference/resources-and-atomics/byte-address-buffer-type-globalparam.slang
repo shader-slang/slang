@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:00:00+00:00
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#shader-io
-//META: doc_section_digest=8ae4aee9e798a45d3d949726815fc6daf4a5c5bd25c7402ac42fe2646d68088c
+//META: doc_section_digest=212a9e3fd4ca324be91b034872f2b7a9afdb1fe8ac5acfc9f068664d69c3e326
 //META: purpose=A module-scope `ByteAddressBuffer` declaration surfaces a `global_param` with the bare `ByteAddressBuffer` resource type, with no element-type parameter.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists byte-address-buffer types alongside structured
-// buffers; the `global_param` carries the type directly. This test
-// observes the bare-type form (no `(...)` parameterization) and
-// complements `structured-buffer-types-globalparam.slang`.
+// Verifies that a byte-address buffer parameter carries its type
+// directly on the `global_param`, with no element-type parameterization
+// in parentheses. Both the read-only and the writable spelling are
+// declared so the CHECKs can pin each bare type name separately.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

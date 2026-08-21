@@ -1,20 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witnesstable-and-witnesstableentry
-//META: doc_section_digest=8793675da78b4d53076ff119e26b6c1db6781408b92a1cb0ac85f2df7ce46cf0
-//META: purpose=A struct conforming to a 3-method interface emits three witness_table_entry rows — one per requirement, in declaration order.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
+//META: doc_section_digest=c07446d42292314ac54df96997ac71db597f857c5d132648cd782bcb15b2b00f
+//META: purpose=A witness table is a key-to-value map, not a positional list: a conformer declaring its members in a different order than the interface still pairs each requirement key with its own satisfying value.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on witness_table_entry axis: multi-method body. The
-// `### witness_table and witness_table_entry` notable opcode
-// prose says "Each entry maps a `requirementKey` ... one per
-// interface requirement". A 3-method interface body therefore
-// produces three `witness_table_entry(%key, %impl)` rows.
-
+// Boundary that separates key-driven pairing from positional pairing. `S`
+// declares `methC`, `methA`, `methB` while `IMulti` requires `methA`, `methB`,
+// `methC`, so any positional association would mis-pair the rows. The
+// order-independent CHECK-DAGs assert each key sits with its own
+// implementation, which only holds if entries are read by key.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IMulti
@@ -26,9 +24,9 @@ interface IMulti
 
 struct S : IMulti
 {
+    int methC(int x) { return x + 2; }
     int methA(int x) { return x; }
     int methB(int x) { return x + 1; }
-    int methC(int x) { return x + 2; }
 };
 
 uniform int inVal;
@@ -43,6 +41,6 @@ void main()
     buf[0] = helper<S>(s, inVal);
 }
 
-// CHECK: witness_table_entry(%IMultix5FmethA,%Sx5FmethA)
-// CHECK: witness_table_entry(%IMultix5FmethB,%Sx5FmethB)
-// CHECK: witness_table_entry(%IMultix5FmethC,%Sx5FmethC)
+// CHECK-DAG: witness_table_entry(%IMultix5FmethA,%Sx5FmethA)
+// CHECK-DAG: witness_table_entry(%IMultix5FmethB,%Sx5FmethB)
+// CHECK-DAG: witness_table_entry(%IMultix5FmethC,%Sx5FmethC)

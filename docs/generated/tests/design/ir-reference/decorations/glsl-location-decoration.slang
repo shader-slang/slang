@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:48Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#layout-and-binding
-//META: doc_section_digest=53c33072d342ae9430710df507cdde301b5918b46f7119412b00900374c8e222
+//META: doc_section_digest=928ba5f8c333b9ec8b6e55397dc87060a4d672e8f7a0cc913acb7f02d7fea184
 //META: purpose=A [vk::location(N)] modifier lowers to a glslLocation decoration carrying the integer location operand.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc records `glslLocation` with operand `location: IRIntLit`
-// and AST origin `[vk::location(...)]` modifier. Confirm the
-// integer N flows through unchanged.
+// Verifies the `glslLocation` row's single `IRIntLit` operand. The
+// attribute is written on a varying field and the CHECK pins
+// `[glslLocation(7 : Int)]`, so the location value must survive lowering
+// unchanged and as an integer literal rather than, say, a folded layout
+// reference.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

@@ -1,21 +1,16 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T17:13:27Z
-//META: source_commit=ecefa0388fc4ccf7d14670c7bf1eccc88a7bdd14
-//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#interfacereqentry
-//META: doc_section_digest=649555343c205ab0c26446093b6240518a16135126c348a497fe87b34f836ad7
-//META: purpose=An interface with zero methods lowers to let %IEmpty : Type = interface with no interface_req_entry operands.
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#witness-tables-and-witness-facts
+//META: doc_section_digest=c07446d42292314ac54df96997ac71db597f857c5d132648cd782bcb15b2b00f
+//META: purpose=An interface with zero requirements lowers to an interface opcode with no interface_req_entry operands.
 //META: intent=boundary
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
-
-// Boundary on interface_req_entry axis: zero requirements. The
-// `### interface_req_entry` notable-opcode prose says entries
-// "declare the requirement". With no requirements the parent
-// `interface(...)` opcode takes *no* `interface_req_entry`
-// operands — the dump shape is `let %IEmpty : Type = interface`
-// (a bare `interface` keyword on the right-hand side).
-
+// Boundary at zero requirements on the interface side. The CHECK matches the
+// interface line and the CHECK-NOT asserts no operand list follows it — an
+// opening parenthesis would mean at least one requirement entry was attached.
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 
 interface IEmpty { };
@@ -34,5 +29,5 @@ void main()
     buf[0] = useEmpty<E>(e, inVal);
 }
 
-// CHECK: let  %IEmpty	: Type	= interface
-// CHECK-NOT: let  %IEmpty	: Type	= interface(
+// CHECK: let  %IEmpty : Type = interface
+// CHECK-NOT: let  %IEmpty : Type = interface(

@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=1106750632bd5fb062ea9e50319f7763d34f78d5
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/cuda.md#phase-b-specialization-and-type-legalization
-//META: doc_section_digest=0410773935d5331fbece0da3f2383f2a7478f2afa84b7d440d2490b07f25489f
+//META: doc_section_digest=5cfb04763d734c87abb0c612990b5db758ffc4cce1785fc806d10db967096a26
 //META: purpose=RWTexture2D<float4> maps to the CUDA primitive CUsurfObject and subscript-store / subscript-load lower to surf2Dwrite / surf2Dread.
 //META: intent=expansion
 //META: pipeline_stage=emit

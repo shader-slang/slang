@@ -1,17 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-22T00:00:00+00:00
-//META: source_commit=6e923e2c0fe3cae4e7cf40e25a96569df5b9f009
-//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#coopmatmapelementifunc
-//META: doc_section_digest=e491a40c4584c9e2ef051e5d42cd61fb8fe95105a8ef0814ea10a93c9c980d08
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
+//META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#cooperative-matrix-and-vector
+//META: doc_section_digest=5d8bfb7cd06d16d7e5526799f2be56c9cee4a73edf35171033b8a239608e92f4
 //META: purpose=`CoopMat.MapElement` invoked with an element-wise function surfaces the documented `CoopMatMapElementIFunc` opcode in the IR dump.
 //META: intent=functional
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// The doc lists `CoopMatMapElementIFunc` (variadic, `min=2`) as the IR
-// form of the core-module `CoopMat.mapElement`. The portable surface
-// uses `MapElement` on a tuple of matrices with a per-element callable.
+// Verifies that an element-wise map over a cooperative matrix becomes a
+// single opcode carrying the matrix and the callable, rather than a
+// lowered loop. The result is stored through a buffer so it survives,
+// and the CHECK looks for the opcode inside `func %main`.
 
 //TEST:SIMPLE(filecheck=IR):-target spirv-asm -dump-ir -o /dev/null -stage compute -entry main
 

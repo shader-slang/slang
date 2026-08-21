@@ -1,17 +1,19 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-20T16:50:55+00:00
-//META: source_commit=bbd84dc65e58598bfa71fafe72764b4076b0869b
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04b-pre-link-passes.md#phase-c-mandatory-optimization-passes
-//META: doc_section_digest=ea5fa74562394aae8870602d7884121af11d8d0462ee86377e7d298a8422bd4b
-//META: purpose=Phase C's applySparseConditionalConstantPropagation (C2) folds `7 + 3` to a single constant 10 stored into the buffer.
+//META: doc_section_digest=49feefd921e3cd705ce44340fcdfa68e653acc4e8992a6e7baac1b7332480921
+//META: purpose=Phase C's applySparseConditionalConstantPropagation (C2) runs over the freshly constructed SSA and folds constant arithmetic to a single literal.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// SCCP runs after SSA construction and constant-folds the
-// arithmetic; the LOWER-TO-IR block shows the folded literal
-// instead of `add(7, 3)`.
+// Verifies the constant-propagation step by giving it literal operands
+// only: `7` flows into `x`, `x + 3` is therefore statically known, and the
+// post-Phase-D snapshot should show the folded `10` being stored rather
+// than an `add` of the two source literals. The CHECK-NOT pins the second
+// half of that -- the unfolded add must not be present.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

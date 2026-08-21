@@ -355,6 +355,12 @@ bool isSlang2026OrLater(SemanticsVisitor* visitor)
            SLANG_LANGUAGE_VERSION_2026;
 }
 
+bool isSlang202cOrLater(SemanticsVisitor* visitor)
+{
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
+           SLANG_LANGUAGE_VERSION_202C;
+}
+
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)
@@ -12777,6 +12783,13 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
         if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
         {
             auto parentDecl = getParentDecl(decl);
+            // An accessor's direct parent is its storage declaration, not the container that
+            // supplies `this`. Consider `Box<T>.Value.set`: registering `Value` does not make
+            // `Box<T>` available to autodiff when the setter stores into one of its fields. Skip
+            // the property here, just as we skip a subscript for its accessors, so the aggregate
+            // receiver is registered in the accessor's generic context.
+            if (as<PropertyDecl>(parentDecl) || as<SubscriptDecl>(parentDecl))
+                parentDecl = getParentDecl(parentDecl);
             auto parentDeclRef =
                 createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(parentDecl));
             auto thisType = calcThisType(parentDeclRef);

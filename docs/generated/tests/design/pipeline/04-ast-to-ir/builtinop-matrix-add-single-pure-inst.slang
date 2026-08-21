@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-fable-5
-//META: generated_at=2026-07-08T16:30:00Z
-//META: source_commit=110ca68915f1b6690e19a647e3437e1ad1f78a03
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#builtin-operators-bypass-call-lowering
-//META: doc_section_digest=e70a29d1d218a8caa31a9b05ae27e6e9e79c2c46f8f65751d8428df1ad6141c2
+//META: doc_section_digest=84a14c8c06fb62977462b222065d70ef81479ad93846db3d8c9e968027e956d2
 //META: purpose=A builtin elementwise `+` on `float2x2` matrix operands takes the checker fast path and lowers to a single pure `add` inst whose result IR type is the matrix type `Mat(Float, 2 : Int, 2 : Int, ...)`.
 //META: intent=boundary
 //META: pipeline_stage=lower

@@ -1,18 +1,18 @@
 //META: generated=true
-//META: model=claude-opus-4-8
-//META: generated_at=2026-07-02T00:00:00+00:00
-//META: source_commit=8e2a63cbf22c85332796702fd02a875466486a23
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ast-reference/declarations.md#requirementdecl-style-nodes-inside-interfacedecl
-//META: doc_section_digest=4c37f9dfe6cf12e08ecfd91cb5b14070a8232c0e86d4bcb998f12ec60adc6aed
-//META: purpose=An interface requirement is whatever Decl is written inside the interface body; a conforming type that omits a required member is diagnosed.
+//META: doc_section_digest=61b41d7c34c3d57c8ab25ebc17ad4847ac05d606da5acd0ee3a97221870d03b4
+//META: purpose=An interface requirement is whatever declaration was written inside the interface body; a conforming type that omits a required member is diagnosed.
 //META: intent=negative
 //META: pipeline_stage=check
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Verifies the documented behavior that "an interface requirement is
-// whatever Decl was written inside the interface body". The struct
-// fails to define `area`, so its `: IShape` conformance must fail and
-// the checker must diagnose it.
+// Verifies that every declaration in an interface body is a requirement a
+// conformer must satisfy. The struct declares a field but not the required
+// method, so its conformance must fail; the CHECK pins the
+// requirement-not-satisfied error.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 

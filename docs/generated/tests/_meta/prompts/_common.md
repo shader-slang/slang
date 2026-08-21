@@ -74,11 +74,11 @@ is not a word character, a hyphen, or a space, then turn each remaining
 space into a hyphen. Punctuation is **deleted, not replaced**, so the
 spaces around it each still produce a hyphen:
 
-| Heading                                          | Anchor                                             |
-| ------------------------------------------------ | -------------------------------------------------- |
-| `### Builtin operators bypass call lowering`     | `#builtin-operators-bypass-call-lowering`          |
-| `### MemberExpr / StaticMemberExpr`              | `#memberexpr--staticmemberexpr` (two hyphens)      |
-| `### CUDA / Python / FFI attributes`             | `#cuda--python--ffi-attributes`                    |
+| Heading                                      | Anchor                                        |
+| -------------------------------------------- | --------------------------------------------- |
+| `### Builtin operators bypass call lowering` | `#builtin-operators-bypass-call-lowering`     |
+| `### MemberExpr / StaticMemberExpr`          | `#memberexpr--staticmemberexpr` (two hyphens) |
+| `### CUDA / Python / FFI attributes`         | `#cuda--python--ffi-attributes`               |
 
 Copy the anchor out of the source doc's heading; do not reuse an anchor
 quoted in another bundle's README without checking it against the
@@ -201,6 +201,31 @@ omit the heading. Bundle-specific sections (e.g. `## Sibling-bundle
 overlap`, `## Catalog coverage`, `## Codes dropped`) may appear after
 the four canonical sections but never between them.
 
+**Never write a raw `{{` or `{%` anywhere in the README body — not even
+inside a code span or fence.** The README carries YAML front-matter, so
+the GitHub Pages Jekyll build treats it as a page and runs Liquid over
+the whole body before Markdown; `{{`/`{%` open Liquid tags. A `{{` that
+Liquid cannot close aborts the entire site build — in
+`float2x2 m = {{1,2},{3,4}}` the scan for `}}` stops at the first single
+`}`, so the tag is never terminated. A `{{...}}` that _is_ terminated
+(e.g. a FileCheck `{{.*}}` wildcard) instead gets evaluated as a template
+expression (usually rendering empty), so the literal text does not
+survive on the page. The README is also read on github.com, where Liquid is not
+processed, so a `{% raw %}` wrapper or an HTML entity inside a backtick
+span is wrong too — both show up literally there. Two spellings are safe
+on both surfaces:
+
+- Where whitespace does not matter, space the braces: write
+  `float2x2 m = { {1,2},{3,4} }`, not `{{1,2},{3,4}}`.
+- Where the exact token matters (a FileCheck `{{...}}` pattern), show it
+  in a raw `<code>` element with numeric brace entities:
+  `<code>&#123;&#123;.*&#125;&#125;</code>` renders as `{{.*}}` on both
+  github.com and Pages. (`_meta/` prose files have no front-matter, so
+  Jekyll copies them verbatim and they may use `{{...}}` freely — this
+  rule is only for the front-matter-bearing bundle READMEs.)
+
+`regenerate.py lint` enforces this and fails the build on any raw opener.
+
 ```markdown
 # Tests for <bundle-key>
 
@@ -212,25 +237,25 @@ strategy (e.g. "one positive + one negative per claim in sections
 
 ## Functional coverage
 
-| Claim                                                                          | Intent     | Anchor                                                               | Tests                                                                    |
-| ------------------------------------------------------------------------------ | ---------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Claim                                                                          | Intent     | Anchor                                                             | Tests                                                                    |
+| ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | The more specialized generic wins when both candidates are equally accessible. | functional | [#overload-resolution](<relative-path-to-doc>#overload-resolution) | [`overload-prefer-specialized.slang`](overload-prefer-specialized.slang) |
-| ...                                                                            | ...        | ...                                                                  | ...                                                                      |
+| ...                                                                            | ...        | ...                                                                | ...                                                                      |
 
 ## Untested claims
 
-| Claim                                                                                                                                     | Reason          | Anchor                                                           | Why untested                                                                                                                                     |
-| ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claim                                                                                                                                     | Reason          | Anchor                                                         | Why untested                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | The doc describes the `serialize(serializer, value)` template pattern that compiler internals use to thread values through serialization. | needs-unit-test | [#serialize-pattern](<relative-path-to-doc>#serialize-pattern) | A C++ idiom invoked from compiler-internal code; no slangc CLI surface reaches it. A C++ unit test against the serializer types could verify it. |
 | The `closesthit` entry point lowers to a DXR `[shader("closesthit")]` HLSL function.                                                      | gpu-dxr         | [#dxr-ray-tracing](<relative-path-to-doc>#dxr-ray-tracing)     | Agent runtime has no GPU; CI nightly has D3D12 + DXR support.                                                                                    |
-| ...                                                                                                                                       | ...             | ...                                                              | ...                                                                                                                                              |
+| ...                                                                                                                                       | ...             | ...                                                            | ...                                                                                                                                              |
 
 ## Doc gaps observed
 
-| Anchor                                                             | Kind            | Gap                                                                                                             | Suggested addition                                                              |
-| ------------------------------------------------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Anchor                                                           | Kind            | Gap                                                                                                             | Suggested addition                                                              |
+| ---------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [#basic-scalar-types](<relative-path-to-doc>#basic-scalar-types) | missing-surface | The doc lists `IntPtr` and `UIntPtr` as opcodes but does not name a Slang surface construct that produces them. | A "user-level surface" column per row, or a note that these are host-side only. |
-| ...                                                                | ...             | ...                                                                                                             | ...                                                                             |
+| ...                                                              | ...             | ...                                                                                                             | ...                                                                             |
 ```
 
 **Functional-coverage table rules:**
@@ -251,13 +276,14 @@ negative | expansion | regression` and matches the test's
   count the `../` steps for the bundle you are actually writing instead
   of copying them from another bundle:
 
-  | Bundle directory                                     | Link to `docs/generated/design/<doc>.md` | Link to `docs/language-reference/<doc>.md` |
-  | ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
-  | `docs/generated/tests/conformance/<bundle>/`         | `../../../design/<doc>.md`               | `../../../../language-reference/<doc>.md`  |
-  | `docs/generated/tests/design/<area>/<bundle>/`       | `../../../../design/<doc>.md`            | `../../../../../language-reference/<doc>.md` |
+  | Bundle directory                               | Link to `docs/generated/design/<doc>.md` | Link to `docs/language-reference/<doc>.md`   |
+  | ---------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
+  | `docs/generated/tests/conformance/<bundle>/`   | `../../../design/<doc>.md`               | `../../../../language-reference/<doc>.md`    |
+  | `docs/generated/tests/design/<area>/<bundle>/` | `../../../../design/<doc>.md`            | `../../../../../language-reference/<doc>.md` |
 
   Lint fails on a README link whose path does not resolve, so check the
   link resolves from the bundle directory before finishing.
+
 - **Tests** is a comma-separated list of clickable filenames in the
   bundle directory, formatted ``[`filename.slang`](filename.slang)``.
   Never repeat a claim across rows — if multiple tests verify the same
@@ -291,14 +317,14 @@ to add.
   multiple sections, pick the most specific anchor and mention the
   others in the Gap cell.
 - **Kind** is one value from the controlled vocabulary:
-  | Kind | When to use |
-  | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-  | `missing-example` | Doc names a claim but does not include a minimal example shader that exercises it. |
-  | `missing-surface` | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it. |
-  | `undocumented-behavior` | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).|
-  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass. |
-  | `ambiguous-claim` | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess. |
-  | `drift-from-source` | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
+  | Kind                     | When to use                                                                                                                 |
+  | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+  | `missing-example`        | Doc names a claim but does not include a minimal example shader that exercises it.                                          |
+  | `missing-surface`        | Doc names an IR / AST / internal construct but does not name the user-level syntax or builtin that produces it.             |
+  | `undocumented-behavior`  | Observed compiler behavior is real and reachable but the doc is silent about it (no claim, no caveat, no warning).          |
+  | `cascading-only-mention` | Doc describes a diagnostic or behavior that is always shadowed in practice by an earlier diagnostic or pass.                |
+  | `ambiguous-claim`        | Doc claim has more than one reasonable interpretation; tests cannot anchor to it without making a guess.                    |
+  | `drift-from-source`      | Observed compiler behavior contradicts what the doc says (e.g., doc says "lowers to `select`" but actually emits `ifElse`). |
 - **Gap** is one to three sentences naming what the doc lacks, in the
   voice of a reader of the doc. Quote the doc literally when the gap
   is about its exact wording. Do **not** describe internal compiler
@@ -531,7 +557,7 @@ nothing.
 
 ### FileCheck / CHECK pattern hygiene (READ — most CHECK failures come from these)
 
-You are writing a pattern that must match the compiler's *actual*
+You are writing a pattern that must match the compiler's _actual_
 emitted text, which you cannot see while generating. You will guess
 wrong if you pin exact generated output. **Assert stable structure with
 loose patterns; never pin volatile detail.** The rules below each
@@ -539,33 +565,36 @@ correspond to a real, recurring failure class — follow every one.
 
 1. **Never pin a compiler-generated SSA id or mangled name.** IDs like
    SPIR-V `%29`, IR `%1234`, or names like `_S3`, `f_0`, `main_1` are
-   assigned by codegen and *vary*. Worse, the slang-test harness
+   assigned by codegen and _vary_. Worse, the slang-test harness
    disassembles SPIR-V with **friendly names** (so an operand prints as
    `%f_0`, not `%29`) in some run modes and numeric in others — a test
    that pins one form fails in the other. For any id/operand use a
    permissive capture, not a numeric one:
+
    - ✅ `%{{[A-Za-z0-9_]+}} = OpConvertFToS %int %{{[A-Za-z0-9_]+}}`
-   - ❌ `%{{[0-9]+}} = OpConvertFToS %int %{{[0-9]+}}`  (fails on `%f_0`)
-   - ❌ `%29 = OpConvertFToS %int %17`  (pins volatile ids)
-   Match the opcode/structure, not the numbering.
+   - ❌ `%{{[0-9]+}} = OpConvertFToS %int %{{[0-9]+}}` (fails on `%f_0`)
+   - ❌ `%29 = OpConvertFToS %int %17` (pins volatile ids)
+     Match the opcode/structure, not the numbering.
 
 2. **Escape FileCheck metacharacters when the emitted text contains them
-   literally.** `[[...]]` is a FileCheck *variable* reference and
-   `{{...}}` is a *regex*. Emitted Metal/HLSL attributes literally
+   literally.** `[[...]]` is a FileCheck _variable_ reference and
+   `{{...}}` is a _regex_. Emitted Metal/HLSL attributes literally
    contain double brackets (`[[unroll]]`, `[[color(0)]]`, `[[buffer(0)]]`).
    A CHECK line `// CHECK: [[unroll]]` is parsed as a variable and fails
    with `undefined variable: unroll`. Escape:
+
    - ✅ `// CHECK: {{\[\[}}unroll{{\]\]}}`
-   Likewise escape a literal `{{` as `{{\{\{}}`.
+     Likewise escape a literal `{{` as `{{\{\{}}`.
 
 3. **Avoid substring collisions.** FileCheck matches substrings, so a
    short pattern silently matches inside a longer token:
+
    - `CHECK-NOT: OpFunction` fires on `OpFunctionEnd` (present in every
      module) — use the specific token you mean, e.g. `CHECK-NOT: OpFunctionCall`.
    - unanchored `StructuredBuffer` matches inside `RWStructuredBuffer` —
      anchor the read-only spelling: `CHECK-DAG: {{^}}StructuredBuffer`.
-   Prefer the most specific token, anchor with `{{^}}`, or include enough
-   surrounding context to disambiguate.
+     Prefer the most specific token, anchor with `{{^}}`, or include enough
+     surrounding context to disambiguate.
 
 4. **Plain `CHECK`/`CHECK-DAG` order must equal emission order.** Sequential
    `CHECK` lines must appear in the order the compiler emits them. Metal
@@ -589,12 +618,12 @@ correspond to a real, recurring failure class — follow every one.
    pins the diagnostic, or record it in `## Untested claims` — **never**
    weaken the CHECK to force green.
 
-7. **`DIAGNOSTIC_TEST`: annotate the compiler's *actual* message, and use
+7. **`DIAGNOSTIC_TEST`: annotate the compiler's _actual_ message, and use
    `non-exhaustive` deliberately.** Do not invent diagnostic wording —
    most diagnostics emit a **short + long message pair** at the same caret
    span, plus secondary notes (`candidate: ...`, `argument N does not
-   match: ...`, `see declaration of ...`). Rules:
-   - Annotate the *actual* text the compiler emits (a substring is fine),
+match: ...`, `see declaration of ...`). Rules:
+   - Annotate the _actual_ text the compiler emits (a substring is fine),
      not a plausible-sounding guess. If you cannot be sure of the wording,
      assert the **error code** (`//CHECK: E39999`) which is stable.
    - Align the caret (`^`) to the reported column; a multi-caret span
@@ -1283,7 +1312,26 @@ agent_self_assessment:
 - Do **not** call `gh` or otherwise file issues yourself.
 - Do **not** attempt to minimize the repro. The operator does this
   during triage. Your `evidence.source_slang` points at the full
-  `.slang` you were writing; that is enough.
+  `.slang` you were writing; that is enough — **as long as the command
+  you record actually runs that file.**
+- If the failure came from a _scratch variant_ rather than the file you
+  are committing — a `/tmp` file, a one-off edit you did not keep —
+  then `source_slang` alone will not reproduce it, and the scratch path
+  will be gone by the time anyone triages. **Inline the exact failing
+  source in `evidence.repro_source`.** `lint` warns when a command names
+  a scratch path and no `repro_source` is given.
+
+  This is not hypothetical bookkeeping. In one triage pass over 17
+  findings, 7 could not be re-run at all for this reason, and 2 of those
+  produced convincing _false_ "already fixed" results — substituting
+  `source_slang` fed the compiler a different program, which failed for
+  an unrelated reason that looked like the bug being gone. A finding that
+  cannot be re-run cannot be filed, because nobody can confirm it still
+  happens.
+
+  Some inputs cannot ship as a test at all — a compiler crash, for
+  instance. `repro_source` is exactly for those.
+
 - Do **not** populate `evidence.minimized_repro` — that field is
   reserved for the operator.
 - Do **not** speculate about the root cause. Stick to observation:

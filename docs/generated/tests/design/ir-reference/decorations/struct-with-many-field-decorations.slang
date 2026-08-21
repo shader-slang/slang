@@ -1,20 +1,20 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T00:00:00Z
-//META: source_commit=60db9042207670b39b0524118887efacb7a3d42d
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=4430d3efb9516cd383356961351a223b29ad1c948e7c5ea9bf0a36d832a4b940
-//META: purpose=Stress - a struct with many fields, each carrying interpolationMode + glslLocation + semantic decorations, produces all per-field decorations in the dump without merging or collisions across fields.
+//META: doc_section_digest=9dcc3971ffe320daffa3155aa97909cc164f7f1f53867e82746329293f4841f5
+//META: purpose=Stress - a struct whose fields each carry interpolationMode, glslLocation and semantic decorations produces all per-field decorations without merging across fields.
 //META: intent=stress
 //META: pipeline_stage=lower
 //META: warning=Auto-generated. May drift from source. Do not edit by hand.
 
-// Stress - sample five interpolation modes (linear=0,
-// noperspective=1, nointerpolation=2, centroid=3, sample=4) on
-// adjacent fields, each with a distinct TEXCOORD semantic and
-// a distinct vk::location. The dump records all five
-// interpolationMode mode integers, all five semantic strings,
-// and the explicit per-field locations independently.
+// Verifies that the shader-IO decorations are per-field and mutually
+// independent. Five adjacent fields use five different interpolation
+// modifiers, five different explicit locations and five different
+// semantics; the CHECK-DAG lines assert every mode integer and every
+// location appears, so a lowering that hoisted one field's decoration onto
+// the struct, or reused one inst for all fields, would fail.
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -dump-ir -o /dev/null -entry main -stage compute
 

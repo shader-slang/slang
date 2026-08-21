@@ -1,9 +1,9 @@
 //META: generated=true
-//META: model=claude-opus-4-7
-//META: generated_at=2026-05-21T13:00:00+00:00
-//META: source_commit=1655c2bf8d3567fa220a5226769ef5e3917d55e8
+//META: model=claude-opus-5[1m]
+//META: generated_at=2026-08-04T00:00:00+00:00
+//META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/target-pipelines/spirv.md#phase-c-spir-v-legalization-lowering-phi-elimination
-//META: doc_section_digest=adbc9f62b2b56295371ba0ea74f7f7385925be80ae5d4b3005d64a60b8337c56
+//META: doc_section_digest=61b9f1fa9e25e0a1a331e30835332c142e930cea0b3de2b952f901beda9edd64
 //META: purpose=RWTexture1D lowers to an OpTypeImage with dim 1D and storage-image sampled-bit 2; legalizeImageSubscript rewrites subscript writes/reads to OpImageWrite / OpImageRead, and the Image1D capability is required.
 //META: intent=expansion
 //META: pipeline_stage=ir-pass
