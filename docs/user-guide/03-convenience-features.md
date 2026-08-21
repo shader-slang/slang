@@ -1181,6 +1181,6 @@ In the above code, the `MaxValueAttribute` struct type is decorated with the `[_
 
 The `scaleFactor` uniform parameter is declared with the user-defined `[MaxValue]` attribute, providing two arguments for `value` and `description`.
 
-The `_AttributeTargets` enum is used to restrict the types of declarations the attribute can apply to. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct` or `Var`.
+The `_AttributeTargets` enum is used to restrict the types of declarations the attribute can apply to. Possible values of `_AttributeTargets` can be `Function`, `Param`, `Struct`, `Var` or `EnumCase`. To make an attribute applicable to more than one kind of declaration, list a `[__AttributeUsage]` for each target separately, e.g. both `[__AttributeUsage(_AttributeTargets.Var)]` and `[__AttributeUsage(_AttributeTargets.EnumCase)]`.
 
 The usage of user-defined attributes can be queried via Slang's reflection API through `TypeReflection` or `VariableReflection`'s `getUserAttributeCount`, `getUserAttributeByIndex`, and `findUserAttributeByName` methods.

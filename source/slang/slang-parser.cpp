@@ -6475,6 +6475,16 @@ Decl* Parser::ParseGLSLInterfaceBlock()
 static EnumCaseDecl* parseEnumCaseDecl(Parser* parser)
 {
     EnumCaseDecl* decl = parser->astBuilder->create<EnumCaseDecl>();
+
+    // Only collect `[...]` bracketed attributes here, not the full modifier set:
+    // an enum case name may be a bareword modifier keyword (e.g. `point`, `linear`,
+    // `sample`), which `ParseModifiers` would otherwise consume as a modifier.
+    Modifier** modifierLink = &decl->modifiers.first;
+    while (peekTokenType(parser) == TokenType::LBracket)
+    {
+        ParseSquareBracketAttributes(parser, &modifierLink);
+    }
+
     parser->FillPosition(decl);
 
     decl->nameAndLoc = expectIdentifier(parser);
