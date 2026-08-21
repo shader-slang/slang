@@ -1,11 +1,12 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -shaderobj
 
-// Unrolling the `dot` fallback removes its `T(0)` accumulator seed, because the additive-identity
-// peephole folds `0 + x` to `x` and `isZero` treats `-0.0` as zero. For operands whose products are
-// all negatively signed zeros that changes the result from `+0.0` to `-0.0`: the loop form computed
-// `(0.0 + -0.0) + -0.0`, which is `+0.0` under IEEE-754, and the unrolled form computes
-// `-0.0 + -0.0`, which is `-0.0`. This pins the sign bit so the behaviour cannot drift unnoticed.
+// Unrolling the `dot` fallback removes its `+0.0` accumulator seed: the additive-identity peephole
+// folds `+0.0 + x` to `x`, which is unsafe for signed zero because `+0.0 + (-0.0)` is `+0.0` while
+// the surviving `-0.0` keeps its sign. For operands whose products are all `-0.0` that changes the
+// result from `+0.0` to `-0.0`: the loop form computed `(0.0 + -0.0) + -0.0`, which is `+0.0` under
+// IEEE-754, and the unrolled form computes `-0.0 + -0.0`, which is `-0.0`. This pins the sign bit so
+// the behaviour cannot drift unnoticed.
 //
 // Operands come from a buffer because an all-literal `dot` is constant-folded before it reaches the
 // fallback at all.
