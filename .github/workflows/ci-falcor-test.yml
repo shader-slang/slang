@@ -19,7 +19,7 @@ permissions:
 jobs:
   test-falcor:
     name: Test (Falcor)
-    timeout-minutes: 100
+    timeout-minutes: 180
     runs-on: [Linux, self-hosted, X64, falcor-bridge]
     # Vet-and-approve gate: this job runs PR-controlled code on the internal
     # bridge VM, so approval (required reviewers = the `ci-approvers` team)
@@ -28,10 +28,14 @@ jobs:
     # build-windows-release-cl-x86_64-gpu-falcor), not here directly --
     # GitHub charges one approval prompt per job that references an
     # environment, so putting the gate on both the build and this job would
-    # mean two separate approval clicks per PR for one Falcor run. A PR by a
-    # team member runs automatically; anyone else's run waits for the one
-    # upstream approval, which also covers this job since it cannot start
-    # until the gated build produces its artifact.
+    # mean two separate approval clicks per PR for one Falcor run. Every PR's
+    # run pauses for that one upstream approval -- environment protection has
+    # no actor scoping, so there is no "team member" exemption -- and it also
+    # covers this job, since it cannot start until the gated build produces
+    # its artifact. timeout-minutes only counts execution time once this job
+    # starts on a runner, so it does not need to budget for the approval
+    # wait; it still needs to cover the ~45 minute Falcor run plus that run's
+    # own queue for a GPU host on the far side of the bridge.
     defaults:
       run:
         shell: bash
