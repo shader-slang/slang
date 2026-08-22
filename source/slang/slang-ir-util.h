@@ -120,6 +120,15 @@ bool isPointerOfType(IRInst* ptrType, IROp opCode);
 
 bool isUserPointerType(IRInst* type);
 
+// True if `type` is a `ConstRef<T, CudaKernelParam>` - the CUDA-family address-forwarding
+// representation for a by-value entry-point kernel parameter (emitted as `T p` / `&p`, not `T*`).
+//
+// Matches only an `IRBorrowInParamType` carrying that atom, never the address space on its own. The
+// emitters branch on this to pick the by-value spelling, and `kIROp_RefParamType` shares those code
+// paths, so testing the address space alone would pull a `ref` parameter into the by-value path.
+// Call the predicate rather than inlining the comparison.
+bool isCudaKernelParamBorrowInType(IRInst* type);
+
 // True if inst produces a derived address from another base address.
 bool isAddressInst(IRInst* inst);
 
@@ -461,6 +470,14 @@ IRBlock* getBlock(IRInst* inst);
 ///
 
 IRVarLayout* findVarLayout(IRInst* value);
+
+/// Return true if `param` is an entry-point (kernel) by-value uniform aggregate parameter: a
+/// non-varying uniform `struct`/`array` in a kernel's argument space. On CUDA its address is
+/// forwarded into a `borrow in` callee (by `transformParamsToConstRef`) instead of copying the
+/// whole aggregate into a per-thread `.local` depot - the #11774 slowdown. This is only a shape
+/// test: forwarding an address is sound solely when the destination slot is a read-only `borrow
+/// in`, which the caller must establish; a `true` result alone does not authorize a forward.
+bool isEntryPointByValueUniformAggregateParam(IRParam* param);
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee);
 KnownBuiltinDeclName getBuiltinFuncEnum(IRInst* callee);

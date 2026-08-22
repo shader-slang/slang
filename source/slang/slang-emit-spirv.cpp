@@ -1641,6 +1641,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
         case AddressSpace::SpecializationConstant:
+        // `CudaKernelParam` is produced only by the CUDA-gated entry-point uniform forward in
+        // `transformParamsToConstRef`, so it never reaches SPIR-V. Like the atoms above it, it
+        // falls out to the `SLANG_UNEXPECTED` below rather than trapping in-place.
+        case AddressSpace::CudaKernelParam:
             // msvc is limiting us from putting the UNEXPECTED macro here, so
             // just fall out
             ;
