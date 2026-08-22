@@ -11732,6 +11732,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // to the module we are lowering.
 
         IRInst* irConstant = nullptr;
+        IRInst* irInitVal = nullptr;
         if (!initExpr)
         {
             // If we don't know the value we want to use, then we just create
@@ -11749,7 +11750,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+            irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
@@ -11767,6 +11768,44 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addVarDecorations(context, irConstant, decl);
 
         getBuilder()->addHighLevelDeclDecoration(irConstant, decl);
+
+        // Emit debug info for named global constants when debug info is enabled.
+        // Use irConstant->getValue() rather than irInitVal: the initializer expression
+        // may go through implicit casts (e.g. float literal to double), so the value
+        // stored in the IRGlobalConstant may be a cast instruction rather than a bare
+        // literal. The SPIRV emitter handles same-domain cast peeling to reach the
+        // underlying IRConstant. We reference this value (not the IRGlobalConstant wrapper)
+        // so the debug instruction survives the replaceGlobalConstants pass, which removes
+        // the wrapper.
+        // Use irConstant->getDataType() as the debug type to match the type that
+        // emitGlobalConstant used, avoiding a mismatch with rate-qualified types.
+        auto foldedVal = irConstant ? as<IRGlobalConstant>(irConstant)->getValue() : nullptr;
+        if (foldedVal && subContext->debugInfoLevel >= DebugInfoLevel::Standard &&
+            decl->loc.isValid())
+        {
+            IRInst* debugSourceInst = getOrEmitDebugSource(subContext, decl->loc);
+            if (debugSourceInst)
+            {
+                auto humaneLoc = _getDebugHumaneLoc(subContext, debugSourceInst, decl->loc);
+                auto declName = decl->getName();
+                if (declName)
+                {
+                    auto nameInst = subBuilder->getStringValue(declName->text.getUnownedSlice());
+                    // Use lowerType(decl->getType()) for the debug metadata type: it gives a
+                    // plain, non-rate-qualified type (e.g. Double rather than @ConstExpr Double).
+                    // irConstant->getDataType() can return a rate-qualified type, which
+                    // emitDebugType does not handle and would produce wrong SPIRV debug output.
+                    auto irType = lowerType(subContext, decl->getType());
+                    subBuilder->emitDebugGlobalConstant(
+                        irType,
+                        nameInst,
+                        debugSourceInst,
+                        subBuilder->getIntValue(subBuilder->getUIntType(), humaneLoc.line),
+                        subBuilder->getIntValue(subBuilder->getUIntType(), humaneLoc.column),
+                        foldedVal);
+                }
+            }
+        }
 
         // Finish of generic
 

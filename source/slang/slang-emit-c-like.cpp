@@ -3245,6 +3245,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugFunction:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
+    case kIROp_DebugGlobalConstant:
         break;
 
     case kIROp_Unmodified:
@@ -5309,6 +5310,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugBuildIdentifier:
     case kIROp_DebugCompilationUnit:
+    case kIROp_DebugGlobalConstant:
         return;
     default:
         break;

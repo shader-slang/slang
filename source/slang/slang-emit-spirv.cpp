@@ -2403,6 +2403,126 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             return true;
 
+        case kIROp_DebugGlobalConstant:
+            if (shouldEmitExtendedDebugInfo)
+            {
+                auto debugGlobalConst = as<IRDebugGlobalConstant>(inst);
+                auto varType = as<IRType>(debugGlobalConst->getDebugType());
+
+                // Ensure DebugCompilationUnit is processed before emitDebugType and
+                // findDebugScope: both call findDebugScope internally, which needs the
+                // module-inst → scope mapping registered by the CU emit.
+                for (auto globalInst : inst->getModule()->getGlobalInsts())
+                {
+                    if (globalInst->getOp() == kIROp_DebugCompilationUnit)
+                    {
+                        ensureInst(globalInst);
+                        break;
+                    }
+                }
+
+                auto debugType = emitDebugType(varType, false);
+                // emitDebugTypeImpl returns m_voidType (OpTypeVoid) if findDebugScope fails
+                // (e.g., varType lives in the session rather than the current module).
+                // An OpTypeVoid debug type is not a valid DebugType operand, so skip.
+                if (!debugType || debugType->opcode == SpvOpTypeVoid)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                auto scope = findDebugScope(inst->getModule()->getModuleInst());
+                if (!scope)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                auto name = debugGlobalConst->getName();
+                auto source = debugGlobalConst->getSource();
+                auto line = debugGlobalConst->getLine();
+                auto col = debugGlobalConst->getCol();
+                auto value = debugGlobalConst->getValue();
+
+                // Walk through casts to find the underlying literal. For example,
+                // `static const double cf1 = 3.0` stores the value as
+                // floatCast(FloatLit(3.0 : Float), Double) before propagateConstExpr folds it.
+                // Cross-domain casts (CastIntToFloat, CastFloatToInt) are also peeled: the
+                // re-materialization below handles the type mismatch by creating a new literal
+                // with the declared varType, which the IRBuilder deduplicates and the SPIRV
+                // emitter encodes correctly.
+                IRInst* resolvedValue = value;
+                while (resolvedValue)
+                {
+                    if (as<IRConstant>(resolvedValue))
+                        break;
+                    auto op = resolvedValue->getOp() & kIROpMask_OpMask;
+                    if ((op == kIROp_FloatCast || op == kIROp_IntCast ||
+                         op == kIROp_CastIntToFloat || op == kIROp_CastFloatToInt) &&
+                        resolvedValue->getOperandCount() >= 1)
+                    {
+                        resolvedValue = resolvedValue->getOperand(0);
+                    }
+                    else
+                    {
+                        resolvedValue = nullptr; // not a scalar literal
+                    }
+                }
+
+                // Only emit DebugGlobalVariable for scalar literal constants: non-constant
+                // values (runtime loads, struct constructors, etc.) cannot be represented
+                // as OpConstant at global scope in SPIRV.
+                if (!resolvedValue || !as<IRConstant>(resolvedValue))
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                // If we peeled a same-domain cast chain, resolvedValue may have a narrower
+                // type than varType (e.g. FloatLit(3.0:Float) inside FloatCast(..., Double)).
+                // Re-materialize the literal with the declared type so the OpConstant we
+                // emit matches the DebugGlobalVariable's debug type. The IRBuilder
+                // deduplicates constants, so this will reuse any existing OpConstant of
+                // the right type/value rather than emitting a duplicate.
+                if (resolvedValue->getDataType() != varType)
+                {
+                    IRBuilder tempBuilder(inst->getModule());
+                    if (auto floatLit = as<IRFloatLit>(resolvedValue))
+                        resolvedValue = tempBuilder.getFloatValue(varType, floatLit->getValue());
+                    else if (auto intLit = as<IRIntLit>(resolvedValue))
+                        resolvedValue = tempBuilder.getIntValue(varType, intLit->getValue());
+                }
+
+                auto spvValue = ensureInst(resolvedValue);
+                if (!spvValue)
+                {
+                    *emittedSpvInst = nullptr;
+                    return true;
+                }
+
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+
+                // FlagIsDefinition = 0x08 in NonSemantic.Shader.DebugInfo.100.
+                auto flags = builder.getIntValue(builder.getUIntType(), 8);
+
+                *emittedSpvInst = emitOpDebugGlobalVariable(
+                    getSection(SpvLogicalSectionID::GlobalVariables),
+                    inst,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    name,
+                    debugType,
+                    source,
+                    line,
+                    col,
+                    scope,
+                    name, // linkageName same as name
+                    spvValue,
+                    flags);
+            }
+            return true;
+
         default:
             // Not a debug instruction, return false to signal caller to continue
             return false;
@@ -2992,6 +3112,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DebugCompilationUnit:
         case kIROp_DebugFunction:
         case kIROp_DebugInlinedAt:
+        case kIROp_DebugGlobalConstant:
             SLANG_UNEXPECTED(
                 "Debug instruction should have been handled by processDebugGlobalInst");
         case kIROp_GetStringHash:
@@ -12178,6 +12299,20 @@ SlangResult emitSPIRVFromIR(
         }
     }
 
+    // Pre-ensure DebugGlobalConstant instructions after the compilation units have been
+    // registered. These instructions are not referenced by any other instruction and would
+    // not be pulled in transitively; they must be explicitly iterated to generate
+    // DebugGlobalVariable entries in the SPIR-V output.
+    // This loop must run after the DebugCompilationUnit loop above (and after the module-scope
+    // debug scope fixup below) so that findDebugScope returns the correct scope.
+    // We defer the actual ensureInst calls to after the scope fixup loop.
+    List<IRInst*> debugGlobalConstInsts;
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (as<IRDebugGlobalConstant>(inst))
+            debugGlobalConstInsts.add(inst);
+    }
+
     // Override m_defaultDebugSource with the entry point's source file.
     // When multiple compilation units exist (e.g., with 'import' syntax), global insts
     // may be processed in module order and m_defaultDebugSource may end up pointing to
@@ -12217,6 +12352,12 @@ SlangResult emitSPIRVFromIR(
             }
         }
     }
+
+    // Emit DebugGlobalVariable for named global constants. These were collected earlier,
+    // after the compilation-unit pre-ensure pass, so the module-scope debug scope is now
+    // registered and findDebugScope will succeed.
+    for (auto inst : debugGlobalConstInsts)
+        context.ensureInst(inst);
 
     for (auto inst : irModule->getGlobalInsts())
     {
