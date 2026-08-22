@@ -24701,16 +24701,40 @@ struct HitObject
     }
 
         /// Returns the parametric ending point (T value at hit/miss). Valid if the hit object represents a hit or a miss.
-        /// DXR 1.3 and OptiX.
+        /// DXR 1.3, OptiX, and GL_(NV|EXT)_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     [require(cuda, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float GetRayTCurrent()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayTCurrent";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTmax";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float = OpHitObjectGetRayTMaxNV &this;
+            };
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float = OpHitObjectGetRayTMaxEXT &this;
+            };
         }
     }
 
