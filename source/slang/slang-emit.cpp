@@ -1239,6 +1239,13 @@ Result linkAndOptimizeIR(
     SLANG_PASS(addDenormalModeDecorations, codeGenContext);
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    // Reject an entry-point parameter using a not-yet-implemented parameter mode
+    // before the uniform-parameter collection below erases its wrapper. (Ordinary
+    // functions are checked after inlining/DCE further down.)
+    SLANG_PASS(checkForUnsupportedEntryPointParamModes, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     // Another transformation that needed to wait until we
     // had layout information on parameters is to take uniform
     // parameters of a shader entry point and move them into
@@ -1674,6 +1681,13 @@ Result linkAndOptimizeIR(
         // as the later target pipelines do.
         SLANG_PASS(cleanUpVoidType);
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+        // Reject any reachable use of a not-yet-implemented parameter mode after the
+        // inlining/simplification above (so an inlined-away use is allowed) but before
+        // host-VM emission, which otherwise bypasses the general `checkUnsupportedInst`
+        // pass.
+        SLANG_PASS(checkForUnsupportedParamModes, sink);
+        if (sink->getErrorCount() != 0)
+            return SLANG_FAIL;
         return SLANG_OK;
     }
 
@@ -1727,6 +1741,16 @@ Result linkAndOptimizeIR(
     {
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
     }
+
+    // Reject any reachable use of a not-yet-implemented parameter mode. Runs after
+    // force-inlining and the following dead-code elimination, so a fully inlined-away
+    // (or otherwise unreferenced) declaration is allowed, while a genuinely reachable
+    // use fails here uniformly for every target. This runs unconditionally because
+    // the general `checkUnsupportedInst` pass below is skipped under
+    // `-minimum-slang-optimization`.
+    SLANG_PASS(checkForUnsupportedParamModes, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // Report checkpointing information.
     if (codeGenContext->shouldReportCheckpointIntermediates())

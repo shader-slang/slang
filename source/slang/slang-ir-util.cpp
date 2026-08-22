@@ -220,6 +220,24 @@ std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRTyp
                 ParameterDirectionInfo::Kind::BorrowIn,
                 as<IRBorrowInParamType>(paramType)->getAddressSpace()),
             as<IRBorrowInParamType>(paramType)->getValueType()};
+    else if (as<IRRefReadOnlyParamType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::RefReadOnly,
+                as<IRRefReadOnlyParamType>(paramType)->getAddressSpace()),
+            as<IRRefReadOnlyParamType>(paramType)->getValueType()};
+    else if (as<IRRefWriteOnlyParamType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::RefWriteOnly,
+                as<IRRefWriteOnlyParamType>(paramType)->getAddressSpace()),
+            as<IRRefWriteOnlyParamType>(paramType)->getValueType()};
+    else if (as<IRConsumeParamType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::Consume,
+                as<IRConsumeParamType>(paramType)->getAddressSpace()),
+            as<IRConsumeParamType>(paramType)->getValueType()};
     else
         return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
 }
@@ -239,6 +257,12 @@ IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IR
         return builder->getBorrowInParamType(type, info.addressSpace);
     case ParameterDirectionInfo::Kind::Ref:
         return builder->getRefParamType(type, info.addressSpace);
+    case ParameterDirectionInfo::Kind::RefReadOnly:
+        return builder->getRefReadOnlyParamType(type, info.addressSpace);
+    case ParameterDirectionInfo::Kind::RefWriteOnly:
+        return builder->getRefWriteOnlyParamType(type, info.addressSpace);
+    case ParameterDirectionInfo::Kind::Consume:
+        return builder->getConsumeParamType(type, info.addressSpace);
     default:
         SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
     }
@@ -411,6 +435,9 @@ bool isWrapperType(IRInst* inst)
     case kIROp_PtrType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_RefReadOnlyParamType:
+    case kIROp_RefWriteOnlyParamType:
+    case kIROp_ConsumeParamType:
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -1246,6 +1273,9 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_PtrType:
     case kIROp_RefParamType:
     case kIROp_BorrowInParamType:
+    case kIROp_RefReadOnlyParamType:
+    case kIROp_RefWriteOnlyParamType:
+    case kIROp_ConsumeParamType:
     case kIROp_GLSLShaderStorageBufferType:
     // Work-graph output records are mutable handles, so treat them as pointer-like.
     case kIROp_ThreadNodeOutputRecordsType:

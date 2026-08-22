@@ -1571,6 +1571,9 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::OutModifier:
     case ASTNodeType::RefModifier:
     case ASTNodeType::BorrowModifier:
+    case ASTNodeType::RefReadOnlyModifier:
+    case ASTNodeType::RefWriteOnlyModifier:
+    case ASTNodeType::ConsumeModifier:
     case ASTNodeType::InOutModifier:
         return ASTNodeType::OutModifier;
 
@@ -1701,6 +1704,14 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
                as<GLSLInterfaceBlockDecl>(decl);
+
+    // The internal `__ref_readonly` / `__ref_writeonly` / `__consume` modes are
+    // parameter-passing modes only; unlike `__ref`/`__constref` they have no
+    // meaning on a global or interface-block declaration.
+    case ASTNodeType::RefReadOnlyModifier:
+    case ASTNodeType::RefWriteOnlyModifier:
+    case ASTNodeType::ConsumeModifier:
+        return as<ParamDecl>(decl) != nullptr;
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:

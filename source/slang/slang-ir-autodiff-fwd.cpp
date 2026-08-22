@@ -1243,12 +1243,16 @@ struct ForwardDiffTranslationContext
         for (UIndex ii = 0; ii < funcType->getParamCount(); ii++)
         {
             auto paramType = funcType->getParamType(ii);
-            bool isOutput = as<IROutParamTypeBase>(paramType) || as<IRRefParamType>(paramType);
+            bool isOutput = as<IROutParamTypeBase>(paramType) || as<IRRefParamType>(paramType) ||
+                            as<IRRefWriteOnlyParamType>(paramType);
+            // The by-reference and consume modes wrap their value type in a pointer-like
+            // node; unwrap those (the read-only / consume modes are not "outputs" but are
+            // still wrappers) to inspect the value type.
+            bool isWrapper = isOutput || as<IRRefReadOnlyParamType>(paramType) ||
+                             as<IRConsumeParamType>(paramType);
 
-            // For outputs (out/inout/ref), get the value type from the pointer.
-            // For inputs, use the param type directly.
             IRType* valueType;
-            if (isOutput)
+            if (isWrapper)
                 valueType = (IRType*)as<IRPtrTypeBase>(paramType)->getValueType();
             else
                 valueType = paramType;

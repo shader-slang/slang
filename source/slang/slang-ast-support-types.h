@@ -1810,6 +1810,41 @@ FIDDLE() namespace Slang
         /// sugar for a parameter of an explicit pointer type (`Ptr<T>`).
         ///
         Ref,
+
+        /// Pass a read-only reference to a memory location.
+        ///
+        /// Indicated by using the `__ref_readonly` modifier on a parameter.
+        ///
+        /// Like `Ref`, this is by-reference pointer sugar: the callee accesses
+        /// the argument's memory location directly (same address, no copies) and
+        /// has no guarantee of exclusive access. Unlike `BorrowIn`, the callee is
+        /// *not* free to receive a reference to a temporary copy. It differs from
+        /// `Ref` only in that the memory location may not be written through the
+        /// parameter. This is distinct from `const`.
+        ///
+        RefReadOnly,
+
+        /// Pass a write-only reference to a memory location.
+        ///
+        /// Indicated by using the `__ref_writeonly` modifier on a parameter.
+        ///
+        /// The by-reference counterpart of `RefReadOnly`: same by-reference,
+        /// non-exclusive semantics as `Ref`, except the memory location may not
+        /// be read through the parameter.
+        ///
+        RefWriteOnly,
+
+        /// Pass a value whose ownership is transferred from caller to callee.
+        ///
+        /// Indicated by using the `__consume` modifier on a parameter.
+        ///
+        /// This is a by-value mode (like `In` and `Out`): the storage at the
+        /// passed-in address is guaranteed to be initialized on entry to the
+        /// callee, and the callee takes ownership of it. On any normal return the
+        /// storage is left uninitialized (the callee has consumed it); on an error
+        /// return it must remain initialized.
+        ///
+        Consume,
     };
 
     void printDiagnosticArg(StringBuilder & sb, ParamPassingMode direction);

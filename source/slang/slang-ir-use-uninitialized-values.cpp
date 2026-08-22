@@ -396,11 +396,13 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     if (!ftype)
         return None;
 
-    // Consider it as a store if its passed
-    // as an out/inout/ref parameter
+    // Consider it as a store if its passed as an out/inout/ref parameter (the
+    // callee may write the location). `__ref_writeonly` is likewise write-through,
+    // so it counts as a store; `__ref_readonly` and `__consume` are reads, so they
+    // fall through to `Load` and require the argument to already be initialized.
     auto type = unwrapAttributedType(ftype->getParamType(index));
     return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
-            as<IRRefParamType>(type))
+            as<IRRefParamType>(type) || as<IRRefWriteOnlyParamType>(type))
                ? Store
                : Load;
 }

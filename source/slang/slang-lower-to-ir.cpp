@@ -3450,10 +3450,13 @@ void addArg(
         break;
 
     case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
         {
             // The next easiest case is the `ref` parameter passing
             // mode, because we always want to pass a pointer to
-            // the actual argument.
+            // the actual argument. The read-only and write-only
+            // by-reference modes share this address-passing behavior.
             //
             // The `LoweredValInfo` representation (used for `argVal`)
             // can store either an r-value or a few different cases
@@ -3489,6 +3492,7 @@ void addArg(
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::BorrowIn:
+    case ParamPassingMode::Consume:
         {
             // The remaining parameter-passing modes are the ones that
             // have the most complicated rules.
@@ -3566,9 +3570,9 @@ void addArg(
             IRInst* tempPtr = getAddress(context, tempVar, loc);
             addSimpleArg(context, ioArgs, LoweredValInfo::simple(tempPtr));
 
-            // If the parameter isn't input-only (that is, `borrow in`),
-            // then we need to ensure that the value in the temporary
-            // after the call gets transferred back to the original
+            // If the parameter isn't input-only (that is, `borrow in` or
+            // `__consume`), then we need to ensure that the value in the
+            // temporary after the call gets transferred back to the original
             // argument (which must be an l-value in this case, so should
             // be a valid destination for `assign()`.
             //
@@ -3597,7 +3601,8 @@ void addArg(
             // `getAddress()` operation has sufficient information to do things
             // like pick between `get`/`set` and `ref` accessors on properties.
             //
-            if (paramPassingMode != ParamPassingMode::BorrowIn)
+            if (paramPassingMode != ParamPassingMode::BorrowIn &&
+                paramPassingMode != ParamPassingMode::Consume)
             {
                 OutArgumentFixup fixup;
                 fixup.src = tempVar;
@@ -3638,7 +3643,10 @@ void addCallArgsForParam(
     switch (paramPassingMode)
     {
     case ParamPassingMode::Ref:
+    case ParamPassingMode::RefReadOnly:
+    case ParamPassingMode::RefWriteOnly:
     case ParamPassingMode::BorrowIn:
+    case ParamPassingMode::Consume:
     case ParamPassingMode::Out:
     case ParamPassingMode::BorrowInOut:
         {
@@ -3671,6 +3679,18 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
     if (paramDecl->hasModifier<RefModifier>())
     {
         return ParamPassingMode::Ref;
+    }
+    if (paramDecl->hasModifier<RefReadOnlyModifier>())
+    {
+        return ParamPassingMode::RefReadOnly;
+    }
+    if (paramDecl->hasModifier<RefWriteOnlyModifier>())
+    {
+        return ParamPassingMode::RefWriteOnly;
+    }
+    if (paramDecl->hasModifier<ConsumeModifier>())
+    {
+        return ParamPassingMode::Consume;
     }
     if (paramDecl->hasModifier<BorrowModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
@@ -4743,6 +4763,15 @@ void _lowerInfoFromFuncParameters(
             break;
         case ParamPassingMode::BorrowIn:
             irParamType = builder->getBorrowInParamType(irParamType, AddressSpace::Generic);
+            break;
+        case ParamPassingMode::RefReadOnly:
+            irParamType = builder->getRefReadOnlyParamType(irParamType, AddressSpace::Generic);
+            break;
+        case ParamPassingMode::RefWriteOnly:
+            irParamType = builder->getRefWriteOnlyParamType(irParamType, AddressSpace::Generic);
+            break;
+        case ParamPassingMode::Consume:
+            irParamType = builder->getConsumeParamType(irParamType, AddressSpace::Generic);
             break;
 
         default:

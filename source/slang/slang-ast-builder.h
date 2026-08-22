@@ -634,6 +634,12 @@ public:
     // Construct the type `ImmutableBorrowParam<valueType>`
     BorrowInParamType* getConstRefParamType(Type* valueType);
 
+    RefReadOnlyParamType* getRefReadOnlyParamType(Type* valueType);
+
+    RefWriteOnlyParamType* getRefWriteOnlyParamType(Type* valueType);
+
+    ConsumeParamType* getConsumeParamType(Type* valueType);
+
     // Construct the type `Ref<valueType>`
     ExplicitRefType* getExplicitRefType(Type* valueType);
 
