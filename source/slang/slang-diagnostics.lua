@@ -4602,6 +4602,14 @@ err(
     span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
 
+warning(
+    "imported-overload-overrides-local-candidate",
+    38208,
+    "call to '~name:Name' resolved to an overload from imported module '~importedModule:Name', overriding a candidate declared in this module",
+    span { loc = "callLoc", message = "chose '~chosenSignature' from imported module '~importedModule', which is a better match for these arguments" },
+    span { loc = "localCandidate:Decl", message = "'~localSignature' declared in this module is not used; add an explicit cast to call it" }
+)
+
 -- Note: compilationCeased is a fatal diagnostic that is locationless
 fatal(
     "compilation-ceased",
