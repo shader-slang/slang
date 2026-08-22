@@ -13,13 +13,28 @@ Detailed build instructions can be found in docs/building.md
 ## Formatting
 
 DO THIS BEFORE COMMITTING YOUR CHANGES:
-RUN `./extras/formatting.sh` to format your changes first!!
+RUN BOTH OF THESE to format your changes first!!
+
+```bash
+./extras/formatting.sh --modified --no-version-check        # C++, CMake, YAML/JSON, shell
+./extras/formatting.sh --modified --md --no-version-check   # markdown - not covered by the line above
+```
+
 Your PR needs to be formatted according to our coding style.
+
+`--no-version-check` is included because the version ranges are narrow — a distro clang-format 18.1.3 is rejected as "too new" and the script then formats nothing. Drop it if you want the exact versions CI uses; keep it if you would otherwise skip the check.
+
+Two commands are needed because a type flag such as `--md` narrows the run to that type rather than adding to it, and markdown is the one formatter a flagless run does not enable. Two further cases are covered by neither command, and both exit 0 having formatted nothing:
+
+- **Untracked files are invisible** to `--modified` (it is `git diff HEAD`). Format a new file by naming it: `./extras/formatting.sh --no-version-check -- path/to/new-file`.
+- **`.slang` files have no formatter configured**, so naming one selects nothing.
+
+Run with no arguments, the script prints its help text and exits 0 without formatting anything.
 
 The formatting script requires these tools:
 
-- **clang-format** 17-18 (for C++ files)
-- **gersemi** 0.21-0.22 (for CMake files)
+- **clang-format** 17.x only (`>= 17, < 18`) (for C++ files)
+- **gersemi** 0.21.x only (`>= 0.21, < 0.22`) (for CMake files)
 - **prettier** 3+ (for YAML/JSON/Markdown files)
 - **shfmt** 3+ (for shell scripts)
 
@@ -43,7 +58,9 @@ Note: If pip install fails with externally-managed-environment error, use `--bre
 brew install clang-format gersemi prettier shfmt
 ```
 
-You can also use `./extras/formatting.sh --check-only` to verify formatting without modifying files.
+These formulae are unpinned, so they may install versions outside the ranges above. Check with `clang-format --version` and `gersemi --version`; if either falls outside its range, install a matching build or rely on `--no-version-check` as the commands above do.
+
+You can also add `--check-only` to either command above to verify without modifying files — that checks the same set the command would format. A bare `./extras/formatting.sh --check-only` checks the whole tree instead, which will report pre-existing violations in files you did not touch.
 
 ## Labeling your PR
 
