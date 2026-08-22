@@ -1307,6 +1307,13 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
+        // bool, experimental opt-in for the SPIR-V-direct path. When set, a read-only texture is
+        // passed directly as a function parameter instead of being specialized into a bindless
+        // descriptor index re-loaded in the callee. Off by default; the index-passing form is a
+        // driver workaround (shader-slang/slang#3252, #12120) and remains the default. Only plain
+        // read-only textures are affected; other resources stay specialized.
+        VulkanUseDirectResourceParams = 158,
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
