@@ -6017,6 +6017,15 @@ fatal(
     span { loc = "location", message = "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque type values. Consider pre-loading the content of any referenced buffers into a local variable before calling 'CoopMat.MapElement', or moving any referenced resources to global scope." }
 )
 
+-- Type legalization (51702)
+
+fatal(
+    "type-legalization-unsupported-operation",
+    51702,
+    "operation is not supported on a value whose type has no representation on this target",
+    span { loc = "location", message = "'~operation' cannot be applied here: one of its operands has a type that this target eliminates during legalization -- such as an empty struct -- so this operation cannot be expressed here. Restructure the code to avoid comparing or otherwise operating on such a value, or file an issue if it looks like something this target should support." }
+)
+
 
 err(
     "class-type-not-supported",

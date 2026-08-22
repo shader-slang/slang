@@ -2193,9 +2193,38 @@ static LegalVal legalizeInst(
             // the instruction, since there will be no value to produce.
             return LegalVal();
         }
-        // TODO: produce a user-visible diagnostic here
+        // An operand that legalized away to nothing is a limit on what this pass can express for
+        // the user's program: unlike `load` and `store`, which legalize to nothing along with such
+        // an operand, this instruction still owes a represented result and has nothing to build it
+        // from. Report that against the user's code.
+        //
+        // Reaching here for any other reason -- notably an instruction whose operands are all
+        // simple but whose own type legalized to something non-simple -- is a gap in this pass
+        // rather than anything the user wrote, so keep asserting for those and do not blame the
+        // shader for a compiler bug.
+        const bool anyOperandEliminated =
+            args.findFirstIndex([](const LegalVal& arg)
+                                { return arg.flavor == LegalVal::Flavor::none; }) >= 0;
+        if (anyOperandEliminated)
+        {
+            // Prefer the instruction's own location, which is the operator being reported on.
+            // `findBestSourceLocFromUses` walks to a consumer first and only falls back to this
+            // instruction, so calling it directly moves the caret onto the enclosing expression --
+            // for `p == nullptr ? 1 : 0` it names the `?` rather than the `==`.
+            context->m_sink->diagnose(Diagnostics::TypeLegalizationUnsupportedOperation{
+                .operation = getIROpInfo(inst->getOp()).name,
+                .location =
+                    inst->sourceLoc.isValid() ? inst->sourceLoc : findBestSourceLocFromUses(inst)});
+            // That diagnostic is fatal, so it aborts compilation and control does not reach here.
+            // The severity is load-bearing rather than incidental: returning a `none` value would
+            // leave the caller queueing this instruction for deallocation while its uses are still
+            // live, and the check that catches that is debug-only. Assert so that lowering the
+            // severity fails loudly instead of silently corrupting the module.
+            SLANG_UNEXPECTED("fatal diagnostic must abort compilation");
+        }
+
         SLANG_UNEXPECTED("non-simple operand(s)!");
-        break;
+        UNREACHABLE_RETURN(LegalVal());
     }
     return result;
 }
