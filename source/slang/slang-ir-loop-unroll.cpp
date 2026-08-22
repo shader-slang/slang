@@ -50,13 +50,30 @@ static bool _eliminateDeadBlocks(List<IRBlock*>& blocks, IRBlock* unreachableBlo
     return changed;
 }
 
+static constexpr int kMaxIterationsToAttempt = 4096;
+
+// Number of peel attempts `_unrollLoop` is allowed for a loop, or -1 if the loop is not
+// `[ForceUnroll]`. A user `[ForceUnroll(N)]` permits N iterations, i.e. N + 1 peel attempts (the
+// extra one folds the exit test after the Nth body). `[ForceUnroll]` / `[ForceUnroll(0)]` means "as
+// many as it takes", capped at `kMaxIterationsToAttempt`.
+//
+// When unrolling is split across `_unrollLoop` calls (the deferral pass peels part of a loop and
+// leaves the rest for the diagnosing pass), the residual carries its *remaining* attempt budget in
+// a second decoration operand so the promised iteration count is not silently reset to the full
+// budget on the later call. That operand holds an attempt count directly (0 = no attempts left, so
+// a still-iterating residual is reported), which is why it is read here in preference to the user
+// count rather than reusing operand 0 — operand 0's 0 means "unlimited", the opposite of "none".
 static int _getLoopMaxIterationsToUnroll(IRLoop* loopInst)
 {
-    static constexpr int kMaxIterationsToAttempt = 4096;
-
     auto forceUnrollDecor = loopInst->findDecoration<IRForceUnrollDecoration>();
     if (!forceUnrollDecor)
         return -1;
+
+    if (forceUnrollDecor->getOperandCount() > 1)
+    {
+        if (auto remaining = as<IRIntLit>(forceUnrollDecor->getOperand(1)))
+            return Math::Min((int)remaining->getValue(), kMaxIterationsToAttempt);
+    }
 
     int maxIterations = kMaxIterationsToAttempt;
     auto maxIterCount = as<IRIntLit>(forceUnrollDecor->getOperand(0));
@@ -219,15 +236,101 @@ static void allocVarForLoopInductionPhiParam(
     }
 }
 
+// Collect the blocks of one peeled iteration whose branch decides whether this loop iterates
+// again or exits — its "fate separators" — into `outSeparators`.
+//
+// A peeled iteration reaches the remaining loop through `continueSink` (a back-edge to the not-
+// yet-peeled iterations) and leaves the loop through `exitSink` (the loop's break target). A
+// separator is a conditional branch that can reach `continueSink` on one side and `exitSink`
+// (without first continuing) on the other — precisely a test that governs the loop's own
+// continue/exit decision. Reachability is computed over `blocks` alone with the two sinks as
+// terminals, so a nested inner loop's own test is *not* a separator here: both of its arms
+// eventually rejoin this iteration's continue path, so neither leads to `exitSink`.
+//
+// A loop can have several separators (e.g. a header test plus an independent `break`); all are
+// collected so the caller can tell whether *any* of them resolved this peel.
+static void _collectLoopFateSeparators(
+    const List<IRBlock*>& blocks,
+    IRBlock* continueSink,
+    IRBlock* exitSink,
+    HashSet<IRBlock*>& outSeparators)
+{
+    HashSet<IRBlock*> regionBlocks;
+    for (auto b : blocks)
+        regionBlocks.add(b);
+
+    // canReach[sink]: region blocks from which `sink` is reachable without leaving the region.
+    auto computeCanReach = [&](IRBlock* sink)
+    {
+        HashSet<IRBlock*> canReach;
+        for (bool changed = true; changed;)
+        {
+            changed = false;
+            for (auto b : blocks)
+            {
+                if (canReach.contains(b))
+                    continue;
+                for (auto succ : b->getSuccessors())
+                {
+                    if (succ == sink || (regionBlocks.contains(succ) && canReach.contains(succ)))
+                    {
+                        canReach.add(b);
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return canReach;
+    };
+
+    HashSet<IRBlock*> canContinue = computeCanReach(continueSink);
+    HashSet<IRBlock*> canExit = computeCanReach(exitSink);
+
+    for (auto b : blocks)
+    {
+        auto terminator = b->getTerminator();
+        if (!as<IRConditionalBranch>(terminator) && !as<IRSwitch>(terminator))
+            continue;
+
+        // A fate separator has one successor that leads to continuing the loop and another that
+        // leads out of it (and cannot itself continue).
+        bool anyContinues = false;
+        bool anyOnlyExits = false;
+        for (auto succ : b->getSuccessors())
+        {
+            bool succContinues = succ == continueSink || canContinue.contains(succ);
+            bool succExits = succ == exitSink || canExit.contains(succ);
+            if (succContinues)
+                anyContinues = true;
+            else if (succExits)
+                anyOnlyExits = true;
+        }
+        if (anyContinues && anyOnlyExits)
+            outSeparators.add(b);
+    }
+}
+
 // Unroll loop up to a predefined maximum number of iterations.
 // Returns true if we can statically determine that the loop terminated within the iteration limit.
 // This operation assumes the loop does not have `continue` jumps, i.e. continueBlock ==
 // targetBlock.
+//
+// `allowCheapBail` enables an early exit for a loop that cannot converge yet: if a peeled iteration
+// still branches back into the loop but none of the loop's own exit tests folded to a constant this
+// peel, peeling continues no further and the residual loop is left in place. That inference is only
+// an approximation — a loop whose exit test depends on loop-carried state that itself converges
+// (e.g. `while (current) { current = next; next = false; }` stops after two iterations) would be
+// abandoned prematurely. It is therefore enabled ONLY on the non-diagnosing deferral pass, where a
+// premature bail merely defers the loop to the diagnosing pass and changes no observable outcome.
+// The diagnosing pass passes `false`, so it performs the honest full peel up to the iteration limit
+// before it reports a loop as non-terminating.
 static bool _unrollLoop(
     TargetProgram* targetProgram,
     IRModule* module,
     IRLoop* loopInst,
-    List<IRBlock*>& blocks)
+    List<IRBlock*>& blocks,
+    bool allowCheapBail)
 {
     if (blocks.getCount() == 0)
     {
@@ -383,7 +486,42 @@ static bool _unrollLoop(
                 loopInst->getContinueBlock(),
                 (UInt)newParams.getCount(),
                 newParams.getArrayView().getBuffer()));
+
+            // Carry the original loop's decorations (notably `[ForceUnroll]`) and source
+            // location onto the residual loop. If unrolling stops early with iterations still
+            // remaining, the leftover loop must still be recognizable as one to unroll on a
+            // later pass (the decoration) and must still point at the user's loop when that pass
+            // diagnoses it (the source location) — `emitLoop` carries neither on its own.
+            newLoopInst->sourceLoc = loopInst->sourceLoc;
+            loopInst->transferDecorationsTo(newLoopInst);
             loopInst->removeAndDeallocate();
+
+            // Preserve the `[ForceUnroll]` iteration budget across a split unroll. This call was
+            // granted `maxIterations` peel attempts and has consumed `attempedIterations + 1` of
+            // them by peeling this iteration; the remainder belongs to the residual. Record it in a
+            // second decoration operand so a later `_unrollLoop` call resumes the same budget
+            // rather than restarting from the user's full count (which would let a
+            // `[ForceUnroll(N)]` loop run more than N iterations when unrolling is deferred). The
+            // remainder is stored in its own operand — not by rewriting the user count in operand 0
+            // — because operand 0's `0` means "unlimited", which cannot encode a remaining budget
+            // of "none".
+            if (auto residualForceUnroll = newLoopInst->findDecoration<IRForceUnrollDecoration>())
+            {
+                IRIntegerValue userCount = 0;
+                if (auto c = as<IRIntLit>(residualForceUnroll->getOperand(0)))
+                    userCount = c->getValue();
+                residualForceUnroll->removeAndDeallocate();
+
+                int remainingAttempts = maxIterations - (attempedIterations + 1);
+                if (remainingAttempts < 0)
+                    remainingAttempts = 0;
+
+                builder.addDecoration(
+                    newLoopInst,
+                    kIROp_ForceUnrollDecoration,
+                    builder.getIntValue(builder.getIntType(), userCount),
+                    builder.getIntValue(builder.getIntType(), remainingAttempts));
+            }
 
             // Update `loopInst` to represent the remaining loop iterations that are yet to be
             // unrolled.
@@ -428,6 +566,23 @@ static bool _unrollLoop(
 
         SLANG_RELEASE_ASSERT(clonedBlocks[0]->getFirstParam() == nullptr);
 
+        // Before folding, find this loop's exit tests in the freshly cloned iteration: the
+        // blocks that decide between continuing the loop (reaching `firstIterationBreakBlock`)
+        // and leaving it (reaching `outerBreakableRegionBreakBlock`). We look now, before
+        // `_foldAndSimplifyLoopIteration` may collapse the CFG, so the tests are found
+        // structurally rather than being confused with control flow that only appears once a
+        // constant test folds. Only the deferral pass (`allowCheapBail`) uses these; the
+        // diagnosing pass peels fully and never bails, so it skips the analysis.
+        HashSet<IRBlock*> preFoldSeparators;
+        if (allowCheapBail)
+        {
+            _collectLoopFateSeparators(
+                clonedBlocks,
+                firstIterationBreakBlock,
+                outerBreakableRegionBreakBlock,
+                preFoldSeparators);
+        }
+
         // With all the insts for the first iteration in place, we now iteratively run
         // SCCP and simplification for the cloned blocks, in hope that some
         // conditional jumps can be folded into unconditional jumps.
@@ -441,7 +596,6 @@ static bool _unrollLoop(
 
         // Now we have peeled off one iteration from the loop, we check if there are any
         // branches into next iteration, if not, the loop terminates and we are done.
-
         bool hasJumpsToRemainingLoop = false;
         for (auto b : clonedBlocks)
         {
@@ -454,6 +608,43 @@ static bool _unrollLoop(
                 }
             }
         }
+
+        // On the deferral pass, check whether *any* of this loop's exit tests resolved to a
+        // constant this peel: a separator resolved if its block was folded away (no longer among
+        // `clonedBlocks`) or its branch became unconditional. If the loop is going to iterate
+        // again but none of its exit tests resolved this peel, none is likely to soon — each
+        // typically depends on a value still loop-carried at this point (e.g. `for (j = 0; j < i;
+        // ++j)` with `i` not yet a literal). Rather than peel up to `kMaxIterationsToAttempt`, stop
+        // and leave the loop for the diagnosing pass. This is only an approximation (a loop whose
+        // carried state converges could still terminate), which is why it is confined to the
+        // non-diagnosing pass: a premature bail here only defers the loop, and the diagnosing pass
+        // (`allowCheapBail == false`) peels it fully before concluding it cannot be unrolled. The
+        // residual loop keeps its `[ForceUnroll]` decoration and source location so that pass can
+        // find and retry or diagnose it.
+        if (allowCheapBail && hasJumpsToRemainingLoop)
+        {
+            bool anySeparatorResolved = preFoldSeparators.getCount() == 0;
+            HashSet<IRBlock*> survivingBlocks;
+            for (auto b : clonedBlocks)
+                survivingBlocks.add(b);
+            for (auto sep : preFoldSeparators)
+            {
+                if (!survivingBlocks.contains(sep))
+                {
+                    anySeparatorResolved = true; // Folded away entirely.
+                    break;
+                }
+                auto t = sep->getTerminator();
+                if (!as<IRConditionalBranch>(t) && !as<IRSwitch>(t))
+                {
+                    anySeparatorResolved = true; // Folded to an unconditional branch.
+                    break;
+                }
+            }
+            if (!anySeparatorResolved)
+                break;
+        }
+
         if (!hasJumpsToRemainingLoop)
         {
             loopTerminated = true;
@@ -530,6 +721,50 @@ List<IRLoop*> collectLoopsInFunc(IRGlobalValueWithCode* func, const TFunc& filte
     return loops;
 }
 
+// Collect every `[ForceUnroll]` loop in `func`, outermost first — the reverse of the
+// inner-first order `collectLoopsInFunc` produces. Reverse-postorder visits an enclosing
+// loop's entry block before the blocks it dominates, so an outer loop's `IRLoop` is seen
+// before the inner loops nested in it.
+static List<IRLoop*> collectForceUnrollLoopsOutermostFirst(IRGlobalValueWithCode* func)
+{
+    List<IRLoop*> loops;
+    for (auto block : getReversePostorder(func))
+    {
+        if (auto loop = as<IRLoop>(block->getTerminator()))
+        {
+            if (loop->findDecoration<IRForceUnrollDecoration>())
+                loops.add(loop);
+        }
+    }
+    return loops;
+}
+
+// Unroll all `[ForceUnroll]` loops in a function, in two passes.
+//
+// A `[ForceUnroll]` loop whose trip count depends on an enclosing `[ForceUnroll]` loop's
+// induction variable cannot be unrolled on its own: while the enclosing loop is still rolled,
+// that variable is loop-carried, so the inner loop's bound never folds to a constant. Consider
+// shader-slang/slang#12473:
+//
+//     [ForceUnroll] for (int i = 0; i < 8; ++i)
+//         [ForceUnroll] for (int j = 0; j < i; ++j)
+//             dst[i*8+j] = src[i*8+j];
+//
+// If the `j` loop is attempted first (inner-first, the natural order), `j < i` never folds and
+// `_unrollLoop` bails without unrolling it. Once the `i` loop is unrolled, each cloned body has
+// `i` substituted by a per-iteration literal, so the copies of the `j` loop then unroll.
+//
+//  - Pass 1 unrolls what it can, inner-first, and does NOT diagnose a loop it fails to unroll —
+//    it simply leaves it. It runs `_unrollLoop` with `allowCheapBail`, so a loop that has not
+//    resolved an exit test after one peel is left for pass 2 rather than peeled all 4096 times.
+//    A premature bail here is harmless: pass 1 emits no diagnostic, so at worst the loop is
+//    deferred to pass 2, which decides its fate honestly.
+//  - Pass 2 unrolls outermost-first and DOES diagnose, with `allowCheapBail` off so it peels a
+//    loop fully (up to the iteration limit) before concluding it cannot terminate. By the time it
+//    reaches a loop, every enclosing `[ForceUnroll]` loop has already been unrolled (or itself
+//    diagnosed and aborted), so a loop that still will not unroll here genuinely cannot be, and its
+//    failure is reported. Because pass 2 aborts on the first failure and each loop is visited once,
+//    "diagnose exactly once" holds without any per-loop bookkeeping.
 bool unrollLoopsInFunc(
     TargetProgram* targetProgram,
     IRModule* module,
@@ -537,42 +772,80 @@ bool unrollLoopsInFunc(
     DiagnosticSink* sink,
     bool* outChanged)
 {
-    List<IRLoop*> loops = collectLoopsInFunc(
+    // Nothing to do if this function has no `[ForceUnroll]` loops. Unrolling only ever clones
+    // existing `[ForceUnroll]` loops (it never introduces the first one), so both passes are
+    // no-ops here. Returning early also avoids running `sortBlocksInFunc` on a function we did not
+    // touch, which would needlessly reorder its blocks and perturb otherwise-unrelated emit.
+    auto pass1Loops = collectLoopsInFunc(
         func,
         [](IRLoop* l) { return l->findDecoration<IRForceUnrollDecoration>() != nullptr; });
-
-    if (loops.getCount() == 0)
+    if (pass1Loops.getCount() == 0)
         return true;
 
-    for (auto loop : loops)
+    // Pass 1: inner-first, best-effort, no diagnostics. A loop that cannot be unrolled yet is
+    // left for pass 2 (which runs after its enclosing loops have been unrolled).
+    for (auto loop : pass1Loops)
     {
         if (!loop->parent)
             continue;
 
-        // Remove any continue jumps from the loop.
         eliminateContinueBlocks(module, loop);
 
         auto blocks = collectBlocksInRegion(func, loop);
-        auto loopLoc = loop->sourceLoc;
-        if (!_unrollLoop(targetProgram, module, loop, blocks))
+        if (_unrollLoop(targetProgram, module, loop, blocks, /*allowCheapBail:*/ true))
+        {
+            if (outChanged)
+                *outChanged = true;
+
+            // Simplify before attempting an enclosing loop, so its body is as folded as
+            // possible when it is cloned.
+            simplifyCFG(func, CFGSimplificationOptions::getDefault());
+            eliminateDeadCode(func);
+        }
+    }
+
+    // Pass 2: outermost-first, diagnosing. Re-collect from the current CFG after each unroll
+    // rather than iterating a once-computed list, because unrolling an enclosing loop clones the
+    // loops nested in it — those clones are new `[ForceUnroll]` loops that a stale list would
+    // miss, and the originals are deallocated. Each round unrolls the outermost remaining loop
+    // (so a loop's enclosing loops are always unrolled before it) and stops once none remain.
+    for (;;)
+    {
+        auto loops = collectForceUnrollLoopsOutermostFirst(func);
+        IRLoop* loopToUnroll = nullptr;
+        for (auto loop : loops)
+        {
+            if (loop->parent)
+            {
+                loopToUnroll = loop;
+                break;
+            }
+        }
+        if (!loopToUnroll)
+            break;
+
+        eliminateContinueBlocks(module, loopToUnroll);
+
+        auto blocks = collectBlocksInRegion(func, loopToUnroll);
+
+        // Capture the location before unrolling: `_unrollLoop` deallocates the loop (replacing it
+        // with a residual loop) on its first peel even when it later bails, so the pointer is
+        // dangling by the time we would diagnose.
+        auto loopLoc = loopToUnroll->sourceLoc;
+        if (!_unrollLoop(targetProgram, module, loopToUnroll, blocks, /*allowCheapBail:*/ false))
         {
             if (sink)
                 sink->diagnose(Diagnostics::CannotUnrollLoop{.location = loopLoc});
             return false;
         }
 
-        // Only report a change once a loop has actually been rewritten:
-        // callers (the specialize fixpoint) take another full simplification
-        // round when this fires, and a collected-but-orphaned loop that the
-        // guard above skips must not trigger that.
         if (outChanged)
             *outChanged = true;
 
-        // Make sure we simplify things as much as possible before
-        // attempting to potentially unroll outer loop.
         simplifyCFG(func, CFGSimplificationOptions::getDefault());
         eliminateDeadCode(func);
     }
+
     sortBlocksInFunc(func);
     return true;
 }
