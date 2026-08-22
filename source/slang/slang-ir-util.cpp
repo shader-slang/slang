@@ -3420,4 +3420,10 @@ IRType* getWorkGraphRecordElementType(IRType* type)
     return nullptr;
 }
 
+bool isNonCopyableOpaqueType(IRType* type)
+{
+    type = unwrapArray(type);
+    return as<IRRayQueryType>(type) || as<IRHitObjectType>(type);
+}
+
 } // namespace Slang
