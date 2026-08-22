@@ -1253,7 +1253,10 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
 
-    auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules);
+    // Pass `context` (the `ProgramLayout`) through so that a type containing an
+    // `extern` member is laid out against its link-time definition rather than
+    // the bare unresolved `extern` declaration. See `TargetRequest::getTypeLayout`.
+    auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules, context);
     return convert(typeLayout);
 }
 
