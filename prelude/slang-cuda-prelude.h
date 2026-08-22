@@ -2638,6 +2638,67 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_max(uintptr_t a, uintptr_t b)
     return a > b ? a : b;
 }
 
+// ----------------------- vector min/max -------------------------
+// Vector-arity overloads of the `<prefix>_min`/`<prefix>_max` scalar intrinsics on the native
+// CUDA vector types, applied element-wise, so a `$P_min`/`$P_max` whose argument is a vector has
+// a helper to resolve to. Element access reuses the `_slang_vector_get_element`/`_ptr` overloads
+// defined above.
+//
+// The supported element prefixes are {F16,F32,F64,I32,I64,U32,U64} plus the pointer-sized integers
+// {IPTR,UPTR} (mirrors the CPU prelude set): the element types that reach the generic path and have
+// a scalar `<prefix>_min`/`<prefix>_max` to apply element-wise. The narrow ints
+// `int8/16`,`uint8/16` have no such scalar helper, so a narrow-int vector (and a matrix, which has
+// no `$P` prefix) is diagnosed (E55215) by the `$P` expander instead.
+//
+// `IPTR`/`UPTR` are defined over both vector base names `CUDASourceEmitter::getVectorPrefix`
+// (`slang-emit-cuda.cpp`) can spell a pointer-sized vector with: `longlong`/`ulonglong` when
+// pointers are 64-bit and `int`/`uint` when they are 32-bit (the width follows the `slangc` host).
+// Defining both keeps the emitted `IPTR_min`/`UPTR_min` resolvable regardless of host width. The
+// `int`/`uint` overloads are only *used* when `intptr_t`/`uintptr_t` are themselves 32-bit, so
+// their scalar helper operates at the same width losslessly; on a 64-bit host they are present but
+// unused and compile cleanly. These share base names with the `I32/I64`/`U32/U64` helpers but are
+// distinct overloads by function name (`IPTR_min` vs `I64_min`), so there is no collision.
+#define SLANG_CUDA_VECTOR_MIN_MAX_N(PREFIX, VECBASE, N)                                         \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL VECBASE##N PREFIX##_min(VECBASE##N a, VECBASE##N b)      \
+    {                                                                                           \
+        VECBASE##N result;                                                                      \
+        for (int i = 0; i < N; ++i)                                                             \
+            *_slang_vector_get_element_ptr(&result, i) =                                        \
+                PREFIX##_min(_slang_vector_get_element(a, i), _slang_vector_get_element(b, i)); \
+        return result;                                                                          \
+    }                                                                                           \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL VECBASE##N PREFIX##_max(VECBASE##N a, VECBASE##N b)      \
+    {                                                                                           \
+        VECBASE##N result;                                                                      \
+        for (int i = 0; i < N; ++i)                                                             \
+            *_slang_vector_get_element_ptr(&result, i) =                                        \
+                PREFIX##_max(_slang_vector_get_element(a, i), _slang_vector_get_element(b, i)); \
+        return result;                                                                          \
+    }
+
+#define SLANG_CUDA_VECTOR_MIN_MAX(PREFIX, VECBASE)  \
+    SLANG_CUDA_VECTOR_MIN_MAX_N(PREFIX, VECBASE, 2) \
+    SLANG_CUDA_VECTOR_MIN_MAX_N(PREFIX, VECBASE, 3) \
+    SLANG_CUDA_VECTOR_MIN_MAX_N(PREFIX, VECBASE, 4)
+
+SLANG_CUDA_VECTOR_MIN_MAX(F32, float)
+SLANG_CUDA_VECTOR_MIN_MAX(F64, double)
+SLANG_CUDA_VECTOR_MIN_MAX(I32, int)
+SLANG_CUDA_VECTOR_MIN_MAX(I64, longlong)
+SLANG_CUDA_VECTOR_MIN_MAX(U32, uint)
+SLANG_CUDA_VECTOR_MIN_MAX(U64, ulonglong)
+SLANG_CUDA_VECTOR_MIN_MAX(IPTR, longlong)
+SLANG_CUDA_VECTOR_MIN_MAX(UPTR, ulonglong)
+SLANG_CUDA_VECTOR_MIN_MAX(IPTR, int)
+SLANG_CUDA_VECTOR_MIN_MAX(UPTR, uint)
+
+#if SLANG_CUDA_ENABLE_HALF
+SLANG_CUDA_VECTOR_MIN_MAX(F16, __half)
+#endif
+
+#undef SLANG_CUDA_VECTOR_MIN_MAX_N
+#undef SLANG_CUDA_VECTOR_MIN_MAX
+
 // ----------------------------- ResourceType -----------------------------------------
 
 
