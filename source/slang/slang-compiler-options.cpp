@@ -8,7 +8,10 @@
 
 namespace Slang
 {
-void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* entries)
+void CompilerOptionSet::load(
+    uint32_t count,
+    const slang::CompilerOptionEntry* entries,
+    CapabilitySource capabilitySource)
 {
     for (uint32_t i = 0; i < count; i++)
     {
@@ -21,6 +24,8 @@ void CompilerOptionSet::load(uint32_t count, const slang::CompilerOptionEntry* e
             value.stringValue = entries[i].value.stringValue0;
             value.stringValue2 = entries[i].value.stringValue1;
         }
+        if (entries[i].name == slang::CompilerOptionName::Capability)
+            value.capabilitySource = capabilitySource;
         add(entries[i].name, value);
 
         // When we see option EmitSpirvDirectly or EmitSpirvViaGLSL, we will need to
@@ -566,7 +571,13 @@ void CompilerOptionSet::setProfileVersion(ProfileVersion version)
 
 void CompilerOptionSet::addCapabilityAtom(CapabilityName cap)
 {
-    add(CompilerOptionName::Capability, cap);
+    // Every caller of this method (the `-capability` CLI option and the
+    // `addTargetCapability` API) is requesting a capability for one specific target, so the
+    // capability this adds is always a `TargetOption`. A session-wide capability request can
+    // only arrive through `load()`, from `SessionDesc::compilerOptionEntries`.
+    CompilerOptionValue value = CompilerOptionValue::fromEnum(cap);
+    value.capabilitySource = CapabilitySource::TargetOption;
+    add(CompilerOptionName::Capability, value);
 }
 
 List<String> CompilerOptionSet::getDownstreamArgs(String downstreamToolName)

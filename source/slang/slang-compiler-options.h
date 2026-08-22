@@ -3,6 +3,7 @@
 
 #include "core/slang-basic.h"
 #include "core/slang-crypto.h"
+#include "slang-capability.h"
 #include "slang-generated-capability-defs.h"
 #include "slang-profile.h"
 #include "slang.h"
@@ -26,6 +27,15 @@ struct CompilerOptionValue
     int intValue2 = 0;
     String stringValue;
     String stringValue2;
+
+    /// For a `CompilerOptionName::Capability` entry, records whether the capability was
+    /// requested at session scope or for one specific target. Meaningless for every other
+    /// option name. Set once, where the entry is produced (`CompilerOptionSet::load`,
+    /// `CompilerOptionSet::addCapabilityAtom`), so that `inheritFrom`/`overrideWith` -- which
+    /// copy `CompilerOptionValue`s wholesale -- carry the origin through a merge instead of
+    /// it having to be reconstructed afterward by comparing option sets. See
+    /// `CapabilitySource` in slang-capability.h for what each scope means for validation.
+    CapabilitySource capabilitySource = CapabilitySource::TargetOption;
 
     template<typename T>
     static CompilerOptionValue fromEnum(T val)
@@ -89,7 +99,15 @@ class Session;
 
 struct CompilerOptionSet
 {
-    void load(uint32_t count, const slang::CompilerOptionEntry* entries);
+    /// Load `entries` into this option set. `capabilitySource` tags any
+    /// `CompilerOptionName::Capability` entries among them with where they came from
+    /// (session-wide vs. this specific target) -- see `CapabilitySource` in
+    /// slang-capability.h -- so that later validation can tell them apart without having to
+    /// reconstruct the distinction from raw option values after option sets are merged.
+    void load(
+        uint32_t count,
+        const slang::CompilerOptionEntry* entries,
+        CapabilitySource capabilitySource);
 
     void buildHash(DigestBuilder<SHA1>& builder);
 

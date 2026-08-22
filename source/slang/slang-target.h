@@ -21,6 +21,8 @@
 namespace Slang
 {
 
+class DiagnosticSink;
+
 enum class CodeGenTarget : SlangCompileTargetIntegral
 {
     Unknown = SLANG_TARGET_UNKNOWN,
@@ -159,9 +161,29 @@ public:
 
     void setTargetCaps(CapabilitySet capSet);
 
+    /// Validate that any capabilities explicitly requested *for this target*
+    /// (`CapabilitySource::TargetOption`) are compatible with the code-gen target,
+    /// emitting an error diagnostic for each one that is not, unless capability checking is
+    /// suppressed by compiler options (e.g. -ignore-capabilities). Capabilities requested at
+    /// session scope (`CapabilitySource::SessionOption`) are not checked here: see the
+    /// comment on that enumerator for why a session-wide request being incompatible with
+    /// one particular target is expected, not an error.
+    void checkCapabilities(DiagnosticSink* sink);
+
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
 private:
+    /// Returns true if this target emits GLSL or uses the GLSL-SPIRV pipeline.
+    /// Used to determine whether SPIRV capability atoms should be auto-converted
+    /// rather than treated as incompatible. Keep in sync with getTargetCaps().
+    bool isGLSLBasedTarget();
+
+    /// Decode one CompilerOptionValue (Int or String kind) from a Capability option
+    /// into a CapabilitySet.  Returns an empty set for unknown or invalid entries.
+    /// Shared between getTargetCaps() and checkCapabilities() to keep the decode
+    /// logic in one place.
+    static CapabilitySet decodeCapabilityOption(const CompilerOptionValue& atomVal);
+
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;

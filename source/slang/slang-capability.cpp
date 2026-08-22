@@ -235,6 +235,19 @@ bool doRequestedCapabilitiesRaiseTargetVersionAboveProfile(
     return emittedVersion != CapabilityAtom::Invalid && emittedVersion > selectedVersion;
 }
 
+List<SourcedCapabilityRequirement> findIncompatibleCapabilityRequirements(
+    CapabilitySet const& targetCaps,
+    List<SourcedCapabilityRequirement> const& requirements)
+{
+    List<SourcedCapabilityRequirement> result;
+    for (auto& requirement : requirements)
+    {
+        if (targetCaps.isIncompatibleWith(requirement.caps))
+            result.add(requirement);
+    }
+    return result;
+}
+
 bool lookupCapabilityName(const UnownedStringSlice& str, CapabilityName& value);
 
 CapabilityName findCapabilityName(UnownedStringSlice const& name)

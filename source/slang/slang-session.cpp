@@ -179,7 +179,10 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
 
     CompilerOptionSet targetOptions;
-    targetOptions.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+    targetOptions.load(
+        desc.compilerOptionEntryCount,
+        desc.compilerOptionEntries,
+        CapabilitySource::TargetOption);
     optionSet.overrideWith(targetOptions);
 }
 

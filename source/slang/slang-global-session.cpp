@@ -852,7 +852,10 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
             desc.enableEffectAnnotations);
     }
 
-    linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+    linkage->m_optionSet.load(
+        desc.compilerOptionEntryCount,
+        desc.compilerOptionEntries,
+        CapabilitySource::SessionOption);
 
     if (!linkage->m_optionSet.hasOption(CompilerOptionName::MatrixLayoutColumn) &&
         !linkage->m_optionSet.hasOption(CompilerOptionName::MatrixLayoutRow))
