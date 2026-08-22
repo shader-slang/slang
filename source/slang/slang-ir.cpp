@@ -1178,11 +1178,27 @@ void IRTypeLayout::Builder::addAttrs(List<IRInst*>& operands)
 // IRParameterGroupTypeLayout
 //
 
+IRTypeLayout* IRParameterGroupTypeLayout::findMetalArgumentBufferTier2ElementTypeLayout()
+{
+    if (auto attr = findAttr<IRMetalArgumentBufferTier2LayoutAttr>())
+        return attr->getTypeLayout();
+    return nullptr;
+}
+
 void IRParameterGroupTypeLayout::Builder::addOperandsImpl(List<IRInst*>& ioOperands)
 {
     ioOperands.add(m_containerVarLayout);
     ioOperands.add(m_elementVarLayout);
     ioOperands.add(m_offsetElementTypeLayout);
+}
+
+void IRParameterGroupTypeLayout::Builder::addAttrsImpl(List<IRInst*>& ioOperands)
+{
+    if (m_metalArgumentBufferTier2ElementTypeLayout)
+    {
+        ioOperands.add(getIRBuilder()->getMetalArgumentBufferTier2LayoutAttr(
+            m_metalArgumentBufferTier2ElementTypeLayout));
+    }
 }
 
 IRParameterGroupTypeLayout* IRParameterGroupTypeLayout::Builder::build()
@@ -7490,6 +7506,18 @@ IRCaseTypeLayoutAttr* IRBuilder::getCaseTypeLayoutAttr(IRTypeLayout* layout)
     return cast<IRCaseTypeLayoutAttr>(createIntrinsicInst(
         getVoidType(),
         kIROp_CaseTypeLayoutAttr,
+        SLANG_COUNT_OF(operands),
+        operands));
+}
+
+IRMetalArgumentBufferTier2LayoutAttr* IRBuilder::getMetalArgumentBufferTier2LayoutAttr(
+    IRTypeLayout* layout)
+{
+    IRInst* operands[] = {layout};
+
+    return cast<IRMetalArgumentBufferTier2LayoutAttr>(createIntrinsicInst(
+        getVoidType(),
+        kIROp_MetalArgumentBufferTier2LayoutAttr,
         SLANG_COUNT_OF(operands),
         operands));
 }

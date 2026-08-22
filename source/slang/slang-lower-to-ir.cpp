@@ -16066,6 +16066,10 @@ struct IRLayoutGenContext : IRGenContext
 
     /// Cache for custom key instructions used for entry-point parameter layout information.
     Dictionary<ParamDecl*, IRInst*> mapEntryPointParamToKey;
+
+    // Metal argument buffer elements need a second layout of the same type under
+    // different rules, and only the target can compute one.
+    TargetRequest* targetReq = nullptr;
     UInt layoutLoweringRecursionDepth = 0;
 };
 
@@ -16155,6 +16159,27 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             lowerVarLayout(context, paramGroupTypeLayout->elementVarLayout));
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
+
+        auto elementTypeLayout = paramGroupTypeLayout->elementVarLayout->typeLayout;
+        // An element measured in argument buffer element slots carries no byte offsets, so
+        // a consumer wanting them needs a second layout computed under tier 2 rules.
+        //
+        // Nothing here checks the device's argument buffer tier. Nothing in the compiler
+        // selects one, since the ruleset is always named by the caller. Reflection decides
+        // this on the category alone too, in maybeChangeTypeLayoutToAgumentBufferTier2.
+        if (elementTypeLayout && elementTypeLayout->type &&
+            elementTypeLayout->FindResourceInfo(LayoutResourceKind::MetalArgumentBufferElement))
+        {
+            // The only caller that builds this context sets targetReq immediately after,
+            // so a null here means a new one did not.
+            SLANG_RELEASE_ASSERT(context->targetReq);
+
+            auto byteTypeLayout = context->targetReq->getTypeLayout(
+                elementTypeLayout->type,
+                slang::LayoutRules::MetalArgumentBufferTier2);
+            builder.setMetalArgumentBufferTier2ElementTypeLayout(
+                lowerTypeLayout(context, byteTypeLayout));
+        }
 
         return _lowerTypeLayoutCommon(&builder, paramGroupTypeLayout);
     }
@@ -16440,6 +16465,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     ASTBuilder* astBuilder = linkage->getASTBuilder();
 
     IRLayoutGenContext contextStorage(sharedContext, astBuilder);
+    contextStorage.targetReq = getTargetReq();
     auto context = &contextStorage;
 
     RefPtr<IRModule> irModule = IRModule::create(session);
@@ -16486,6 +16512,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     IRTypeLayout* irGlobalScopeTypeLayout = irGlobalStructTypeLayout;
     if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(globalScopeTypeLayout))
     {
+        // The global scope element is measured in bytes, unlike a parameter block element, so
+        // it needs no second layout to carry byte offsets.
         IRParameterGroupTypeLayout::Builder globalParameterGroupTypeLayoutBuilder(builder);
 
         auto irElementTypeLayout = irGlobalStructTypeLayout;

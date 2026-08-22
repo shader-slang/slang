@@ -2924,6 +2924,12 @@ local insts = {
 					min_operands = 1,
 				},
 			},
+			{
+				metalArgumentBufferTier2Layout = {
+					struct_name = "MetalArgumentBufferTier2LayoutAttr",
+					min_operands = 1,
+				},
+			},
 			{ unorm = { struct_name = "UNormAttr" } },
 			{
 				snorm = {
