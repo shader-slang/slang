@@ -420,6 +420,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         slang-unit-test
         PRIVATE
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
+            ${slang_SOURCE_DIR}/source/slang/slang-fossil.cpp
+            ${slang_SOURCE_DIR}/source/slang/slang-fossil-validate.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-output-path-util.cpp
             ${slang_SOURCE_DIR}/tools/slang-test/test-reporter.cpp
     )

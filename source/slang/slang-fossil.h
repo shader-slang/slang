@@ -24,6 +24,38 @@
 namespace Slang
 {
 
+// Deserializing data is an important place where security issues
+// can arise, so it is usually important to perform validation
+// checks throughout the process, and fail fast rather than
+// risk reading mal-formed data.
+//
+// Validation is off by default, because it is expensive and a key case for
+// deserialization in Slang is loading the core module from the `slang.dll`
+// binary itself, which is trusted. It covers both the type/kind checks made
+// while reading and the walk that proves the whole object graph lies inside
+// the blob; the latter alone costs around two seconds per process in a release
+// build. Builds that read untrusted serialized data should turn it on with the
+// `SLANG_ENABLE_VALIDATION_FOSSIL` CMake option, which defines this macro.
+//
+// It is defined here rather than in `slang-serialize-fossil.h` because
+// the reader for the format itself (`Fossil::getRootValue`) needs it
+// too, and sits below the serializer in the include graph.
+//
+#ifndef SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_ENABLE_VALIDATION_FOSSIL 0
+#endif
+
+#if SLANG_ENABLE_VALIDATION_FOSSIL
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION)                             \
+    do                                                                         \
+    {                                                                          \
+        if (!(CONDITION))                                                      \
+            SLANG_UNEXPECTED("invalid format encountered in serialized data"); \
+    } while (0)
+#else
+#define SLANG_SERIALIZE_FOSSIL_VALIDATE(CONDITION) SLANG_ASSERT(CONDITION)
+#endif
+
 struct FossilizedPtrLikeLayout;
 struct FossilizedRecordLayout;
 struct FossilizedValLayout;
@@ -1164,13 +1196,38 @@ struct Header
 
 static_assert(sizeof(Header) == 32);
 
-/// Get the root object from a fossilized blob.
+#if SLANG_ENABLE_VALIDATION_FOSSIL
+
+/// Validate that everything reachable from the root value of the blob at `data`
+/// (of `size` bytes) lies within that blob.
 ///
-/// This operation performs some basic validation on the blob to
-/// ensure that it doesn't seem incorrectly sized or otherwise
-/// corrupted/malformed.
+/// The fossil format is navigated in place, following relative pointers taken
+/// directly from the data, so this walk is what lets the rest of the reader
+/// dereference them without bounds checks of its own.
 ///
-Fossil::AnyValPtr getRootValue(ISlangBlob* blob);
+void validateRootValue(void const* data, Size size, FossilizedVariantObj* rootValueVariant);
+
+#endif
+
+/// Whether the contents of a blob are already trusted.
+///
+/// Validating a blob costs time proportional to its size, and the core module
+/// that ships inside the compiler binary is both the largest blob loaded and the
+/// one loaded on every single startup -- while also being the one blob that
+/// cannot have come from an attacker. Marking it trusted is what keeps validation
+/// affordable to leave switched on.
+///
+/// `Untrusted` is the default everywhere, so forgetting to pass this errs toward
+/// validating rather than toward a hole.
+///
+enum class Trust
+{
+    /// Came from outside the compiler; validate before navigating it.
+    Untrusted,
+
+    /// Shipped with the compiler itself; validating it would be pure cost.
+    Trusted,
+};
 
 /// Get the root object from a fossilized blob.
 ///
@@ -1178,7 +1235,15 @@ Fossil::AnyValPtr getRootValue(ISlangBlob* blob);
 /// ensure that it doesn't seem incorrectly sized or otherwise
 /// corrupted/malformed.
 ///
-Fossil::AnyValPtr getRootValue(void const* data, Size size);
+Fossil::AnyValPtr getRootValue(ISlangBlob* blob, Trust trust = Trust::Untrusted);
+
+/// Get the root object from a fossilized blob.
+///
+/// This operation performs some basic validation on the blob to
+/// ensure that it doesn't seem incorrectly sized or otherwise
+/// corrupted/malformed.
+///
+Fossil::AnyValPtr getRootValue(void const* data, Size size, Trust trust = Trust::Untrusted);
 } // namespace Fossil
 
 SLANG_FORCE_INLINE Size FossilizedStringObj::getSize() const

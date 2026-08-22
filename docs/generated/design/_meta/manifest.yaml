@@ -1261,6 +1261,11 @@ documents:
       - source/slang/slang-serialize-container.cpp
       - source/slang/slang-serialize-fossil.h
       - source/slang/slang-serialize-fossil.cpp
+      # The fossil format itself, and the walk that validates a blob before
+      # it is navigated, are what the "Fossil backend" section describes.
+      - source/slang/slang-fossil.h
+      - source/slang/slang-fossil.cpp
+      - source/slang/slang-fossil-validate.cpp
       - source/core/slang-riff.h
       - source/core/slang-riff.cpp
       - source/slang/slang-serialize-ir-types.h
