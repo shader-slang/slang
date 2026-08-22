@@ -4323,6 +4323,36 @@ bool SemanticsVisitor::TryUnifyTypes(
     if (const auto sndErrorType = as<ErrorType>(snd); sndErrorType)
         return true;
 
+    // Generic-argument inference works against the interface, not its existential box: a
+    // parameter of type `dyn IFoo<n>` matched against an argument of type `dyn IFoo<3>` (or a
+    // concrete `X` that conforms to `IFoo<3>`) must infer `n = 3`. Unwrap the `ExistentialType`
+    // to the interface it boxes and recurse, so the existing interface unification /
+    // inheritance-facet paths run exactly as they did before the box existed.
+    //
+    // Exception: when the *other* side is a bare generic type parameter still being solved (e.g.
+    // `T` matched against `dyn IFoo`), we must NOT unwrap — that parameter binds to the box
+    // `dyn IFoo`, not the interface, so that a later occurrence such as `Ptr<T>` still matches an
+    // argument of type `Ptr<dyn IFoo>`.
+    {
+        auto isSolvableTypeParam = [&](Type* t) -> bool
+        {
+            if (auto declRefType = as<DeclRefType>(t))
+                if (auto typeParam = declRefType->getDeclRef().as<GenericTypeParamDecl>())
+                    return isRelevantGeneric(constraints, typeParam.getDecl()->parentDecl);
+            return false;
+        };
+        auto fstInterface = getExistentialInterfaceType(fst);
+        auto sndInterface = getExistentialInterfaceType(snd);
+        bool unwrapFst = fstInterface && !isSolvableTypeParam(snd);
+        bool unwrapSnd = sndInterface && !isSolvableTypeParam(fst);
+        if (unwrapFst || unwrapSnd)
+        {
+            QualType fstUnwrapped = unwrapFst ? QualType(fstInterface, fst.isLeftValue) : fst;
+            QualType sndUnwrapped = unwrapSnd ? QualType(sndInterface, snd.isLeftValue) : snd;
+            return TryUnifyTypes(constraints, unificationOptions, fstUnwrapped, sndUnwrapped);
+        }
+    }
+
     // If one or the other of the types is a conjunction `X & Y`,
     // then we want to recurse on both `X` and `Y`.
     //

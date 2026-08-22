@@ -2074,6 +2074,37 @@ Val* ExistentialSpecializedType::_substituteImplOverride(
     return substType;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ExistentialType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("dyn ") << getInterfaceType();
+}
+
+Type* ExistentialType::_createCanonicalTypeOverride()
+{
+    // Canonicalize by canonicalizing the wrapped interface, but stay an `ExistentialType`.
+    // `dyn IFoo` must remain distinct from `IFoo` under canonical-type identity, otherwise
+    // the conformance check would treat the box as conforming to its own interface.
+    return getCurrentASTBuilder()->getExistentialType(getInterfaceType()->getCanonicalType());
+}
+
+Val* ExistentialType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substInterfaceType =
+        as<Type>(getInterfaceType()->substituteImpl(astBuilder, subst, &diff));
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getExistentialType(substInterfaceType);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ThisType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 DeclRef<InterfaceDecl> ThisType::getInterfaceDeclRef()

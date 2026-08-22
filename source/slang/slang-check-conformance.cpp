@@ -263,6 +263,14 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
     SubtypeWitness* failureWitness = nullptr;
 
+    // An existential type is only reflexively a subtype of itself. In particular `dyn IFoo`
+    // does not conform to `IFoo`, and no concrete type is a subtype of `dyn IFoo`; any such
+    // relation produces no witness. (Equal existential types fall through to the self-facet
+    // path below, which supplies the reflexive witness.)
+    if ((as<ExistentialType>(subType) || as<ExistentialType>(superType)) &&
+        !subType->equals(superType))
+        return failureWitness;
+
     // In the common case, we can use the pre-computed inheritance information for `subType`
     // to enumerate all the types it transitively inherits from.
     //
@@ -414,6 +422,20 @@ bool SemanticsVisitor::isValidGenericConstraintType(Type* type)
                isValidGenericConstraintType(andType->getRight());
     }
     return isInterfaceType(type);
+}
+
+Type* SemanticsVisitor::maybeFormExistentialType(Type* type)
+{
+    // An interface (or conjunction of interfaces) named in a data-type context denotes the
+    // existential type `dyn IFoo`, not the interface itself. `isValidGenericConstraintType`
+    // already recognizes exactly the "interface or conjunction of interfaces" shape, so we
+    // reuse it. Anything else (concrete types, `ExtractExistentialType`, an already-formed
+    // `ExistentialType`) is returned unchanged.
+    if (!type || as<ExistentialType>(type))
+        return type;
+    if (isValidGenericConstraintType(type))
+        return m_astBuilder->getExistentialType(type);
+    return type;
 }
 
 SubtypeWitness* SemanticsVisitor::isTypeDifferentiable(Type* type)

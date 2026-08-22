@@ -1,6 +1,6 @@
-// Explicitly specializing a generic interface method with an interface
-// type should be rejected with the same existential-specialization
-// diagnostic as the implicit form. Previously this crashed in typeflow.
+// Explicitly specializing a generic interface method with an interface type must be rejected:
+// the argument `IFoo` denotes the existential `dyn IFoo`, which does not conform to `IFoo`
+// (shader-slang/slang#12430).
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
@@ -45,7 +45,7 @@ void computeMain(int id : SV_DispatchThreadID)
     IBar b = createDynamicObject<IBar>(id, 0);
     IFoo df = createDynamicObject<IFoo>(id, 0);
     int result = b.eval<IFoo>(df);
-//CHECK:                     ^ error E33180
-//CHECK:                     ^ specializing 'B.eval' with an existential type is not allowed.
+//CHECK:           ^^^^ error E38029
+//CHECK:           ^^^^ type argument 'dyn IFoo' does not conform to the required interface 'IFoo'
     outputBuffer[0] = result;
 }

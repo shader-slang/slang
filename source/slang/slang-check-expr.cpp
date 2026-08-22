@@ -191,12 +191,16 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             // The interface type stored on the `ExtractExistentialType` should
             // be the bare interface, not a `ModifiedType` wrapping it (e.g. the
             // `no_diff` modifier that `[Differentiable]` adds to non-
-            // differentiable return types). Otherwise downstream consumers that
+            // differentiable return types), nor the `ExistentialType` box that
+            // now types existential values. Otherwise downstream consumers that
             // look at the cached "original interface type" by `DeclRefType`
             // would not recognize it as an interface.
+            Type* originalInterfaceType = unwrapModifiedType(expr->type.type);
+            if (auto existentialType = as<ExistentialType>(originalInterfaceType))
+                originalInterfaceType = existentialType->getInterfaceType();
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
-                unwrapModifiedType(expr->type.type),
+                originalInterfaceType,
                 interfaceDeclRef);
 
             ExtractExistentialValueExpr* openedValue =
@@ -246,6 +250,12 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
     // existential-dispatch idiom, and a raw `this_type(...)` leaks all the
     // way to codegen.
     auto exprType = unwrapModifiedType(expr->type.type);
+
+    // A *value* whose type is an existential box `dyn IFoo` is the thing that gets opened here.
+    // Under the `IFoo` / `dyn IFoo` split a value never has a bare interface type, so we look
+    // through the `ExistentialType` to the interface it boxes and open that.
+    if (auto existentialType = as<ExistentialType>(exprType))
+        exprType = existentialType->getInterfaceType();
 
     if (auto declRefType = as<DeclRefType>(exprType))
     {
@@ -5122,11 +5132,14 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 
     expr->functionExpr = CheckTerm(expr->functionExpr);
 
-    if (auto baseType = as<DeclRefType>(expr->functionExpr->type))
+    // If the callee is a value (a `DeclRefType` functor, or an existential `dyn IFoo` value whose
+    // interface declares `operator()`), look up the `operator()` member and call that instead.
+    // `maybeInsertImplicitOpForMemberBase` opens the existential so the lookup sees the interface's
+    // requirements.
+    if (as<DeclRefType>(expr->functionExpr->type) ||
+        getExistentialInterfaceType(expr->functionExpr->type))
     {
-        // If callee is a value of DeclRefType, then it is a functor.
-        // We need to look for `operator()` member within the type and
-        // call that instead.
+        auto baseType = expr->functionExpr->type.type;
         auto operatorName = getName("()");
 
         bool needDeref = false;
@@ -7671,6 +7684,12 @@ static bool _isTypeParametric(Type* type)
 Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 {
     expr->typeExpr = CheckProperType(expr->typeExpr);
+    // The right-hand side of `is` is a type-test *target*, a position where an interface names
+    // itself (like a generic constraint) rather than denoting the existential box. `CheckProperType`
+    // will have boxed a bare interface into `dyn IFoo`; unwrap it so the downstream subtype and
+    // optional-constraint checks run against the interface, as they did before the box existed.
+    if (auto rhsInterfaceType = getExistentialInterfaceType(expr->typeExpr.type))
+        expr->typeExpr.type = rhsInterfaceType;
     auto originalVal = CheckTerm(expr->value);
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
@@ -7679,7 +7698,12 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
     auto unwrappedValueType = unwrapModifiedType(valueType);
-    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
+    // The value of an `is` test now has existential type `dyn IFoo`; recover the interface it
+    // boxes so the runtime-check witness below is derived against the interface, not the box.
+    auto boxedInterfaceType = getExistentialInterfaceType(unwrappedValueType);
+    auto valueInterfaceType = boxedInterfaceType         ? boxedInterfaceType
+                              : isInterfaceType(unwrappedValueType) ? unwrappedValueType
+                                                                    : valueType;
 
     // If value is a subtype of `type`, then this expr is always true.
     auto witness = isSubtype(valueType, expr->typeExpr.type, IsSubTypeOptions::None);
@@ -7699,7 +7723,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
 
     // Check if the right-hand side type is an interface type. For 'is'
     // statements, that's only allowed if it's related to an optional
-    // constraint.
+    // constraint. (The RHS was unwrapped from `dyn IFoo` to the bare interface above.)
     if (isInterfaceType(expr->typeExpr.type) && !optionalWitness)
     {
         getSink()->diagnose(Diagnostics::IsOperatorCannotUseInterfaceAsRhs{.expr = expr});
@@ -7742,8 +7766,13 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = CheckProperType(typeExpr);
+    // As with `is`, the `as` target names an interface as itself, not as the existential box;
+    // unwrap `dyn IFoo` back to the interface so the rejection and witness checks below behave
+    // exactly as before the box existed.
+    if (auto rhsInterfaceType = getExistentialInterfaceType(typeExpr.type))
+        typeExpr.type = rhsInterfaceType;
 
-    // Check if the right-hand side type is an interface type
+    // Check if the right-hand side type is an interface type.
     if (isInterfaceType(typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::AsOperatorCannotUseInterfaceAsRhs{.expr = expr});
@@ -7754,7 +7783,12 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     expr->value = CheckTerm(expr->value);
     auto valueType = expr->value->type.type;
     auto unwrappedValueType = unwrapModifiedType(valueType);
-    auto valueInterfaceType = isInterfaceType(unwrappedValueType) ? unwrappedValueType : valueType;
+    // The cast source now has existential type `dyn IFoo`; recover the boxed interface so the
+    // runtime-cast witness below is derived against the interface, not the box.
+    auto boxedInterfaceType = getExistentialInterfaceType(unwrappedValueType);
+    auto valueInterfaceType = boxedInterfaceType         ? boxedInterfaceType
+                              : isInterfaceType(unwrappedValueType) ? unwrappedValueType
+                                                                    : valueType;
 
     // Reject `expr as OpaqueType` (and structs containing opaque fields) because
     // Optional<T> cannot wrap resource/opaque types.
@@ -9253,20 +9287,13 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
 
 Expr* SemanticsExprVisitor::visitAndTypeExpr(AndTypeExpr* expr)
 {
-    // The left and right sides of an `&` for types must both be types.
-    //
-    expr->left = CheckProperType(expr->left);
-    expr->right = CheckProperType(expr->right);
-
-    // TODO: We should enforce some rules here about what is allowed
-    // for the `left` and `right` types.
-    //
-    // For now, the right rule is that they probably need to either
-    // be interfaces, or conjunctions thereof.
-    //
-    // Eventually it may be valuable to support more flexible
-    // types in conjunctions, especialy in cases where inheritance
-    // gets involved.
+    // The operands of an interface conjunction `IFoo & IBar` name interfaces *as interfaces*.
+    // We must not run them through `CheckProperType`, which would box each into an existential
+    // (`(dyn IFoo) & (dyn IBar)`); instead check that each is an interface or conjunction thereof
+    // and keep it as the interface. The resulting `AndType` is itself boxed into a single
+    // `dyn (IFoo & IBar)` only when it is later used in a proper-type position.
+    expr->left = checkInterfaceOrConjunctionType(expr->left);
+    expr->right = checkInterfaceOrConjunctionType(expr->right);
 
     // The result of this expression is an `AndType`, which we need
     // to wrap in a `TypeType` to indicate that the result is the type

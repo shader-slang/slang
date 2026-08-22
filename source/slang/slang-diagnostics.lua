@@ -1634,6 +1634,13 @@ err(
 )
 
 err(
+    "expected-interface-or-conjunction-type",
+    30307,
+    "expected an interface or a conjunction of interfaces",
+    span { loc = "expr:Expr", message = "expected an interface or a conjunction of interfaces, got '~type:Type'" }
+)
+
+err(
     "expected-function",
     33070,
     "expected a function",

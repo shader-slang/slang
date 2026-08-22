@@ -846,6 +846,11 @@ Type* ASTBuilder::getAndType(Type* left, Type* right)
     return type;
 }
 
+Type* ASTBuilder::getExistentialType(Type* interfaceType)
+{
+    return getOrCreate<ExistentialType>(interfaceType);
+}
+
 Type* ASTBuilder::getModifiedType(Type* base, Count modifierCount, Val* const* modifiers)
 {
     auto type = getOrCreate<ModifiedType>(base, makeArrayView((Val**)modifiers, modifierCount));
