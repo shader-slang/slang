@@ -26,9 +26,21 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
         builder.setInsertBefore(entryPoint);
         clonedEntryPointForCall = (IRFunc*)cloneInst(&cloneEnv, &builder, entryPoint);
         // Remove entrypoint and linkage decorations from the cloned callee.
+        //
+        // The clone is an ordinary function, so it must not keep anything that only makes sense on
+        // an entry point. Dropping `IREntryPointDecoration` while keeping a decoration that is
+        // scoped to an entry point leaves a shape no consumer can honour -- the SPIR-V emitter
+        // would emit an `OpExecutionMode` naming a plain `OpFunction`, which the spec does not
+        // allow. `isEntryPointScopedDecoration` therefore decides that half, so this list and the
+        // emitter cannot disagree about which decorations are entry-point-only.
         List<IRInst*> decorsToRemove;
         for (auto decor : clonedEntryPointForCall->getDecorations())
         {
+            if (isEntryPointScopedDecoration(decor->getOp()))
+            {
+                decorsToRemove.add(decor);
+                continue;
+            }
             switch (decor->getOp())
             {
             case kIROp_ExportDecoration:
@@ -36,7 +48,6 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
             case kIROp_HLSLExportDecoration:
             case kIROp_EntryPointDecoration:
             case kIROp_LayoutDecoration:
-            case kIROp_NumThreadsDecoration:
             case kIROp_ImportDecoration:
             case kIROp_ExternCDecoration:
             case kIROp_ExternCppDecoration:
