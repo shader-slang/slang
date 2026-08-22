@@ -1,0 +1,251 @@
+name: CI Static Unit Tests
+
+# Builds and runs `slang-static-unit-test`, the unit tests that call non-exported
+# `source/slang` entry points directly. Those tests require SLANG_LIB_TYPE=STATIC, which is a
+# different configuration from every other CI build, so this is a separate
+# workflow rather than an option on ci-slang-build.yml.
+#
+# It builds only the `slang-static-unit-test` target rather than everything, which
+# is roughly a third of the compile work of a full build.
+#
+# One job per host toolchain -- gcc on Linux, clang on macOS, cl on Windows -- since
+# what varies between them is the compiler these tests are built with, not the code
+# under test.
+#
+# These tests do not touch a GPU, so they run on GitHub-hosted runners. Keeping
+# them off the self-hosted Windows pool avoids competing for runners with the
+# GPU build/test jobs that sit on the critical path of a CI run.
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      save-sccache:
+        description: "Save sccache to GitHub Actions cache (for populate-sccache on the default branch)"
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  static-unit-test:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      # Ensure Git Bash tools (gzip, tar) are in PATH for Windows, as
+      # actions/cache needs them before common-setup runs.
+      - name: Add Git Bash to PATH (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          persist-credentials: false
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      # This cache key deliberately carries a `static-unit-test` component and
+      # so shares nothing with the keys used by ci-slang-build.yml. A static
+      # build cannot reuse objects from a shared build: SLANG_DYNAMIC and
+      # SLANG_DYNAMIC_EXPORT are defined only for SHARED, STB_IMAGE_STATIC only
+      # for STATIC, and sccache hashes the preprocessed source. Sharing a key
+      # would mean this job misses on everything it restores and then writes
+      # static objects back under a key the shared builds also restore,
+      # degrading their hit rate too.
+      - name: Restore sccache cache
+        continue-on-error: true
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
+          key: sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: ${{ inputs.os }}
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          build-llvm: false
+
+      - name: Build slang-static-unit-test
+        run: |
+          cmake_launcher_defines=()
+          if [[ -n "${sccache_path:-}" ]]; then
+            echo "Using sccache: ${sccache_path}"
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+            # Precompiled headers are incompatible with sccache and cause
+            # linker errors, matching what ci-slang-build.yml does.
+            cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
+            sccache --show-stats || true
+          fi
+
+          cmake --preset default --fresh \
+            -DSLANG_LIB_TYPE=STATIC \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_DXIL=OFF \
+            -DSLANG_DXC_BUILD_FROM_SOURCE=OFF \
+            -DSLANG_IGNORE_ABORT_MSG=ON \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            "${cmake_launcher_defines[@]}"
+
+          cmake --build build --config "$cmake_config" --target slang-static-unit-test
+
+          if [[ -n "${sccache_path:-}" ]]; then
+            sccache --show-stats || true
+          fi
+
+      - name: Run slang-static-unit-test
+        run: |
+          # RUNNER_OS is provided by the runner, so nothing from the workflow
+          # inputs is interpolated into this script.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test_path="$bin_dir/slang-static-unit-test.exe"
+          else
+            test_path="$bin_dir/slang-static-unit-test"
+          fi
+
+          if [[ ! -f "$test_path" ]]; then
+            echo "::error::expected slang-static-unit-test at $test_path"
+            ls -la "$bin_dir" || true
+            exit 1
+          fi
+
+          "$test_path" | tee ordinary.log
+          # `tee` masks the binary's status, so read it from PIPESTATUS.
+          if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+            echo "::error::the ordinary run failed"
+            exit 1
+          fi
+
+          # The self-checks below ignore themselves in an ordinary run, which is what
+          # exercises SLANG_IGNORE_TEST and the driver's Ignored tally. Assert that
+          # rather than assume it: if Ignored were scored as Pass, the run would still
+          # be green and the skip would simply vanish from the summary.
+          if ! grep -qE "skip[[:space:]]+harnessSelfCheck" ordinary.log; then
+            echo "::error::no self-check reported as skipped; SLANG_IGNORE_TEST may be misclassified"
+            exit 1
+          fi
+          if ! grep -qE "[1-9][0-9]* ignored" ordinary.log; then
+            echo "::error::ignored tests were not counted in the summary"
+            exit 1
+          fi
+
+          # The suite above is written to pass, so passing does not prove the harness
+          # can report a failure. Drive the failure paths deliberately and require the
+          # binary to notice: a driver that always exited 0, or that scored a failed
+          # check as a pass, would keep every job above green while catching nothing.
+          echo "--- harness self-check: failures must fail the run, and not stop it ---"
+          set +e
+          SLANG_STATIC_UNIT_TEST_SELFCHECK=1 "$test_path" harnessSelfCheck \
+            > selfcheck.log 2>&1
+          selfcheck_status=$?
+          set -e
+          cat selfcheck.log
+
+          if [[ $selfcheck_status -eq 0 ]]; then
+            echo "::error::harness self-check passed; deliberately failing tests did not fail the run"
+            exit 1
+          fi
+          # These match whitespace loosely on purpose: the driver prints its label in a
+          # fixed-width field (`printf("  %-6s %s\\n", ...)` in
+          # slang-static-unit-test-main.cpp), and pinning the exact column count here
+          # would turn a harmless formatting change into a CI failure. The labels and
+          # test names are what carry meaning.
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckReportsAFailingCheck" selfcheck.log; then
+            echo "::error::a failed SLANG_CHECK was not reported as a failure"
+            exit 1
+          fi
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckSurvivesAThrowingTest" selfcheck.log; then
+            echo "::error::an exception escaping a test body was not reported as a failure"
+            exit 1
+          fi
+          # Registered after the throwing test, so its `ok` is what proves the driver
+          # carried on rather than dying at the throw. Without this the non-zero exit
+          # alone would not distinguish "reported and continued" from "died".
+          if ! grep -qE "ok[[:space:]]+harnessSelfCheckContinuesAfterAThrow" selfcheck.log; then
+            echo "::error::the run did not continue past a test that threw"
+            exit 1
+          fi
+          # A Slang::Exception -- what SLANG_ASSERT actually throws -- must be reported
+          # with its message. It does not derive from std::exception, so a handler that
+          # caught only that would drop this into the message-less fallback.
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckReportsASlangExceptionMessage" selfcheck.log; then
+            echo "::error::a Slang::Exception escaping a test body was not reported as a failure"
+            exit 1
+          fi
+          if ! grep -q "deliberate self-check slang exception" selfcheck.log; then
+            echo "::error::the Slang::Exception message was not reported"
+            exit 1
+          fi
+          # A failure reported through message() rather than addResult must still fail.
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckFailsOnAReportedRunError" selfcheck.log; then
+            echo "::error::a RunError reported via message() did not fail the test"
+            exit 1
+          fi
+          # The exception detail has to reach the log, or such a failure is not
+          # diagnosable without attaching a debugger.
+          if ! grep -q "deliberate self-check exception" selfcheck.log; then
+            echo "::error::the escaping exception's what() was not reported"
+            exit 1
+          fi
+
+          # A filter matching nothing must also be an error, not a silent empty run.
+          echo "--- harness self-check: an unmatched filter must fail the run ---"
+          set +e
+          "$test_path" __no_such_test__ > filter.log 2>&1
+          filter_status=$?
+          set -e
+          cat filter.log
+          if [[ $filter_status -eq 0 ]]; then
+            echo "::error::an unmatched filter reported success instead of failing"
+            exit 1
+          fi
+          # ...and for the stated reason. A non-zero exit alone would also be produced
+          # by the binary failing to start.
+          if ! grep -q "matched none of the" filter.log; then
+            echo "::error::the unmatched filter failed for some reason other than the filter"
+            exit 1
+          fi
+
+      # Populate the cache from the default branch only, mirroring
+      # ci-slang-build.yml. Pull-request runs restore but never save, so a PR
+      # cannot poison the cache for everyone else.
+      - name: Save sccache cache
+        if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ inputs.os == 'windows' && 'C:/sccache' || '/tmp/.cache/sccache' }}
+          key: sccache-static-unit-test-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
