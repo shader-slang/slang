@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"module": "esnext",
+		"target": "es2020",
+		"lib": [
+			"es2020",
+			"WebWorker"
+		],
+		"rootDir": "src",
+		"sourceMap": true,
+		"types": [
+			"@webgpu/types",
+			"@types/node",
+		],
+        "moduleResolution": "bundler"
+	},
+	"include": [
+		"src"
+	],
+	"exclude": [
+		"node_modules",
+		".vscode-test-web"
+	]
+}

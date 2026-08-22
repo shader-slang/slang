@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"module": "es2022",
+		"target": "es2020",
+		"lib": [
+			"es2020",
+			"WebWorker",
+			"DOM"
+		],
+		"rootDir": "src",
+		"sourceMap": true,
+		"types": [
+			"@webgpu/types",
+		],
+    	"moduleResolution": "bundler"
+	},
+	"include": [
+		"src/**/*",
+		"src/**/*.vue"
+	],
+	"exclude": [
+		"node_modules",
+		".vscode-test-web"
+	]
+}
