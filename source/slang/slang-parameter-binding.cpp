@@ -697,6 +697,14 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
 
     if (varDecl->hasModifier<ShaderRecordAttribute>() && as<ConstantBufferType>(type))
     {
+        // CUDA's shader-record rules fall back to ordinary uniform layout, so a shader-record
+        // global is folded into the launch-parameter struct and read from launch memory instead
+        // of the shader binding table -- a silent wrong-memory miscompile. Reject it here.
+        if (isCUDATarget(context->getTargetRequest()))
+        {
+            getSink(context)->diagnose(
+                Diagnostics::ShaderRecordGlobalNotSupportedOnCuda{.decl = varDecl});
+        }
         return createTypeLayoutWith(
             layoutContext,
             rules->getShaderRecordConstantBufferRules(),
