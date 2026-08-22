@@ -1334,8 +1334,8 @@ HLSLRayTracingLayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl(
 //
 CUDARayTracingLayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl(
     LayoutResourceKind::RayPayload);
-// CUDARayTracingLayoutRulesImpl
-// kCUDACallablePayloadParameterLayoutRulesImpl(LayoutResourceKind::CallablePayload);
+CUDARayTracingLayoutRulesImpl kCUDACallablePayloadParameterLayoutRulesImpl(
+    LayoutResourceKind::CallablePayload);
 CUDARayTracingLayoutRulesImpl kCUDAHitAttributesParameterLayoutRulesImpl(
     LayoutResourceKind::HitAttributes);
 
@@ -1812,6 +1812,12 @@ LayoutRulesImpl kCUDAEntryPointParameterLayoutRulesImpl_ = {
 LayoutRulesImpl kCUDARayPayloadParameterLayoutRulesImpl_ = {
     &kCUDALayoutRulesFamilyImpl,
     &kCUDARayPayloadParameterLayoutRulesImpl,
+    &kCUDAObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kCUDACallablePayloadParameterLayoutRulesImpl_ = {
+    &kCUDALayoutRulesFamilyImpl,
+    &kCUDACallablePayloadParameterLayoutRulesImpl,
     &kCUDAObjectLayoutRulesImpl,
 };
 
@@ -2551,7 +2557,7 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getRayPayloadParameterRules()
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getCallablePayloadParameterRules()
 {
-    return nullptr;
+    return &kCUDACallablePayloadParameterLayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
