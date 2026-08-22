@@ -13,6 +13,44 @@
 namespace Slang
 {
 
+// True for BFloat16 / FP8 (FloatE4M3, FloatE5M2) scalars or vectors/matrices
+// of them. Modifier wrappers (e.g. inout) are unwrapped at each level.
+static bool _isStorageOnlyFloatType(Type* type)
+{
+    if (!type)
+        return false;
+    type = unwrapModifiedType(type);
+    if (auto vecType = as<VectorExpressionType>(type))
+        type = unwrapModifiedType(vecType->getElementType());
+    else if (auto matType = as<MatrixExpressionType>(type))
+        type = unwrapModifiedType(matType->getElementType());
+    return as<BFloat16Type>(type) || as<Fp8Type>(type);
+}
+
+// On any overload-resolution failure whose arguments include a storage-only float
+// (BFloat16 / FP8), point the user at the fp32-roundtrip pattern. This covers
+// operators and math functions alike — hence "misuse" rather than "arithmetic".
+//
+// Intentionally a broad, best-effort hint: it keys only on the *presence* of a
+// storage-only-float argument, not on whether that argument is the operand that
+// actually caused resolution to fail. So a call that fails for an unrelated reason
+// but happens to pass a bf16/FP8 argument may still get the note, even though
+// converting that argument would not resolve the failure. This keeps the helper
+// decoupled from per-candidate mismatch bookkeeping (argMismatchArgIndex etc.), and
+// the dominant case — bf16/FP8 operands of a built-in operator or math function — is
+// exactly the case the hint is meant to explain.
+static void _maybeDiagnoseStorageOnlyFloatMisuse(DiagnosticSink* sink, InvokeExpr* expr)
+{
+    for (auto arg : expr->arguments)
+    {
+        if (arg && _isStorageOnlyFloatType(arg->type))
+        {
+            sink->diagnose(Diagnostics::Bfloat16Fp8StorageTypeHint{.location = expr->loc});
+            return;
+        }
+    }
+}
+
 bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
 {
     if (auto declRef = isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -3694,6 +3732,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 }
             }
         }
+
+        // Both failure branches above (no-applicable and ambiguous) converge here.
+        // Emit the storage-only-float hint last — after the primary error and any
+        // candidate notes — so the user reads the actual error first, then the
+        // fp32-roundtrip suggestion. It fires for operators and math functions
+        // alike when an argument is a BFloat16 / FP8 storage-only type; for
+        // ambiguous calls that is the common case, since those types implicitly
+        // convert to half/float/double and make the built-in overloads ambiguous.
+        _maybeDiagnoseStorageOnlyFloatMisuse(getSink(), expr);
 
         return CreateErrorExpr(expr);
     }
