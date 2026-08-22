@@ -4715,6 +4715,24 @@ void _lowerInfoFromFuncParameters(
         kParameterListCollectMode_Default,
         ParamPassingMode::In);
 
+    auto accessorDecl = declRef.as<AccessorDecl>().getDecl();
+    if (accessorDecl &&
+        (as<PropertyDecl>(accessorDecl->parentDecl) ||
+         as<SubscriptDecl>(accessorDecl->parentDecl)) &&
+        as<LookupDeclRef>(declRef.declRefBase) && parameterLists.params.getCount() &&
+        parameterLists.params[0].isThisParam)
+    {
+        // A looked-up accessor carries a more precise `this` type than its lexical interface.
+        // Consider `valueHolder[index] = newValue` with an interface-typed value: the setter
+        // requirement is lowered as `Lookup(OpenedType, operator[].set)`, but ordinary parent
+        // traversal initially contributes the interface's abstract `This`. Use the lookup source
+        // that the checked DeclRef already records so the setter temporary has `OpenedType` and
+        // can carry its differential through the inout call.
+        auto lookupThisType = getThisParamTypeForCallable(context, declRef);
+        SLANG_RELEASE_ASSERT(lookupThisType);
+        parameterLists.params[0].type = lookupThisType;
+    }
+
     auto& paramTypes = outInfo.paramTypes;
 
     for (auto paramInfo : parameterLists.params)

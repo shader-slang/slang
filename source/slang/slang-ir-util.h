@@ -396,6 +396,12 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key);
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key);
 
+/// Returns the associated differential type recorded by a pair's witness.
+/// A run-time witness remains a run-time type lookup for type-flow to specialize later.
+IRType* getDifferentialTypeFromPairType(
+    IRBuilder* builder,
+    IRDifferentialPairType* differentialPairType);
+
 IRInst* getVulkanPayloadLocation(IRInst* payloadGlobalVar);
 
 IRInst* getInstInBlock(IRInst* inst);

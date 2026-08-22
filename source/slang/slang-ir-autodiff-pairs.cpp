@@ -441,8 +441,25 @@ struct DiffPairLoweringPass : InstPassBase
 
     IRInst* lowerPairType(IRBuilder* builder, IRType* pairType)
     {
-        auto loweredPairType = pairBuilder->lowerDiffPairType(builder, pairType);
-        return loweredPairType;
+        if (auto diffPairType = as<IRDifferentialPairTypeBase>(pairType))
+        {
+            // Recomputed existential operations can temporarily produce a pair whose primal or
+            // associated differential type is local to the function that opened the existential.
+            // This also occurs for a higher-order pair such as DifferentialPair<
+            // DifferentialPair<T>> when T's differential witness is selected at run time.
+            // Creating a nominal struct for either shape would make that function-local type
+            // escape its valid scope. These transient pairs are removed with their unused
+            // derivative declarations after autodiff finalization.
+            if (isRuntimeType(diffPairType->getValueType()))
+                return nullptr;
+
+            auto differentialType = (IRType*)
+                _getDiffTypeFromPairType(pairBuilder->sharedContext, builder, diffPairType);
+            if (isRuntimeType(differentialType))
+                return nullptr;
+        }
+
+        return pairBuilder->lowerDiffPairType(builder, pairType);
     }
 
     IRInst* lowerMakePair(IRBuilder* builder, IRInst* inst)
@@ -453,24 +470,14 @@ struct DiffPairLoweringPass : InstPassBase
             builder->setInsertBefore(makePairInst);
             if (auto loweredPairType = (IRType*)lowerPairType(builder, pairType))
             {
-                if (isRuntimeType(pairType->getValueType()))
-                {
-                    // Do nothing.
-                    return makePairInst;
-                }
-                else
-                {
-                    IRInst* result = nullptr;
+                IRInst* operands[2] = {
+                    makePairInst->getPrimalValue(),
+                    makePairInst->getDifferentialValue()};
+                auto result = builder->emitMakeStruct((IRType*)loweredPairType, 2, operands);
 
-                    IRInst* operands[2] = {
-                        makePairInst->getPrimalValue(),
-                        makePairInst->getDifferentialValue()};
-                    result = builder->emitMakeStruct((IRType*)(loweredPairType), 2, operands);
-
-                    makePairInst->replaceUsesWith(result);
-                    makePairInst->removeAndDeallocate();
-                    return result;
-                }
+                makePairInst->replaceUsesWith(result);
+                makePairInst->removeAndDeallocate();
+                return result;
             }
         }
 
@@ -481,11 +488,21 @@ struct DiffPairLoweringPass : InstPassBase
     {
         if (auto getDiffInst = as<IRDifferentialPairGetDifferentialBase>(inst))
         {
+            if (auto makePair = as<IRMakeDifferentialPairBase>(getDiffInst->getBase()))
+            {
+                auto result = makePair->getDifferentialValue();
+                getDiffInst->replaceUsesWith(result);
+                getDiffInst->removeAndDeallocate();
+                return result;
+            }
+
             auto pairType = getDiffInst->getBase()->getDataType();
             if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
             {
                 pairType = pairPtrType->getValueType();
             }
+            if (!as<IRDifferentialPairTypeBase>(pairType))
+                return nullptr;
 
             builder->setInsertBefore(getDiffInst);
             if (auto loweredType = lowerPairType(builder, pairType))
@@ -502,11 +519,21 @@ struct DiffPairLoweringPass : InstPassBase
         }
         else if (auto getPrimalInst = as<IRDifferentialPairGetPrimalBase>(inst))
         {
+            if (auto makePair = as<IRMakeDifferentialPairBase>(getPrimalInst->getBase()))
+            {
+                auto result = makePair->getPrimalValue();
+                getPrimalInst->replaceUsesWith(result);
+                getPrimalInst->removeAndDeallocate();
+                return result;
+            }
+
             auto pairType = getPrimalInst->getBase()->getDataType();
             if (auto pairPtrType = as<IRPtrTypeBase>(pairType))
             {
                 pairType = pairPtrType->getValueType();
             }
+            if (!as<IRDifferentialPairTypeBase>(pairType))
+                return nullptr;
 
             builder->setInsertBefore(getPrimalInst);
             if (auto loweredType = lowerPairType(builder, pairType))
@@ -543,31 +570,51 @@ struct DiffPairLoweringPass : InstPassBase
                 case kIROp_DifferentialPtrPairGetPrimal:
                     lowerPairAccess(builder, inst);
                     break;
-
-                case kIROp_MakeDifferentialPtrPair:
-                case kIROp_MakeDifferentialPair:
-                    lowerMakePair(builder, inst);
-                    break;
-
                 default:
                     break;
                 }
             });
 
-        OrderedDictionary<IRInst*, IRInst*> pendingReplacements;
+        // Lower constructors only after every projection has been detached from its pair base.
+        // Otherwise replacing `getPrimal(makePair(...))`'s constructor first erases the nominal
+        // pair type that the projection needs to select the generated struct field.
+        processAllInsts(
+            [&](IRInst* inst)
+            {
+                builder->setInsertInto(instWithChildren);
+                switch (inst->getOp())
+                {
+                case kIROp_MakeDifferentialPtrPair:
+                case kIROp_MakeDifferentialPair:
+                    lowerMakePair(builder, inst);
+                    break;
+                default:
+                    break;
+                }
+            });
+
+        // Snapshot pair types before rewriting them. Lowering one type creates its nominal struct;
+        // a mutation-aware traversal must not then treat instructions in that new struct as more
+        // input to the same lowering operation.
+        List<IRDifferentialPairTypeBase*> pairTypes;
         processAllInsts(
             [&](IRInst* inst)
             {
                 if (auto pairType = as<IRDifferentialPairTypeBase>(inst))
-                {
-                    if (auto loweredType = lowerPairType(builder, pairType))
-                    {
-                        if (!pendingReplacements.containsKey(pairType))
-                            pendingReplacements.add(pairType, loweredType);
-                        modified = true;
-                    }
-                }
+                    pairTypes.add(pairType);
             });
+
+        OrderedDictionary<IRInst*, IRInst*> pendingReplacements;
+        for (auto pairType : pairTypes)
+        {
+            builder->setInsertInto(instWithChildren);
+            if (auto loweredType = lowerPairType(builder, pairType))
+            {
+                if (!pendingReplacements.containsKey(pairType))
+                    pendingReplacements.add(pairType, loweredType);
+                modified = true;
+            }
+        }
         for (auto replacement : pendingReplacements)
         {
             replacement.key->replaceUsesWith(replacement.value);

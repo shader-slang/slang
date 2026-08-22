@@ -16,40 +16,26 @@
 namespace Slang
 {
 
-// Represents a work item for packing `inout` or `out` arguments after a concrete call.
-struct ArgumentPackWorkItem
+// Represents an output-capable wrapper argument that must be written back after a concrete call.
+struct ArgumentWriteBack
 {
-    enum Kind
-    {
-        Pack,
-        UpCast,
-    } kind = Pack;
-
-    // A `AnyValue` typed destination.
+    // The wrapper-side destination and concrete temporary used for an output-capable parameter.
+    // After the call, `castTypeFlowValue` performs the reverse structural conversion.
     IRInst* dstArg = nullptr;
-    // A concrete value to be packed.
     IRInst* concreteArg = nullptr;
 };
 
-bool isAnyValueType(IRType* type)
-{
-    if (as<IRAnyValueType>(type) || as<IRUntaggedUnionType>(type))
-        return true;
-    return false;
-}
-
-// Unpack an `arg` of `IRAnyValue` into concrete type if necessary, to make it feedable into the
-// parameter. If `arg` represents a AnyValue typed variable passed in to a concrete `out`
-// parameter, this function indicates that it needs to be packed after the call by setting
-// `packAfterCall`.
-IRInst* maybeUnpackArg(
+// Cast a wrapper argument to the implementation's parameter type. Pointer parameters use a
+// concrete temporary so the same recursive conversion can initialize input-capable directions and
+// marshal output-capable directions back after the call.
+IRInst* castWrapperArg(
     IRBuilder* builder,
     IRType* paramType,
     IRInst* arg,
-    ArgumentPackWorkItem& packAfterCall)
+    ArgumentWriteBack& writeBack)
 {
-    packAfterCall.dstArg = nullptr;
-    packAfterCall.concreteArg = nullptr;
+    writeBack.dstArg = nullptr;
+    writeBack.concreteArg = nullptr;
 
     // If either paramType or argType is a pointer type
     // (because of `inout` or `out` modifiers), we extract
@@ -67,58 +53,37 @@ IRInst* maybeUnpackArg(
         argValType = argPtrType->getValueType();
     }
 
-
-    // Unpack `arg` if the parameter expects concrete type but
-    // `arg` is an AnyValue.
-    if (!isAnyValueType(paramValType) && isAnyValueType(argValType))
+    if (paramValType != argValType)
     {
-        // if parameter expects an `out` pointer, store the unpacked val into a
-        // variable and pass in a pointer to that variable.
         if (as<IRPtrTypeBase>(paramType))
         {
-            auto tempVar = builder->emitVar(paramValType);
-            if (as<IRBorrowInOutParamType>(paramType))
-                builder->emitStore(
-                    tempVar,
-                    builder->emitUnpackAnyValue(paramValType, builder->emitLoad(arg)));
-
-            // tempVar needs to be unpacked into original var after the call.
-            packAfterCall.kind = ArgumentPackWorkItem::Kind::Pack;
-            packAfterCall.dstArg = arg;
-            packAfterCall.concreteArg = tempVar;
-            return tempVar;
-        }
-        else
-        {
-            return builder->emitUnpackAnyValue(paramValType, argVal);
-        }
-    }
-
-    // Reinterpret 'arg' if it is being passed to a parameter with
-    // a different type collection. For now, we'll approximate this
-    // by checking if the types are different, but this should be
-    // encoded in the types.
-    //
-    if (as<IRTaggedUnionType>(paramValType) && as<IRTaggedUnionType>(argValType) &&
-        paramValType != argValType)
-    {
-        // if parameter expects an `out` pointer, store the unpacked val into a
-        // variable and pass in a pointer to that variable.
-        if (as<IROutParamType>(paramType))
-        {
+            const auto [direction, unusedValueType] = splitParameterDirectionAndType(paramType);
+            SLANG_UNUSED(unusedValueType);
             auto tempVar = builder->emitVar(paramValType);
 
-            // tempVar needs to be unpacked into original var after the call.
-            packAfterCall.kind = ArgumentPackWorkItem::Kind::UpCast;
-            packAfterCall.dstArg = arg;
-            packAfterCall.concreteArg = tempVar;
+            // Every pointer direction except `out` exposes an incoming value to the callee.
+            if (direction.kind != ParameterDirectionInfo::Kind::Out)
+            {
+                auto initialValue =
+                    castTypeFlowValue(builder, builder->emitLoad(arg), paramValType);
+                builder->emitStore(tempVar, initialValue);
+            }
+
+            // `BorrowIn` is read-only. `Out`, `BorrowInOut`, and `Ref` can update the value and
+            // therefore require the symmetric conversion after the concrete call.
+            if (direction.kind == ParameterDirectionInfo::Kind::Out ||
+                direction.kind == ParameterDirectionInfo::Kind::BorrowInOut ||
+                direction.kind == ParameterDirectionInfo::Kind::Ref)
+            {
+                writeBack.dstArg = arg;
+                writeBack.concreteArg = tempVar;
+            }
             return tempVar;
         }
-        else
-        {
-            SLANG_UNEXPECTED("Unexpected upcast for non-out parameter");
-        }
+
+        return castTypeFlowValue(builder, argVal, paramValType);
     }
+
     return arg;
 }
 
@@ -179,7 +144,7 @@ IRFunc* emitWitnessTableWrapper(
     }
 
     List<IRInst*> args;
-    List<ArgumentPackWorkItem> argsToPack;
+    List<ArgumentWriteBack> writeBacks;
 
     SLANG_ASSERT(params.getCount() == (Index)targetFuncType->getParamCount());
     for (UInt i = 0; i < targetFuncType->getParamCount(); i++)
@@ -188,42 +153,32 @@ IRFunc* emitWitnessTableWrapper(
         // Type of the parameter in the callee.
         auto funcParamType = targetFuncType->getParamType(i);
 
-        // If the implementation expects a concrete type
-        // (either in the form of a pointer for `out`/`inout` parameters,
-        // or in the form a value for `in` parameters, while
-        // the interface exposes an AnyValue type,
-        // we need to unpack the AnyValue argument to the appropriate
-        // concerete type.
-        ArgumentPackWorkItem packWorkItem;
-        auto newArg = maybeUnpackArg(builder, funcParamType, wrapperParam, packWorkItem);
+        // If the implementation expects a concrete type (either a pointer for `out`/`inout`
+        // parameters or a value for `in` parameters) while the interface exposes a structural
+        // type-flow type, cast the wrapper argument to the concrete type. Storage-level
+        // `AnyValueType` values are introduced later by `lowerUntaggedUnionTypes`.
+        ArgumentWriteBack writeBack;
+        auto newArg = castWrapperArg(builder, funcParamType, wrapperParam, writeBack);
         args.add(newArg);
-        if (packWorkItem.concreteArg)
-            argsToPack.add(packWorkItem);
+        if (writeBack.concreteArg)
+            writeBacks.add(writeBack);
     }
     auto call = builder->emitCallInst(targetFuncType->getResultType(), funcInst, args);
 
-    // Pack all `out` arguments.
-    for (auto item : argsToPack)
+    // Write output-capable arguments back through their wrapper-side pointers.
+    for (auto item : writeBacks)
     {
-        auto anyValType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
+        auto wrapperValueType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
         auto concreteVal = builder->emitLoad(item.concreteArg);
-        auto packedVal = (item.kind == ArgumentPackWorkItem::Kind::Pack)
-                             ? builder->emitPackAnyValue(anyValType, concreteVal)
-                             : upcastSet(builder, concreteVal, anyValType);
+        auto packedVal = castTypeFlowValue(builder, concreteVal, wrapperValueType);
         builder->emitStore(item.dstArg, packedVal);
     }
 
     // Pack return value if necessary.
-    if (!isAnyValueType(call->getDataType()) &&
-        isAnyValueType(funcTypeInInterface->getResultType()))
+    if (call->getDataType() != funcTypeInInterface->getResultType())
     {
-        auto pack = builder->emitPackAnyValue(funcTypeInInterface->getResultType(), call);
-        builder->emitReturn(pack);
-    }
-    else if (call->getDataType() != funcTypeInInterface->getResultType())
-    {
-        auto reinterpret = upcastSet(builder, call, funcTypeInInterface->getResultType());
-        builder->emitReturn(reinterpret);
+        auto adaptedResult = castTypeFlowValue(builder, call, funcTypeInInterface->getResultType());
+        builder->emitReturn(adaptedResult);
     }
     else
     {

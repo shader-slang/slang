@@ -1456,6 +1456,11 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(finalizeSpecialization);
 
+    // Type-flow keeps abstract differential pairs in a semantic wrapper so dispatch synthesis and
+    // the final inlining round cannot erase their two-component identity. No specialization runs
+    // after this point, so it is now safe to select the ordinary tuple storage representation.
+    SLANG_PASS(lowerDifferentialPairInfoTypes);
+
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
     // DiffTypeInfo originates from autodiff (calcRequiredLoweringPassSet marks it in

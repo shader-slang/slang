@@ -209,6 +209,13 @@ bool isExistentialOrRuntimeInst(IRInst* inst)
         return isExistentialOrRuntimeInst(lookup->getWitnessTable());
     }
 
+    // Higher-order autodiff synthesizes this witness next to the function being translated. Its
+    // entries do not exist until translation resolves the underlying differential-pair type, so
+    // an associated-type lookup through it has the same function-local lifetime as a lookup
+    // through an opened existential.
+    if (inst->getOp() == kIROp_MakeIDifferentiableWitness)
+        return true;
+
     return as<IRExtractExistentialType>(inst) || as<IRExtractExistentialWitnessTable>(inst) ||
            as<IRMakeExistential>(inst) || as<IRInterfaceType>(inst->getDataType());
 }
@@ -656,6 +663,50 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
         //
         return emitDAddForExistentialType(builder, primalType, op1, op2);
     }
+    else if (auto arrayType = as<IRArrayType>(primalType))
+    {
+        // Add composites structurally so an existential nested inside them is handled by the
+        // run-time existential path above. For example, the differential of
+        // `Array<DifferentialPair<IFoo>, 2>` contains existential differential values at each
+        // pair component. Calling the statically generated Array.dadd() would instead perform an
+        // associated-type lookup without the run-time witness that identifies each `IFoo`.
+        auto elementType = arrayType->getElementType();
+        auto differentialElementType = (IRType*)getDifferentialForType(elementType);
+        auto elementCount = getIntVal(arrayType->getElementCount());
+        List<IRInst*> elements;
+        for (IRIntegerValue i = 0; i < elementCount; ++i)
+        {
+            auto element1 = builder->emitGetElement(differentialElementType, op1, i);
+            auto element2 = builder->emitGetElement(differentialElementType, op2, i);
+            elements.add(emitDAddOfDiffInstType(builder, elementType, element1, element2));
+        }
+        return builder->emitMakeArray(
+            (IRType*)getDifferentialForType(primalType),
+            elements.getCount(),
+            elements.getBuffer());
+    }
+    else if (auto pairType = as<IRDifferentialPairType>(primalType))
+    {
+        // DifferentialPair<T>.Differential is itself a pair whose two components are
+        // T.Differential. Add each component using T's rule so an existential T reaches the
+        // run-time helper instead of a witness lookup embedded in DifferentialPair.dadd().
+        auto elementType = pairType->getValueType();
+        auto differentialElementType = (IRType*)getDifferentialForType(elementType);
+        auto primal = emitDAddOfDiffInstType(
+            builder,
+            elementType,
+            builder->emitDifferentialValuePairGetPrimal(differentialElementType, op1),
+            builder->emitDifferentialValuePairGetPrimal(differentialElementType, op2));
+        auto differential = emitDAddOfDiffInstType(
+            builder,
+            elementType,
+            builder->emitDifferentialValuePairGetDifferential(differentialElementType, op1),
+            builder->emitDifferentialValuePairGetDifferential(differentialElementType, op2));
+        return builder->emitMakeDifferentialValuePair(
+            (IRType*)getDifferentialForType(primalType),
+            primal,
+            differential);
+    }
     else if (as<IRAssociatedType>(primalType))
     {
         // Should not happen. associated type does not have any additional info, we can't
@@ -681,6 +732,17 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddForExistentialType(
     IRInst* op1,
     IRInst* op2)
 {
+    // An existential zero is represented explicitly by a NullDifferential payload. Eliminate it
+    // before creating the run-time dadd helper: besides being the additive identity, this keeps a
+    // zero-only accumulation from requiring dynamic dispatch over every IDifferentiable
+    // conformance visible in the linked module.
+    if (auto existential = as<IRMakeExistential>(op1);
+        existential && existential->getWitnessTable() == sharedContext->nullDifferentialWitness)
+        return op2;
+    if (auto existential = as<IRMakeExistential>(op2);
+        existential && existential->getWitnessTable() == sharedContext->nullDifferentialWitness)
+        return op1;
+
     return builder->emitCallInst(
         (IRType*)this->getDifferentialForType(primalType),
         this->getOrCreateExistentialDAddMethod(),
@@ -701,6 +763,32 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             this->sharedContext->nullDifferentialWitness);
 
         return existentialZero;
+    }
+
+    // Construct composite zeros structurally instead of calling the composite's static dzero().
+    // Consider an Array<DifferentialPair<IValueHolder>, 2>. The array and pair conformances are
+    // statically known, but IValueHolder's concrete differential type is known only at run time.
+    // Recursing reaches that existential leaf, where the null differential above is the
+    // representation-independent additive identity. Calling Array.dzero() would instead reach a
+    // static IValueHolder.Differential.dzero() lookup with no run-time witness to select it.
+    if (auto arrayType = as<IRArrayType>(primalType))
+    {
+        auto elementZero = emitDZeroOfDiffInstType(builder, arrayType->getElementType());
+        return builder->emitMakeArrayFromElement(
+            (IRType*)getDifferentialForType(primalType),
+            elementZero);
+    }
+
+    if (auto pairType = as<IRDifferentialPairType>(primalType))
+    {
+        // DifferentialPair<T>.Differential stores two T.Differential values. The null
+        // differential is therefore the correct zero for both components, including when T is
+        // an existential whose concrete differential type is available only through type flow.
+        auto elementZero = emitDZeroOfDiffInstType(builder, pairType->getValueType());
+        return builder->emitMakeDifferentialPair(
+            (IRType*)getDifferentialForType(primalType),
+            elementZero,
+            elementZero);
     }
 
     // Handle TypePack types by emitting dzero for each element and packing results.
