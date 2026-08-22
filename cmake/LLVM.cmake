@@ -100,7 +100,7 @@ function(fetch_or_build_slang_llvm)
         endif()
 
         # TODO: Put a check here that libslang-llvm.so doesn't have a 'NEEDED'
-        # directive for libLLVM-21.so, it's almost certainly going to break at
+        # directive for libLLVM-22.so, it's almost certainly going to break at
         # runtime in surprising ways when linked alongside Mesa (or anything else
         # pulling in libLLVM.so)
     endif()
