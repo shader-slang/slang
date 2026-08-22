@@ -331,6 +331,8 @@ int test()
 ```
 Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
+An overload must involve at least one user-defined operand type. Overloading a builtin operator on builtin scalar/vector/matrix operands only (for example `float4x4 operator*(float4x4, float4x4)`) is not supported and is diagnosed as an error, because the compiler always applies the builtin operation to such operands. To get GLSL-style matrix operators or vector equality, enable GLSL operator semantics with `-allow-glsl` (or `import glsl;`).
+
 In addition, you can overload operator `()` as a member method:
 ```csharp
 struct MyFunctor
