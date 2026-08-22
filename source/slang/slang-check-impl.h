@@ -961,6 +961,9 @@ public:
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
     void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
+    /// Makes the autodiff supplement loaded during checking visible to this context's caches.
+    void addLoadedAutodiffModule(ModuleDecl* moduleDecl);
+
     /// Invalidate inheritance info for `type`
     void invalidateInheritanceInfo(Type* type);
 
@@ -1060,6 +1063,9 @@ private:
     /// Mapping from type declarations to the known extensions that apply to them
     Dictionary<Decl*, RefPtr<CandidateExtensionList>> m_mapDeclToCandidateExtensions;
 
+    /// Autodiff supplement modules already handled by this semantic context.
+    HashSet<ModuleDecl*> m_loadedAutodiffModules;
+
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
 
@@ -1070,6 +1076,9 @@ private:
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`.
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
 
+    /// Merge candidate extensions from a module that may already be in the aggregate view.
+    void _mergeCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
+
     /// Mapping from a decl to additional declarations of the same decl.
     /// The additional declarations provide a location to hold extra decorations.
     OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> m_mapDeclToAssociatedDecls;
@@ -1079,6 +1088,9 @@ private:
 
     /// Add associated decls declared in `moduleDecl` to `m_mapDeclToAssociatedDecls`
     void _addDeclAssociationsFromModule(ModuleDecl* moduleDecl);
+
+    /// Merge associated declarations from a module that may already be in the aggregate view.
+    void _mergeDeclAssociationsFromModule(ModuleDecl* moduleDecl);
 
     ASTBuilder* _getASTBuilder() { return m_linkage->getASTBuilder(); }
 
@@ -1263,6 +1275,11 @@ public:
     DiagnosticSink* getSink() { return m_sink; }
 
     Session* getSession() { return m_shared->getSession(); }
+
+    /// Loads the autodiff supplement and merges it into this context's semantic caches.
+    /// Diagnoses and returns load failures so the caller can stop its current checking path.
+    /// Builtin source compilation intentionally succeeds without a module to merge.
+    SlangResult ensureAutodiffModuleLoaded(SourceLoc location);
 
     Linkage* getLinkage() { return m_shared->m_linkage; }
     NamePool* getNamePool() { return getLinkage()->getNamePool(); }

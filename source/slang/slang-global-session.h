@@ -227,6 +227,9 @@ public:
 
     ModuleDecl* baseModuleDecl = nullptr;
     List<RefPtr<Module>> coreModules;
+    // Prevent a differentiability annotation inside a builtin module from recursively requesting
+    // the autodiff supplement while the builtin set is still being generated.
+    bool m_isCompilingBuiltinModule = false;
 
     SourceManager builtinSourceManager;
 
@@ -261,8 +264,12 @@ public:
     String coreModulePath;
 
     ComPtr<ISlangBlob> coreLibraryCode;
-    // ComPtr<ISlangBlob> slangLibraryCode;
     ComPtr<ISlangBlob> hlslLibraryCode;
+    // Source for the eager base-surface segment (autodiff-base.meta.slang), concatenated into the
+    // `Core` builtin module. Distinct from `autodiffLibraryCode` below, which is the lazy
+    // supplement source (diff.meta.slang) compiled/deserialized only as the separate `Autodiff`
+    // builtin module. See `getBuiltinModuleSource`, which routes each to its own module.
+    ComPtr<ISlangBlob> autodiffBaseLibraryCode;
     ComPtr<ISlangBlob> glslLibraryCode;
     ComPtr<ISlangBlob> autodiffLibraryCode;
 
@@ -270,6 +277,9 @@ public:
 
     ComPtr<ISlangBlob> getCoreLibraryCode();
     ComPtr<ISlangBlob> getHLSLLibraryCode();
+    // Base-surface source folded into the `Core` module (eager); see `autodiffBaseLibraryCode`.
+    ComPtr<ISlangBlob> getAutodiffBaseLibraryCode();
+    // Supplement source for the standalone lazy `Autodiff` module; see `autodiffLibraryCode`.
     ComPtr<ISlangBlob> getAutodiffLibraryCode();
     ComPtr<ISlangBlob> getGLSLLibraryCode();
 
@@ -304,6 +314,19 @@ public:
     Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
     Module* getBuiltinModule(slang::BuiltinModuleName builtinModuleName);
+
+    /// Loads the autodiff builtin module if it has not already been loaded, and reports which
+    /// module (if any) the caller should now merge.
+    ///
+    /// `outModule` is set to null, with `SLANG_OK` returned, while a builtin module is being
+    /// source-compiled: starting another builtin compilation there would recurse, and that
+    /// compilation already checks the supplement's declarations itself, so there is no separate
+    /// module to merge. Success therefore does *not* imply a module — the out-parameter exists so
+    /// that a caller cannot read one without confronting the possibility that there is none.
+    SlangResult loadAutodiffModuleIfNeeded(Module*& outModule);
+
+    /// Returns whether this session is currently source-compiling a builtin module.
+    bool isCompilingBuiltinModule() const { return m_isCompilingBuiltinModule; }
 
     Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
 
@@ -400,5 +423,17 @@ private:
 SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough);
 
 const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name);
+
+// Returns how many builtin/core modules `session` currently has loaded, for unit tests that observe
+// lazy builtin-module loading (e.g. the autodiff supplement, which loads on demand).
+//
+// This is defined out-of-line in libslang on purpose: reading the count dereferences the internal
+// `Session`, and under `-fsanitize=vptr` that dereference needs `typeinfo for Slang::Session`,
+// which is emitted with Session's implementation. Doing it here lets a separately linked unit-test
+// tool query the count through the public `IGlobalSession*` without referencing that internal
+// typeinfo itself — a reference that fails to link on ELF, where the internal type's RTTI is not
+// exported. It is exported (SLANG_API) solely so the unit-test tool can link it and is deliberately
+// absent from the public `slang.h` API.
+SLANG_API Index getLoadedBuiltinModuleCountForUnitTest(slang::IGlobalSession* session);
 
 } // namespace Slang
