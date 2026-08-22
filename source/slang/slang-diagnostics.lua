@@ -467,6 +467,8 @@ standalone_note("downstream-compile-time", 102, "downstream compile time: ~time"
 
 standalone_note("performance-benchmark-result", 103, "compiler performance benchmark:\\n~benchmarkOutput")
 
+standalone_note("memory-usage-report", 117, "compiler memory usage:\\n~memoryReportOutput")
+
 err(
     "need-to-enable-experiment-feature",
     104,

@@ -7,6 +7,7 @@
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-emit-dependency-file.h"
+#include "slang-memory-report.h"
 #include "slang-module-library.h"
 #include "slang-options.h"
 #include "slang-reflection-json.h"
@@ -1983,6 +1984,27 @@ SlangResult EndToEndCompileRequest::compile()
         getSink()->diagnose(
             Diagnostics::PerformanceBenchmarkResult{.benchmarkOutput = perfResult.produceString()});
     }
+    if (getOptionSet().getBoolOption(CompilerOptionName::ReportMemoryUsage))
+    {
+        // Taken here, after `executeActions` has returned, so the account covers a completed
+        // compile: every module the compile loaded is still live and reachable from the linkage.
+        // Anything allocated and released during the compile is already gone, which is why this is
+        // a lower bound on the peak rather than an explanation of it.
+        StringBuilder memoryResult;
+        appendMemoryReportLines(captureMemoryReport(getLinkage(), getFrontEndReq()), memoryResult);
+        getSink()->diagnose(
+            Diagnostics::MemoryUsageReport{.memoryReportOutput = memoryResult.produceString()});
+    }
+
+    // Re-snapshot the diagnostic output now that the post-compile reports have been emitted.
+    //
+    // The snapshot above is taken as soon as the compile itself finishes, which is before
+    // -report-downstream-time, -report-perf-benchmark and -report-memory-usage produce anything.
+    // A caller reading `getDiagnosticOutput()` would therefore receive a string that predates
+    // every one of those reports; only consumers wired directly to the stderr writer, such as the
+    // command line, would see them. `StringBuilder::produceString` copies rather than consumes, so
+    // this supersedes the earlier snapshot with the full buffer instead of appending a tail.
+    m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
     // Repro dump handling
     {

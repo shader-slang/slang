@@ -2054,6 +2054,19 @@ public:
 
     ConstantMap& getConstantMap() { return m_constantMap; }
 
+    /// Return the bytes held by this context's lookup tables.
+    ///
+    /// These tables scale with the module's instruction count but live on the heap, outside the
+    /// `IRModule`'s `MemoryArena`, so a memory report that measured only the arena would understate
+    /// IR by an amount that grows with the module — the shape of the curve would be wrong, not just
+    /// its offset.
+    size_t calcTotalMemoryAllocated() const
+    {
+        return m_globalValueNumberingMap.calcTotalMemoryAllocated() +
+               m_instReplacementMap.calcTotalMemoryAllocated() +
+               m_constantMap.calcTotalMemoryAllocated();
+    }
+
 private:
     // The module that will own all of the IR
     IRModule* m_module;
@@ -2164,6 +2177,32 @@ public:
     Dictionary<AnnotationCacheKey, IRAnnotation*>* getAnnotationLookupCache()
     {
         return &m_annotationLookupCache;
+    }
+
+    /// Return the bytes held by this module's `Dictionary` lookup tables — the deduplication
+    /// context's maps plus the analysis, mangled-name, unique-id and annotation maps — which live
+    /// on the heap rather than in the module's `MemoryArena`.
+    ///
+    /// Reported separately from the arena rather than folded into it, because the two answer
+    /// different questions: the arena is the cost of the instructions themselves, this is the cost
+    /// of being able to find them. The mangled-name map owns a `List` per entry, so those are
+    /// walked rather than assumed empty.
+    ///
+    /// Deliberately NOT a total of everything heap-backed the module owns. `m_containerPool` (a
+    /// fixed-size pool of recycled scratch containers) and `m_linkingInfo` are excluded, because
+    /// sizing them would need new accessors on `ObjectPool` and `HashSet` for quantities that are
+    /// scratch and link-time state rather than lookup structure. What they hold lands in the
+    /// report's unattributed remainder, which is where unmeasured memory is supposed to land.
+    size_t calcSideTableMemoryAllocated() const
+    {
+        size_t total = m_deduplicationContext.calcTotalMemoryAllocated() +
+                       m_mapInstToAnalysis.calcTotalMemoryAllocated() +
+                       m_mapMangledNameToGlobalInst.calcTotalMemoryAllocated() +
+                       m_mapInstToUniqueId.calcTotalMemoryAllocated() +
+                       m_annotationLookupCache.calcTotalMemoryAllocated();
+        for (const auto& entry : m_mapMangledNameToGlobalInst)
+            total += size_t(entry.second.getCapacity()) * sizeof(IRInst*);
+        return total;
     }
 
     /// Ensure the module-owned acceleration cache used by linker global handling is built.
