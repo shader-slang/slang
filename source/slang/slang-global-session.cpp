@@ -709,7 +709,8 @@ SlangResult Session::_readBuiltinModule(
     // to deserialize the IR module.
     //
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, this, sourceLocReader, irModule));
+    SLANG_RETURN_ON_FAIL(
+        readSerializedModuleIR(irChunk, this, sourceLocReader, fileContents, irModule));
 
     irModule->setName(module->getNameObj());
     module->setIRModule(irModule);

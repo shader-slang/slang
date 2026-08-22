@@ -5,6 +5,7 @@
 #include "core/slang-common.h"
 #include "core/slang-dictionary.h"
 #include "core/slang-performance-profiler.h"
+#include "core/slang-platform.h"
 #include "core/slang-riff.h"
 #include "slang-ir-insts-stable-names.h"
 #include "slang-ir-insts.h"
@@ -14,6 +15,9 @@
 #include "slang-serialize.h"
 #include "slang-tag-version.h"
 #include "slang.h"
+
+#include <mutex>
+#include <thread>
 
 //
 #include "slang-serialize-ir.cpp.fiddle"
@@ -88,25 +92,25 @@ struct FlatInstTable
     // These are the same length, the number of instructions in the module
     // The instAllocInfo list is all that's necessary to allocate an instruction
     FIDDLE() List<InstAllocInfo> instAllocInfo;
-    FIDDLE() List<Int64> childCounts;
+    FIDDLE() SerializedArray<Int64> childCounts;
     FIDDLE() List<SourceLoc> sourceLocs;
 
     // The length of operandIndices is the number of instructions in the module
     // (for typeUse) + the number of operands in the module
     //
     // a nullptr operand is encoded as -1
-    FIDDLE() List<Int64> operandIndices;
+    FIDDLE() SerializedArray<Int64> operandIndices;
 
     // The length is equal to the number of strings and blobs in the module
-    FIDDLE() List<Int64> stringLengths;
+    FIDDLE() SerializedArray<Int64> stringLengths;
 
     // The length is the sum of all stringLengths, the contents is the
     // concatenation of all their data
-    FIDDLE() List<uint8_t> stringChars;
+    FIDDLE() SerializedArray<uint8_t> stringChars;
 
     // The length is number of integer/floating constants in the module, and
     // the contents are the bits of those constants
-    FIDDLE() List<UInt64> literals;
+    FIDDLE() SerializedArray<UInt64> literals;
 };
 
 // For debugging
@@ -280,10 +284,25 @@ struct IRSerialWriteContext : SourceLocSerialContext
 
 struct IRSerialReadContext : SourceLocSerialContext, RefObject
 {
-    IRSerialReadContext(Session* session, SerialSourceLocReader* sourceLocReader)
-        : _session(session), _sourceLocReader(sourceLocReader)
+    /// `blobHoldingSerializedData` may be null, and is retained when it is not.
+    ///
+    /// Deferred instruction bodies are decoded long after this read returns, out of
+    /// spans that point into the serialized bytes rather than copies of them. Whoever
+    /// owns those bytes therefore has to outlive the `IRModule`. Retaining the blob
+    /// here makes that ownership explicit and local; when the caller has no blob to
+    /// give (the bytes are a caller-local buffer), bodies are not deferred at all.
+    IRSerialReadContext(
+        Session* session,
+        SerialSourceLocReader* sourceLocReader,
+        ISlangBlob* blobHoldingSerializedData)
+        : _session(session)
+        , _sourceLocReader(sourceLocReader)
+        , _blobHoldingSerializedData(blobHoldingSerializedData)
     {
     }
+
+    ISlangBlob* getBlobHoldingSerializedData() const { return _blobHoldingSerializedData; }
+    ComPtr<ISlangBlob> _blobHoldingSerializedData;
     virtual void handleIRModule(IRReadSerializer const& serializer, IRModule*& value);
     virtual void handleName(IRReadSerializer const& serializer, Name*& value);
     virtual SerialSourceLocReader* getSourceLocReader() override { return _sourceLocReader; }
@@ -476,7 +495,7 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
             // Update parent's child count
             if (inst->parent)
             {
-                flat.childCounts[inst->parent->scratchData]++;
+                flat.childCounts.mutableAt(inst->parent->scratchData)++;
             }
         });
 
@@ -518,16 +537,581 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
     serialize(serializer, flat);
 }
 
+//
+/// True if builtin-module instruction bodies should be left encoded until something
+/// reads them. **On by default**; `SLANG_ONDEMAND_IR=0` forces the eager load.
+///
+/// The override exists because the two paths must produce identical results, and the
+/// cheapest way to investigate a suspected difference is to run the same binary both
+/// ways. It is deliberately an override rather than an opt-in: shipping this off by
+/// default would mean nobody gets the reduction without knowing to ask, and the
+/// deferred path would go untested in ordinary runs.
+///
+/// Read once: a global session is shared across threads, and the underlying
+/// environment lookup is not safe against a concurrent write. Uses
+/// `PlatformUtil::getEnvironmentVariable` rather than `getenv`, which MSVC
+/// deprecates and this build treats as an error.
+bool isOnDemandIRLoadEnabled()
+{
+    static const bool enabled = []
+    {
+        StringBuilder value;
+        if (SLANG_FAILED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice("SLANG_ONDEMAND_IR"),
+                value)))
+        {
+            return true;
+        }
+        // Set-but-empty reads as "not specified", so that clearing the variable in a
+        // shell behaves the same as never having set it.
+        const String text = value.produceString();
+        return text.getLength() == 0 || text[0] != '0';
+    }();
+    return enabled;
+}
+
+// Decoding state for a module's flat instruction table.
+//
+// The same walk serves two purposes, which is why it lives in an object rather
+// than a lambda: it runs once over the whole module at load time, and then again
+// over a single subtree each time a deferred body is asked for. Holding the flat
+// table and the instruction array keeps the second use possible -- a body's
+// operands are indices into that array, and may name any module-scope global.
+//
+// Depths in the module's preorder walk. The module inst is the root, its globals sit
+// directly under it, and a global's decorations and body children sit under those. Three
+// separate pieces of logic depend on this model agreeing -- the deferral test in
+// `decodeInst`, the eager-skeleton scan, and the depth a replayed body is decoded at --
+// so the numbers are named rather than written out at each site.
+static const Int64 kModuleInstDepth = 0;
+static const Int64 kGlobalValueDepth = 1;
+static const Int64 kBodyChildDepth = 2;
+
+struct FlatModuleDecoder : IRDeferredBodyLoader
+{
+    FlatInstTable flat;
+    List<IRInst*> instsList; ///< index -1 is the null slot, hence `insts()`
+    IRModule* module = nullptr;
+
+    /// Keeps the serialized bytes alive for as long as bodies can still be decoded.
+    ///
+    /// The flat table holds spans into this blob rather than copies, so it must not be
+    /// released while this decoder can still be asked for a body. Only set when the
+    /// caller supplied a blob; deferral is disabled otherwise.
+    ComPtr<ISlangBlob> blobHoldingSerializedData;
+
+    /// Set when an unrecognized opcode is seen, by either the load walk or a body
+    /// decoded later.
+    ///
+    /// Recorded here rather than on the `IRSerialReadContext`, which this must not
+    /// reference: that would close the cycle `IRModule -> decoder -> context -> IRModule`
+    /// and leak every module for the life of the process, while a raw pointer would
+    /// dangle. The load propagates this into the context while it is alive; a deferred
+    /// decode has no reader, and writes here so the information is not lost into freed
+    /// memory.
+    bool foundUnrecognizedInstructions = false;
+
+    /// Where each deferred body's encoding begins.
+    ///
+    /// Recorded when the load walk reaches a global value's first non-decoration
+    /// child. The payload streams are consumed by running cursors, so replaying a
+    /// subtree needs the cursor positions as of its start, not just its index.
+    struct DeferredBody
+    {
+        Int64 firstChildInstIndex;
+        Int64 childCount;
+        Int64 instCount = 0; ///< instructions in the whole deferred subtree
+        Int64 operandCursor;
+        Int64 literalCursor;
+        Int64 stringLengthCursor;
+        Int64 stringDataCursor;
+    };
+    Dictionary<IRInst*, DeferredBody> deferredBodies;
+
+    /// True while the load walk should defer bodies. Cleared during a deferred
+    /// decode so that nested subtrees materialize fully.
+    ///
+    /// The flag means two different things at two different times: during the initial
+    /// load walk it is the top-level on-demand/eager mode, and during a later
+    /// `materializeDeferredBody` it is forced false and restored on the way out.
+    ///
+    /// **Not reentrancy-safe on its own.** Because it is a member rather than a
+    /// parameter threaded through `decodeInst`, the save/restore is only correct while
+    /// no second decode can interleave with it -- which holds today because every
+    /// deferred decode runs under `mutex`, and the load walk runs before the decoder is
+    /// reachable by anyone else. A future caller that reaches `decodeInst` from some
+    /// other context must take that lock or thread the mode through as a parameter;
+    /// otherwise one decode's restore will overwrite another's mode mid-walk and
+    /// bodies will be deferred, or not, at the wrong depth.
+    bool deferBodies = false;
+
+    /// Serialises deferred decoding.
+    ///
+    /// The decode mutates state that is global to the module -- the cursors, the
+    /// instruction array and the module's arena -- so it is serialised wholesale
+    /// rather than per instruction. Contention is limited to the first touch of
+    /// each body.
+    ///
+    /// The concurrency guarded against is the supported one: the
+    /// serial-frontend/parallel-backend workflow in docs/user-guide/08-compiling.md, where
+    /// `getEntryPointCode` and friends may run concurrently on a linked component type.
+    /// Those run target passes and emit over IR that can still reference a builtin module.
+    /// (Concurrent whole *compiles* on a shared global session are documented as
+    /// unsupported, so they are not the justification.)
+    ///
+    /// That is where materializing actually happens, measured rather than assumed --
+    /// first touches across the two phases, for one compute entry point:
+    ///
+    ///     threads   during serial front end   during parallel backend
+    ///        1                 0                        38
+    ///        4                 0                        40
+    ///        8                 0                        52
+    ///       16                 0                        57
+    ///
+    /// The front end materializes nothing: linking leaves every body it did not
+    /// need still encoded, and emit is what walks them. So every first touch happens
+    /// on the concurrent side.
+    ///
+    /// The rise from 38 to 57 is the contended case occurring, not extra work being
+    /// done. 38 is the number of distinct bodies; the excess is threads that all
+    /// observed the deferred flag before any of them had finished, each entering the
+    /// slow path for the same body. That is the shape `materializeDeferredBody`
+    /// documents and handles by rechecking under this lock, and it is why the lock
+    /// is load-bearing rather than insurance.
+    std::mutex mutex;
+
+    Int64 instIndex = 0;
+    Int64 operandCursor = 0;
+    Int64 literalCursor = 0;
+    Int64 stringLengthCursor = 0;
+    Int64 stringDataCursor = 0;
+
+    /// The instruction array, indexed from -1 so that a serialized -1 reads as null.
+    ///
+    /// Asserted rather than assumed: the load path sizes `instsList` before the first
+    /// call, but deferred materialization reaches this from paths that do not, and
+    /// `&instsList[1]` on an empty list is out of bounds without saying so.
+    IRInst** insts()
+    {
+        SLANG_RELEASE_ASSERT(instsList.getCount() >= 1);
+        return &instsList[1];
+    }
+    Int64 getInstCount() const { return flat.instAllocInfo.getCount(); }
+
+    /// Why an operand is being read, which decides whether a null result is a violation.
+    ///
+    /// A bare `true`/`false` at the call site said nothing about the distinction it
+    /// selects, and the distinction is the load-bearing one: it is the difference between
+    /// "this must resolve or the whole deferral scheme is unsound" and "a null here is
+    /// the expected answer".
+    enum class OperandUse
+    {
+        /// The result is about to be wired into a live instruction, so it must resolve.
+        WireIntoLiveInst,
+        /// The operand belongs to an instruction the walk deliberately skipped, and is
+        /// read only to keep the cursors aligned. Such operands may name other skipped
+        /// instructions, where null is the correct result.
+        ConsumeForSkippedInst,
+    };
+
+    /// Reads one operand index and resolves it to an instruction.
+    ///
+    /// Advances the operand cursor by one either way; the `use` only decides how strictly
+    /// the result is checked.
+    IRInst* readInstRef(OperandUse use)
+    {
+        const bool mustResolve = (use == OperandUse::WireIntoLiveInst);
+        SLANG_RELEASE_ASSERT(operandCursor < flat.operandIndices.getCount());
+        const auto index = flat.operandIndices[operandCursor++];
+        SLANG_RELEASE_ASSERT(index >= -1 && index < getInstCount());
+        IRInst* const result = insts()[index];
+        // -1 encodes a null operand. Anything else must resolve to an instruction that
+        // exists, which is the invariant the whole scheme rests on: nothing outside a
+        // deferred body refers into one, so no eagerly decoded operand can land on a
+        // slot the skeleton left empty. Measured as holding across every operand in the
+        // builtin modules; assert it rather than return the null and fail later.
+        SLANG_RELEASE_ASSERT(!mustResolve || index == -1 || result);
+        return result;
+    }
+
+    /// Decodes the instruction at the cursor and, recursively, its children.
+    ///
+    /// **Advances every cursor it touches** -- instruction, operand, literal, string
+    /// length and string data -- for the subtree it walks. That is the central side
+    /// effect and the reason the decode order is fixed: the payload for instruction *i*
+    /// is "the next unread entry", not something addressable by index, so the cursors
+    /// are the only thing that says where the next instruction's data begins.
+    ///
+    /// A null return means the instruction was deliberately not materialized. Its
+    /// operand and payload entries are consumed anyway, precisely so that the cursors
+    /// stay aligned for the instructions that are kept.
+    IRInst* decodeInst(IRInst* parent, Int64 depth);
+
+    /// Allocates the instruction for a given index; see the definition.
+    IRInst* allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor);
+
+    /// `IRDeferredBodyLoader`.
+    void materializeDeferredBody(IRInst* inst) override;
+};
+
+void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
+{
+    std::lock_guard<std::mutex> lock(mutex);
+
+    DeferredBody body;
+    if (!deferredBodies.tryGetValue(inst, body))
+    {
+        // Another thread decoded this body while we waited for the lock.
+        return;
+    }
+    // `body` is a copy, so the entry is not needed past this point -- but it is
+    // removed only after the children are linked, below. Removing it here would
+    // mean that a decode which aborts part-way (an assertion in this file throws
+    // rather than terminating) leaves the instruction still flagged as deferred
+    // with no entry to decode: the next access would find nothing, return quietly,
+    // and hand the caller an empty body as though it were complete.
+
+    // Replay this subtree from where the load walk left off, with deferral
+    // disabled so nested instructions materialize in full.
+    // Allocate every instruction in the subtree before wiring any of them, exactly
+    // as the load-time path does. Instructions forward-reference each other --
+    // a branch names a block defined later -- so an operand read before its target
+    // exists would silently resolve to null.
+    {
+        // A private cursor for the sizing walk, named as at load time and deliberately
+        // not the member: this pass runs ahead of the decode to size allocations, so
+        // advancing the member here would leave it past the body's start before the
+        // decode below rewinds it.
+        Int64 allocStringLengthCursor = body.stringLengthCursor;
+        const Int64 end = body.firstChildInstIndex + body.instCount;
+        for (Int64 i = body.firstChildInstIndex; i < end; ++i)
+        {
+            if (!insts()[i])
+                insts()[i] = allocateInstAt(i, allocStringLengthCursor);
+        }
+    }
+
+    const bool savedDefer = deferBodies;
+    deferBodies = false;
+    instIndex = body.firstChildInstIndex;
+    operandCursor = body.operandCursor;
+    literalCursor = body.literalCursor;
+    stringLengthCursor = body.stringLengthCursor;
+    stringDataCursor = body.stringDataCursor;
+
+    // Build the body as a detached chain first, then attach it with a single store.
+    //
+    // The children are unreachable by any other thread while they are being built, so
+    // linking them to each other needs no synchronization. Attaching is the only
+    // publication, and it is one store: previously the chain was spliced onto the last
+    // decoration on the first iteration, which let a concurrent decoration walk follow
+    // that link into a chain that was still being decoded.
+    IRInst* const lastDecoration = inst->m_decorationsAndChildren.last;
+    IRInst* bodyFirst = nullptr;
+    IRInst* bodyLast = nullptr;
+    for (Int64 i = 0; i < body.childCount; ++i)
+    {
+        auto child = decodeInst(inst, kBodyChildDepth);
+        if (!child)
+            continue;
+        child->prev = bodyLast;
+        if (bodyLast)
+            bodyLast->next = child;
+        else
+            bodyFirst = child;
+        bodyLast = child;
+    }
+    if (bodyLast)
+        bodyLast->next = nullptr;
+
+    if (bodyFirst)
+    {
+        bodyFirst->prev = lastDecoration;
+        inst->m_decorationsAndChildren.last = bodyLast;
+        // The publishing store. Release so that a reader which observes the link also
+        // observes every field of every instruction in the chain behind it.
+        if (lastDecoration)
+            irPublishInstLink(lastDecoration->next, bodyFirst);
+        else
+            irPublishInstLink(inst->m_decorationsAndChildren.first, bodyFirst);
+    }
+
+    deferBodies = savedDefer;
+
+    // Drop the entry and clear the flag together, so the two never disagree.
+    deferredBodies.remove(inst);
+
+    // Release: a thread that later observes this as false must also see every
+    // write above, so that it reads a fully linked body.
+    inst->m_hasDeferredBody.store(false, std::memory_order_release);
+}
+
+
+/// Returns the allocation size an instruction of `op` needs beyond the base `IRInst`,
+/// advancing `stringLengthCursor` past the length entry of a string or blob constant.
+///
+/// Shared by the load-time walk and by deferred materialization so the two cannot
+/// drift: an earlier version of the deferred path duplicated this switch and, in
+/// doing so, dropped both range checks below, which are what keep a corrupt or
+/// future-version table from truncating `numChars` or overflowing the allocation
+/// size that the subsequent `memcpy` writes into.
+static size_t _readInstMinSizeInBytes(IROp op, const FlatInstTable& flat, Int64& stringLengthCursor)
+{
+    switch (op)
+    {
+    [[unlikely]] case kIROp_ModuleInst:
+        return offsetof(IRModuleInst, module) +
+               sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
+    case kIROp_BoolLit:
+    case kIROp_IntLit:
+    case kIROp_FloatLit:
+    case kIROp_PtrLit:
+    case kIROp_VoidLit:
+        return offsetof(IRConstant, value) + sizeof(IRConstant::value);
+    // About 5% of instructions in the core module are strings!
+    case kIROp_StringLit:
+    case kIROp_BlobLit:
+        {
+            SLANG_RELEASE_ASSERT(stringLengthCursor < flat.stringLengths.getCount());
+            const auto len = flat.stringLengths[stringLengthCursor++];
+            SLANG_RELEASE_ASSERT(len >= 0);
+            // `IRConstant::StringValue::numChars` is `uint32_t`; a longer length would
+            // truncate when it is stored.
+            SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+
+            const size_t headerSize =
+                offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
+            // Guard the addition itself, so a huge length cannot wrap and yield an
+            // allocation smaller than the characters later copied into it.
+            SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
+
+            return headerSize + size_t(len);
+        }
+    default:
+        return 0;
+    }
+}
+
+/// Allocates the instruction for `instIndex`, mirroring the sizing rules of the
+/// load-time allocation pass.
+///
+/// Needed because a deferred body's instructions were never allocated: the load
+/// pass left their slots empty. String and blob constants carry their characters
+/// inline, so their size depends on a length that is read from the payload stream;
+/// the cursor is positioned at that length here, and reading it **advances** the cursor
+/// past it. That is why the caller passes its own cursor by reference and why the payload
+/// switch below does not read the length again -- a second read, or removing this one as
+/// redundant, shifts every subsequent string constant by one entry.
+IRInst* FlatModuleDecoder::allocateInstAt(Int64 instIndexToAlloc, Int64& inStringLengthCursor)
+{
+    const auto& allocInfo = flat.instAllocInfo[instIndexToAlloc];
+    IROp op = allocInfo.op;
+    if (op == kIROp_Invalid) [[unlikely]]
+    {
+        // Report it the same way the load-time walk does. Without this a lazily
+        // materialized module would silently accept an opcode that an eager load
+        // reports, and the end-state checks keyed on this flag would not relax.
+        op = kIROp_Unrecognized;
+        foundUnrecognizedInstructions = true;
+    }
+
+    const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, inStringLengthCursor);
+    return module->_allocateInst(op, allocInfo.operandCount, minSizeInBytes);
+}
+
+
+IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
+{
+    SLANG_RELEASE_ASSERT(depth < kMaxIRSerializationDepth);
+    SLANG_RELEASE_ASSERT(instIndex < getInstCount());
+
+    const auto thisInstIndex = instIndex++;
+    IRInst* inst = insts()[thisInstIndex];
+
+    // Under on-demand load this instruction may have been skipped. Its operand and
+    // payload entries still have to be consumed so the cursors stay aligned for
+    // the instructions that were kept.
+    const auto& allocInfo = flat.instAllocInfo[thisInstIndex];
+
+    // The table is the single source for how many operands to consume. When the
+    // instruction exists it was allocated with this same count, so the two agree by
+    // construction -- but if they ever stopped agreeing, reading the instruction's
+    // count would desynchronize the operand cursor for every instruction after this
+    // one, and the damage would surface nowhere near here.
+    const Int64 thisOperandCount = Int64(allocInfo.operandCount);
+    SLANG_ASSERT(!inst || Int64(inst->operandCount) == thisOperandCount);
+
+    // operands and sourcelocs
+    if (inst)
+    {
+        inst->sourceLoc = flat.sourceLocs[thisInstIndex];
+        inst->typeUse.init(inst, readInstRef(OperandUse::WireIntoLiveInst));
+        for (Int64 o = 0; o < thisOperandCount; ++o)
+            inst->getOperands()[o].init(inst, readInstRef(OperandUse::WireIntoLiveInst));
+    }
+    else
+    {
+        readInstRef(OperandUse::ConsumeForSkippedInst); // type use
+        for (Int64 o = 0; o < thisOperandCount; ++o)
+            readInstRef(OperandUse::ConsumeForSkippedInst);
+    }
+
+    // Handle special instructions
+    switch (inst ? inst->m_op : allocInfo.op)
+    {
+    [[unlikely]] case kIROp_ModuleInst:
+        if (inst)
+            cast<IRModuleInst>(inst)->module = module;
+        break;
+    case kIROp_BoolLit:
+    case kIROp_IntLit:
+        {
+            SLANG_RELEASE_ASSERT(literalCursor < flat.literals.getCount());
+            const auto bits = flat.literals[literalCursor++];
+            if (inst)
+                cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
+            break;
+        }
+    case kIROp_FloatLit:
+        {
+            SLANG_RELEASE_ASSERT(literalCursor < flat.literals.getCount());
+            const auto bits = flat.literals[literalCursor++];
+            if (inst)
+                cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
+            break;
+        }
+    case kIROp_PtrLit:
+        {
+            SLANG_RELEASE_ASSERT(literalCursor < flat.literals.getCount());
+            const auto bits = flat.literals[literalCursor++];
+            // Keep the compiler happy on 32 bit builds
+            if (inst)
+                cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
+            break;
+        }
+    case kIROp_StringLit:
+    case kIROp_BlobLit:
+        {
+            auto* const c = inst ? cast<IRConstant>(inst) : nullptr;
+            SLANG_RELEASE_ASSERT(stringLengthCursor < flat.stringLengths.getCount());
+            const auto len = flat.stringLengths[stringLengthCursor++];
+            SLANG_RELEASE_ASSERT(len >= 0);
+            SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
+
+            const auto stringCharsCount = flat.stringChars.getCount();
+            SLANG_RELEASE_ASSERT(stringDataCursor <= stringCharsCount);
+            SLANG_RELEASE_ASSERT(len <= stringCharsCount - stringDataCursor);
+
+            if (c)
+            {
+                char* const dstChars = c->value.stringVal.chars;
+                c->value.stringVal.numChars = uint32_t(len);
+                if (len != 0)
+                    memcpy(dstChars, flat.stringChars.getBuffer() + stringDataCursor, size_t(len));
+            }
+            stringDataCursor += len;
+            break;
+        }
+    }
+
+    // Read in children, and fix up pointers. Children that were skipped come
+    // back as null and are simply not linked, which is what leaves a global
+    // value holding its decorations but no body.
+    if (inst)
+        inst->parent = parent;
+    IRInst* prev = nullptr;
+    IRInst* first = nullptr;
+    IRInst* last = nullptr;
+    const auto childCount = flat.childCounts[thisInstIndex];
+    SLANG_RELEASE_ASSERT(childCount >= 0);
+    for (Int64 i = 0; i < childCount; ++i)
+    {
+        // A global value's decorations come first and stay eager; everything
+        // after them is its body. Note where that body's encoding starts, then
+        // let the remaining children be walked without being materialized --
+        // the walk still has to run, to consume their operand and payload
+        // entries and keep the cursors aligned.
+        if (deferBodies && depth == kGlobalValueDepth && inst && !inst->m_hasDeferredBody)
+        {
+            // Looked at before the recursive call validates it, so bound it here; a
+            // corrupt `childCounts` is what would put this out of range.
+            SLANG_RELEASE_ASSERT(instIndex < getInstCount());
+            const IROp nextOp = flat.instAllocInfo[instIndex].op;
+            const bool nextIsDecoration =
+                nextOp >= kIROp_FirstDecoration && nextOp <= kIROp_LastDecoration;
+            if (!nextIsDecoration)
+            {
+                DeferredBody body;
+                body.firstChildInstIndex = instIndex;
+                body.childCount = childCount - i;
+                body.operandCursor = operandCursor;
+                body.literalCursor = literalCursor;
+                body.stringLengthCursor = stringLengthCursor;
+                body.stringDataCursor = stringDataCursor;
+                deferredBodies.add(inst, body);
+                // Plain (seq_cst) store, unlike the release store that clears this flag
+                // in `materializeDeferredBody`, and deliberately so: setting it happens
+                // during the load walk, before the module or this decoder is reachable
+                // from any other thread, so there is nothing to synchronize with yet.
+                // The orderings elsewhere on this field are load-bearing; this one is
+                // not, and the asymmetry is intentional rather than an oversight.
+                inst->m_hasDeferredBody = true;
+            }
+        }
+        auto c = decodeInst(inst, depth + 1);
+        if (!c)
+            continue;
+        if (!first)
+            first = c;
+        last = c;
+        c->prev = prev;
+        if (prev)
+            prev->next = c;
+        prev = c;
+    }
+    if (last)
+        last->next = nullptr;
+    if (inst)
+    {
+        inst->m_decorationsAndChildren.first = first;
+        inst->m_decorationsAndChildren.last = last;
+    }
+
+    // Now that the whole subtree has been walked, record how many instructions
+    // it spans, so materializing it later can pre-allocate them all.
+    if (inst && inst->m_hasDeferredBody)
+    {
+        // The entry was added on the deferral branch above and `m_hasDeferredBody` is
+        // the guard, so this lookup cannot miss. Assert rather than skip: leaving
+        // `instCount` at 0 would make materialization pre-allocate nothing while the
+        // decode still walks every child, so forward references would resolve against
+        // null slots and fail somewhere far away.
+        auto recorded = deferredBodies.tryGetValue(inst);
+        SLANG_RELEASE_ASSERT(recorded);
+        recorded->instCount = instIndex - recorded->firstChildInstIndex;
+    }
+
+    return inst;
+}
+
 static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serializer, IRModule* module)
 {
     IRSerialReadContext& readContext = *serializer.getContext();
-    FlatInstTable flat;
+    RefPtr<FlatModuleDecoder> decoder = new FlatModuleDecoder();
+    decoder->module = module;
+    FlatInstTable& flat = decoder->flat;
     serialize(serializer, flat);
     const List<SourceLoc>& sourceLocs = flat.sourceLocs;
     // dumpFlatInstTableStats(flat, "deserializing");
 
-    Int64 stringLengthIndex = 0;
-    List<IRInst*> instsList;
+    List<IRInst*>& instsList = decoder->instsList;
+
+    // Pass 1 walks the string lengths independently of the decoding cursors below,
+    // purely to size the allocations for string and blob constants. Named apart from
+    // the decoder's `stringLengthCursor` deliberately: this one runs to completion here
+    // and is then done, while the decoder's is saved and restored across deferred
+    // decodes, so conflating the two would hide that only one of them is replayed.
+    Int64 allocStringLengthCursor = 0;
 
     const auto numInsts = flat.instAllocInfo.getCount();
 
@@ -541,8 +1125,145 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
     instsList.setCount(numInsts + 1);
     // nullptr instructions are represented as `-1`. We can save ourselves a
     // branch by just making that index valid.
-    IRInst** const insts = &instsList[1];
+    IRInst** const insts = decoder->insts();
     insts[-1] = nullptr;
+
+    // An on-demand load materializes only what a symbol index needs -- the module inst,
+    // each module-scope global, and each global's decorations -- and leaves each
+    // global's body encoded until something asks for its children.
+    //
+    // This needs no change to the serialized format. The obstacle to decoding one
+    // instruction on its own is that operands, literals and strings are consumed by
+    // running cursors in preorder; those cursor positions are recovered here by a
+    // scan over `childCounts` that allocates nothing.
+    // Deferral is only sound when something keeps the serialized bytes alive: the flat
+    // table spans point into them, and a body is decoded long after this returns. A
+    // caller that reads out of its own buffer supplies no blob, and gets an eager load.
+    decoder->blobHoldingSerializedData = readContext.getBlobHoldingSerializedData();
+    bool onDemandIRLoad = isOnDemandIRLoadEnabled() && decoder->blobHoldingSerializedData;
+
+    // Deferral is only safe if the blob is the storage these spans were parsed out of, not
+    // merely a blob the caller happened to have. Otherwise a body is decoded out of freed
+    // memory, silently and long after the call that would be blamed for it. That is not
+    // hypothetical: `addLibraryReference` retained a copy while parsing the caller's
+    // pointer, which was harmless until bodies stopped being materialized eagerly.
+    if (onDemandIRLoad)
+    {
+        const Byte* const blobBegin =
+            (const Byte*)decoder->blobHoldingSerializedData->getBufferPointer();
+        const Byte* const blobEnd = blobBegin + decoder->blobHoldingSerializedData->getBufferSize();
+        const uintptr_t blobLow = (uintptr_t)blobBegin;
+        const uintptr_t blobHigh = (uintptr_t)blobEnd;
+
+        // Integer comparison, not pointer comparison. This runs precisely when a span may
+        // point into a *different* allocation, and there `<`/`>=` is unspecified
+        // ([expr.rel]) and forming `data + size` is undefined ([expr.add]) -- so the
+        // pointer spelling would be reasoning the optimizer may discard, in the one case
+        // the guard exists for. `p <= hi` is established before `hi - p` is evaluated, and
+        // the size is compared against that difference rather than added to `p`, so
+        // nothing overflows.
+        auto spanIsInsideBlob = [&](const Byte* data, uintptr_t sizeInBytes)
+        {
+            const uintptr_t p = (uintptr_t)data;
+            if (p < blobLow || p > blobHigh)
+                return false;
+            return sizeInBytes <= blobHigh - p;
+        };
+
+        // The element count is widened before it is multiplied, so the byte size cannot
+        // wrap on the way in -- a corrupt count that wrapped to a small positive would
+        // otherwise pass a check computed from it. Counts are non-negative by construction;
+        // a negative one means the table is corrupt, and is refused rather than multiplied.
+        auto arrayIsSafe = [&](auto const& array, uintptr_t elementSize)
+        {
+            if (!array.isView())
+                return true;
+            const Count count = array.getCount();
+            if (count < 0)
+                return false;
+            return spanIsInsideBlob((const Byte*)array.getBuffer(), (uintptr_t)count * elementSize);
+        };
+
+        // Every view-capable array, not a sample: which ones are views depends on the
+        // backend and on what the module contains, so a subset check passes whenever the
+        // arrays it named happened to be the owned ones.
+        const bool spansAreOwnedByTheBlob = arrayIsSafe(flat.childCounts, sizeof(Int64)) &&
+                                            arrayIsSafe(flat.operandIndices, sizeof(Int64)) &&
+                                            arrayIsSafe(flat.stringLengths, sizeof(Int64)) &&
+                                            arrayIsSafe(flat.stringChars, sizeof(uint8_t)) &&
+                                            arrayIsSafe(flat.literals, sizeof(UInt64));
+
+        if (!spansAreOwnedByTheBlob)
+        {
+            _noteDeferralDeclinedForSpanMismatch();
+            // Fall back to an eager load rather than asserting. A caller that supplies an
+            // unrelated blob then gets correct behaviour at the old cost, which is a better
+            // failure mode than aborting a compile -- and eager loading is exactly what this
+            // path did before deferral existed.
+            onDemandIRLoad = false;
+        }
+    }
+    /// Per-instruction predicate: is instruction `i` part of the eager *skeleton*?
+    ///
+    /// The skeleton is the set of instructions materialized at load time -- the module
+    /// inst, its globals, and each global's decorations including anything nested under
+    /// them. Everything else is a deferrable body. This is the one name for that set;
+    /// "on-demand load" names the mode that produces it.
+    ///
+    /// A predicate rather than a command, so `!instIsEager[i]` reads as "instruction `i`
+    /// was deferred" at the use site below.
+    List<uint8_t> instIsEager;
+    if (onDemandIRLoad)
+    {
+        instIsEager.setCount(numInsts);
+        ::memset(instIsEager.getBuffer(), 0, size_t(numInsts));
+
+        // Preorder scan tracking depth, allocating nothing. `childCounts` is in the
+        // same preorder as the instructions, so a stack of remaining-child counts
+        // is enough to recover each instruction's depth.
+        //
+        // This decides the same cut that `decodeInst` decides again while walking:
+        // what is eager skeleton and what is a deferrable body. The two must agree
+        // exactly -- an instruction this scan leaves unallocated but the decoder does
+        // not defer would be wired against an empty slot, and the reverse would defer
+        // a body whose slots were never filled. They agree because both derive from
+        // one rule, that a global's decorations are eager and everything after them is
+        // body, but they express it differently and there is no single predicate
+        // enforcing it. Sharing one is the obvious follow-up; `readInstRef` asserting
+        // that no live operand resolves to an empty slot is what would catch a
+        // disagreement today.
+        List<Int64> remainingChildren;
+        Int64 depth = 0;
+        // True while the scan is inside a global's decoration, including anything
+        // nested under it. A decoration is kept eager because the symbol index reads
+        // it without materializing, so its children have to be kept too: they are
+        // reachable only through the decoration, and nothing on that path would ever
+        // trigger a materialization to supply them. Keeping just the decoration inst
+        // would silently give a decoration-with-children no children under on-demand load.
+        bool inDecorationSubtree = false;
+        for (Int64 i = 0; i < numInsts; ++i)
+        {
+            const IROp op = flat.instAllocInfo[i].op;
+            const bool isDecoration = op >= kIROp_FirstDecoration && op <= kIROp_LastDecoration;
+            // Depth 0 is the module inst and depth 1 its globals; a global's
+            // decorations sit at depth 2 and carry the linkage names.
+            if (depth <= kBodyChildDepth)
+                inDecorationSubtree = false;
+            if (depth == kBodyChildDepth && isDecoration)
+                inDecorationSubtree = true;
+            instIsEager[i] = uint8_t(depth <= kGlobalValueDepth || inDecorationSubtree);
+
+            remainingChildren.add(flat.childCounts[i]);
+            depth++;
+            while (remainingChildren.getCount() && remainingChildren.getLast() == 0)
+            {
+                remainingChildren.removeLast();
+                depth--;
+            }
+            if (remainingChildren.getCount())
+                remainingChildren.getLast()--;
+        }
+    }
 
     for (Int64 instIndex = 0; instIndex < numInsts; ++instIndex)
     {
@@ -553,152 +1274,41 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             readContext._foundUnrecognizedInstructions = true;
             op = kIROp_Unrecognized;
         }
-        size_t minSizeInBytes = 0;
-        switch (op)
-        {
-        [[unlikely]] case kIROp_ModuleInst:
-            minSizeInBytes = offsetof(IRModuleInst, module) +
-                             sizeof(IRModuleInst::module); // NOLINT(bugprone-sizeof-expression)
-            break;
-        case kIROp_BoolLit:
-        case kIROp_IntLit:
-        case kIROp_FloatLit:
-        case kIROp_PtrLit:
-        case kIROp_VoidLit:
-            minSizeInBytes = offsetof(IRConstant, value) + sizeof(IRConstant::value);
-            break;
-        // About 5% of instructions in the core module are strings!
-        case kIROp_StringLit:
-        case kIROp_BlobLit:
-            {
-                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
-                const auto len = flat.stringLengths[stringLengthIndex++];
-                SLANG_RELEASE_ASSERT(len >= 0);
-                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
-
-                const size_t headerSize =
-                    offsetof(IRConstant, value) + offsetof(IRConstant::StringValue, chars);
-                SLANG_RELEASE_ASSERT(size_t(len) <= size_t(-1) - headerSize);
-
-                minSizeInBytes = headerSize + size_t(len);
-                break;
-            }
-        }
-        insts[instIndex] = module->_allocateInst(op, a.operandCount, minSizeInBytes);
+        const size_t minSizeInBytes = _readInstMinSizeInBytes(op, flat, allocStringLengthCursor);
+        // Under on-demand load the skipped instructions are never allocated; the
+        // preorder walk below still consumes their operand and payload cursors so
+        // that positions stay correct for the instructions that are kept.
+        insts[instIndex] = (onDemandIRLoad && !instIsEager[instIndex])
+                               ? nullptr
+                               : module->_allocateInst(op, a.operandCount, minSizeInBytes);
     }
 
-    Int64 litIndex = 0;
-    Int64 operandIndex = 0;
-    Int64 instIndex = 0;
-    stringLengthIndex = 0;
-    Int64 stringDataIndex = 0;
-    auto readInstRef = [&]() -> IRInst*
+    decoder->deferBodies = onDemandIRLoad;
+    const auto moduleInst = decoder->decodeInst(nullptr, kModuleInstDepth);
+
+    // Keep the decoder alive so the bodies it skipped can still be decoded. It
+    // holds the flat table and the instruction array, which a body needs: its
+    // operands are indices into that array and may name any module-scope global.
+    if (decoder->deferredBodies.getCount())
     {
-        SLANG_RELEASE_ASSERT(operandIndex < operandIndicesCount);
-        const auto index = flat.operandIndices[operandIndex++];
-        SLANG_RELEASE_ASSERT(index >= -1 && index < numInsts);
-        return insts[index];
-    };
-    const auto go = [&](auto& go, IRInst* parent, Int64 depth) -> IRInst*
-    {
-        SLANG_RELEASE_ASSERT(depth < kMaxIRSerializationDepth);
-        SLANG_RELEASE_ASSERT(instIndex < numInsts);
+        module->setDeferredBodyLoader(decoder);
+    }
 
-        const auto thisInstIndex = instIndex++;
-        IRInst* inst = insts[thisInstIndex];
-
-        // operands and sourcelocs
-        inst->sourceLoc = sourceLocs[thisInstIndex];
-        inst->typeUse.init(inst, readInstRef());
-        for (Int64 o = 0; o < inst->operandCount; ++o)
-            inst->getOperands()[o].init(inst, readInstRef());
-
-        // Handle special instructions
-        switch (inst->m_op)
-        {
-        [[unlikely]] case kIROp_ModuleInst:
-            cast<IRModuleInst>(inst)->module = module;
-            break;
-        case kIROp_BoolLit:
-        case kIROp_IntLit:
-            {
-                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
-                const auto bits = flat.literals[litIndex++];
-                cast<IRConstant>(inst)->value.intVal = bitCast<IRIntegerValue>(bits);
-                break;
-            }
-        case kIROp_FloatLit:
-            {
-                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
-                const auto bits = flat.literals[litIndex++];
-                cast<IRConstant>(inst)->value.floatVal = bitCast<double>(bits);
-                break;
-            }
-        case kIROp_PtrLit:
-            {
-                SLANG_RELEASE_ASSERT(litIndex < flat.literals.getCount());
-                const auto bits = flat.literals[litIndex++];
-                // Keep the compiler happy on 32 bit builds
-                cast<IRConstant>(inst)->value.ptrVal = (void*)(uintptr_t(bits));
-                break;
-            }
-        case kIROp_StringLit:
-        case kIROp_BlobLit:
-            {
-                const auto c = cast<IRConstant>(inst);
-                SLANG_RELEASE_ASSERT(stringLengthIndex < flat.stringLengths.getCount());
-                const auto len = flat.stringLengths[stringLengthIndex++];
-                SLANG_RELEASE_ASSERT(len >= 0);
-                SLANG_RELEASE_ASSERT(uint64_t(len) <= uint64_t(UINT32_MAX));
-
-                const auto stringCharsCount = flat.stringChars.getCount();
-                SLANG_RELEASE_ASSERT(stringDataIndex <= stringCharsCount);
-                SLANG_RELEASE_ASSERT(len <= stringCharsCount - stringDataIndex);
-
-                char* const dstChars = c->value.stringVal.chars;
-                c->value.stringVal.numChars = uint32_t(len);
-                if (len != 0)
-                    memcpy(dstChars, flat.stringChars.begin() + stringDataIndex, size_t(len));
-                stringDataIndex += len;
-                break;
-            }
-        }
-
-        // Read in children, and fix up pointers
-        inst->parent = parent;
-        IRInst* prev = nullptr;
-        IRInst* first = nullptr;
-        IRInst* last = nullptr;
-        const auto childCount = flat.childCounts[thisInstIndex];
-        SLANG_RELEASE_ASSERT(childCount >= 0);
-        for (Int64 i = 0; i < childCount; ++i)
-        {
-            auto c = go(go, inst, depth + 1);
-            if (i == 0)
-                first = c;
-            last = c;
-            c->prev = prev;
-            if (prev)
-                prev->next = c;
-            prev = c;
-        }
-        if (last)
-            last->next = nullptr;
-        inst->m_decorationsAndChildren.first = first;
-        inst->m_decorationsAndChildren.last = last;
-
-        return inst;
-    };
-    const auto moduleInst = go(go, nullptr, 0);
-    SLANG_RELEASE_ASSERT(instIndex == numInsts);
-    SLANG_RELEASE_ASSERT(operandIndex == operandIndicesCount);
+    // The walk visits every instruction and consumes every payload entry even when
+    // bodies are deferred -- deferring skips materialization, not traversal -- so
+    // these end-state checks hold either way.
+    SLANG_RELEASE_ASSERT(decoder->instIndex == numInsts);
+    SLANG_RELEASE_ASSERT(decoder->operandCursor == operandIndicesCount);
     // Unknown future opcodes intentionally become a recoverable read failure later.
     // This reader cannot know whether those opcodes consume literal or string payloads.
+    // Propagate what the decode walk saw, while the context is still alive.
+    readContext._foundUnrecognizedInstructions |= decoder->foundUnrecognizedInstructions;
+
     if (!readContext._foundUnrecognizedInstructions)
     {
-        SLANG_RELEASE_ASSERT(litIndex == flat.literals.getCount());
-        SLANG_RELEASE_ASSERT(stringLengthIndex == flat.stringLengths.getCount());
-        SLANG_RELEASE_ASSERT(stringDataIndex == flat.stringChars.getCount());
+        SLANG_RELEASE_ASSERT(decoder->literalCursor == flat.literals.getCount());
+        SLANG_RELEASE_ASSERT(decoder->stringLengthCursor == flat.stringLengths.getCount());
+        SLANG_RELEASE_ASSERT(decoder->stringDataCursor == flat.stringChars.getCount());
     }
     SLANG_RELEASE_ASSERT(as<IRModuleInst>(moduleInst));
     return cast<IRModuleInst>(moduleInst);
@@ -791,6 +1401,7 @@ Result readSerializedModuleInfo(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
+    ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule)
 {
     auto dataChunk = as<RIFF::DataChunk>(chunk);
@@ -814,7 +1425,8 @@ Result readSerializedModuleInfo(
         return SLANG_FAIL;
 
     IRModuleInfo info;
-    auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
+    auto sharedDecodingContext =
+        RefPtr(new IRSerialReadContext(session, sourceLocReader, blobHoldingSerializedData));
     {
         Fossil::ReadContext readContext;
         Fossil::SerialReader reader(
@@ -837,11 +1449,17 @@ Result readSerializedModuleIR(
     RIFF::Chunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader,
+    ISlangBlob* blobHoldingSerializedData,
     RefPtr<IRModule>& outIRModule)
 {
     SLANG_PROFILE;
 
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(chunk, session, sourceLocReader, outIRModule));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR_(
+        chunk,
+        session,
+        sourceLocReader,
+        blobHoldingSerializedData,
+        outIRModule));
 
     //
     // Module is finally valid (or at least as much as it was going it) and
@@ -852,5 +1470,380 @@ Result readSerializedModuleIR(
     return SLANG_OK;
 }
 
+static Index _countChildrenOf(IRInst* inst)
+{
+    Index count = 0;
+    for (IRInst* child : inst->getChildren())
+    {
+        SLANG_UNUSED(child);
+        count++;
+    }
+    return count;
+}
+
+void testRoundTripDecorationWithChildren(
+    slang::IGlobalSession* globalSession,
+    Index& outExpectedChildren,
+    Index& outActualChildren,
+    bool& outBodyWasDeferred)
+{
+    outExpectedChildren = 0;
+    outActualChildren = 0;
+    outBodyWasDeferred = false;
+
+    Session* session = static_cast<Session*>(globalSession);
+
+    // Build a function whose decoration is itself a parent, and which also has a body.
+    //
+    // The shape is the point, not what the instructions mean. A global value's children
+    // are its decorations followed by its body, and deferral cuts between the two -- so a
+    // decoration with children of its own puts instructions on the eager side of that cut
+    // at the same depth as instructions on the deferred side.
+    // `DifferentiableTypeDictionaryDecoration` is used only because it is a decoration
+    // declared `parent = true`; nothing here depends on autodiff.
+    RefPtr<IRModule> original = IRModule::create(session);
+    IRInst* originalFunc = nullptr;
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        originalFunc = builder.createFunc();
+
+        IRInst* dict = builder.addDifferentiableTypeDictionaryDecoration(originalFunc);
+        IRInst* floatType = builder.getFloatType();
+        builder.addDifferentiableTypeEntry(dict, floatType, floatType);
+        builder.addDifferentiableTypeEntry(dict, floatType, floatType);
+
+        // Something to defer. With only decorations, nothing is deferred and the round
+        // trip would say nothing about the cut.
+        builder.setInsertInto(originalFunc);
+        builder.emitBlock();
+        builder.emitReturn();
+    }
+
+    if (IRInst* dict =
+            originalFunc->findDecorationImpl(kIROp_DifferentiableTypeDictionaryDecoration))
+    {
+        outExpectedChildren = _countChildrenOf(dict);
+    }
+
+    OwnedMemoryStream stream(FileAccess::ReadWrite);
+    {
+        RIFF::Builder riffBuilder;
+        RIFF::BuildCursor cursor(riffBuilder);
+        // The IR chunk is written as the root, so it can be found again without pulling in
+        // the surrounding module-container layout, which this has no use for.
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, PropertyKeys<IRModule>::IRModule);
+        writeSerializedModuleIR(cursor, original, nullptr);
+        if (SLANG_FAILED(riffBuilder.writeTo(&stream)))
+            return;
+    }
+
+    // Read back out of a blob, which is what makes deferral possible: the flat table holds
+    // spans into these bytes rather than copies, so a body decoded later needs them still
+    // alive. `readSerializedModuleIR` loads eagerly when handed null.
+    const auto contents = stream.getContents();
+    List<uint8_t> bytes;
+    bytes.addRange(contents.getBuffer(), contents.getCount());
+    ComPtr<ISlangBlob> blob = ListBlob::create(bytes);
+
+    auto rootChunk = RIFF::RootChunk::getFromBlob(blob->getBufferPointer(), blob->getBufferSize());
+    if (!rootChunk)
+        return;
+
+    // The root here is the `ir  ` list chunk written above, and the module is its first
+    // child -- the same step `ModuleChunk::findIR()` takes. Handing the list chunk itself
+    // to the reader instead walks the wrong level and corrupts the heap.
+    auto irChunk = rootChunk->getFirstChild().get();
+    if (!irChunk)
+        return;
+
+    RefPtr<IRModule> reloaded;
+    if (SLANG_FAILED(readSerializedModuleIR(irChunk, session, nullptr, blob, reloaded)))
+        return;
+
+    IRInst* func = nullptr;
+    for (IRInst* child : reloaded->getModuleInst()->getChildren())
+    {
+        if (child->getOp() == kIROp_Func)
+        {
+            func = child;
+            break;
+        }
+    }
+    if (!func)
+        return;
+
+    outBodyWasDeferred = func->m_hasDeferredBody;
+
+    // Walking the decoration list does not materialize the body -- that is the access
+    // pattern decorations are kept eager to serve, and the one this rule protects.
+    if (IRInst* dict = func->findDecorationImpl(kIROp_DifferentiableTypeDictionaryDecoration))
+    {
+        outActualChildren = _countChildrenOf(dict);
+    }
+}
+
+
+/// Serializes `module` and reads it back out of a blob, which is the condition that lets
+/// bodies stay encoded. Shared by the two test hooks below.
+static SlangResult _testRoundTrip(
+    IRModule* module,
+    Session* session,
+    ComPtr<ISlangBlob>& outBlob,
+    RefPtr<IRModule>& outModule,
+    TestBlobMode blobMode = TestBlobMode::Matching)
+{
+    OwnedMemoryStream stream(FileAccess::ReadWrite);
+    {
+        RIFF::Builder riffBuilder;
+        RIFF::BuildCursor cursor(riffBuilder);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, PropertyKeys<IRModule>::IRModule);
+        writeSerializedModuleIR(cursor, module, nullptr);
+        SLANG_RETURN_ON_FAIL(riffBuilder.writeTo(&stream));
+    }
+
+    const auto contents = stream.getContents();
+    List<uint8_t> bytes;
+    bytes.addRange(contents.getBuffer(), contents.getCount());
+    outBlob = ListBlob::create(bytes);
+
+    auto rootChunk =
+        RIFF::RootChunk::getFromBlob(outBlob->getBufferPointer(), outBlob->getBufferSize());
+    if (!rootChunk)
+        return SLANG_FAIL;
+    // The root is the `ir  ` list chunk written above and the module is its first child --
+    // the step `ModuleChunk::findIR()` takes. Handing the list chunk itself to the reader
+    // walks the wrong level and corrupts the heap.
+    auto irChunk = rootChunk->getFirstChild().get();
+    if (!irChunk)
+        return SLANG_FAIL;
+
+    ISlangBlob* blobForReader = outBlob;
+    ComPtr<ISlangBlob> decoyBlob;
+    switch (blobMode)
+    {
+    case TestBlobMode::Null:
+        blobForReader = nullptr;
+        break;
+    case TestBlobMode::Mismatched:
+        // Same bytes, different allocation. Deferral must decline: the chunk pointers and
+        // spans refer into `outBlob`, so retaining this one would keep the wrong memory
+        // alive and leave the views dangling the moment `outBlob` went away.
+        decoyBlob = ListBlob::create(bytes);
+        blobForReader = decoyBlob;
+        break;
+    case TestBlobMode::Matching:
+        break;
+    }
+
+    return readSerializedModuleIR(irChunk, session, nullptr, blobForReader, outModule);
+}
+
+void testConcurrentBodyMaterialization(
+    slang::IGlobalSession* globalSession,
+    Index& outDeferredCount,
+    Index& outMismatches)
+{
+    outDeferredCount = 0;
+    outMismatches = 0;
+
+    Session* session = static_cast<Session*>(globalSession);
+
+    // Enough functions that the threads spread across bodies rather than all queuing on
+    // one, and enough instructions per body that a partially published chain is visible as
+    // a short one rather than needing exact timing to catch.
+    static const Index kFuncCount = 64;
+    static const Index kBodyInstCount = 24;
+
+    RefPtr<IRModule> original = IRModule::create(session);
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        for (Index f = 0; f < kFuncCount; ++f)
+        {
+            IRInst* func = builder.createFunc();
+            // Decorations are required for this to test what it claims. A deferred body is
+            // published into the link *after the last decoration*, so with none the body
+            // attaches at `first`, the decoration walk starts at null and ends immediately,
+            // and the acquire on that link is never exercised.
+            builder.addNameHintDecoration(func, UnownedStringSlice("concurrentProbe"));
+            builder.setInsertInto(func);
+            builder.emitBlock();
+            for (Index i = 0; i < kBodyInstCount - 2; ++i)
+            {
+                IRType* floatType = builder.getFloatType();
+                builder.emitAdd(
+                    floatType,
+                    builder.getFloatValue(floatType, IRFloatingPointValue(i)),
+                    builder.getFloatValue(floatType, IRFloatingPointValue(1)));
+            }
+            builder.emitReturn();
+            builder.setInsertInto(original->getModuleInst());
+        }
+    }
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    if (SLANG_FAILED(_testRoundTrip(original, session, blob, reloaded)))
+        return;
+
+    List<IRInst*> funcs;
+    for (IRInst* child : reloaded->getModuleInst()->getChildren())
+    {
+        if (child->getOp() == kIROp_Func)
+            funcs.add(child);
+    }
+    if (funcs.getCount() != kFuncCount)
+        return;
+
+    for (IRInst* func : funcs)
+    {
+        if (func->m_hasDeferredBody)
+            outDeferredCount++;
+    }
+
+    // Counted from the pre-serialization module, so the expectation does not come from the
+    // path under test.
+    List<Index> expected;
+    for (IRInst* child : original->getModuleInst()->getChildren())
+    {
+        if (child->getOp() != kIROp_Func)
+            continue;
+        expected.add(_countChildrenOf(child));
+    }
+    if (expected.getCount() != funcs.getCount())
+        return;
+
+    // Released together so every thread arrives at the same untouched body at once. Staggered
+    // starts would let each body finish materializing before the next thread reached it,
+    // which is the uncontended case the other tests already cover.
+    static const int kThreadCount = 8;
+    std::atomic<bool> go{false};
+    std::atomic<Index> mismatches{0};
+    List<std::thread> threads;
+    for (int t = 0; t < kThreadCount; ++t)
+    {
+        threads.add(std::thread(
+            [&, threadIndex = t]()
+            {
+                while (!go.load(std::memory_order_acquire))
+                    std::this_thread::yield();
+                // Half the threads publish, half walk decorations. Materializing from
+                // every thread exercises the mutex but not the barrier that matters most:
+                // the decoration walk is the one reader allowed to observe the publication
+                // link *without* going through `ensureBodyMaterialized`, which is why
+                // `getFirstDecoration`, `getNextDecoration` and
+                // `IRDecorationList::Iterator::operator++` load it with acquire. Unless
+                // some thread is walking decorations while another publishes into
+                // `lastDecoration->next`, that race is never run and dropping those
+                // acquires passes every test.
+                const bool walksDecorations = (threadIndex % 2) == 1;
+                for (Index i = 0; i < funcs.getCount(); ++i)
+                {
+                    if (walksDecorations)
+                    {
+                        // Must never run past the decorations into a body that another
+                        // thread is publishing. Counting is enough to catch it: a walk
+                        // that continues into the body returns more than there are
+                        // decorations.
+                        Index decorationCount = 0;
+                        for (IRDecoration* decoration : funcs[i]->getDecorations())
+                        {
+                            SLANG_UNUSED(decoration);
+                            decorationCount++;
+                        }
+                        // Exactly the one decoration added above. More than that means the
+                        // walk followed a link into a body another thread was publishing
+                        // and kept going, counting body instructions as decorations.
+                        if (decorationCount != 1)
+                            mismatches.fetch_add(1);
+                    }
+                    else
+                    {
+                        // The first touch of each body: this is what takes the loader's
+                        // mutex and, on the winning thread, publishes the chain with a
+                        // release store.
+                        funcs[i]->ensureBodyMaterialized();
+                        if (_countChildrenOf(funcs[i]) != expected[i])
+                            mismatches.fetch_add(1);
+                    }
+                }
+            }));
+    }
+    go.store(true, std::memory_order_release);
+    for (auto& thread : threads)
+        thread.join();
+
+    outMismatches = mismatches.load();
+}
+
+
+void testDeferralFallback(
+    slang::IGlobalSession* globalSession,
+    TestBlobMode blobMode,
+    bool& outDeferredLoaderInstalled,
+    Index& outInstCount,
+    Index& outSpanMismatchDelta)
+{
+    outDeferredLoaderInstalled = false;
+    outInstCount = 0;
+    outSpanMismatchDelta = 0;
+
+    Session* session = static_cast<Session*>(globalSession);
+
+    // A module with several bodies, so a deferred load has something to defer and an
+    // eager one has something to get wrong.
+    RefPtr<IRModule> original = IRModule::create(session);
+    {
+        IRBuilder builder(original);
+        builder.setInsertInto(original->getModuleInst());
+        for (Index f = 0; f < 8; ++f)
+        {
+            IRInst* func = builder.createFunc();
+            builder.setInsertInto(func);
+            builder.emitBlock();
+            IRType* floatType = builder.getFloatType();
+            for (Index i = 0; i < 6; ++i)
+            {
+                builder.emitAdd(
+                    floatType,
+                    builder.getFloatValue(floatType, IRFloatingPointValue(i)),
+                    builder.getFloatValue(floatType, IRFloatingPointValue(1)));
+            }
+            builder.emitReturn();
+            builder.setInsertInto(original->getModuleInst());
+        }
+    }
+
+    const Index mismatchBefore = getDeferralDeclinedForSpanMismatchCount();
+
+    ComPtr<ISlangBlob> blob;
+    RefPtr<IRModule> reloaded;
+    if (SLANG_FAILED(_testRoundTrip(original, session, blob, reloaded, blobMode)))
+        return;
+
+    outSpanMismatchDelta = getDeferralDeclinedForSpanMismatchCount() - mismatchBefore;
+    outDeferredLoaderInstalled = (reloaded->getDeferredBodyLoader() != nullptr);
+
+    // Counting every instruction forces every body to materialize if it was deferred, and
+    // reads every body if it was not -- so the same number must come back either way. That
+    // is the property the fallbacks exist to preserve: declining deferral may cost time,
+    // but it must never change what was loaded.
+    Index count = 0;
+    for (IRInst* global : reloaded->getModuleInst()->getChildren())
+    {
+        count++;
+        for (IRInst* child : global->getChildren())
+        {
+            count++;
+            for (IRInst* grandchild : child->getChildren())
+            {
+                SLANG_UNUSED(grandchild);
+                count++;
+            }
+        }
+    }
+    outInstCount = count;
+}
 
 } // namespace Slang

@@ -2235,7 +2235,12 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
+    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(
+        irChunk,
+        session,
+        sourceLocReader,
+        blobHoldingSerializedData,
+        irModule));
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of

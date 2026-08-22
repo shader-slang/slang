@@ -1721,10 +1721,30 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // We need to deserialize and add the modules
     ComPtr<IModuleLibrary> library;
 
+    // Parse out of the blob's bytes, not the caller's.
+    //
+    // `RawBlob::create` *copies*, so `libBlob` holds the data at a different address than
+    // `libData`. Passing `libData` as the thing to parse while passing `libBlob` as the
+    // thing to retain used to be harmless, because the module was fully materialized before
+    // this returned and the caller's buffer was never read again. With on-demand loading it
+    // is a use-after-free waiting to happen: the RIFF chunk pointers, the fossil cursors and
+    // the resulting `SerializedArray` views would all refer into `libData`, deferred bodies
+    // would be decoded out of it long after this call, and the documented contract for
+    // `spAddLibraryReference` lets the caller free it as soon as the call returns.
+    //
+    // The sibling overload in slang-module-library.cpp already does this correctly; this one
+    // just handed over the wrong pointer.
     auto libBlob = RawBlob::create((const Byte*)libData, libDataSize);
+    if (!libBlob)
+        return SLANG_E_OUT_OF_MEMORY;
 
-    SLANG_RETURN_ON_FAIL(
-        loadModuleLibrary(libBlob, (const Byte*)libData, libDataSize, basePath, this, library));
+    SLANG_RETURN_ON_FAIL(loadModuleLibrary(
+        libBlob,
+        (const Byte*)libBlob->getBufferPointer(),
+        libBlob->getBufferSize(),
+        basePath,
+        this,
+        library));
 
     // Create an artifact without any name (as one is not provided)
     auto artifact =

@@ -41,6 +41,7 @@
 #include "core/slang-basic.h"
 
 #include <optional>
+#include <type_traits>
 
 namespace Slang
 {
@@ -581,6 +582,286 @@ SLANG_FORCE_INLINE bool hasElements(S const& serializer)
     return serializer->hasElements();
 }
 
+//
+// Some serializer backends know up front how many elements a container holds --
+// the fossil format stores the count -- while others discover it only by reading.
+// `tryGetRemainingElementCount` reports the count where it is available so a
+// container can size its storage once, and returns -1 where it is not, leaving
+// the caller to grow as it goes.
+//
+// Detected structurally rather than by adding a virtual to the serializer
+// interface, so that backends which cannot answer need no changes.
+//
+template<typename S, typename = void>
+struct SerializerKnowsRemainingElementCount : std::false_type
+{
+};
+
+template<typename S>
+struct SerializerKnowsRemainingElementCount<
+    S,
+    std::void_t<decltype(std::declval<S const&>()->getRemainingElementCount())>> : std::true_type
+{
+};
+
+template<typename S>
+SLANG_FORCE_INLINE Count tryGetRemainingElementCount(S const& serializer)
+{
+    if constexpr (SerializerKnowsRemainingElementCount<S>::value)
+        return serializer->getRemainingElementCount();
+    else
+        return Count(-1);
+}
+
+//
+// Backends whose stored layout for a scalar element matches the in-memory one can
+// hand over a whole run of elements at once rather than decoding them singly.
+// `tryReadContiguousScalars` uses that where it exists and reports false
+// otherwise, so the caller falls back to the per-element loop.
+//
+template<typename S, typename T, typename = void>
+struct SerializerSupportsBulkScalarRead : std::false_type
+{
+};
+
+template<typename S, typename T>
+struct SerializerSupportsBulkScalarRead<
+    S,
+    T,
+    std::void_t<decltype(std::declval<S const&>()
+                             ->template tryReadContiguousScalars<T>(std::declval<T*>(), Count(0)))>>
+    : std::true_type
+{
+};
+
+template<typename S, typename T, typename = void>
+struct SerializerSupportsScalarSpan : std::false_type
+{
+};
+
+template<typename S, typename T>
+struct SerializerSupportsScalarSpan<
+    S,
+    T,
+    std::void_t<decltype(std::declval<S const&>()->template tryGetContiguousScalars<T>(
+        std::declval<T const*&>(),
+        Count(0)))>> : std::true_type
+{
+};
+
+template<typename S, typename T>
+SLANG_FORCE_INLINE bool tryGetContiguousScalars(S const& serializer, T const*& outData, Count count)
+{
+    if constexpr (SerializerSupportsScalarSpan<S, T>::value)
+        return serializer->template tryGetContiguousScalars<T>(outData, count);
+    else
+        return false;
+}
+
+//
+// An array that is read as a view over the serialized data when the backend can
+// supply one, and as an owned copy otherwise.
+//
+// Fossilized arrays are contiguous at a known stride, so for a scalar element type
+// the stored bytes already have the layout the program wants. Reading them in place
+// avoids copying -- which for the IR's flat instruction table is several megabytes
+// per module, and megabytes that have to be *retained* if bodies are decoded later.
+//
+// The serialized layout is identical to `List<T>`, so switching a field between the
+// two changes nothing on disk.
+//
+template<typename T>
+struct SerializedArray
+{
+    T const* getBuffer() const { return _data; }
+    Count getCount() const { return _count; }
+    T const& operator[](Index index) const
+    {
+        SLANG_ASSERT(index >= 0 && index < _count);
+        return _data[index];
+    }
+    T const* begin() const { return _data; }
+    T const* end() const { return _data + _count; }
+
+    //
+    // Mutating operations, used when building a table to be written. They act on
+    // the owned storage; a view is read-only by construction, since it points into
+    // data this object does not own.
+    //
+    void add(T const& value)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.add(value);
+        setFromOwned();
+    }
+    void setCount(Count newCount)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.setCount(newCount);
+        setFromOwned();
+    }
+    void reserve(Count capacity)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.reserve(capacity);
+        setFromOwned();
+    }
+    /// Mutable access to an element, valid only while this owns its storage.
+    ///
+    /// Deliberately not an `operator[]` overload: a non-const `SerializedArray`
+    /// being *read* would then bind to the mutable overload and go to the owned
+    /// buffer, which for a view is empty. That reads out of bounds, and silently,
+    /// since the bounds assert compiles out in release builds.
+    T& mutableAt(Index index)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        return _owned[index];
+    }
+    void addRange(T const* values, Count valueCount)
+    {
+        SLANG_RELEASE_ASSERT(!isView());
+        _owned.addRange(values, valueCount);
+        setFromOwned();
+    }
+
+    /// True if this is a view into serialized data rather than an owned copy, and
+    /// therefore depends on that data staying alive.
+    ///
+    /// Stored rather than inferred. Deriving it from "`_count` is non-zero and `_owned`
+    /// is empty" made an empty view indistinguishable from an empty owned array, and
+    /// kept that case unreachable only because a reader elsewhere declines to hand back
+    /// a zero-length run -- an invariant enforced in a different file from the one that
+    /// depends on it.
+    bool isView() const { return _isView; }
+
+    /// Points this at `count` elements of serialized data it does not own.
+    ///
+    /// The one way to become a view. Named so that the three fields are only ever moved
+    /// between consistent states together: a caller that set them individually could
+    /// leave `_data` pointing into the blob while `isView()` reported ownership, which
+    /// is the dangling case copy/move goes to some trouble to avoid.
+    void adoptView(T const* data, Count count)
+    {
+        _owned = List<T>();
+        _data = data;
+        _count = count;
+        _isView = true;
+    }
+
+    /// Discards any view and prepares to accumulate owned elements.
+    void beginOwned(Count reserveCount)
+    {
+        _owned.clear();
+        if (reserveCount > 0)
+            _owned.reserve(reserveCount);
+        _isView = false;
+        setFromOwned();
+    }
+
+    /// Copies the referenced data into this object, so it no longer depends on the
+    /// serialized blob. A no-op if it is already owned.
+    void makeOwned()
+    {
+        if (!isView())
+            return;
+        _owned.setCount(_count);
+        ::memcpy(_owned.getBuffer(), _data, size_t(_count) * sizeof(T));
+        _data = _owned.getBuffer();
+        _isView = false;
+    }
+
+    void setFromOwned()
+    {
+        _data = _owned.getBuffer();
+        _count = _owned.getCount();
+        _isView = false;
+    }
+
+    SerializedArray() = default;
+
+    //
+    // Copy and move have to be written out rather than defaulted. `_data` is a raw
+    // pointer that, for an owned array, points into `_owned`'s buffer; a defaulted
+    // copy would give the destination its own `_owned` while `_data` still referred
+    // to the *source's* buffer, so the copy would dangle as soon as the source was
+    // destroyed or grew. Re-deriving `_data` from the destination's own storage
+    // keeps the two fields consistent, and a view copies as a view because it has
+    // no owned storage to re-point into.
+    //
+    SerializedArray(SerializedArray const& other) { _copyFrom(other); }
+    SerializedArray(SerializedArray&& other) { _moveFrom(static_cast<SerializedArray&&>(other)); }
+
+    SerializedArray& operator=(SerializedArray const& other)
+    {
+        if (this != &other)
+            _copyFrom(other);
+        return *this;
+    }
+    SerializedArray& operator=(SerializedArray&& other)
+    {
+        if (this != &other)
+            _moveFrom(static_cast<SerializedArray&&>(other));
+        return *this;
+    }
+
+private:
+    void _copyFrom(SerializedArray const& other)
+    {
+        _owned = other._owned;
+        _isView = other._isView;
+        if (other.isView())
+        {
+            _data = other._data;
+            _count = other._count;
+        }
+        else
+        {
+            setFromOwned();
+        }
+    }
+
+    void _moveFrom(SerializedArray&& other)
+    {
+        const bool otherWasView = other.isView();
+        _isView = otherWasView;
+        T const* otherData = other._data;
+        Count otherCount = other._count;
+        _owned = static_cast<List<T>&&>(other._owned);
+        if (otherWasView)
+        {
+            _data = otherData;
+            _count = otherCount;
+        }
+        else
+        {
+            setFromOwned();
+        }
+        other._data = nullptr;
+        other._count = 0;
+        other._isView = false;
+    }
+
+private:
+    // Private because the three of them describe one state together: `_data` points
+    // either into `_owned` or into serialized data, and `_isView` says which. A caller
+    // that set them individually could leave `_data` referring to a blob while this
+    // object reported ownership, which is the dangling case copy, move and `makeOwned`
+    // go to some trouble to avoid. Every transition between states has a name above.
+    T const* _data = nullptr;
+    Count _count = 0;
+    bool _isView = false;
+    List<T> _owned;
+};
+
+template<typename S, typename T>
+SLANG_FORCE_INLINE bool tryReadContiguousScalars(S const& serializer, T* dest, Count count)
+{
+    if constexpr (SerializerSupportsBulkScalarRead<S, T>::value)
+        return serializer->template tryReadContiguousScalars<T>(dest, count);
+    else
+        return false;
+}
+
 template<typename S>
 SLANG_FORCE_INLINE void serialize(S const& serializer, bool& value)
 {
@@ -829,6 +1110,48 @@ private:
 //
 
 template<typename S, typename T>
+void serialize(S const& serializer, SerializedArray<T>& value)
+{
+    SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
+    if (isWriting(serializer))
+    {
+        for (Index i = 0; i < value.getCount(); ++i)
+        {
+            T element = value[i];
+            serialize(serializer, element);
+        }
+    }
+    else
+    {
+        const Count remaining = tryGetRemainingElementCount(serializer);
+        if constexpr (std::is_arithmetic<T>::value)
+        {
+            if (remaining > 0)
+            {
+                T const* view = nullptr;
+                if (tryGetContiguousScalars(serializer, view, remaining))
+                {
+                    // Drop any storage a previous read left behind. `isView()` asks
+                    // whether `_owned` is empty, so leaving stale owned elements here
+                    // would make this object claim ownership while `_data` points into
+                    // the serialized blob -- `makeOwned()` would then do nothing and the
+                    // mutators would edit storage that `_data` does not refer to.
+                    value.adoptView(view, remaining);
+                    return;
+                }
+            }
+        }
+        value.beginOwned(remaining);
+        while (hasElements(serializer))
+        {
+            T element;
+            serialize(serializer, element);
+            value.add(element);
+        }
+    }
+}
+
+template<typename S, typename T>
 void serialize(S const& serializer, List<T>& value)
 {
     SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
@@ -840,6 +1163,31 @@ void serialize(S const& serializer, List<T>& value)
     else
     {
         value.clear();
+        // Size the list once where the backend knows the count. Without this the
+        // list doubles as it fills, so a large array is copied repeatedly on the
+        // way in and its transient peak is roughly twice the final size.
+        const Count remaining = tryGetRemainingElementCount(serializer);
+        if (remaining > 0)
+            value.reserve(remaining);
+        // Where the backend stores this element type exactly as memory holds it,
+        // take the whole run in one copy; the per-element loop below costs a
+        // layout check and a bounds-checked append per value, which for the IR's
+        // multi-megabyte index arrays is most of deserialization time.
+        // Restricted to arithmetic elements: those are the ones the fossil format
+        // stores as a bare scalar of the same width, so the stored run and the
+        // destination array have identical layout. Aggregates like InstAllocInfo
+        // are stored as records and must go through the per-element path.
+        if constexpr (std::is_arithmetic<T>::value)
+        {
+            if (remaining > 0)
+            {
+                value.setCount(remaining);
+                if (tryReadContiguousScalars(serializer, value.getBuffer(), remaining))
+                    return;
+                value.clear();
+                value.reserve(remaining);
+            }
+        }
         while (hasElements(serializer))
         {
             T element;
