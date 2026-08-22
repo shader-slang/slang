@@ -314,7 +314,7 @@ Reports information about checkpoint contexts used for reverse-mode automatic di
 
 <a id="trace-coverage"></a>
 ### -trace-coverage
-Instrument the shader with per-statement line coverage counters. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
+Instrument the shader with per-statement line coverage counters. Statements that provably execute together share one counter and one runtime probe, which keeps instrumented shader code small without changing reported per-line results; the manifest therefore reports fewer counters than source entries. When writing compiled output to a file, slangc also emits `&lt;output&gt;.coverage-manifest.json` mapping source coverage entries to counters. 
 
 
 <a id="trace-function-coverage"></a>

@@ -16,12 +16,18 @@ coverageAtomic("name"); // AtomicAdd(__slang_coverage[slot], 1)
 
 The real compiler first emits marker IR ops during AST lowering. The
 IR coverage pass later assigns numeric counter slots, synthesizes the
-hidden `__slang_coverage` buffer, and rewrites each marker to an
-atomic increment — or, under `-trace-coverage-boolean`, to a plain
+hidden `__slang_coverage` buffer, and rewrites markers to an atomic
+increment — or, under `-trace-coverage-boolean`, to a plain
 non-atomic store of `1` (hit/not-hit). Placement is identical across
 the two rewrite forms; everything in this document applies to both.
 Slot numbers are not part of the placement contract; the metadata maps
 each source coverage entry to the slot chosen for that compile.
+
+Markers and counters are not one-to-one. Line markers that provably
+execute together are coalesced onto a single counter and a single
+runtime probe — see [Counter coalescing](#counter-coalescing) below.
+Every marker still produces its own source coverage entry, so this
+changes how many probes the shader carries, not what gets reported.
 
 Modes are independent. Enabling more than one mode adds the markers
 from each enabled mode into the same counter buffer.
@@ -82,6 +88,80 @@ void someFunction(uint N)
 The marker on the `while` statement counts execution reaching the loop
 statement. It does not count each loop-condition evaluation. Per-arm
 loop condition counts come from branch coverage.
+
+### Counter coalescing
+
+Emitted shader size scales with the number of probe sequences, not with
+counter width: every probe expands to index arithmetic, an address
+computation, and an atomic. Line coverage therefore coalesces markers
+that provably execute together onto one counter and one probe.
+
+The rule is simple because the IR is already in basic-block form when
+the coverage pass runs: markers in the same basic block, with nothing
+between them that can abandon the invocation, all execute exactly the
+same number of times. A basic block has one entry and one exit, so
+reaching any instruction in it means reaching all of them.
+
+The `someFunction` example above therefore emits two counters for its
+six markers — one for the entry block, one for the loop body:
+
+```slang
+void someFunction(uint N)
+{
+    // `uint i = 0` and `while` are in the same block: one probe covers
+    // both, and it sits at the last of the two.
+    uint i = 0;
+    coverageAtomic("region: i = 0, while");
+    while (i < N)
+    {
+        // The four body statements are one straight-line region.
+        buf[0] = buf[1] + buf[2];
+        buf[3] = buf[4] + buf[5];
+        buf[6] = buf[7] + buf[8];
+        i++;
+        coverageAtomic("region: loop body");
+    }
+}
+```
+
+Because the block boundary *is* the region boundary, every structural
+split falls out for free: `if` / `else` arms, `switch` cases, loop
+bodies versus loop exits, early `return` / `break` / `continue`, and
+short-circuit operands all begin new blocks during lowering, so none of
+them can be coalesced across.
+
+The probe sits at the **last** marker of a region rather than the
+first. Reaching it proves every earlier marker in the region also
+executed; placing it first would over-report when a region is entered
+but abandoned partway.
+
+Two cases break the "same block means same count" property, and both
+split the region:
+
+- An instruction that can abandon the invocation — `discard`, an abort,
+  or a call to a function that transitively contains one, or that never
+  returns at all. The analysis is a memoized fixpoint over the call
+  graph.
+- A call whose target cannot be resolved statically, such as an
+  interface method dispatched through a witness table. Coverage runs
+  before specialization, so these are common; the pass assumes the
+  worst and splits, since an extra probe costs emitted code while a
+  missed split would cost correctness.
+
+Function and branch markers always take a dedicated counter. They are
+already one probe per function or per arm, and their counts carry
+per-site meaning that sharing would destroy.
+
+Reported results are unaffected. Every source entry survives with its
+own file/line attribution, and hosts accumulate per entry, so several
+entries reading one slot produce exactly the LCOV records that
+dedicated slots did. What changes is `counterCount`, which drops
+markedly below the entry count — roughly half on the bundled demos.
+
+Known gap: the ray-tracing hit terminators (`IgnoreHit`,
+`AcceptHitAndEndSearch`) end the invocation at the target level, but
+Slang's IR models them as ordinary `void` functions that return
+normally, so the analysis cannot currently see them.
 
 ## Function Coverage: `-trace-function-coverage`
 
@@ -417,9 +497,13 @@ in two different compiles.
 
 ## Future Region Coverage
 
-The current modes all use one direct runtime counter per emitted
-source entry. Future source-region coverage may move toward a
-clang-style model where entries describe source ranges and some
-reported counts are derived from other counters. That should extend
-coverage metadata, but it should not change the basic rule that hidden
-resource binding is separate from source attribution.
+Line coverage already shares one counter across the source entries of
+a straight-line region (see [Counter coalescing](#counter-coalescing)),
+but each entry still names a concrete counter and reports a real
+count. Future source-region coverage may move further toward a
+clang-style model where entries describe source *ranges* and some
+reported counts are derived arithmetically from other counters rather
+than read directly. That would extend coverage metadata — most likely
+by using `kInvalidCoverageCounterIndex` for derived entries — but it
+should not change the basic rule that hidden resource binding is
+separate from source attribution.
