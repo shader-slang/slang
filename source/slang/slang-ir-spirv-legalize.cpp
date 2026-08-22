@@ -3026,10 +3026,58 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
 
+        // Must run after specialization: it makes each function's result address
+        // space concrete (so we test the final value, not the pre-specialization
+        // default) and removes dead specialized clones at the end of its own
+        // processModule (so a surviving flagged function is one that is genuinely
+        // emitted, not a clone that will be deleted).
+        diagnoseUnreturnableStorageClassPointerReturns();
+
         // For SPIR-V, we don't skip this validation, because we might then be generating
         // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
+    }
+
+    // SPIR-V's Logical addressing model permits a function to return a pointer only
+    // in one of an explicit set of storage classes: PhysicalStorageBuffer, or
+    // StorageBuffer/Workgroup (which Slang pairs with the VariablePointers
+    // capabilities). This is a fixed whitelist: a result pointer in any other
+    // concrete class is rejected by spirv-val ("functions may not return a pointer
+    // in this storage class") regardless of the pointee's lifetime — e.g. Function
+    // (function-local storage) or Private (a static global). Report it here once
+    // address spaces are concrete, rather than let it reach emission as invalid
+    // SPIR-V. Mirrors the validator's returnable-class set in
+    // external/spirv-tools/source/val/validate_function.cpp.
+    void diagnoseUnreturnableStorageClassPointerReturns()
+    {
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            // Only functions defined here (with a body) emit the OpReturn this
+            // diagnoses; a bodyless import/extern declaration's result is the
+            // defining module's concern, so skip it (matches the getFirstBlock
+            // idiom used elsewhere in this file).
+            if (!func || !func->getFirstBlock())
+                continue;
+            auto funcType = as<IRFuncType>(func->getDataType());
+            if (!funcType)
+                continue;
+            auto resultPtrType = as<IRPtrTypeBase>(funcType->getResultType());
+            if (!resultPtrType || !resultPtrType->hasAddressSpace())
+                continue;
+            switch (resultPtrType->getAddressSpace())
+            {
+            case AddressSpace::UserPointer: // emitted as PhysicalStorageBuffer
+            case AddressSpace::StorageBuffer:
+            case AddressSpace::GroupShared: // emitted as Workgroup
+                continue;
+            default:
+                break;
+            }
+            m_sink->diagnose(
+                Diagnostics::CannotReturnPointerInThisStorageClass{.location = func->sourceLoc});
+        }
     }
 
     void updateFunctionTypes()
