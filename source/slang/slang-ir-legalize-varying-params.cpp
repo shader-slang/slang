@@ -3296,7 +3296,14 @@ private:
                 continue;
             }
             SLANG_ASSERT(typeLayout);
-            typeLayout->getFieldLayout(index);
+            // `varLayout` can describe fewer fields than the struct has, because a field may have
+            // been merged in from outside the layout's scope (e.g. an `out` parameter appended to
+            // the return struct by lowerOutParameters). Stop rather than read past the array.
+            if (index >= (Index)typeLayout->getFieldCount())
+            {
+                index++;
+                continue;
+            }
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
@@ -3635,6 +3642,133 @@ private:
             varsWithSemanticInfo);
     }
 
+    // Collect one composed variable layout per scalar/vector leaf of `typeLayout`, in depth-first
+    // field order, appending them to `outLeafLayouts`.
+    //
+    // `maybeFlattenNestedStructs` turns a nested output struct into a flat list of leaf fields in
+    // depth-first order, so a matching flat layout is obtained by walking the (possibly nested)
+    // result type layout the same way. A struct field's layout contributes its own resource offset
+    // to its children before recursing, so a leaf that sits at `base + n` inside its enclosing
+    // struct ends up with the composed absolute offset — matching where the flat field lands in the
+    // emitted signature.
+    void _collectFlattenedLeafLayouts(
+        IRBuilder& builder,
+        IRTypeLayout* typeLayout,
+        const List<IRVarLayout::Builder::ResInfo>& parentOffsets,
+        List<IRVarLayout*>& outLeafLayouts)
+    {
+        auto structTypeLayout = as<IRStructTypeLayout>(typeLayout);
+        SLANG_ASSERT(structTypeLayout);
+
+        for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
+        {
+            auto fieldLayout = fieldAttr->getLayout();
+
+            // Compose this field's own offsets on top of the enclosing structs' offsets.
+            List<IRVarLayout::Builder::ResInfo> composedOffsets(parentOffsets);
+            for (auto offsetAttr : fieldLayout->getOffsetAttrs())
+            {
+                auto kind = offsetAttr->getResourceKind();
+                bool merged = false;
+                for (auto& res : composedOffsets)
+                {
+                    if (res.kind == kind)
+                    {
+                        res.offset += offsetAttr->getOffset();
+                        res.space += offsetAttr->getSpace();
+                        merged = true;
+                        break;
+                    }
+                }
+                if (!merged)
+                {
+                    IRVarLayout::Builder::ResInfo res;
+                    res.kind = kind;
+                    res.offset = offsetAttr->getOffset();
+                    res.space = offsetAttr->getSpace();
+                    composedOffsets.add(res);
+                }
+            }
+
+            if (auto nestedStructLayout = as<IRStructTypeLayout>(fieldLayout->getTypeLayout()))
+            {
+                _collectFlattenedLeafLayouts(
+                    builder,
+                    nestedStructLayout,
+                    composedOffsets,
+                    outLeafLayouts);
+                continue;
+            }
+
+            IRVarLayout::Builder leafLayoutBuilder(&builder, fieldLayout->getTypeLayout());
+            leafLayoutBuilder.cloneEverythingButOffsetsFrom(fieldLayout);
+            for (auto& res : composedOffsets)
+            {
+                auto resInfo = leafLayoutBuilder.findOrAddResourceInfo(res.kind);
+                resInfo->offset = res.offset;
+                resInfo->space = res.space;
+            }
+            outLeafLayouts.add(leafLayoutBuilder.build());
+        }
+    }
+
+    // Build a variable layout for a flattened output struct that is 1:1 with its (flattened)
+    // fields.
+    //
+    // `wrapReturnValueInStruct` flattens the return struct's nested members into leaf fields, but
+    // the original `resultLayout` still describes the pre-flatten shape (its nested-struct field
+    // carries a nested type layout), so the two can no longer be matched by positional index and
+    // the positional walk in `ensureStructHasUserSemantic` would read past the layout's field
+    // array. This produces a layout whose field entries line up one-for-one with
+    // `flattenedStruct`'s fields, so that walk is valid again.
+    IRVarLayout* buildFlattenedResultVarLayout(
+        IRBuilder& builder,
+        IRVarLayout* resultLayout,
+        IRStructType* flattenedStruct)
+    {
+        auto resultTypeLayout = as<IRStructTypeLayout>(resultLayout->getTypeLayout());
+        if (!resultTypeLayout)
+            return resultLayout;
+
+        List<IRVarLayout::Builder::ResInfo> noParentOffsets;
+        List<IRVarLayout*> leafLayouts;
+        _collectFlattenedLeafLayouts(builder, resultTypeLayout, noParentOffsets, leafLayouts);
+
+        Index flattenedFieldCount = 0;
+        for (auto field : flattenedStruct->getFields())
+        {
+            SLANG_UNUSED(field);
+            flattenedFieldCount++;
+        }
+        // The collected leaves cover the fields that came from the struct return, in the same
+        // depth-first order the struct was flattened, so they line up as a prefix of
+        // `flattenedStruct`'s fields. Trailing fields merged in from elsewhere (e.g. an `out`
+        // parameter appended to the same output struct) have no leaf, so leaves can be fewer than
+        // fields — but never more.
+        SLANG_ASSERT(leafLayouts.getCount() <= flattenedFieldCount);
+
+        IRStructTypeLayout::Builder flatLayoutBuilder(&builder);
+        Index leafIndex = 0;
+        for (auto field : flattenedStruct->getFields())
+        {
+            if (leafIndex >= leafLayouts.getCount())
+                break;
+            flatLayoutBuilder.addField(field->getKey(), leafLayouts[leafIndex]);
+            leafIndex++;
+        }
+        auto flatTypeLayout = flatLayoutBuilder.build();
+
+        IRVarLayout::Builder varLayoutBuilder(&builder, flatTypeLayout);
+        varLayoutBuilder.cloneEverythingButOffsetsFrom(resultLayout);
+        for (auto offsetAttr : resultLayout->getOffsetAttrs())
+        {
+            auto resInfo = varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+            resInfo->offset = offsetAttr->getOffset();
+            resInfo->space = offsetAttr->getSpace();
+        }
+        return varLayoutBuilder.build();
+    }
+
     // Replaces all 'IRReturn' by copying the current 'IRReturn' to a new var of type 'newType'.
     // Copying logic from 'IRReturn' to 'newType' is controlled by 'copyLogicFunc' function.
     template<typename CopyLogicFunc>
@@ -3970,6 +4104,11 @@ private:
                 semanticInfoToRemove);
             if (returnStructType != flattenedStruct)
             {
+                // The flattened struct has one leaf field per (possibly nested) original field, so
+                // `resultLayout` no longer matches it field-for-field. Rebuild a layout that is 1:1
+                // with the flattened fields before assigning varying semantics.
+                resultLayout =
+                    buildFlattenedResultVarLayout(builder, resultLayout, flattenedStruct);
                 // Replace all return-values with the flattenedStruct we made.
                 _replaceAllReturnInst(
                     builder,
