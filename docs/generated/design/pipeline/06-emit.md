@@ -32,7 +32,7 @@ modifying a target backend.
   produced, an associated source-map artifact. Post-emit metadata is
   attached per emit path: the source and direct-SPIR-V artifacts
   associate `linkedIR.metadata`, while the HostVM and LLVM dispatch
-  functions do not. Dependency-file output is *not* attached to the
+  functions do not. Dependency-file output is _not_ attached to the
   artefact: `writeDependencyFile` writes Make-style rules to the
   separately configured dependency-output path.
 
@@ -394,16 +394,16 @@ The forcing looks at both sides of the pair
 ([slang-emit-c-like.cpp](../../../../source/slang/slang-emit-c-like.cpp)
 line 760): an operand whose own operator is in that set is
 parenthesized whenever the outer context binds tighter than
-assignment, and *every* operand of an outer operator in that set is
+assignment, and _every_ operand of an outer operator in that set is
 parenthesized whatever its own precedence. Combinations outside the
 set are left minimally parenthesized:
 
-| Source | Emitted |
-| --- | --- |
-| `a + b * c` | `a + b * c` |
-| `(a + b) * c` | `(a + b) * c` |
-| `a \| b & c` | `a \| (b & c)` |
-| `a << b + c` | `a << (b + c)` |
+| Source           | Emitted              |
+| ---------------- | -------------------- |
+| `a + b * c`      | `a + b * c`          |
+| `(a + b) * c`    | `(a + b) * c`        |
+| `a \| b & c`     | `a \| (b & c)`       |
+| `a << b + c`     | `a << (b + c)`       |
 | `a < b == c < d` | `(a < b) == (c < d)` |
 
 ## Preludes
@@ -426,16 +426,16 @@ backend injects mid-emission through `ensurePrelude` (the
 strings), which are compiled into the emitters rather than shipped as
 headers.
 
-| Target | Prelude header |
-| --- | --- |
-| HLSL | [slang-hlsl-prelude.h](../../../../prelude/slang-hlsl-prelude.h) |
-| CUDA | [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h) |
+| Target     | Prelude header                                                                                                                                                                                                                                                                       |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| HLSL       | [slang-hlsl-prelude.h](../../../../prelude/slang-hlsl-prelude.h)                                                                                                                                                                                                                     |
+| CUDA       | [slang-cuda-prelude.h](../../../../prelude/slang-cuda-prelude.h)                                                                                                                                                                                                                     |
 | C++ shader | [slang-cpp-prelude.h](../../../../prelude/slang-cpp-prelude.h), [slang-cpp-types-core.h](../../../../prelude/slang-cpp-types-core.h), [slang-cpp-types.h](../../../../prelude/slang-cpp-types.h), [slang-cpp-scalar-intrinsics.h](../../../../prelude/slang-cpp-scalar-intrinsics.h) |
-| C++ host | [slang-cpp-host-prelude.h](../../../../prelude/slang-cpp-host-prelude.h) |
-| Torch | [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h) |
-| LLVM | [slang-llvm.h](../../../../prelude/slang-llvm.h) |
+| C++ host   | [slang-cpp-host-prelude.h](../../../../prelude/slang-cpp-host-prelude.h)                                                                                                                                                                                                             |
+| Torch      | [slang-torch-prelude.h](../../../../prelude/slang-torch-prelude.h)                                                                                                                                                                                                                   |
+| LLVM       | [slang-llvm.h](../../../../prelude/slang-llvm.h)                                                                                                                                                                                                                                     |
 
-What is registered for a `SourceLanguage` is a *string*, not
+What is registered for a `SourceLanguage` is a _string_, not
 necessarily an `#include`, and the default is the embedded text of the
 header itself — for CUDA, C++, and HLSL only
 ([slang-global-session.cpp](../../../../source/slang/slang-global-session.cpp)

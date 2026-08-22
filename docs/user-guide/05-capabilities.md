@@ -38,6 +38,7 @@ uint2 getClock() {...}
 ```
 
 Each `[require]` attribute declares a conjunction of capability atoms, and all `[require]` attributes form the final requirement of the `getClock()` function as a disjunction of capabilities:
+
 ```
 (spvShaderClockKHR | glsl + GL_EXT_shader_realtime_clock | hlsl_nvapi)
 ```
@@ -45,11 +46,13 @@ Each `[require]` attribute declares a conjunction of capability atoms, and all `
 A capability can **imply** other capabilities. Here `spvShaderClockKHR` is a capability that implies `SPV_KHR_shader_clock`, which represents the SPIR-V `SPV_KHR_shader_clock` extension, and the `SPV_KHR_shader_clock` capability implies `spirv_1_0`, which stands for the SPIR-V code generation target.
 
 When evaluating capability requirements, Slang will expand all implications. Therefore the final capability requirement for `getClock` is:
+
 ```
   spirv_1_0 + SPV_KHR_shader_clock + spvShaderClockKHR
 | glsl + _GL_EXT_shader_realtime_clock
 | hlsl + hlsl_nvapi
 ```
+
 This means the function can be called from locations where the `spvShaderClockKHR` capability is available (when targeting SPIR-V), or where the `GL_EXT_shader_realtime_clock` extension is available when targeting GLSL,
 or where `nvapi` is available when targeting HLSL.
 
@@ -65,6 +68,7 @@ For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShad
 
 The capability requirement of a member is always merged with the requirements declared in its parent(s). If the member declares requirements for additional compilation targets, they are added to the requirement set as a separate disjunction.
 For example, given:
+
 ```csharp
 [require(glsl)]
 [require(hlsl)]
@@ -75,10 +79,12 @@ struct MyType
     static void method() { ... }
 }
 ```
+
 `MyType.method` will have requirement `glsl | hlsl + hlsl_nvapi | spirv`.
 
 The `[require]` attribute can also be used on module declarations, so that the requirement will
 apply to all members within the module. For example:
+
 ```csharp
 [require(glsl)]
 [require(hlsl)]
@@ -97,6 +103,7 @@ For inheritance/implementing-interfaces, the story is a bit different.
 We require that the subtype's (`Foo1`) capabilities are a subset of the supertype's (`IFoo1`) capabilities.
 
 For example:
+
 ```csharp
 [require(sm_4_0)]
 interface IFoo1
@@ -107,6 +114,7 @@ struct Foo1 : IFoo1
 {
 }
 ```
+
 This is an error since `Foo1` is not a subset of `IFoo1`. `Foo1` has `sm_6_0`, which includes capabilities `sm_4_0` does not have.
 
 ```csharp
@@ -123,6 +131,7 @@ struct Foo1 : IFoo1, IFoo2
 {
 }
 ```
+
 This is not an error since `IFoo2` and `IFoo1` are supersets of `Foo1`.
 
 Additionally, any supertype-to-subtype relationship must share the same shader stage and shader target support.
@@ -190,7 +199,7 @@ extension MyType
 extension MyType {}
 ```
 
-Static extension *member functions* are exempt from this check because they can be called without
+Static extension _member functions_ are exempt from this check because they can be called without
 an instance of the target type. A `[require(...)]` attribute on a constructor, subscript, or property is
 always checked: a constructor produces a value of the target type, a subscript provides indexed
 access to it, and a property provides named access to it, so all three must be compatible with the
@@ -261,6 +270,7 @@ public extension uint : IAtomicAddable_Error
 ### Inference of Capability Requirements
 
 By default, Slang will infer the capability requirements of a function given its definition, as long as the function has `internal` or `private` visibility. For example, given:
+
 ```csharp
 void myFunc()
 {
@@ -268,17 +278,21 @@ void myFunc()
         discard;
 }
 ```
+
 Slang will automatically deduce that `myFunc` has capability
+
 ```
   spirv_1_0 + SPV_KHR_shader_clock + spvShaderClockKHR + fragment
 | glsl + _GL_EXT_shader_realtime_clock + fragment
 | hlsl + hlsl_nvapi + fragment
 ```
+
 Since `discard` statement requires capability `fragment`.
 
 ### Inference on target_switch
 
 A `__target_switch` statement will introduce disjunctions in its inferred capability requirement. For example:
+
 ```csharp
 void myFunc()
 {
@@ -289,6 +303,7 @@ void myFunc()
     }
 }
 ```
+
 The capability requirement of `myFunc` is `(spirv | hlsl)`, meaning that the function can be called from a context where either `spirv` or `hlsl` capability
 is available.
 
@@ -357,6 +372,7 @@ public void logic_stage_fail_1() // Error, function requires `any_hit`, body doe
 
 To make it easy to specify capabilities on different platforms, Slang also defines many aliases that can be used in `[require]` attributes.
 For example, Slang declares in `slang-capabilities.capdef`:
+
 ```
 alias sm_6_6 = _sm_6_6
              | glsl_spirv_1_5 + sm_6_5
@@ -367,11 +383,14 @@ alias sm_6_6 = _sm_6_6
              | cuda
              | cpp;
 ```
+
 So user code can write `[require(sm_6_6)]` to mean that the function requires shader model 6.6 on D3D or equivalent set of GLSL/SPIR-V extensions when targeting GLSL or SPIR-V.
 Note that in the above definition, `GL_EXT_shader_atomic_int64` is also an alias that is defined as:
+
 ```
 alias GL_EXT_shader_atomic_int64 = _GL_EXT_shader_atomic_int64 | spvInt64Atomics;
 ```
+
 Where `_GL_EXT_shader_atomic_int64` is the atom that represents the true `GL_EXT_shader_atomic_int64` GLSL extension.
 The `GL_EXT_shader_atomic_int64` alias is defined as a disjunction of `_GL_EXT_shader_atomic_int64` and the `Int64Atomics` SPIR-V capability so that
 it can be used in the context of both GLSL and SPIR-V targets.

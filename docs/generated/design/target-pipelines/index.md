@@ -19,9 +19,9 @@ control-flow-graph view of the shared orchestrator
 For an unordered, topical catalog of every IR pass — grouped by
 category rather than by execution order — see
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md). For the
-capability / profile *model* that decides what a target is allowed
+capability / profile _model_ that decides what a target is allowed
 to emit, see [../cross-cutting/targets.md](../cross-cutting/targets.md);
-the pages here document per-target pipeline *behavior* only.
+the pages here document per-target pipeline _behavior_ only.
 
 ## Pages
 
@@ -99,8 +99,8 @@ exactly two deviations, both deliberate:
   the page needs to say explicitly that they are out of scope.
 - [spirv.md](spirv.md) titles its fourth phase
   `## Phase D: IR-to-SPIR-V emit, simplification loop, downstream
-  tools`, because SPIR-V is the one target whose *legalization
-  driver* runs inside the emit step rather than inside
+tools`, because SPIR-V is the one target whose _legalization
+  driver_ runs inside the emit step rather than inside
   `linkAndOptimizeIR` (see the comparison table below).
 
 Every page's `## Conditional gates` section now opens with a
@@ -116,13 +116,13 @@ is which switch arm each target lands in.
 
 ## Cross-target comparison
 
-| Target | CodeGenTarget enum values | Phase C entry | Phase D emitter | Downstream tools | Loops |
-| --- | --- | --- | --- | --- | --- |
-| SPIR-V | `SPIRV`, `SPIRVAssembly` | (no single entry in `linkAndOptimizeIR`; per-pass SPIR-V arms) — the `legalizeIRForSPIRV` driver ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 3347) runs in **Phase D**, called from `emitSPIRVFromIR` | `emitSPIRVForEntryPointsDirectly` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3500) → `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) line 12092) | spirv-link, spirv-val, spirv-opt | **Yes** — the only target with iterative passes: `simplifyIRForSpirvLegalization` and the forward-declared-pointer fixup in `emitSPIRVFromIR`, both to convergence (see note below). |
-| HLSL | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single entry; per-pass HLSL arms, e.g. `legalizeRayPayloadAccessQualifiersForHLSL` and `validateBarrierFlagsForHLSL` in [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp)) | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp)) | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`. |
-| Metal | `Metal`, `MetalLib`, `MetalLibAssembly` | `legalizeIRForMetal` ([slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp)) | `MetalSourceEmitter` ([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp)) | Apple `metal` compiler (for `MetalLib*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForMetal` is single-pass. |
-| WGSL | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly` | `legalizeIRForWGSL` ([slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp)) | `WGSLSourceEmitter` ([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp)) | Tint (for `WGSLSPIRV*`) | **No** loops in `linkAndOptimizeIR`; `legalizeIRForWGSL` is single-pass. |
-| CUDA | `CUDASource`, `CUDAHeader`, `PTX` | (no single entry; per-pass CUDA arms — `lowerImmutableBufferLoadForCUDA` in [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) is the one pass that exists solely for this target family) | `CUDASourceEmitter` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp), inheriting from `CPPSourceEmitter`) | nvrtc / runtime CUDA compiler (for `PTX`) | **No** loops in `linkAndOptimizeIR`. |
+| Target | CodeGenTarget enum values                                                     | Phase C entry                                                                                                                                                                                                                                       | Phase D emitter                                                                                                                                                                                                | Downstream tools                           | Loops                                                                                                                                                                                |
+| ------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SPIR-V | `SPIRV`, `SPIRVAssembly`                                                      | (no single entry in `linkAndOptimizeIR`; per-pass SPIR-V arms) — the `legalizeIRForSPIRV` driver ([slang-ir-spirv-legalize.cpp](../../../../source/slang/slang-ir-spirv-legalize.cpp) line 3347) runs in **Phase D**, called from `emitSPIRVFromIR` | `emitSPIRVForEntryPointsDirectly` ([slang-emit.cpp](../../../../source/slang/slang-emit.cpp) line 3500) → `emitSPIRVFromIR` ([slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) line 12092) | spirv-link, spirv-val, spirv-opt           | **Yes** — the only target with iterative passes: `simplifyIRForSpirvLegalization` and the forward-declared-pointer fixup in `emitSPIRVFromIR`, both to convergence (see note below). |
+| HLSL   | `HLSL` (plus downstream `DXIL`, `DXBytecode`, and their `*Assembly` variants) | (no single entry; per-pass HLSL arms, e.g. `legalizeRayPayloadAccessQualifiersForHLSL` and `validateBarrierFlagsForHLSL` in [slang-ir-hlsl-legalize.cpp](../../../../source/slang/slang-ir-hlsl-legalize.cpp))                                      | `HLSLSourceEmitter` ([slang-emit-hlsl.cpp](../../../../source/slang/slang-emit-hlsl.cpp))                                                                                                                      | DXC (for `DXIL*`), fxc (for `DXBytecode*`) | **No** loops in `linkAndOptimizeIR`.                                                                                                                                                 |
+| Metal  | `Metal`, `MetalLib`, `MetalLibAssembly`                                       | `legalizeIRForMetal` ([slang-ir-metal-legalize.cpp](../../../../source/slang/slang-ir-metal-legalize.cpp))                                                                                                                                          | `MetalSourceEmitter` ([slang-emit-metal.cpp](../../../../source/slang/slang-emit-metal.cpp))                                                                                                                   | Apple `metal` compiler (for `MetalLib*`)   | **No** loops in `linkAndOptimizeIR`; `legalizeIRForMetal` is single-pass.                                                                                                            |
+| WGSL   | `WGSL`, `WGSLSPIRV`, `WGSLSPIRVAssembly`                                      | `legalizeIRForWGSL` ([slang-ir-wgsl-legalize.cpp](../../../../source/slang/slang-ir-wgsl-legalize.cpp))                                                                                                                                             | `WGSLSourceEmitter` ([slang-emit-wgsl.cpp](../../../../source/slang/slang-emit-wgsl.cpp))                                                                                                                      | Tint (for `WGSLSPIRV*`)                    | **No** loops in `linkAndOptimizeIR`; `legalizeIRForWGSL` is single-pass.                                                                                                             |
+| CUDA   | `CUDASource`, `CUDAHeader`, `PTX`                                             | (no single entry; per-pass CUDA arms — `lowerImmutableBufferLoadForCUDA` in [slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp) is the one pass that exists solely for this target family)                | `CUDASourceEmitter` ([slang-emit-cuda.cpp](../../../../source/slang/slang-emit-cuda.cpp), inheriting from `CPPSourceEmitter`)                                                                                  | nvrtc / runtime CUDA compiler (for `PTX`)  | **No** loops in `linkAndOptimizeIR`.                                                                                                                                                 |
 
 Two entries in that table need a caveat.
 
@@ -133,7 +133,7 @@ target-specific legalization. HLSL, CUDA, and SPIR-V do not, but
 for different reasons: HLSL and CUDA genuinely scatter their
 target-specific work across several individual switch arms (the
 passes named above are examples, not the full inventory — each
-child page lists them all), whereas SPIR-V *does* have a
+child page lists them all), whereas SPIR-V _does_ have a
 single driver — it simply runs later, inside the emit step, so it
 belongs to Phase D on [spirv.md](spirv.md) rather than Phase C.
 
@@ -145,7 +145,7 @@ lines 3124-3145, `simplifyIRForSpirvLegalization` declares
 neither counter is ever incremented. The loop conditions
 `while (changed && iterationCounter < kMaxIterations)` and its
 inner equivalent are therefore effectively `while (changed)`: both
-loops run to convergence, and the 8 / 16 figures are a *nominal*
+loops run to convergence, and the 8 / 16 figures are a _nominal_
 bound that the source declares but never applies — so neither loop
 has an enforced worst-case iteration count.
 [spirv.md](spirv.md) documents the consequences, and the outer
@@ -159,8 +159,8 @@ and its downstream tool chain in detail.
 ## Filtering rules
 
 There are two independent reasons a pass may be absent from a
-per-target page: the arm is gated on a *different target*, or the
-pass is gated on the module *not containing* the IR it would
+per-target page: the arm is gated on a _different target_, or the
+pass is gated on the module _not containing_ the IR it would
 transform. The first is what makes the five pages differ from each
 other; the second is what makes any one page differ from compile to
 compile.
@@ -220,13 +220,13 @@ easy to get wrong when reading a single page:
   `reinterpret` instructions for `lowerReinterpret` a few lines
   later to consume. Every other flag is written only by the two
   scans, so this is the single place where the gate set is a
-  function of a pass *result* rather than of a module walk.
+  function of a pass _result_ rather than of a module walk.
 
 For a single, unfiltered view of every pass — independent of both
 kinds of filtering — read
 [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) and the
 source of `linkAndOptimizeIR` directly. For the cross-cutting
-per-target option and capability *model* — including its
+per-target option and capability _model_ — including its
 "Profiles versus explicit `-capability`" section, which settles how
 a requested profile relates to explicit capability atoms — see
 [../cross-cutting/targets.md](../cross-cutting/targets.md); that

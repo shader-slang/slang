@@ -9,8 +9,7 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PRIVATE
         ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
         ${slang_SOURCE_DIR}/external
-    PRECOMPILE_HEADERS
-        ${slang_SOURCE_DIR}/source/core/slang-basic.h
+    PRECOMPILE_HEADERS ${slang_SOURCE_DIR}/source/core/slang-basic.h
 )
 if(NOT MSVC)
     # This is necessary to compile the DXC headers.

@@ -120,12 +120,12 @@ The lexer handles several C-isms:
 
 ### Literal scanning and value extraction
 
-The lexer separates *scanning* a literal (recording its extent as raw
-token text) from *decoding* its value, and the split is nearly clean:
+The lexer separates _scanning_ a literal (recording its extent as raw
+token text) from _decoding_ its value, and the split is nearly clean:
 scanning does the minimum work needed to find where the literal ends
 plus a few purely syntactic checks (`invalidDigitForBase`,
 `octalLiteral`, `quoteCannotBeDelimiter`), while everything about the
-literal's *meaning* is deferred. Of those three checks only
+literal's _meaning_ is deferred. Of those three checks only
 `octalLiteral` is a warning: scanning continues into
 `_lexNumber(lexer, 8)`, so `017` still yields a usable base-8 literal
 token ([slang-lexer.cpp](../../../../source/compiler-core/slang-lexer.cpp)
@@ -151,7 +151,7 @@ in [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h):
 - `getIntegerLiteralValue` — parses the integer, optionally returning
   the suffix, decimal-base flag, and an overflow flag.
 - `getFloatingPointLiteralValue` — parses the floating-point value.
-  This helper also *classifies the suffix*: it splits the token into a
+  This helper also _classifies the suffix_: it splits the token into a
   number part and a suffix part, maps the suffix to a
   `FloatingPointLiteralType` (`Half` for `h`/`hf`/`fh`, `Float` for an
   empty suffix or `f`, `Double` for `l`/`lf`/`fl`, each in either
@@ -162,7 +162,7 @@ in [slang-lexer.h](../../../../source/compiler-core/slang-lexer.h):
   `outIsOutOfRange`, `outPrecisionLost`, and `outErrorContent` — are
   non-optional references. `outIsOutOfRange` means the result is `0`
   (underflow) or `INFINITY` (overflow above the maximum for the
-  *literal type*, not for `double`); `outPrecisionLost` is reported
+  _literal type_, not for `double`); `outPrecisionLost` is reported
   only for hex floats and only when the value is in range.
 - `getStringLiteralTokenValue(token, sink)` — decodes escapes into the
   resulting bytes; `getFileNameTokenValue` is the variant for
@@ -217,7 +217,7 @@ The corresponding diagnostics
 `outOfRangeCodePointForUtf8`) are defined in
 [slang-lexer-diagnostic-defs.h](../../../../source/compiler-core/slang-lexer-diagnostic-defs.h).
 
-### What the lexer does *not* do
+### What the lexer does _not_ do
 
 - It does not classify keywords (deferred to lookup).
 - It does not evaluate numeric literals during scanning; value
@@ -319,7 +319,7 @@ language to GLSL when it names a valid GLSL version; `#extension`
 `#pragma once` records the containing file's unique identity in
 `pragmaOnceUniqueIdentities` (line 4272), and `HandleIncludeDirective`
 returns early for a later `#include` resolving to that identity (line
-3680). An unrecognized sub-directive is *not* an error:
+3680). An unrecognized sub-directive is _not_ an error:
 `findPragmaDirective` falls back to `handleUnknownPragmaDirective`
 (line 4242), which warns with `UnknownPragmaDirectiveIgnored` and skips
 the line — unlike an unknown `#`-directive, which
@@ -373,7 +373,7 @@ source locations are chosen differently:
 
 1. **Raw body tokens** — tokens copied verbatim from the macro
    definition. Their `SourceLoc` is the location of the corresponding
-   token in the macro *definition*, replayed by
+   token in the macro _definition_, replayed by
    `MacroInvocation::readToken`
    ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)).
    No new `SourceView` is created for the invocation, so such a
@@ -383,21 +383,21 @@ source locations are chosen differently:
    `PretokenizedInputStream` without rewriting anything (lines 2351
    and 2494), so each keeps the `SourceLoc` it was physically lexed
    with at the invocation. A parameter used more than once replays the
-   *same* location every time: given `#define TWICE(x) ((x) + (x))`, a
+   _same_ location every time: given `#define TWICE(x) ((x) + (x))`, a
    diagnostic about the argument in `TWICE(undeclared)` points at
    `undeclared` in the invocation, not at either `(x)` in the body —
    where the category-1 rule would put it.
 3. **Constructed tokens** — synthesized fresh, with three different
    source-location rules
    ([slang-preprocessor.cpp](../../../../source/slang/slang-preprocessor.cpp)):
-   - *Builtins* (`__LINE__`, `__FILE__`) are pushed by
+   - _Builtins_ (`__LINE__`, `__FILE__`) are pushed by
      `_pushStreamForSourceLocBuiltin`, which gives the synthesized token
      `m_macroInvocationLoc`, attributing it to the invocation site (the
      reported line/file value, however, derives from the initiating
      top-level location).
-   - *Stringized parameters* (`#x`) take the location of the `#` token
-     in the macro *definition* (`m_macro->tokens.m_tokens[tokenIndex].loc`).
-   - *Pasted tokens* (`x##y`) are re-lexed from a fresh
+   - _Stringized parameters_ (`#x`) take the location of the `#` token
+     in the macro _definition_ (`m_macro->tokens.m_tokens[tokenIndex].loc`).
+   - _Pasted tokens_ (`x##y`) are re-lexed from a fresh
      `PathInfo::makeTokenPaste()` source view whose origin is the `##`
      token location (`tokenPasteLoc`).
 

@@ -80,8 +80,7 @@ separator will be reported as drift.
 Note the field `catalog_code` (and `catalog_name`). `catalog_code` is
 what `lint` keys the digest recomputation on, so it has to be the code
 exactly as the catalog spells it; it also makes grep trivial:
-`grep "catalog_code=30019" docs/generated/tests` finds the test for code
-30019.
+`grep "catalog_code=30019" docs/generated/tests` finds the test for code 30019.
 
 **The test body is the minimum input that fires the diagnostic:**
 

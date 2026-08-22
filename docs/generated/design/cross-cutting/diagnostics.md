@@ -420,13 +420,13 @@ cross-catalog checks. Because
 notes that "it is possible for multiple diagnostics to have the same id"
 and returns only the first added, a tool that needs to target a precise
 diagnostic should prefer the `name` over the integer id. The same
-caveat applies when *reading* output: `39999` is carried by about two
+caveat applies when _reading_ output: `39999` is carried by about two
 dozen entries, `no-applicable-overload-for-name-with-args` and
 `ambiguous-overload-for-name-with-args` among them, and the rendered
 header carries the id and the message but never the name, so for a
 multi-bound code the message text is the only discriminator.
 
-A catalog entry is a diagnostic the compiler *can* emit; it is not a
+A catalog entry is a diagnostic the compiler _can_ emit; it is not a
 promise that some input reaches it, and its summary line does not
 identify the construct that triggers it.
 `expected-array-expression` (`30020`) is raised only by

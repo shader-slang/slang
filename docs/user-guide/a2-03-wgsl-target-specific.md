@@ -8,86 +8,82 @@ WGSL-Specific Functionalities
 
 This chapter provides information for WGSL (WebGPU Shading Language)-specific functionalities and behaviors.
 
-
 System-Value semantics
 ----------------------
 
 The system-value semantics are translated to the following WGSL code.
 
-| SV semantic name | WGSL code |
-|--|--|
-| SV_Barycentrics | *Not supported* |
-| SV_ClipDistance<N> | *Not supported* |
-| SV_CullDistance<N> | *Not supported* |
-| SV_Coverage | `@builtin(sample_mask)` |
-| SV_CullPrimitive | *Not supported* |
-| SV_Depth | `@builtin(frag_depth)` |
-| SV_DepthGreaterEqual | *Not supported* |
-| SV_DepthLessEqual | *Not supported* |
-| SV_DispatchThreadID | `@builtin(global_invocation_id)` |
-| SV_DomainLocation | *Not supported* |
-| SV_FragInvocationCount | *Not supported* |
-| SV_FragSize | *Not supported* |
-| SV_GSInstanceID | *Not supported* |
-| SV_GroupID | `@builtin(workgroup_id)` |
-| SV_GroupIndex | `@builtin(local_invocation_index)` |
-| SV_GroupThreadID | `@builtin(local_invocation_id)` |
-| SV_InnerCoverage | *Not supported* |
-| SV_InsideTessFactor | *Not supported* |
-| SV_InstanceID | `@builtin(instance_index)` |
-| SV_IntersectionAttributes | *Not supported* |
-| SV_IsFrontFace | `@builtin(front_facing)` |
-| SV_OutputControlPointID | *Not supported* |
-| SV_PointSize | *Not supported* |
-| SV_Position | `@builtin(position)` |
-| SV_PrimitiveID | *Not supported* |
-| SV_RenderTargetArrayIndex | *Not supported* |
-| SV_SampleIndex | `@builtin(sample_index)` |
-| SV_ShadingRate | *Not supported* |
-| SV_StartVertexLocation | *Not supported* |
-| SV_StartInstanceLocation | *Not supported* |
-| SV_StencilRef | *Not supported* |
-| SV_Target<N> | *Not supported* |
-| SV_TessFactor | *Not supported* |
-| SV_VertexID | `@builtin(vertex_index)` |
-| SV_ViewID | *Not supported* |
-| SV_ViewportArrayIndex | *Not supported* |
-| SV_VulkanInstanceID | `@builtin(instance_index)` |
-| SV_VulkanSamplePosition | *Not supported* |
-| SV_VulkanVertexID | `@builtin(vertex_index)` |
-
+| SV semantic name          | WGSL code                          |
+| ------------------------- | ---------------------------------- |
+| SV_Barycentrics           | _Not supported_                    |
+| SV_ClipDistance<N>        | _Not supported_                    |
+| SV_CullDistance<N>        | _Not supported_                    |
+| SV_Coverage               | `@builtin(sample_mask)`            |
+| SV_CullPrimitive          | _Not supported_                    |
+| SV_Depth                  | `@builtin(frag_depth)`             |
+| SV_DepthGreaterEqual      | _Not supported_                    |
+| SV_DepthLessEqual         | _Not supported_                    |
+| SV_DispatchThreadID       | `@builtin(global_invocation_id)`   |
+| SV_DomainLocation         | _Not supported_                    |
+| SV_FragInvocationCount    | _Not supported_                    |
+| SV_FragSize               | _Not supported_                    |
+| SV_GSInstanceID           | _Not supported_                    |
+| SV_GroupID                | `@builtin(workgroup_id)`           |
+| SV_GroupIndex             | `@builtin(local_invocation_index)` |
+| SV_GroupThreadID          | `@builtin(local_invocation_id)`    |
+| SV_InnerCoverage          | _Not supported_                    |
+| SV_InsideTessFactor       | _Not supported_                    |
+| SV_InstanceID             | `@builtin(instance_index)`         |
+| SV_IntersectionAttributes | _Not supported_                    |
+| SV_IsFrontFace            | `@builtin(front_facing)`           |
+| SV_OutputControlPointID   | _Not supported_                    |
+| SV_PointSize              | _Not supported_                    |
+| SV_Position               | `@builtin(position)`               |
+| SV_PrimitiveID            | _Not supported_                    |
+| SV_RenderTargetArrayIndex | _Not supported_                    |
+| SV_SampleIndex            | `@builtin(sample_index)`           |
+| SV_ShadingRate            | _Not supported_                    |
+| SV_StartVertexLocation    | _Not supported_                    |
+| SV_StartInstanceLocation  | _Not supported_                    |
+| SV_StencilRef             | _Not supported_                    |
+| SV_Target<N>              | _Not supported_                    |
+| SV_TessFactor             | _Not supported_                    |
+| SV_VertexID               | `@builtin(vertex_index)`           |
+| SV_ViewID                 | _Not supported_                    |
+| SV_ViewportArrayIndex     | _Not supported_                    |
+| SV_VulkanInstanceID       | `@builtin(instance_index)`         |
+| SV_VulkanSamplePosition   | _Not supported_                    |
+| SV_VulkanVertexID         | `@builtin(vertex_index)`           |
 
 Supported HLSL features when targeting WGSL
 -------------------------------------------
 
 The following table lists Slang's support for various HLSL feature sets, when targeting WGSL.
 
-| Feature set | Supported |
-| -- | -- |
-| ray tracing | No |
-| inline ray tracing | No |
-| mesh shader | No |
-| tessellation shader | No |
-| geometry shader | No |
-| wave intrinsics | No |
-| barriers | Yes |
-| atomics | Yes |
+| Feature set         | Supported                    |
+| ------------------- | ---------------------------- |
+| ray tracing         | No                           |
+| inline ray tracing  | No                           |
+| mesh shader         | No                           |
+| tessellation shader | No                           |
+| geometry shader     | No                           |
+| wave intrinsics     | No                           |
+| barriers            | Yes                          |
+| atomics             | Yes                          |
 | switch fall-through | Restructured (warning 41026) |
 
 ### Switch Fall-Through
 
 WGSL does not support fall-through in switch statements. When Slang encounters switch fall-through in source code targeting WGSL, it restructures the code by duplicating the fall-through destination into each source case. This produces correct results but may affect wave convergence if the duplicated code contains subgroup operations. See the [target compatibility documentation](../target-compatibility.md#switch-fallthrough) for details.
 
-
 Supported atomic types
 ----------------------
 
 The following table shows what is supported when targeting WGSL:
 
-|              |  32-bit integer | 64-bit integer  |      32-bit float     |  64-bit float    |   16-bit float   |
-|--------------|-----------------|-----------------|-----------------------|------------------|------------------|
-| Supported?   |   Yes           |     No          |    No                 |       No         |      No          |
-
+|            | 32-bit integer | 64-bit integer | 32-bit float | 64-bit float | 16-bit float |
+| ---------- | -------------- | -------------- | ------------ | ------------ | ------------ |
+| Supported? | Yes            | No             | No           | No           | No           |
 
 ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)ByteAddressBuffer
 -----------------------------------------------------------------------------------------------
@@ -102,7 +98,6 @@ Interlocked operations
 
 The InterlockedAdd, InterlockedAnd, etc... functions are not supported when targeting WGSL.
 Instead, operations on [`Atomic<T>`](https://shader-slang.com/stdlib-reference/types/atomic-0/index) types should be used.
-
 
 Entry Point Parameter Handling
 ------------------------------
@@ -120,12 +115,10 @@ Because WGSL entry point varying inputs are packed into a single struct paramete
 
 This limitation does not affect non-varying resource types (e.g. descriptor table slots), which are tracked individually.
 
-
 Parameter blocks
 ----------------
 
 Each `ParameterBlock` is assigned its own bind group in WGSL.
-
 
 Write-only Textures
 ---------------
@@ -133,7 +126,6 @@ Write-only Textures
 Many image formats supported by WebGPU can only be accessed in a compute shader as a write-only image.
 Use the `WTexture2D` type (similar to `RWTexture2D`) to write to an image when possible.
 The write-only texture types are also supported when targeting HLSL/GLSL/SPIR-V/Metal and CUDA.
-
 
 Pointers
 --------
@@ -150,18 +142,17 @@ Address Space Assignment
 
 WGSL requires explicit address space qualifiers. Slang automatically assigns appropriate address spaces:
 
-| Variable Type         | WGSL Address Space  |
-| --------------------- | ------------------- |
-| Local Variables       | `function`          |
-| Global Variables      | `private`           |
-| Uniform Buffers       | `uniform`           |
-| RW/Structured Buffers | `storage`           |
-| Group Shared          | `workgroup`         |
-| Parameter Blocks      | `uniform`           |
+| Variable Type         | WGSL Address Space |
+| --------------------- | ------------------ |
+| Local Variables       | `function`         |
+| Global Variables      | `private`          |
+| Uniform Buffers       | `uniform`          |
+| RW/Structured Buffers | `storage`          |
+| Group Shared          | `workgroup`        |
+| Parameter Blocks      | `uniform`          |
 
 Module-scope `static const` globals are emitted as a WGSL `const` (a compile-time value) when their type is a scalar, vector, or matrix.
 A `static const` global of **array** type is instead emitted as a `var<private>` (with the same initializer), because a WGSL `const` is a compile-time value that may only be indexed by a const-expression, whereas a `var<private>` is addressable and so can be indexed by a runtime value (for example `positions[vertexID]`).
-
 
 Matrix type translation
 -----------------------

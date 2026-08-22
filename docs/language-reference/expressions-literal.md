@@ -5,47 +5,46 @@ All literal expressions are [r-values](expressions-value-categories.md).
 
 ## Boolean Literal Expressions
 
-> *`BooleanLiteral`* = (**`'true'`** \| **`'false'`**)
+> _`BooleanLiteral`_ = (**`'true'`** \| **`'false'`**)
 
 Boolean literals represent [Boolean](types-fundamental.md#boolean) values `true` and `false`.
 
-
 ## Integer Literal Expressions
 
-> *`IntegerLiteral`* = (<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`DecIntegerLiteralBody`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexIntegerLiteralBody`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`BinIntegerLiteralBody`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`OctIntegerLiteralBody`* )<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`IntegerSuffix`*?
+> _`IntegerLiteral`_ = (<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`DecIntegerLiteralBody`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`HexIntegerLiteralBody`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`BinIntegerLiteralBody`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`OctIntegerLiteralBody`_ )<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`IntegerSuffix`_?
 >
-> *`DecIntegerLiteralBody`* = <br>
+> _`DecIntegerLiteralBody`_ = <br>
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;**`'0'`** \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`DecDigitNonZero`* *`DecDigit`*\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`DecDigitNonZero`_ _`DecDigit`_\*<br>
 >
-> *`DecDigit`* = **`<[0-9]>`**
+> _`DecDigit`_ = **`<[0-9]>`**
 >
-> *`DecDigitNonZero`* = **`<[1-9]>`**
+> _`DecDigitNonZero`_ = **`<[1-9]>`**
 >
-> *`HexIntegerLiteralBody`* = (**`'0x'`**\|**`'0X'`**) *`HexDigit`*+
+> _`HexIntegerLiteralBody`_ = (**`'0x'`**\|**`'0X'`**) _`HexDigit`_+
 >
-> *`HexDigit`* = **`<[0-9A-Fa-f]>`**
+> _`HexDigit`_ = **`<[0-9A-Fa-f]>`**
 >
-> *`BinIntegerLiteralBody`* = (**`'0b'`**\|**`'0B'`**) *`BinDigit`*+
+> _`BinIntegerLiteralBody`_ = (**`'0b'`**\|**`'0B'`**) _`BinDigit`_+
 >
-> *`BinDigit`* = **`'0'`** \| **`'1'`**
+> _`BinDigit`_ = **`'0'`** \| **`'1'`**
 >
-> *`OctIntegerLiteralBody`* = **`'0'`** *`OctDigit`*+
+> _`OctIntegerLiteralBody`_ = **`'0'`** _`OctDigit`_+
 >
-> *`OctDigit`* = **`<[0-7]>`**
+> _`OctDigit`_ = **`<[0-7]>`**
 >
-> *`IntegerSuffix`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;( *`IntegerSuffixUnsigned`* *`IntegerSuffixWidth`*? ) \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;( *`IntegerSuffixWidth`* *`IntegerSuffixUnsigned`*? )
+> _`IntegerSuffix`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;( _`IntegerSuffixUnsigned`_ _`IntegerSuffixWidth`_? ) \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;( _`IntegerSuffixWidth`_ _`IntegerSuffixUnsigned`_? )
 >
-> *`IntegerSuffixUnsigned`* = **`'u'`** \| **`'U'`**
+> _`IntegerSuffixUnsigned`_ = **`'u'`** \| **`'U'`**
 >
-> *`IntegerSuffixWidth`* = **`'l'`** \| **`'L'`** \| **`'ll'`** \| **`'LL'`** \| **`'z'`** \| **`'Z'`**
+> _`IntegerSuffixWidth`_ = **`'l'`** \| **`'L'`** \| **`'ll'`** \| **`'LL'`** \| **`'z'`** \| **`'Z'`**
 
 An integer literal represents an [integer](types-fundamental.md#integer) value. It consists of two parts:
 
@@ -67,14 +66,14 @@ type, and the width specifier selects the minimum width for the type.
 
 The type of the literal is the first type from the following table that fits the value:
 
-Suffix        | Decimal base                     | Hex, binary, octal bases
-------------- | -------------------------------- | ---------------------------------------
-(none)/`L`    | `int`, `int64_t`, `uint64_t`(\*) | `int`, `uint`, `int64_t`, `uint64_t`
-`LL`          | `int64_t`, `uint64_t`(\*)        | `int64_t`, `uint64_t`
-`U`/`UL`/`LU` | `uint`, `uint64_t`               | `uint`, `uint64_t`
-`ULL`/`LLU`   | `uint64_t`                       | `uint64_t`
-`Z`           | `intptr_t`, `uintptr_t`(\*)      | `intptr_t`
-`UZ`/`ZU`     | `uintptr_t`                      | `uintptr_t`
+| Suffix        | Decimal base                     | Hex, binary, octal bases             |
+| ------------- | -------------------------------- | ------------------------------------ |
+| (none)/`L`    | `int`, `int64_t`, `uint64_t`(\*) | `int`, `uint`, `int64_t`, `uint64_t` |
+| `LL`          | `int64_t`, `uint64_t`(\*)        | `int64_t`, `uint64_t`                |
+| `U`/`UL`/`LU` | `uint`, `uint64_t`               | `uint`, `uint64_t`                   |
+| `ULL`/`LLU`   | `uint64_t`                       | `uint64_t`                           |
+| `Z`           | `intptr_t`, `uintptr_t`(\*)      | `intptr_t`                           |
+| `UZ`/`ZU`     | `uintptr_t`                      | `uintptr_t`                          |
 
 Types marked with (\*) trigger a warning; they are intended only as a fallback to silently accept values
 that would otherwise overflow the signed integer type.
@@ -91,32 +90,32 @@ In addition, the following exceptions are made to allow expressing the smallest 
 
 The following table summarizes the literal types given the suffix and the value.
 
-Suffix                 | Base        | Value range                                 | Literal type
----------------------- | ----------- | ------------------------------------------- | -------------
-(none)/`L`             | dec         | [0, 2147483647] (\*\*)                      | `int`
-(none)/`L`             | dec         | [2147483648, 9223372036854775807] (\*\*)    | `int64_t`
-(none)/`L`             | dec         | [9223372036854775808, 18446744073709551615] | `uint64_t` (\*)
-(none)/`L`             | hex/bin/oct | [0x0, 0x7FFFFFFF]                           | `int`
-(none)/`L`             | hex/bin/oct | [0x80000000, 0xFFFFFFFF]                    | `uint`
-(none)/`L`             | hex/bin/oct | [0x100000000, 0x7FFFFFFFFFFFFFFF]           | `int64_t`
-(none)/`L`             | hex/bin/oct | [0x8000000000000000, 0xFFFFFFFFFFFFFFFF]    | `uint64_t`
-`LL`                   | dec         | [0, 9223372036854775807] (\*\*)             | `int64_t`
-`LL`                   | dec         | [9223372036854775808, 18446744073709551615] | `uint64_t` (\*)
-`LL`                   | hex/bin/oct | [0x0, 0x7FFFFFFFFFFFFFFF]                   | `int64_t`
-`LL`                   | hex/bin/oct | [0x8000000000000000, 0xFFFFFFFFFFFFFFFF]    | `uint64_t`
-`U`/`UL`/`LU`          | any         | [0, 4294967295]                             | `uint`
-`U`/`UL`/`LU`          | any         | [4294967296, 18446744073709551615]          | `uint64_t`
-`ULL`/`LLU`            | any         | [0, 18446744073709551615]                   | `uint64_t`
-`Z` (32-bit)           | dec         | [0, 2147483647] (\*\*)                      | `intptr_t`
-`Z` (32-bit)           | dec         | [2147483648, 4294967295]                    | `uintptr_t` (\*)
-`Z` (32-bit)           | hex/bin/oct | [0x0, 0xFFFFFFFF]                           | `intptr_t`
-`UZ`/`ZU` (32-bit)     | dec         | [0, 4294967295]                             | `uintptr_t`
-`UZ`/`ZU` (32-bit)     | hex/bin/oct | [0x0, 0xFFFFFFFF]                           | `uintptr_t`
-`Z` (64-bit)           | dec         | [0, 9223372036854775807] (\*\*)             | `intptr_t`
-`Z` (64-bit)           | dec         | [9223372036854775808, 18446744073709551615] | `uintptr_t` (\*)
-`Z` (64-bit)           | hex/bin/oct | [0x0, 0xFFFFFFFFFFFFFFFF]                   | `intptr_t`
-`UZ`/`ZU` (64-bit)     | dec         | [0, 18446744073709551615]                   | `uintptr_t`
-`UZ`/`ZU` (64-bit)     | hex/bin/oct | [0x0, 0xFFFFFFFFFFFFFFFF]                   | `uintptr_t`
+| Suffix             | Base        | Value range                                 | Literal type     |
+| ------------------ | ----------- | ------------------------------------------- | ---------------- |
+| (none)/`L`         | dec         | [0, 2147483647] (\*\*)                      | `int`            |
+| (none)/`L`         | dec         | [2147483648, 9223372036854775807] (\*\*)    | `int64_t`        |
+| (none)/`L`         | dec         | [9223372036854775808, 18446744073709551615] | `uint64_t` (\*)  |
+| (none)/`L`         | hex/bin/oct | [0x0, 0x7FFFFFFF]                           | `int`            |
+| (none)/`L`         | hex/bin/oct | [0x80000000, 0xFFFFFFFF]                    | `uint`           |
+| (none)/`L`         | hex/bin/oct | [0x100000000, 0x7FFFFFFFFFFFFFFF]           | `int64_t`        |
+| (none)/`L`         | hex/bin/oct | [0x8000000000000000, 0xFFFFFFFFFFFFFFFF]    | `uint64_t`       |
+| `LL`               | dec         | [0, 9223372036854775807] (\*\*)             | `int64_t`        |
+| `LL`               | dec         | [9223372036854775808, 18446744073709551615] | `uint64_t` (\*)  |
+| `LL`               | hex/bin/oct | [0x0, 0x7FFFFFFFFFFFFFFF]                   | `int64_t`        |
+| `LL`               | hex/bin/oct | [0x8000000000000000, 0xFFFFFFFFFFFFFFFF]    | `uint64_t`       |
+| `U`/`UL`/`LU`      | any         | [0, 4294967295]                             | `uint`           |
+| `U`/`UL`/`LU`      | any         | [4294967296, 18446744073709551615]          | `uint64_t`       |
+| `ULL`/`LLU`        | any         | [0, 18446744073709551615]                   | `uint64_t`       |
+| `Z` (32-bit)       | dec         | [0, 2147483647] (\*\*)                      | `intptr_t`       |
+| `Z` (32-bit)       | dec         | [2147483648, 4294967295]                    | `uintptr_t` (\*) |
+| `Z` (32-bit)       | hex/bin/oct | [0x0, 0xFFFFFFFF]                           | `intptr_t`       |
+| `UZ`/`ZU` (32-bit) | dec         | [0, 4294967295]                             | `uintptr_t`      |
+| `UZ`/`ZU` (32-bit) | hex/bin/oct | [0x0, 0xFFFFFFFF]                           | `uintptr_t`      |
+| `Z` (64-bit)       | dec         | [0, 9223372036854775807] (\*\*)             | `intptr_t`       |
+| `Z` (64-bit)       | dec         | [9223372036854775808, 18446744073709551615] | `uintptr_t` (\*) |
+| `Z` (64-bit)       | hex/bin/oct | [0x0, 0xFFFFFFFFFFFFFFFF]                   | `intptr_t`       |
+| `UZ`/`ZU` (64-bit) | dec         | [0, 18446744073709551615]                   | `uintptr_t`      |
+| `UZ`/`ZU` (64-bit) | hex/bin/oct | [0x0, 0xFFFFFFFFFFFFFFFF]                   | `uintptr_t`      |
 
 (\*) marks a warning.
 
@@ -176,50 +175,50 @@ the special cases listed above (for example, the `int` row also accepts `2147483
 
 ## Floating-Point Literal Expressions
 
-> *`FloatLiteral`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;( *`DecFloatLiteralBody`* \| *`HexFloatLiteralBody`* )<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`FloatSuffix`*?
+> _`FloatLiteral`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;( _`DecFloatLiteralBody`_ \| _`HexFloatLiteralBody`_ )<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`FloatSuffix`_?
 >
-> *`DecFloatLiteralBody`* = <br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBodyForm1`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBodyForm2`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DecFloatLiteralBodyForm3`*
+> _`DecFloatLiteralBody`_ = <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DecFloatLiteralBodyForm1`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DecFloatLiteralBodyForm2`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DecFloatLiteralBodyForm3`_
 >
-> *`DecFloatLiteralBodyForm1`* = *`DecDigit`*+ *`DecExponent`*
+> _`DecFloatLiteralBodyForm1`_ = _`DecDigit`_+ _`DecExponent`_
 >
-> *`DecFloatLiteralBodyForm2`* = *`DecDigit`*+ **`'.'`** *`DecExponent`*?
+> _`DecFloatLiteralBodyForm2`_ = _`DecDigit`_+ **`'.'`** _`DecExponent`_?
 >
-> *`DecFloatLiteralBodyForm3`* = *`DecDigit`*\* **`'.'`** *`DecDigit`*+ *`DecExponent`*?
+> _`DecFloatLiteralBodyForm3`_ = _`DecDigit`_\* **`'.'`** _`DecDigit`_+ _`DecExponent`_?
 >
-> *`DecExponent`* = *`DecExponentNumeric`* \| *`InfinityExponent`*
+> _`DecExponent`_ = _`DecExponentNumeric`_ \| _`InfinityExponent`_
 >
-> *`DecExponentNumeric`* = (**`'e'`** \| **`'E'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+> _`DecExponentNumeric`_ = (**`'e'`** \| **`'E'`**) (**`'+'`** \| **`'-'`**)? _`DecDigit`_+
 >
-> *`InfinityExponent`* = **`'#INF'`**
+> _`InfinityExponent`_ = **`'#INF'`**
 >
-> *`HexFloatLiteralBody`* =<br>
+> _`HexFloatLiteralBody`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'0x'`**\|**`'0X'`**) (<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBodyForm1`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBodyForm2`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;*`HexFloatLiteralBodyForm3`* )
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`HexFloatLiteralBodyForm1`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`HexFloatLiteralBodyForm2`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;_`HexFloatLiteralBodyForm3`_ )
 >
-> *`HexFloatLiteralBodyForm1`* = *`HexDigit`*+ *`HexExponent`*
+> _`HexFloatLiteralBodyForm1`_ = _`HexDigit`_+ _`HexExponent`_
 >
-> *`HexFloatLiteralBodyForm2`* = *`HexDigit`*+ **`'.'`** *`HexExponent`*
+> _`HexFloatLiteralBodyForm2`_ = _`HexDigit`_+ **`'.'`** _`HexExponent`_
 >
-> *`HexFloatLiteralBodyForm3`* = *`HexDigit`*\* **`'.'`** *`HexDigit`*+ *`HexExponent`*
+> _`HexFloatLiteralBodyForm3`_ = _`HexDigit`_\* **`'.'`** _`HexDigit`_+ _`HexExponent`_
 >
-> *`HexExponent`* = *`HexExponentNumeric`* \| *`InfinityExponent`*
+> _`HexExponent`_ = _`HexExponentNumeric`_ \| _`InfinityExponent`_
 >
-> *`HexExponentNumeric`* = (**`'p'`** \| **`'P'`**) (**`'+'`** \| **`'-'`**)? *`DecDigit`*+
+> _`HexExponentNumeric`_ = (**`'p'`** \| **`'P'`**) (**`'+'`** \| **`'-'`**)? _`DecDigit`_+
 >
-> *`FloatSuffix`* = *`FloatSuffixF16`* \| *`FloatSuffixF32`* \| *`FloatSuffixF64`*
+> _`FloatSuffix`_ = _`FloatSuffixF16`_ \| _`FloatSuffixF32`_ \| _`FloatSuffixF64`_
 >
-> *`FloatSuffixF16`* = **`'h'`** \| **`'H'`** \| **`'hf'`** \| **`'HF'`** \| **`'fh'`** \| **`'FH'`**
+> _`FloatSuffixF16`_ = **`'h'`** \| **`'H'`** \| **`'hf'`** \| **`'HF'`** \| **`'fh'`** \| **`'FH'`**
 >
-> *`FloatSuffixF32`* = **`'f'`** \| **`'F'`**
+> _`FloatSuffixF32`_ = **`'f'`** \| **`'F'`**
 >
-> *`FloatSuffixF64`* = **`'l'`** \| **`'L'`** \| **`'lf'`** \| **`'LF'`** \| **`'fl'`** \| **`'FL'`**
+> _`FloatSuffixF64`_ = **`'l'`** \| **`'L'`** \| **`'lf'`** \| **`'LF'`** \| **`'fl'`** \| **`'FL'`**
 
 A floating-point literal represents a [floating-point](types-fundamental.md#floating) value. The numeric form
 consists of three parts:
@@ -230,21 +229,21 @@ consists of three parts:
 
 The decimal body has two variants:
 
-1. Decimal digits and exponent. (*`DecFloatLiteralBodyForm1`*)
-2. Decimal digits separated by a decimal separator, and an optional exponent. (*`DecFloatLiteralBodyForm2`*
-   and *`DecFloatLiteralBodyForm3`*)
+1. Decimal digits and exponent. (_`DecFloatLiteralBodyForm1`_)
+2. Decimal digits separated by a decimal separator, and an optional exponent. (_`DecFloatLiteralBodyForm2`_
+   and _`DecFloatLiteralBodyForm3`_)
 
 The decimal digits and the optional separator form the decimal significand. The value is
-*significand \* 10^x*, where *x* is the signed decimal number given by *`DecExponentNumeric`*, or 0
+_significand \* 10^x_, where _x_ is the signed decimal number given by _`DecExponentNumeric`_, or 0
 if no exponent is specified.
 
 The hexadecimal body consists of hexadecimal digits, an optional radix separator, and a mandatory
-hexadecimal exponent (*`HexFloatLiteralBodyForm1`*, *`HexFloatLiteralBodyForm2`*,
-*`HexFloatLiteralBodyForm3`*).
+hexadecimal exponent (_`HexFloatLiteralBodyForm1`_, _`HexFloatLiteralBodyForm2`_,
+_`HexFloatLiteralBodyForm3`_).
 
 The hexadecimal digits and the optional separator form the hexadecimal significand. The value of the
-literal is *significand \* 2^y*, where *y* is the signed decimal number given by
-*`HexExponentNumeric`*. Note that the exponent is always written in decimal.
+literal is _significand \* 2^y_, where _y_ is the signed decimal number given by
+_`HexExponentNumeric`_. Note that the exponent is always written in decimal.
 
 In either decimal or hexadecimal form, using `#INF` as the exponent signifies that the literal value is
 positive infinity. The digits before the exponent are ignored. Negative infinity is expressed by preceding
@@ -287,55 +286,54 @@ The literal evaluation rules are as follows:
 
 > 📝 **Remark 1:** A floating-point literal expression without a suffix has type `float`.
 
-
 ## String Literal Expressions
 
-> *`StringLiteral`* = *`StringLiteralToken`*+
+> _`StringLiteral`_ = _`StringLiteralToken`_+
 >
-> *`StringLiteralToken`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DQuotedString`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`RawString`*
+> _`StringLiteralToken`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DQuotedString`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`RawString`_
 >
-> *`DQuotedString`* = **`'"'`** *`DStringChar`*\* **`'"'`**
+> _`DQuotedString`_ = **`'"'`** _`DStringChar`_\* **`'"'`**
 >
-> *`DStringChar`* = <br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharUnquoted`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedUnicode`*
+> _`DStringChar`_ = <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharUnquoted`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuoted`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuotedOctal`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuotedHex`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuotedUnicode`_
 >
-> *`DStringCharUnquoted`* = **`<[^\\"[:newline:]]>`**
+> _`DStringCharUnquoted`_ = **`<[^\\"[:newline:]]>`**
 >
 > Note: [:newline:] consists of characters `\r` and `\n`. (See the escape sequence table below.)
 >
-> *`DStringCharQuoted`* = **`<\\[\\'"?abfnrtv]>`**
+> _`DStringCharQuoted`_ = **`<\\[\\'"?abfnrtv]>`**
 >
-> *`DStringCharQuotedOctal`* = **`<\\[0-7]{1,3}>`**
+> _`DStringCharQuotedOctal`_ = **`<\\[0-7]{1,3}>`**
 >
-> *`DStringCharQuotedHex`* =<br>
+> _`DStringCharQuotedHex`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\x[0-9A-Fa-f]+>`** \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\x\{[0-9A-Fa-f]+\}>`**
 >
-> *`DStringCharQuotedUnicode`* =<br>
+> _`DStringCharQuotedUnicode`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\u[0-9A-Fa-f]{4}>`** \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\U[0-9A-Fa-f]{8}>`** \|<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`<\\u\{[0-9A-Fa-f]+\}>`**
 >
-> *`RawString`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'R"'`** *`RawStringDelim`* **`'('`**<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`RawStringContent`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`')'`** *`RawStringDelim`* **`'"'`**
+> _`RawString`_ =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'R"'`** _`RawStringDelim`_ **`'('`**<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`RawStringContent`_<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`')'`** _`RawStringDelim`_ **`'"'`**
 >
-> *`RawStringDelim`* = *`RawStringDelimChar`*\*
+> _`RawStringDelim`_ = _`RawStringDelimChar`_\*
 >
-> *`RawStringDelimChar`* = **`<[^"()[:space:]]>`**
+> _`RawStringDelimChar`_ = **`<[^"()[:space:]]>`**
 >
 > Note: [:space:] consists of characters ` `, `\t`, `\r`, `\n`, `\v`, and `\f`. (See the escape
 > sequence table below.)
 >
-> *`RawStringContent`* is the longest sequence of characters that does not contain
-> **`')'`** *`RawStringDelim`* **`'"'`**, where *`RawStringDelim`* is the same delimiter
+> _`RawStringContent`_ is the longest sequence of characters that does not contain
+> **`')'`** _`RawStringDelim`_ **`'"'`**, where _`RawStringDelim`_ is the same delimiter
 > token that opened the raw string.
 
 A string literal represents a sequence of 8-bit bytes in UTF-8 encoding. Its type is
@@ -348,13 +346,13 @@ forms part of the string value.
 
 A string token has two forms:
 
-1. Double-quoted string (*`DQuotedString`*)
-2. Raw string (*`RawString`*)
+1. Double-quoted string (_`DQuotedString`_)
+2. Raw string (_`RawString`_)
 
-The double-quoted string token starts with a double-quote (`"`), followed by any number of *`DStringChar`*
+The double-quoted string token starts with a double-quote (`"`), followed by any number of _`DStringChar`_
 elements, and ends with a double-quote.
 
-A *`DStringChar`* element encodes a single character within a double-quoted string token. For most characters,
+A _`DStringChar`_ element encodes a single character within a double-quoted string token. For most characters,
 the character is encoded as is. The exceptions are the newline character (ASCII character 10), the carriage
 return character (ASCII character 13), the backslash (`\`), and the double-quote character (`"`). These
 characters are always encoded using an escape sequence.
@@ -362,33 +360,33 @@ characters are always encoded using an escape sequence.
 An escape sequence begins with a backslash (`\`). The following table describes the escape sequences and their
 respective character values:
 
-Escape sequence                    | Encoded character value
----------------------------------- | --------------------------------------
-`\'`                               | Character `'`
-`\"`                               | Character `"`
-`\\`                               | Character `\`
-`\?`                               | Character `?`
-`\a`                               | ASCII character 7 (bell)
-`\b`                               | ASCII character 8 (backspace)
-`\f`                               | ASCII character 12 (form feed)
-`\n`                               | ASCII character 10 (newline)
-`\r`                               | ASCII character 13 (carriage return)
-`\t`                               | ASCII character 9 (horizontal tab)
-`\v`                               | ASCII character 11 (vertical tab)
-`\`<em>nnn</em>                    | Octal number specifying an 8-bit character code (1-3 digits)
-`\x`<em>nnn</em>                   | Character code in hexadecimal format (one or more digits)
-`\x{`<em>nnn</em>`}`               | Character code in hexadecimal format (one or more digits)
-`\u`<em>nnnn</em>                  | Unicode code point in hexadecimal format (4 digits)
-`\u{`<em>nnn</em>`}`               | Unicode code point in hexadecimal format (one or more digits)
-`\U`<em>nnnnnnnn</em>              | Unicode code point in hexadecimal format (8 digits)
+| Escape sequence       | Encoded character value                                       |
+| --------------------- | ------------------------------------------------------------- |
+| `\'`                  | Character `'`                                                 |
+| `\"`                  | Character `"`                                                 |
+| `\\`                  | Character `\`                                                 |
+| `\?`                  | Character `?`                                                 |
+| `\a`                  | ASCII character 7 (bell)                                      |
+| `\b`                  | ASCII character 8 (backspace)                                 |
+| `\f`                  | ASCII character 12 (form feed)                                |
+| `\n`                  | ASCII character 10 (newline)                                  |
+| `\r`                  | ASCII character 13 (carriage return)                          |
+| `\t`                  | ASCII character 9 (horizontal tab)                            |
+| `\v`                  | ASCII character 11 (vertical tab)                             |
+| `\`<em>nnn</em>       | Octal number specifying an 8-bit character code (1-3 digits)  |
+| `\x`<em>nnn</em>      | Character code in hexadecimal format (one or more digits)     |
+| `\x{`<em>nnn</em>`}`  | Character code in hexadecimal format (one or more digits)     |
+| `\u`<em>nnnn</em>     | Unicode code point in hexadecimal format (4 digits)           |
+| `\u{`<em>nnn</em>`}`  | Unicode code point in hexadecimal format (one or more digits) |
+| `\U`<em>nnnnnnnn</em> | Unicode code point in hexadecimal format (8 digits)           |
 
 In string literals, octal and hexadecimal character codes represent individual bytes, and they must be in the
 range 0–255. Unicode code points are expanded as UTF-8 encoded byte sequences.
 
-A raw string starts with **`'R"'`**, followed by a user-defined delimiter *`RawStringDelim`* and **`'('`**.
-The character sequence *`RawStringContent`* that follows is taken verbatim — no escape processing is performed
+A raw string starts with **`'R"'`**, followed by a user-defined delimiter _`RawStringDelim`_ and **`'('`**.
+The character sequence _`RawStringContent`_ that follows is taken verbatim — no escape processing is performed
 — and may contain any sequence of characters that does not include the termination sequence. The raw string
-terminates with **`')'`** followed by the same *`RawStringDelim`* and the closing double quote **`'"'`**.
+terminates with **`')'`** followed by the same _`RawStringDelim`_ and the closing double quote **`'"'`**.
 
 **Examples:**
 
@@ -426,31 +424,29 @@ DEF)"                   // value: ABC, a newline, then DEF
 > This is tracked by GitHub issues [#11291](https://github.com/shader-slang/slang/issues/11291)
 > and [#11306](https://github.com/shader-slang/slang/issues/11306).
 
-
 ## Character Literal Expressions
 
-> *`CharLiteral`* = **`<'>`** *`SChar`* **`<'>`**
+> _`CharLiteral`_ = **`<'>`** _`SChar`_ **`<'>`**
 >
-> *`SChar`* = <br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`SCharUnquoted`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuoted`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedOctal`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedHex`* \|<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`DStringCharQuotedUnicode`*
+> _`SChar`_ = <br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`SCharUnquoted`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuoted`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuotedOctal`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuotedHex`_ \|<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`DStringCharQuotedUnicode`_
 >
-> *`SCharUnquoted`* = **`<[^\'[:newline:]]>`**
+> _`SCharUnquoted`_ = **`<[^\'[:newline:]]>`**
 >
 > Note: [:newline:] consists of characters `\r` and `\n`. (See the escape sequence table above.)
 
 A character literal expression evaluates to a single character value. The type of the value is
-[uint](types-fundamental.md#integer). The character literal consists of an *`SChar`* enclosed in single quotes
-(`'`). *`SChar`* follows the same rules as *`DStringChar`* in a double-quoted string, except that an unquoted
+[uint](types-fundamental.md#integer). The character literal consists of an _`SChar`_ enclosed in single quotes
+(`'`). _`SChar`_ follows the same rules as _`DStringChar`_ in a double-quoted string, except that an unquoted
 character may be a double quote (`"`) but may not be a single quote (`'`). A single quote must be escaped as
 `\'`.
 
 The hexadecimal numbers in escape sequences must be in the range 0–4294967295 (i.e., representable as
 `uint`). The octal escapes are limited to 0–255. Unicode code points map to their respective character values.
-
 
 ```hlsl
 '\0'                    // Character 0 (null character)

@@ -23,11 +23,11 @@ runner path roots.
 
 ## Picking an input format
 
-| Producer | Recommended input | Why |
-| -------- | ----------------- | --- |
-| `llvm-cov` on Linux/macOS C++ | `llvm-cov export -format=json` | Native regions, lossless branches/functions, totals match `llvm-cov report` by construction |
-| Shader coverage (`shader-coverage-to-lcov.py`) | LCOV `.info` | Producer emits LCOV natively |
-| Windows OpenCppCoverage → Cobertura → LCOV | LCOV `.info` | No JSON variant available upstream |
+| Producer                                       | Recommended input              | Why                                                                                         |
+| ---------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------- |
+| `llvm-cov` on Linux/macOS C++                  | `llvm-cov export -format=json` | Native regions, lossless branches/functions, totals match `llvm-cov report` by construction |
+| Shader coverage (`shader-coverage-to-lcov.py`) | LCOV `.info`                   | Producer emits LCOV natively                                                                |
+| Windows OpenCppCoverage → Cobertura → LCOV     | LCOV `.info`                   | No JSON variant available upstream                                                          |
 
 > **Why not just always feed LCOV?** `llvm-cov export -format=lcov`
 > is lossy on the LLVM path: regions are missing entirely, BRDA

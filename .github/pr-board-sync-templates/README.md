@@ -20,14 +20,14 @@ the reference for what slang runs.
 
 ## The templates
 
-| Template | Copy to | Customize? | Purpose |
-|---|---|---|---|
-| `example-pr-maintenance.yml` | `.github/workflows/pr-maintenance.yml` | no | PR lifecycle + reviews (`pull_request_target`, `pull_request_review`, `check_suite`). |
-| `example-pr-checks-complete.yml` | `.github/workflows/pr-checks-complete.yml` | **yes** — list this repo's workflow names | CI / gating-check results via `workflow_run` (Actions CI does not emit usable `check_suite`). |
-| `example-pr-commit-status.yml` | `.github/workflows/pr-commit-status.yml` | no | External commit statuses via the `status` event. |
-| `example-pr-sweep-nightly.yml` | `.github/workflows/pr-sweep-nightly.yml` | no | Nightly / on-demand sweep of every open PR in this repo (`mode: sweep`). |
-| `example-pr-review-fork-bridge.yml` | `.github/workflows/pr-review-fork-bridge.yml` | no | Optional: stage 1 of the real-time fork-PR review relay. |
-| `example-pr-review-fork-apply.yml` | `.github/workflows/pr-review-fork-apply.yml` | no | Optional: stage 2 (privileged) of the fork-PR review relay. |
+| Template                            | Copy to                                       | Customize?                                | Purpose                                                                                       |
+| ----------------------------------- | --------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `example-pr-maintenance.yml`        | `.github/workflows/pr-maintenance.yml`        | no                                        | PR lifecycle + reviews (`pull_request_target`, `pull_request_review`, `check_suite`).         |
+| `example-pr-checks-complete.yml`    | `.github/workflows/pr-checks-complete.yml`    | **yes** — list this repo's workflow names | CI / gating-check results via `workflow_run` (Actions CI does not emit usable `check_suite`). |
+| `example-pr-commit-status.yml`      | `.github/workflows/pr-commit-status.yml`      | no                                        | External commit statuses via the `status` event.                                              |
+| `example-pr-sweep-nightly.yml`      | `.github/workflows/pr-sweep-nightly.yml`      | no                                        | Nightly / on-demand sweep of every open PR in this repo (`mode: sweep`).                      |
+| `example-pr-review-fork-bridge.yml` | `.github/workflows/pr-review-fork-bridge.yml` | no                                        | Optional: stage 1 of the real-time fork-PR review relay.                                      |
+| `example-pr-review-fork-apply.yml`  | `.github/workflows/pr-review-fork-apply.yml`  | no                                        | Optional: stage 2 (privileged) of the fork-PR review relay.                                   |
 
 ## Onboarding a repo
 
@@ -59,7 +59,7 @@ architecture.
 GitHub deliberately does **not** deliver `check_suite`/`check_run` events for
 suites created by GitHub Actions, to prevent recursive workflow runs. Since these
 repos' CI is GitHub Actions, a `check_suite` trigger never fires for it. The
-events that *are* delivered:
+events that _are_ delivered:
 
 - **`workflow_run`** — fires when an Actions workflow completes; carries CI/check
   results. Used by `pr-checks-complete.yml` (and the fork-review relay).

@@ -91,7 +91,7 @@ pass interact with the rest of the pipeline.
   - `undoParameterCopy` (line ~2048 CPU/CUDA/Metal arm).
   - `eliminatePhis` with **default** options.
   - `applyVariableScopeCorrection` runs (line ~2324 `target !=
-    SPIRV`).
+SPIRV`).
 - **Phase D — CUDA emit and downstream tools.** From
   `emitEntryPointsSourceFromIR` through the `CUDASourceEmitter`
   (line ~2459), `simplifyForEmit`, and `sourceEmitter->emitModule`.
@@ -139,7 +139,7 @@ Cover at least:
 - `lowerBuiltinTypesForKernelEntryPoints` — strips Slang-only
   shader types from kernel signatures.
 - The effect of `shouldLegalizeExistentialAndResourceTypes =
-  false` — explain which Phase-B passes skip and why (CUDA's C++
+false` — explain which Phase-B passes skip and why (CUDA's C++
   type system handles existentials and resources directly).
 - The CUDA-immutable-load pass
   ([slang-ir-cuda-immutable-load.cpp](../../../../source/slang/slang-ir-cuda-immutable-load.cpp))

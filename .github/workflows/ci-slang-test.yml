@@ -50,6 +50,16 @@ on:
         type: string
         default: ""
         description: "GPU tier label (e.g., 't4', 'sm80plus'). Used to apply tier-specific skip lists."
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
       api:
         required: false
         type: string
@@ -76,6 +86,9 @@ jobs:
 
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: false
           submodules: "false"
           fetch-depth: "1"
 
@@ -227,8 +240,9 @@ jobs:
           fi
 
       - name: Run Slang examples
-        # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run examples on release for pull requests and /ci dispatches, and not
+        # on merge_group, to reduce CI load.
+        if: inputs.full-gpu-tests && inputs.config == 'release' && (github.event_name == 'pull_request' || github.event_name == 'repository_dispatch')
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -240,8 +254,9 @@ jobs:
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
-        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
+        # Run GLSL backend tests on release for pull requests and /ci dispatches,
+        # and not on merge_group, to reduce CI load.
+        if: inputs.os != 'macos' && inputs.full-gpu-tests && inputs.config == 'release' && (github.event_name == 'pull_request' || github.event_name == 'repository_dispatch')
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1

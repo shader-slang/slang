@@ -22,7 +22,7 @@ Non-Type `Val` classes are declared in
 [slang-ast-val.h](../../../../source/slang/slang-ast-val.h). The `Val`
 and `DeclRefBase` abstract bases are in
 [slang-ast-base.h](../../../../source/slang/slang-ast-base.h). The
-`Type` subhierarchy lives in [types.md](types.md); `Type` *is* a
+`Type` subhierarchy lives in [types.md](types.md); `Type` _is_ a
 `Val`, but its concrete classes are documented there to keep this
 page focused on the non-Type Vals.
 
@@ -49,7 +49,7 @@ hash-consed by the `ASTBuilder`: any two `Val`s built through
 are the same `Val*`. The classes
 listed below carry their data as generic
 `m_operands: List<ValNodeOperand>`, not as per-class C++ fields; the
-"Key fields" column therefore lists *operand slot* semantics rather
+"Key fields" column therefore lists _operand slot_ semantics rather
 than declared C++ fields, except for the few classes that add named
 state (rare).
 
@@ -144,7 +144,7 @@ can take. The user-facing API is the template `DeclRef<T>`, declared
 in [slang-ast-support-types.h](../../../../source/slang/slang-ast-support-types.h)
 and described in [base.md](base.md#support-types).
 
-The four shapes record *how* a declaration was reached; they are not
+The four shapes record _how_ a declaration was reached; they are not
 four things a program can spell. `DirectDeclRef` and `MemberDeclRef`
 differ only in whether the path to the declaration had to be written
 out: a `DirectDeclRef` holds a bare `Decl` operand and so has nothing
@@ -157,12 +157,12 @@ add information beyond the path — an argument list and a
 `SubtypeWitness` — and so are the two that can make decl-refs to the
 same `Decl` denote different things.
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `DirectDeclRef` | `DeclRefBase` | `decl: Decl` (`getDecl()`) | (none) | A bare decl-ref to a `Decl` with no substitutions. |
-| `MemberDeclRef` | `DeclRefBase` | `decl: Decl`, `parent: DeclRefBase` (`getParentOperand()`) | (none) | A decl-ref expressed relative to a parent decl-ref. |
-| `LookupDeclRef` | `DeclRefBase` | `decl: Decl` (the decl to look up), `lookupSource: Type`, `witness: SubtypeWitness` | (none) | A decl-ref reached by lookup through a `SubtypeWitness` (used for interface-requirement satisfaction). |
-| `GenericAppDeclRef` | `DeclRefBase` | `decl: Decl` (the inner decl), `genericDeclRef: DeclRefBase`, argument `Val` operands from slot 2 (`getArgs()`) | (none) | A generic decl-ref with its arguments applied. |
+| Class               | Parent        | Key fields                                                                                                      | Grammar | Summary                                                                                                |
+| ------------------- | ------------- | --------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------ |
+| `DirectDeclRef`     | `DeclRefBase` | `decl: Decl` (`getDecl()`)                                                                                      | (none)  | A bare decl-ref to a `Decl` with no substitutions.                                                     |
+| `MemberDeclRef`     | `DeclRefBase` | `decl: Decl`, `parent: DeclRefBase` (`getParentOperand()`)                                                      | (none)  | A decl-ref expressed relative to a parent decl-ref.                                                    |
+| `LookupDeclRef`     | `DeclRefBase` | `decl: Decl` (the decl to look up), `lookupSource: Type`, `witness: SubtypeWitness`                             | (none)  | A decl-ref reached by lookup through a `SubtypeWitness` (used for interface-requirement satisfaction). |
+| `GenericAppDeclRef` | `DeclRefBase` | `decl: Decl` (the inner decl), `genericDeclRef: DeclRefBase`, argument `Val` operands from slot 2 (`getArgs()`) | (none)  | A generic decl-ref with its arguments applied.                                                         |
 
 ### IntVal family
 
@@ -174,39 +174,39 @@ Every `IntVal` stores its own `Type` in operand slot 0
 (`IntVal::getType()`), so the "Key fields" column below lists only the
 operands that follow that slot.
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `ConstantIntVal` | `IntVal` | `value: IntegerLiteralValue` (`getValue()`) | (none) | A literal compile-time integer. |
-| `DeclRefIntVal` | `IntVal` | `declRef: DeclRef<VarDeclBase>` (to a value generic param) | (none) | An unsubstituted generic value parameter. |
-| `TypeCastIntVal` | `IntVal` | `base: Val` (`getBase()`) | (none) | An integer cast to a different integer type (the target type is the node's own `type` operand), spelled as a conversion in a compile-time position — e.g. the array bound `int[int(N)]` over a `let N : uint` parameter. |
-| `BuiltinOperationIntVal` | `IntVal` | `op: BuiltinOperationKind` (operand 1), arg `IntVal` operands (from slot 2) | (none) | A still-symbolic builtin operator (e.g. `N / 2`); folds to a `ConstantIntVal` once its operands are concrete. |
-| `SizeOfIntVal` | `SizeOfLikeIntVal` | `valArg: Type` (`getValArg()`) | (none) | Compile-time `sizeof` of a type. |
-| `AlignOfIntVal` | `SizeOfLikeIntVal` | `valArg: Type` (`getValArg()`) | (none) | Compile-time `alignof` of a type. |
-| `CountOfIntVal` | `SizeOfLikeIntVal` | `valArg: Val` (`getValArg()`) | (none) | Compile-time `countof`; the argument is any `Val`, not only a type. |
-| `FirstIntVal` | `IntVal` | `basePack: Val` | (none) | First element of an `IntVal` pack. |
-| `LastIntVal` | `IntVal` | `basePack: Val` | (none) | Last element of an `IntVal` pack. |
-| `ConcreteIntValPack` | `IntVal` | element `IntVal` operands (`getCount()` / `getElement(i)`) | (none) | An already-bound pack of integer values. |
-| `TrimFirstIntValPack` | `IntVal` | `basePack: Val` | (none) | Pack with the first element removed. |
-| `TrimLastIntValPack` | `IntVal` | `basePack: Val` | (none) | Pack with the last element removed. |
-| `ShapeConcatIntValPack` | `ShapeTransformIntValPack` | `leftPack: Val`, `rightPack: Val`, `axis: IntVal` | (none) | Concatenate two `IntVal` packs along an axis. |
-| `ShapePermuteIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `orderPack: Val` | (none) | Permute an `IntVal` pack by an order pack. |
-| `ShapeSwapIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `dim0: IntVal`, `dim1: IntVal` | (none) | Swap two entries in an `IntVal` pack. |
-| `ShapeReduceIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `axis: IntVal` | (none) | Drop one axis from an `IntVal` pack. |
-| `ExpandIntValPack` | `IntVal` | `patternVal: Val` plus captured-pack operands | (none) | An unexpanded value pattern over captured value packs (the value analogue of `ExpandType`). |
-| `EachIntVal` | `IntVal` | `basePack: Val` | (none) | Indexes into a value pack during substitution using the substitution's `packExpansionIndex`. |
-| `WitnessLookupIntVal` | `IntVal` | `witness: SubtypeWitness`, `key: Decl` (`getKey()`) | (none) | An integer value resolved through a witness-table lookup; spelled `T.Name` for a `static const int` interface requirement read through a type parameter's conformance, as `Shape.dimensions` is in `_Texture`. |
-| `PolynomialIntVal` | `IntVal` | `constantTerm: IntegerLiteralValue` plus `PolynomialIntValTerm` operands | (none) | A polynomial in unsubstituted generic value parameters. |
-| `ErrorIntVal` | `IntVal` | (type operand only) | (none) | Error placeholder; lets checking continue when an integer value cannot be computed. |
+| Class                    | Parent                     | Key fields                                                                  | Grammar | Summary                                                                                                                                                                                                                  |
+| ------------------------ | -------------------------- | --------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ConstantIntVal`         | `IntVal`                   | `value: IntegerLiteralValue` (`getValue()`)                                 | (none)  | A literal compile-time integer.                                                                                                                                                                                          |
+| `DeclRefIntVal`          | `IntVal`                   | `declRef: DeclRef<VarDeclBase>` (to a value generic param)                  | (none)  | An unsubstituted generic value parameter.                                                                                                                                                                                |
+| `TypeCastIntVal`         | `IntVal`                   | `base: Val` (`getBase()`)                                                   | (none)  | An integer cast to a different integer type (the target type is the node's own `type` operand), spelled as a conversion in a compile-time position — e.g. the array bound `int[int(N)]` over a `let N : uint` parameter. |
+| `BuiltinOperationIntVal` | `IntVal`                   | `op: BuiltinOperationKind` (operand 1), arg `IntVal` operands (from slot 2) | (none)  | A still-symbolic builtin operator (e.g. `N / 2`); folds to a `ConstantIntVal` once its operands are concrete.                                                                                                            |
+| `SizeOfIntVal`           | `SizeOfLikeIntVal`         | `valArg: Type` (`getValArg()`)                                              | (none)  | Compile-time `sizeof` of a type.                                                                                                                                                                                         |
+| `AlignOfIntVal`          | `SizeOfLikeIntVal`         | `valArg: Type` (`getValArg()`)                                              | (none)  | Compile-time `alignof` of a type.                                                                                                                                                                                        |
+| `CountOfIntVal`          | `SizeOfLikeIntVal`         | `valArg: Val` (`getValArg()`)                                               | (none)  | Compile-time `countof`; the argument is any `Val`, not only a type.                                                                                                                                                      |
+| `FirstIntVal`            | `IntVal`                   | `basePack: Val`                                                             | (none)  | First element of an `IntVal` pack.                                                                                                                                                                                       |
+| `LastIntVal`             | `IntVal`                   | `basePack: Val`                                                             | (none)  | Last element of an `IntVal` pack.                                                                                                                                                                                        |
+| `ConcreteIntValPack`     | `IntVal`                   | element `IntVal` operands (`getCount()` / `getElement(i)`)                  | (none)  | An already-bound pack of integer values.                                                                                                                                                                                 |
+| `TrimFirstIntValPack`    | `IntVal`                   | `basePack: Val`                                                             | (none)  | Pack with the first element removed.                                                                                                                                                                                     |
+| `TrimLastIntValPack`     | `IntVal`                   | `basePack: Val`                                                             | (none)  | Pack with the last element removed.                                                                                                                                                                                      |
+| `ShapeConcatIntValPack`  | `ShapeTransformIntValPack` | `leftPack: Val`, `rightPack: Val`, `axis: IntVal`                           | (none)  | Concatenate two `IntVal` packs along an axis.                                                                                                                                                                            |
+| `ShapePermuteIntValPack` | `ShapeTransformIntValPack` | `valuePack: Val`, `orderPack: Val`                                          | (none)  | Permute an `IntVal` pack by an order pack.                                                                                                                                                                               |
+| `ShapeSwapIntValPack`    | `ShapeTransformIntValPack` | `valuePack: Val`, `dim0: IntVal`, `dim1: IntVal`                            | (none)  | Swap two entries in an `IntVal` pack.                                                                                                                                                                                    |
+| `ShapeReduceIntValPack`  | `ShapeTransformIntValPack` | `valuePack: Val`, `axis: IntVal`                                            | (none)  | Drop one axis from an `IntVal` pack.                                                                                                                                                                                     |
+| `ExpandIntValPack`       | `IntVal`                   | `patternVal: Val` plus captured-pack operands                               | (none)  | An unexpanded value pattern over captured value packs (the value analogue of `ExpandType`).                                                                                                                              |
+| `EachIntVal`             | `IntVal`                   | `basePack: Val`                                                             | (none)  | Indexes into a value pack during substitution using the substitution's `packExpansionIndex`.                                                                                                                             |
+| `WitnessLookupIntVal`    | `IntVal`                   | `witness: SubtypeWitness`, `key: Decl` (`getKey()`)                         | (none)  | An integer value resolved through a witness-table lookup; spelled `T.Name` for a `static const int` interface requirement read through a type parameter's conformance, as `Shape.dimensions` is in `_Texture`.           |
+| `PolynomialIntVal`       | `IntVal`                   | `constantTerm: IntegerLiteralValue` plus `PolynomialIntValTerm` operands    | (none)  | A polynomial in unsubstituted generic value parameters.                                                                                                                                                                  |
+| `ErrorIntVal`            | `IntVal`                   | (type operand only)                                                         | (none)  | Error placeholder; lets checking continue when an integer value cannot be computed.                                                                                                                                      |
 
 ### Polynomial helpers
 
 These are `Val`s (so they can be hash-consed) but are not `IntVal`s
 themselves: they appear as operands of a `PolynomialIntVal`.
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `PolynomialIntValFactor` | `Val` | `param: IntVal`, `power: IntegerLiteralValue` | (none) | One factor `param^power` of a polynomial term. |
-| `PolynomialIntValTerm` | `Val` | `constFactor: IntegerLiteralValue`, `paramFactors: OperandView<PolynomialIntValFactor>` | (none) | One term of a `PolynomialIntVal`: a constant factor times a product of `PolynomialIntValFactor`s. |
+| Class                    | Parent | Key fields                                                                              | Grammar | Summary                                                                                           |
+| ------------------------ | ------ | --------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `PolynomialIntValFactor` | `Val`  | `param: IntVal`, `power: IntegerLiteralValue`                                           | (none)  | One factor `param^power` of a polynomial term.                                                    |
+| `PolynomialIntValTerm`   | `Val`  | `constFactor: IntegerLiteralValue`, `paramFactors: OperandView<PolynomialIntValFactor>` | (none)  | One term of a `PolynomialIntVal`: a constant factor times a product of `PolynomialIntValFactor`s. |
 
 ### Witness family
 
@@ -224,40 +224,40 @@ the operands that follow them. The two differentiation witnesses
 are the exception: they use slot 0 for their own operand and do not
 follow the `sub` / `sup` convention.
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `DeclaredSubtypeWitness` | `SubtypeWitness` | `declRef: DeclRef<Decl>` — the declaration that introduced the relation | (none) | Evidence reported by an in-scope declaration (an `InheritanceDecl`, or a `GenericTypeConstraintDecl` for a `where` clause). |
-| `TransitiveSubtypeWitness` | `SubtypeWitness` | `subToMid: SubtypeWitness`, `midToSup: SubtypeWitness` | (none) | Subtype evidence obtained by composing two existing witnesses. |
-| `TypeEqualityWitness` | `SubtypeWitness` | (`sub` / `sup` only) | (none) | Evidence that two types are equal (a special case of subtyping that goes both ways). |
-| `ExtractExistentialSubtypeWitness` | `SubtypeWitness` | `declRef: DeclRef<VarDeclBase>` — the opened existential value | (none) | Evidence carried by an opened existential value. |
-| `DynamicSubtypeWitness` | `SubtypeWitness` | (`sub` / `sup` only) | (none) | Evidence that a user-supplied `__Dynamic` type argument satisfies an existential type parameter. |
-| `TypePackSubtypeWitness` | `SubtypeWitness` | per-element `SubtypeWitness` operands (`getCount()` / `getWitness(i)`) | (none) | Element-wise pack subtyping. |
-| `EachSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | `each` over a pack witness. |
-| `FirstSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | First element of a pack witness. |
-| `LastSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Last element of a pack witness. |
-| `TrimFirstSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Pack witness with the first element trimmed. |
-| `TrimLastSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | Pack witness with the last element trimmed. |
-| `PackBranchSubtypeWitness` | `SubtypeWitness` | `packOperand: Val`, `emptyWitness: SubtypeWitness`, `nonEmptyWitness: SubtypeWitness` | (none) | Pack-conditional subtype witness: selects a witness depending on whether the pack is empty. |
-| `ExpandSubtypeWitness` | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness` | (none) | `expand` of a pattern witness. |
-| `DiffTypeInfoWitness` | `SubtypeWitness` | `thisParamType: Type`, `thisTypeDiffWitness`, `returnTypeDiffWitness`, per-parameter witnesses from slot 3 | (none) | Bundles the differential-type witnesses for a callable's `this`, return, and parameter types. |
-| `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | `baseWitness: Witness` | (none) | Evidence for higher-order differentiable-type translation. |
+| Class                                   | Parent           | Key fields                                                                                                 | Grammar | Summary                                                                                                                     |
+| --------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `DeclaredSubtypeWitness`                | `SubtypeWitness` | `declRef: DeclRef<Decl>` — the declaration that introduced the relation                                    | (none)  | Evidence reported by an in-scope declaration (an `InheritanceDecl`, or a `GenericTypeConstraintDecl` for a `where` clause). |
+| `TransitiveSubtypeWitness`              | `SubtypeWitness` | `subToMid: SubtypeWitness`, `midToSup: SubtypeWitness`                                                     | (none)  | Subtype evidence obtained by composing two existing witnesses.                                                              |
+| `TypeEqualityWitness`                   | `SubtypeWitness` | (`sub` / `sup` only)                                                                                       | (none)  | Evidence that two types are equal (a special case of subtyping that goes both ways).                                        |
+| `ExtractExistentialSubtypeWitness`      | `SubtypeWitness` | `declRef: DeclRef<VarDeclBase>` — the opened existential value                                             | (none)  | Evidence carried by an opened existential value.                                                                            |
+| `DynamicSubtypeWitness`                 | `SubtypeWitness` | (`sub` / `sup` only)                                                                                       | (none)  | Evidence that a user-supplied `__Dynamic` type argument satisfies an existential type parameter.                            |
+| `TypePackSubtypeWitness`                | `SubtypeWitness` | per-element `SubtypeWitness` operands (`getCount()` / `getWitness(i)`)                                     | (none)  | Element-wise pack subtyping.                                                                                                |
+| `EachSubtypeWitness`                    | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness`                                                                       | (none)  | `each` over a pack witness.                                                                                                 |
+| `FirstSubtypeWitness`                   | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness`                                                                       | (none)  | First element of a pack witness.                                                                                            |
+| `LastSubtypeWitness`                    | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness`                                                                       | (none)  | Last element of a pack witness.                                                                                             |
+| `TrimFirstSubtypeWitness`               | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness`                                                                       | (none)  | Pack witness with the first element trimmed.                                                                                |
+| `TrimLastSubtypeWitness`                | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness`                                                                       | (none)  | Pack witness with the last element trimmed.                                                                                 |
+| `PackBranchSubtypeWitness`              | `SubtypeWitness` | `packOperand: Val`, `emptyWitness: SubtypeWitness`, `nonEmptyWitness: SubtypeWitness`                      | (none)  | Pack-conditional subtype witness: selects a witness depending on whether the pack is empty.                                 |
+| `ExpandSubtypeWitness`                  | `SubtypeWitness` | `patternTypeWitness: SubtypeWitness`                                                                       | (none)  | `expand` of a pattern witness.                                                                                              |
+| `DiffTypeInfoWitness`                   | `SubtypeWitness` | `thisParamType: Type`, `thisTypeDiffWitness`, `returnTypeDiffWitness`, per-parameter witnesses from slot 3 | (none)  | Bundles the differential-type witnesses for a callable's `this`, return, and parameter types.                               |
+| `HigherOrderDiffTypeTranslationWitness` | `SubtypeWitness` | `baseWitness: Witness`                                                                                     | (none)  | Evidence for higher-order differentiable-type translation.                                                                  |
 
 #### Type-coercion witnesses
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `BuiltinTypeCoercionWitness` | `TypeCoercionWitness` | `fromType: Type`, `toType: Type` | (none) | Coercion evidence for built-in conversions. |
-| `DeclRefTypeCoercionWitness` | `TypeCoercionWitness` | `fromType: Type`, `toType: Type`, `declRef: DeclRef<Decl>` | (none) | Coercion evidence backed by a user-defined conversion. |
+| Class                        | Parent                | Key fields                                                 | Grammar | Summary                                                |
+| ---------------------------- | --------------------- | ---------------------------------------------------------- | ------- | ------------------------------------------------------ |
+| `BuiltinTypeCoercionWitness` | `TypeCoercionWitness` | `fromType: Type`, `toType: Type`                           | (none)  | Coercion evidence for built-in conversions.            |
+| `DeclRefTypeCoercionWitness` | `TypeCoercionWitness` | `fromType: Type`, `toType: Type`, `declRef: DeclRef<Decl>` | (none)  | Coercion evidence backed by a user-defined conversion. |
 
 #### Other witnesses
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `NoneWitness` | `Witness` | (no operands) | (none) | The "none" value of an optional constraint. |
-| `HasDiffTypeInfoWitness` | `Witness` | `declRef: DeclRef<HasDiffTypeInfoConstraintDecl>` | (none) | Evidence carried by a `HasDiffTypeInfoConstraintDecl`. |
-| `DeclaredVariadicPackCountWitness` | `Witness` | `declRef: DeclRef<GenericVariadicPackCountConstraintDecl>` | (none) | Unsubstituted evidence for a variadic-pack count constraint, carried by a `GenericVariadicPackCountConstraintDecl`. |
-| `ConcreteVariadicPackCountWitness` | `Witness` | `actualCount: IntVal`, `expectedCount: IntVal` | (none) | Evidence that a pack's actual element count matches the count a constraint expects. |
-| `NonEmptyPackWitness` | `Witness` | `pack: Val` | (none) | Evidence that a type pack is non-empty. |
+| Class                              | Parent    | Key fields                                                 | Grammar | Summary                                                                                                             |
+| ---------------------------------- | --------- | ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
+| `NoneWitness`                      | `Witness` | (no operands)                                              | (none)  | The "none" value of an optional constraint.                                                                         |
+| `HasDiffTypeInfoWitness`           | `Witness` | `declRef: DeclRef<HasDiffTypeInfoConstraintDecl>`          | (none)  | Evidence carried by a `HasDiffTypeInfoConstraintDecl`.                                                              |
+| `DeclaredVariadicPackCountWitness` | `Witness` | `declRef: DeclRef<GenericVariadicPackCountConstraintDecl>` | (none)  | Unsubstituted evidence for a variadic-pack count constraint, carried by a `GenericVariadicPackCountConstraintDecl`. |
+| `ConcreteVariadicPackCountWitness` | `Witness` | `actualCount: IntVal`, `expectedCount: IntVal`             | (none)  | Evidence that a pack's actual element count matches the count a constraint expects.                                 |
+| `NonEmptyPackWitness`              | `Witness` | `pack: Val`                                                | (none)  | Evidence that a type pack is non-empty.                                                                             |
 
 ### Modifier values
 
@@ -269,7 +269,7 @@ live in [modifiers.md](modifiers.md)). These values are stored by
 expression's syntax-level `Modifiers` into `Val`s before building the
 `ModifiedType`.
 
-Because the value ends up on the *type*, it stays there for the rest
+Because the value ends up on the _type_, it stays there for the rest
 of the compile, and every later decision made about that type sees
 it. [core.meta.slang](../../../../source/slang/core.meta.slang)
 declares `unorm` and `snorm` (lines 44-60 and 62-78) as marking a
@@ -289,14 +289,14 @@ target actually emits is decided in the emitters, which are not in
 this page's `watched_paths`; see
 [../pipeline/06-emit.md](../pipeline/06-emit.md).
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `ModifierVal` | `Val` | (no operands) | (none) | Concrete base for type-level modifier values. |
-| `TypeModifierVal` | `ModifierVal` | (no operands) | (none) | Modifier that adjusts a type. |
-| `ResourceFormatModifierVal` | `TypeModifierVal` | (no operands) | (none) | Modifier that constrains the storage format of a resource. |
-| `UNormModifierVal` | `ResourceFormatModifierVal` | (no operands) | (none) | `unorm` resource format. |
-| `SNormModifierVal` | `ResourceFormatModifierVal` | (no operands) | (none) | `snorm` resource format. |
-| `NoDiffModifierVal` | `TypeModifierVal` | (no operands) | (none) | `no_diff` type-level modifier. |
+| Class                       | Parent                      | Key fields    | Grammar | Summary                                                    |
+| --------------------------- | --------------------------- | ------------- | ------- | ---------------------------------------------------------- |
+| `ModifierVal`               | `Val`                       | (no operands) | (none)  | Concrete base for type-level modifier values.              |
+| `TypeModifierVal`           | `ModifierVal`               | (no operands) | (none)  | Modifier that adjusts a type.                              |
+| `ResourceFormatModifierVal` | `TypeModifierVal`           | (no operands) | (none)  | Modifier that constrains the storage format of a resource. |
+| `UNormModifierVal`          | `ResourceFormatModifierVal` | (no operands) | (none)  | `unorm` resource format.                                   |
+| `SNormModifierVal`          | `ResourceFormatModifierVal` | (no operands) | (none)  | `snorm` resource format.                                   |
+| `NoDiffModifierVal`         | `TypeModifierVal`           | (no operands) | (none)  | `no_diff` type-level modifier.                             |
 
 ### Differentiation values
 
@@ -311,20 +311,20 @@ The watched headers declare these shapes but contain no construction
 site for them; naming the producer would require adding the semantic
 checking sources to this page's `watched_paths`.
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `DifferentiateVal` | `Val` | `func: DeclRef<Decl>` (`getFunc()`) | (none) | Concrete base for differentiation Vals; represents the result of differentiating a function. |
-| `ForwardDifferentiateVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Forward-mode derivative. |
-| `BackwardDifferentiateVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Backward-mode derivative. |
-| `BackwardDifferentiateIntermediateTypeVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Intermediate-type of a backward derivative. |
-| `BackwardDifferentiatePrimalVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Primal companion of a backward derivative. |
-| `BackwardDifferentiatePropagateVal` | `DifferentiateVal` | `func: DeclRef<Decl>` | (none) | Propagate-phase Val of a backward derivative. |
+| Class                                      | Parent             | Key fields                          | Grammar | Summary                                                                                      |
+| ------------------------------------------ | ------------------ | ----------------------------------- | ------- | -------------------------------------------------------------------------------------------- |
+| `DifferentiateVal`                         | `Val`              | `func: DeclRef<Decl>` (`getFunc()`) | (none)  | Concrete base for differentiation Vals; represents the result of differentiating a function. |
+| `ForwardDifferentiateVal`                  | `DifferentiateVal` | `func: DeclRef<Decl>`               | (none)  | Forward-mode derivative.                                                                     |
+| `BackwardDifferentiateVal`                 | `DifferentiateVal` | `func: DeclRef<Decl>`               | (none)  | Backward-mode derivative.                                                                    |
+| `BackwardDifferentiateIntermediateTypeVal` | `DifferentiateVal` | `func: DeclRef<Decl>`               | (none)  | Intermediate-type of a backward derivative.                                                  |
+| `BackwardDifferentiatePrimalVal`           | `DifferentiateVal` | `func: DeclRef<Decl>`               | (none)  | Primal companion of a backward derivative.                                                   |
+| `BackwardDifferentiatePropagateVal`        | `DifferentiateVal` | `func: DeclRef<Decl>`               | (none)  | Propagate-phase Val of a backward derivative.                                                |
 
 ### Misc Vals
 
-| Class | Parent | Key fields | Grammar | Summary |
-| --- | --- | --- | --- | --- |
-| `UIntSetVal` | `Val` | sequence of `ConstantIntVal` bitmasks | (none) | A hash-consed bitset used by the capability system. |
+| Class        | Parent | Key fields                            | Grammar | Summary                                             |
+| ------------ | ------ | ------------------------------------- | ------- | --------------------------------------------------- |
+| `UIntSetVal` | `Val`  | sequence of `ConstantIntVal` bitmasks | (none)  | A hash-consed bitset used by the capability system. |
 
 ## Notable nodes
 
@@ -421,7 +421,7 @@ existential.
 `ExpandSubtypeWitness` mirror the type-pack operators (see
 [types.md](types.md)) at the witness level. The checker carries
 one witness per element of a type pack so that variadic generics can
-be type-checked element-wise. Separately, the *count* of a variadic
+be type-checked element-wise. Separately, the _count_ of a variadic
 pack carries its own evidence: `DeclaredVariadicPackCountWitness`
 holds the still-symbolic count from a
 `GenericVariadicPackCountConstraintDecl`, and
@@ -442,7 +442,7 @@ opened-existential type conforms to the interface bound.
 ### DeclRef family and the four shapes a decl-ref can take
 
 A `DeclRef<T>` is more than "pointer to `Decl`": it also records
-*how* the declaration was reached. `DirectDeclRef` is the simple
+_how_ the declaration was reached. `DirectDeclRef` is the simple
 case. `MemberDeclRef` is "this member of this parent decl-ref".
 `GenericAppDeclRef` wraps an existing decl-ref in generic-argument
 substitutions. `LookupDeclRef` represents a decl found by
@@ -464,7 +464,7 @@ dynamic class and the same operand list are guaranteed to be the same
 instead of consulting the `getOrCreate` cache, so two equal substituted
 `DifferentiateVal`s can be distinct pointers. This means the
 checker can use pointer equality as type / value equality, but it
-also means *all* operands must themselves be canonical — the
+also means _all_ operands must themselves be canonical — the
 `Val::resolve()` machinery exists precisely to keep this invariant.
 `Val::equals` is written in those terms: it succeeds when the two
 pointers are identical or when their `resolve()` results are, and each

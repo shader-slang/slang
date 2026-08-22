@@ -1,0 +1,838 @@
+name: CI Matrix
+
+# Reusable workflow that runs the full CI matrix (build/test/sanitizer/materialx + check-matrix).
+# Called by:
+#   - ci.yml on pull_request / merge_group / workflow_dispatch (defaults pass through)
+#   - ci-command.yml on /ci slash command (ref/repository/is-fork-pr point at the PR head)
+#
+# The docs-only / should-run gate lives in ci.yml's filter job; ci-matrix is only
+# invoked when the gate passes.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to check out. Empty = github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = github.repository (default)."
+        required: false
+        type: string
+        default: ""
+      is-fork-pr:
+        description: "Force fork-PR secret gating. Set true by /ci for fork PRs."
+        required: false
+        type: boolean
+        default: false
+
+# Ceiling for every job in this workflow: a job's own `permissions:` can only
+# restrict further, never exceed, what's granted here (GitHub Actions never
+# elevates permissions across a workflow_call boundary). This must be the
+# union of every scope any job below declares at the job level:
+#   - id-token: write   — GCP Workload Identity auth (Linux container builds,
+#                          WASM build, sanitizer)
+#   - packages: read    — pulling the (public) CI container images
+#   - actions: read     — check-cmdline-ref / check-capability-atoms-ref /
+#                          test-falcor / test-compile-regression /
+#                          test-benchmark querying workflow-run state
+permissions:
+  contents: read
+  id-token: write
+  packages: read
+  actions: read
+
+jobs:
+  # Low-priority gate. This job runs for every PR/dispatch that needs CI, but
+  # only nv-slang-bot[bot] workflow_dispatch runs can ever yield. Those are the
+  # bot's draft-testing runs: a draft PR has no pull_request CI, so the bot
+  # dispatches CI manually while iterating. Every other run — human PRs, the
+  # bot's own ready-for-review PRs, and merge_group — is full priority, so the
+  # gate succeeds immediately and the build jobs (which require this job to
+  # succeed) proceed normally. When a throttled bot dispatch must yield to
+  # human, merge-queue, or older bot CI, a marker step fails this job so it
+  # consumes no expensive build/test runners; ci-retry-yielded-bot then reruns
+  # it once CI is quiet.
+  #
+  # The job deliberately resolves to success or failure, never 'skipped':
+  # a skipped dependency would collide with the implicit success() that gates
+  # the build jobs and silently skip all of CI. See the build-job `if` below.
+  wait-for-human-priority:
+    # This gate fires for every PR revision and does light work (checkout +
+    # Python + `gh api`, no GPU) — the same shape as ci-health/ci-analytics.
+    #
+    # RUNNER SELECTION — switchable via the `ANALYTICS_RUNS_ON` repository
+    # variable, WITHOUT a code change (Settings → Secrets and variables →
+    # Actions → Variables):
+    #   - variable UNSET (default): run on GitHub-hosted `ubuntu-latest`.
+    #   - variable SET to a runs-on JSON string, e.g.
+    #     `["Linux", "self-hosted", "analytics", "GCP"]`: run on the GCP
+    #     analytics pool.
+    # It was offloaded to the GCP analytics pool in June 2026 to keep it off the
+    # 20-runner org cap. NOTE: ci-health.yml runs on the same variable; keeping
+    # it on GCP avoids the self-starvation blind spot where the cap monitor is
+    # itself starved by the cap it measures — prefer the GCP pool for this group
+    # unless the Teams-tier cap has ample headroom.
+    runs-on: ${{ vars.ANALYTICS_RUNS_ON && fromJSON(vars.ANALYTICS_RUNS_ON) || fromJSON('["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    # Only reads Actions API state and runs a script; no write access needed.
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: false
+      - id: priority
+        name: Check priority gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Only the bot's own workflow_dispatch runs (its draft-testing runs)
+          # are throttled. The bot's ready-for-review PRs are treated as human.
+          IS_THROTTLED_BOT: ${{ github.event_name == 'workflow_dispatch' && github.triggering_actor == 'nv-slang-bot[bot]' }}
+        run: |
+          if [[ "$IS_THROTTLED_BOT" != "true" ]]; then
+            echo "Not a throttled bot run; proceeding without yielding."
+            echo "yielded=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 extras/ci/wait-for-priority.py \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow ci.yml \
+            --max-yield-hours 12
+
+      - name: Stop yielded bot CI
+        if: steps.priority.outputs.yielded == 'true'
+        run: |
+          echo "::error::priority-gate-yielded: higher-priority CI is active; ci-retry-yielded-bot will rerun this bot CI when quiet"
+          exit 1
+
+  # Linux x86_64 builds run in the CI container.
+  #
+  # RUNNER SELECTION — switchable between GitHub-hosted and the GCP self-hosted
+  # build pool via the `LINUX_BUILD_RUNS_ON` repository variable, WITHOUT a code
+  # change (Settings → Secrets and variables → Actions → Variables):
+  #   - variable UNSET (default): run on GitHub-hosted `ubuntu-22.04`.
+  #   - variable SET to a runs-on JSON string, e.g.
+  #     `["Linux", "self-hosted", "build", "GCP"]`: run on the GCP build pool.
+  # These builds were offloaded to GCP in June 2026 (PR #11738) to relieve the
+  # GitHub-hosted 20-runner org cap; with the Teams-tier 60-runner cap they can
+  # ride the GitHub-hosted pool again by default, while the variable keeps a
+  # zero-code-change escape hatch back to GCP if the cap tightens.
+  #
+  # container-user must track the runner: the GCP build image's runner owns
+  # _work as UID:GID 1003, while GitHub-hosted runners use 1001 (the reusable
+  # workflow's default). It is keyed off the SAME variable so the two never
+  # diverge — set the variable → get the GCP UID; unset → get the hosted UID.
+  build-linux-debug-gcc-x86_64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build-container.yml
+    # id-token is never part of the default GITHUB_TOKEN even when the repo
+    # default is "write"; it must be requested explicitly for the reusable
+    # workflow's GCP Workload Identity auth step. Set it on the caller so the
+    # token actually carries id-token:write rather than relying on the default.
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      config: debug
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # Runner selection and container-user tracking: see build-linux-debug-gcc-x86_64
+  # above (both keyed off the `LINUX_BUILD_RUNS_ON` repository variable).
+  build-linux-release-gcc-x86_64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build-container.yml
+    # id-token is never part of the default GITHUB_TOKEN even when the repo
+    # default is "write"; it must be requested explicitly for the reusable
+    # workflow's GCP Workload Identity auth step. Set it on the caller so the
+    # token actually carries id-token:write rather than relying on the default.
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      config: release
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      container-user: ${{ vars.LINUX_BUILD_RUNS_ON && '1003:1003' || '1001:1001' }}
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # WASM build runs directly on the host (no container). It needs the gcc host
+  # toolchain (g++) for the native generators build; emsdk is downloaded by the
+  # build itself. Both GitHub-hosted `ubuntu-22.04` and the GCP linux-cpu-runner
+  # image provide g++, so this job runs on either.
+  #
+  # RUNNER SELECTION — switchable via the `LINUX_BUILD_RUNS_ON` repository
+  # variable, same as the x86_64 builds above: unset → GitHub-hosted
+  # `ubuntu-22.04`; set to a runs-on JSON string → the GCP build pool. id-token
+  # is requested for the reusable workflow's GCP Workload Identity auth step
+  # (never part of the default GITHUB_TOKEN); it is harmless on GitHub-hosted.
+  build-linux-release-gcc-wasm:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      os: linux
+      compiler: gcc
+      platform: wasm
+      config: release
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # Sanitizer build+test (blocking via check-matrix, runs on every PR). Runs in the
+  # clang CI container as `--user root`, so there is no container-user concern
+  # and no runner-UID coupling — only the runner label switches.
+  #
+  # RUNNER SELECTION — switchable via the `LINUX_BUILD_RUNS_ON` repository
+  # variable, same as the x86_64 builds above: unset → GitHub-hosted
+  # `ubuntu-22.04`; set to a runs-on JSON string → the GCP build pool. id-token
+  # is requested explicitly for GCP Workload Identity auth (never part of the
+  # default GITHUB_TOKEN); it is harmless on GitHub-hosted.
+  sanitizer-linux-clang-x86_64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-sanitizer.yml
+    permissions:
+      # Required by ci-slang-sanitizer.yml's GCP Workload Identity auth step;
+      # id-token is never part of the default GITHUB_TOKEN.
+      id-token: write
+      contents: read
+      packages: read
+    with:
+      runs-on: ${{ vars.LINUX_BUILD_RUNS_ON || '["ubuntu-22.04"]' }}
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # macOS builds
+  build-macos-debug-clang-aarch64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  build-macos-release-clang-aarch64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # Linux ARM64 builds (GitHub-hosted)
+  build-linux-debug-gcc-aarch64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+      warnings-as-errors: false
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  build-linux-release-gcc-aarch64:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+      warnings-as-errors: false
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # Windows builds (self-hosted)
+  build-windows-debug-cl-x86_64-gpu:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "build"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  build-windows-release-cl-x86_64-gpu:
+    needs: [wait-for-human-priority]
+    if: needs.wait-for-human-priority.result == 'success' || needs.wait-for-human-priority.result == 'skipped'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "build"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # Vet-and-approve gate for the Falcor-only rebuild below. A job that
+  # calls a reusable workflow via `uses:` cannot itself carry
+  # `environment:` (GitHub only allows name/uses/with/secrets/needs/if/
+  # permissions on such jobs), so the approval gate has to live on this
+  # plain job instead, with the build depending on it.
+  falcor-build-approval-gate:
+    environment: falcor-ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only runs `echo`; no GITHUB_TOKEN scopes are needed.
+    permissions: {}
+    steps:
+      - name: Approved
+        run: echo "Falcor rebuild approved."
+
+  # A separate build for test-falcor, gated behind the same falcor-ci
+  # approval as the test job itself. The regular Windows-release build
+  # above runs eagerly and its slang-tests-* artifact expires (1-day
+  # retention, and GitHub's download URLs are short-lived signed URLs)
+  # long before a PR sitting in the Falcor approval queue gets looked at.
+  # Building again here, only once approved, means the artifact this job
+  # produces is always fresh when test-falcor actually needs it. The
+  # other six consumers of build-windows-release-cl-x86_64-gpu's artifact
+  # (dx/vk/cuda/rhi tests, MaterialX, compile-regression, benchmark) are
+  # unaffected -- they keep using the eagerly-built, ungated artifact.
+  #
+  # If test-falcor fails on a stale/inaccessible artifact from this job
+  # (observed: the bridge relay's own GitHub API artifact lookup can fail
+  # for an unrelated attempt/token reason even when the artifact itself is
+  # neither expired nor deleted -- see PR #12614 discussion), GitHub's
+  # "Re-run failed jobs" will NOT rebuild here: re-run only ever
+  # propagates to jobs downstream of a failure, never to an upstream job
+  # that already succeeded (confirmed by a GitHub Actions maintainer,
+  # https://github.com/actions/runner/issues/1961). Use "Re-run all jobs"
+  # instead in that case, which forces this job to run fresh. This is a
+  # known, accepted cost: a real Falcor regression needing a code fix
+  # already forces a full re-run via a new commit, so this only affects
+  # the narrower case of a transient retry with no code change.
+  build-windows-release-cl-x86_64-gpu-falcor:
+    needs: [falcor-build-approval-gate]
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "build"]'
+      artifact-name-suffix: "-falcor"
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+      is-fork-pr: ${{ inputs.is-fork-pr }}
+
+  # Linux tests (self-hosted GPU runner, containerized)
+  test-linux-debug-gcc-x86_64:
+    needs: [build-linux-debug-gcc-x86_64]
+    uses: ./.github/workflows/ci-slang-test-container.yml
+    with:
+      config: debug
+      server-count: 8
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-linux-debug-gcc-x86_64-rhi:
+    needs: [build-linux-debug-gcc-x86_64]
+    uses: ./.github/workflows/ci-rhi-test-container.yml
+    with:
+      config: debug
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-linux-release-gcc-x86_64:
+    needs: [build-linux-release-gcc-x86_64]
+    uses: ./.github/workflows/ci-slang-test-container.yml
+    with:
+      config: release
+      server-count: 8
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-linux-release-gcc-x86_64-rhi:
+    needs: [build-linux-release-gcc-x86_64]
+    uses: ./.github/workflows/ci-rhi-test-container.yml
+    with:
+      config: release
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # Linux x86_64 SM80+ capability tests (self-hosted L4/Blackwell runner).
+  # Runs only cooperative-matrix / neural coverage that T4 cannot safely
+  # execute after CUDA coopmat moves to Ampere-only mma.sync PTX.
+  test-linux-release-gcc-x86_64-sm80:
+    needs: [build-linux-release-gcc-x86_64]
+    uses: ./.github/workflows/ci-slang-test-container.yml
+    with:
+      config: release
+      runs-on: '["Linux", "self-hosted", "SM80Plus"]'
+      gpu-tier: sm80plus
+      server-count: 8
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
+  # Runs the test suite filtered to CPU and LLVM backends via
+  # -api cpu+llvm, so GPU-targeted test variants are ignored rather than run.
+  # Catches frontend / IR / diagnostic regressions on cheap hardware and
+  # complements the GPU-runner jobs.
+  test-linux-release-gcc-x86_64-cpu:
+    needs: [build-linux-release-gcc-x86_64]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: release
+      runs-on: '["ubuntu-24.04"]'
+      full-gpu-tests: false
+      cpu-only: true
+      server-count: 4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # macOS tests
+  test-macos-debug-clang-aarch64:
+    needs: [build-macos-debug-clang-aarch64]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+      full-gpu-tests: true
+      server-count: 3
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-macos-debug-clang-aarch64-rhi:
+    needs: [build-macos-debug-clang-aarch64]
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-macos-release-clang-aarch64:
+    needs: [build-macos-release-clang-aarch64]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      full-gpu-tests: true
+      server-count: 3
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-macos-release-clang-aarch64-rhi:
+    needs: [build-macos-release-clang-aarch64]
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # Linux ARM64 tests (GitHub-hosted, CPU only)
+  test-linux-debug-gcc-aarch64:
+    needs: [build-linux-debug-gcc-aarch64]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+      full-gpu-tests: false
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-linux-release-gcc-aarch64:
+    needs: [build-linux-release-gcc-aarch64]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+      full-gpu-tests: false
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # Windows GPU tests (self-hosted).
+  # Each config is split into three parallel jobs to reduce wall-clock time:
+  #   -gpu-dx:   dx11+dx12+wgpu
+  #   -gpu-vk:   vk+cpu+llvm + no-API tests
+  #   -gpu-cuda: cuda
+  # The three jobs run concurrently on separate runners.
+  test-windows-debug-cl-x86_64-gpu-dx:
+    needs: [build-windows-debug-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-debug-cl-x86_64-gpu-vk:
+    needs: [build-windows-debug-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cpu+llvm
+      gpu-tier: t4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-debug-cl-x86_64-gpu-cuda:
+    needs: [build-windows-debug-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: cuda
+      gpu-tier: t4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-debug-cl-x86_64-gpu-rhi:
+    needs: [build-windows-debug-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-release-cl-x86_64-gpu-dx:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-release-cl-x86_64-gpu-vk:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cpu+llvm
+      gpu-tier: t4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-release-cl-x86_64-gpu-cuda:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: cuda
+      gpu-tier: t4
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  test-windows-release-cl-x86_64-gpu-rhi:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-rhi-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # MaterialX integration test (Windows only for initial validation).
+  test-materialx-windows-release:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    uses: ./.github/workflows/ci-materialx-regression-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-latest"]'
+      ref: ${{ inputs.ref }}
+      repository: ${{ inputs.repository }}
+
+  # Verify docs/command-line-slangc-reference.md matches `slangc -help`.
+  # Reuses the release artifact built by build-linux-release-gcc-x86_64 instead
+  # of building slangc again from scratch (the old standalone
+  # check-cmdline-ref.yml did a full redundant build for this one check).
+  # Comment /regenerate-cmdline-ref on the PR to auto-fix a failure.
+  check-cmdline-ref:
+    needs: [build-linux-release-gcc-x86_64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - name: Download Slang release artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-linux-x86_64-gcc-release
+          path: artifacts
+
+      - name: Generate command line reference
+        run: |
+          # slangc is dynamically linked against libslang; the artifact lays
+          # libraries under Release/lib, separate from the Release/bin binaries.
+          chmod +x artifacts/Release/bin/* 2>/dev/null || true
+          export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
+          mkdir -p temp
+          # Capture stdout+stderr to match how the golden file is produced by
+          # regenerate-cmdline-ref.yml; otherwise stray stderr output would be
+          # baked into the reference but missing here, causing a spurious diff.
+          artifacts/Release/bin/slangc -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
+
+      - name: Compare with existing reference
+        run: |
+          if ! diff -q temp/command-line-slangc-reference.md docs/command-line-slangc-reference.md > /dev/null; then
+            echo "Command line reference is out of date. Diff:"
+            diff -u docs/command-line-slangc-reference.md temp/command-line-slangc-reference.md
+            echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
+            exit 1
+          fi
+
+  # Verify docs/user-guide/a4-02-reference-capability-atoms.md matches
+  # source/slang/slang-capabilities.capdef.
+  # Reuses the release artifact built by build-linux-release-gcc-x86_64 instead
+  # of building slang-capability-generator again from scratch.
+  check-capability-atoms-ref:
+    needs: [build-linux-release-gcc-x86_64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
+          persist-credentials: false
+
+      - name: Download Slang release artifact
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: slang-tests-linux-x86_64-gcc-release
+          path: artifacts
+
+      - name: Generate capability atoms reference
+        run: |
+          # slang-capability-generator may depend on libraries under Release/lib,
+          # separate from the Release/bin binaries.
+          chmod +x artifacts/Release/bin/* 2>/dev/null || true
+          export LD_LIBRARY_PATH="$PWD/artifacts/Release/lib:$LD_LIBRARY_PATH"
+          if [[ ! -x artifacts/Release/bin/slang-capability-generator ]]; then
+            echo "slang-capability-generator is missing from the Slang release artifact."
+            exit 1
+          fi
+          mkdir -p temp/capability temp/docs/user-guide
+          cp docs/user-guide/a4-02-reference-capability-atoms.md temp/docs/user-guide/a4-02-reference-capability-atoms.md
+          capdefs=(source/slang/*.capdef)
+          artifacts/Release/bin/slang-capability-generator \
+            "${capdefs[@]}" \
+            --target-directory temp/capability \
+            --doc temp/docs/user-guide/a4-02-reference-capability-atoms.md
+
+      - name: Compare with existing reference
+        run: |
+          if ! diff -q temp/docs/user-guide/a4-02-reference-capability-atoms.md docs/user-guide/a4-02-reference-capability-atoms.md > /dev/null; then
+            echo "Capability atoms reference is out of date. Diff:"
+            diff -u docs/user-guide/a4-02-reference-capability-atoms.md temp/docs/user-guide/a4-02-reference-capability-atoms.md
+            echo "Please regenerate docs/user-guide/a4-02-reference-capability-atoms.md with slang-capability-generator."
+            exit 1
+          fi
+
+  test-falcor:
+    needs: [build-windows-release-cl-x86_64-gpu-falcor]
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-falcor-test.yml
+    with:
+      slang-artifact-name: slang-tests-windows-x86_64-cl-release-falcor
+
+  test-compile-regression:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-slang-regression-test.yml
+
+  test-benchmark:
+    needs: [build-windows-release-cl-x86_64-gpu]
+    permissions:
+      contents: read
+      actions: read
+    uses: ./.github/workflows/ci-mdl-benchmark-test.yml
+
+  # Nested gate inside the matrix; ci.yml's top-level check-ci summarizes
+  # this job's result (or the skipped state when filter says docs-only) and
+  # is the name branch protection should require.
+  #
+  # The build jobs must be listed in `needs` even though every test job
+  # already depends on a build job: when a needed job fails, GitHub
+  # Actions marks the dependent jobs "skipped" (not "failed"). Requiring
+  # every needed job to succeed ensures skipped jobs cannot hide a failed
+  # dependency (see #11553).
+  check-matrix:
+    needs:
+      [
+        build-linux-debug-gcc-x86_64,
+        build-linux-release-gcc-x86_64,
+        build-linux-release-gcc-wasm,
+        build-linux-debug-gcc-aarch64,
+        build-linux-release-gcc-aarch64,
+        build-macos-debug-clang-aarch64,
+        build-macos-release-clang-aarch64,
+        build-windows-debug-cl-x86_64-gpu,
+        build-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-dx,
+        test-windows-release-cl-x86_64-gpu-vk,
+        test-windows-release-cl-x86_64-gpu-cuda,
+        test-windows-release-cl-x86_64-gpu-rhi,
+        test-windows-debug-cl-x86_64-gpu-dx,
+        test-windows-debug-cl-x86_64-gpu-vk,
+        test-windows-debug-cl-x86_64-gpu-cuda,
+        test-windows-debug-cl-x86_64-gpu-rhi,
+        test-macos-release-clang-aarch64,
+        test-macos-release-clang-aarch64-rhi,
+        test-macos-debug-clang-aarch64,
+        test-macos-debug-clang-aarch64-rhi,
+        test-linux-release-gcc-x86_64,
+        test-linux-release-gcc-x86_64-rhi,
+        test-linux-release-gcc-x86_64-sm80,
+        test-linux-release-gcc-x86_64-cpu,
+        test-linux-debug-gcc-x86_64,
+        test-linux-debug-gcc-x86_64-rhi,
+        test-linux-release-gcc-aarch64,
+        test-linux-debug-gcc-aarch64,
+        test-materialx-windows-release,
+        sanitizer-linux-clang-x86_64,
+        check-cmdline-ref,
+        check-capability-atoms-ref,
+        test-falcor,
+        test-compile-regression,
+        test-benchmark,
+        wait-for-human-priority,
+      ]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check CI Results
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          echo "=== CI Results Summary ==="
+          echo "$NEEDS_JSON" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+
+          # Require every needed job to succeed. Checking the generic
+          # `needs` JSON (rather than enumerating each job) means any job
+          # added to `needs` above is gated automatically.
+          unsuccessful=$(echo "$NEEDS_JSON" | jq -r 'to_entries[]
+            | select(.value.result != "success")
+            | "\(.key): \(.value.result)"')
+          if [[ -n "$unsuccessful" ]]; then
+            echo "These CI jobs did not succeed:"
+            echo "$unsuccessful"
+            exit 1
+          fi
+
+          echo "All CI jobs completed successfully!"

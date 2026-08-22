@@ -26,10 +26,10 @@ contract.
 
 This restriction is about **provenance, not breadth**. It forbids choosing
 tests by looking at uncovered code; it does **not** forbid systematically
-expanding a documented *family* (per-op, per-type, per-shape variants) when
+expanding a documented _family_ (per-op, per-type, per-shape variants) when
 the family is confirmed by an authoritative surface — the language
 reference or the core-module declarations — and each variant's behaviour is
-established by *running the compiler*, not assumed. That is the
+established by _running the compiler_, not assumed. That is the
 [`_claims.md` § Systematic variant expansion](_claims.md) rule, and it is
 the primary lever for deepening emission / legalization coverage when the
 design doc states a rule generically without enumerating its cells.
@@ -70,7 +70,7 @@ design doc states a rule generically without enumerating its cells.
    variants `NAME-DAG:` / `NAME-NEXT:` / etc.). Lint rejects tests
    that run but verify nothing. **Verify locally before commit** with
    `regenerate.py verify <bundle>` (see the `## Verify before
-   committing` section in `_common.md` for the contract). Tests
+committing` section in `_common.md` for the contract). Tests
    targeting backends your runtime doesn't have (`-target dxil`,
    `-target dx12`, GPU-runtime execution) come back as `ignored`;
    that's fine — commit them and CI validates. Tests that come back

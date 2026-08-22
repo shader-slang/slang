@@ -5,11 +5,10 @@ Expression Type Conversions
 
 **Grammar:**
 
-> **`'('`** *`type-expr`* **`')'`**) *`base-expr`*
+> **`'('`** _`type-expr`_ **`')'`**) _`base-expr`_
 
-A _cast expression_ converts a value (*`base-expr`*) to the desired type (*`type-expr`*). This is also known
+A _cast expression_ converts a value (_`base-expr`_) to the desired type (_`type-expr`_). This is also known
 as an explicit type conversion. See [Expression Type Conversions](expressions-conversions.md) for details.
-
 
 ```hlsl
 (int) 1.0f
@@ -31,5 +30,6 @@ MyStruct s = {};
 ```
 
 cases:
+
 - cast to void. But see also https://github.com/shader-slang/slang/issues/11315
 - passing a void value to `return` statement is allowed for `void`-typed functions

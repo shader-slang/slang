@@ -9,14 +9,14 @@ warning: "Auto-generated. May drift from source. Do not edit by hand."
 
 # Name Resolution
 
-This subtree documents the *algorithmic rules* by which Slang turns an
+This subtree documents the _algorithmic rules_ by which Slang turns an
 identifier in source text into a resolved `DeclRef`, and is written for
 a compiler contributor working on or debugging those rules. The pages here
 cover which declarations are considered and in what order, how
 shadowing works, how visibility filters candidates, and how a
 `LookupResult` holding several candidates is narrowed to a single best
-match. This is the *what rules* half of name resolution; the *where in
-the compile flow* half lives in
+match. This is the _what rules_ half of name resolution; the _where in
+the compile flow_ half lives in
 [../pipeline/02-parse-ast.md](../pipeline/02-parse-ast.md) (which
 builds the scope chain while parsing) and
 [../pipeline/03-semantic-check.md](../pipeline/03-semantic-check.md)
@@ -47,12 +47,12 @@ assuming a mechanism lives wholly on one page.
 
 ## Pages
 
-| Page | Topic | Primary source |
-| --- | --- | --- |
-| [scopes.md](scopes.md) | The `Scope` record, which AST nodes own a scope, sibling scopes, and the order scopes are consulted | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h), [slang-parser.cpp](../../../../source/slang/slang-parser.cpp), [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) |
-| [lookup.md](lookup.md) | The lookup entry points; masks and option bits, inheritance and transparent-member walks, breadcrumbs, shadowing | [slang-lookup.h](../../../../source/slang/slang-lookup.h), [slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp) |
-| [visibility.md](visibility.md) | `public` / `internal` / `private`, the per-language-version defaults, and where the visibility filter runs | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h), [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp), [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) |
-| [overload-resolution.md](overload-resolution.md) | Candidate filtering, conversion-cost ranking, partial generic application, operator overloading | [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp), [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) |
+| Page                                             | Topic                                                                                                            | Primary source                                                                                                                                                                                                      |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [scopes.md](scopes.md)                           | The `Scope` record, which AST nodes own a scope, sibling scopes, and the order scopes are consulted              | [slang-ast-base.h](../../../../source/slang/slang-ast-base.h), [slang-parser.cpp](../../../../source/slang/slang-parser.cpp), [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)                 |
+| [lookup.md](lookup.md)                           | The lookup entry points; masks and option bits, inheritance and transparent-member walks, breadcrumbs, shadowing | [slang-lookup.h](../../../../source/slang/slang-lookup.h), [slang-lookup.cpp](../../../../source/slang/slang-lookup.cpp)                                                                                            |
+| [visibility.md](visibility.md)                   | `public` / `internal` / `private`, the per-language-version defaults, and where the visibility filter runs       | [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h), [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp), [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) |
+| [overload-resolution.md](overload-resolution.md) | Candidate filtering, conversion-cost ranking, partial generic application, operator overloading                  | [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp), [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)                                                                |
 
 ## Flow diagram
 

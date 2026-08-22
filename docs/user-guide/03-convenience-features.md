@@ -8,38 +8,47 @@ permalink: /user-guide/convenience-features
 This topic covers a series of nice-to-have language features in Slang. These features are not supported by HLSL but are introduced to Slang to simplify code development. Many of these features are added to Slang per request of our users.
 
 ## Type Inference in Variable Definitions
+
 Slang supports automatic variable type inference:
+
 ```csharp
 var a = 1; // OK, `a` is an `int`.
 var b = float3(0, 1, 2); // OK, `b` is a `float3`.
 ```
+
 Automatic type inference requires an initialization expression to be present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result in a compiler error:
+
 ```csharp
 var a; // Error, cannot infer the type of `a`.
 ```
 
 You may use the `var` keyword to define a variable in a modern syntax:
+
 ```csharp
 var a : int = 1; // OK.
 var b : int; // OK.
 ```
 
 ## Immutable Values
+
 The `var` syntax and the traditional C-style variable definition introduce a _mutable_ variable whose value can be changed after its definition. If you wish to introduce an immutable or constant value, you may use the `let` keyword:
+
 ```rust
 let a = 5; // OK, `a` is `int`.
 let b : int = 5; // OK.
 ```
+
 Attempting to change an immutable value will result in a compiler error:
+
 ```rust
 let a = 5;
 a = 6; // Error, `a` is immutable.
 ```
 
-
 ## Namespaces
 
 You can use the `namespace` syntax to define symbols in a namespace:
+
 ```csharp
 namespace ns
 {
@@ -48,6 +57,7 @@ namespace ns
 ```
 
 Slang also supports the abbreviated syntax for defining nested namespaces:
+
 ```csharp
 namespace ns1.ns2
 {
@@ -69,6 +79,7 @@ namespace ns1
 ```
 
 To access symbols defined in a namespace, you can use their qualified name with namespace prefixes:
+
 ```csharp
 void test()
 {
@@ -78,6 +89,7 @@ void test()
 ```
 
 Symbols defined in the same namespace can access each other without a qualified name. This is true even if the referenced symbol is defined in a different file or module:
+
 ```csharp
 namespace ns
 {
@@ -88,6 +100,7 @@ namespace ns
 
 You can also use the `using` keyword to pull symbols defined in a different namespace to
 the current scope, removing the requirement for using fully qualified names.
+
 ```cpp
 namespace ns1.ns2
 {
@@ -123,6 +136,7 @@ int rs = foo.compute(1,2);
 ```
 
 Slang also supports static member functions. For example:
+
 ```
 struct Foo
 {
@@ -155,7 +169,7 @@ For GPU performance considerations, the `this` argument in a member function is 
 struct Foo
 {
     int count;
-    
+
     [mutating]
     void setCount(int x) { count = x; }
 
@@ -173,6 +187,7 @@ void test()
 ## Properties
 
 Properties provide a convenient way to access values exposed by a type, where the logic behind accessing the value is defined in `getter` and `setter` function pairs. Slang's `property` feature is similar to C# and Swift.
+
 ```csharp
 struct MyType
 {
@@ -202,6 +217,7 @@ struct MyType
 ```
 
 You may also use an explicit parameter for the setter method:
+
 ```csharp
 property uint highBits
 {
@@ -209,9 +225,11 @@ property uint highBits
 }
 ```
 
-> #### Note ####
+> #### Note
+>
 > Slang currently does not support automatically synthesized `getter` and `setter` methods. For example,
 > the following code is not supported:
+>
 > ```
 > property uint highBits {get;set;} // Not supported yet.
 > ```
@@ -219,11 +237,13 @@ property uint highBits
 ## Initializers
 
 ### Constructors
-> #### Note ####
+
+> #### Note
+>
 > The syntax for defining constructors is subject to future change.
 
-
 Slang supports defining constructors in `struct` types. You can write:
+
 ```csharp
 struct MyType
 {
@@ -236,16 +256,18 @@ struct MyType
 ```
 
 You can use a constructor to construct a new instance by using the type name in a function call expression:
+
 ```csharp
 MyType instance = MyType(1,2);  // instance.myVal is 3.
 ```
 
 You may also use a C++-style initializer list to invoke a constructor:
+
 ```csharp
 MyType instance = {1, 2};
 ```
 
-If a constructor does not define any parameters, it will be recognized as a *default* constructor that will be automatically called at the definition of a variable:
+If a constructor does not define any parameters, it will be recognized as a _default_ constructor that will be automatically called at the definition of a variable:
 
 ```csharp
 struct MyType
@@ -264,7 +286,8 @@ int test()
 }
 ```
 
-Slang will also implicitly call a *default* constructor of all parents of a derived struct (same as C++):
+Slang will also implicitly call a _default_ constructor of all parents of a derived struct (same as C++):
+
 ```csharp
 struct MyType_Base
 {
@@ -301,6 +324,7 @@ testMyType2()
 ### Member Init Expressions
 
 Slang supports member init expressions:
+
 ```csharp
 struct MyType
 {
@@ -311,6 +335,7 @@ struct MyType
 ## Operator Overloading
 
 Slang allows defining operator overloads as global methods:
+
 ```csharp
 struct MyType
 {
@@ -329,9 +354,11 @@ int test()
     return rs.val; // returns 3.
 }
 ```
+
 Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `+`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
+
 ```csharp
 struct MyFunctor
 {
@@ -351,6 +378,7 @@ void test()
 ## Subscript Operator
 
 Slang allows overriding `operator[]` with `__subscript` syntax:
+
 ```csharp
 struct MyType
 {
@@ -375,12 +403,14 @@ int test()
 Tuple types can hold a collection of values of different types.
 Tuple types are defined in Slang with the `Tuple<...>` syntax, and
 constructed with either a constructor or the `makeTuple` function:
+
 ```csharp
 Tuple<int, float, bool> t0 = Tuple<int, float, bool>(5, 2.0f, false);
 Tuple<int, float, bool> t1 = makeTuple(3, 1.0f, true);
 ```
 
 Tuple elements can be accessed with `_0`, `_1` member names:
+
 ```csharp
 int i = t0._0; // 5
 bool b = t1._2; // true
@@ -409,6 +439,7 @@ let cmp = t0 < t1; // false
 
 You can use `countof()` on a tuple type or a tuple value to obtain the number of
 elements in a tuple. This is considered a compile-time constant.
+
 ```csharp
 int n = countof(Tuple<int, float>); // 2
 int n1 = countof(makeTuple(1,2,3)); // 3
@@ -501,8 +532,8 @@ Vertex<hasNormal, hasColor> vertMain<bool hasNormal, bool hasColor>(VertexIn inp
 }
 ```
 
-
 ## `if_let` syntax
+
 Slang supports the `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` or `Conditional<T, hasValue>` value. The syntax is similar to Rust's
 `if let` syntax, the value expression must be an `Optional<T>` or `Conditional<T, hasValue>` type, for example:
 
@@ -522,6 +553,7 @@ void test()
 ## `reinterpret<T>` operation
 
 Sometimes it is useful to reinterpret the bits of one type as another type, for example:
+
 ```csharp
 struct MyType
 {
@@ -537,6 +569,7 @@ float4 myPackedVector = packMyTypeToFloat4(myVal);
 The `packMyTypeToFloat4` function is usually implemented by bit casting each field in the source type and assigning it into the corresponding field in the target type,
 by calling `intAsFloat`, `floatAsInt` and using bit operations to shift things in the right place.
 Instead of writing `packMyTypeToFloat4` function yourself, you can use Slang's built-in `reinterpret<T>` to do just that for you:
+
 ```
 float4 myPackedVector = reinterpret<float4>(myVal);
 ```
@@ -546,6 +579,7 @@ float4 myPackedVector = reinterpret<float4>(myVal);
 ## Pointers (limited)
 
 Slang supports pointers when generating code for SPIR-V, C++, and CUDA targets. The syntax for pointers is similar to C, with the exception that operator `.` can also be used to dereference a member from a pointer. For example:
+
 ```csharp
 struct MyType
 {
@@ -607,9 +641,11 @@ to access the global descriptor heap or resource array in order to obtain the ac
 are not opaque handles, `DescriptorHandle<T>` maps to `T` and will have the same size and alignment defined by the target.
 
 `DescriptorHandle<T>` is declared as:
+
 ```slang
 struct DescriptorHandle<T> where T:IOpaqueDescriptor {}
 ```
+
 where `IOpaqueDescriptor` is an interface implemented by all resource types, including textures,
 `ConstantBuffer`, `RaytracingAccelerationStructure`, `SamplerState`, `SamplerComparisonState` and all types of `StructuredBuffer`.
 
@@ -637,7 +673,7 @@ void main()
 ### Direct Descriptor-Heap Indexing
 
 For source compatibility with HLSL Shader Model 6.6, Slang also accepts `ResourceDescriptorHeap[index]`
-and `SamplerDescriptorHeap[index]` directly as *input* syntax. Indexing either heap yields an untyped
+and `SamplerDescriptorHeap[index]` directly as _input_ syntax. Indexing either heap yields an untyped
 handle whose concrete type is recovered from the assignment target, so you can write:
 
 ```slang
@@ -704,7 +740,7 @@ using `getBindlessSpaceIndex() >= 0` as the usage test.
 Default behavior assigns binding indices based on descriptor types:
 
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
-|------------------------|-------------------------------------------|---------------|
+| ---------------------- | ----------------------------------------- | ------------- |
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
 | CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
 | Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
@@ -797,6 +833,7 @@ The user can call `defaultGetDescriptorFromHandle` function from their implement
 `getDescriptorFromHandle` to dispatch to the default behavior.
 
 Additionally, `defaultGetDescriptorFromHandle()` takes an optional argument whose type is `constexpr BindlessDescriptorOptions`. This parameter allows specifying alternative standard presets for how bindless-indexes are assigned. Note that this is currently only relevant to SPIR-V:
+
 ```slang
 public enum BindlessDescriptorOptions
 {
@@ -808,7 +845,7 @@ public enum BindlessDescriptorOptions
 `None` provides the following bindings for descriptor types:
 
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
-|------------------------|-------------------------------------------|---------------|
+| ---------------------- | ----------------------------------------- | ------------- |
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
 | CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
 | Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
@@ -822,7 +859,7 @@ public enum BindlessDescriptorOptions
 `VkMutable` provides the following bindings for descriptor types:
 
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
-|------------------------|-------------------------------------------|---------------|
+| ---------------------- | ----------------------------------------- | ------------- |
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
 | CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
 | Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
@@ -861,7 +898,8 @@ enum DescriptorAccess
 
 By default, the value of a `DescriptorHandle<T>` object is assumed to be dynamically uniform across all
 execution threads. If this is not the case, the user is required to mark the `DescriptorHandle` as `nonuniform`
-*immediately* before dereferencing it:
+_immediately_ before dereferencing it:
+
 ```slang
 void test(DescriptorHandle<Texture2D> t)
 {
@@ -872,10 +910,9 @@ void test(DescriptorHandle<Texture2D> t)
 If the resource pointer value is not uniform and `nonuniform` is not called, the result may be
 undefined.
 
-
-
 Extensions
 --------------------
+
 Slang allows defining additional methods for a type outside its initial definition. For example, suppose we already have a type defined:
 
 ```csharp
@@ -887,6 +924,7 @@ struct MyType
 ```
 
 You can extend `MyType` with new method members:
+
 ```csharp
 extension MyType
 {
@@ -907,6 +945,7 @@ void test()
 This feature is similar to extensions in Swift and extension methods in C#.
 
 > #### Note:
+>
 > You can only extend a type with additional methods. Extending with additional data fields is not allowed.
 
 Multi-level break
@@ -914,6 +953,7 @@ Multi-level break
 
 Slang allows `break` statements with a label to jump into any ancestor control flow break points, and not just the immediate parent.
 Example:
+
 ```
 outer:
 for (int i = 0; i < 5; i++)
@@ -929,8 +969,10 @@ for (int i = 0; i < 5; i++)
 
 Force inlining
 -----------------
+
 Most downstream shader compilers will inline all function calls. However, you can instruct the Slang compiler to do the inlining
 by using the `[ForceInline]` decoration:
+
 ```
 [ForceInline]
 int f(int x) { return x + 1; }
@@ -949,6 +991,7 @@ the error.
 
 In order to be able to throw an error, a function must declare the type of that
 error with `throws`:
+
 ```
 enum MyError
 {
@@ -963,6 +1006,7 @@ int f() throws MyError
     return 42;
 }
 ```
+
 Currently, functions may only throw a single type of error.
 
 To call a function that may throw, you must prepend it with `try`:
@@ -1004,10 +1048,13 @@ You can chain multiple catch statements for different types of errors.
 
 Special Scoping Syntax
 -------------------
+
 Slang supports three special scoping constructs to allow users to mix in custom decorators and content in the shader code. These constructs allow a rendering engine to define custom metadata in the shader, or map engine-specific block syntax to a meaningful block that is understood by the compiler via proper `#define`s.
 
 ### `__ignored_block`
+
 An ignored block will be parsed and ignored by the compiler:
+
 ```
 __ignored_block
 {
@@ -1018,8 +1065,10 @@ __ignored_block
 ```
 
 ### `__transparent_block`
+
 Symbols defined in a transparent block will be treated as if they are defined
 in the parent scope:
+
 ```csharp
 struct MyType
 {
@@ -1029,7 +1078,9 @@ struct MyType
     }
 }
 ```
+
 Is equivalent to:
+
 ```csharp
 struct MyType
 {
@@ -1038,9 +1089,11 @@ struct MyType
 ```
 
 ### `__file_decl`
+
 Symbols defined in a `__file_decl` will be treated as if they are defined in
 the global scope. However, symbols defined in different `__file_decl`s are not visible
 to each other. For example:
+
 ```csharp
 __file_decl
 {

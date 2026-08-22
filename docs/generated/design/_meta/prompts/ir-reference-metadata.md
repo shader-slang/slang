@@ -6,7 +6,7 @@ See [_common.md](_common.md) for the universal rules and the
 ## Target
 
 Produce `docs/generated/design/ir-reference/metadata.md` — the
-per-opcode reference for IR metadata families that are *not*
+per-opcode reference for IR metadata families that are _not_
 decorations: `Layout` (around line 2617), `Attr` (around line 2650),
 `Debug*` (around lines 2714-2750), and `SPIRVAsmOperand` (around
 line 2754).
@@ -18,7 +18,7 @@ line 2754).
     (`VarLayout`, `EntryPointLayout`, `TypeLayout`,
     `StructLayout`, `OffsetAttr`, `SizeAttr`, ...).
   - **Attribute** — `Attr` parent and its children
-    (general-purpose IR attributes that are *not* decorations).
+    (general-purpose IR attributes that are _not_ decorations).
   - **Debug info** — `DebugLine`, `DebugValue`, `DebugFunction`,
     `DebugScope`, `DebugBuildIdentifier`, `DebugCompilationUnit`,
     `DebugSource`, `DebugInlinedAt`, ... Cite the SPIR-V non-semantic
@@ -53,10 +53,10 @@ Cover at least:
 
 ## Forbidden content
 
-- Layout *algorithm* — see
+- Layout _algorithm_ — see
   [../pipeline/05-ir-passes.md](../pipeline/05-ir-passes.md) and the
   `slang-ir-layout*.cpp` files.
-- Debug-info *emission* — see
+- Debug-info _emission_ — see
   [../pipeline/06-emit.md](../pipeline/06-emit.md) and
   `slang-emit-spirv.cpp`.
 

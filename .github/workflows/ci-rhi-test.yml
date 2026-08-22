@@ -23,6 +23,16 @@ on:
         type: string
         default: ""
         description: "Optional suffix for artifact name (e.g., '-cuda')"
+      ref:
+        description: "Git ref to check out. Empty = use github.sha (default)."
+        required: false
+        type: string
+        default: ""
+      repository:
+        description: "Repository to check out. Empty = use github.repository (default)."
+        required: false
+        type: string
+        default: ""
 
 jobs:
   test-slang-rhi:
@@ -35,6 +45,8 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
+          repository: ${{ inputs.repository != '' && inputs.repository || github.repository }}
+          ref: ${{ inputs.ref != '' && inputs.ref || github.sha }}
           persist-credentials: false
           submodules: "recursive"
           fetch-depth: "1"

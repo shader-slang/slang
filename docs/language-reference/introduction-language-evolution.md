@@ -116,8 +116,7 @@ When a proposal contains backward breaking changes, then:
 
 **Example:**
 
-*Unscoped enumerations* have been slated for removal, tracked by GitHub issue
-#[11175](https://github.com/shader-slang/slang/issues/11175). This is a potentially significant breaking
+_Unscoped enumerations_ have been slated for removal, tracked by GitHub issue #[11175](https://github.com/shader-slang/slang/issues/11175). This is a potentially significant breaking
 change that requires following the specification proposal process.
 
 Tentatively, the unscoped enumerations are going to be removed in Slang 2028. The current default language is 2025 at

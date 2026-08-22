@@ -163,7 +163,7 @@ _`#hash-consing-and-the-astbuilder` / `#substitution-and-the-substitution-cache`
 37. `SubtypeWitness` fixes operand slots 0 and 1 as `sub` and `sup`; the two differentiation witnesses are the exception.
 38. `PolynomialIntValFactor` and `PolynomialIntValTerm` are `Val`s that are not `IntVal`s and appear only as operands of a `PolynomialIntVal`.
 39. The pack integer values (`FirstIntVal`, `LastIntVal`, `ConcreteIntValPack`, `TrimFirstIntValPack`, `TrimLastIntValPack`, the four `Shape*IntValPack`s, `ExpandIntValPack`, `EachIntVal`) mirror the type-pack operators at the value level.
-40. The pack subtype witnesses mirror the type-pack operators at the witness level, and a variadic pack's *count* carries its own evidence (`DeclaredVariadicPackCountWitness` resolving into `ConcreteVariadicPackCountWitness`).
+40. The pack subtype witnesses mirror the type-pack operators at the witness level, and a variadic pack's _count_ carries its own evidence (`DeclaredVariadicPackCountWitness` resolving into `ConcreteVariadicPackCountWitness`).
 41. `ExtractExistentialSubtypeWitness` is manufactured when an existential value is opened.
 42. `DynamicSubtypeWitness` is evidence that a `__Dynamic` type argument satisfies an existential type parameter.
 43. `TypeEqualityWitness` is built through `SemanticsVisitor::createTypeEqualityWitness` for the self facet of a non-decl-ref type and for the extracted / projected types of an opened existential.

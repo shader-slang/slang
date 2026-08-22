@@ -106,10 +106,10 @@ In implementation terms:
 linked-issue sync when already assigned). Skips human drafts (except Bot PRs) and
 merge-queued PRs.
 
-| Source              | Assignee             | Auto-requested reviewer                                      | Comment |
-| ------------------- | -------------------- | ------------------------------------------------------------ | ------- |
-| **Internal**        | PR author            | none                                                         | none |
-| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none       | one-shot automated notice naming the assignee (explicitly: do not reply); may FYI a higher-signal collaborator without `@` |
+| Source              | Assignee             | Auto-requested reviewer                                | Comment                                                                                                                    |
+| ------------------- | -------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| **Internal**        | PR author            | none                                                   | none                                                                                                                       |
+| **Community / Bot** | see pick order below | shepherd if they are not the PR author; otherwise none | one-shot automated notice naming the assignee (explicitly: do not reply); may FYI a higher-signal collaborator without `@` |
 
 **Pick order** (Community/Bot assignee / shepherd):
 

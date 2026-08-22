@@ -53,10 +53,10 @@ and how `legalizeIRForWGSL` and `WGSLSourceEmitter` cooperate.
   `floatNonUniformResourceIndex` runs (line ~1980 / 1983-1984 also
   covers `isWGPUTarget`),
   `legalizeLogicalAndOr` runs (`isD3DTarget || isKhronosTarget ||
-  isWGPUTarget || isMetalTarget`),
+isWGPUTarget || isMetalTarget`),
   `eliminatePhis` with **default** options,
   `applyVariableScopeCorrection` runs (line ~2324 `target !=
-  SPIRV`).
+SPIRV`).
 - **Phase D — WGSL emit and downstream tools.** From
   `emitEntryPointsSourceFromIR` through the `WGSLSourceEmitter`
   (line ~2469), `simplifyForEmit`, and `sourceEmitter->emitModule`.

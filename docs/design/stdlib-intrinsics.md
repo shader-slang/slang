@@ -3,7 +3,7 @@ Core Module Intrinsics
 
 The following document aims to cover a variety of systems used to add target specific features. They are most extensively used in the slang core module.
 
-**NOTE!** These features should *not* be considered stable! They can be used in regular slang code to add features, but they risk breaking with any Slang version change. Additionally the features implementation can be very particular to what is required for a specific feature set, so might not work as expected in all scenarios.
+**NOTE!** These features should _not_ be considered stable! They can be used in regular slang code to add features, but they risk breaking with any Slang version change. Additionally the features implementation can be very particular to what is required for a specific feature set, so might not work as expected in all scenarios.
 
 As these features are in flux, it is quite possible this document is behind the current features available within the Slang code base.
 
@@ -13,11 +13,11 @@ If you want to add support for a feature for a target to Slang, implementing it 
 
 The main place these features are used are within the slang core module. This is implemented with a set of slang files within the slang project
 
-* core.meta.slang 
-* hlsl.meta.slang
-* diff.meta.slang
+- core.meta.slang
+- hlsl.meta.slang
+- diff.meta.slang
 
-Looking at these files will demonstrate the features in use. 
+Looking at these files will demonstrate the features in use.
 
 Most of the intrinsics and attributes have names that indicate that they are not for normal use. This is typically via a `__` prefix. The same convention applies to result registers named inside a `spirv_asm` block: internal registers must be `__`-prefixed (e.g. `%__result`), because the SPIR-V emitter turns every named `spirv_asm` register into an `OpName` in the output, and the prefix keeps those debug names from being mistaken for user symbols. The parser asserts this for core-module code. See the "Internal `spirv_asm` result registers" section of [coding-conventions.md](coding-conventions.md).
 
@@ -47,11 +47,11 @@ A `[__readNone]` indicates a function that computes its results strictly based o
 
 ## [__NoSideEffect]
 
-Specifies a function declaration has no observable side effects. 
+Specifies a function declaration has no observable side effects.
 
 ## [__unsafeForceInlineEarly]
 
-Inlines the contained code, but does so very early stage. Being earlier allows allows some kinds of inlining transformations to work, that wouldn't work with regular inlining. It also means it must be used with *care*, because it may produce unexpected results for more complex scenarios.  
+Inlines the contained code, but does so very early stage. Being earlier allows allows some kinds of inlining transformations to work, that wouldn't work with regular inlining. It also means it must be used with _care_, because it may produce unexpected results for more complex scenarios.
 
 ## [__NonCopyableType]
 
@@ -68,22 +68,23 @@ A `[KnownBuiltin("name")]` attribute allows the compiler to identify this declar
 # Intrinsics
 
 <a id="target-intrinsic"></a>
+
 ## __target_intrinsic(target, expansion)
 
 This is a widely used and somewhat complicated intrinsic. Placed on a declaration it describes how the declaration should be emitted for a target. The complexity is that `expansion` is applied via a variety of rules. `target` is a "target capability", commonly it's just the emit target for the intrinsic, so one of...
 
-* hlsl
-* glsl
-* cuda - CUDA
-* cpp - C++ output (used for exe, shared-library or host-callable)
+- hlsl
+- glsl
+- cuda - CUDA
+- cpp - C++ output (used for exe, shared-library or host-callable)
 
-* spirv - Used for slangs SPIR-V direct mechanism
+- spirv - Used for slangs SPIR-V direct mechanism
 
-A function definition can have a `target_intrinsic` *and* a body. In that case, the body will be used for targets where the `target_intrinsic` isn't defined. 
+A function definition can have a `target_intrinsic` _and_ a body. In that case, the body will be used for targets where the `target_intrinsic` isn't defined.
 
-If the intrinsic can be emitted as is, the expansion need not be specified. If only the *name* needs to changed (params can be passed as is), only the name to be expanded to needs to be specified *without* `()`. In this scenario it is not necessary to specify as a string in quotes, and just the identifier name can be used.
+If the intrinsic can be emitted as is, the expansion need not be specified. If only the _name_ needs to changed (params can be passed as is), only the name to be expanded to needs to be specified _without_ `()`. In this scenario it is not necessary to specify as a string in quotes, and just the identifier name can be used.
 
-Currently `HLSL` has a special handling in that it is *assumed* if a declaration exists that it can be emitted verbatim to HLSL.  
+Currently `HLSL` has a special handling in that it is _assumed_ if a declaration exists that it can be emitted verbatim to HLSL.
 
 The target can also be a capability atom. The atoms are listed in "slang-capability-defs.h".
 
@@ -95,21 +96,26 @@ The `expansion` value can be a string or an identifier. If it is an identifier, 
 
 Sections of the `expansion` string that are to be replaced are prefixed by the `$` sigil.
 
-* $0-9 - Indicates the parameter at that index. For a method call $0 is `this`.
-* $T0-9 - The type for the param at the index. If the type is a texture resource derived type, returns the *element* type.
-* $TR - The return type
-* $G0-9 - Replaced by the type/value at that index of specialization
-* $S0-9 - The scalar type of the generic at the index.
-* $p - Used on texturing operations. Produces the combined texture sampler arguments as needed for GLSL.
-* $q - The counterpart of `$p` for a texture-only query (e.g. `GetDimensions`) on a combined texture-sampler. When the combined `Sampler2D`-style value is lowered into a `{texture, sampler}` pair, an extra sampler operand is injected at index 1; `$q` makes the positional `$N` (for N >= 1) accessors skip it so the outputs line up. Emits nothing, and is a no-op on a plain (non-combined) texture.
-* $C - The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format conversion required between the type associated by the resource and the backing ImageFormat. Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture writes that will do a format conversion.
-* $E - Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface access is byte addressed. $E will return the byte size of the *backing element*.
-* $c - When doing texture access in GLSL the result may need to be cast. In particular if the underlying texture is 'half' based, GLSL only accesses (read/write) as float. So we need to cast to a half type on output. When storing into a texture it is still the case the value written must be half - but we don't need to do any casting there as half is coerced to float without a problem.
-* $z - If we are calling a D3D texturing operation in the form t.Foo(s, ...), where `t` is a Texture&lt;T&gt;, then this is the step where we try to properly swizzle the output of the equivalent GLSL call into the right shape.
-* $N0-9 - Extract the element count from a vector argument so that we can use it in the constructed expression.
-* $V0-9 - Take an argument of some scalar/vector type and pad it out to a 4-vector with the same element type (this is the inverse of `$z`).
-* $P - Type-based prefix as used for CUDA and C++ targets (I8 for int8_t, F32 - float etc)
-* $[0-9] - Access extra type or value operands passed explicitly after the format string in `__intrinsic_asm`. For type operands (e.g. generic type parameters like `T`), emits the type name. For value operands (e.g. generic integer parameters like `let N : int`), emits the value expression. The extra operands are listed as a comma-separated sequence after the format string literal. Indices are zero-based.
+- $0-9 - Indicates the parameter at that index. For a method call $0 is `this`.
+- $T0-9 - The type for the param at the index. If the type is a texture resource derived type, returns the _element_ type.
+- $TR - The return type
+- $G0-9 - Replaced by the type/value at that index of specialization
+- $S0-9 - The scalar type of the generic at the index.
+- $p - Used on texturing operations. Produces the combined texture sampler arguments as needed for GLSL.
+- $q - The counterpart of `$p`for a texture-only query (e.g.`GetDimensions`) on a combined texture-sampler. When the combined `Sampler2D`-style value is lowered into a `{texture, sampler}`pair, an extra sampler operand is injected at index 1;`$q` makes the positional `$N` (for N >= 1) accessors skip it so the outputs line up. Emits nothing, and is a no-op on a plain (non-combined) texture.
+- $C - The $C intrinsic is a mechanism to change the name of an invocation depending on if there is a format conversion required between the type associated by the resource and the backing ImageFormat. Currently this is only implemented on CUDA, where there are specialized versions of the RWTexture writes that will do a format conversion.
+- $E - Sometimes accesses need to be scaled. For example in CUDA the x coordinate for surface access is byte addressed. $E will return the byte size of the _backing element_.
+- $c - When doing texture access in GLSL the result may need to be cast. In particular if the underlying texture is 'half' based, GLSL only accesses (read/write) as float. So we need to cast to a half type on output. When storing into a texture it is still the case the value written must be half - but we don't need to do any casting there as half is coerced to float without a problem.
+- $z - If we are calling a D3D texturing operation in the form t.Foo(s, ...), where `t` is a Texture&lt;T&gt;, then this is the step where we try to properly swizzle the output of the equivalent GLSL call into the right shape.
+- $N0-9 - Extract the element count from a vector argument so that we can use it in the constructed expression.
+- $V0-9 - Take an argument of some scalar/vector type and pad it out to a 4-vector with the same element type (this is the inverse of `$z`).
+- $a - We have an operation that needs to lower to either `atomic*` or `imageAtomic*` for GLSL, depending on whether its first operand is a subscript into an array. This `$a`is the first`a`in`atomic`, so we will replace it accordingly.
+- $A - We have an operand that represents the destination of an atomic operation in GLSL, and it should be lowered based on whether it is an ordinary l-value, or an image subscript. In the image subscript case this operand will turn into multiple arguments to the `imageAtomic*` function.
+- $XP - Ray tracing ray payload
+- $XC - Ray tracing callable payload
+- $XH - Ray tracing hit object attribute
+- $P - Type-based prefix as used for CUDA and C++ targets (I8 for int8_t, F32 - float etc)
+- $[0-9] - Access extra type or value operands passed explicitly after the format string in `__intrinsic_asm`. For type operands (e.g. generic type parameters like `T`), emits the type name. For value operands (e.g. generic integer parameters like `let N : int`), emits the value expression. The extra operands are listed as a comma-separated sequence after the format string literal. Indices are zero-based.
 
 ## __attributeTarget(astClassName)
 
@@ -123,7 +129,7 @@ Identifies the declaration is being "builtin".
 
 A modifier that indicates a built-in associated type requirement (e.g., `Differential`). The requirement is one of `BuiltinRequirementKind`.
 
-The requirement value can just be specified via the `$()` mechanism. 
+The requirement value can just be specified via the `$()` mechanism.
 
 ## __builtin_type(tag)
 
@@ -131,7 +137,7 @@ Specifies a builtin type - the integer value of one of the enumeration BaseType.
 
 ## __magic_type(clsName, tag)
 
-Used before a type declaration. The clsName is the name of the class that is used to represent the type in the AST in Slang *C++* code. The tag is an optional integer value that is in addition and meaningful in the context of the class type.
+Used before a type declaration. The clsName is the name of the class that is used to represent the type in the AST in Slang _C++_ code. The tag is an optional integer value that is in addition and meaningful in the context of the class type.
 
 ##__intrinsic_type(op)
 
@@ -166,12 +172,12 @@ attribute_syntax [name(parmName: paramType, ...)] : syntaxClass;
 
 There can be 0 or more params associated with the attribute, and if so the () are not needed.
 
-* `name` gives the name of the attribute to define.
-* `paramName` is the name of param that are specified with attribute use
-* `paramType` is the type of the value associated with the param 
-* `syntaxClass` is the name of an AST node class that we expect this attribute to create when checked.
+- `name` gives the name of the attribute to define.
+- `paramName` is the name of param that are specified with attribute use
+- `paramType` is the type of the value associated with the param
+- `syntaxClass` is the name of an AST node class that we expect this attribute to create when checked.
 
-For example 
+For example
 
 ```
 __attributeTarget(FuncDecl)
@@ -207,15 +213,15 @@ __glsl_version(430)
 
 ## __glsl_extension
 
-Specifies the GLSL extension that is required for the declaration to work. A declaration that has the intrinsic, when output to GLSL will additionally add `#extension` to the the GLSL or SPIR-V output.  
+Specifies the GLSL extension that is required for the declaration to work. A declaration that has the intrinsic, when output to GLSL will additionally add `#extension` to the the GLSL or SPIR-V output.
 
 Multiple extensions can be applied to a decoration if that is applicable, if there are multiple ways of implementing that can be emitted in the same manner (see the section around [target](#target-intrinsic)) for more details.
 
 ## __spirv_version
 
-When declaration is used for SPIR-V target will take the highest value seen to be the SPIR-V version required. For compilation through GLSLANG, the value is passed down to to GLSLANG specifying this SPIR-V is being targeted. 
+When declaration is used for SPIR-V target will take the highest value seen to be the SPIR-V version required. For compilation through GLSLANG, the value is passed down to to GLSLANG specifying this SPIR-V is being targeted.
 
-Example 
+Example
 
 ```
 __spirv_version(1.3)
@@ -223,29 +229,29 @@ __spirv_version(1.3)
 
 ## vk::spirv_instruction
 
-Provides a way to use a limited amount of `GL_EXT_spirv_intrinsics` the extension.  
+Provides a way to use a limited amount of `GL_EXT_spirv_intrinsics` the extension.
 
 ```
 vk::spirv_instruction(op, set)
 ```
 
-Op is the integer *value* for the op. The `set` is optional string which specifies the instruction set the op is associated with. 
+Op is the integer _value_ for the op. The `set` is optional string which specifies the instruction set the op is associated with.
 For example
 
 ```
 __specialized_for_target(glsl)
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
 void debugBreak();
-``` 
+```
 
-# CUDA specific 
+# CUDA specific
 
 ## __cuda_sm_version
 
 When declaration is used with this intrinsic for a CUDA target, the highest shader model seen will be passed down to the downstream CUDA compile (NVRTC).
 
-# NVAPI 
+# NVAPI
 
 ## [__requiresNVAPI]
 
-If declaration is reached during a compilation for an applicable target (D3D11/12), will indicate that [NVAPI support](../nvapi-support.md) is required for declaration to work. 
+If declaration is reached during a compilation for an applicable target (D3D11/12), will indicate that [NVAPI support](../nvapi-support.md) is required for declaration to work.

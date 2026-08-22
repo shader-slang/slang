@@ -20,8 +20,8 @@ short call-outs further down each page. The intended reader is a
 compiler developer who already knows roughly what they are looking for
 and needs to find the opcode, its shape, and where it comes from.
 
-The family pages are intentionally narrow: they describe *shape and
-provenance*, not *behaviour of the passes that consume the IR*. For
+The family pages are intentionally narrow: they describe _shape and
+provenance_, not _behaviour of the passes that consume the IR_. For
 the conventions every opcode obeys (schema, flag bits, hoistable/global
 deduplication, module versioning, the workflow for adding a new opcode),
 see [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md).
@@ -53,18 +53,18 @@ flowchart TD
 
 ## Pages
 
-| Page | Family | Lua entry root | Approx. opcodes |
-| --- | --- | --- | --- |
-| [types.md](types.md) | Type instructions | `Type` (line 20), with the nested `BasicType` (22), `TranslatedTypeBase` (168), and `WorkGraphRecordTypeBase` (232) groups | ~170 |
-| [values.md](values.md) | Constants, arithmetic, conversions (including the `DescriptorHandle<T>` conversions), memory, aggregate constructors, reshape/pack helpers, constexpr arithmetic/casts, string and native-pointer helpers | `Constant` (line 953) plus top-level value opcodes; the `constexpr*` cluster starts at line 3408 | ~150 |
-| [structure.md](structure.md) | Module structure: functions, generics, globals, structs, interfaces, witness tables | `GlobalValueWithCode` (line 885), `module` (line 942) | ~20 |
-| [control-flow.md](control-flow.md) | Block, parameters, branches, function exits, target / quad-execution `Require*` markers | `block` (line 944), `param` (line 1170), `TerminatorInst` (lines 1450-1535), the backend-hint group (1537-1547) | ~30 |
-| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers) | `specialize` (line 1047), `lookupWitness` (1048); the type-flow `SetBase` group at line 3125 | ~50 |
-| [resources-and-atomics.md](resources-and-atomics.md) | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing, descriptor-heap loads, and the natural-layout `getNaturalStride` / `getNaturalAlignment` pair | `AtomicOperation` (line 1186) plus top-level resource opcodes | ~90 |
-| [differentiation.md](differentiation.md) | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff placeholders, `DiffTypeInfo` | `MakeDifferentialPairBase` (lines 1016-1046), `DiffTypeInfo` (1124), `TranslateBase` (2816-2855) | ~40 |
-| [decorations.md](decorations.md) | Decoration family (metadata attached to instructions) | `Decoration` (line 1752) | ~200 |
-| [metadata.md](metadata.md) | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand` | `Layout` (line 2876), `Attr` (2909), the `Debug*` cluster (2974-3009), `SPIRVAsmOperand` (3016) | ~60 |
-| [misc.md](misc.md) | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, compile-time size/align/count queries, storage casts, untyped descriptor-heap handle casts, liveness markers, tensor / runtime helpers, kernel launch | Top-level miscellaneous opcodes, plus the `Undefined` (972), `BindingQuery` (1736), `CastStorageToLogicalBase` (2763), and `LiveRangeMarker` (2961) groups | ~70 |
+| Page                                                         | Family                                                                                                                                                                                                                                    | Lua entry root                                                                                                                                             | Approx. opcodes |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| [types.md](types.md)                                         | Type instructions                                                                                                                                                                                                                         | `Type` (line 20), with the nested `BasicType` (22), `TranslatedTypeBase` (168), and `WorkGraphRecordTypeBase` (232) groups                                 | ~170            |
+| [values.md](values.md)                                       | Constants, arithmetic, conversions (including the `DescriptorHandle<T>` conversions), memory, aggregate constructors, reshape/pack helpers, constexpr arithmetic/casts, string and native-pointer helpers                                 | `Constant` (line 953) plus top-level value opcodes; the `constexpr*` cluster starts at line 3408                                                           | ~150            |
+| [structure.md](structure.md)                                 | Module structure: functions, generics, globals, structs, interfaces, witness tables                                                                                                                                                       | `GlobalValueWithCode` (line 885), `module` (line 942)                                                                                                      | ~20             |
+| [control-flow.md](control-flow.md)                           | Block, parameters, branches, function exits, target / quad-execution `Require*` markers                                                                                                                                                   | `block` (line 944), `param` (line 1170), `TerminatorInst` (lines 1450-1535), the backend-hint group (1537-1547)                                            | ~30             |
+| [generics-and-existentials.md](generics-and-existentials.md) | `specialize`, witness lookup, existential pack/unpack, RTTI, type-flow specialization (sets, tagged unions, dispatchers)                                                                                                                  | `specialize` (line 1047), `lookupWitness` (1048); the type-flow `SetBase` group at line 3125                                                               | ~50             |
+| [resources-and-atomics.md](resources-and-atomics.md)         | Image/buffer/sampler ops, shader IO, atomics, barriers, fragment-shader interlocks, cooperative matrix/vector, wave intrinsics, raytracing, descriptor-heap loads, and the natural-layout `getNaturalStride` / `getNaturalAlignment` pair | `AtomicOperation` (line 1186) plus top-level resource opcodes                                                                                              | ~90             |
+| [differentiation.md](differentiation.md)                     | Autodiff: differential pairs, forward/backward differentiate, reverse-mode contexts, autodiff placeholders, `DiffTypeInfo`                                                                                                                | `MakeDifferentialPairBase` (lines 1016-1046), `DiffTypeInfo` (1124), `TranslateBase` (2816-2855)                                                           | ~40             |
+| [decorations.md](decorations.md)                             | Decoration family (metadata attached to instructions)                                                                                                                                                                                     | `Decoration` (line 1752)                                                                                                                                   | ~200            |
+| [metadata.md](metadata.md)                                   | `Layout`, `Attr`, `Debug*`, `SPIRVAsmOperand`                                                                                                                                                                                             | `Layout` (line 2876), `Attr` (2909), the `Debug*` cluster (2974-3009), `SPIRVAsmOperand` (3016)                                                            | ~60             |
+| [misc.md](misc.md)                                           | System opcodes (`nop`, `Unrecognized`), pack/expansion, type queries, compile-time size/align/count queries, storage casts, untyped descriptor-heap handle casts, liveness markers, tensor / runtime helpers, kernel launch               | Top-level miscellaneous opcodes, plus the `Undefined` (972), `BindingQuery` (1736), `CastStorageToLogicalBase` (2763), and `LiveRangeMarker` (2961) groups | ~70             |
 
 The **Approx. opcodes** column is rounded to the nearest ten. It is
 approximate for a second reason as well: a few rows on each page are
@@ -73,7 +73,7 @@ underlying row counts double-count those dual-role opcodes.
 
 Two ownership splits are worth knowing before you pick a page, because
 the obvious guess is wrong in both cases. The `DescriptorHandle<T>`
-conversions live on [values.md](values.md), the *untyped*
+conversions live on [values.md](values.md), the _untyped_
 descriptor-heap handle casts on
 [misc.md](misc.md#untyped-descriptor-heap-handle-casts), and the
 descriptor-heap loads on
@@ -91,7 +91,7 @@ families.
 
 ## How AST nodes lower to IR
 
-The AST-origin column on every family page names the *producer* that
+The AST-origin column on every family page names the _producer_ that
 constructs a given opcode: where that producer is AST lowering, the
 citation is one of the roughly 230 `visit*` member functions in
 [../../../../source/slang/slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
@@ -139,10 +139,10 @@ a bare `—` are retired; see the column contract in
   legalization that shapes which opcodes survive to emission.
 - [../glossary.md](../glossary.md) — definitions of `IRInst`, `IROp`,
   `IRBuilder`, `IRModule`, `parent instruction`, `terminator
-  instruction`, `block parameter`, `decoration`, `hoistable
-  instruction`, `target intrinsic`, `differential pair`, `witness
-  table`, `existential type`, `specialization`, `single static
-  assignment (SSA)`.
+instruction`, `block parameter`, `decoration`, `hoistable
+instruction`, `target intrinsic`, `differential pair`, `witness
+table`, `existential type`, `specialization`, `single static
+assignment (SSA)`.
 
 ## How to navigate
 

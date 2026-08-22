@@ -101,7 +101,7 @@ source shape that trips it and an emit difference that follows.
 - **`nvrtc` invocation and PTX/cubin bytecode** beyond what `-target ptx`
   produces locally. The doc anchors this at `#downstream-nvrtc`; a real CUDA
   toolchain is not present on the no-GPU runner.
-- **Pass *ordering* within a phase.** Pass existence is observable through its
+- **Pass _ordering_ within a phase.** Pass existence is observable through its
   effect on emitted text; ordering is an IR-level claim owned by
   `pipeline/05-ir-passes`.
 - **The autodiff gate** (`#the-autodiff-gate`) where it requires a differentiable
@@ -160,13 +160,13 @@ Default:
 
 Variants this bundle legitimately needs:
 
-| Need | Directive |
-| --- | --- |
-| `CUDAHeader`-vs-`CUDASource` divergence | `-target cuh` alongside `-target cuda` |
-| PTX as the artifact endpoint | `-target ptx` |
-| Ray-tracing entry-point shapes | `-stage raygeneration` / `closesthit` / `anyhit` / `intersection` |
-| Cooperative-vector gate | `-capability optix_coopvec` |
-| SM-gated behavior | `-capability cuda_sm_7_0` |
+| Need                                        | Directive                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| `CUDAHeader`-vs-`CUDASource` divergence     | `-target cuh` alongside `-target cuda`                              |
+| PTX as the artifact endpoint                | `-target ptx`                                                       |
+| Ray-tracing entry-point shapes              | `-stage raygeneration` / `closesthit` / `anyhit` / `intersection`   |
+| Cooperative-vector gate                     | `-capability optix_coopvec`                                         |
+| SM-gated behavior                           | `-capability cuda_sm_7_0`                                           |
 | A value-level result rather than a spelling | `COMPARE_COMPUTE:-cpu -output-using-type` with `TEST_INPUT` buffers |
 
 ## Lessons captured for the CUDA target pipeline

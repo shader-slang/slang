@@ -5,13 +5,13 @@ Member Expression
 
 **Grammar:**
 
-> *`namespace-identifier`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+> _`namespace-identifier`_ (**`'.'`** | **`'::'`**) _`member-identifier`_
 >
-> *`type-expr`* (**`'.'`** | **`'::'`**) *`member-identifier`*
+> _`type-expr`_ (**`'.'`** | **`'::'`**) _`member-identifier`_
 >
-> *`value-expr`* **`'.'`** *`member-identifier`*
+> _`value-expr`_ **`'.'`** _`member-identifier`_
 >
-> *`pointer-value-expr`* **`'->'`** *`member-identifier`*
+> _`pointer-value-expr`_ **`'->'`** _`member-identifier`_
 
 A _member access expression_ selects a member of a namespace, type, or a value expression.
 
@@ -26,16 +26,15 @@ for details.
 If the left-hand-side is a value, then:
 
 1. If the value is a scalar, vector, matrix, or tuple value, the member access expression is a swizzle
-   expression. See *Swizzle Expressions* below.
+   expression. See _Swizzle Expressions_ below.
 
 2. If the value type is a [struct](types-struct.md), then the:
 
-   1. If *`member-identifier`* names a member (a field or a function), then the expression is a value
+   1. If _`member-identifier`_ names a member (a field or a function), then the expression is a value
       expression for that member, matching the value category.
 
-   2. If *`member-identifier`* names a property, then the expression is translated as a `get` or `set`
+   2. If _`member-identifier`_ names a property, then the expression is translated as a `get` or `set`
       accessor of that property, depending on whether the expression reads or assigns that property.
-
 
 ### Implicit Dereference
 
@@ -48,9 +47,9 @@ For an explicit pointer, the arrow operator `->` dereferences the pointer and th
 When the base expression of a member expression is of a vector type `vector<T,N>` then a member expression is a _vector swizzle expression_.
 The member name must conform to these constraints:
 
-* The member name must comprise between one and four ASCII characters
-* The characters must be come either from the set (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to element indics of (0, 1, 2, 3)
-* The element index corresponding to each character must be less than `N`
+- The member name must comprise between one and four ASCII characters
+- The characters must be come either from the set (`x`, `y`, `z`, `w`) or (`r`, `g`, `b`, `a`), corresponding to element indics of (0, 1, 2, 3)
+- The element index corresponding to each character must be less than `N`
 
 If the member name of a swizzle consists of a single character, then the expression has type `T` and is equivalent to a subscript expression with the corresponding element index.
 

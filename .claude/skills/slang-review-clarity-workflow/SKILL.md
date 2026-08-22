@@ -99,6 +99,7 @@ candidate entries.
       contract they concern;
     - proposed comments do not include candidate IDs, status, confidence, scope, notes, or
       other process metadata.
+
 11. If the user asked to post, run `slang-review-post-github` on the canonical workflow file.
 
 If a harness cannot invoke repository-local skills by name, read and apply the corresponding

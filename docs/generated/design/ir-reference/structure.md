@@ -64,8 +64,7 @@ do not spell them out (see
 for how that generation works).
 
 `IRBuilder` is declared in
-[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (line
-3158) and only forward-declared in
+[slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) (line 3158) and only forward-declared in
 [slang-ir.h](../../../../source/slang/slang-ir.h) (line 37); its
 bodies are mostly in
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp). The structural
@@ -155,28 +154,28 @@ expressed by the wrapper's accessors, such as
 
 ### Module
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `module` | `IRModuleInst` | — | P | `ModuleDecl`, via `generateIRForTranslationUnit` | Top-level container; children are every other module-scope instruction. |
+| Opcode   | C++ wrapper    | Operands | Flags | AST origin                                       | Summary                                                                 |
+| -------- | -------------- | -------- | ----- | ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `module` | `IRModuleInst` | —        | P     | `ModuleDecl`, via `generateIRForTranslationUnit` | Top-level container; children are every other module-scope instruction. |
 
 ### Functions and generics
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `func` | `IRFunc` | — | P | any `FunctionDeclBase` (`FuncDecl`, `ConstructorDecl`, `AccessorDecl`, `SynthesizedFuncDecl`) via `lowerFuncDecl`, including the synthesized `FuncDecl` that checking stores on a lambda | Function; children are blocks. The signature is the inst's own `FuncType`, not an operand. |
-| `generic` | `IRGeneric` | — | P | `GenericDecl` via `visitGenericDecl` | Function-shaped instruction whose single block computes a type-level value; ends with `return_val` / `IRReturn`. |
-| `param` | `IRParam` | — | | `ParamDecl`, plus block-parameter introduction | Function or block parameter; always a child of a `block`. Documented in detail in [control-flow.md](control-flow.md). |
-| `call` | `IRCall` | `callee` plus a variadic argument tail | | `InvokeExpr` via `visitInvokeExprImpl` and `emitCallToDeclRef` | Calls `callee` with the remaining operands as arguments; result type is the call's own type. |
+| Opcode    | C++ wrapper | Operands                               | Flags | AST origin                                                                                                                                                                               | Summary                                                                                                               |
+| --------- | ----------- | -------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `func`    | `IRFunc`    | —                                      | P     | any `FunctionDeclBase` (`FuncDecl`, `ConstructorDecl`, `AccessorDecl`, `SynthesizedFuncDecl`) via `lowerFuncDecl`, including the synthesized `FuncDecl` that checking stores on a lambda | Function; children are blocks. The signature is the inst's own `FuncType`, not an operand.                            |
+| `generic` | `IRGeneric` | —                                      | P     | `GenericDecl` via `visitGenericDecl`                                                                                                                                                     | Function-shaped instruction whose single block computes a type-level value; ends with `return_val` / `IRReturn`.      |
+| `param`   | `IRParam`   | —                                      |       | `ParamDecl`, plus block-parameter introduction                                                                                                                                           | Function or block parameter; always a child of a `block`. Documented in detail in [control-flow.md](control-flow.md). |
+| `call`    | `IRCall`    | `callee` plus a variadic argument tail |       | `InvokeExpr` via `visitInvokeExprImpl` and `emitCallToDeclRef`                                                                                                                           | Calls `callee` with the remaining operands as arguments; result type is the call's own type.                          |
 
 ### Global state
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `global_var` | `IRGlobalVar` | — | G | a module-scope `VarDecl` that is neither a shader parameter nor `static const`, via `lowerGlobalVarDecl`, and a mutable function-`static` local, via `lowerFunctionStaticVarDecl` | Module-scope mutable variable; its type is a `PtrType`, and a module-scope initializer lives in child blocks (a function-`static` initializer does not — see below). |
-| `global_param` | `IRGlobalParam` | — | G | a module-scope shader-parameter `VarDecl`, via `lowerGlobalShaderParam` | Module-scope uniform parameter; unlike `global_var` it *is* the value, not its address. |
-| `globalConstant` | `IRGlobalConstant` | `value` (optional; unnamed in Lua, read by `getValue()`) | G | a `static const` module-scope `VarDecl`, via `lowerGlobalConstantDecl`, and a function-`static` `const`, via `lowerFunctionStaticConstVarDecl` | Module-scope constant; with no operand it is an `extern` constant defined in another module. |
-| `global_generic_param` | `IRGlobalGenericParam` | — | G | `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl`, written `type_param T : IFoo;` at module scope | Declares a generic parameter at module level; bound by `bind_global_generic_param`. Note the producer is *not* `GenericTypeParamDecl` — `GlobalGenericParamDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 10878) derives from `AggTypeDecl` while `GlobalGenericValueParamDecl` (line 10885) derives from `VarDeclBase`, and constraint decls parented by one also lower here. [generics-and-existentials.md](generics-and-existentials.md) owns the declaration/binding pair in full. |
-| `global_hashed_string_literals` | `IRGlobalHashedStringLiterals` | (variadic) | | (synthesized) | Container for the module's hashed-string-literal pool; a module holds at most one. |
+| Opcode                          | C++ wrapper                    | Operands                                                 | Flags | AST origin                                                                                                                                                                        | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------- | ------------------------------ | -------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `global_var`                    | `IRGlobalVar`                  | —                                                        | G     | a module-scope `VarDecl` that is neither a shader parameter nor `static const`, via `lowerGlobalVarDecl`, and a mutable function-`static` local, via `lowerFunctionStaticVarDecl` | Module-scope mutable variable; its type is a `PtrType`, and a module-scope initializer lives in child blocks (a function-`static` initializer does not — see below).                                                                                                                                                                                                                                                                                                                                                        |
+| `global_param`                  | `IRGlobalParam`                | —                                                        | G     | a module-scope shader-parameter `VarDecl`, via `lowerGlobalShaderParam`                                                                                                           | Module-scope uniform parameter; unlike `global_var` it _is_ the value, not its address.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `globalConstant`                | `IRGlobalConstant`             | `value` (optional; unnamed in Lua, read by `getValue()`) | G     | a `static const` module-scope `VarDecl`, via `lowerGlobalConstantDecl`, and a function-`static` `const`, via `lowerFunctionStaticConstVarDecl`                                    | Module-scope constant; with no operand it is an `extern` constant defined in another module.                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `global_generic_param`          | `IRGlobalGenericParam`         | —                                                        | G     | `GlobalGenericParamDecl` / `GlobalGenericValueParamDecl`, written `type_param T : IFoo;` at module scope                                                                          | Declares a generic parameter at module level; bound by `bind_global_generic_param`. Note the producer is _not_ `GenericTypeParamDecl` — `GlobalGenericParamDecl` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 10878) derives from `AggTypeDecl` while `GlobalGenericValueParamDecl` (line 10885) derives from `VarDeclBase`, and constraint decls parented by one also lower here. [generics-and-existentials.md](generics-and-existentials.md) owns the declaration/binding pair in full. |
+| `global_hashed_string_literals` | `IRGlobalHashedStringLiterals` | (variadic)                                               |       | (synthesized)                                                                                                                                                                     | Container for the module's hashed-string-literal pool; a module holds at most one.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
 The two AST origins of `global_var` print differently. A module-scope
 `static int g = 3;` keeps its initializer in a child block that
@@ -193,7 +192,7 @@ block %2:
 A function-`static` does not. `lowerFunctionStaticVarDecl`
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 lines 11885-11924) leaves the variable's own `global_var` bodyless and
-creates a *second*, unnamed `global_var` typed `Ptr(Bool)` whose block
+creates a _second_, unnamed `global_var` typed `Ptr(Bool)` whose block
 returns `false`. That second global is a run-once guard: the
 initializer is lowered into the enclosing function, under an `ifElse`
 on the guard, instead of into a block on the variable. So one `static`
@@ -225,18 +224,18 @@ body call an interface method on `T` before `T` is bound.
 
 ### Struct internals
 
-The `StructType` and `ClassType` *type* opcodes are documented as
+The `StructType` and `ClassType` _type_ opcodes are documented as
 types in [types.md](types.md); here we describe their role as parent
 containers that own `field` children.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `struct` (container) | `IRStructType` | — (children: `field`) | P | `StructDecl` via `visitAggTypeDecl` | Owns the struct's `field` children, read back by `getFields()`. See [types.md](types.md) for its type-side semantics. |
-| `class` (container) | `IRClassType` | — (children: `field`) | P | `ClassDecl` via `visitAggTypeDecl` | Owns the class's `field` children; cross-linked to [types.md](types.md). |
-| `field` | `IRStructField` | `key, fieldType` (unnamed in Lua; `min_operands = 2`) | | a member `VarDeclBase`, and an `InheritanceDecl` for the leading base-type member | Declares one named member of a `struct` / `class` parent. |
-| `key` | `IRStructKey` | — | G | a member `VarDeclBase`, an `InheritanceDecl`, or an interface requirement via `getInterfaceRequirementKey` | Identity for a field or interface requirement; carries `key_<mangled>` linkage so the member is addressable across compilation units. |
-| `builtinRequirementKey` | `IRBuiltinRequirementKey` | `kindOperand` | H | `getInterfaceRequirementKey` for a `BuiltinRequirementModifier`-tagged requirement | Key for a recognized built-in interface requirement (e.g. an `IDifferentiable` member); deduplicated by construction from its `BuiltinRequirementKind` operand. |
-| `indexedFieldKey` | `IRIndexedFieldKey` | `baseType, index` | H | `lowerTypeLayout` | Placeholder key for the *n*-th field of a tuple-like type, replaced when that type is materialized into a `struct`. Its only producer is the `getIndexedFieldKey` call in `lowerTypeLayout` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 16173), so it originates in layout lowering rather than being synthesized from nowhere. |
+| Opcode                  | C++ wrapper               | Operands                                              | Flags | AST origin                                                                                                 | Summary                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------------- | ------------------------- | ----------------------------------------------------- | ----- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `struct` (container)    | `IRStructType`            | — (children: `field`)                                 | P     | `StructDecl` via `visitAggTypeDecl`                                                                        | Owns the struct's `field` children, read back by `getFields()`. See [types.md](types.md) for its type-side semantics.                                                                                                                                                                                                                                             |
+| `class` (container)     | `IRClassType`             | — (children: `field`)                                 | P     | `ClassDecl` via `visitAggTypeDecl`                                                                         | Owns the class's `field` children; cross-linked to [types.md](types.md).                                                                                                                                                                                                                                                                                          |
+| `field`                 | `IRStructField`           | `key, fieldType` (unnamed in Lua; `min_operands = 2`) |       | a member `VarDeclBase`, and an `InheritanceDecl` for the leading base-type member                          | Declares one named member of a `struct` / `class` parent.                                                                                                                                                                                                                                                                                                         |
+| `key`                   | `IRStructKey`             | —                                                     | G     | a member `VarDeclBase`, an `InheritanceDecl`, or an interface requirement via `getInterfaceRequirementKey` | Identity for a field or interface requirement; carries `key_<mangled>` linkage so the member is addressable across compilation units.                                                                                                                                                                                                                             |
+| `builtinRequirementKey` | `IRBuiltinRequirementKey` | `kindOperand`                                         | H     | `getInterfaceRequirementKey` for a `BuiltinRequirementModifier`-tagged requirement                         | Key for a recognized built-in interface requirement (e.g. an `IDifferentiable` member); deduplicated by construction from its `BuiltinRequirementKind` operand.                                                                                                                                                                                                   |
+| `indexedFieldKey`       | `IRIndexedFieldKey`       | `baseType, index`                                     | H     | `lowerTypeLayout`                                                                                          | Placeholder key for the _n_-th field of a tuple-like type, replaced when that type is materialized into a `struct`. Its only producer is the `getIndexedFieldKey` call in `lowerTypeLayout` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 16173), so it originates in layout lowering rather than being synthesized from nowhere. |
 
 Note that a `struct` does not own its `key` children: keys are
 `global`, so they sit at module scope where code outside the struct can
@@ -244,14 +243,14 @@ reference them, and a `field` points at its key by operand.
 
 ### Interface internals
 
-The `InterfaceType` *type* opcode is documented in
+The `InterfaceType` _type_ opcode is documented in
 [types.md](types.md); here we describe its role as the carrier of
 `interface_req_entry` operands.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `interface` | `IRInterfaceType` | `interface_req_entry...` (variadic) | G | `InterfaceDecl` via `visitInterfaceDecl` | Interface declaration; its operands are the requirement entries, counted by `getRequirementCount()`. |
-| `interface_req_entry` | `IRInterfaceRequirementEntry` | `requirementKey, requirementVal` | G | (synthesized as part of `InterfaceDecl` lowering) | One requirement slot of an interface; `requirementKey` is an `IRStructKey` or a hoistable `IRBuiltinRequirementKey`. Cross-link to [generics-and-existentials.md](generics-and-existentials.md). |
+| Opcode                | C++ wrapper                   | Operands                            | Flags | AST origin                                        | Summary                                                                                                                                                                                          |
+| --------------------- | ----------------------------- | ----------------------------------- | ----- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `interface`           | `IRInterfaceType`             | `interface_req_entry...` (variadic) | G     | `InterfaceDecl` via `visitInterfaceDecl`          | Interface declaration; its operands are the requirement entries, counted by `getRequirementCount()`.                                                                                             |
+| `interface_req_entry` | `IRInterfaceRequirementEntry` | `requirementKey, requirementVal`    | G     | (synthesized as part of `InterfaceDecl` lowering) | One requirement slot of an interface; `requirementKey` is an `IRStructKey` or a hoistable `IRBuiltinRequirementKey`. Cross-link to [generics-and-existentials.md](generics-and-existentials.md). |
 
 ### Witness tables and witness facts
 
@@ -260,18 +259,18 @@ the dispatch side in
 [generics-and-existentials.md](generics-and-existentials.md); the
 rows below describe their structural role.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `witness_table` | `IRWitnessTable` | `concreteType` (unnamed in Lua; read by `getConcreteType()`) plus children: `witness_table_entry` | H | `InheritanceDecl` via `visitInheritanceDecl` / `lowerWitnessTable` | Conformance of `concreteType` to the interface carried in its result type; owns one entry per requirement. Hoistable so identical conformances dedupe. |
-| `witness_table_entry` | `IRWitnessTableEntry` | `requirementKey, satisfyingVal` | | (synthesized) | One row of a `witness_table`. |
-| `thisTypeWitness` | `IRThisTypeWitness` | — (see note) | | (synthesized inside `InterfaceDecl` lowering) | Placeholder witness that `ThisType` implements the enclosing interface; only valid inside an interface definition. The interface is carried in the *result type*, not an operand: `IRBuilder::createThisTypeWitness` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5298) builds the inst with zero operands and result type `getWitnessTableType(interfaceType)`. The Lua entry declares a `type` operand that no producer ever supplies, so `IRThisTypeWitness::getConstraintType()` would read operand 0 out of range; nothing calls it, so the bug is latent. |
-| `TypeEqualityWitness` | `IRTypeEqualityWitness` | `subType, superType` | H | `TypeEqualityWitness` (`Val`) | Witness certifying two types are equal. Lowered by `visitTypeEqualityWitness` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 2398) from the AST `Val` of the same name, so it has a direct origin rather than being synthesized. |
+| Opcode                | C++ wrapper             | Operands                                                                                          | Flags | AST origin                                                         | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ----------------------- | ------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `witness_table`       | `IRWitnessTable`        | `concreteType` (unnamed in Lua; read by `getConcreteType()`) plus children: `witness_table_entry` | H     | `InheritanceDecl` via `visitInheritanceDecl` / `lowerWitnessTable` | Conformance of `concreteType` to the interface carried in its result type; owns one entry per requirement. Hoistable so identical conformances dedupe.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `witness_table_entry` | `IRWitnessTableEntry`   | `requirementKey, satisfyingVal`                                                                   |       | (synthesized)                                                      | One row of a `witness_table`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `thisTypeWitness`     | `IRThisTypeWitness`     | — (see note)                                                                                      |       | (synthesized inside `InterfaceDecl` lowering)                      | Placeholder witness that `ThisType` implements the enclosing interface; only valid inside an interface definition. The interface is carried in the _result type_, not an operand: `IRBuilder::createThisTypeWitness` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 5298) builds the inst with zero operands and result type `getWitnessTableType(interfaceType)`. The Lua entry declares a `type` operand that no producer ever supplies, so `IRThisTypeWitness::getConstraintType()` would read operand 0 out of range; nothing calls it, so the bug is latent. |
+| `TypeEqualityWitness` | `IRTypeEqualityWitness` | `subType, superType`                                                                              | H     | `TypeEqualityWitness` (`Val`)                                      | Witness certifying two types are equal. Lowered by `visitTypeEqualityWitness` ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp) line 2398) from the AST `Val` of the same name, so it has a direct origin rather than being synthesized.                                                                                                                                                                                                                                                                                                                |
 
 ### Symbol aliasing
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `SymbolAlias` | `IRSymbolAlias` | `symbol` | | an `AggTypeDecl` with an `aliasedType`, and an `InheritanceDecl` nested in one | Module-level alias of another symbol under a different mangled name. Must be eliminated by the linker — every use is replaced with the canonical symbol. |
+| Opcode        | C++ wrapper     | Operands | Flags | AST origin                                                                     | Summary                                                                                                                                                  |
+| ------------- | --------------- | -------- | ----- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SymbolAlias` | `IRSymbolAlias` | `symbol` |       | an `AggTypeDecl` with an `aliasedType`, and an `InheritanceDecl` nested in one | Module-level alias of another symbol under a different mangled name. Must be eliminated by the linker — every use is replaced with the canonical symbol. |
 
 ## Notable opcodes
 
@@ -284,7 +283,7 @@ block; its `Param` children are the function parameters in
 declaration order, which is exactly what
 `IRGlobalValueWithParams::getFirstParam` / `getParams` in
 [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) (line 803)
-return — they forward to the *first block*, not to `func` itself, so a
+return — they forward to the _first block_, not to `func` itself, so a
 function's parameters are always block parameters. `isDefinition()`
 distinguishes a definition from a declaration by testing whether any
 block exists at all. Function-level decorations
@@ -295,7 +294,7 @@ than to its body.
 A dump renders the signature as the inst's type clause,
 `func %addPair : Func(Int, Int, Int)`, and the operand order of
 `IRFuncType` is the thing to know when reading one: operand 0 is the
-*result* type and operands 1 onward are the parameter types in source
+_result_ type and operands 1 onward are the parameter types in source
 order, so the leading `Int` above is the return type and only the two
 that follow are parameters
 ([slang-ir.h](../../../../source/slang/slang-ir.h) lines 1626-1640).
@@ -323,7 +322,7 @@ generic's `return_val`.
 A `generic` is not only how a `GenericDecl` is lowered. An individual
 interface requirement can also be generic — a differentiability
 constraint on a generic interface method, for instance — and in that
-case lowering builds a requirement-local `IRGeneric` and stores *that*
+case lowering builds a requirement-local `IRGeneric` and stores _that_
 as the witness-table entry value. Uses of such a requirement therefore
 read `specialize(lookupWitness(table, key), methodArgs...)` rather
 than a flat `lookupWitness`. See
@@ -370,7 +369,7 @@ A module also records the IR semantics version it was built against:
 `m_version` is initialized to `k_maxSupportedModuleVersion`, and the
 supported range is `k_minSupportedModuleVersion` (4) ..
 `k_maxSupportedModuleVersion` (28). That range tracks module
-*semantics*, not the opcode numbering — opcodes are serialized through
+_semantics_, not the opcode numbering — opcodes are serialized through
 stable names, so adding one does not by itself invalidate an existing
 `.slang-module`. See
 [../cross-cutting/ir-instructions.md](../cross-cutting/ir-instructions.md)
@@ -450,7 +449,7 @@ two share is how a null result type prints:
 
 `witness_table` records that one concrete type conforms to one
 interface. Operand 0 is the concrete (sub) type, read back via
-`getConcreteType()`; the interface it satisfies is *not* an operand
+`getConcreteType()`; the interface it satisfies is _not_ an operand
 but is carried in the instruction's result type — a
 `WitnessTableType` whose conformance interface is read back via
 `getConformanceType()`. That split is visible in the builder signature
@@ -478,7 +477,7 @@ declares one requirement — the `requirementKey` (a `StructKey`, or
 a `BuiltinRequirementKey` for a built-in requirement) plus the
 requirement's type (`requirementVal`).
 `witness_table_entry` lives inside a `witness_table` parent and
-*satisfies* a requirement — pairing the same `requirementKey` with
+_satisfies_ a requirement — pairing the same `requirementKey` with
 the concrete implementing function or value. The two opcodes are
 the interface-side and implementation-side halves of the same
 key-driven dispatch table, and neither side should be indexed
@@ -493,7 +492,7 @@ default body is what gets skipped, and it adds no second entry
 ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
 line 12101, in the loop that counts the interface's operands). An
 associated-type bound such as `associatedtype A :
-IBar` is represented as a *sibling* requirement of `A` rather than a
+IBar` is represented as a _sibling_ requirement of `A` rather than a
 member of it, so no extra entries are synthesized for it; its entry
 carries a `WitnessTableType(bound)` requirement value. See
 [../pipeline/04-ast-to-ir.md](../pipeline/04-ast-to-ir.md) for the
@@ -558,5 +557,5 @@ name hint, so a dump numbers it like any other unnamed value.
 - [../../../design/ir.md](../../../design/ir.md) — design rationale
   for the parent / hoistable / global instruction model.
 - [../glossary.md](../glossary.md) — definitions of `parent
-  instruction`, `linkage`, `module`, `witness table`,
+instruction`, `linkage`, `module`, `witness table`,
   `decl-ref`.

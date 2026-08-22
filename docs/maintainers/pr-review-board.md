@@ -29,7 +29,7 @@ sometimes a reviewer). Treat that as a starting point — change it if it's wron
   repo in `Scope: [...]` (for example `Scope: [slangpy, slang-rhi]`). The author
   is assigned and no reviewer is auto-requested; they should find one themselves.
 - **Community** — a human author who isn't Internal. A shepherd is chosen (see
-  below), asked to review (unless they *are* the author), and a short comment is
+  below), asked to review (unless they _are_ the author), and a short comment is
   posted on the PR. If someone else looks like a better reviewer from recent
   commits on the changed files, the comment names them — without `@`-mentioning
   or auto-requesting them.
@@ -52,13 +52,13 @@ ask in the team channel.
 
 ## What each `Status` means for you
 
-| Status | Meaning | Act? |
-| --- | --- | --- |
-| **In Review** | Waiting on review (or a fresh commit not yet re-reviewed). Bot drafts sit here too so you can shepherd them. | **Yes** — review, or make sure someone is. |
-| **Revising** | Author (or bot) is still working: human draft, changes requested, or a Bot PR with failed CI. | **No** |
-| **Snagged** | Needs a human: CI failed on a human PR, CI needs approval to run, or approved+green but not in the merge queue. | **Yes** — fix CI, approve the run, or enqueue/merge. |
-| **Approved** | Has an approving review; waiting on CI or the merge queue. | **No** |
-| **Done** | Closed (merged or not). Terminal. | **No** |
+| Status        | Meaning                                                                                                         | Act?                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **In Review** | Waiting on review (or a fresh commit not yet re-reviewed). Bot drafts sit here too so you can shepherd them.    | **Yes** — review, or make sure someone is.           |
+| **Revising**  | Author (or bot) is still working: human draft, changes requested, or a Bot PR with failed CI.                   | **No**                                               |
+| **Snagged**   | Needs a human: CI failed on a human PR, CI needs approval to run, or approved+green but not in the merge queue. | **Yes** — fix CI, approve the run, or enqueue/merge. |
+| **Approved**  | Has an approving review; waiting on CI or the merge queue.                                                      | **No**                                               |
+| **Done**      | Closed (merged or not). Terminal.                                                                               | **No**                                               |
 
 **`In Review` and `Snagged` are the columns that want you.** The rest are waiting on someone/something else, or finished.
 

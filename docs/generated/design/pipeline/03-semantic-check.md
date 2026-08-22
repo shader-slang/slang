@@ -36,14 +36,14 @@ int call<T : IFoo>(T v) { return v.twice(); }
 the parser hands over an `S` whose base list is still an unchecked
 `Expr`, a `call` body still in `UnparsedStmt` form, and not one `Expr`
 carrying a type. Checking resolves `IFoo` in `S`'s base list and in
-`T`'s constraint to the same decl (*names resolved*); gives
+`T`'s constraint to the same decl (_names resolved_); gives
 `v.twice()` the type `int`, which is what makes the call legal
-(*types attached*); records the `S : IFoo` witness table
-(*conformances recorded*); fills that table's `twice` slot with a
+(_types attached_); records the `S : IFoo` witness table
+(_conformances recorded_); fills that table's `twice` slot with a
 witness for the interface's default body, which `S` never spelled
-(*default conformance witnesses synthesized*); and turns the
-`UnparsedStmt` into a checked `Stmt` tree (*function bodies fully
-parsed and checked*). Nothing here carries a modifier; the checks
+(_default conformance witnesses synthesized_); and turns the
+`UnparsedStmt` into a checked `Stmt` tree (_function bodies fully
+parsed and checked_). Nothing here carries a modifier; the checks
 that would apply are described under
 [Modifier validation](#modifier-validation).
 
@@ -74,7 +74,7 @@ Every file collaborates through `SemanticsContext` /
 `SemanticsVisitor` declared in
 [slang-check-impl.h](../../../../source/slang/slang-check-impl.h).
 
-The *Example rejection* column names one diagnostic the file itself
+The _Example rejection_ column names one diagnostic the file itself
 emits, so that each row is a claim a test can be written against
 rather than a label. Three rows have none to name:
 `slang-check-conformance.cpp` and `slang-check-resolve-val.cpp` emit
@@ -82,21 +82,21 @@ no diagnostics at all — they compute a result and leave the reporting
 to whoever asked for it — and `slang-check.cpp`'s only diagnostics are
 about loading a downstream compiler, not about the program.
 
-| File | Concern | Example rejection |
-| --- | --- | --- |
-| [slang-check.cpp](../../../../source/slang/slang-check.cpp) | Entry point; orchestrates the checking phases | none from checking; it sequences the phases |
-| [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp) | `Decl` checking — types, signatures, default values, attributes | `E30200`, a declaration conflicting with an earlier one |
-| [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) | `Expr` checking — type inference, lvalue-ness, conversions | `E30011`, assigning to something that is not an l-value |
-| [slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp) | `Stmt` checking — control flow, scope rules, return-type validation | `E30003`, `break` outside a loop or `switch` |
-| [slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp) | Resolves `Type` references that appear in `Expr` form | `E30060`, an expression used where a type is required |
-| [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp) | Overload resolution; ranks candidates produced by lookup | `E40018`, the note naming the argument that rejected a candidate |
-| [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances | none; a missing requirement is reported as `E38100` by its caller in `slang-check-decl.cpp` |
-| [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) | Implicit-conversion ranking and coercion site checks | `E30523`, too many initializers in an initializer list |
-| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation | `E30815`, a circular `extension` |
-| [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp) | Validates modifier combinations and attribute arguments | `E31202`, two modifiers from one exclusive group on a decl |
-| [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp) | Generic constraint solving (`where`-clauses, witness inference) | `E30433`, a pack count that fails a `countof(...)` constraint |
-| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values | none; a bad resolution result is reported at the use site |
-| [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp) | Entry-point checks: stage-specific signatures, parameter rules | `E38007`, an entry point with no stage |
+| File                                                                                | Concern                                                             | Example rejection                                                                           |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [slang-check.cpp](../../../../source/slang/slang-check.cpp)                         | Entry point; orchestrates the checking phases                       | none from checking; it sequences the phases                                                 |
+| [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)               | `Decl` checking — types, signatures, default values, attributes     | `E30200`, a declaration conflicting with an earlier one                                     |
+| [slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)               | `Expr` checking — type inference, lvalue-ness, conversions          | `E30011`, assigning to something that is not an l-value                                     |
+| [slang-check-stmt.cpp](../../../../source/slang/slang-check-stmt.cpp)               | `Stmt` checking — control flow, scope rules, return-type validation | `E30003`, `break` outside a loop or `switch`                                                |
+| [slang-check-type.cpp](../../../../source/slang/slang-check-type.cpp)               | Resolves `Type` references that appear in `Expr` form               | `E30060`, an expression used where a type is required                                       |
+| [slang-check-overload.cpp](../../../../source/slang/slang-check-overload.cpp)       | Overload resolution; ranks candidates produced by lookup            | `E40018`, the note naming the argument that rejected a candidate                            |
+| [slang-check-conformance.cpp](../../../../source/slang/slang-check-conformance.cpp) | Verifies and synthesizes interface conformances                     | none; a missing requirement is reported as `E38100` by its caller in `slang-check-decl.cpp` |
+| [slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp)   | Implicit-conversion ranking and coercion site checks                | `E30523`, too many initializers in an initializer list                                      |
+| [slang-check-inheritance.cpp](../../../../source/slang/slang-check-inheritance.cpp) | Inheritance and extension lookup; facet computation                 | `E30815`, a circular `extension`                                                            |
+| [slang-check-modifier.cpp](../../../../source/slang/slang-check-modifier.cpp)       | Validates modifier combinations and attribute arguments             | `E31202`, two modifiers from one exclusive group on a decl                                  |
+| [slang-check-constraint.cpp](../../../../source/slang/slang-check-constraint.cpp)   | Generic constraint solving (`where`-clauses, witness inference)     | `E30433`, a pack count that fails a `countof(...)` constraint                               |
+| [slang-check-resolve-val.cpp](../../../../source/slang/slang-check-resolve-val.cpp) | Resolves and canonicalizes `Type`, `DeclRef`, and witness values    | none; a bad resolution result is reported at the use site                                   |
+| [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp)           | Entry-point checks: stage-specific signatures, parameter rules      | `E38007`, an entry point with no stage                                                      |
 
 ## Two-pass interaction with the parser
 
@@ -157,7 +157,7 @@ failing constraint to emit a precise diagnostic.
 A constraint written on an associated type — whether as
 `associatedtype A : IBar`, `associatedtype A where A : IBar`, or
 `__constraint A : IBar` — is recorded uniformly as a
-`GenericTypeConstraintDecl` requirement of the *enclosing interface*
+`GenericTypeConstraintDecl` requirement of the _enclosing interface_
 (a sibling of `A`), not nested under `A`. In that unified
 representation `findWitnessForInterfaceRequirement`
 ([slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp))
@@ -179,7 +179,7 @@ When computing the inheritance of an associated-type access such as
 interfaces each anchor type conforms to, re-expresses each through the
 anchor's conformance witness, and adds the opposite endpoint as a base
 of the access. An equality constraint such as `__constraint A == B`
-makes `T.A` and `T.B` mutual bases — a *benevolent* cycle. The engine
+makes `T.A` and `T.B` mutual bases — a _benevolent_ cycle. The engine
 tolerates this by skipping a base whose inheritance info is still being
 computed (`_isInheritanceInfoBeingComputed`), accumulating the skipped
 in-progress ancestor `DeclRef`s through a `HashSet<DeclRef<Decl>>*
@@ -198,14 +198,14 @@ captured eagerly but reported lazily. The constraint solver records a
 tagged union whose `Kind` selects both the stored payload and the
 diagnostic that will eventually be emitted:
 
-| `Kind` | Diagnostic | Triggered by |
-| --- | --- | --- |
-| `VariadicPackCountMismatch` | `E30433` | `takesTwo(1, 2, 3)` against `void takesTwo<each T>(expand each T args) where countof(T) == 2` |
-| `GenericArityMismatch` | `E30438` | a call whose argument list cannot be matched to the generic's parameter list at all |
-| `OrdinaryGenericParamNotInferred` | `E30439` | `f(1)` against `void f<T>(int a)` — no argument mentions `T` |
-| `InterfaceConformanceNotSatisfied` | `E38029` | `pick(s)` against `T pick<T : IFoo>(T a)` where `S` does not implement `IFoo` |
-| `GenericConstraintNotSatisfied` | `E30440` | `f(1.5f)` against `void f<T>(T a) where T == int`; the fallback for every constraint that is not a conformance |
-| `GenericParamUnificationConflict` | `E30442` | `two(x, y)` against `void two<T>(T a, T b)` with unrelated `A` and `B` |
+| `Kind`                             | Diagnostic | Triggered by                                                                                                   |
+| ---------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
+| `VariadicPackCountMismatch`        | `E30433`   | `takesTwo(1, 2, 3)` against `void takesTwo<each T>(expand each T args) where countof(T) == 2`                  |
+| `GenericArityMismatch`             | `E30438`   | a call whose argument list cannot be matched to the generic's parameter list at all                            |
+| `OrdinaryGenericParamNotInferred`  | `E30439`   | `f(1)` against `void f<T>(int a)` — no argument mentions `T`                                                   |
+| `InterfaceConformanceNotSatisfied` | `E38029`   | `pick(s)` against `T pick<T : IFoo>(T a)` where `S` does not implement `IFoo`                                  |
+| `GenericConstraintNotSatisfied`    | `E30440`   | `f(1.5f)` against `void f<T>(T a) where T == int`; the fallback for every constraint that is not a conformance |
+| `GenericParamUnificationConflict`  | `E30442`   | `two(x, y)` against `void two<T>(T a, T b)` with unrelated `A` and `B`                                         |
 
 Every arm follows its error with a "see declaration of" note carrying
 the candidate's rendered signature (`GenericSignatureTried`), and the
@@ -224,7 +224,7 @@ catch-all `Diagnostics::GenericArgumentInferenceFailed`.
 ### Differentiability as interface conformance
 
 Differentiability is recorded as an interface conformance of the
-*function viewed as a type*, rather than as a modifier fact that later
+_function viewed as a type_, rather than as a modifier fact that later
 stages re-derive. Consider:
 
 ```slang
@@ -266,7 +266,7 @@ differentiable?" is a subtype query instead of a modifier lookup:
 back the witness rather than a `bool` matters because the caller needs
 that witness to build and specialize the derivative call.
 
-A `[Differentiable]` annotation on an *interface requirement* is
+A `[Differentiable]` annotation on an _interface requirement_ is
 handled the same way as the associated-type constraints described
 above — as a requirement of the enclosing interface rather than
 something nested under the member. `_moveInterfaceDifferentiabilityRequirementToInterface`
@@ -291,7 +291,7 @@ this document only points at the implementation.
 Some declarations gain members at check time rather than at parse
 time: default conformance witnesses, generated comparison /
 construction methods, and several built-in conformances. The
-*decisions* about what to synthesize live primarily in
+_decisions_ about what to synthesize live primarily in
 [slang-check-decl.cpp](../../../../source/slang/slang-check-decl.cpp)
 — for example `_synthesizeCtorSignature` for default constructors and
 the `trySynthesize*RequirementWitness` routines for interface
@@ -311,7 +311,7 @@ combinations, attribute argument types, and the differences between
 Slang and GLSL input. Modifier nodes themselves are defined in
 [slang-ast-modifier.h](../../../../source/slang/slang-ast-modifier.h).
 
-*Mutually exclusive* is decided by `getModifierConflictGroupKind`
+_Mutually exclusive_ is decided by `getModifierConflictGroupKind`
 (line 1564), which maps a modifier's `ASTNodeType` to the group it
 competes in; a second modifier landing in a group already claimed on
 the same decl produces `E31202`. Most modifiers are their own group,
@@ -321,8 +321,7 @@ groups with more than one member are the ones worth knowing:
 `uniform` share one; and `nointerpolation`, `noperspective`, `linear`,
 `sample` and `centroid` share one more.
 
-The dialect axis here is GLSL rather than HLSL. `checkModifier` (line
-1936) computes `isGLSLInput` from the `-allow-glsl` option
+The dialect axis here is GLSL rather than HLSL. `checkModifier` (line 1936) computes `isGLSLInput` from the `-allow-glsl` option
 (`CompilerOptionName::AllowGLSL`) or from a `GLSLModuleModifier` on
 the module, and passes it to `isModifierAllowedOnDecl` (line 1675); a
 modifier used in a position that predicate rejects is reported as
@@ -338,14 +337,14 @@ modifier, but the scope each one names is not the source file.
 ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp),
 line 1144) decides the question:
 
-| Modifier | Visible from |
-| --- | --- |
-| `public` | any scope, including other modules |
-| `internal` | any scope in the declaring module |
-| `private` | the declaring type or namespace, plus extensions of that same type |
+| Modifier   | Visible from                                                       |
+| ---------- | ------------------------------------------------------------------ |
+| `public`   | any scope, including other modules                                 |
+| `internal` | any scope in the declaring module                                  |
+| `private`  | the declaring type or namespace, plus extensions of that same type |
 
 `private` is therefore type-scoped, not file-scoped: a free function
-in the *same* file cannot read a `private` member of a `struct`, and
+in the _same_ file cannot read a `private` member of a `struct`, and
 the read is rejected with `E30600`. Writing `private` where there is
 no enclosing type for it to scope to — at global scope, or on an
 interface requirement — is rejected up front with `E30603`.
@@ -358,7 +357,7 @@ interface requirement — is rejected up front with `E30603`.
 lines 372 and 442) constrain what a `dyn interface` may declare and
 what may conform to one. Both are gated on
 `allowExperimentalDynamicDispatch` (line 364) and are a no-op unless
-the module's language version is 2026 or later (`-std 2026`) *and*
+the module's language version is 2026 or later (`-std 2026`) _and_
 `-enable-experimental-dynamic-dispatch` was **not** passed — so the
 same source compiles differently under the default `-std`.
 
@@ -399,7 +398,7 @@ validation rather than the general inference walk:
   function that names such a type to redeclare those capabilities.
   Builtin generic types carrying `MagicTypeModifier`/
   `IntrinsicTypeModifier` already have more specific diagnostics and are
-  filtered out (but still recursed *through*). A requirement the target
+  filtered out (but still recursed _through_). A requirement the target
   cannot provide — `[require(cpp)] struct Foo<T>` named as `Foo<int>`
   in a SPIR-V entry point's signature — is reported against the entry
   point as `E36107`, followed by a `see using of 'Foo'` note.
@@ -467,7 +466,7 @@ Several diagnostics in this stage go beyond naming the construct and
 point the user at the likely fix:
 
 - **Per-candidate argument mismatch.** When a call matches no overload,
-  the diagnostic now lists each candidate signature *and* the specific
+  the diagnostic now lists each candidate signature _and_ the specific
   argument that rejected it. `slang-check-overload.cpp` records the
   offending argument index and the expected/actual types on the
   candidate, then emits a
@@ -476,7 +475,7 @@ point the user at the likely fix:
   `float`s reports `E39999` on the call, then an `E40011`
   `candidate: <signature>` note per candidate, each followed by an
   `E40018` note reading `argument 0 does not match: expected 'A', got
-  'float'`. Candidates are deduplicated by their rendered signature
+'float'`. Candidates are deduplicated by their rendered signature
   string (not by `Decl*`, which would wrongly collapse distinct
   specializations such as `foo<float>` and `foo<int>`); at most ten
   unique candidates are printed and the remainder are summarized by an

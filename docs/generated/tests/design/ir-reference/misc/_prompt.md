@@ -26,7 +26,7 @@ The rule that follows:
 
 ## The translation rule: claims to observations
 
-Three observation points, chosen by what the claim is *about*.
+Three observation points, chosen by what the claim is _about_.
 
 **1. The platform-neutral IR — for "this opcode exists with this shape".**
 
@@ -47,7 +47,7 @@ out over every target that can express them (`hlsl`, `spirv-asm`, `metal`,
 
 **3. A computed result — for value-level claims.** Which arm a `PackBranch`
 selects, what the type predicates answer, whether two hashes agree: these are
-questions about a *result*, not a spelling. Use
+questions about a _result_, not a spelling. Use
 
 ```
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
@@ -58,26 +58,26 @@ for a `printf`-shaped check.
 
 ### Anchors and what to write for each
 
-| Anchor | What to test |
-| --- | --- |
-| `#system-opcodes` | The always-present module/system opcodes a trivial compile produces. |
-| `#capability-sets` | Capability-set opcodes reachable from a `[require(...)]`-style source shape. |
-| `#tensor-and-runtime-helpers` | Only the rows reachable without the Torch/host binding path. |
-| `#pack-and-expansion`, `#expand-and-each` | Variadic generic expansion: `Expand` / `Each` shape in the dump, and the expanded result value. |
-| `#packbranch` | The parent/child shape **and** which arm is selected at runtime. |
-| `#makewitnesspack` | The witness pack produced for a variadic conformance. |
-| `#type-queries-and-predicates`, `#istype` | Each predicate's dump shape and its answer as a computed value. |
-| `#size-alignment-count` | `sizeof` / `alignof` / `countof` opcodes and their folded values. |
-| `#storage-type-legalization-casts`, `#storage--logical-casts` | The cast opcodes legalization introduces, observed in the dump. |
-| `#variable-struct-wrapping-legalization` | The wrapper struct legalization introduces. |
-| `#annotations`, `#annotation` | The `Annotation` opcode and its operands. |
-| `#liveness-markers` | Liveness range markers where a portable source shape produces them. |
-| `#string-hashing`, `#getstringhash` | The opcode in the dump **and** the folded hash value; two equal strings hash equal. |
-| `#kernel-launch`, `#cudakernellaunch` | Only what is reachable without the CUDA host path. |
+| Anchor                                                                                                    | What to test                                                                                                                                                  |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#system-opcodes`                                                                                         | The always-present module/system opcodes a trivial compile produces.                                                                                          |
+| `#capability-sets`                                                                                        | Capability-set opcodes reachable from a `[require(...)]`-style source shape.                                                                                  |
+| `#tensor-and-runtime-helpers`                                                                             | Only the rows reachable without the Torch/host binding path.                                                                                                  |
+| `#pack-and-expansion`, `#expand-and-each`                                                                 | Variadic generic expansion: `Expand` / `Each` shape in the dump, and the expanded result value.                                                               |
+| `#packbranch`                                                                                             | The parent/child shape **and** which arm is selected at runtime.                                                                                              |
+| `#makewitnesspack`                                                                                        | The witness pack produced for a variadic conformance.                                                                                                         |
+| `#type-queries-and-predicates`, `#istype`                                                                 | Each predicate's dump shape and its answer as a computed value.                                                                                               |
+| `#size-alignment-count`                                                                                   | `sizeof` / `alignof` / `countof` opcodes and their folded values.                                                                                             |
+| `#storage-type-legalization-casts`, `#storage--logical-casts`                                             | The cast opcodes legalization introduces, observed in the dump.                                                                                               |
+| `#variable-struct-wrapping-legalization`                                                                  | The wrapper struct legalization introduces.                                                                                                                   |
+| `#annotations`, `#annotation`                                                                             | The `Annotation` opcode and its operands.                                                                                                                     |
+| `#liveness-markers`                                                                                       | Liveness range markers where a portable source shape produces them.                                                                                           |
+| `#string-hashing`, `#getstringhash`                                                                       | The opcode in the dump **and** the folded hash value; two equal strings hash equal.                                                                           |
+| `#kernel-launch`, `#cudakernellaunch`                                                                     | Only what is reachable without the CUDA host path.                                                                                                            |
 | `#work-graph-records-and-barrier-flags`, `#getenumbarriermemorytypeflags-and-getenumbarriersemanticflags` | The **named constants** in emitted HLSL — never a hard-coded integer (see the HLSL named-constant rule in `CLAUDE.md`). Needs `-stage node -profile lib_6_8`. |
-| `#untyped-descriptor-heap-handle-casts` | That the cast does not survive into target code. |
-| `#compiler-dictionary-and-late-capability-requirements`, `#compilerdictionaryentry` | The dictionary entry shape where reachable. |
-| `#coverage-gaps-against-sibling-pages` | Nothing — this is a process section; record it as untested. |
+| `#untyped-descriptor-heap-handle-casts`                                                                   | That the cast does not survive into target code.                                                                                                              |
+| `#compiler-dictionary-and-late-capability-requirements`, `#compilerdictionaryentry`                       | The dictionary entry shape where reachable.                                                                                                                   |
+| `#coverage-gaps-against-sibling-pages`                                                                    | Nothing — this is a process section; record it as untested.                                                                                                   |
 
 ### Not testable here (record under `## Untested claims`)
 
@@ -87,7 +87,7 @@ for a `printf`-shaped check.
   territory) — they need a Python/Torch build, not a `//TEST` directive.
 - Rows with **no producer at HEAD** — state that explicitly; a negative test
   ("this opcode appears in no dump") is worth writing where the doc claims
-  dormancy, but the claim that it *would* mean something is not testable.
+  dormancy, but the claim that it _would_ mean something is not testable.
 - `#family-hierarchy` claims about abstract grouping entries — the consequence is
   the shape of a C++ range check.
 - `#coverage-gaps-against-sibling-pages` — a statement about this documentation
@@ -138,7 +138,7 @@ appears in the same dump.
 - **Anchor at a user-named function.** The dump contains the whole linked module;
   an unanchored pattern can match a core-module instruction instead.
 - **Named constants, never integers.** Barrier flags and other target enums must
-  be checked as their emitted *names*; asserting the integer bakes in a mapping
+  be checked as their emitted _names_; asserting the integer bakes in a mapping
   the downstream compiler owns.
 - **Value questions need value tests.** "Which arm runs" and "do these hash
   equal" cannot be answered from a spelling — use `COMPARE_COMPUTE -cpu` or

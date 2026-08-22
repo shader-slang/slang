@@ -28,12 +28,12 @@ guarantees this module does (and does not) provide.
 Opcode-level detail for the `Layout`, `TypeLayout`, and `Attr` IR
 families is **not** repeated here — see
 [../ir-reference/metadata.md](../ir-reference/metadata.md), which
-owns those families. This page covers the *target-independent*
+owns those families. This page covers the _target-independent_
 layout-IR mechanism; per-target codegen behavior belongs to
 [../target-pipelines/index.md](../target-pipelines/index.md), and
 the capability/profile model belongs to
 [../cross-cutting/targets.md](../cross-cutting/targets.md). The one
-class of target-specific material that *is* covered here is the
+class of target-specific material that _is_ covered here is the
 Vulkan **binding model** (`vk::binding`,
 `vk::input_attachment_index`), because that is parameter-binding
 behavior rather than emit behavior.
@@ -73,7 +73,7 @@ behavior rather than emit behavior.
 
 ## Parameter binding: producing the `ProgramLayout`
 
-`createIRModuleForLayout` is a *transcription* step: every binding
+`createIRModuleForLayout` is a _transcription_ step: every binding
 number, register space, and byte offset it writes into IR was
 already decided by
 [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp).
@@ -84,15 +84,15 @@ that pass guarantees.
 (line 4453) drives the following ordered stages inside one
 `ParameterBindingContext`:
 
-| # | Stage | Anchor | What it does |
-|---|---|---|---|
-| 1 | Collect parameters | `collectParameters` (line 4506), then `collectSpecializationParams` (line 4516) | Builds the `sharedContext.parameters` list and the `programLayout->entryPoints` array; entry points are treated much like global parameters. |
-| 2 | Reserve explicit global bindings | `_generateParameterBindings` (line 1587), called per parameter at line 4540 | Honors `register`/`vk::binding`/`layout(binding=)` on *global* parameters, recording them in the used-range sets before anything is auto-allocated. |
-| 3 | Reserve explicit entry-point bindings | `addExplicitVkBindingsForEntryPointParameters` (line 1574), called at line 4544 | Added by PR #11712; see [Explicit `vk::binding` on entry-point parameters](#explicit-vkbinding-on-entry-point-parameters). |
-| 4 | Decide whether a default space is needed | `_calcNeedsDefaultSpace` (line 4196), consumed at lines 4706-4707 | Determines whether descriptor set 0 must be reserved for implicitly-placed parameters. |
-| 5 | Allocate the default space / constant buffer | `allocateUnusedSpaces` (line 855) at line 4740 | Claims the first unused space. |
-| 6 | Complete the remaining bindings | `_completeBindings` (line 4092) at line 4765 | Auto-allocates every resource kind not already placed. |
-| 7 | Place the bindless descriptor heap | lines 4809-4834, gated on the target implying `CapabilityName::descriptor_handle` | Scans upward for the first space not in `usedSpaces`, starting from the requested `-bindless-space-index`, and places the heap there. When that is not the requested space and the option was given explicitly, it warns with `Diagnostics::RequestedBindlessSpaceIndexUnavailable` — warning `39012`, "requested bindless space index '~requested' is unavailable, using the next available index '~available'." Either way `programLayout->bindlessSpaceIndex` is set to the space actually chosen. |
+| #   | Stage                                        | Anchor                                                                            | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --- | -------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Collect parameters                           | `collectParameters` (line 4506), then `collectSpecializationParams` (line 4516)   | Builds the `sharedContext.parameters` list and the `programLayout->entryPoints` array; entry points are treated much like global parameters.                                                                                                                                                                                                                                                                                                                                                          |
+| 2   | Reserve explicit global bindings             | `_generateParameterBindings` (line 1587), called per parameter at line 4540       | Honors `register`/`vk::binding`/`layout(binding=)` on _global_ parameters, recording them in the used-range sets before anything is auto-allocated.                                                                                                                                                                                                                                                                                                                                                   |
+| 3   | Reserve explicit entry-point bindings        | `addExplicitVkBindingsForEntryPointParameters` (line 1574), called at line 4544   | Added by PR #11712; see [Explicit `vk::binding` on entry-point parameters](#explicit-vkbinding-on-entry-point-parameters).                                                                                                                                                                                                                                                                                                                                                                            |
+| 4   | Decide whether a default space is needed     | `_calcNeedsDefaultSpace` (line 4196), consumed at lines 4706-4707                 | Determines whether descriptor set 0 must be reserved for implicitly-placed parameters.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 5   | Allocate the default space / constant buffer | `allocateUnusedSpaces` (line 855) at line 4740                                    | Claims the first unused space.                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 6   | Complete the remaining bindings              | `_completeBindings` (line 4092) at line 4765                                      | Auto-allocates every resource kind not already placed.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 7   | Place the bindless descriptor heap           | lines 4809-4834, gated on the target implying `CapabilityName::descriptor_handle` | Scans upward for the first space not in `usedSpaces`, starting from the requested `-bindless-space-index`, and places the heap there. When that is not the requested space and the option was given explicitly, it warns with `Diagnostics::RequestedBindlessSpaceIndexUnavailable` — warning `39012`, "requested bindless space index '~requested' is unavailable, using the next available index '~available'." Either way `programLayout->bindlessSpaceIndex` is set to the space actually chosen. |
 
 Two bookkeeping structures matter for reading the rest of this
 section, because they are independent and are easy to conflate:
@@ -102,14 +102,14 @@ section, because they are independent and are easy to conflate:
   `markSpaceUsed` (line 850) and `allocateUnusedSpaces` (line 855),
   and it is what the bindless-heap and default-space logic consult.
 - **the per-space used-range sets** (`usedResourceRanges`, indexed
-  by `LayoutResourceKind`) — track occupied *index ranges within* a
+  by `LayoutResourceKind`) — track occupied _index ranges within_ a
   space, and drive overlap diagnostics. Recording a range does
   **not** mark the space used.
 
 ### Explicit `vk::binding` on entry-point parameters
 
 Before PR #11712 (`c3037d220`), `[[vk::binding(binding, set)]]` on
-an entry-point *parameter* was accepted by the parser and then
+an entry-point _parameter_ was accepted by the parser and then
 silently ignored by binding: the parameter received a positionally
 defaulted binding. It is now honored on targets for which
 `doesTargetSupportVkBindingOnEntryPointParameters` returns true —
@@ -147,7 +147,7 @@ carry at least one honored annotation:
   descriptor-shaped resource.
 - `addExplicitVkBindingForEntryPointParameter` (line 1482)
   performs the reservation for one parameter. A `SubpassInput`
-  consumes *two* kinds at once, so this function reserves both the
+  consumes _two_ kinds at once, so this function reserves both the
   descriptor slot and the `InputAttachmentIndex`.
 - `entryPointHasSupportedVkBindingParameters` (line 1894) selects
   between the two completion paths at line 4003: entry points with
@@ -157,7 +157,7 @@ carry at least one honored annotation:
   aggregate `completeBindingsForParameter` path.
 - Inside the per-parameter path,
   `removeNonExplicitEntryPointParameterDescriptorOffsets`
-  (line 1914) drops the synthetic *field-relative* descriptor
+  (line 1914) drops the synthetic _field-relative_ descriptor
   offsets so that implicit parameters get real bindings allocated
   from the global context, while
   `copyExistingBindingInfoFromParameter` (line 1841) re-seeds the
@@ -172,7 +172,7 @@ The default-space calculation learned about this too:
 fully placed by explicit annotations, so an entry point whose
 parameters are all explicitly bound no longer forces a default set.
 
-Whether the annotation is *ignorable* is diagnosed separately, in
+Whether the annotation is _ignorable_ is diagnosed separately, in
 [slang-check-shader.cpp](../../../../source/slang/slang-check-shader.cpp):
 `isVkBindingCompatibleEntryPointParameterType` (line 920) decides
 which parameter types can have a binding placed at all, and
@@ -269,7 +269,7 @@ struct Payload { float4 color; }
 void main(inout Payload payload) { payload.color = float4(1, 0, 0, 1); }
 ```
 
-Note that this is a *target*-limitation diagnostic, distinct from
+Note that this is a _target_-limitation diagnostic, distinct from
 the pre-existing stage-limitation diagnostics (for example the
 `in`-only-callable case), because callable and hit stages do
 support these parameters on SPIR-V, HLSL, and GLSL.
@@ -304,12 +304,13 @@ support these parameters on SPIR-V, HLSL, and GLSL.
   }
   ```
 
-  So *any* caller that asks for the program layout also pays for
+  So _any_ caller that asks for the program layout also pays for
   the layout IR module. `getOrCreateIRModuleForLayout`
   ([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
   line 15993) is a two-line wrapper that calls `getOrCreateLayout`
   and then returns the now-populated field; it does not itself
   invoke the constructor.
+
 - **Nothing is built when binding failed.** `getOrCreateLayout`
   returns `nullptr` immediately after `generateParameterBindings`
   if `sink->getErrorCount() != 0`, before the
@@ -387,12 +388,12 @@ For each `varLayout` in `globalStructLayout->fields` (lines
 `globalStructLayout` comes from
 `getScopeStructLayout(programLayout)` at line 16396:
 
-| # | Step | Function | Notes |
-|---|---|---|---|
-| 1 | Materialize stub `IRGlobalVar` | `materialize(context, ensureDecl(context, varDecl.getDecl())).val` | Produces an `[import(...)]` stub when no definition is present in the layout-IR module. Fails with `SLANG_UNEXPECTED("unhandled value flavor")` if `materialize` returns null. |
-| 2 | Lower the variable layout | `lowerVarLayout(context, varLayout)` | Produces an `IRVarLayout` instruction that encodes the per-variable layout (binding, space, byte offset, ...). |
-| 3 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irVar, irLayout)` | The decoration is what makes the layout queryable on the stub. |
-| 4 | Record in the global type-layout builder | `globalStructTypeLayoutBuilder.addField(irVar, irLayout)` | Feeds the module-level `IRStructTypeLayout` built right after the loop via `_lowerTypeLayoutCommon`. |
+| #   | Step                                     | Function                                                           | Notes                                                                                                                                                                          |
+| --- | ---------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Materialize stub `IRGlobalVar`           | `materialize(context, ensureDecl(context, varDecl.getDecl())).val` | Produces an `[import(...)]` stub when no definition is present in the layout-IR module. Fails with `SLANG_UNEXPECTED("unhandled value flavor")` if `materialize` returns null. |
+| 2   | Lower the variable layout                | `lowerVarLayout(context, varLayout)`                               | Produces an `IRVarLayout` instruction that encodes the per-variable layout (binding, space, byte offset, ...).                                                                 |
+| 3   | Attach `IRLayoutDecoration`              | `builder->addLayoutDecoration(irVar, irLayout)`                    | The decoration is what makes the layout queryable on the stub.                                                                                                                 |
+| 4   | Record in the global type-layout builder | `globalStructTypeLayoutBuilder.addField(irVar, irLayout)`          | Feeds the module-level `IRStructTypeLayout` built right after the loop via `_lowerTypeLayoutCommon`.                                                                           |
 
 ## Global-scope type layout
 
@@ -426,16 +427,16 @@ builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 For each `entryPointLayout` in `programLayout->entryPoints` (lines
 16455-16499):
 
-| # | Step | Function | Notes |
-|---|---|---|---|
-| 1 | Skip if no AST | `if (!funcDeclRef) continue;` | Deserialized entry points have no AST-level information; the layout-IR module cannot synthesize a stub for them. |
-| 2 | Skip unspecialized generics | `if (isUnspecializedGenericFuncDeclRef(funcDeclRef)) continue;` | Generic entry points without specialization arguments do not yet have a concrete layout. |
-| 3 | Lower the function type | `lowerType(context, getFuncType(astBuilder, funcDeclRef))` | Produces an `IRFuncType`. |
-| 4 | Materialize the stub function | `getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType))` | Produces an `IRFunc` skeleton; usually `[import(...)]`. |
-| 5 | Attach import linkage if missing | `if (!irFunc->findDecoration<IRLinkageDecoration>()) builder->addImportDecoration(irFunc, mangledName)` | Wires the stub to its real implementation in the executable IR module by mangled name. |
-| 6 | Forward capability atoms | iterate `inferredCapabilityRequirements` and call `builder->addRequireCapabilityAtomDecoration` for each atom in `[_spirv_1_0, latestSpirvAtom]` or `[metallib_2_3, latestMetalAtom]` | Lets the layout module advertise the SPIR-V / Metal capability set per entry point. Other targets do **not** get capability decorations on layout-module entry points (see [Caveats and gotchas](#caveats-and-gotchas)). |
-| 7 | Lower the entry-point layout | `lowerEntryPointLayout(context, entryPointLayout)` | Produces an `IREntryPointLayout` that encodes parameter bindings and stage. |
-| 8 | Attach `IRLayoutDecoration` | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)` | The decoration the reflection API and the linker query. |
+| #   | Step                             | Function                                                                                                                                                                              | Notes                                                                                                                                                                                                                    |
+| --- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Skip if no AST                   | `if (!funcDeclRef) continue;`                                                                                                                                                         | Deserialized entry points have no AST-level information; the layout-IR module cannot synthesize a stub for them.                                                                                                         |
+| 2   | Skip unspecialized generics      | `if (isUnspecializedGenericFuncDeclRef(funcDeclRef)) continue;`                                                                                                                       | Generic entry points without specialization arguments do not yet have a concrete layout.                                                                                                                                 |
+| 3   | Lower the function type          | `lowerType(context, getFuncType(astBuilder, funcDeclRef))`                                                                                                                            | Produces an `IRFuncType`.                                                                                                                                                                                                |
+| 4   | Materialize the stub function    | `getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType))`                                                                                                                | Produces an `IRFunc` skeleton; usually `[import(...)]`.                                                                                                                                                                  |
+| 5   | Attach import linkage if missing | `if (!irFunc->findDecoration<IRLinkageDecoration>()) builder->addImportDecoration(irFunc, mangledName)`                                                                               | Wires the stub to its real implementation in the executable IR module by mangled name.                                                                                                                                   |
+| 6   | Forward capability atoms         | iterate `inferredCapabilityRequirements` and call `builder->addRequireCapabilityAtomDecoration` for each atom in `[_spirv_1_0, latestSpirvAtom]` or `[metallib_2_3, latestMetalAtom]` | Lets the layout module advertise the SPIR-V / Metal capability set per entry point. Other targets do **not** get capability decorations on layout-module entry points (see [Caveats and gotchas](#caveats-and-gotchas)). |
+| 7   | Lower the entry-point layout     | `lowerEntryPointLayout(context, entryPointLayout)`                                                                                                                                    | Produces an `IREntryPointLayout` that encodes parameter bindings and stage.                                                                                                                                              |
+| 8   | Attach `IRLayoutDecoration`      | `builder->addLayoutDecoration(irFunc, irEntryPointLayout)`                                                                                                                            | The decoration the reflection API and the linker query.                                                                                                                                                                  |
 
 ## Optional obfuscation pass
 
@@ -534,7 +535,7 @@ it returns `nullptr` when nothing has been built yet.
   corrupted or out of sync.
 - **`m_layout` must be set.** The `SLANG_ASSERT(m_layout)` at
   line 16359 is followed by a redundant `if (!programLayout) return
-  nullptr;` at lines 16362-16363, so in a release build a missing
+nullptr;` at lines 16362-16363, so in a release build a missing
   layout returns `nullptr` rather than crashing; in a debug build
   the assert fires first.
 - **Capability decorations are SPIR-V- and Metal-only.** The atom
@@ -548,7 +549,7 @@ it returns `nullptr` when nothing has been built yet.
   directly. The decoration is `IRRequireCapabilityAtomDecoration`
   (`kIROp_RequireCapabilityAtomDecoration`), which the IR dumper
   prints as `[requireCapabilityAtom(...)]`. There is no observation
-  point at which it can be attributed to the *layout* module:
+  point at which it can be attributed to the _layout_ module:
   `createIRModuleForLayout` never calls `dumpIR`, and by the first
   post-link snapshot `linkIR` has merged the layout module into the
   executable module's.
@@ -569,9 +570,9 @@ Only a small number of compiler options affect this stage. They are
 declared in
 [slang-compiler-options.h](../../../../source/slang/slang-compiler-options.h):
 
-| Gate | CLI spelling | Accessor | Effect |
-|---|---|---|---|
-| `CompilerOptionName::Obfuscate` | `-obfuscate` | `shouldObfuscateCode()` (line 361) | Enables the strip + DCE block at the end of `createIRModuleForLayout`, and is also passed to the `SharedIRGenContext` constructor at line 16375. |
+| Gate                                     | CLI spelling                    | Accessor                                                                                                             | Effect                                                                                                                                                |
+| ---------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CompilerOptionName::Obfuscate`          | `-obfuscate`                    | `shouldObfuscateCode()` (line 361)                                                                                   | Enables the strip + DCE block at the end of `createIRModuleForLayout`, and is also passed to the `SharedIRGenContext` constructor at line 16375.      |
 | `CompilerOptionName::BindlessSpaceIndex` | `-bindless-space-index <index>` | `getIntOption(...)` at [slang-parameter-binding.cpp](../../../../source/slang/slang-parameter-binding.cpp) line 4815 | Requests a specific descriptor space for the bindless descriptor heap; parameter binding honors it only if that space is not already in `usedSpaces`. |
 
 The CLI spellings come from the option table in

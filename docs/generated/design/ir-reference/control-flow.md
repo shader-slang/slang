@@ -74,7 +74,7 @@ Expression lowering also creates control flow: `visitSelectExpr`
 
 Two things this page has to cite are outside its manifest
 `watched_paths`, so changing them will not mark the page stale.
-`IREdge::isCritical` is *declared* in `slang-ir.h` but *defined* in
+`IREdge::isCritical` is _declared_ in `slang-ir.h` but _defined_ in
 [slang-ir-ssa.cpp](../../../../source/slang/slang-ir-ssa.cpp) at
 line 1312, and the eight backend-hint opcodes are reached from
 `__intrinsic_op` declarations in
@@ -119,66 +119,66 @@ range (`kIROp_FirstUnconditionalBranch` ...
 `as<IRUnconditionalBranch>()` is a single range comparison.
 `kIROp_FirstTerminatorInst` is `kIROp_Return` and
 `kIROp_LastTerminatorInst` is `kIROp_Defer`, which is exactly why
-`discard` — declared one line later in the Lua file — is *not* a
+`discard` — declared one line later in the Lua file — is _not_ a
 terminator.
 
 ## Opcodes
 
 ### Block and parameters
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `block` | `IRBlock` | — | P | — (structural container) | Basic block; its *children*, not its operands, are the instructions it owns. |
-| `param` | `IRParam` | — | | `ParamDecl`, plus `SelectExpr` / `LogicOperatorShortCircuitExpr` / `TryExpr` result parameters introduced by `visitSelectExpr` (line 7989) and its peers on blocks opened by `startBlock` (line 8193) | Block-level parameter; always the first N children of its parent block. Slang IR's replacement for SSA `phi` nodes. |
+| Opcode  | C++ wrapper | Operands | Flags | AST origin                                                                                                                                                                                            | Summary                                                                                                             |
+| ------- | ----------- | -------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `block` | `IRBlock`   | —        | P     | — (structural container)                                                                                                                                                                              | Basic block; its _children_, not its operands, are the instructions it owns.                                        |
+| `param` | `IRParam`   | —        |       | `ParamDecl`, plus `SelectExpr` / `LogicOperatorShortCircuitExpr` / `TryExpr` result parameters introduced by `visitSelectExpr` (line 7989) and its peers on blocks opened by `startBlock` (line 8193) | Block-level parameter; always the first N children of its parent block. Slang IR's replacement for SSA `phi` nodes. |
 
 ### Terminators: returns and yields
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `return_val` | `IRReturn` | `val` | | `ReturnStmt` via `visitReturnStmt` (line 8831) | Function return; always carries exactly one operand, the void value for a `void` return. |
-| `yield` | `IRYield` | `val` | | `ExpandExpr` via `visitExpandExpr` (line 6565) | Terminates the single block inside an `expand` instruction with that iteration's pattern value. |
+| Opcode       | C++ wrapper | Operands | Flags | AST origin                                     | Summary                                                                                         |
+| ------------ | ----------- | -------- | ----- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `return_val` | `IRReturn`  | `val`    |       | `ReturnStmt` via `visitReturnStmt` (line 8831) | Function return; always carries exactly one operand, the void value for a `void` return.        |
+| `yield`      | `IRYield`   | `val`    |       | `ExpandExpr` via `visitExpandExpr` (line 6565) | Terminates the single block inside an `expand` instruction with that iteration's pattern value. |
 
 ### Terminators: unconditional branches
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `unconditionalBranch` | `IRUnconditionalBranch` | `target, args...` (`min=1`) | | `BreakStmt`, `ContinueStmt` via `visitBreakStmt` (line 9059) and `visitContinueStmt` (9077), plus fall-through between lowered statements | Jumps to a target block; operands after the first are bound to the target's `param`s. |
-| `loop` | `IRLoop` | `target, breakBlock, continueBlock, args...` (`min=3`) | | `ForStmt`, `WhileStmt`, `DoWhileStmt`, `CatchStmt` via `visitForStmt` (line 8410), `visitWhileStmt` (8544), `visitDoWhileStmt` (8629), `visitCatchStmt` (8967) | Loop entry; the break and continue labels are explicit operands, and any further operands are target-block arguments. |
+| Opcode                | C++ wrapper             | Operands                                               | Flags | AST origin                                                                                                                                                     | Summary                                                                                                               |
+| --------------------- | ----------------------- | ------------------------------------------------------ | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `unconditionalBranch` | `IRUnconditionalBranch` | `target, args...` (`min=1`)                            |       | `BreakStmt`, `ContinueStmt` via `visitBreakStmt` (line 9059) and `visitContinueStmt` (9077), plus fall-through between lowered statements                      | Jumps to a target block; operands after the first are bound to the target's `param`s.                                 |
+| `loop`                | `IRLoop`                | `target, breakBlock, continueBlock, args...` (`min=3`) |       | `ForStmt`, `WhileStmt`, `DoWhileStmt`, `CatchStmt` via `visitForStmt` (line 8410), `visitWhileStmt` (8544), `visitDoWhileStmt` (8629), `visitCatchStmt` (8967) | Loop entry; the break and continue labels are explicit operands, and any further operands are target-block arguments. |
 
 ### Terminators: conditional branches
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `conditionalBranch` | `IRConditionalBranch` | `condition, trueBlock, falseBlock` (`min=3`) | | (synthesized) | Two-way branch with no structured join operand and no target arguments. |
-| `ifElse` | `IRIfElse` | `condition, trueBlock, falseBlock, afterBlock` (`min=4`) | | `IfStmt` via `visitIfStmt` (line 8280), plus `SelectExpr`, `LogicOperatorShortCircuitExpr`, and every loop condition test | Structured two-way branch whose fourth operand records the reconvergence point. |
+| Opcode              | C++ wrapper           | Operands                                                 | Flags | AST origin                                                                                                                | Summary                                                                         |
+| ------------------- | --------------------- | -------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `conditionalBranch` | `IRConditionalBranch` | `condition, trueBlock, falseBlock` (`min=3`)             |       | (synthesized)                                                                                                             | Two-way branch with no structured join operand and no target arguments.         |
+| `ifElse`            | `IRIfElse`            | `condition, trueBlock, falseBlock, afterBlock` (`min=4`) |       | `IfStmt` via `visitIfStmt` (line 8280), plus `SelectExpr`, `LogicOperatorShortCircuitExpr`, and every loop condition test | Structured two-way branch whose fourth operand records the reconvergence point. |
 
 ### Terminators: switches
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `switch` | `IRSwitch` | `condition, breakLabel, defaultLabel, caseValue/caseLabel pairs...` (`min=3`) | | `SwitchStmt` (`switch`), `StageSwitchStmt` (`__stage_switch`) via `visitSwitchStmt` (line 9495) and `visitStageSwitchStmt` (9329) | Multi-way switch; the case list is a set of (value, label) pairs reached through `getCaseValue` / `getCaseLabel`. |
-| `targetSwitch` | `IRTargetSwitch` | `breakBlock, caseValue/caseBlock pairs...` (`min=1`) | | `TargetSwitchStmt` (`__target_switch`) via `visitTargetSwitchStmt` (line 9425) | Compile-time switch on the code-generation target; case values are `CapabilityName` integers, not runtime values. |
+| Opcode         | C++ wrapper      | Operands                                                                      | Flags | AST origin                                                                                                                        | Summary                                                                                                           |
+| -------------- | ---------------- | ----------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `switch`       | `IRSwitch`       | `condition, breakLabel, defaultLabel, caseValue/caseLabel pairs...` (`min=3`) |       | `SwitchStmt` (`switch`), `StageSwitchStmt` (`__stage_switch`) via `visitSwitchStmt` (line 9495) and `visitStageSwitchStmt` (9329) | Multi-way switch; the case list is a set of (value, label) pairs reached through `getCaseValue` / `getCaseLabel`. |
+| `targetSwitch` | `IRTargetSwitch` | `breakBlock, caseValue/caseBlock pairs...` (`min=1`)                          |       | `TargetSwitchStmt` (`__target_switch`) via `visitTargetSwitchStmt` (line 9425)                                                    | Compile-time switch on the code-generation target; case values are `CapabilityName` integers, not runtime values. |
 
 ### Terminators: error flow
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `throw` | `IRThrow` | `value` | | `ThrowStmt` via `visitThrowStmt` (line 8942) | Throws the operand as an error value, terminating the current block. |
-| `tryCall` | `IRTryCall` | `successBlock, failureBlock, callee, args...` (`min=3`) | | `TryExpr` via `visitTryExpr` (line 8020) | Calls `callee` and branches to `successBlock` on a normal return or `failureBlock` on a throw. |
+| Opcode    | C++ wrapper | Operands                                                | Flags | AST origin                                   | Summary                                                                                        |
+| --------- | ----------- | ------------------------------------------------------- | ----- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `throw`   | `IRThrow`   | `value`                                                 |       | `ThrowStmt` via `visitThrowStmt` (line 8942) | Throws the operand as an error value, terminating the current block.                           |
+| `tryCall` | `IRTryCall` | `successBlock, failureBlock, callee, args...` (`min=3`) |       | `TryExpr` via `visitTryExpr` (line 8020)     | Calls `callee` and branches to `successBlock` on a normal return or `failureBlock` on a throw. |
 
 ### Terminators: no-continuation
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `missingReturn` | `IRMissingReturn` (generated) | — | | `FunctionDeclBase` body lowering in `lowerFuncDeclInContext` | Terminates the fall-off-the-end block of a value-returning function so a later dataflow check can diagnose it. |
-| `unreachable` | `IRUnreachable` (generated) | — | | IR passes only, never AST lowering; `applySparseConditionalConstantPropagation` is the one that produces it before the first dump | Asserts that the block has no reachable continuation. |
+| Opcode          | C++ wrapper                   | Operands | Flags | AST origin                                                                                                                        | Summary                                                                                                        |
+| --------------- | ----------------------------- | -------- | ----- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `missingReturn` | `IRMissingReturn` (generated) | —        |       | `FunctionDeclBase` body lowering in `lowerFuncDeclInContext`                                                                      | Terminates the fall-off-the-end block of a value-returning function so a later dataflow check can diagnose it. |
+| `unreachable`   | `IRUnreachable` (generated)   | —        |       | IR passes only, never AST lowering; `applySparseConditionalConstantPropagation` is the one that produces it before the first dump | Asserts that the block has no reachable continuation.                                                          |
 
 ### Terminators: defer and asm
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `defer` | `IRDefer` | `deferBlock, mergeBlock, scopeBlock` | | `DeferStmt` via `visitDeferStmt` (line 8919) | Records a deferred-action block whose body must run before the surrounding scope exits. |
-| `GenericAsm` | `IRGenericAsm` | `asmText, args...` (`min=1`) | | `IntrinsicAsmStmt`, written as the statement `__intrinsic_asm "<text>";`, via `visitIntrinsicAsmStmt` (line 9470) | Inline target-specific text whose semantics include terminating control flow; `getAsm()` reads operand 0 as a string literal. |
+| Opcode       | C++ wrapper    | Operands                             | Flags | AST origin                                                                                                        | Summary                                                                                                                       |
+| ------------ | -------------- | ------------------------------------ | ----- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `defer`      | `IRDefer`      | `deferBlock, mergeBlock, scopeBlock` |       | `DeferStmt` via `visitDeferStmt` (line 8919)                                                                      | Records a deferred-action block whose body must run before the surrounding scope exits.                                       |
+| `GenericAsm` | `IRGenericAsm` | `asmText, args...` (`min=1`)         |       | `IntrinsicAsmStmt`, written as the statement `__intrinsic_asm "<text>";`, via `visitIntrinsicAsmStmt` (line 9470) | Inline target-specific text whose semantics include terminating control flow; `getAsm()` reads operand 0 as a string literal. |
 
 ### Other control-flow opcodes
 
@@ -186,18 +186,18 @@ None of the rows below is a `TerminatorInst`; they sit outside the
 `kIROp_FirstTerminatorInst` / `kIROp_LastTerminatorInst` range and
 appear as ordinary instructions inside a block.
 
-| Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
-| --- | --- | --- | --- | --- | --- |
-| `discard` | `IRDiscard` (generated) | — | | `DiscardStmt` via `visitDiscardStmt` (line 9053) | HLSL `discard` for fragment shaders; ends pixel processing. |
-| `gpuForeach` | `IRGpuForeach` (generated) | `device, gridDims, kernel, args...` (`min=3`) | | `GpuForeachStmt` via `visitGpuForeachStmt` (line 8739) | Host-side GPU dispatch loop; pairs with a backend-specific kernel launch. |
-| `RequirePrelude` | `IRRequirePrelude` | `preludeText` (`min=1`) | | Call to `__requirePrelude` (`core.meta.slang`) | Requires that a target-specific prelude snippet be emitted. |
-| `RequireTargetExtension` | `IRRequireTargetExtension` | `extension` | | Call to `__requireTargetExtension` (`core.meta.slang`, `hlsl.meta.slang`) | Requires that a named target extension be enabled. |
-| `RequireComputeDerivative` | `IRRequireComputeDerivative` | — | | Call to `__requireComputeDerivative` (`core.meta.slang`) | Marks an entry point as needing compute-shader derivative support. |
-| `StaticAssert` | `IRStaticAssert` | `condition, message` | | Call to `static_assert` (`core.meta.slang`) | Compile-time assertion; consumed before emit. |
-| `Printf` | `IRPrintf` (generated) | `format, args...` | | Call to `printf` (`hlsl.meta.slang`) | Runtime print; the format string is operand 0 and the expanded pack follows. |
-| `Abort` | `IRAbort` (generated) | `format, args...` | | Call to `abort` (`hlsl.meta.slang`) | Terminates shader execution with a formatted message (`VK_KHR_shader_abort`). |
-| `RequireMaximallyReconverges` | `IRRequireMaximallyReconverges` | — | | Call to `__requireMaximallyReconverges` (`core.meta.slang`) | Marks an entry point as requiring the maximally-reconverges execution mode. |
-| `RequireQuadDerivatives` | `IRRequireQuadDerivatives` | — | | Call to `__requireQuadDerivatives` (`core.meta.slang`) | Marks an entry point as requiring the quad-derivatives execution mode. |
+| Opcode                        | C++ wrapper                     | Operands                                      | Flags | AST origin                                                                | Summary                                                                       |
+| ----------------------------- | ------------------------------- | --------------------------------------------- | ----- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `discard`                     | `IRDiscard` (generated)         | —                                             |       | `DiscardStmt` via `visitDiscardStmt` (line 9053)                          | HLSL `discard` for fragment shaders; ends pixel processing.                   |
+| `gpuForeach`                  | `IRGpuForeach` (generated)      | `device, gridDims, kernel, args...` (`min=3`) |       | `GpuForeachStmt` via `visitGpuForeachStmt` (line 8739)                    | Host-side GPU dispatch loop; pairs with a backend-specific kernel launch.     |
+| `RequirePrelude`              | `IRRequirePrelude`              | `preludeText` (`min=1`)                       |       | Call to `__requirePrelude` (`core.meta.slang`)                            | Requires that a target-specific prelude snippet be emitted.                   |
+| `RequireTargetExtension`      | `IRRequireTargetExtension`      | `extension`                                   |       | Call to `__requireTargetExtension` (`core.meta.slang`, `hlsl.meta.slang`) | Requires that a named target extension be enabled.                            |
+| `RequireComputeDerivative`    | `IRRequireComputeDerivative`    | —                                             |       | Call to `__requireComputeDerivative` (`core.meta.slang`)                  | Marks an entry point as needing compute-shader derivative support.            |
+| `StaticAssert`                | `IRStaticAssert`                | `condition, message`                          |       | Call to `static_assert` (`core.meta.slang`)                               | Compile-time assertion; consumed before emit.                                 |
+| `Printf`                      | `IRPrintf` (generated)          | `format, args...`                             |       | Call to `printf` (`hlsl.meta.slang`)                                      | Runtime print; the format string is operand 0 and the expanded pack follows.  |
+| `Abort`                       | `IRAbort` (generated)           | `format, args...`                             |       | Call to `abort` (`hlsl.meta.slang`)                                       | Terminates shader execution with a formatted message (`VK_KHR_shader_abort`). |
+| `RequireMaximallyReconverges` | `IRRequireMaximallyReconverges` | —                                             |       | Call to `__requireMaximallyReconverges` (`core.meta.slang`)               | Marks an entry point as requiring the maximally-reconverges execution mode.   |
+| `RequireQuadDerivatives`      | `IRRequireQuadDerivatives`      | —                                             |       | Call to `__requireQuadDerivatives` (`core.meta.slang`)                    | Marks an entry point as requiring the quad-derivatives execution mode.        |
 
 ## Notable opcodes
 
@@ -217,13 +217,13 @@ Three of the callouts below turn on that ordering: `throw`,
 by the first dump; `unreachable` is never emitted by lowering but is
 already present; and an arm that lowering gave a block of its own may
 have been folded onto the merge block. Read an `AST origin` cell as a
-claim about which visitor *constructs* an opcode, not as a promise
+claim about which visitor _constructs_ an opcode, not as a promise
 that a dump still contains it.
 
 ### `block` and `param`
 
 A `block` is a parent instruction whose children form the body of a
-basic block. The *first* N children of a block are always `param`
+basic block. The _first_ N children of a block are always `param`
 instructions — they declare the values that incoming branches must
 supply — and `IRBlock::getFirstParam` / `getParams` /
 `getOrdinaryInsts` in
@@ -265,11 +265,11 @@ The three loop statements fill those operands differently.
 target, `continueBlock`, and `breakBlock` are three distinct blocks.
 `visitWhileStmt` uses the loop head itself as the continue label
 (line 8568) and passes it as both the target and the continue
-operand, so *every* `while` has `target == continueBlock`.
+operand, so _every_ `while` has `target == continueBlock`.
 `visitDoWhileStmt` uses the trailing test block instead (line 8653)
 and inverts the predicate — `emitNot` at line 8689, then
 `emitIfElse(not(cond), breakBlock, merge, merge)` at line 8734 — so a
-`do`-`while` leaves the loop when the *negated* test is true. A
+`do`-`while` leaves the loop when the _negated_ test is true. A
 `while (true)` keeps the shared head-and-continue block and leaves
 its break block without a predecessor, which is why that block
 carries `unreachable` by the time the loop is dumped.
@@ -298,7 +298,7 @@ A third collapsed shape is not the emitters' doing. `visitIfStmt`
 gives an `if`/`else` three fresh blocks (lines 8303-8309) however
 empty its arms are, but the mandatory `simplifyCFG` folds away an arm
 that does nothing except branch to the merge block. An `if` whose
-*then* arm is empty and whose `else` arm is not therefore reaches a
+_then_ arm is empty and whose `else` arm is not therefore reaches a
 dump as `trueBlock == afterBlock` — the mirror image of the else-less
 shape, and one no convenience emitter produces.
 
@@ -327,7 +327,7 @@ role-based accessors rather than doing operand arithmetic:
 `getCaseCount()`, `getCaseValue(i)`, and `getCaseLabel(i)`. Two
 `IRUse*`-returning forms exist alongside them —
 `getCaseValueUse(i)` and `getCaseLabelUse(i)` — because
-`getCaseValue` hands back the used *value*, which is enough to
+`getCaseValue` hands back the used _value_, which is enough to
 inspect a case but not to rewrite one. Replacing a case key in
 place needs the `IRUse` slot so that `IRUse::set` can unregister
 the old operand from its use list and register the new one;
@@ -337,8 +337,7 @@ the old operand from its use list and register the new one;
 
 The condition may be a `bool` as far as the IR is concerned, but
 some targets require an integer switch. The pass
-`legalizeBoolSwitchForTargetsRequiringIntSwitch` (same file, line
-5135) walks every block's terminator, and for each `IRSwitch` whose
+`legalizeBoolSwitchForTargetsRequiringIntSwitch` (same file, line 5135) walks every block's terminator, and for each `IRSwitch` whose
 condition has `IRBoolType` it inserts a bool-to-int cast, points
 `switchInst->condition` at the cast, and rewrites each case key to
 the matching `IRIntLit` (`true` to 1, `false` to 0). It release-
@@ -449,7 +448,7 @@ as the diagnostic's location. A body that discards nothing (`{ }`,
 
 `discard` is the HLSL fragment-shader instruction that ends pixel
 processing without running later stages. Although it terminates the
-pixel's *runtime* processing, it is *not* an IR terminator: its
+pixel's _runtime_ processing, it is _not_ an IR terminator: its
 opcode is one past `kIROp_LastTerminatorInst`, so `as<IRTerminatorInst>`
 rejects it, and it sits as an ordinary instruction inside a block
 that ends with whatever real terminator follows. `visitDiscardStmt`
@@ -539,5 +538,5 @@ line 79), so each iteration also picks up the purity facts
   block parameters vs. SSA `phi`, and for explicit structured-join
   operands on `loop` / `ifElse`.
 - [../glossary.md](../glossary.md) — definitions of `block
-  parameter`, `terminator instruction`, `parent instruction`,
+parameter`, `terminator instruction`, `parent instruction`,
   `single static assignment (SSA)`, `control-flow graph`.
