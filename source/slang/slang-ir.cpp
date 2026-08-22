@@ -7570,6 +7570,50 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
     return setBaseInst;
 }
 
+IRSetBase* IRBuilder::getSetFromSortedElements(IROp op, UInt count, IRInst* const* sortedElements)
+{
+    // Produces the same canonical form as `getSet`, but the caller has already
+    // put the elements in unique-ID order with duplicates removed, so neither
+    // the intermediate hash set nor the sort is needed.
+    //
+    // Violating the precondition is not benign: a non-canonical operand list
+    // produces a set inst that hash-consing cannot dedupe against its
+    // structural equals, which silently breaks the pointer-identity that
+    // `areInfosEqual` relies on. So each part of the contract is checked as
+    // far as it can be:
+    //
+    //   * globality, and duplicate-freedom, are checked unconditionally --
+    //     both are cheap pointer-level tests;
+    //   * strict ordering is checked in debug builds only, and only by
+    //     *reading* the module's unique-ID map. `getUniqueID` assigns IDs
+    //     lazily, so calling it here would hand out IDs earlier than the
+    //     normal path does and perturb the canonical order of unrelated sets.
+    //     Elements of an already-built set always have IDs, so for real
+    //     callers the read-only lookup is a hit.
+    for (UInt i = 0; i < count; ++i)
+        if (sortedElements[i]->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("getSetFromSortedElements called with non-global operands");
+
+    for (UInt i = 1; i < count; ++i)
+        SLANG_RELEASE_ASSERT(sortedElements[i] != sortedElements[i - 1]);
+
+#ifdef _DEBUG
+    {
+        auto uniqueIDMap = getModule()->getUniqueIdMap();
+        for (UInt i = 1; i < count; ++i)
+        {
+            auto prevID = uniqueIDMap->tryGetValue(sortedElements[i - 1]);
+            auto curID = uniqueIDMap->tryGetValue(sortedElements[i]);
+            if (prevID && curID)
+                SLANG_ASSERT(*prevID < *curID);
+        }
+    }
+#endif
+
+    return as<IRSetBase>(
+        emitIntrinsicInst(nullptr, op, count, const_cast<IRInst**>(sortedElements)));
+}
+
 IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
 {
     return getSet(op, {element});
