@@ -7,6 +7,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
 #include "slang-target.h"
 
 #include <limits>
@@ -511,6 +512,49 @@ static bool isCoverageInstrumentationTargetSupported(TargetRequest* targetReques
     return !isWGPUTarget(targetRequest) && !isCPUTargetViaLLVM(targetRequest);
 }
 
+// Locate the wave intrinsics that wave-aggregation synthesizes calls to.
+// They are marked `[KnownBuiltin]` in the core module and force-kept across
+// link (slang-ir-link.cpp) when coverage is enabled, so the definitions are
+// present here; the coverage pass runs before inlining/target-switch, so the
+// calls resolve through the normal pipeline afterwards.
+//
+// Precondition: link leaves at most one IR func per `[KnownBuiltin]` name. The
+// single-definition guarantee itself comes from link's `[KnownBuiltin]`
+// force-keep, which copies exactly one decorated definition per name; the
+// `SLANG_ASSERT`s below are a DEBUG-BUILD tripwire on that invariant, not a
+// release-build guard (in release `SLANG_ASSERT` expands to `SLANG_ASSUME`).
+// In a release build the loop simply binds that sole definition. An out-param
+// left null means the force-keep did not preserve its intrinsic; the sole
+// caller asserts on that, since under the shared force-keep predicate the
+// intrinsics are present whenever the caller reaches this function.
+static void findCoverageWaveFuncs(IRModule* module, IRFunc*& outCountBits, IRFunc*& outFirstLane)
+{
+    outCountBits = nullptr;
+    outFirstLane = nullptr;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        auto knownBuiltin = func->findDecoration<IRKnownBuiltinDecoration>();
+        if (!knownBuiltin)
+            continue;
+        switch (knownBuiltin->getName())
+        {
+        case KnownBuiltinDeclName::WaveActiveCountBits:
+            SLANG_ASSERT(!outCountBits); // expect a unique definition post-link
+            outCountBits = func;
+            break;
+        case KnownBuiltinDeclName::WaveIsFirstLane:
+            SLANG_ASSERT(!outFirstLane); // expect a unique definition post-link
+            outFirstLane = func;
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 // Maps the per-slot byte-width selector (`counterByteWidth`, in bytes)
 // to the counter buffer's element `IRType`: `8` -> `uint64_t`, `4` ->
 // `uint`. Both entry paths (the `-trace-coverage-counter-width` CLI
@@ -953,11 +997,23 @@ struct CoverageInstrumenter
     IRType* counterElementType;
     IRType* counterElementPtrType;
     IRType* intType;
+    IRType* boolType;
+    IRType* uintType;
     // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
     // counter is written with a plain non-atomic store of 1 instead of an
     // atomic add, recording whether the entry executed (0 / non-zero) rather
     // than an exact count.
     bool booleanMode = false;
+    // Invariant (established in the ctor, read in `lowerMarkerOp`): the three
+    // wave members move together. `waveAggregate` is true iff this target
+    // aggregates, boolean mode is off, AND the linker force-kept both
+    // `[KnownBuiltin]` intrinsics, in which case
+    // `waveCountBitsFunc`/`waveIsFirstLaneFunc` are the resolved callees
+    // `lowerMarkerOp` invokes; when false, both funcs stay null and the
+    // per-lane path is taken.
+    bool waveAggregate = false;
+    IRFunc* waveCountBitsFunc = nullptr;
+    IRFunc* waveIsFirstLaneFunc = nullptr;
     List<BranchSiteRemap> branchSiteRemaps;
     uint32_t nextBranchSiteID = 1;
 
@@ -966,7 +1022,8 @@ struct CoverageInstrumenter
         IRGlobalParam* buf,
         SourceManager* sm,
         ArtifactPostEmitMetadata& md,
-        bool booleanMode)
+        bool booleanMode,
+        bool waveAggregationSupported)
         : module(m)
         , coverageBuffer(buf)
         , sourceManager(sm)
@@ -982,6 +1039,49 @@ struct CoverageInstrumenter
         counterElementType = bufferType->getElementType();
         counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
+        boolType = tmpBuilder.getBoolType();
+        uintType = tmpBuilder.getUIntType();
+
+        // Boolean mode already removes the atomic entirely, so there is nothing
+        // for wave aggregation to reduce; the plain-store path wins where both
+        // apply. `slang-ir-link.cpp` excludes boolean mode from the force-keep
+        // on the same reasoning, so in that configuration the intrinsics are not
+        // linked in and would not be findable here anyway.
+        waveAggregate = waveAggregationSupported && !booleanMode;
+        if (waveAggregate)
+        {
+            findCoverageWaveFuncs(module, waveCountBitsFunc, waveIsFirstLaneFunc);
+            // The linker force-keeps both intrinsics under the same predicate
+            // that set `waveAggregationSupported`, so they are present here iff
+            // this branch runs; a null means that pairing has broken.
+            SLANG_ASSERT(waveCountBitsFunc && waveIsFirstLaneFunc);
+        }
+    }
+
+    // Move `inst` and every following inst in its block into a fresh block,
+    // leaving the original block open (no terminator) so the caller can
+    // append control flow. The loop carries the original terminator into the
+    // new block, so the new block is well-formed while the original is
+    // deliberately left open for the caller to terminate. Not a general-purpose
+    // utility — used only by `lowerMarkerOp`.
+    IRBlock* splitBlockAtInst(IRInst* inst)
+    {
+        SLANG_ASSERT(inst);
+        SLANG_ASSERT(!as<IRParam>(inst));
+        IRBlock* originalBlock = as<IRBlock>(inst->getParent());
+        SLANG_ASSERT(originalBlock);
+        SLANG_ASSERT(originalBlock->getTerminator());
+
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+        IRBlock* newBlock = builder.emitBlock();
+        for (IRInst* i = inst; i;)
+        {
+            IRInst* next = i->getNextInst();
+            i->insertAtEnd(newBlock);
+            i = next;
+        }
+        return newBlock;
     }
 
     uint32_t getRemappedBranchSiteID(IRInst* markerOp, uint32_t originalSiteID)
@@ -1037,10 +1137,17 @@ struct CoverageInstrumenter
         }
     }
 
-    // Lower a single coverage marker op to an atomic add on
-    // `coverageBuffer[slot]`. Appends the source-entry metadata that
-    // currently points at this direct counter slot, then removes the
-    // marker op.
+    // Lower a single coverage marker op to a counter increment on
+    // `coverageBuffer[slot]`, then append the source-entry metadata that points
+    // at this slot and remove the marker op. The `waveAggregate` member selects
+    // between two lowerings:
+    //   - per-lane (waveAggregate == false): a plain `AtomicAdd(slot, 1)`, one
+    //     atomic per active lane;
+    //   - wave-aggregated (waveAggregate == true): count the active lanes
+    //     (`WaveActiveCountBits`), elect one lane (`WaveIsFirstLane`), and have
+    //     that lane apply the whole increment via a guarded
+    //     `AtomicAdd(slot, laneCount)` — this splits the marker's block and
+    //     emits an if/else around the atomic.
     void lowerMarkerOp(IRInst* markerOp, UInt slot)
     {
         CoverageTracingEntry entry;
@@ -1059,6 +1166,8 @@ struct CoverageInstrumenter
             kIROp_RWStructuredBufferGetElementPtr,
             2,
             getElemArgs);
+
+        IRInst* memoryOrder = builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed);
 
         if (booleanMode)
         {
@@ -1081,21 +1190,81 @@ struct CoverageInstrumenter
             // serializes on the hot counter address (measured ~15x slower),
             // defeating the purpose. Trade-off: no exact execution count
             // (`CoverageCounterMode::Boolean`, not `Count`).
+            //
+            // Wave aggregation does not apply here and the constructor has
+            // already forced `waveAggregate` off: there is no atomic left to
+            // contend on, and electing one lane to store `1` would record the
+            // same 0/non-zero result at the cost of a branch.
             builder.emitStore(slotPtr, builder.getIntValue(counterElementType, 1));
+        }
+        else if (waveAggregate)
+        {
+            // Wave-aggregated counter increment (issue #11509). Instead of
+            // every active lane issuing `atomicAdd(slot, 1)` — which serializes
+            // on the few hot counter slots and can trip GPU TDR on large
+            // dispatches — count the active lanes once and let a single lane
+            // apply the whole increment:
+            //   uint lc = WaveActiveCountBits(true);
+            //   if (WaveIsFirstLane()) atomicAdd(slot, lc);
+            // `WaveActiveCountBits(true)` counts lanes active at this marker, so
+            // the aggregated total matches the per-lane total exactly. The
+            // equality is load-bearing on one premise: the wave active-mask at
+            // this marker equals the set of lanes that, in the per-lane
+            // lowering, each execute `atomicAdd(slot, 1)` here. For markers
+            // inside divergent control flow this relies on the active mask at
+            // the (partially-converged) marker point matching the per-lane
+            // execution mask.
+            //
+            // Placement is load-bearing: `WaveActiveCountBits`/`WaveIsFirstLane`
+            // are wave-collective, so every lane that participates in the count
+            // must reach them. They are emitted into `headBlock` — before the
+            // `WaveIsFirstLane()` guard — and must stay in this convergent
+            // control flow. Sinking either call into `thenBlock` (the elected-
+            // lane branch) would let only one lane vote and break the count, so
+            // a refactor must not move the collective calls past the guard.
+            IRInst* trueVal = builder.getBoolValue(true);
+            IRInst* laneCount = builder.emitCallInst(uintType, waveCountBitsFunc, 1, &trueVal);
+            IRInst* isFirstLane = builder.emitCallInst(boolType, waveIsFirstLaneFunc, 0, nullptr);
+
+            // `WaveActiveCountBits` returns a 32-bit lane count, but the atomic
+            // addend must match the counter's element type, which is `uint64_t`
+            // at the default `-trace-coverage-counter-width 64`. Widen rather
+            // than narrow the counter: a wave is at most 128 lanes, so the value
+            // always fits and the cast is lossless.
+            IRInst* addend = laneCount;
+            if (counterElementType->getOp() == kIROp_UInt64Type)
+                addend = builder.emitCast(counterElementType, laneCount);
+
+            IRBlock* headBlock = as<IRBlock>(markerOp->getParent());
+            IRBlock* afterBlock = splitBlockAtInst(markerOp);
+
+            IRBlock* thenBlock = builder.createBlock();
+            thenBlock->insertAfter(headBlock);
+
+            builder.setInsertInto(headBlock);
+            // `afterBlock` is passed as BOTH the false-branch and the merge
+            // block: a non-elected lane falls through directly to the
+            // continuation; only the elected (first) lane runs `thenBlock`.
+            builder.emitIfElse(isFirstLane, thenBlock, afterBlock, afterBlock);
+
+            builder.setInsertInto(thenBlock);
+            IRInst* atomicArgs[] = {slotPtr, addend, memoryOrder};
+            builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
+            builder.emitBranch(afterBlock);
         }
         else
         {
             // Emit `AtomicAdd(slotPtr, 1, relaxed)` — lowered by each
             // backend emitter to its native atomic-increment idiom
             // (InterlockedAdd on HLSL, atomicAdd on GLSL, OpAtomicIAdd on
-            // SPIR-V, etc.). The immediate and the result type are typed
-            // against `counterElementType` (uint or uint64), so the same
-            // lowering path produces a 64-bit `OpAtomicIAdd` /
-            // `atomicAdd(ulonglong*)` when the buffer is wide.
+            // SPIR-V, etc.). Correct under GPU concurrency. The immediate and
+            // the result type are typed against `counterElementType` (uint or
+            // uint64), so the same lowering path produces a 64-bit
+            // `OpAtomicIAdd` / `atomicAdd(ulonglong*)` when the buffer is wide.
             IRInst* atomicArgs[] = {
                 slotPtr,
                 builder.getIntValue(counterElementType, 1),
-                builder.getIntValue(intType, (IRIntegerValue)kIRMemoryOrder_Relaxed),
+                memoryOrder,
             };
             builder.emitIntrinsicInst(counterElementType, kIROp_AtomicAdd, 3, atomicArgs);
         }
@@ -1295,6 +1464,41 @@ static bool tryGetCoverageUniformBindingInfo(
 
 } // anonymous namespace
 
+// Wave-aggregation (issue #11509) reduces atomic contention by issuing one
+// atomic per wave instead of one per active lane. The coverage pass
+// synthesizes calls to the stdlib `WaveActiveCountBits(true)` /
+// `WaveIsFirstLane()`, so it is only valid where those intrinsics lower.
+//
+// A capability query (`getTargetCaps().implies(subgroup_basic_ballot)`) is the
+// WRONG test at this early post-link stage: SPIR-V/Metal/CUDA subgroup atoms
+// are added on demand at emit (not present yet), and `implies` against a
+// multi-target compound alias requires the cap set to cover every target
+// family at once — so it returns false even for SPIR-V/CUDA/Metal here. Gate
+// on target family instead (the idiomatic approach in slang-emit.cpp), with
+// the HLSL shader-model 6.0 boundary checked via the profile version.
+//
+// GLSL is intentionally left on the per-lane path: `isKhronosTarget` would
+// also include GLSL, but enabling it needs separate validation that a bare
+// `glsl_450` profile auto-declares the subgroup extension rather than
+// erroring, so we gate on SPIR-V only via `isSPIRV`.
+bool isCoverageWaveAggregationSupported(TargetProgram* targetProgram)
+{
+    TargetRequest* targetRequest = targetProgram->getTargetReq();
+    if (!isCoverageInstrumentationTargetSupported(targetRequest)) // excludes WGSL + CPU-via-LLVM
+        return false;
+    if (isCPUTarget(targetRequest)) // cpp-source CPU has no wave/SIMD-group concept
+        return false;
+    if (isCUDATarget(targetRequest))
+        return true;
+    if (isMetalTarget(targetRequest))
+        return true;
+    if (isSPIRV(targetRequest->getTarget())) // SPIR-V / Vulkan
+        return true;
+    if (isD3DTarget(targetRequest)) // HLSL: wave intrinsics require shader model 6.0+
+        return targetProgram->getOptionSet().getProfileVersion() >= ProfileVersion::DX_6_0;
+    return false;
+}
+
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -1306,6 +1510,7 @@ void instrumentCoverage(
     int counterByteWidth,
     bool booleanMode,
     TargetRequest* targetRequest,
+    bool waveAggregationSupported,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata)
 {
@@ -1461,7 +1666,8 @@ void instrumentCoverage(
         buffer,
         sink ? sink->getSourceManager() : nullptr,
         outMetadata,
-        booleanMode);
+        booleanMode,
+        waveAggregationSupported);
     instrumenter.run(markerOps);
 }
 

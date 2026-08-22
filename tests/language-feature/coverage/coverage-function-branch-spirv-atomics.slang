@@ -42,6 +42,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[0] = accum;
 }
 
+// Wave-aggregated increments (issue #11509) require the subgroup ballot
+// capability for WaveActiveCountBits.
+//CHECK: OpCapability GroupNonUniformBallot
+
 // The synthesized coverage buffer must be present for function/branch
 // coverage even when line coverage is disabled.
 //CHECK: __slang_coverage
@@ -62,6 +66,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK-DAG: OpLoopMerge
 //CHECK-DAG: OpSelectionMerge
 //CHECK-DAG: OpSelectionMerge
+// Each marker aggregates over active lanes before the guarded atomic.
+//CHECK-DAG: OpGroupNonUniformBallotBitCount
+//CHECK-DAG: OpGroupNonUniformElect
 //CHECK-DAG: OpAtomicIAdd
 //CHECK-DAG: OpAtomicIAdd
 //CHECK-DAG: OpAtomicIAdd

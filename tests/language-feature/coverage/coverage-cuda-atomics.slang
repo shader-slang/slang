@@ -33,9 +33,27 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 //CHECK: struct GlobalParams
 //CHECK: RWStructuredBuffer{{.*}}_slang_coverage
 
-// Counter increments must use CUDA's native `atomicAdd` on the
-// coverage buffer field — confirms the full instrumentation path
-// survives to CUDA codegen.
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(0\)}}
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(1\)}}
-//CHECK-DAG: atomicAdd{{.*_slang_coverage.*int\(2\)}}
+// Counter increments are wave-aggregated (issue #11509): each marker counts the
+// active lanes and a single elected lane applies the whole increment, instead of
+// every lane issuing atomicAdd(slot, 1). On CUDA `WaveActiveCountBits` lowers to
+// `__popc(__ballot_sync(...))`, so assert that real idiom (not just the kept
+// function name), then bind each guarded `atomicAdd` to BOTH its coverage-slot
+// pointer and the active-lane-count result so the test proves the atomic targets
+// the slot and adds the lane count, not a literal 1.
+//
+// At the default 64-bit counter width the atomic addend must be `ulonglong`, so
+// the 32-bit `WaveActiveCountBits` result is widened with a `ulonglong(...)`
+// cast; each slot binds that widened value as the atomic's addend.
+//CHECK: __popc(__ballot_sync
+//CHECK: [[SLOT0:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(0)
+//CHECK: [[CNT0:_S[0-9]+]] = WaveActiveCountBits
+//CHECK: ulonglong [[CNT0W:_S[0-9]+]] = ulonglong([[CNT0]])
+//CHECK: atomicAdd([[SLOT0]], [[CNT0W]])
+//CHECK: [[SLOT1:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(1)
+//CHECK: [[CNT1:_S[0-9]+]] = WaveActiveCountBits
+//CHECK: ulonglong [[CNT1W:_S[0-9]+]] = ulonglong([[CNT1]])
+//CHECK: atomicAdd([[SLOT1]], [[CNT1W]])
+//CHECK: [[SLOT2:_S[0-9]+]] = {{.*}}_slang_coverage{{.*}}int(2)
+//CHECK: [[CNT2:_S[0-9]+]] = WaveActiveCountBits
+//CHECK: ulonglong [[CNT2W:_S[0-9]+]] = ulonglong([[CNT2]])
+//CHECK: atomicAdd([[SLOT2]], [[CNT2W]])

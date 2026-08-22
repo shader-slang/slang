@@ -1200,18 +1200,26 @@ Result linkAndOptimizeIR(
         // non-atomic stores (`*slot = 1`), which MSL accepts at either width —
         // verified against the Metal compiler — so the requested width is
         // honored there.
-        bool coverageBoolean = false;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
-        {
-            if (values->getCount() > 0)
-                coverageBoolean = (*values)[0].intValue != 0;
-        }
+        // Read boolean mode from the MERGED `TargetProgram` option set, the same
+        // scope the linker uses to decide the wave-intrinsic force-keep
+        // (`slang-ir-link.cpp`). Reading the per-target `opts` here would let a
+        // program-scope `-trace-coverage-boolean` desync the two: the linker
+        // would drop the wave intrinsics while this gate still requested
+        // aggregation, and the pass would then find no callee for them.
+        const bool coverageBoolean =
+            targetProgram->getOptionSet().getBoolOption(CompilerOptionName::TraceCoverageBoolean);
         if (isMetalTarget(targetRequest) && counterByteWidth > 4 && !coverageBoolean)
         {
             if (hasExplicitCounterByteWidth)
                 sink->diagnose(Diagnostics::CoverageCounterWidthCappedForMetal{});
             counterByteWidth = 4;
         }
+        // Boolean mode is excluded: it emits a plain non-atomic store, so there
+        // is no atomic contention for wave aggregation to relieve. `linkIR`
+        // applies the identical exclusion when deciding whether to force-keep
+        // the wave intrinsics, so the two stay in lockstep.
+        const bool coverageWaveAggregationSupported =
+            !coverageBoolean && isCoverageWaveAggregationSupported(targetProgram);
         SLANG_PASS(
             instrumentCoverage,
             sink,
@@ -1223,6 +1231,7 @@ Result linkAndOptimizeIR(
             counterByteWidth,
             coverageBoolean,
             targetRequest,
+            coverageWaveAggregationSupported,
             outLinkedIR.globalScopeVarLayout,
             *metadata);
         validateIRModuleIfEnabled(codeGenContext, irModule);

@@ -194,10 +194,36 @@ counters are inserted, with examples, see
      on the same source line get distinct slots and are aggregated by
      the LCOV exporter. Function and branch markers produce their own
      `CoverageEntryInfo::kind` values and use the same counter buffer.
-   - **Rewrites each op** as `AtomicAdd(__slang_coverage[slot], 1,
-Relaxed)` in the default counting mode, or as a plain non-atomic
-     store of `1` under `-trace-coverage-boolean` (hit/not-hit; see
-     `CoverageCounterMode` in the roadmap section).
+   - **Rewrites each op into a counter update.** Three lowerings, chosen
+     in this order:
+     - **Boolean mode** (`-trace-coverage-boolean`, any target): a plain
+       non-atomic store of `1` (hit/not-hit; see `CoverageCounterMode` in
+       the roadmap section). This removes atomic contention outright, so
+       it takes precedence over wave aggregation — there is no atomic
+       left to aggregate.
+     - **Counting mode, non-wave targets** (CPU/cpp-source, WGSL, GLSL,
+       sub-SM6.0 HLSL): per-lane
+       `AtomicAdd(__slang_coverage[slot], 1, Relaxed)`.
+     - **Counting mode, wave-capable targets** (SPIR-V, CUDA, Metal,
+       HLSL SM6.0+, selected by `isCoverageWaveAggregationSupported`):
+       the wave-aggregated form (issue #11509), where the active lanes
+       are counted once and a single elected lane applies the whole
+       increment —
+       `uint lc = WaveActiveCountBits(true); if (WaveIsFirstLane())
+       AtomicAdd(__slang_coverage[slot], lc, Relaxed);` — so the hot
+       counter slot takes one atomic per wave instead of one per lane.
+
+     The aggregated total equals the per-lane total by construction: one
+     guarded atomic per marker, with addend equal to the number of lanes
+     active at that marker. That equality rests on the wave active-mask
+     at the marker matching the set of lanes that would each have issued
+     a per-lane increment there; under divergent control flow this is
+     governed by hardware reconvergence, a property of all wave
+     intrinsics rather than of this lowering. The equivalence is verified
+     structurally by FileCheck tests, **not** by a runtime multi-lane
+     comparison on real hardware — see the count-equivalence note in
+     issue #11509.
+
    - **Records source entries on the artifact's
      `ICoverageTracingMetadata` and the synthesized buffer binding on
      `ISyntheticResourceMetadata`.** A source entry is unattributable when its

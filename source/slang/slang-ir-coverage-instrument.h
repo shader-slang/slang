@@ -7,6 +7,7 @@ struct IRModule;
 struct IRVarLayout;
 class DiagnosticSink;
 class TargetRequest;
+class TargetProgram;
 class ArtifactPostEmitMetadata;
 
 // Default per-slot byte width for the synthesized `__slang_coverage`
@@ -70,6 +71,20 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // an atomic add, so it records whether the entry executed (0 / non-zero)
 // rather than an exact count. This removes all atomic contention. Off by
 // default.
+//
+// `waveAggregationSupported` is the caller-computed result of
+// `isCoverageWaveAggregationSupported`. When true the pass emits the
+// wave-aggregated increment; when false it emits the per-lane atomic add. The
+// caller and the linker compute it identically so the force-kept wave
+// intrinsics are present iff the pass will call them.
+//
+// `booleanMode` and `waveAggregationSupported` are two answers to the same
+// problem — atomic contention on hot counter slots — and `booleanMode` wins
+// where both apply: it removes the atomic entirely, leaving nothing for wave
+// aggregation to reduce. A boolean-mode compile therefore takes the plain-store
+// path regardless of `waveAggregationSupported`, and the linker applies the
+// same exclusion so no wave intrinsic is force-kept for a pass that will never
+// call it.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,
@@ -81,6 +96,7 @@ void instrumentCoverage(
     int counterByteWidth,
     bool booleanMode,
     TargetRequest* targetRequest,
+    bool waveAggregationSupported,
     IRVarLayout*& globalScopeVarLayout,
     ArtifactPostEmitMetadata& outMetadata);
 
@@ -95,6 +111,18 @@ void finalizeCoverageInstrumentationMetadata(
     IRVarLayout* globalScopeVarLayout,
     TargetRequest* targetRequest,
     ArtifactPostEmitMetadata& outMetadata);
+
+// True when `targetProgram` can lower the wave intrinsics that coverage
+// instrumentation uses to aggregate counter increments per wave (issue
+// #11509): SPIR-V, CUDA, Metal, and HLSL shader-model 6.0+. CPU/cpp-source,
+// WGSL, sub-SM6.0 HLSL, and GLSL stay on the per-lane path. Shared by the
+// coverage pass (to pick the lowering) and the linker (to force-keep the wave
+// intrinsics only where they will actually be used) so the two stay aligned.
+//
+// Takes the `TargetProgram` and reads the merged profile itself: the HLSL
+// shader-model gate needs the merged profile (an API-supplied profile lands
+// only there), and reading it internally keeps both callers in lockstep.
+bool isCoverageWaveAggregationSupported(TargetProgram* targetProgram);
 
 } // namespace Slang
 

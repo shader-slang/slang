@@ -11,17 +11,22 @@ metadata and binding contract, see
 The examples below use a conceptual helper:
 
 ```slang
-coverageAtomic("name"); // AtomicAdd(__slang_coverage[slot], 1)
+coverageAtomic("name"); // increment counter at __slang_coverage[slot]
 ```
 
 The real compiler first emits marker IR ops during AST lowering. The
 IR coverage pass later assigns numeric counter slots, synthesizes the
-hidden `__slang_coverage` buffer, and rewrites each marker to an
-atomic increment — or, under `-trace-coverage-boolean`, to a plain
-non-atomic store of `1` (hit/not-hit). Placement is identical across
-the two rewrite forms; everything in this document applies to both.
-Slot numbers are not part of the placement contract; the metadata maps
-each source coverage entry to the slot chosen for that compile.
+hidden `__slang_coverage` buffer, and rewrites each marker to a counter
+update. There are three rewrite forms: a plain non-atomic store of `1`
+under `-trace-coverage-boolean` (hit/not-hit), a per-lane
+`AtomicAdd(__slang_coverage[slot], 1)` in counting mode on non-wave
+targets, and a wave-aggregated form (one atomic per wave, addend =
+active-lane count) in counting mode on wave-capable targets — see the
+lowerings described in [`shader-coverage.md`](shader-coverage.md)
+(issue #11509). Placement is identical across all three; everything in
+this document applies to each. Slot numbers are not part of the
+placement contract; the metadata maps each source coverage entry to the
+slot chosen for that compile.
 
 Modes are independent. Enabling more than one mode adds the markers
 from each enabled mode into the same counter buffer.

@@ -5,6 +5,7 @@
 #include "core/slang-performance-profiler.h"
 #include "slang-capability.h"
 #include "slang-ir-autodiff.h"
+#include "slang-ir-coverage-instrument.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize-target-switch.h"
@@ -2340,6 +2341,32 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
+    // Coverage instrumentation (issue #11509) synthesizes calls to the wave
+    // intrinsics `WaveActiveCountBits`/`WaveIsFirstLane` for wave-aggregated
+    // counters, so those `[KnownBuiltin]` funcs must survive link even when the
+    // user shader references no wave ops. Force-keep them only when coverage is
+    // enabled AND the target actually aggregates (the same predicate the
+    // coverage pass uses) — otherwise they would be dead code, and on a target
+    // that can't lower them (e.g. WGSL) a kept-but-unused wave func breaks
+    // codegen.
+    //
+    // `shouldTraceAnyCoverage()` is the same "any coverage mode on" predicate
+    // the coverage pass keys off, so reusing it keeps the force-keep in lockstep
+    // with whether the pass runs (rather than re-spelling the three-flag
+    // disjunction here). The force-keep-iff-the-pass-calls-them invariant lives
+    // canonically on the `isCoverageWaveAggregationSupported` declaration in
+    // slang-ir-coverage-instrument.h.
+    //
+    // Boolean mode (`-trace-coverage-boolean`) is excluded for the same reason
+    // the pass excludes it: that lowering emits a plain non-atomic store, so
+    // there is no atomic to aggregate and the intrinsics would be kept for a
+    // call that never happens. `slang-emit.cpp` applies the identical exclusion
+    // when computing the pass's own gate.
+    const bool keepCoverageWaveFuncs =
+        codeGenContext->shouldTraceAnyCoverage() &&
+        !targetProgram->getOptionSet().getBoolOption(CompilerOptionName::TraceCoverageBoolean) &&
+        isCoverageWaveAggregationSupported(targetProgram);
+
     HashSet<IRInst*> extraInstsToClone;
     auto cloneAndKeepAlive = [&](IRInst* inst)
     {
@@ -2372,8 +2399,22 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         for (auto inst : linkingInfo->getKnownBuiltins())
         {
             auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>();
-            if (knownBuiltin && knownBuiltin->getName() == KnownBuiltinDeclName::NullDifferential)
+            if (!knownBuiltin)
+                continue;
+            switch (knownBuiltin->getName())
+            {
+            case KnownBuiltinDeclName::NullDifferential:
                 cloneAndKeepAlive(inst);
+                break;
+            case KnownBuiltinDeclName::WaveActiveCountBits:
+            case KnownBuiltinDeclName::WaveIsFirstLane:
+                // Force-kept only when coverage will aggregate on this target.
+                if (keepCoverageWaveFuncs)
+                    cloneAndKeepAlive(inst);
+                break;
+            default:
+                break;
+            }
         }
     }
 
