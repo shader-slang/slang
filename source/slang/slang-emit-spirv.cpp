@@ -2034,6 +2034,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (auto arrayType = as<IRUnsizedArrayType>(valueType))
             return getArrayElementStrideValue(arrayType, rule);
 
+        if (auto arrayType = as<IRArrayType>(valueType))
+            return getArrayElementStrideValue(arrayType, rule);
+
         IRSizeAndAlignment sizeAndAlignment;
         getSizeAndAlignment(m_targetRequest, rule, valueType, &sizeAndAlignment);
 
