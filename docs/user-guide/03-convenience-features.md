@@ -842,10 +842,13 @@ enum DescriptorKind
     Unknown, /// Unknown descriptor kind.
     Texture, /// A texture descriptor.
     CombinedTextureSampler, /// A combined texture and sampler state descriptor.
-    Buffer, /// A buffer descriptor.
+    ConstantBuffer, /// A constant buffer descriptor.
+    StorageBuffer, /// A storage buffer descriptor.
+    Buffer = StorageBuffer, /// Deprecated. Use `StorageBuffer` instead.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
-    TexelBuffer /// A texel buffer descriptor.
+    UniformTexelBuffer, /// A uniform texel buffer descriptor (read-only).
+    StorageTexelBuffer /// A storage texel buffer descriptor (read-write).
 }
 
 enum DescriptorAccess
