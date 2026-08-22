@@ -3725,6 +3725,13 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "duplicate-system-value-semantic",
+    30706,
+    "duplicate system-value semantic '~semantic'; each system value can be declared at most once per entry point",
+    span { loc = "location" }
+)
+
 --
 -- 308xx: inheritance
 --

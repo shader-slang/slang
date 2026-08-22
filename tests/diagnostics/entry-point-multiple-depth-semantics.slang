@@ -10,7 +10,9 @@
 // rejected uniformly on every target.
 //
 // Each function is tested in isolation via `-entry`, which compiles only that one
-// entry point, so exactly the single E30705 diagnostic is produced per case.
+// entry point, so only that case's diagnostics are produced. Most cases declare two
+// *different* depth semantics and so report E30705 alone; `twoSame` repeats one
+// semantic and therefore also reports the duplicate-system-value error E30706.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=TWOPARAMS):-target spirv -entry twoParams -stage fragment
 //DIAGNOSTIC_TEST:SIMPLE(diag=TWOSAME):-target spirv -entry twoSame -stage fragment
@@ -31,9 +33,14 @@ void twoParams(float x, out float a : SV_DepthGreaterEqual, out float b : SV_Dep
 // The canonical duplicate: the same depth semantic declared twice (a likely copy-paste error).
 // The message names both offenders, which with identical spellings reads sensibly as
 // "'SV_Depth' conflicts with the earlier 'SV_Depth'".
+//
+// This case is also an *exact* duplicate system value, so it additionally trips E30706 at the
+// second parameter: repeating one depth semantic violates both "at most one depth output" and
+// "each system value at most once". The two checks are independent and both reports are correct.
 [shader("fragment")]
 void twoSame(float x, out float a : SV_Depth, out float b : SV_Depth)
 //TWOSAME:                                                  ^^^^^^^^ E30705
+//TWOSAME:                                              ^ E30706
 {
     a = x + 1.0;
     b = x - 1.0;
