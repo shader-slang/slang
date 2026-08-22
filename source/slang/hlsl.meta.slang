@@ -29162,7 +29162,7 @@ $}
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         let V : int
-    >(__constref groupshared T[V] data, uint element, uint stride)
+    >(const groupshared T[V] data, uint element, uint stride)
     {
         __target_switch
         {
@@ -29227,7 +29227,7 @@ $}
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
-    >(__constref groupshared U[V] data, uint element, uint stride)
+    >(const groupshared U[V] data, uint element, uint stride)
     {
         __target_switch
         {
@@ -29299,7 +29299,7 @@ $}
         U,
         let V : int,
         let L : int
-    >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
+    >(const groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         let pointer = __getAddress(data[element]);
@@ -30053,7 +30053,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let matrixLayout : CoopMatMatrixLayout,
     let U : int
 >(
-    __constref groupshared T[U] data,
+    const groupshared T[U] data,
     uint element,
     uint stride)
 {
@@ -30997,7 +30997,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [__NoSideEffect]
     [require(cooperative_vector)]
     [require(optix_coopvec)]
-    static CoopVec<T, N> load<let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> load<let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
@@ -31028,7 +31028,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [__NoSideEffect]
     [require(spirv, cooperative_vector)]
-    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int>(__constref groupshared const U[M] data, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int>(const groupshared U[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
@@ -31043,7 +31043,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [__NoSideEffect]
     [require(spirv, cooperative_vector)]
-    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int, let L : int>(__constref groupshared const vector<U, L>[M] data, int32_t byteOffset16ByteAligned = 0)
+    static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int, let L : int>(const groupshared vector<U, L>[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
@@ -31429,7 +31429,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    void __Load(__constref groupshared T buffer[M], uint elemOffset)
+    void __Load(const groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
         __target_switch
@@ -32531,7 +32531,7 @@ CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* b
 // Groupshared
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(const groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(data, byteOffset16ByteAligned);
 }

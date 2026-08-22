@@ -58,7 +58,10 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
     [require(cuda)]
     static uint getSharedBaseAddr<let V : int>(groupshared uint4[V] shmem)
     {
-        __intrinsic_asm "(unsigned)__cvta_generic_to_shared(($0).m_data)";
+        // `shmem` is a `groupshared` parameter, so it is passed by reference; on CUDA the
+        // argument arrives as a pointer to the shared array, hence `$0->m_data` (not `$0.m_data`)
+        // to reach the underlying storage before decaying it to a shared-space address.
+        __intrinsic_asm "(unsigned)__cvta_generic_to_shared(($0)->m_data)";
     }
 
     [ForceInline]

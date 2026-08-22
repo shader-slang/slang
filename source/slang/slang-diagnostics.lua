@@ -3725,6 +3725,27 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "groupshared-parameter-cannot-have-direction-modifier",
+    30707, -- 30706 reserved for #11885 (duplicate-system-value-semantic)
+    "a 'groupshared' parameter is passed by reference; 'in'/'out'/'inout' cannot be used with 'groupshared' -- use bare 'groupshared' for a read-write reference or 'const groupshared' for a read-only reference",
+    span { loc = "modifier:Modifier" }
+)
+
+err(
+    "groupshared-parameter-not-allowed-on-hlsl-with-boundary",
+    30708,
+    "a 'groupshared' parameter cannot be passed across a function boundary when targeting HLSL",
+    span { loc = "location", message = "this function keeps a call boundary that could not be inlined away, and HLSL cannot pass thread-group-shared memory across one" }
+)
+
+err(
+    "groupshared-argument-must-be-groupshared-lvalue",
+    30711,
+    "argument to 'groupshared' parameter '~param' must name thread-group-shared memory (a 'groupshared' variable, a component of one, or a 'groupshared' parameter forwarded on)",
+    span { loc = "arg:Expr", message = "this argument does not name 'groupshared' storage" }
+)
+
 --
 -- 308xx: inheritance
 --
@@ -4461,6 +4482,13 @@ err(
     38034,
     "'borrow in' on differentiable parameter",
     span { loc = "modifier:Modifier", message = "cannot use 'borrow in' on a differentiable parameter." }
+)
+
+err(
+    "cannot-use-groupshared-on-differentiable-function-parameter",
+    38038,
+    "'~spelling' on a parameter of a differentiable function",
+    span { loc = "modifier:Modifier", message = "a 'groupshared' parameter is passed by reference, so no derivative can be propagated back through it; 'no_diff' does not help, because the parameter is still passed by reference." }
 )
 
 err(
