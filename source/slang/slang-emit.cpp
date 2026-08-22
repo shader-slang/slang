@@ -1105,16 +1105,19 @@ Result linkAndOptimizeIR(
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
-    if (requiredLoweringPassSet.coverageTracing)
+    // Placement options are read and validated OUTSIDE the gate below.
+    // `requiredLoweringPassSet.coverageTracing` is derived from coverage marker
+    // ops present in the IR, so a shader with nothing instrumentable in it
+    // would otherwise accept a contradictory or unsupported option set in
+    // total silence — the user asked for a placement and got no compilation
+    // and no diagnostic.
+    int explicitBinding = -1;
+    int explicitSpace = -1;
+    int bindlessIndex = -1;
     {
-        // Pull explicit binding values from `-trace-coverage-binding`
-        // here; pass -1 for either side to request auto-allocation in
-        // the synthesis routine.
-        int explicitBinding = -1;
-        int explicitSpace = -1;
-        List<int> reservedSpaces;
-        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+        auto& placementOpts = codeGenContext->getTargetReq()->getOptionSet();
+        if (auto values =
+                placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
             if (values->getCount() > 0)
             {
@@ -1122,6 +1125,37 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
+        // PROTOTYPE: `-trace-coverage-bindless-index <index>`. -1 leaves the
+        // ordinary single-buffer form; >= 0 selects the
+        // unbounded-descriptor-array form. WHERE the array lives is a separate
+        // decision that stays with `-trace-coverage-binding` (or
+        // auto-allocation), because the host's descriptor set layout is the
+        // host's to choose and the compiler cannot see it.
+        if (auto values =
+                placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
+        {
+            if (values->getCount() > 0)
+            {
+                // The CLI parser rejects negatives, but a host setting this
+                // through the API bypasses it, and a negative index would
+                // silently fall back to the single-buffer form -- one binding
+                // per shader, the opposite of what the caller asked for.
+                int requestedIndex = (int)(*values)[0].intValue;
+                if (requestedIndex < 0)
+                {
+                    if (sink)
+                        sink->diagnose(Diagnostics::CoverageBindlessValueOutOfRange{});
+                    return SLANG_FAIL;
+                }
+                bindlessIndex = requestedIndex;
+            }
+        }
+    }
+
+    if (requiredLoweringPassSet.coverageTracing)
+    {
+        List<int> reservedSpaces;
+        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
         if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
         {
             for (auto value : *values)
@@ -1222,6 +1256,7 @@ Result linkAndOptimizeIR(
             (int)reservedSpaces.getCount(),
             counterByteWidth,
             coverageBoolean,
+            bindlessIndex,
             targetRequest,
             outLinkedIR.globalScopeVarLayout,
             *metadata);

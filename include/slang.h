@@ -1307,6 +1307,32 @@ typedef uint32_t SlangSizeT;
                  //   debug information: using it with `-g0`, or without any `-g` option (both
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
+        TraceCoverageBindlessIndex =
+            158, // int: PROTOTYPE. Synthesize `__slang_coverage` as an unbounded
+                 //   descriptor array of structured buffers rather than a single
+                 //   buffer, and index it with this value:
+                 //   `__slang_coverage[N][slot]`. Many separately compiled
+                 //   shaders sharing one pipeline then occupy a single
+                 //   descriptor binding instead of one binding each, and each
+                 //   shader's buffer is sized independently by the host.
+                 //
+                 //   Where the array itself lives is a separate decision, made
+                 //   with `TraceCoverageBinding` (or left to auto-allocation).
+                 //   Note for hosts: if the descriptor array is declared with
+                 //   `VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT`,
+                 //   Vulkan requires it to be the highest-numbered binding in
+                 //   its set. A fixed `descriptorCount` carries no such
+                 //   restriction. Either way it is the host's layout to satisfy
+                 //   and the compiler cannot see it.
+                 //
+                 //   The index is a compile-time constant and therefore part of
+                 //   the compiled artifact: a host that keys a shader cache on
+                 //   the compiled output must derive it from a stable shader
+                 //   identity rather than from load order, or an unchanged
+                 //   shader recompiles whenever that order shifts. Supplying it
+                 //   at pipeline creation instead would remove that constraint;
+                 //   see the issue linked from the PR. SPIR-V and GLSL only.
+
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.
         CountOf,
