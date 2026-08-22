@@ -27392,6 +27392,35 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     }
 }
 
+// A SubpassInput / SubpassInputMS is an opaque image descriptor, so like `_Texture` above it can be
+// recovered from the `UntypedResourceHandle` that `ResourceDescriptorHeap[i]` yields.
+__generic<T, let isMS : int>
+extension __SubpassImpl<T, isMS> : __IDynamicResourceCastable<__DynamicResourceKind.General>
+{
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    __implicit_conversion($(kConversionCost_GenericParamUpcast))
+    __init(__DynamicResource res);
+
+    typealias Handle = DescriptorHandle<This>;
+
+    static const DescriptorKind kind = DescriptorKind.Texture;
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.Read;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<This> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(UntypedResourceHandle h)
+    {
+        return getDescriptorFromHandle(DescriptorHandle<This>(uint2(__getUntypedResourceHandleIndex(h), 0)));
+    }
+}
+
 ${
 struct DynamicResourceTypeInfo
 {

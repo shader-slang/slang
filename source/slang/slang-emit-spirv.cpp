@@ -7338,7 +7338,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!ptrType)
         {
             // Buffer resource handle types should have been lowered to pointers before emission.
-            SLANG_ASSERT(!"expected lowered buffer resource type to be a pointer");
+            // Must be a release assert: a debug-only assert lets release builds fall through to the
+            // null-pointer `getAddressSpace()` call below.
+            SLANG_RELEASE_ASSERT(!"expected lowered buffer resource type to be a pointer");
             return SpvStorageClassStorageBuffer;
         }
 
@@ -7560,6 +7562,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_TextureType:
         case kIROp_SamplerStateType:
         case kIROp_SamplerComparisonStateType:
+        case kIROp_SubpassInputType:
+            // A SubpassInput is an image descriptor (`OpTypeImage`, `Dim == SubpassData`) despite
+            // having a distinct IR type op, so it belongs in the image branch, not the buffer one.
             descriptorElementType = ensureInst(valueType);
             break;
         case kIROp_RaytracingAccelerationStructureType:
