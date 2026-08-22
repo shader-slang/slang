@@ -18,6 +18,16 @@
       }
     },
     {
+      "name": "release-perf-parity",
+      "inherits": "default",
+      "description": "Align the two perf-relevant settings a default Release build diverges from the published binaries on (LTO on, develop-build off; see #12645). NOT a full release.yml reproduction (which also sets generators, examples, LLVM flavor). Build with 'release-perf-parity-release'.",
+      "binaryDir": "${sourceDir}/build.release-perf-parity",
+      "cacheVariables": {
+        "SLANG_ENABLE_RELEASE_LTO": "ON",
+        "SLANG_STANDARD_MODULE_DEVELOP_BUILD": "OFF"
+      }
+    },
+    {
       "name": "emscripten",
       "description": "Emscripten-based Wasm build",
       "generator": "Ninja Multi-Config",
@@ -181,6 +191,11 @@
       "name": "minSizeRel",
       "configurePreset": "default",
       "configuration": "MinSizeRel"
+    },
+    {
+      "name": "release-perf-parity-release",
+      "configurePreset": "release-perf-parity",
+      "configuration": "Release"
     },
     {
       "name": "vs2022-debug",

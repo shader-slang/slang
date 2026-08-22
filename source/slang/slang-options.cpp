@@ -41,6 +41,22 @@
 #include <stdio.h>
 #include <string.h>
 
+// The build reports SLANG_ENABLE_RELEASE_LTO (per-config) and SLANG_STANDARD_MODULE_DEVELOP_BUILD
+// via compile definitions injected from CMake (see source/slang/CMakeLists.txt), each expanding to
+// integer 1 or 0. If a definition is absent (a build outside the project's CMake), report "unknown"
+// rather than a definite value: the point of this diagnostic is to not mislead about the build
+// config, so guessing "off" when we cannot know would defeat it.
+#if defined(SLANG_BUILD_LTO_ENABLED)
+#define SLANG_BUILD_LTO_STR (SLANG_BUILD_LTO_ENABLED ? "on" : "off")
+#else
+#define SLANG_BUILD_LTO_STR "unknown"
+#endif
+#if defined(SLANG_BUILD_STANDARD_MODULE_DEVELOP)
+#define SLANG_BUILD_STANDARD_MODULE_DEVELOP_STR (SLANG_BUILD_STANDARD_MODULE_DEVELOP ? "on" : "off")
+#else
+#define SLANG_BUILD_STANDARD_MODULE_DEVELOP_STR "unknown"
+#endif
+
 namespace Slang
 {
 
@@ -3635,8 +3651,15 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             break;
         case OptionKind::Version:
             {
+                // The first line is the build tag verbatim; downstream tools parse it, so it must
+                // stay unchanged. The second line reports the effective state of the two build
+                // settings that silently diverge between a default-preset build and the published
+                // binaries (#12645).
                 StringBuilder versionStr;
                 versionStr << m_session->getBuildTagString() << "\n";
+                versionStr << "build-config: release-lto=" << SLANG_BUILD_LTO_STR
+                           << " standard-module-develop-build="
+                           << SLANG_BUILD_STANDARD_MODULE_DEVELOP_STR << "\n";
                 m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
                 break;
             }
