@@ -106,35 +106,12 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     }
 }
 
-// True if `target` generates output that has no representation for a function-typed
-// value, i.e. a value that holds a function and is stored, loaded, or selected at
-// runtime rather than named directly at a call site.
-//
-// Consider this shader:
-//
-//      int addOne(int x) { return x + 1; }
-//      static functype(int) -> int gFn = addOne;
-//      void computeMain() { outBuf[0] = applyIt(gFn, 41); }
-//
-// `specializeHigherOrderParameters` normally replaces a function-typed argument with a direct
-// call, but it is best-effort: `isParamSuitableForSpecialization` only accepts an argument it
-// can resolve statically, and a call it cannot specialize is silently skipped. Reading `gFn`
-// out of a variable is not one of those cases, so the function type survives to emit, where
-// each of these targets writes something no prelude defines: `Slang_FuncType<...>` for
-// C++/CUDA kernels (defined only in `slang-cpp-host-prelude.h`), `Func<...>` from Metal's
-// op-name fallback, or an empty type annotation for WGSL (issue #12367).
-//
-// Host C++ is excluded because its prelude does define `Slang_FuncType`, for `[DllImport]`.
-// The set is otherwise limited to targets where a function-typed value has been observed
-// reaching emission and producing invalid output, which is why the PyTorch binding target is
-// absent even though its prelude does not define the name either.
-//
-// `ShaderSharedLibrary` and `ShaderHostCallable` compile through kernel C++
-// (`_getDefaultSourceForTarget`), so without them the undefined name is reported by the
-// downstream compiler -- `'Slang_FuncType' does not name a type` from gcc -- rather than here.
-// `ShaderLLVMIR` shares that lowering and crashes further down when a function type survives, so
-// it is rejected here too.
-static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
+// True on targets where a surviving function-typed value produces invalid output *silently* (an
+// undefined spelling at exit 0) or crashes, so it must be diagnosed here (issue #12367). The set
+// is exactly the silently-broken targets: HLSL/GLSL/SPIR-V are excluded because they already fail
+// loudly (E99999 / a spirv-opt assert), and host C++ because its prelude defines `Slang_FuncType`
+// for `[DllImport]`.
+static bool shouldDiagnoseFuncTypedValue(TargetRequest* target)
 {
     switch (target->getTarget())
     {
@@ -150,19 +127,6 @@ static bool isTargetWithoutFuncTypeSupport(TargetRequest* target)
     default:
         return isMetalTarget(target) || isWGPUTarget(target);
     }
-}
-
-// True if `type` is a function type, or an array of one, looking through the pointer that a
-// variable or struct field is declared with. An array is included because it is emitted
-// element-type-first and so produces the same undefined spelling.
-//
-// Struct types are deliberately not recursed into: every struct's fields are checked directly
-// by the module-level walk, and a pointer to the synthesized `KernelContext` is passed around
-// as a parameter and a local, so looking inside it here would report the same field once per
-// value that happens to point at the struct.
-static bool holdsFuncType(IRType* type)
-{
-    return as<IRFuncType>(unwrapArrayAndPointers(type)) != nullptr;
 }
 
 // True if `funcType` has any parameter or result of type `String`.
@@ -224,7 +188,7 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // any diagnostic.
     const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
-    // See `isTargetWithoutFuncTypeSupport`. A function-typed value also reaches emission as a
+    // See `shouldDiagnoseFuncTypedValue`. A function-typed value also reaches emission as a
     // local variable or a parameter that specialization could not resolve, which the
     // module-level checks for globals and `KernelContext` fields do not see:
     //
@@ -232,26 +196,31 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     //
     // A `select` between two functions is not a shape `isParamSuitableForSpecialization`
     // accepts, so both the local and the parameter it is passed to keep their function type.
-    const bool rejectFuncTypedValue = isTargetWithoutFuncTypeSupport(target);
+    const bool rejectFuncTypedValue = shouldDiagnoseFuncTypedValue(target);
 
-    // A single unsupported value is reachable as several insts -- the local it is stored in, a
-    // parameter it is passed through, and a temporary introduced for an aggregate -- and some
-    // of those are synthesized with no location. Report only the ones that can name a source
-    // position, so one mistake produces one actionable error rather than several, most of which
-    // point nowhere.
+    // One unsupported value is reachable as several insts (the local, a parameter it flows to, a
+    // synthesized aggregate temporary derived from a module-scope global), many without a location.
+    // Report only those that can name a position, so one mistake yields one actionable error rather
+    // than several pointing nowhere -- and so a body-scope derivative of a global does not
+    // duplicate the error already raised for that global at module scope. A whole declaration with
+    // no location (an imported precompiled global) is a module-scope shape, reported
+    // unconditionally below.
     auto diagnoseFuncTypedValue = [&](IRInst* inst)
     {
-        if (!rejectFuncTypedValue || !holdsFuncType(inst->getDataType()))
+        if (!rejectFuncTypedValue || !as<IRFuncType>(unwrapArrayAndPointers(inst->getDataType())))
             return;
         auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
         if (loc.isValid())
             sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
     };
 
-    if (auto firstBlock = func->getFirstBlock(); firstBlock)
+    if (rejectFuncTypedValue)
     {
-        for (auto param : firstBlock->getParams())
-            diagnoseFuncTypedValue(param);
+        if (auto firstBlock = func->getFirstBlock(); firstBlock)
+        {
+            for (auto param : firstBlock->getParams())
+                diagnoseFuncTypedValue(param);
+        }
     }
 
     for (auto block : func->getBlocks())
@@ -324,11 +293,11 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
-    // See `isTargetWithoutFuncTypeSupport`. A function-typed global reaches here as one of two
+    // See `shouldDiagnoseFuncTypedValue`. A function-typed global reaches here as one of two
     // shapes: `introduceExplicitGlobalContext` (C++/CUDA/Metal) moves it into a `KernelContext`
     // struct field, while WGSL keeps it a global variable. Both are written out by the ordinary
     // type-emission path, so a global that is only ever written still emits its declaration.
-    const bool rejectFuncTypedValue = isTargetWithoutFuncTypeSupport(target);
+    const bool rejectFuncTypedValue = shouldDiagnoseFuncTypedValue(target);
 
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -338,7 +307,9 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
             {
                 for (auto field : structType->getFields())
                 {
-                    if (holdsFuncType(field->getFieldType()))
+                    // Look through the pointer/array a field is declared with, but not into nested
+                    // structs -- their own fields are visited by this same walk.
+                    if (as<IRFuncType>(unwrapArrayAndPointers(field->getFieldType())))
                     {
                         // The key carries the location of the global this field replaced (see
                         // `introduceExplicitGlobalContext`), but a declaration read from a
@@ -354,7 +325,7 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
             else if (globalInst->getOp() == kIROp_GlobalVar)
             {
                 // WGSL keeps the global rather than moving it into a context struct.
-                if (holdsFuncType(globalInst->getDataType()))
+                if (as<IRFuncType>(unwrapArrayAndPointers(globalInst->getDataType())))
                 {
                     auto loc = globalInst->sourceLoc.isValid() ? globalInst->sourceLoc
                                                                : findFirstUseLoc(globalInst);
