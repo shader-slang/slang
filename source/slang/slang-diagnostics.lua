@@ -5576,6 +5576,13 @@ err(
 )
 
 err(
+    "kernel-entry-point-requires-body",
+    55104,
+    "kernel entry point requires a body",
+    span { loc = "location", message = "a '[CudaKernel]' function must have a body; a forward declaration cannot be compiled into a kernel entry point for the CUDA or PyTorch target." }
+)
+
+err(
     "unsupported-builtin-type",
     55200,
     "unsupported builtin type",
