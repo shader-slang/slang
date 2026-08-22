@@ -924,13 +924,32 @@ class RequireCapabilityDecl : public Decl
     FIDDLE(...)
 };
 
-// A generic declaration, parameterized on types/values
-FIDDLE()
-class GenericDecl : public ContainerDecl
+// A declaration that is parameterized by a list of type-level (compile-time)
+// parameters and wraps a single inner declaration those parameters apply to.
+// The parameters may be type parameters or value parameters, and are stored as
+// ordinary direct members so they participate in scope and lookup within this
+// declaration.
+//
+// A parsed `ParameterizedDecl` always has a non-null `inner` declaration.
+FIDDLE(abstract)
+class ParameterizedDecl : public ContainerDecl
 {
     FIDDLE(...)
-    // The decl that is genericized...
+    // The inner declaration the parameters apply to.
+    //
+    // The inner declaration is a child of this declaration — its `parentDecl`
+    // points back to this declaration — but it is not one of this declaration's
+    // members: it does not appear in the member list seen when this declaration
+    // is treated as a `ContainerDecl`, and so is not found by member lookup on
+    // it.
     FIDDLE() Decl* inner = nullptr;
+};
+
+// A generic declaration, parameterized on types/values
+FIDDLE()
+class GenericDecl : public ParameterizedDecl
+{
+    FIDDLE(...)
 
     /// A cached list of arguments that can be used when forming
     /// a reference to the inner declaration with "default
@@ -938,6 +957,17 @@ class GenericDecl : public ContainerDecl
     /// argument will be a reference to the parameter itself).
     ///
     List<Val*> _cachedArgsForDefaultSubstitution;
+};
+
+// A template declaration, providing HLSL/C++-style `template<...>` syntax in
+// the HLSL-flavored dialect.
+//
+// A template exists only to be instantiated as needed in the front end. Its
+// inner declaration is duck-typed and checked per instantiation.
+FIDDLE()
+class TemplateDecl : public ParameterizedDecl
+{
+    FIDDLE(...)
 };
 
 FIDDLE()

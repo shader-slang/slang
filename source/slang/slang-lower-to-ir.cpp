@@ -14782,6 +14782,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return ensureDecl(context, genDecl->inner);
     }
 
+    LoweredValInfo visitTemplateDecl(TemplateDecl* /*templateDecl*/)
+    {
+        // A template declaration has no representation in Slang IR; an
+        // instantiation is an ordinary declaration and is lowered as such.
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         // A function declaration may have multiple, target-specific

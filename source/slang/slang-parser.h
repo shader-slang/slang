@@ -39,6 +39,10 @@ Stmt* parseUnparsedStmt(
 
 ModuleDecl* populateBaseLanguageModule(ASTBuilder* astBuilder, Scope* scope);
 
+// Populate `scope` with the syntax that is available only in the HLSL-flavored
+// dialect. This scope is consulted only when parsing HLSL source.
+ModuleDecl* populateHLSLLanguageModule(ASTBuilder* astBuilder, Scope* scope);
+
 /// Information used to set up SyntaxDecl. Such decls
 /// when correctly setup define a callback. For some of the callbacks it's necessary
 /// for the `parseUserData` to be set the the associated classInfo
