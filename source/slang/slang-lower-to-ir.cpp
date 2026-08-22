@@ -6708,6 +6708,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
             else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
             {
+                // An intrinsic-type aggregate lowers to a builtin IR type, not a
+                // struct, so its default requires builtin-aware construction.
+                if (aggTypeDeclRef.getDecl()->findModifier<IntrinsicTypeModifier>())
+                {
+                    return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
+                }
+
                 List<IRInst*> args;
 
                 if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
