@@ -1,6 +1,7 @@
 #include "slang-ir-typeflow-specialize.h"
 
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-autodiff.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
@@ -228,7 +229,24 @@ static bool isSpecArgExistentialDerived(IRInst* inst, int depth = 0)
 bool isInvalidExistentialSpecialization(IRInst* specializedValue)
 {
     if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+    {
+        auto specialize = as<IRSpecialize>(specializedValue);
+        if (specialize &&
+            isBackwardDerivativeValue(getInvalidExistentialSpecializationTarget(specialize)))
+        {
+            // Autodiff derives `load.remat<T>` from a valid constrained call before type flow has
+            // selected T. Type flow then clones it as, for example,
+            // `load.remat<FooImpl, FooImpl : IFoo>`, copying the source decoration along with the
+            // instruction. Re-check the current arguments only for this compiler-generated
+            // derivative; an ordinary user generic remains invalid even if later analysis can
+            // enumerate its possible concrete types.
+            for (UInt i = 0; i < specialize->getArgCount(); ++i)
+                if (isSpecArgExistentialDerived(specialize->getArg(i)))
+                    return true;
+            return false;
+        }
         return true;
+    }
 
     // The decoration pass marks IRSpecialize instructions, but specializeModule() may
     // resolve the specialization before the typeflow pass runs, consuming the decorated
@@ -540,6 +558,19 @@ bool isConcreteType(IRInst* inst)
     case kIROp_ThisType:
     case kIROp_AssociatedType: // Shouldn't really appear in general, but we have some synthesized
                                // methods that do use this
+    case kIROp_LookupWitnessMethod:
+        // A witness lookup used as a type is a computed associated type. Its propagation info can
+        // still refine it to the satisfying type or set of types.
+        return false;
+    case kIROp_BackwardDiffIntermediateContextType:
+    case kIROp_TrivialBackwardDiffIntermediateContextType:
+    case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+    case kIROp_BackwardDiffMinimalContextType:
+    case kIROp_TrivialBackwardDiffMinimalContextType:
+    case kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc:
+        // These are requests to derive a context type from a function, not final concrete types.
+        // Translation replaces them with the generated context type once the corresponding
+        // derivative function is available.
         return false;
     case kIROp_ArrayType:
         return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
@@ -565,12 +596,19 @@ bool isConcreteType(IRInst* inst)
             return false;
         }
     case kIROp_DifferentialPairType:
-        return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
+        {
+            auto pairType = cast<IRDifferentialPairType>(inst);
+            // The witness determines the pair's associated differential type. A concrete primal
+            // type alone is insufficient when that witness is produced inside a function by
+            // opening an existential. A module-scope witness specialization is still statically
+            // resolvable, though, and must remain a nominal pair so keyed `.p`/`.d` accesses keep
+            // matching the nominal pair struct created by differential-pair lowering.
+            return isConcreteType(pairType->getValueType()) && isGlobalInst(pairType->getWitness());
+        }
     case kIROp_DifferentialPairInfoType:
-        // Like TaggedUnionType, this is already the concrete runtime representation selected for
-        // an abstract source value. Treating it as another abstract source type would recursively
-        // specialize every helper that accepts the representation. `getLoweredType` still owns
-        // the separate decision to recover a nominal pair when both components are singletons.
+        // Pair info, like the other set-based type-flow representations, is a concrete run-time
+        // representation for lowering. `isTypeFlowRefinableType` separately records that a later
+        // analysis round may narrow its component sets.
         return true;
     case kIROp_AttributedType:
         return isConcreteType(cast<IRAttributedType>(inst)->getBaseType());
@@ -608,6 +646,46 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
+// Returns true if `type` contains a set-based representation emitted by type flow. Such a type is
+// concrete enough for lowering, but remains an upper bound when newly generated code is analyzed.
+bool isTypeFlowUpperBoundType(IRInst* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_TaggedUnionType:
+    case kIROp_UntaggedUnionType:
+    case kIROp_ElementOfSetType:
+    case kIROp_SetTagType:
+    case kIROp_DifferentialPairInfoType:
+        return true;
+    default:
+        break;
+    }
+
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+        return isTypeFlowUpperBoundType(ptrType->getValueType());
+    if (auto arrayType = as<IRArrayType>(type))
+        return isTypeFlowUpperBoundType(arrayType->getElementType());
+    if (auto optionalType = as<IROptionalType>(type))
+        return isTypeFlowUpperBoundType(optionalType->getValueType());
+    if (auto attributedType = as<IRAttributedType>(type))
+        return isTypeFlowUpperBoundType(attributedType->getBaseType());
+    if (auto pairType = as<IRDifferentialPairType>(type))
+        return isTypeFlowUpperBoundType(pairType->getValueType());
+    if (auto tupleType = as<IRTupleType>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); ++i)
+            if (isTypeFlowUpperBoundType(tupleType->getOperand(i)))
+                return true;
+    }
+    return false;
+}
+
+bool isTypeFlowRefinableType(IRInst* type)
+{
+    return !isConcreteType(type) || isTypeFlowUpperBoundType(type);
+}
+
 // Create info for a concrete type, using `paramType` as a union mask to determine
 // how much structural decomposition to perform.
 //
@@ -625,7 +703,7 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
     // If paramType is concrete, return the bare type directly.
     // (No wrapping needed since concrete positions can't be further refined.)
     //
-    if (isConcreteType(paramType))
+    if (!isTypeFlowRefinableType(paramType))
         return type;
 
     // Structural cases - recurse only when both type and paramType match the same form.
@@ -727,9 +805,32 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramTyp
                 (IRType*)makeInfoForConcreteType(module, pairType->getValueType(), componentMask);
             auto differentialInfo = (IRType*)makeInfoForConcreteType(
                 module,
-                getConcreteDifferentialType(&builder, pairType),
+                getDifferentialTypeFromPairType(&builder, pairType),
                 componentMask);
             return builder.getDifferentialPairInfoType(primalInfo, differentialInfo);
+        }
+    }
+
+    if (auto pairInfo = as<IRDifferentialPairInfoType>(type))
+    {
+        if (as<IRDifferentialPairType>(paramType))
+        {
+            // A previous type-flow edge has already converted the nominal pair into its semantic
+            // structural representation. Treat that representation as matching the nominal pair
+            // mask so enclosing arrays, tuples, and pointers preserve the component information.
+            return pairInfo;
+        }
+    }
+
+    if (auto taggedUnion = as<IRTaggedUnionType>(type))
+    {
+        if (as<IRInterfaceType>(paramType))
+        {
+            // A tagged union is already the semantic propagation representation of an interface
+            // value. Preserve it when it is nested inside a concrete tuple, such as an autodiff
+            // rematerialization context, instead of wrapping the representation itself as a
+            // singleton concrete type.
+            return taggedUnion;
         }
     }
 
@@ -862,10 +963,29 @@ bool isExistentialDifferentialPairType(IRInst* inst)
     return false;
 }
 
+// Returns a component of the semantic differential-pair representation while preserving an
+// enclosing pointer's direction and address space. Reverse-mode functions project through
+// `inout DifferentialPair<T>` parameters, so their pair base is pointer-wrapped even though the
+// same operation on an ordinary value has an unwrapped base.
+IRType* tryGetDifferentialPairInfoComponentType(IRBuilder* builder, IRType* baseType, UInt index)
+{
+    auto valueType = baseType;
+    auto ptrType = as<IRPtrTypeBase>(baseType);
+    if (ptrType)
+        valueType = ptrType->getValueType();
+
+    auto pairInfo = as<IRDifferentialPairInfoType>(valueType);
+    if (!pairInfo)
+        return nullptr;
+
+    SLANG_RELEASE_ASSERT(index < 2);
+    auto componentType =
+        (IRType*)(index == 0 ? pairInfo->getPrimalInfo() : pairInfo->getDifferentialInfo());
+    return ptrType ? builder->getPtrTypeWithAddressSpace(componentType, ptrType) : componentType;
+}
+
 // Returns true if the type is or transitively contains an interface type
 // that would require dynamic dispatch (i.e., not a COM interface and not builtin).
-// Note: does not currently unwrap IRSpecialize or IRPtrTypeBase; these are not
-// expected in practice for GPU shader parameters.
 static bool typeIncludesDynamicDispatch(IRType* type)
 {
     if (auto interfaceType = as<IRInterfaceType>(type))
@@ -1053,6 +1173,20 @@ struct TypeFlowSpecializationContext
         return none(); // Default info for any inst that we haven't registered.
     }
 
+    // Returns information explicitly propagated during the current type-flow round. This is
+    // separate from `tryGetInfo`, whose fallback can be an upper-bound representation left by an
+    // earlier round.
+    IRInst* tryGetStoredInfo(IRInst* context, IRInst* inst)
+    {
+        if (!inst->getParent())
+            return none();
+
+        if (auto moduleInst = as<IRModuleInst>(inst->getParent()))
+            return _tryGetInfo(InstWithContext(moduleInst, inst));
+
+        return _tryGetInfo(InstWithContext(context, inst));
+    }
+
     // Find information for an inst that is being used as an argument
     // under a given context.
     //
@@ -1076,6 +1210,9 @@ struct TypeFlowSpecializationContext
         if (auto info = tryGetInfo(context, inst))
             return info;
 
+        if (isTypeFlowUpperBoundType(inst->getDataType()))
+            return inst->getDataType();
+
         if (isConcreteType(inst->getDataType()))
         {
             // If the inst has a concrete type, we can make a default info for it,
@@ -1097,15 +1234,18 @@ struct TypeFlowSpecializationContext
     //
     IRInst* tryGetInfo(IRInst* context, IRInst* inst)
     {
+        // Information discovered in this round is more precise than a type-flow representation
+        // stored on the value by an earlier round.
+        if (auto info = tryGetStoredInfo(context, inst))
+            return info;
+
         if (inst->getDataType())
         {
             // If the data-type is already a tagged union or untagged union or
             // element-of-set type, then the refinement occured during a previous phase.
             //
-            // For now, we simply re-use that info directly.
-            //
-            // In the future, it makes sense to treat it as non-concrete and use
-            // them as an upper-bound for further refinement.
+            // Re-use that representation as an upper bound until current-round propagation
+            // supplies more precise information.
             //
             switch (inst->getDataType()->getOp())
             {
@@ -1114,21 +1254,20 @@ struct TypeFlowSpecializationContext
             case kIROp_ElementOfSetType:
             case kIROp_DifferentialPairInfoType:
                 return inst->getDataType();
+            case kIROp_SetTagType:
+                {
+                    // A previously specialized witness-table value is now represented by its
+                    // runtime tag. The tag still identifies one element of the original set, so
+                    // expose that set as propagation information for any lookup synthesized in a
+                    // later autodiff/specialization round.
+                    IRBuilder builder(module);
+                    return builder.getElementOfSetType(
+                        cast<IRSetTagType>(inst->getDataType())->getSet());
+                }
             }
         }
 
-        // A small check for de-allocated insts.
-        if (!inst->getParent())
-            return none();
-
-        // For module-scope instructions, look up info using the module as context.
-        // This is populated during the initial seeding phase of performInformationPropagation
-        // and refined by the worklist, following the SCCP pattern of processing global scope
-        // first and sharing info with function-scope analysis.
-        if (auto moduleInst = as<IRModuleInst>(inst->getParent()))
-            return _tryGetInfo(InstWithContext(moduleInst, inst));
-
-        return _tryGetInfo(InstWithContext(context, inst));
+        return none();
     }
 
     // Performs set-union over the two sets, and returns a new
@@ -1160,6 +1299,33 @@ struct TypeFlowSpecializationContext
         return as<T>(builder.getSet(
             set1->getOp(),
             allValues)); // Create a new set with the union of values
+    }
+
+    // Reconciles a lazily translated singleton with structural propagation information for the
+    // same type. Consider a reverse-mode witness-table entry whose context type is initially
+    // `BackwardDiffIntermediateContextType(method)`. The derivative is not necessarily available
+    // when the lookup result set is first built, but by the time another path contributes the
+    // generated tuple context, translation can resolve that marker. If lowering the structural
+    // information produces that exact canonical tuple type, the structural form is strictly more
+    // informative because it retains the nested existential type and witness-table sets.
+    IRInst* tryMergeTranslatedSingletonWithStructuralInfo(
+        IRInst* typeUnionMask,
+        IRInst* flatInfo,
+        IRInst* structuralInfo)
+    {
+        auto untaggedUnion = as<IRUntaggedUnionType>(flatInfo);
+        if (!untaggedUnion || !untaggedUnion->getSet()->isSingleton())
+            return nullptr;
+
+        auto originalType = untaggedUnion->getSet()->getElement(0);
+        auto translatedType = translationContext.resolveInst(originalType);
+        auto translatedMask = translationContext.resolveInst(typeUnionMask);
+        // The singleton can be the unrefined declared type itself. For example, a generated
+        // context contains `Array<DifferentialPair<IValueHolder>, 2>`, while another call edge has
+        // already refined those nested pairs into DifferentialPairInfoType. Identity with the
+        // merge-point type proves that both describe the same value without inventing a second
+        // structural equivalence relation; the structural form simply carries more information.
+        return translatedType == translatedMask ? structuralInfo : nullptr;
     }
 
     // Performs a flat (non-structural) union of two propagation infos that are
@@ -1208,7 +1374,8 @@ struct TypeFlowSpecializationContext
     // return type). It determines how much structural decomposition to perform during union:
     //
     // - If typeUnionMask is structural (Tuple, Array, Ptr, Optional, Attributed, or
-    //   DifferentialPair), and both infos match that structure, recurse element-wise using
+    //   DifferentialPair or DifferentialPairInfoType), and both infos match that structure,
+    //   recurse element-wise using
     //   typeUnionMask's sub-types as sub-masks.
     //
     // - If typeUnionMask is concrete, both infos should represent the same thing; return info1.
@@ -1228,10 +1395,40 @@ struct TypeFlowSpecializationContext
         if (areInfosEqual(info1, info2))
             return info1;
 
+        // A merge point can use a computed type, such as the result of looking up an autodiff
+        // context requirement. Resolve it before choosing between structural and flat union so a
+        // context that has become a tuple is decomposed with the same shape as its propagated info.
+        auto translatedUnionMask = translationContext.resolveInst(typeUnionMask);
+        typeUnionMask = translatedUnionMask;
+
+        // An untagged-union mask left by an earlier round is an upper bound over concrete payload
+        // types. Normalize a newly discovered concrete payload into the same singleton-set form
+        // before merging it with information already represented by that upper bound.
+        if (as<IRUntaggedUnionType>(typeUnionMask))
+        {
+            if (!isTypeFlowRefinableType(info1))
+                info1 = makeInfoForConcreteType(module, info1, typeUnionMask);
+            if (!isTypeFlowRefinableType(info2))
+                info2 = makeInfoForConcreteType(module, info2, typeUnionMask);
+            if (areInfosEqual(info1, info2))
+                return info1;
+        }
+
         // If union mask is concrete, infos should be equivalent representations
         // of the same concrete type. Return the existing info.
-        if (isConcreteType(typeUnionMask))
+        if (!isTypeFlowRefinableType(typeUnionMask))
             return info1;
+
+        // A computed autodiff context can resolve to the structural representation already carried
+        // by the other path. Reconcile those equivalent spellings before using the union mask to
+        // decompose the values; at this point one side is deliberately still a singleton set and
+        // therefore does not yet match the mask's tuple shape.
+        if (auto merged =
+                tryMergeTranslatedSingletonWithStructuralInfo(typeUnionMask, info1, info2))
+            return merged;
+        if (auto merged =
+                tryMergeTranslatedSingletonWithStructuralInfo(typeUnionMask, info2, info1))
+            return merged;
 
         // --- Structural union masks ---
         // If typeUnionMask is structural and both infos match that structure,
@@ -1242,17 +1439,19 @@ struct TypeFlowSpecializationContext
         {
             auto tuple1 = as<IRTupleType>(info1);
             auto tuple2 = as<IRTupleType>(info2);
-
-            IRBuilder builder(module);
-            List<IRType*> elementInfos;
-            for (UInt i = 0; i < tupleUnionMask->getOperandCount(); i++)
+            if (tuple1 && tuple2)
             {
-                elementInfos.add((IRType*)unionPropagationInfo(
-                    tupleUnionMask->getOperand(i),
-                    tuple1->getOperand(i),
-                    tuple2->getOperand(i)));
+                IRBuilder builder(module);
+                List<IRType*> elementInfos;
+                for (UInt i = 0; i < tupleUnionMask->getOperandCount(); i++)
+                {
+                    elementInfos.add((IRType*)unionPropagationInfo(
+                        tupleUnionMask->getOperand(i),
+                        tuple1->getOperand(i),
+                        tuple2->getOperand(i)));
+                }
+                return builder.getTupleType(elementInfos);
             }
-            return builder.getTupleType(elementInfos);
         }
 
         // Array
@@ -1355,6 +1554,28 @@ struct TypeFlowSpecializationContext
             }
         }
 
+        // A prior type-flow round can already have replaced the nominal pair mask with its
+        // semantic pair-info representation. Preserve that boundary and use the independently
+        // propagated primal and differential masks when merging newly generated code.
+        if (auto diffPairInfoUnionMask = as<IRDifferentialPairInfoType>(typeUnionMask))
+        {
+            auto pairInfo1 = as<IRDifferentialPairInfoType>(info1);
+            auto pairInfo2 = as<IRDifferentialPairInfoType>(info2);
+            if (pairInfo1 && pairInfo2)
+            {
+                IRBuilder builder(module);
+                auto primalInfo = (IRType*)unionPropagationInfo(
+                    diffPairInfoUnionMask->getPrimalInfo(),
+                    pairInfo1->getPrimalInfo(),
+                    pairInfo2->getPrimalInfo());
+                auto differentialInfo = (IRType*)unionPropagationInfo(
+                    diffPairInfoUnionMask->getDifferentialInfo(),
+                    pairInfo1->getDifferentialInfo(),
+                    pairInfo2->getDifferentialInfo());
+                return builder.getDifferentialPairInfoType(primalInfo, differentialInfo);
+            }
+        }
+
         // --- Non-structural, non-concrete union masks ---
         // For any remaining case (InterfaceType, WitnessTableType, FuncType,
         // LookupWitnessMethod result, etc.), or when the structural match failed,
@@ -1368,16 +1589,27 @@ struct TypeFlowSpecializationContext
     //
     void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, WorkQueue<WorkItem>& workQueue)
     {
-        if (isConcreteType(inst->getDataType()))
+        if (!isTypeFlowRefinableType(inst->getDataType()))
             return;
 
-        auto existingInfo = tryGetInfo(context, inst);
+        auto existingInfo = tryGetStoredInfo(context, inst);
         if (areInfosEqual(existingInfo, newInfo))
             return;
 
         IRBuilder builder(module);
         propagationMap[InstWithContext(context, inst)] = builder.getWeakUse(newInfo);
         addUsersToWorkQueue(context, inst, newInfo, workQueue);
+    }
+
+    // Returns the semantic type known for a union mask in the current context. Generated autodiff
+    // signatures can name a context through LookupWitnessMethod; its propagated ElementOfSet is
+    // the source of truth for the satisfying tuple type even while the IR instruction itself has
+    // not translated to that tuple.
+    IRInst* getEffectiveUnionMask(IRInst* context, IRInst* typeUnionMask)
+    {
+        if (auto maskInfo = tryGetInfo(context, typeUnionMask))
+            return substituteSetsInTypeLike(maskInfo);
+        return typeUnionMask;
     }
 
     // Union new propagation info with existing info at a merge point, then update.
@@ -1394,11 +1626,18 @@ struct TypeFlowSpecializationContext
         IRInst* mergePointType,
         WorkQueue<WorkItem>& workQueue)
     {
-        if (isConcreteType(inst->getDataType()))
+        if (!isTypeFlowRefinableType(inst->getDataType()))
             return;
 
-        auto existingInfo = tryGetInfo(context, inst);
-        auto unionedInfo = unionPropagationInfo(mergePointType, existingInfo, newInfo);
+        auto existingInfo = tryGetStoredInfo(context, inst);
+        // A generated autodiff signature can use a LookupWitnessMethod result as its declared
+        // context type. The lookup itself remains a non-structural IR instruction, but type flow
+        // may already know its singleton satisfying type. Use that semantic result as the union
+        // mask so a generated tuple context is merged structurally instead of as a flat leaf.
+        auto unionedInfo = unionPropagationInfo(
+            getEffectiveUnionMask(context, mergePointType),
+            existingInfo,
+            newInfo);
 
         if (areInfosEqual(existingInfo, unionedInfo))
             return;
@@ -1514,13 +1753,15 @@ struct TypeFlowSpecializationContext
         if (auto fwb = as<IRSpecializeExistentialsInFunc>(callable))
             callableForType = getFuncDefinitionForContext(fwb);
         auto callableFuncType = cast<IRFuncType>(callableForType->getDataType());
-        if (isConcreteType(callableFuncType->getResultType()))
+        if (!isTypeFlowRefinableType(callableFuncType->getResultType()))
             return;
 
         auto existingReturnInfo = getFuncReturnInfo(callable);
         // Use the function's declared return type as union mask for structural union.
-        auto newReturnInfo =
-            unionPropagationInfo(callableFuncType->getResultType(), existingReturnInfo, returnInfo);
+        auto newReturnInfo = unionPropagationInfo(
+            getEffectiveUnionMask(callable, callableFuncType->getResultType()),
+            existingReturnInfo,
+            returnInfo);
 
         if (!areInfosEqual(existingReturnInfo, newReturnInfo))
         {
@@ -2090,7 +2331,7 @@ struct TypeFlowSpecializationContext
                 //
                 // We'll still need to consider out parameters separately.
                 //
-                if (!isConcreteType(callInst->getDataType()))
+                if (isTypeFlowRefinableType(callInst->getDataType()))
                 {
                     auto returnInfoPtr = funcReturnInfo.tryGetValue(targetCallee);
                     auto returnInfo = (returnInfoPtr) ? *returnInfoPtr : nullptr;
@@ -2262,8 +2503,10 @@ struct TypeFlowSpecializationContext
                 IRInst* existingInfo = nullptr;
                 this->fieldInfo.tryGetValue(field, existingInfo);
                 // Use the field's declared type as context for structural union.
-                auto newInfo =
-                    unionPropagationInfo(field->getFieldType(), existingInfo, operandInfo);
+                auto newInfo = unionPropagationInfo(
+                    getEffectiveUnionMask(context, field->getFieldType()),
+                    existingInfo,
+                    operandInfo);
                 if (newInfo && !areInfosEqual(existingInfo, newInfo))
                 {
                     // Update the field info map
@@ -2286,7 +2529,7 @@ struct TypeFlowSpecializationContext
         auto arrayType = as<IRArrayType>(makeArray->getDataType());
 
         // If array is concrete, no need to proceed.
-        if (isConcreteType(arrayType))
+        if (!isTypeFlowRefinableType(arrayType))
             return none();
 
         //
@@ -2298,11 +2541,14 @@ struct TypeFlowSpecializationContext
         for (UInt i = 0; i < makeArray->getOperandCount(); i++)
         {
             auto element = makeArray->getOperand(i);
-            if (auto elementInfo = tryGetInfo(context, element))
+            auto elementInfo = tryGetArgInfo(context, element, arrayType->getElementType());
+            if (elementInfo)
             {
                 // Use the array's declared element type as context for structural union.
-                unionInfo =
-                    unionPropagationInfo(arrayType->getElementType(), unionInfo, elementInfo);
+                unionInfo = unionPropagationInfo(
+                    getEffectiveUnionMask(context, arrayType->getElementType()),
+                    unionInfo,
+                    elementInfo);
             }
             else
             {
@@ -2324,11 +2570,11 @@ struct TypeFlowSpecializationContext
         // We propagate the element's info to the array type.
         //
         auto arrayType = as<IRArrayType>(makeArray->getDataType());
-        if (isConcreteType(arrayType))
+        if (!isTypeFlowRefinableType(arrayType))
             return none();
 
         auto element = makeArray->getOperand(0);
-        auto elementInfo = tryGetInfo(context, element);
+        auto elementInfo = tryGetArgInfo(context, element, arrayType->getElementType());
         if (!elementInfo)
             return none();
 
@@ -2344,7 +2590,7 @@ struct TypeFlowSpecializationContext
         auto tupleType = as<IRTupleType>(makeTuple->getDataType());
 
         // If tuple is concrete, no need to proceed.
-        if (isConcreteType(tupleType))
+        if (!isTypeFlowRefinableType(tupleType))
             return none();
 
         //
@@ -2357,20 +2603,15 @@ struct TypeFlowSpecializationContext
         {
             auto element = makeTuple->getOperand(i);
             auto elementType = (IRType*)tupleType->getOperand(i);
-            if (auto elementInfo = tryGetInfo(context, element))
-            {
-                elementInfos.add((IRType*)elementInfo);
-            }
-            else if (isConcreteType(elementType))
-            {
-                // For concrete element types, just use the type itself.
-                elementInfos.add(elementType);
-            }
-            else
-            {
-                // If any non-concrete element has no info, we can't proceed.
+            // Use the operand's concrete type as information when it is being inserted into an
+            // abstract tuple element. Reverse-mode rematerialization does this when it rebuilds a
+            // context declared with an interface element from a value already lowered to a tagged
+            // union. Looking only for previously propagated information would discard that known
+            // runtime representation at the tuple boundary.
+            auto elementInfo = tryGetArgInfo(context, element, elementType);
+            if (!elementInfo)
                 return none();
-            }
+            elementInfos.add((IRType*)elementInfo);
         }
 
         IRBuilder builder(module);
@@ -2915,9 +3156,33 @@ struct TypeFlowSpecializationContext
 
     IRInst* analyzeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
     {
-        SLANG_UNUSED(context);
+        auto pairType = inst->getDataType();
+        if (!pairType)
+            return none();
 
-        if (isExistentialDifferentialPairType(inst->getDataType()))
+        if (!pairType->getParent())
+            return none();
+
+        if (auto existingPairInfo = as<IRDifferentialPairInfoType>(pairType))
+        {
+            // Type-flow can revisit code generated during an earlier specialization round. In
+            // that case the MakeDiffPair already has the semantic pair-info type written onto it.
+            // Its two component types are the current upper bounds; keep analyzing the operands
+            // against those bounds instead of trying to reinterpret the pair-info type as a
+            // nominal DifferentialPairType.
+            auto primalInfo =
+                tryGetArgInfo(context, inst->getPrimal(), existingPairInfo->getPrimalInfo());
+            auto diffInfo = tryGetArgInfo(
+                context,
+                inst->getDifferential(),
+                existingPairInfo->getDifferentialInfo());
+            if (!primalInfo || !diffInfo)
+                return none();
+
+            IRBuilder builder(module);
+            return builder.getDifferentialPairInfoType((IRType*)primalInfo, (IRType*)diffInfo);
+        }
+        else if (isExistentialDifferentialPairType(pairType))
         {
             // DifferentialPair<IFoo>
             IRBuilder builder(module);
@@ -2932,7 +3197,7 @@ struct TypeFlowSpecializationContext
 
             return builder.getDifferentialPairInfoType(primalInfo, diffInfo);
         }
-        else if (!isGlobalInst(inst->getDataType()))
+        else if (!isGlobalInst(pairType))
         {
             // DifferentialPair<T> where T is generic/abstract
             IRBuilder builder(module);
@@ -2948,6 +3213,22 @@ struct TypeFlowSpecializationContext
 
             return builder.getDifferentialPairInfoType(primalInfo, diffInfo);
         }
+        else if (auto nominalPairType = as<IRDifferentialPairType>(pairType);
+                 nominalPairType && isTypeFlowRefinableType(pairType))
+        {
+            // A nominal pair can be globally interned while still containing abstract values.
+            // For example, `DifferentialPair<Array<DifferentialPair<IFoo>, 2>>` has a global pair
+            // type, but its primal and differential arrays still carry type-flow information for
+            // each existential component. Preserve that information in the semantic pair shape.
+            auto componentMask = nominalPairType->getValueType();
+            auto primalInfo = tryGetArgInfo(context, inst->getPrimal(), componentMask);
+            auto diffInfo = tryGetArgInfo(context, inst->getDifferential(), componentMask);
+            if (!primalInfo || !diffInfo)
+                return none();
+
+            IRBuilder builder(module);
+            return builder.getDifferentialPairInfoType((IRType*)primalInfo, (IRType*)diffInfo);
+        }
         else
         {
             // DifferentialPair<ConcreteType> - concrete type.
@@ -2957,15 +3238,10 @@ struct TypeFlowSpecializationContext
 
     IRInst* analyzeDifferentialPairGetPrimal(IRInst* context, IRDifferentialPairGetPrimal* inst)
     {
-        SLANG_UNUSED(context);
         IRBuilder builder(module);
-        if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
-        {
-            if (auto pairType = as<IRDifferentialPairInfoType>(pairInfo))
-            {
-                return pairType->getPrimalInfo();
-            }
-        }
+        auto pairInfo = tryGetInfo(context, inst->getOperand(0));
+        if (pairInfo)
+            return tryGetDifferentialPairInfoComponentType(&builder, (IRType*)pairInfo, 0);
 
         return none();
     }
@@ -2974,15 +3250,10 @@ struct TypeFlowSpecializationContext
         IRInst* context,
         IRDifferentialPairGetDifferential* inst)
     {
-        SLANG_UNUSED(context);
         IRBuilder builder(module);
-        if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
-        {
-            if (auto pairType = as<IRDifferentialPairInfoType>(pairInfo))
-            {
-                return pairType->getDifferentialInfo();
-            }
-        }
+        auto pairInfo = tryGetInfo(context, inst->getOperand(0));
+        if (pairInfo)
+            return tryGetDifferentialPairInfoComponentType(&builder, (IRType*)pairInfo, 1);
 
         return none();
     }
@@ -3266,7 +3537,7 @@ struct TypeFlowSpecializationContext
         // For non-existential optional types with non-concrete value types,
         // we propagate the optional wrapper with an appropriate value info.
         auto optionalType = as<IROptionalType>(inst->getDataType());
-        if (optionalType && !isConcreteType(optionalType->getValueType()))
+        if (optionalType && isTypeFlowRefinableType(optionalType->getValueType()))
         {
             // Return an optional info wrapping the value type's info.
             // Since this is 'none', we use the concrete value type info.
@@ -3308,7 +3579,7 @@ struct TypeFlowSpecializationContext
         // For non-existential optional types with non-concrete value types,
         // we wrap the value's info in an optional info.
         auto optionalType = as<IROptionalType>(inst->getDataType());
-        if (optionalType && !isConcreteType(optionalType->getValueType()))
+        if (optionalType && isTypeFlowRefinableType(optionalType->getValueType()))
         {
             IRBuilder builder(module);
             if (auto valueInfo = tryGetInfo(context, inst->getValue()))
@@ -3346,7 +3617,7 @@ struct TypeFlowSpecializationContext
         // For non-existential optional types with non-concrete value types,
         // we extract the value's info from the optional info.
         auto optionalType = as<IROptionalType>(inst->getOperand(0)->getDataType());
-        if (optionalType && !isConcreteType(optionalType->getValueType()))
+        if (optionalType && isTypeFlowRefinableType(optionalType->getValueType()))
         {
             if (auto info = tryGetInfo(context, inst->getOperand(0)))
             {
@@ -3428,7 +3699,15 @@ struct TypeFlowSpecializationContext
                         return;
                     }
 
-                    results.add(findWitnessTableEntry(witnessTab, key));
+                    // Resolve the satisfying value before it becomes an element of the analysis
+                    // set. Autodiff witness tables can name a computed context type such as
+                    // `BackwardDiffIntermediateContextType(method)`. Once the derivative exists,
+                    // that marker translates to the generated tuple context. Storing the marker
+                    // here would leave type flow with two spellings of the same result and would
+                    // discard propagation information for existential fields inside the tuple.
+                    auto satisfyingValue = findWitnessTableEntry(witnessTab, key);
+                    auto resolvedValue = translationContext.resolveInst(satisfyingValue);
+                    results.add(resolvedValue);
                 });
 
             auto setOp = getSetOpFromType(inst->getDataType());
@@ -3783,10 +4062,18 @@ struct TypeFlowSpecializationContext
 
         if (auto diffPairType = as<IRDifferentialPairType>(typeLike))
         {
+            if (isConcreteType(diffPairType))
+                return diffPairType;
+
             IRBuilder builder(module);
+            builder.setInsertBefore(diffPairType);
             auto substitutedValueType =
                 (IRType*)substituteSetsInTypeLike(diffPairType->getValueType());
-            return builder.getDifferentialPairInfoType(substitutedValueType, substitutedValueType);
+            auto substitutedDifferentialType = (IRType*)substituteSetsInTypeLike(
+                getDifferentialTypeFromPairType(&builder, diffPairType));
+            return builder.getDifferentialPairInfoType(
+                substitutedValueType,
+                substitutedDifferentialType);
         }
 
         return typeLike;
@@ -3855,10 +4142,19 @@ struct TypeFlowSpecializationContext
 
         if (auto diffPairType = as<IRDifferentialPairType>(type))
         {
+            if (isConcreteType(diffPairType))
+                return diffPairType;
+
             IRBuilder builder(module);
+            builder.setInsertBefore(diffPairType);
             auto substitutedValueType =
                 (IRType*)substituteSets(context, diffPairType->getValueType());
-            return builder.getDifferentialPairInfoType(substitutedValueType, substitutedValueType);
+            auto substitutedDifferentialType = (IRType*)substituteSets(
+                context,
+                getDifferentialTypeFromPairType(&builder, diffPairType));
+            return builder.getDifferentialPairInfoType(
+                substitutedValueType,
+                substitutedDifferentialType);
         }
 
         return type;
@@ -4145,7 +4441,12 @@ struct TypeFlowSpecializationContext
     // info for them yet (not ready to propagate). The caller should skip adding
     // the propagation edge in this case.
     //
-    IRInst* maybeGetBoundFunc(IRInst* callee, List<IRInst*>& paramInfos, WorkQueue<WorkItem>&)
+    IRInst* maybeGetBoundFunc(
+        IRInst* callerContext,
+        IRCall* callInst,
+        IRInst* callee,
+        List<IRInst*>& paramInfos,
+        WorkQueue<WorkItem>& workQueue)
     {
         // Only handle direct (non-generic, non-intrinsic) functions.
         IRFunc* func = as<IRFunc>(callee);
@@ -4202,14 +4503,11 @@ struct TypeFlowSpecializationContext
 
             if (!paramInfo)
             {
-                // Non-concrete param with no info yet - use VoidLit so the
-                // interprocedural edge is still registered. This allows
-                // propagation to proceed (e.g. diagnostics for __ref params
-                // with dynamic dispatch types) even before full info arrives.
-                IRBuilder builder(module);
-                bindings.add(builder.getVoidValue());
-                argIndex++;
-                continue;
+                // The call is not ready to specialize yet. Registering the bare callee here
+                // would merge this call with every other instantiation of the function and lose
+                // the relationship between this argument's concrete types and its result. The
+                // call will be analyzed again when propagation supplies the missing information.
+                return nullptr;
             }
 
             hasAnyBinding = true;
@@ -4220,6 +4518,43 @@ struct TypeFlowSpecializationContext
 
         if (!hasAnyBinding)
             return callee; // No bindings to specialize on
+
+        // Calls are revisited whenever an argument's information widens. Keep one context for
+        // each concrete callee at this call site and widen its bindings in place. Keying by call
+        // site preserves correlations between unrelated calls while avoiding a trail of obsolete
+        // contexts for every intermediate lattice state of this call.
+        auto callSite = InstWithContext(callerContext, callInst);
+        if (auto cachedContexts = callSiteSpecializedFuncCache.tryGetValue(callSite))
+        {
+            for (auto cachedContext : *cachedContexts)
+            {
+                if (cachedContext->getFunc() != callee)
+                    continue;
+
+                bool changed = false;
+                auto param = func->getFirstBlock()->getFirstParam();
+                for (Index i = 0; i < bindings.getCount(); ++i)
+                {
+                    SLANG_ASSERT(param);
+                    auto oldBinding = cachedContext->getOperand((UInt)i + 1);
+                    auto newBinding = bindings[i];
+                    if (!as<IRVoidLit>(oldBinding))
+                    {
+                        newBinding =
+                            unionPropagationInfo(param->getDataType(), oldBinding, newBinding);
+                    }
+                    if (!areInfosEqual(oldBinding, newBinding))
+                    {
+                        cachedContext->setOperand((UInt)i + 1, newBinding);
+                        changed = true;
+                    }
+                    param = param->getNextParam();
+                }
+                if (changed)
+                    initializeBindingsForSpecializeExistentials(cachedContext, func, workQueue);
+                return cachedContext;
+            }
+        }
 
         IRBuilder builder(module);
         List<IRInst*> operands;
@@ -4236,10 +4571,10 @@ struct TypeFlowSpecializationContext
                 (UInt)operands.getCount(),
                 operands.getBuffer()));
 
-        existentialSpecializedFuncCache.addIfNotExists(
-            callee,
+        callSiteSpecializedFuncCache.addIfNotExists(
+            callSite,
             List<IRSpecializeExistentialsInFunc*>());
-        existentialSpecializedFuncCache[callee].add(existentialSpecializedFunc);
+        callSiteSpecializedFuncCache[callSite].add(existentialSpecializedFunc);
 
         return existentialSpecializedFunc;
     }
@@ -4549,7 +4884,6 @@ struct TypeFlowSpecializationContext
 
         auto callee = inst->getCallee();
         auto calleeInfo = tryGetInfo(context, callee);
-
         if (isNoneCallee(callee))
             return none();
 
@@ -4574,6 +4908,15 @@ struct TypeFlowSpecializationContext
                 // A poison callee represents an impossible call path. The rewrite phase
                 // replaces such calls with a default value, so there is no callee body to
                 // discover or propagate into.
+                return;
+            }
+            if (!getFuncDefinitionForContext(callee))
+            {
+                // A witness lookup can itself have function type before its abstract table is
+                // specialized. For example, reverse-mode code looks up `dzero` on a context whose
+                // witness is still flowing through a generated tuple. The lookup is a callable
+                // value, but it is not a function definition that this interprocedural analysis
+                // can discover; witness-lookup lowering will resolve it after the table is known.
                 return;
             }
 
@@ -4680,7 +5023,8 @@ struct TypeFlowSpecializationContext
                 }
                 auto paramInfos =
                     convertArgInfosToParamInfos(cast<IRFuncType>(resolvedFunc->getDataType()));
-                if (auto boundCallee = maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
+                if (auto boundCallee =
+                        maybeGetBoundFunc(context, inst, resolvedFunc, paramInfos, workQueue))
                     propagateToCallSite(boundCallee);
             }
 
@@ -4694,7 +5038,8 @@ struct TypeFlowSpecializationContext
 
             auto paramInfos =
                 convertArgInfosToParamInfos(cast<IRFuncType>(resolvedCallee->getDataType()));
-            if (auto boundCallee = maybeGetBoundFunc(resolvedCallee, paramInfos, workQueue))
+            if (auto boundCallee =
+                    maybeGetBoundFunc(context, inst, resolvedCallee, paramInfos, workQueue))
                 propagateToCallSite(boundCallee);
         }
 
@@ -4870,8 +5215,10 @@ struct TypeFlowSpecializationContext
                     // it makes sense to include this as a case in updateInfo()
                     //
                     // Use the field address's pointer type as context for structural union.
-                    if (auto newInfo =
-                            unionPropagationInfo(fieldAddress->getDataType(), info, existingInfo))
+                    if (auto newInfo = unionPropagationInfo(
+                            getEffectiveUnionMask(context, fieldAddress->getDataType()),
+                            info,
+                            existingInfo))
                     {
                         if (newInfo != existingInfo)
                         {
@@ -4938,7 +5285,7 @@ struct TypeFlowSpecializationContext
         {
             if (auto paramInfo = tryGetInfo(context, param))
                 paramInfos.add(paramInfo);
-            else if (isConcreteType(param->getDataType()))
+            else if (!isTypeFlowRefinableType(param->getDataType()))
             {
                 paramInfos.add(makeInfoForConcreteType(
                     module,
@@ -4956,18 +5303,15 @@ struct TypeFlowSpecializationContext
         return paramInfos;
     }
 
-    // Returns the effective parameter types for a given calling context, after
-    // the type-flow propagation is complete.
+    // Returns the propagated parameter information for a given calling context after type-flow
+    // propagation is complete. A null entry means that the corresponding parameter has no
+    // call-specific refinement.
     //
     List<IRType*> getEffectiveParamTypes(IRInst* context)
     {
         // This proceeds by looking at the propagation info for each parameter,
         // then returning the info if one exists.
         //
-        // If one does not exist, it means the parameter has a concrete type
-        // (not dynamic or generic), and we can just use that for the parameter.
-        //
-
         List<IRType*> effectiveTypes;
         IRFunc* func = nullptr;
         if (as<IRFunc>(context))
@@ -4999,8 +5343,7 @@ struct TypeFlowSpecializationContext
                     continue;
                 }
 
-            // Fallback.. no new info, just use the param type.
-            effectiveTypes.add(param->getDataType());
+            effectiveTypes.add(nullptr);
         }
 
         return effectiveTypes;
@@ -5278,7 +5621,7 @@ struct TypeFlowSpecializationContext
                 {
                     auto funcResultType = cast<IRFuncType>(func->getDataType())->getResultType();
                     if (auto specializedType =
-                            getLoweredType(getFuncReturnInfo(func), funcResultType))
+                            getEffectiveType(func, getFuncReturnInfo(func), funcResultType))
                     {
                         IRBuilder builder(module);
                         builder.setInsertBefore(returnInst);
@@ -5580,7 +5923,8 @@ struct TypeFlowSpecializationContext
         if (!pairType)
             return nullptr;
 
-        SLANG_RELEASE_ASSERT(getConcreteDifferentialType(&builder, pairType) == differentialType);
+        SLANG_RELEASE_ASSERT(
+            getDifferentialTypeFromPairType(&builder, pairType) == differentialType);
         return pairType;
     }
 
@@ -5757,6 +6101,20 @@ struct TypeFlowSpecializationContext
         return (IRType*)info;
     }
 
+    // Resolves an effective type while retaining the semantic structure of an abstract
+    // differential pair. A flat associated-type set can reach a selected pair implementation at
+    // a dispatch boundary, but that set describes the wrapper payload, not the implementation's
+    // two-component shape. Recompute the pair information from the implementation's declared mask
+    // so its body and wrapper agree on the same representation.
+    IRType* getEffectiveType(IRInst* context, IRInst* info, IRType* typeUnionMask)
+    {
+        if (!info)
+            return nullptr;
+
+        auto substitutedInfo = substituteSets(context, info);
+        return getLoweredType(substitutedInfo, typeUnionMask);
+    }
+
     // Replace an insts type with its effective type as determined by the analysis.
     bool replaceType(IRInst* context, IRInst* inst)
     {
@@ -5772,7 +6130,7 @@ struct TypeFlowSpecializationContext
 
         if (auto info = tryGetInfo(context, inst))
         {
-            if (auto specializedType = getLoweredType(info, inst->getDataType()))
+            if (auto specializedType = getEffectiveType(context, info, inst->getDataType()))
             {
                 if (specializedType == inst->getDataType())
                     return false; // No change
@@ -5890,6 +6248,14 @@ struct TypeFlowSpecializationContext
 
         // Otherwise, we go off the info for the inst.
         auto info = tryGetInfo(context, inst);
+        if (!info && as<IRSetTagType>(inst->getWitnessTable()->getDataType()))
+        {
+            // Autodiff can synthesize a global lookup after information propagation has already
+            // visited the original lookup chain. Its witness operand has nevertheless been
+            // specialized to a set tag, which is sufficient to run the normal lookup analysis
+            // here and immediately lower the new instruction.
+            info = analyzeLookupWitnessMethod(context, inst);
+        }
         if (!info)
             return false;
 
@@ -6339,13 +6705,30 @@ struct TypeFlowSpecializationContext
         List<IRType*>& paramTypes = *module->getContainerPool().getList<IRType>();
         auto baseFuncType = cast<IRFuncType>(baseFuncDef->getDataType());
         UInt paramIndex = 0;
-        for (auto paramType : paramEffectiveTypes)
+        for (auto paramInfo : paramEffectiveTypes)
         {
             auto typeUnionMask = baseFuncType->getParamType(paramIndex);
-            if (auto lowered = getLoweredType(paramType, typeUnionMask))
+            IRType* lowered = nullptr;
+            if (paramInfo)
+            {
+                lowered = getEffectiveType(callee, paramInfo, typeUnionMask);
+            }
+            else if (!isGlobalInst(typeUnionMask))
+            {
+                // A function-local declared type can still contain generic or associated-type
+                // computations that this context must substitute. A module-scope declared type,
+                // however, is only a mask: substituting propagation recorded for the same global
+                // interface node by a different parameter would incorrectly correlate otherwise
+                // independent arguments.
+                lowered = getEffectiveType(callee, typeUnionMask, typeUnionMask);
+            }
+
+            if (lowered)
+            {
                 paramTypes.add(lowered);
+            }
             else
-                paramTypes.add(paramType);
+                paramTypes.add(typeUnionMask);
             paramIndex++;
         }
 
@@ -6353,7 +6736,7 @@ struct TypeFlowSpecializationContext
         IRType* resultType = nullptr;
         auto returnInfo = getFuncReturnInfo(callee);
         auto resultTypeUnionMask = baseFuncType->getResultType();
-        if (auto loweredResult = getLoweredType(returnInfo, resultTypeUnionMask))
+        if (auto loweredResult = getEffectiveType(callee, returnInfo, resultTypeUnionMask))
         {
             resultType = loweredResult;
         }
@@ -6496,7 +6879,7 @@ struct TypeFlowSpecializationContext
         // and to read a name hint, both of which accept any `IRInst*`.
         IRInst* lookupKey = nullptr;
         List<IRInst*> specArgs;
-        List<IRInst*> bindings;
+        List<IRSpecializeExistentialsInFunc*> boundContexts;
     };
 
     // Walk the callee operand chain backward, collecting DispatchActions
@@ -6567,6 +6950,7 @@ struct TypeFlowSpecializationContext
         // Check calleeSet for bindings (IRSpecializeExistentialsInFunc).
         IRBuilder builder(module);
         List<IRInst*> bindings;
+        List<IRSpecializeExistentialsInFunc*> boundContexts;
         for (UInt i = 0; i < inst->getOperandCount() - 1; i++)
             bindings.add(builder.getVoidValue());
 
@@ -6578,6 +6962,7 @@ struct TypeFlowSpecializationContext
             {
                 if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(element))
                 {
+                    boundContexts.add(existentialSpecializedFunc);
                     for (UInt i = 1; i < existentialSpecializedFunc->getOperandCount(); i++)
                     {
                         if (!as<IRVoidLit>(bindings[i - 1]))
@@ -6606,7 +6991,7 @@ struct TypeFlowSpecializationContext
         {
             DispatchAction action;
             action.kind = DispatchAction::Kind::BindExistentials;
-            action.bindings = bindings;
+            action.boundContexts = boundContexts;
             actions.add(action);
         }
 
@@ -6629,6 +7014,9 @@ struct TypeFlowSpecializationContext
         WorkQueue<IRInst*>& globalsWorkList)
     {
         IRBuilder builder(module);
+
+        if (dispatchFuncType == nullptr)
+            return nullptr;
 
         Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>> elements;
         forEachInSet(
@@ -6699,20 +7087,24 @@ struct TypeFlowSpecializationContext
 
                     case DispatchAction::Kind::BindExistentials:
                         {
-                            List<IRInst*> boundFuncOperands;
-                            boundFuncOperands.add(val);
-                            for (auto binding : action.bindings)
-                                boundFuncOperands.add(binding);
+                            IRSpecializeExistentialsInFunc* boundContext = nullptr;
+                            for (auto candidate : action.boundContexts)
+                            {
+                                if (candidate->getFunc() == val)
+                                {
+                                    SLANG_RELEASE_ASSERT(!boundContext);
+                                    boundContext = candidate;
+                                }
+                            }
 
-                            auto existentialSpecializedFunc =
-                                cast<IRSpecializeExistentialsInFunc>(builder.emitIntrinsicInst(
-                                    nullptr,
-                                    kIROp_SpecializeExistentialsInFunc,
-                                    (UInt)boundFuncOperands.getCount(),
-                                    boundFuncOperands.getBuffer()));
-
-                            auto loweredFunc =
-                                lowerSpecializeExistentialsInFunc(existentialSpecializedFunc);
+                            // The callee set already contains the analyzed context for each
+                            // concrete witness-table entry. Reuse that context so cloning transfers
+                            // the parameter, result, and internal-instruction propagation maps as
+                            // one correlated unit. Reconstructing an equivalent-looking context
+                            // here would lose those maps and make the wrapper marshal an abstract
+                            // interface value after type flow has finished.
+                            SLANG_RELEASE_ASSERT(boundContext);
+                            auto loweredFunc = lowerSpecializeExistentialsInFunc(boundContext);
                             if (loweredFunc)
                                 val = loweredFunc;
                             break;
@@ -6722,12 +7114,8 @@ struct TypeFlowSpecializationContext
 
                 globalsWorkList.enqueue(val);
 
-                auto effectiveFuncType = getEffectiveFuncType(val);
-                elements.add(tag, {val, effectiveFuncType});
+                elements.add(tag, {val, getEffectiveFuncType(val)});
             });
-
-        if (dispatchFuncType == nullptr)
-            return nullptr;
 
         auto dispatchFunc = createDispatchFunc(dispatchFuncType, elements);
 
@@ -7035,6 +7423,13 @@ struct TypeFlowSpecializationContext
         SLANG_ASSERT(effectiveFuncType);
         auto funcTypeUnionMask = maybeExpandFuncType(*contextFuncTypePtr);
 
+        struct PointerArgumentWriteBack
+        {
+            IRInst* destination = nullptr;
+            IRInst* temporary = nullptr;
+        };
+        List<PointerArgumentWriteBack> pointerWriteBacks;
+
         // First, we'll legalize all operands by upcasting if necessary.
         // This needs to be done even if the callee is not a set.
         //
@@ -7063,15 +7458,37 @@ struct TypeFlowSpecializationContext
                     break;
                 }
 
-            // Upcasting of out-parameters is the responsibility of the callee.
             case ParameterDirectionInfo::Kind::Out:
-
-            // For all other modes, sets must match ('subtyping' is not allowed)
             case ParameterDirectionInfo::Kind::BorrowInOut:
             case ParameterDirectionInfo::Kind::BorrowIn:
             case ParameterDirectionInfo::Kind::Ref:
                 {
-                    callArgs.add(arg);
+                    auto argPtrType = as<IRPtrTypeBase>(arg->getDataType());
+                    if (!argPtrType || argPtrType->getValueType() == paramType)
+                    {
+                        callArgs.add(arg);
+                        break;
+                    }
+
+                    // An output-capable callee can use a broader type-flow representation than
+                    // the caller's storage. Consider reverse differentiation through
+                    // `inout Array<DifferentialPair<IFoo>, 2>`: the propagation function may
+                    // accumulate every run-time IFoo differential it can produce, while this call
+                    // site has already narrowed the array elements. Passing the caller pointer
+                    // directly would give the call mismatched pointer types, and inlining would
+                    // turn that mismatch into an invalid load. Use a temporary in the callee's
+                    // representation and recursively cast in each required direction instead.
+                    auto temporary = argBuilder.emitVar(paramType);
+                    if (paramDirection.kind != ParameterDirectionInfo::Kind::Out)
+                    {
+                        auto inputValue = argBuilder.emitLoad(arg);
+                        auto castInput = castTypeFlowValue(&argBuilder, inputValue, paramType);
+                        argBuilder.emitStore(temporary, castInput);
+                    }
+                    callArgs.add(temporary);
+
+                    if (paramDirection.kind != ParameterDirectionInfo::Kind::BorrowIn)
+                        pointerWriteBacks.add({arg, temporary});
                     break;
                 }
             default:
@@ -7107,6 +7524,16 @@ struct TypeFlowSpecializationContext
             IRBuilderSourceLocRAII builderSourceLocRAII(&builder, inst->sourceLoc);
             auto newCall =
                 builder.emitCallInst(effectiveFuncType->getResultType(), callee, callArgs);
+
+            for (auto writeBack : pointerWriteBacks)
+            {
+                auto destinationType =
+                    cast<IRPtrTypeBase>(writeBack.destination->getDataType())->getValueType();
+                auto outputValue = builder.emitLoad(writeBack.temporary);
+                auto castOutput = castTypeFlowValue(&builder, outputValue, destinationType);
+                builder.emitStore(writeBack.destination, castOutput);
+            }
+
             inst->replaceUsesWith(newCall);
             inst->removeAndDeallocate();
         }
@@ -7338,7 +7765,7 @@ struct TypeFlowSpecializationContext
                 inst->getPrimal(),
                 concretePairType->getValueType());
             auto differentialType =
-                (IRType*)getConcreteDifferentialType(&builder, concretePairType);
+                (IRType*)getDifferentialTypeFromPairType(&builder, concretePairType);
             auto differential = getConcreteValueFromSingletonExistential(
                 &builder,
                 inst->getDifferential(),
@@ -7379,9 +7806,13 @@ struct TypeFlowSpecializationContext
         IRInst* context,
         IRDifferentialPairGetDifferential* inst)
     {
-        if (auto pairInfo = as<IRDifferentialPairInfoType>(inst->getBase()->getDataType()))
+        SLANG_UNUSED(context);
+        IRBuilder builder(module);
+        if (auto differentialType = tryGetDifferentialPairInfoComponentType(
+                &builder,
+                inst->getBase()->getDataType(),
+                1))
         {
-            auto differentialType = pairInfo->getDifferentialInfo();
             if (inst->getDataType() != differentialType)
             {
                 inst->setFullType(differentialType);
@@ -7389,14 +7820,19 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        if (auto pairType = as<IRDifferentialPairType>(inst->getBase()->getDataType()))
+        if (auto pairType = as<IRDifferentialPairType>(inst->getBase()->getDataType());
+            pairType && isConcreteType(pairType))
         {
-            IRBuilder builder(module);
-            auto concreteType = (IRType*)getConcreteDifferentialType(&builder, pairType);
+            // A nominal DifferentialPair can still have an abstract element, as in
+            // `DifferentialPair<IValueHolder>`. In that case its associated differential type is
+            // represented by type-flow information above, not by a concrete witness table.
+            auto concreteType = (IRType*)getDifferentialTypeFromPairType(&builder, pairType);
             if (inst->getDataType() != concreteType)
             {
-                SLANG_RELEASE_ASSERT(
-                    tryGetSingletonConcreteType(tryGetInfo(context, inst)) == concreteType);
+                // Dispatch wrappers are emitted after information propagation, so their newly
+                // synthesized projections do not have entries in the propagation map. Once the
+                // base is a concrete nominal pair, its witness is the source of truth for this
+                // result type.
                 inst->setFullType(concreteType);
                 return true;
             }
@@ -7407,9 +7843,13 @@ struct TypeFlowSpecializationContext
 
     bool specializeDifferentialPairGetPrimal(IRInst* context, IRDifferentialPairGetPrimal* inst)
     {
-        if (auto pairInfo = as<IRDifferentialPairInfoType>(inst->getBase()->getDataType()))
+        SLANG_UNUSED(context);
+        IRBuilder builder(module);
+        if (auto primalType = tryGetDifferentialPairInfoComponentType(
+                &builder,
+                inst->getBase()->getDataType(),
+                0))
         {
-            auto primalType = pairInfo->getPrimalInfo();
             if (inst->getDataType() != primalType)
             {
                 inst->setFullType(primalType);
@@ -7417,13 +7857,14 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        if (auto pairType = as<IRDifferentialPairType>(inst->getBase()->getDataType()))
+        if (auto pairType = as<IRDifferentialPairType>(inst->getBase()->getDataType());
+            pairType && isConcreteType(pairType))
         {
             auto concreteType = pairType->getValueType();
             if (inst->getDataType() != concreteType)
             {
-                SLANG_RELEASE_ASSERT(
-                    tryGetSingletonConcreteType(tryGetInfo(context, inst)) == concreteType);
+                // See the corresponding differential projection above: a concrete nominal base
+                // completely determines this type even for post-analysis wrapper instructions.
                 inst->setFullType(concreteType);
                 return true;
             }
@@ -8399,8 +8840,13 @@ struct TypeFlowSpecializationContext
                 if (auto witnessTable = as<IRWitnessTable>(use->getUser()))
                 {
                     if (witnessTable->getDataType() == targetTableType &&
-                        isGlobalInst(witnessTable))
+                        isGlobalInst(witnessTable) &&
+                        isConcreteType(witnessTable->getConcreteType()))
                     {
+                        // Generic conformances specialized with an abstract argument can also be
+                        // global. They are templates for later specialization, not run-time
+                        // alternatives: their concrete type still contains interfaces or witness
+                        // lookups and cannot be marshalled into a dispatch payload.
                         outTables.add(witnessTable);
                     }
                 }
@@ -8545,12 +8991,9 @@ struct TypeFlowSpecializationContext
     // Set of already discovered contexts.
     HashSet<IRInst*> availableContexts;
 
-    // Cache for SpecializeExistentialsInFunc: maps from base function to all
-    // SpecializeExistentialsInFunc contexts created for it. This is used to
-    // oppourtunistically merge variants of the same function depending on policy
-    // (i.e. as-few-variants-as-possible vs. aggressive specialization).
-    //
-    Dictionary<IRInst*, List<IRSpecializeExistentialsInFunc*>> existentialSpecializedFuncCache;
+    // Specialized contexts created for each call site. Each list has at most one context for a
+    // given concrete callee; its bindings widen monotonically as analysis revisits the call.
+    Dictionary<InstWithContext, List<IRSpecializeExistentialsInFunc*>> callSiteSpecializedFuncCache;
 
     // Information on the call-site. Note that this may be different from the information
     // on the inst used by the call-site, since it may carry bindings from call arguments.
@@ -8610,39 +9053,28 @@ struct DifferentialPairInfoLoweringContext : InstPassBase
     {
         bool changed = false;
 
-        // Rewrite the semantic pair operations before replacing their types. Otherwise their
-        // ordinary differential-pair opcodes would become indistinguishable from malformed
-        // nominal pair operations whose result/base type happened to change to a tuple.
+        // Rewrite projections before constructors. A projection can use a pair-info constructor
+        // directly; replacing that constructor first would change the projection's base to an
+        // ordinary tuple and erase the semantic pair boundary needed to select its component.
         processAllInsts(
             [&](IRInst* inst)
             {
-                if (auto makePair = as<IRMakeDifferentialPair>(inst))
-                {
-                    if (auto pairInfo = as<IRDifferentialPairInfoType>(makePair->getDataType()))
-                    {
-                        IRBuilder builder(makePair);
-                        builder.setInsertBefore(makePair);
-                        auto tuple = builder.emitMakeTuple(
-                            getTupleType(pairInfo),
-                            {makePair->getPrimal(), makePair->getDifferential()});
-                        makePair->replaceUsesWith(tuple);
-                        makePair->removeAndDeallocate();
-                        changed = true;
-                    }
-                    return;
-                }
-
                 if (auto getPrimal = as<IRDifferentialPairGetPrimal>(inst))
                 {
-                    if (auto pairInfo =
-                            as<IRDifferentialPairInfoType>(getPrimal->getBase()->getDataType()))
+                    IRBuilder builder(getPrimal);
+                    if (auto componentType = tryGetDifferentialPairInfoComponentType(
+                            &builder,
+                            getPrimal->getBase()->getDataType(),
+                            0))
                     {
-                        IRBuilder builder(getPrimal);
                         builder.setInsertBefore(getPrimal);
-                        auto projection = builder.emitGetTupleElement(
-                            pairInfo->getPrimalInfo(),
-                            getPrimal->getBase(),
-                            0);
+                        IRInst* projection = nullptr;
+                        if (as<IRPtrTypeBase>(getPrimal->getBase()->getDataType()))
+                            projection =
+                                builder.emitGetElementPtr(componentType, getPrimal->getBase(), 0);
+                        else
+                            projection =
+                                builder.emitGetTupleElement(componentType, getPrimal->getBase(), 0);
                         getPrimal->replaceUsesWith(projection);
                         getPrimal->removeAndDeallocate();
                         changed = true;
@@ -8652,19 +9084,47 @@ struct DifferentialPairInfoLoweringContext : InstPassBase
 
                 if (auto getDifferential = as<IRDifferentialPairGetDifferential>(inst))
                 {
-                    if (auto pairInfo = as<IRDifferentialPairInfoType>(
-                            getDifferential->getBase()->getDataType()))
+                    IRBuilder builder(getDifferential);
+                    if (auto componentType = tryGetDifferentialPairInfoComponentType(
+                            &builder,
+                            getDifferential->getBase()->getDataType(),
+                            1))
                     {
-                        IRBuilder builder(getDifferential);
                         builder.setInsertBefore(getDifferential);
-                        auto projection = builder.emitGetTupleElement(
-                            pairInfo->getDifferentialInfo(),
-                            getDifferential->getBase(),
-                            1);
+                        IRInst* projection = nullptr;
+                        if (as<IRPtrTypeBase>(getDifferential->getBase()->getDataType()))
+                            projection = builder.emitGetElementPtr(
+                                componentType,
+                                getDifferential->getBase(),
+                                1);
+                        else
+                            projection = builder.emitGetTupleElement(
+                                componentType,
+                                getDifferential->getBase(),
+                                1);
                         getDifferential->replaceUsesWith(projection);
                         getDifferential->removeAndDeallocate();
                         changed = true;
                     }
+                }
+            });
+
+        // With every projection detached from its semantic pair base, constructors can become
+        // ordinary tuples without making a later pair projection ambiguous.
+        processInstsOfType<IRMakeDifferentialPair>(
+            kIROp_MakeDifferentialPair,
+            [&](IRMakeDifferentialPair* makePair)
+            {
+                if (auto pairInfo = as<IRDifferentialPairInfoType>(makePair->getDataType()))
+                {
+                    IRBuilder builder(makePair);
+                    builder.setInsertBefore(makePair);
+                    auto tuple = builder.emitMakeTuple(
+                        getTupleType(pairInfo),
+                        {makePair->getPrimal(), makePair->getDifferential()});
+                    makePair->replaceUsesWith(tuple);
+                    makePair->removeAndDeallocate();
+                    changed = true;
                 }
             });
 

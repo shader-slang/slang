@@ -16,8 +16,8 @@
 namespace Slang
 {
 
-// Represents a work item for packing `inout` or `out` arguments after a concrete call.
-struct ArgumentPackWorkItem
+// Represents an output-capable wrapper argument that must be written back after a concrete call.
+struct ArgumentWriteBack
 {
     // The wrapper-side destination and concrete temporary used for an output-capable parameter.
     // After the call, `castTypeFlowValue` performs the reverse structural conversion.
@@ -25,17 +25,17 @@ struct ArgumentPackWorkItem
     IRInst* concreteArg = nullptr;
 };
 
-// Adapt a wrapper argument to the implementation's parameter type. Pointer parameters use a
+// Cast a wrapper argument to the implementation's parameter type. Pointer parameters use a
 // concrete temporary so the same recursive conversion can initialize input-capable directions and
 // marshal output-capable directions back after the call.
-IRInst* maybeUnpackArg(
+IRInst* castWrapperArg(
     IRBuilder* builder,
     IRType* paramType,
     IRInst* arg,
-    ArgumentPackWorkItem& packAfterCall)
+    ArgumentWriteBack& writeBack)
 {
-    packAfterCall.dstArg = nullptr;
-    packAfterCall.concreteArg = nullptr;
+    writeBack.dstArg = nullptr;
+    writeBack.concreteArg = nullptr;
 
     // If either paramType or argType is a pointer type
     // (because of `inout` or `out` modifiers), we extract
@@ -75,8 +75,8 @@ IRInst* maybeUnpackArg(
                 direction.kind == ParameterDirectionInfo::Kind::BorrowInOut ||
                 direction.kind == ParameterDirectionInfo::Kind::Ref)
             {
-                packAfterCall.dstArg = arg;
-                packAfterCall.concreteArg = tempVar;
+                writeBack.dstArg = arg;
+                writeBack.concreteArg = tempVar;
             }
             return tempVar;
         }
@@ -144,7 +144,7 @@ IRFunc* emitWitnessTableWrapper(
     }
 
     List<IRInst*> args;
-    List<ArgumentPackWorkItem> argsToPack;
+    List<ArgumentWriteBack> writeBacks;
 
     SLANG_ASSERT(params.getCount() == (Index)targetFuncType->getParamCount());
     for (UInt i = 0; i < targetFuncType->getParamCount(); i++)
@@ -157,16 +157,16 @@ IRFunc* emitWitnessTableWrapper(
         // parameters or a value for `in` parameters) while the interface exposes a structural
         // type-flow type, cast the wrapper argument to the concrete type. Storage-level
         // `AnyValueType` values are introduced later by `lowerUntaggedUnionTypes`.
-        ArgumentPackWorkItem packWorkItem;
-        auto newArg = maybeUnpackArg(builder, funcParamType, wrapperParam, packWorkItem);
+        ArgumentWriteBack writeBack;
+        auto newArg = castWrapperArg(builder, funcParamType, wrapperParam, writeBack);
         args.add(newArg);
-        if (packWorkItem.concreteArg)
-            argsToPack.add(packWorkItem);
+        if (writeBack.concreteArg)
+            writeBacks.add(writeBack);
     }
     auto call = builder->emitCallInst(targetFuncType->getResultType(), funcInst, args);
 
-    // Pack all `out` arguments.
-    for (auto item : argsToPack)
+    // Write output-capable arguments back through their wrapper-side pointers.
+    for (auto item : writeBacks)
     {
         auto wrapperValueType = cast<IRPtrTypeBase>(item.dstArg->getDataType())->getValueType();
         auto concreteVal = builder->emitLoad(item.concreteArg);

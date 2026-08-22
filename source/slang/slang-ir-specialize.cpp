@@ -1774,12 +1774,9 @@ struct SpecializationContext
                 break;
         }
 
-        // Type-flow keeps abstract differential pairs in a semantic wrapper while the
-        // specialization loop and witness-table dispatcher synthesis are still active. Once the
-        // loop reaches its fixed point, lower that wrapper exactly once so later autodiff and tuple
-        // passes see only nominal concrete pairs or ordinary tuples.
-        if (!sink || sink->getErrorCount() == 0)
-            this->changed |= lowerDifferentialPairInfoTypes(module);
+        // DifferentialPairInfoType remains semantic until the final specialization phase. Autodiff
+        // can synthesize and inline more witness-table wrappers after this loop, and those rewrites
+        // must still be able to distinguish a pair from an ordinary two-element tuple.
     }
 
     void addInstsToWorkListRec(IRInst* inst)

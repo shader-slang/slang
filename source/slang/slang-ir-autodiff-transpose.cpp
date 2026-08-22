@@ -2229,11 +2229,24 @@ struct DiffTransposePass
             // We have a concrete type.
             // (A:IDiff = MakeExistential(B, W)) ->
             // (dB: T += ExtractExistentialValue(Reinterpret(dW)))
-            auto diffValInDiffType = builder->emitReinterpret(
-                diffType,
-                builder->emitExtractExistentialValue(
-                    builder->emitExtractExistentialType(revValue),
-                    revValue));
+            IRInst* diffValInDiffType;
+            if (isRuntimeType(revValue->getDataType()))
+            {
+                // A gradient whose type is an opened associated type is an untagged payload, not
+                // an existential object. Type flow lowers that payload to AnyValue, so unpack it
+                // directly. In particular, it has no witness/type tag for ExtractExistentialValue
+                // to project; the opened type instruction already carries the correlated run-time
+                // type selected by the original existential's witness.
+                diffValInDiffType = builder->emitUnpackAnyValue(diffType, revValue);
+            }
+            else
+            {
+                diffValInDiffType = builder->emitReinterpret(
+                    diffType,
+                    builder->emitExtractExistentialValue(
+                        builder->emitExtractExistentialType(revValue),
+                        revValue));
+            }
 
             return TranspositionResult(List<RevGradient>(RevGradient(
                 RevGradient::Flavor::Simple,

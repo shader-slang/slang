@@ -2,7 +2,7 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -vk
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -cuda
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [anyValueSize(16)]
@@ -76,6 +76,8 @@ interface ICompositeConsumer
     float consumeOptional(OptionalPair pair);
     float replacePair(inout ValuePair pair);
     void replaceArray(inout PairArray pairs);
+    [Differentiable]
+    float consumeArrayReverse(inout PairArray pairs);
 }
 
 struct CompositeConsumer : ICompositeConsumer
@@ -124,6 +126,34 @@ struct CompositeConsumer : ICompositeConsumer
         pairs[0] = fwd_diff(makeSquaredValue)(diffPair(first.p + 1.0, first.d));
         pairs[1] = fwd_diff(makeLinearValue)(diffPair(second.p + 1.0, second.d));
     }
+
+    [Differentiable]
+    float consumeArrayReverse(inout PairArray pairs)
+    {
+        return readValue(pairs[0].p) + readValue(pairs[1].p);
+    }
+}
+
+[Differentiable]
+PairArray makeReversePairs()
+{
+    PairArray pairs = {
+        fwd_diff(makeLinearValue)(diffPair(2.0, 0.0)),
+        fwd_diff(makeSquaredValue)(diffPair(3.0, 0.0))};
+    return pairs;
+}
+
+[Differentiable]
+float dispatchArrayReverse(inout PairArray pairs)
+{
+    ICompositeConsumer consumer = CompositeConsumer();
+    return consumer.consumeArrayReverse(pairs);
+}
+
+[Differentiable]
+float evaluateArrayReverse(PairArray pairs)
+{
+    return dispatchArrayReverse(pairs);
 }
 
 //TEST_INPUT: type_conformance LinearValueHolder:IValueHolder = 0
@@ -173,4 +203,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[4] =
         updatedFirst.p * 1000.0 + updatedFirst.d * 100.0 + updatedSecond.p * 10.0 + updatedSecond.d;
     // CHECK: 4152
+
+    // Differentiating this wrapper reaches an `inout PairArray` call through the witness table.
+    // Its backward wrapper must recursively cast the composite and write the accumulated
+    // existential differentials back through both the inout pointer and the outer array.
+    DifferentialPair<PairArray> reversePairs = fwd_diff(makeReversePairs)();
+    bwd_diff(dispatchArrayReverse)(reversePairs, 1.0);
+
+    // Reapply the function in forward mode with the accumulated cotangent as its direction. The
+    // resulting tangent is the gradient's squared norm: 1 * 1 + 6 * 6 = 37. This checks both
+    // returned run-time differential values without downcasting an associated existential type.
+    let gradientCheck = fwd_diff(evaluateArrayReverse)(reversePairs);
+    outputBuffer[5] = gradientCheck.d; // CHECK: 37
 }

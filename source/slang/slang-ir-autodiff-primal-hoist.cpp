@@ -2825,59 +2825,83 @@ static bool shouldStoreVar(IRVar* var)
 
 bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
 {
-    if (auto load = as<IRLoad>(use.usedVal))
+    const bool recomputable = [&]()
     {
-        auto ptr = load->getPtr();
-
-        // We can't recompute a `load` is if it is a load from a global mutable
-        // variable.
-        if (isGlobalOrUnknownMutableAddress(getParentFunc(load), ptr))
-            return false;
-
-        // We can't recompute a 'load' from a mutable function parameter.
-        if (as<IRParam>(ptr) || as<IRVar>(ptr))
+        if (auto load = as<IRLoad>(use.usedVal))
         {
-            // An exception is a load of a constref parameter, which should
-            // remain constant throughout the function.
-            if (as<IRBorrowInParamType>(getRootAddr(ptr)->getDataType()))
-                return true;
-            if (isInstInPrimalOrTransposedParameterBlocks(ptr))
+            auto ptr = load->getPtr();
+
+            // We can't recompute a `load` is if it is a load from a global mutable
+            // variable.
+            if (isGlobalOrUnknownMutableAddress(getParentFunc(load), ptr))
                 return false;
-        }
-    }
-    else if (auto param = as<IRParam>(use.usedVal))
-    {
-        if (inductionValueInsts.containsKey(param))
-            return true;
 
-        // We can recompute a phi param if it is not in a loop start block.
-        auto parentBlock = as<IRBlock>(param->getParent());
-        for (auto pred : parentBlock->getPredecessors())
-        {
-            if (auto loop = as<IRLoop>(pred->getTerminator()))
+            if (auto var = as<IRVar>(ptr); var && isRuntimeType(load->getDataType()))
             {
-                if (loop->getTargetBlock() == parentBlock)
+                // Loads of function-local variables exist only for call temporaries. A runtime
+                // type cannot be checkpointed across functions, so verify the stronger invariant
+                // needed here: this temporary's last write is a recomputable call. The unzip pass
+                // will reconstruct the variable, its initializer, and the call together.
+                auto writeUse = findLatestUniqueWriteUse(var);
+                SLANG_RELEASE_ASSERT(writeUse);
+                auto call = as<IRCall>(writeUse->getUser());
+                SLANG_RELEASE_ASSERT(call && !shouldStoreInst(call));
+                return true;
+            }
+
+            // We can't recompute a 'load' from a mutable function parameter.
+            if (as<IRParam>(ptr) || as<IRVar>(ptr))
+            {
+                // An exception is a load of a constref parameter, which should
+                // remain constant throughout the function.
+                if (as<IRBorrowInParamType>(getRootAddr(ptr)->getDataType()))
+                    return true;
+                if (isInstInPrimalOrTransposedParameterBlocks(ptr))
                     return false;
             }
         }
-
-        // We can't recompute function parameters. (param is in the first block of a function)
-        if (auto paramParentBlock = as<IRBlock>(param->getParent()))
+        else if (auto param = as<IRParam>(use.usedVal))
         {
-            if (paramParentBlock == paramParentBlock->getParent()->getFirstBlock())
+            if (inductionValueInsts.containsKey(param))
+                return true;
+
+            // We can recompute a phi param if it is not in a loop start block.
+            auto parentBlock = as<IRBlock>(param->getParent());
+            for (auto pred : parentBlock->getPredecessors())
             {
-                return false;
+                if (auto loop = as<IRLoop>(pred->getTerminator()))
+                {
+                    if (loop->getTargetBlock() == parentBlock)
+                        return false;
+                }
+            }
+
+            // We can't recompute function parameters. (param is in the first block of a function)
+            if (auto paramParentBlock = as<IRBlock>(param->getParent()))
+            {
+                if (paramParentBlock == paramParentBlock->getParent()->getFirstBlock())
+                {
+                    return false;
+                }
             }
         }
-    }
-    else if (auto exitValue = as<IRLoopExitValue>(use.usedVal))
-    {
-        if (loopExitValueInsts.containsKey(exitValue->getVal()))
-            return true;
-        else
-            return false;
-    }
-    return true;
+        else if (auto exitValue = as<IRLoopExitValue>(use.usedVal))
+        {
+            if (loopExitValueInsts.containsKey(exitValue->getVal()))
+                return true;
+            else
+                return false;
+        }
+        return true;
+    }();
+
+    // A runtime type names the result of opening an existential in this function. It cannot
+    // appear in the reverse function's checkpoint context, so every value of that type must
+    // necessarily be recomputable there. Assert that it also satisfies the ordinary recomputation
+    // rules instead of silently overriding them; a future mutable load, loop phi, or function
+    // parameter with a runtime type would otherwise produce invalid reverse IR.
+    SLANG_RELEASE_ASSERT(!isRuntimeType(use.usedVal->getDataType()) || recomputable);
+    return recomputable;
 }
 
 HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
@@ -2900,12 +2924,9 @@ HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
         }
         else
         {
-            // We may not be able to recompute due to limitations of the unzip pass. If so, store
-            // the result unless its type was produced by opening an existential. That type cannot
-            // leave the function where it was opened, so recomputation is the only valid
-            // classification. `canTypeBeStored` is deliberately not used for this decision: it
-            // also rejects legal context types such as DifferentialPtrPair<T>.
-            if (isRuntimeType(use.usedVal->getDataType()) || canRecompute(use))
+            // We may not be able to recompute other values due to limitations of the unzip pass.
+            const bool recomputable = canRecompute(use);
+            if (recomputable)
                 return HoistResult::recompute(use.usedVal);
 
             // The fallback is to store.

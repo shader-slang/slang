@@ -156,7 +156,7 @@ IRInst* castTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
                 argPairInfo->getDifferentialInfo(),
                 arg);
             auto primal = castTypeFlowValue(builder, primalArg, destPairType->getValueType());
-            auto differentialType = getConcreteDifferentialType(builder, destPairType);
+            auto differentialType = getDifferentialTypeFromPairType(builder, destPairType);
             auto differential = castTypeFlowValue(builder, differentialArg, differentialType);
             return builder->emitMakeDifferentialPair(destPairType, primal, differential);
         }
@@ -183,7 +183,7 @@ IRInst* castTypeFlowValue(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             // pair-info lowering pass chooses the ordinary tuple layout in one place.
             auto primal =
                 builder->emitDifferentialValuePairGetPrimal(argPairType->getValueType(), arg);
-            auto differentialType = getConcreteDifferentialType(builder, argPairType);
+            auto differentialType = getDifferentialTypeFromPairType(builder, argPairType);
             auto differential =
                 builder->emitDifferentialValuePairGetDifferential(differentialType, arg);
             auto adaptedPrimal = castTypeFlowValue(builder, primal, destPairInfo->getPrimalInfo());
