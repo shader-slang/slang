@@ -440,6 +440,13 @@ struct IntroduceExplicitGlobalContextPass
         auto key = builder.createStructKey();
         builder.createStructField(m_contextStructType, key, fieldDataType);
 
+        // Carry over the location of the global this field stands in for, so that a later
+        // pass reporting a problem with the field (for example, a type that the target
+        // cannot represent) can point at the original declaration. A freshly created key
+        // has no location of its own, and none of its uses correspond to source the user
+        // wrote, so without this the diagnostic has no `file:line` to name.
+        key->sourceLoc = originalInst->sourceLoc;
+
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);

@@ -106,6 +106,29 @@ static bool isKernelCPPOrCUDASourceTarget(TargetRequest* target)
     }
 }
 
+// True on targets where a surviving function-typed value produces invalid output *silently* (an
+// undefined spelling at exit 0) or crashes, so it must be diagnosed here (issue #12367). The set
+// is exactly the silently-broken targets: HLSL/GLSL/SPIR-V are excluded because they already fail
+// loudly (E99999 / a spirv-opt assert), and host C++ because its prelude defines `Slang_FuncType`
+// for `[DllImport]`.
+static bool shouldDiagnoseFuncTypedValue(TargetRequest* target)
+{
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
+        return true;
+    default:
+        return isMetalTarget(target) || isWGPUTarget(target);
+    }
+}
+
 // True if `funcType` has any parameter or result of type `String`.
 static bool funcTypeReferencesStringType(IRFuncType* funcType)
 {
@@ -165,10 +188,48 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     // any diagnostic.
     const bool rejectString = isKernelCPPOrCUDASourceTarget(target);
 
+    // See `shouldDiagnoseFuncTypedValue`. A function-typed value also reaches emission as a
+    // local variable or a parameter that specialization could not resolve, which the
+    // module-level checks for globals and `KernelContext` fields do not see:
+    //
+    //      functype(int) -> int local = (tid.x > 0) ? addOne : addTwo;
+    //
+    // A `select` between two functions is not a shape `isParamSuitableForSpecialization`
+    // accepts, so both the local and the parameter it is passed to keep their function type.
+    const bool rejectFuncTypedValue = shouldDiagnoseFuncTypedValue(target);
+
+    // One unsupported value is reachable as several insts (the local, a parameter it flows to, a
+    // synthesized aggregate temporary derived from a module-scope global), many without a location.
+    // Report only those that can name a position, so one mistake yields one actionable error rather
+    // than several pointing nowhere -- and so a body-scope derivative of a global does not
+    // duplicate the error already raised for that global at module scope. A whole declaration with
+    // no location (an imported precompiled global) is a module-scope shape, reported
+    // unconditionally below.
+    auto diagnoseFuncTypedValue = [&](IRInst* inst)
+    {
+        if (!rejectFuncTypedValue || !as<IRFuncType>(unwrapArrayAndPointers(inst->getDataType())))
+            return;
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        if (loc.isValid())
+            sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+    };
+
+    if (rejectFuncTypedValue)
+    {
+        if (auto firstBlock = func->getFirstBlock(); firstBlock)
+        {
+            for (auto param : firstBlock->getParams())
+                diagnoseFuncTypedValue(param);
+        }
+    }
+
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
+            if (inst->getOp() == kIROp_Var)
+                diagnoseFuncTypedValue(inst);
+
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
@@ -232,8 +293,47 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
 
 void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
+    // See `shouldDiagnoseFuncTypedValue`. A function-typed global reaches here as one of two
+    // shapes: `introduceExplicitGlobalContext` (C++/CUDA/Metal) moves it into a `KernelContext`
+    // struct field, while WGSL keeps it a global variable. Both are written out by the ordinary
+    // type-emission path, so a global that is only ever written still emits its declaration.
+    const bool rejectFuncTypedValue = shouldDiagnoseFuncTypedValue(target);
+
     for (auto globalInst : module->getGlobalInsts())
     {
+        if (rejectFuncTypedValue)
+        {
+            if (auto structType = as<IRStructType>(globalInst))
+            {
+                for (auto field : structType->getFields())
+                {
+                    // Look through the pointer/array a field is declared with, but not into nested
+                    // structs -- their own fields are visited by this same walk.
+                    if (as<IRFuncType>(unwrapArrayAndPointers(field->getFieldType())))
+                    {
+                        // The key carries the location of the global this field replaced (see
+                        // `introduceExplicitGlobalContext`), but a declaration read from a
+                        // precompiled module has none, so fall back to a use. The value is
+                        // rejected either way: emitting it would produce output the target
+                        // cannot represent, whether or not a position can be named for it.
+                        auto key = field->getKey();
+                        auto loc = key->sourceLoc.isValid() ? key->sourceLoc : findFirstUseLoc(key);
+                        sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                    }
+                }
+            }
+            else if (globalInst->getOp() == kIROp_GlobalVar)
+            {
+                // WGSL keeps the global rather than moving it into a context struct.
+                if (as<IRFuncType>(unwrapArrayAndPointers(globalInst->getDataType())))
+                {
+                    auto loc = globalInst->sourceLoc.isValid() ? globalInst->sourceLoc
+                                                               : findFirstUseLoc(globalInst);
+                    sink->diagnose(Diagnostics::FuncTypeNotSupportedOnTarget{.location = loc});
+                }
+            }
+        }
+
         switch (globalInst->getOp())
         {
         case kIROp_VectorType:
