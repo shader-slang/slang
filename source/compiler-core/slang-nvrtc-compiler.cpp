@@ -49,6 +49,14 @@ typedef struct _nvrtcProgram* nvrtcProgram;
     x(nvrtcResult, nvrtcGetProgramLog, (nvrtcProgram prog, char *log))\
     x(nvrtcResult, nvrtcAddNameExpression, (nvrtcProgram prog, const char * const name_expression)) \
     x(nvrtcResult, nvrtcGetLoweredName, (nvrtcProgram prog, const char *const name_expression, const char** lowered_name))
+
+// Entry points that are not present in every NVRTC we support, and so must not
+// be required for the library to load. `nvrtcGetSupportedArchs` and its
+// companion were added in CUDA 11.2; binding them through SLANG_NVRTC_FUNCS
+// would make Slang refuse to load anything older.
+#define SLANG_NVRTC_OPTIONAL_FUNCS(x) \
+    x(nvrtcResult, nvrtcGetNumSupportedArchs, (int* numArchs)) \
+    x(nvrtcResult, nvrtcGetSupportedArchs, (int* supportedArchs))
 // clang-format on
 
 } // namespace nvrtc
@@ -149,6 +157,24 @@ protected:
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
+    // Null when the loaded NVRTC predates them; see SLANG_NVRTC_OPTIONAL_FUNCS.
+    SLANG_NVRTC_OPTIONAL_FUNCS(SLANG_NVTRC_MEMBER_FUNCS);
+
+    /// Return the compute capabilities the loaded NVRTC actually accepts, as
+    /// `major * 10 + minor` values in ascending order.
+    ///
+    /// This function owns the decision of whether an answer is usable, so that
+    /// callers have exactly one thing to test. On SLANG_OK the list is
+    /// guaranteed non-empty; anything else means "no usable answer, fall back"
+    /// and carries no further meaning.
+    ///
+    /// SLANG_E_NOT_AVAILABLE therefore covers both the expected case -- an
+    /// NVRTC predating these entry points -- and a successful query reporting
+    /// no architectures. The latter is not a state Slang could act on if it
+    /// occurred, and folding it here is deliberate rather than an oversight:
+    /// distinguishing it would give every caller a second case to handle for no
+    /// behavioural difference.
+    SlangResult _getSupportedArchs(List<int>& outArchs);
 
     // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT*
     // include cuda_fp16.h.
@@ -187,6 +213,13 @@ SlangResult NVRTCDownstreamCompiler::init(ISlangSharedLibrary* library)
         return SLANG_FAIL;
 
     SLANG_NVRTC_FUNCS(SLANG_NVTRC_GET_FUNC)
+
+    // Optional entry points are bound the same way but must not fail the load
+    // when absent; each is left null and guarded at the point of use.
+#define SLANG_NVTRC_GET_OPTIONAL_FUNC(ret, name, params) \
+    m_##name = (ret(*) params)library->findFuncByName(#name);
+
+    SLANG_NVRTC_OPTIONAL_FUNCS(SLANG_NVTRC_GET_OPTIONAL_FUNC)
 
     m_sharedLibrary = library;
 
@@ -684,6 +717,65 @@ SlangResult _findFileInIncludePath(
     }
 
     return SLANG_E_NOT_FOUND;
+}
+
+SemanticVersion NVRTCDownstreamCompilerUtil::resolveArchAgainstSupported(
+    SemanticVersion requested,
+    const List<int>& supportedAscending)
+{
+    if (supportedAscending.getCount() == 0)
+        return requested;
+
+    const auto toVersion = [](int arch) { return SemanticVersion(arch / 10, arch % 10); };
+
+    // Smallest supported architecture that satisfies the request. Rounding the
+    // other way would hand back something that does not provide what the code
+    // asked for.
+    for (Index i = 0; i < supportedAscending.getCount(); ++i)
+    {
+        const SemanticVersion candidate = toVersion(supportedAscending[i]);
+        if (candidate >= requested)
+            return candidate;
+    }
+
+    // Nothing supported satisfies it; the best available is the highest.
+    return toVersion(supportedAscending.getLast());
+}
+
+SlangResult NVRTCDownstreamCompiler::_getSupportedArchs(List<int>& outArchs)
+{
+    outArchs.clear();
+
+    if (!m_nvrtcGetNumSupportedArchs || !m_nvrtcGetSupportedArchs)
+        return SLANG_E_NOT_AVAILABLE;
+
+    // A successful query reporting no architectures would mean this NVRTC can
+    // compile for nothing at all. Treated as "no usable answer" rather than
+    // asserted, because the value comes from a loaded library rather than from
+    // our own invariants.
+    int numArchs = 0;
+    if (m_nvrtcGetNumSupportedArchs(&numArchs) != NVRTC_SUCCESS || numArchs <= 0)
+        return SLANG_E_NOT_AVAILABLE;
+
+    outArchs.setCount(numArchs);
+    if (m_nvrtcGetSupportedArchs(outArchs.getBuffer()) != NVRTC_SUCCESS)
+    {
+        outArchs.clear();
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    // resolveArchAgainstSupported requires ascending order -- both its forward
+    // scan and its "highest supported" fallback depend on it -- and this is the
+    // single point that guarantees it. NVRTC documents its result as ascending,
+    // so this sort is normally a no-op; it is here so the helper's precondition
+    // is enforced by us rather than assumed of a third party.
+    //
+    // The paths below and this ordering guarantee are exercised only indirectly:
+    // reaching them needs a loaded NVRTC, which GPU-less CI does not have. The
+    // resolution logic itself is separated into resolveArchAgainstSupported for
+    // exactly that reason, and is unit-tested there without an NVRTC.
+    outArchs.sort();
+    return SLANG_OK;
 }
 
 SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(
@@ -1279,6 +1371,20 @@ SlangResult NVRTCDownstreamCompiler::compile(
     }
 
     {
+        // Ask the loaded NVRTC which architectures it actually accepts. This
+        // supplies the *upper* bound, which nothing else here knows: requesting
+        // an architecture newer than this NVRTC understands is otherwise a hard
+        // failure at compile time, with no way for a caller to have predicted
+        // it. It also gives the exact set, so an intermediate requirement can be
+        // resolved to an architecture that really exists.
+        //
+        // Absent on NVRTC older than CUDA 11.2, in which case every use below
+        // is skipped and behaviour is exactly as before.
+        // On success the list is non-empty; _getSupportedArchs owns that
+        // guarantee, so there is nothing further to test here.
+        List<int> supportedArchs;
+        const bool haveSupportedArchs = SLANG_SUCCEEDED(_getSupportedArchs(supportedArchs));
+
         // The lowest supported CUDA architecture version supported
         // by any version of NVRTC we support is `compute_30`.
         //
@@ -1320,6 +1426,26 @@ SlangResult NVRTCDownstreamCompiler::compile(
                     version = capabilityVersion.version;
                 }
             }
+        }
+
+        // Resolve the request against the architectures NVRTC actually accepts.
+        //
+        // The ladder above proposes a *policy* floor, not a capability one. On
+        // NVRTC 12.8+ it picks `compute_75` because architectures below that are
+        // deprecated rather than removed -- they are still reported here, so
+        // taking the reported floor would reintroduce the deprecation warning
+        // that branch exists to avoid.
+        //
+        // The reported set then bounds that proposal from above and snaps it to
+        // a real member. Note this can *raise* the floor as well as cap the
+        // request: if a future NVRTC genuinely drops `sm_75` and reports a
+        // minimum of 80, the ladder's 7.5 is rounded up to 8.0, because there is
+        // no longer an architecture matching the policy. See
+        // resolveArchAgainstSupported for the resolution semantics.
+        if (haveSupportedArchs)
+        {
+            version =
+                NVRTCDownstreamCompilerUtil::resolveArchAgainstSupported(version, supportedArchs);
         }
 
         StringBuilder builder;
