@@ -822,7 +822,28 @@ typedef uint32_t SlangSizeT;
         // This flag will be deprecated, use CompilerOption instead.
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY = 1 << 10,
     };
-    inline constexpr SlangTargetFlags kDefaultTargetFlags =
+    // Must have internal linkage, and must never be `inline`. An `inline constexpr`
+    // variable has external linkage, so wherever it is odr-used the definition is
+    // emitted under one shared external symbol name. AddressSanitizer wraps the
+    // copy in an instrumented module with a redzone, which changes the size it
+    // records for that symbol; the copy in a non-instrumented libslang has none,
+    // the sizes disagree, and ASan's ODR checker reports a violation that breaks
+    // mixed ASan builds. Internal linkage does not stop a definition from being
+    // emitted; it removes the external name, so each translation unit gets its own
+    // copy and no shared symbol remains for the checker to compare. The value is
+    // still folded at compile time because it is `constexpr`.
+    //
+    // `static` is how that internal linkage is spelled, here and at
+    // `kInvalidCoverageCounterIndex`. It is explicitness rather than the thing
+    // doing the work: clang and gcc both give a bare `constexpr` internal linkage
+    // even inside this `extern "C"` block, though `[dcl.link]/7` ("treated as if
+    // it contains the `extern` specifier") can be read as saying otherwise.
+    //
+    // `[[maybe_unused]]` suppresses GCC's `-Wunused-const-variable=2`, which its
+    // documentation defines as warning for unused constant static variables
+    // defined in headers. An `inline` variable is not subject to it.
+    // See issue #11927.
+    [[maybe_unused]] static constexpr SlangTargetFlags kDefaultTargetFlags =
         SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
 
     /*!
@@ -4848,7 +4869,11 @@ enum class CoverageBranchArmKind : uint32_t
     DefaultArm = 4,
 };
 
-inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
+// Internal linkage via `static`, and `[[maybe_unused]]` to suppress GCC's
+// `-Wunused-const-variable=2`, for the same reasons as `kDefaultTargetFlags`; see
+// the note there. Never `inline`: that is what would give this constant external
+// linkage and reintroduce the ASan ODR failure in mixed builds. See issue #11927.
+[[maybe_unused]] static constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
