@@ -4283,6 +4283,13 @@ err(
 )
 
 err(
+    "entry-point-cannot-throw",
+    38053,
+    "entry point cannot have a 'throws' clause",
+    span { loc = "location", message = "entry point '~entryPoint:Name' cannot declare a 'throws' clause; a shader entry point has no error return channel, so handle the error inside the entry point with 'do'/'catch' instead" }
+)
+
+err(
     "entry-point-cannot-be-generic",
     38014,
     "generic entry point used without specialization arguments",

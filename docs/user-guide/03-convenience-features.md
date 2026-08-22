@@ -983,6 +983,12 @@ void g() throws MyError
 }
 ```
 
+A shader entry point is the one function that cannot propagate an error this way.
+It is invoked by the pipeline rather than by other Slang code, so there is nowhere
+for an uncaught error to go, and declaring `throws` on an entry point is an error.
+An entry point that calls a throwing function must handle the error itself with
+`do`/`catch` rather than re-throwing it.
+
 To catch an error, you can use a `do-catch` statement:
 
 ```
