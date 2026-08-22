@@ -30656,7 +30656,7 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 /// @param N The vector size.
 __intrinsic_type($(kIROp_CoopVectorType))
 [require(cooperative_vector)]
-struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmetic
+struct CoopVec<T : ICoopElement, let N : int> : IArray<T>
 {
     //
     // Initialization
@@ -30676,14 +30676,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         this.fill(t);
     }
 
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    __init<U : __BuiltinArithmeticType>(CoopVec<U, N> other)
-    {
-        this.copyFrom(other);
-    }
-
     [OverloadRank(-10)]
     [ForceInline]
     [require(cooperative_vector)]
@@ -30701,33 +30693,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     //
     // Simple setters
     //
-
-    /// Copy values from another CoopVec instance into this one. The source CoopVec can have a different element type,
-    /// in which case appropriate type conversion will be performed.
-    /// @param other The source CoopVec to copy from.
-    [mutating]
-    [ForceInline]
-    [require(cooperative_vector)]
-    [require(optix_coopvec)]
-    void copyFrom<U : __BuiltinArithmeticType>(CoopVec<U,N> other)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 = $1";
-        case optix_coopvec:
-            __intrinsic_asm "optixCoopVecCvt<OptixCoopVec<$[0], $[1]>>(*($0))", T, N;
-        default:
-            if (__isFloat<T>() && __isInt<U>())
-                this = __int_to_float_cast<T>(other);
-            else if (__isInt<T>() && __isFloat<U>())
-                this = __float_to_int_cast<T>(other);
-            else if (__isFloat<T>() && __isFloat<U>())
-                this = __real_cast<T>(other);
-            else if (__isInt<T>() && __isInt<U>())
-                this = __int_cast<T>(other);
-        }
-    }
 
     /// Fill all elements of this CoopVec with the specified value.
     /// @param t The value to fill all elements with.
@@ -31117,6 +31082,136 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return ret;
     }
 
+    // These bodyless intrinsic-op hooks stay on the struct (rather than in the arithmetic
+    // extension) so both the `__BuiltinArithmeticType` `IArithmetic` extension and the
+    // `__BuiltinFloatingPointType` `IDifferentiableArithmetic` extension can reach them: generic
+    // core-module conformance checking resolves witnesses from the struct, but not from a sibling
+    // extension. They carry no body, so relaxing the struct bound to `ICoopElement` does not
+    // eager-check any arithmetic on `T`.
+    __intrinsic_op($(kIROp_Add))
+    This __pureAdd(This other);
+
+    __intrinsic_op($(kIROp_Sub))
+    This __pureSub(This other);
+
+    __intrinsic_op($(kIROp_Mul))
+    This __pureMul(This other);
+
+    __intrinsic_op($(kIROp_Div))
+    This __pureDiv(This other);
+
+    __intrinsic_op($(kIROp_Neg))
+    static This __pureNeg(This other);
+
+    //
+    // Internal utilities for loading and storing
+    //
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer)]
+    void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        }
+    }
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        }
+    }
+
+    __generic<let M : int>
+    [mutating]
+    // Careful, this takes the offset in elements
+    [ForceInline]
+    [require(hlsl)]
+    void __Load(__constref groupshared T buffer[M], uint elemOffset)
+    {
+        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
+        __target_switch
+        {
+        case hlsl:
+            [ForceUnroll]
+            for(int i = 0; i < N; ++i)
+                this[i] = buffer[i + elemOffset];
+            return;
+        }
+    }
+
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        }
+    }
+
+    __generic<let M : int>
+    [require(hlsl)]
+    // Careful, this takes the offset in elements
+    void __Store(__ref groupshared T buffer[M], uint elemOffset)
+    {
+        __target_switch
+        {
+        case hlsl: static_assert(false, "Not supported");
+        }
+    }
+
+}
+
+// The struct requires only `ICoopElement`; arithmetic, comparison, element-conversion, and
+// matrix-multiply operations need a builtin arithmetic element, so they live here and conform
+// `CoopVec` to `IArithmetic` only when `T : __BuiltinArithmeticType`. A non-arithmetic element
+// type (e.g. `BFloat16`) is a legal `CoopVec` element with no arithmetic surface declared.
+extension<T : __BuiltinArithmeticType, let N : int> CoopVec<T, N> : IArithmetic
+{
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    __init<U : __BuiltinArithmeticType>(CoopVec<U, N> other)
+    {
+        this.copyFrom(other);
+    }
+
+    /// Copy values from another CoopVec instance into this one. The source CoopVec can have a different element type,
+    /// in which case appropriate type conversion will be performed.
+    /// @param other The source CoopVec to copy from.
+    [mutating]
+    [ForceInline]
+    [require(cooperative_vector)]
+    [require(optix_coopvec)]
+    void copyFrom<U : __BuiltinArithmeticType>(CoopVec<U,N> other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 = $1";
+        case optix_coopvec:
+            __intrinsic_asm "optixCoopVecCvt<OptixCoopVec<$[0], $[1]>>(*($0))", T, N;
+        default:
+            if (__isFloat<T>() && __isInt<U>())
+                this = __int_to_float_cast<T>(other);
+            else if (__isInt<T>() && __isFloat<U>())
+                this = __float_to_int_cast<T>(other);
+            else if (__isFloat<T>() && __isFloat<U>())
+                this = __real_cast<T>(other);
+            else if (__isInt<T>() && __isInt<U>())
+                this = __int_cast<T>(other);
+        }
+    }
+
     //
     // IComparable
     //
@@ -31184,9 +31279,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Arithmetic
     //
 
-    __intrinsic_op($(kIROp_Add))
-    This __pureAdd(This other);
-
     [mutating]
     [ForceInline]
     [require(hlsl)]
@@ -31218,9 +31310,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
-    __intrinsic_op($(kIROp_Sub))
-    This __pureSub(This other);
-
     [mutating]
     [require(hlsl)]
     void __mutSub(This other)
@@ -31249,9 +31338,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
-    __intrinsic_op($(kIROp_Mul))
-    This __pureMul(This other);
-
     [mutating]
     [require(hlsl)]
     void __mutMul(This other)
@@ -31279,9 +31365,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         default: return __pureMul(other);
         }
     }
-
-    __intrinsic_op($(kIROp_Div))
-    This __pureDiv(This other);
 
     [mutating]
     [require(hlsl)]
@@ -31337,9 +31420,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         }
     }
 
-    __intrinsic_op($(kIROp_Neg))
-    static This __pureNeg(This other);
-
     /// Returns a new cooperative vector where each component has its sign negated.
     /// @return A new cooperative vector containing the negated values.
     //[ForceInline]
@@ -31387,72 +31467,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [mutating]
     [require(hlsl)]
     void __mutClamp(This minVal, This maxVal)
-    {
-        __target_switch
-        {
-        case hlsl: static_assert(false, "Not supported");
-        }
-    }
-
-    //
-    // Internal utilities for loading and storing
-    //
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer)]
-    void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
-        }
-    }
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
-        }
-    }
-
-    __generic<let M : int>
-    [mutating]
-    // Careful, this takes the offset in elements
-    [ForceInline]
-    [require(hlsl)]
-    void __Load(__constref groupshared T buffer[M], uint elemOffset)
-    {
-        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
-        __target_switch
-        {
-        case hlsl:
-            [ForceUnroll]
-            for(int i = 0; i < N; ++i)
-                this[i] = buffer[i + elemOffset];
-            return;
-        }
-    }
-
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    {
-        __target_switch
-        {
-        case hlsl: static_assert(false, "Not supported");
-        }
-    }
-
-    __generic<let M : int>
-    [require(hlsl)]
-    // Careful, this takes the offset in elements
-    void __Store(__ref groupshared T buffer[M], uint elemOffset)
     {
         __target_switch
         {
@@ -31768,12 +31782,19 @@ extension<T : __BuiltinFloatingPointType, let N : int> CoopVec<T, N>
     }
 }
 
-// These arithmetic witnesses copy the normal CoopVec target-switch implementations.
-// The specialization is only here to satisfy differentiable arithmetic requirements.
+// These witnesses re-implement the arithmetic and comparison surface for floating-point element
+// types so that `CoopVec<float-ish, N>` conforms to `IDifferentiableArithmetic`. The general
+// `IArithmetic` extension above also applies to floating-point `T`, but generic core-module
+// conformance checking cannot draw an inherited requirement's witness from a sibling extension, so
+// the comparison/`mod` members are duplicated here rather than reused. `[OverloadRank(1)]` makes
+// these the preferred match for a floating-point `T`, so a direct `add`/`equals`/etc. call is not
+// ambiguous against the general (rank-0) extension. The arithmetic methods additionally carry
+// `[Differentiable]` because `IDifferentiableArithmetic` requires the differentiable forms.
 __generic<T : __BuiltinFloatingPointType, let N : int>
 extension CoopVec<T, N> : IDifferentiableArithmetic
 {
     [Differentiable]
+    [OverloadRank(1)]
     [ForceInline]
     [require(cooperative_vector)]
     [require(optix_coopvec)]
@@ -31790,6 +31811,7 @@ extension CoopVec<T, N> : IDifferentiableArithmetic
     }
 
     [Differentiable]
+    [OverloadRank(1)]
     [ForceInline]
     [require(cooperative_vector)]
     [require(optix_coopvec)]
@@ -31806,6 +31828,7 @@ extension CoopVec<T, N> : IDifferentiableArithmetic
     }
 
     [Differentiable]
+    [OverloadRank(1)]
     [ForceInline]
     [require(cooperative_vector)]
     [require(optix_coopvec)]
@@ -31822,6 +31845,7 @@ extension CoopVec<T, N> : IDifferentiableArithmetic
     }
 
     [Differentiable]
+    [OverloadRank(1)]
     [ForceInline]
     [require(cooperative_vector)]
     This div(This other)
@@ -31835,6 +31859,7 @@ extension CoopVec<T, N> : IDifferentiableArithmetic
     }
 
     [Differentiable]
+    [OverloadRank(1)]
     [require(cooperative_vector)]
     This neg()
     {
@@ -31844,6 +31869,70 @@ extension CoopVec<T, N> : IDifferentiableArithmetic
             __intrinsic_asm "-$0";
         default: return __pureNeg(this);
         }
+    }
+
+    [OverloadRank(1)]
+    [ForceInline]
+    [require(cooperative_vector)]
+    This mod(This other)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "$0 % $1";
+        default:
+            This ret;
+            for(int i = 0; i < N; ++i)
+                ret[i] = this[i] % other[i];
+            return ret;
+        }
+    }
+
+    [OverloadRank(1)]
+    bool equals(This other)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    [OverloadRank(1)]
+    bool lessThan(This other)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    [OverloadRank(1)]
+    bool lessThanOrEquals(This other)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
@@ -32480,48 +32569,51 @@ extension RWByteAddressBuffer : IRWPhysicalBuffer
 // element type for structured buffers and groupshared arrays (and ByteAddressBuffers for consistency
 //
 
+// `coopVecLoad*` only requires `T : ICoopElement`: a load is parameterized by the element type and
+// performs no arithmetic, so it admits non-arithmetic elements such as `BFloat16`.
+
 /// Load values from a byte-addressable buffer into a cooperative vector.
 /// @param buffer The source buffer to load data from.
 /// @param byteOffset16ByteAligned The byte offset from the start of the buffer. Must be 16-byte aligned.
 /// @return A new cooperative vector containing the loaded values.
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : ICoopElement>(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : ICoopElement>(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : ICoopElement, L : IBufferDataLayout = DefaultDataLayout>(StructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType, L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : ICoopElement, L : IBufferDataLayout = DefaultDataLayout>(RWStructuredBuffer<T, L> buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(spirv, cooperative_vector)]
-CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoad<let N : int, T : ICoopElement>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
 
 [ForceInline]
 [require(spirv, cooperative_vector, vk_mem_model)]
-CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
+CoopVec<T, N> coopVecLoadCoherent<let N : int, T : ICoopElement>(T* buffer, int32_t byteOffset16ByteAligned = 0, constexpr MemoryScope memoryScope = MemoryScope::Device)
 {
     return CoopVec<T, N>.loadCoherent(buffer, byteOffset16ByteAligned, memoryScope);
 }
@@ -32529,7 +32621,7 @@ CoopVec<T, N> coopVecLoadCoherent<let N : int, T : __BuiltinArithmeticType>(T* b
 // Groupshared
 [ForceInline]
 [require(cooperative_vector)]
-CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
+CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : ICoopElement, let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(data, byteOffset16ByteAligned);
 }
