@@ -2,7 +2,7 @@
 // structures (the `kIROp_RaytracingAccelerationStructureType` leaf category),
 // which the other opaque-local tests do not exercise.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -entry main -stage raygeneration
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv -entry main -stage raygeneration
 
 RaytracingAccelerationStructure as0, as1;
 uniform bool useSecond;

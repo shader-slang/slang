@@ -22,10 +22,10 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int index = dispatchThreadID.x;
 
     // Only the first 4 elements will be 1
-    (index < 4) && assignFunc(index);
+    (void)((index < 4) && assignFunc(index));
 
     // Only the last 4 elements will be 1.
-    (index < 12) || assignFunc(index);
+    (void)((index < 12) || assignFunc(index));
 
     //CHK-COUNT-4: 1
     //CHK-COUNT-8: 0

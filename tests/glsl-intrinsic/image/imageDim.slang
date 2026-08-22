@@ -157,12 +157,12 @@ bool checkAllImageStore()
     loadCheck = loadCheck && load_image_cubeArray() == 0;
     imageStore(image_2dMultiSampleArray, ivec3(0), 1, vec4(0));
     loadCheck = loadCheck && load_image_2dMultiSampleArray() == 0;
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return loadCheck;
 }
 bool checkAllImageSamples()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageSamples(image_2dMultiSample) == 2
         && imageSamples(image_2dMultiSampleArray) == 2
@@ -170,7 +170,7 @@ bool checkAllImageSamples()
 }
 bool checkAllImageAtomicAdd()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicAdd(image_1d, 0, 0.0f) == 1
         && load_image_1d() == 1
@@ -198,7 +198,7 @@ bool checkAllImageAtomicAdd()
 }
 bool checkAllImageAtomicExchange()
 {
-    resetAllImageValues();
+    (void)resetAllImageValues();
     return true
         && imageAtomicExchange(image_1d, 0, 0.0f) == 1
         && load_image_1d() == 0

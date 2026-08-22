@@ -59,6 +59,15 @@ bool isUniformParameterType(Type* type);
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 bool isSlang202cOrLater(SemanticsVisitor* visitor);
 
+/// Where an expression appears, for the "check an expression that must have a proper type"
+/// routines. Distinct from `CoercionSite` (which is specific to coercing to a known target type);
+/// this records roles where we require a proper type but have no target to coerce to.
+enum class ExprCheckingRole
+{
+    General,
+    ExpressionStatement,
+};
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -3651,6 +3660,20 @@ public:
 
     Expr* CheckExpr(Expr* expr);
 
+    /// Does the checked `expr` name a type or namespace rather than denote a runtime value? True
+    /// for a `TypeType` (a bare `MyType;`, `RWStructuredBuffer;`, or `IDifferentiable;`), a
+    /// `GenericDeclRefType`, or a `NamespaceType` — none of which can reach IR lowering. Used to
+    /// reject such expressions where a value is required (case 3 of shader-slang/slang#12428).
+    bool isExprOfNonValueType(Expr* expr);
+
+    /// Fully check `expr` and enforce that its type is either a proper type or `void`.
+    ///
+    /// If checking leaves `expr` naming a type or namespace rather than a value (see
+    /// `isExprOfNonValueType`, e.g. a bare `MyType;` used as a statement), this diagnoses an error
+    /// (`type-name-used-as-expression-statement`) and rewrites `expr` to have an `ErrorType`, so
+    /// that downstream discarded-result checks naturally skip it via the usual cascading-error
+    /// avoidance. `role` records where the expression appears, for wording/diagnostic purposes.
+    Expr* checkExprOfProperOrVoidType(Expr* expr, ExprCheckingRole role);
 
     void compareMemoryQualifierOfParamToArgument(ParamDecl* paramIn, Expr* argIn);
     void _checkAliasedOutArguments(
@@ -4050,10 +4073,23 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt);
 
-    // If `expr` is the discarded result of a call to a `[NoDiscard]` function,
-    // emit an error. Used for any context where an expression's result is
-    // ignored (an expression statement, or a `for` loop's side-effect expression).
-    void maybeDiagnoseDiscardedNoDiscardResult(Expr* expr);
+    // Diagnose an expression-statement whose (parsed, pre-check) syntactic form is not one whose
+    // result is normally discarded on purpose. The allowed forms are an assignment (`=` or a
+    // compound `+=` etc.), a genuine call (including a cast), a prefix/postfix `++`/`--`, and an
+    // effect-only form (`spirv_asm { ... }`, `expand <expr>`); anything else (a bare variable, a
+    // bare member reference, a lambda, ...) is diagnosed. This is case (1) of
+    // shader-slang/slang#12428, and is purely syntactic, so it runs on the original AST before
+    // `CheckExpr` may rewrite node types, and is not suppressed by the type-based checks.
+    void diagnoseExpressionStatementForm(Expr* expr);
+
+    // If `expr`'s result is discarded and that is worth diagnosing, emit the appropriate warning or
+    // error. Always diagnoses a call to a `[NoDiscard]` function (an error). When
+    // `warnOnDiscardedValue` is true (an expression statement), also warns on a discarded
+    // non-`void` result (case (2) of shader-slang/slang#12428), skipping the carve-outs
+    // (assignment, `++`/`--`, a bare function reference, an error-typed or `void` result); when
+    // false (a `for` loop's side-effect expression, where discarding is expected) only the
+    // `[NoDiscard]` error applies.
+    void maybeDiagnoseDiscardedResult(Expr* expr, bool warnOnDiscardedValue);
 
     // Try to infer the max number of iterations the loop will run.
     void tryInferLoopMaxIterations(ForStmt* stmt);

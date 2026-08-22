@@ -36,7 +36,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
             { float3(0.9, 0.6, 0.4), 0.1 },
             { float3(0, 0, 0), 1.0 });
         DifferentialPair<Auto_Bwd_ScatterSample> dp_result;
-        __fwd_diff(bsdfGGXSample)(sd, dp_params, dp_result);
+        (void)__fwd_diff(bsdfGGXSample)(sd, dp_params, dp_result);
 
         outputBuffer[4] = dp_result.p.weight[0];
         outputBuffer[5] = dp_result.p.weight[1];

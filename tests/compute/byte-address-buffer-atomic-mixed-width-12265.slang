@@ -10,7 +10,7 @@ RWByteAddressBuffer buffer;
 // the 64-bit atomic; that must not leak `ulonglong` onto the 32-bit atomic in `computeMain`.
 void doMax(RWByteAddressBuffer uav)
 {
-    uav.InterlockedMaxU64(0, 5);
+    (void)uav.InterlockedMaxU64(0, 5);
 }
 
 [shader("compute")]
