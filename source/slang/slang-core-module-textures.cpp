@@ -269,8 +269,11 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             metal << "$q";
             const char* metalMipLevel = "0";
 
+            // CUDA inline assembly numbers all dimension outputs first, followed by the texture
+            // and mip-level inputs.
             StringBuilder cuda;
             cuda << "{";
+            const char* cudaTxqPrefix = includeMipInfo ? "txq.level." : "txq.";
 
             StringBuilder wgsl;
             wgsl << "$q{";
@@ -291,9 +294,11 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t width; asm(\\\"txq.width.b32 %0, [%1];\\\" : \\\"=r\\\"(width) : "
-                        "\\\"l\\\"($0)); *($"
-                     << String(paramCount) << ") = width;";
+                cuda << "uint32_t width; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%1]"
+                     << (includeMipInfo ? ", %2" : "")
+                     << ";\\\" : \\\"=r\\\"(width) : \\\"l\\\"($0)"
+                     << (includeMipInfo ? ", \\\"r\\\"($1)" : "") << "); *($" << String(paramCount)
+                     << ") = width;";
                 wgsl << "($" << String(paramCount) << ") = "
                      << wgslTextureAttributeConversion(
                             dimType,
@@ -309,9 +314,12 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t w, h; asm(\\\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
-                        "[%2];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h) : \\\"l\\\"($0)); *($"
-                     << String(paramCount) << ") = w;";
+                cuda << "uint32_t w, h; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%2]"
+                     << (includeMipInfo ? ", %3" : "") << "; " << cudaTxqPrefix
+                     << "height.b32 %1, [%2]" << (includeMipInfo ? ", %3" : "")
+                     << ";\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h) : \\\"l\\\"($0)"
+                     << (includeMipInfo ? ", \\\"r\\\"($1)" : "") << "); *($" << String(paramCount)
+                     << ") = w;";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "dim.x") << ";";
@@ -334,10 +342,13 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t w, h, d; asm(\\\"txq.width.b32 %0, [%3]; txq.height.b32 %1, "
-                        "[%3]; txq.depth.b32 %2, [%3];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h), "
-                        "\\\"=r\\\"(d) : \\\"l\\\"($0)); *($"
-                     << String(paramCount) << ") = w;";
+                cuda << "uint32_t w, h, d; asm(\\\"" << cudaTxqPrefix << "width.b32 %0, [%3]"
+                     << (includeMipInfo ? ", %4" : "") << "; " << cudaTxqPrefix
+                     << "height.b32 %1, [%3]" << (includeMipInfo ? ", %4" : "") << "; "
+                     << cudaTxqPrefix << "depth.b32 %2, [%3]" << (includeMipInfo ? ", %4" : "")
+                     << ";\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h), \\\"=r\\\"(d) : \\\"l\\\"($0)"
+                     << (includeMipInfo ? ", \\\"r\\\"($1)" : "") << "); *($" << String(paramCount)
+                     << ") = w;";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "dim.x") << ";";

@@ -16,7 +16,7 @@ Items with ^ means there is some discussion about support later in the document 
 | [u/int64_t Type](#int64_t)                           | No    | Yes ^     | Yes     | Yes            | Yes   | Yes       |
 | u/int64_t Intrinsics                                 | No    | No        | Yes     | Yes            | Yes   | Yes       |
 | [int matrix](#int-matrix)                            | Yes   | Yes       | No +    | Yes            | No    | Yes       |
-| [tex.GetDimensions](#tex-get-dimensions)             | Yes   | Yes       | Yes     | No             | Yes   | Yes       |
+| [tex.GetDimensions](#tex-get-dimensions)             | Yes   | Yes       | Yes     | Partial ^      | Yes   | Yes       |
 | [SM6.0 Wave Intrinsics](#sm6-wave)                   | No    | Yes       | Partial | Yes ^          | No    | No        |
 | SM6.0 Quad Intrinsics                                | No    | Yes       | No +    | No             | No    | No        |
 | [SM6.5 Wave Intrinsics](#sm6.5-wave)                 | No    | Yes ^     | No +    | Yes ^          | No    | No        |
@@ -86,7 +86,10 @@ Means can use matrix types containing integer types.
 
 ## tex.GetDimensions
 
-tex.GetDimensions is the GetDimensions method on 'texture' objects. This is not supported on CUDA as CUDA has no equivalent functionality to get these values. GetDimensions work on Buffer resource types on CUDA.
+tex.GetDimensions is the GetDimensions method on 'texture' objects. CUDA supports querying texture
+width, height, and depth, including at a specified mip level. Its array-size, mip-level-count, and
+sample-count output parameters are currently written as zero. GetDimensions works on Buffer
+resource types on CUDA.
 
 <a id="sm6-wave"></a>
 
