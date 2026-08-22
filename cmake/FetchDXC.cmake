@@ -98,13 +98,13 @@ function(_dxc_stage_hlsl_headers dxc_root dxc_origin)
     endif()
 
     set(_dxc_inc_src "${_dxc_hlsl_include_dir}/dx/linalg.h")
-    set(_dxc_inc_dst "${slang_BINARY_DIR}/dxc/include/dx/linalg.h")
+    set(_dxc_inc_dst "${CMAKE_BINARY_DIR}/dxc/include/dx/linalg.h")
     list(PREPEND _dxc_header_deps "${_dxc_inc_src}")
     add_custom_command(
         OUTPUT "${_dxc_inc_dst}"
         COMMAND
             ${CMAKE_COMMAND} -E copy_directory "${_dxc_hlsl_include_dir}"
-            "${slang_BINARY_DIR}/dxc/include"
+            "${CMAKE_BINARY_DIR}/dxc/include"
         DEPENDS ${_dxc_header_deps}
         VERBATIM
     )
