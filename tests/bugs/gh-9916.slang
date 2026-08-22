@@ -45,5 +45,9 @@ float4 fragmentMain(FragmentInput input) : SV_Target
 
 // CHECK_BINDLESS: OpCapability BindlessTextureNV
 // CHECK_BINDLESS: OpConstant %ulong 5
-// CHECK_BINDLESS: OpConvertUToSampledImageNV
+// A plain (non-combined) texture handle converts to an OpTypeImage via OpConvertUToImageNV, then is
+// paired with the converted sampler through OpSampledImage before sampling.
+// CHECK_BINDLESS: OpConvertUToImageNV
+// CHECK_BINDLESS: OpConvertUToSamplerNV
+// CHECK_BINDLESS: OpSampledImage
 // CHECK_BINDLESS: OpImageSampleImplicitLod
