@@ -59,6 +59,7 @@
 #include "slang-ir-glsl-liveness.h"
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-inline.h"
+#include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-late-require-capability.h"
 #include "slang-ir-layout.h"
@@ -1452,6 +1453,24 @@ Result linkAndOptimizeIR(
     }
     if (requiredLoweringPassSet.matrixSwizzleStore)
         SLANG_PASS(lowerMatrixSwizzleStores);
+
+    // After specialization, variables that were of unresolved IRSpecialize type (e.g. a local
+    // variable of a generic struct type) were skipped by the first insertDebugValueStore pass
+    // in slang-lower-to-ir.cpp because their types were not yet concrete. Now that
+    // specializeModule has run, those types are concrete and insertDebugValueStore can emit
+    // IRDebugVar + IRDebugValue for them. The function is idempotent via two complementary
+    // skip signals: IRVar locals skip if immediately preceded by an IRDebugVar (the invariant
+    // insertion point); params skip if a name-matched IRDebugVar with an argIndex already
+    // exists in the entry block, or if an IRDebugValue referencing the param directly exists
+    // (covering in-params whose name hints are absent). This call must be before
+    // eliminateDeadCode so the new debug stores protect the newly instrumented variables from
+    // being eliminated.
+    if (targetCompilerOptions.getDebugInfoLevel() >= DebugInfoLevel::Standard)
+    {
+        DebugValueStoreContext debugValueContext;
+        insertDebugValueStore(debugValueContext, irModule);
+    }
+
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(finalizeSpecialization);
