@@ -121,7 +121,6 @@ struct PathInfo
     {
         return PathInfo{Type::FromString, userPath, String()};
     }
-
     Type type;             ///< The type of path
     String foundPath;      ///< The path where the file was found (might contain relative elements)
     String uniqueIdentity; ///< The unique identity of the file on the path found
@@ -573,9 +572,78 @@ struct SourceManager
     // Initialize a source manager, with an optional parent
     void initialize(SourceManager* parent, ISlangFileSystemExt* fileSystemExt);
 
+    /// Maximum number of macro expansion levels the diagnostic system will traverse.
+    /// Both the chain walker in slang-diagnostic-sink.cpp and the loc unmapper in
+    /// slang-source-loc.cpp use this constant so the two limits stay in sync and the unmapper
+    /// never gives up before the diagnostic walker does.
+    static constexpr int kMaxMacroExpansionDepth = 1024;
+
     /// Allocate a range of SourceLoc locations, these can be used to identify a specific location
     /// in the source
     SourceRange allocateSourceRange(UInt size);
+
+    /// A lightweight record of one macro invocation. Stored in a flat side table on the
+    /// SourceManager so the diagnostic renderer can emit "expanded from macro 'X'" notes without
+    /// creating a SourceFile or SourceView per invocation. Entries are appended in allocation order
+    /// and sorted by range.begin (which is monotone from allocateSourceRange), enabling binary
+    /// search in findMacroExpansion.
+    struct MacroExpansionEntry
+    {
+        /// Per-invocation source range. Body tokens are remapped into this range so each
+        /// invocation's tokens are distinguishable from tokens of other invocations of the same
+        /// macro.
+        SourceRange range;
+        String macroName;      ///< Macro name, for "expanded from macro 'X'" note.
+        SourceLoc callSiteLoc; ///< Where this macro was invoked (may itself be in an outer range).
+        /// Original loc of the first body token in the macro definition file. Used to recover the
+        /// pre-remap definition-file loc from a remapped per-invocation loc:
+        ///   originalLoc = originalBodyBeginLoc + (remappedLoc - range.begin)
+        SourceLoc originalBodyBeginLoc;
+    };
+
+    /// Register one macro invocation for diagnostic backtracing.
+    ///
+    /// The preprocessor calls this once per invocation (when body tracking is enabled). It
+    /// allocates a per-invocation source range of bodyRangeSize bytes, records the macro name and
+    /// call-site location alongside it, and returns the allocated range. The preprocessor then
+    /// remaps body-token locs into this range so the diagnostic renderer can later look up which
+    /// invocation each token came from and walk the call-site chain.
+    ///
+    /// bodyRangeSize must equal `lastBodyTokenLoc - firstBodyTokenLoc + 1`.
+    SourceRange registerMacroExpansion(
+        const String& macroName,
+        SourceLoc callSiteLoc,
+        SourceLoc originalBodyBeginLoc,
+        UInt bodyRangeSize);
+
+    /// Return the MacroExpansionEntry whose range contains loc, searching this manager and its
+    /// parents. Returns nullptr if loc does not fall in any registered expansion range.
+    ///
+    /// Requires: entries in m_macroExpansions are sorted by range.begin (monotone from
+    /// allocateSourceRange guarantees this under normal use).
+    const MacroExpansionEntry* findMacroExpansion(SourceLoc loc) const;
+
+    /// Return the SourceView that covers the definition-file position for `loc`, resolving
+    /// through any macro expansion remapping. On return, `loc` is updated in-place to the
+    /// resolved definition-file location.
+    ///
+    /// Call this function whenever `loc` may have originated inside a macro body — for example
+    /// when it is a diagnostic primary span, a note span, an IR instruction's source loc, or
+    /// any loc that may have been produced during macro expansion. Locs in those contexts may
+    /// refer to a per-invocation tracking range that has no direct SourceView; this function
+    /// maps such a loc back to its origin in the macro definition file and returns the SourceView
+    /// for that location.
+    ///
+    /// Use findSourceViewRecursively instead when the loc is guaranteed to be a standard
+    /// non-expansion loc (e.g. a loc read directly from an include-chain SourceView, or
+    /// an IR loc that predates macro expansion tracking).
+    ///
+    /// Returns nullptr when the loc cannot be resolved to any SourceView. When nullptr is
+    /// returned, loc holds the deepest definition-file loc that was reached. Callers that only
+    /// need the loc value (e.g. to build a diagnostic note span) may use it safely; callers
+    /// that need to read source content via a SourceView should treat a nullptr return as
+    /// "no displayable source context."
+    SourceView* findSourceViewThroughExpansion(SourceLoc& loc) const;
 
     /// Returns the loc for start of next allocation
     SourceLoc getNextRangeStart() const { return m_nextLoc; }
@@ -585,7 +653,12 @@ struct SourceManager
     SourceFile* createSourceFileWithString(const PathInfo& pathInfo, const String& contents);
     SourceFile* createSourceFileWithBlob(const PathInfo& pathInfo, ISlangBlob* blob);
 
-    /// Get the humane source location
+    /// Get the humane source location for `loc`.
+    ///
+    /// If `loc` is a per-invocation macro-expansion-range loc (produced by
+    /// _maybeRemapBodyTokenLoc in the preprocessor), it is transparently unmapped
+    /// to the original definition-file position before the line/column is computed.
+    /// Callers do not need to pre-process the loc; this method handles all cases.
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
     /// Get the path associated with a location
@@ -689,6 +762,11 @@ protected:
     List<SourceView*> m_sourceViews;
     // All of the SourceFiles constructed on this SourceManager. This owns the SourceFile.
     List<SourceFile*> m_sourceFiles;
+
+    // Side table of macro expansion entries, ordered by range.begin (monotonically increasing
+    // because entries come from allocateSourceRange). Used by the diagnostic renderer to emit
+    // "expanded from macro 'X'" notes without growing m_sourceViews.
+    List<MacroExpansionEntry> m_macroExpansions;
 
     StringSlicePool m_slicePool;
 

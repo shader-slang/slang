@@ -779,6 +779,30 @@ private:
     /// nested macro invocations might be in flight.
     SourceLoc m_initiatingMacroInvocationLoc;
 
+    /// Per-invocation source range allocated in the SourceManager side table. Body tokens are
+    /// remapped into this range so the diagnostic renderer can identify which invocation each token
+    /// came from. begin.isValid() iff this invocation is being tracked for diagnostic backtrace.
+    SourceRange m_expansionRange;
+
+    /// The [begin, end] span of locs from the macro body in the definition file. Used as the gate
+    /// and offset base in _remapBodyLoc: only tokens whose original loc falls in this range are
+    /// remapped into m_expansionRange. Tokens from argument substitution or token-paste already
+    /// carry their own locs and are left unchanged.
+    ///
+    /// Note: m_bodyTokenRange.end is the loc of the *last* body token (inclusive), not one past
+    /// it. bodyRangeSize = end - begin + 1 accounts for this when allocating m_expansionRange.
+    SourceRange m_bodyTokenRange;
+
+    /// Remap loc from the macro body definition file into m_expansionRange so the diagnostic
+    /// renderer can walk the side table back to this invocation's call site. Returns loc unchanged
+    /// if it does not fall within m_bodyTokenRange or if tracking is disabled.
+    SourceLoc _remapBodyLoc(SourceLoc loc) const;
+
+    /// If token.loc falls within m_bodyTokenRange, remap it via _remapBodyLoc. Called for each
+    /// body token as it is replayed; argument-substitution and token-paste tokens are unaffected
+    /// because their locs are already outside m_bodyTokenRange.
+    void _maybeRemapBodyTokenLoc(Token& token) const;
+
     /// One token of lookahead
     Token m_lookaheadToken;
 
@@ -1483,6 +1507,96 @@ MacroInvocation::MacroInvocation(
     m_macroInvocationLoc = macroInvocationLoc;
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
     m_isStartOfLine = isStartOfLine;
+
+    // Register this invocation in the SourceManager side table so the diagnostic renderer can emit
+    // "expanded from macro 'X'" notes.
+    //
+    // We skip two cases where tracking is not useful:
+    //   - Builtins: their body tokens have invalid locs (no definition file), so there is nothing
+    //     meaningful to point back to.
+    //   - Empty macros and macros whose first token has an invalid loc: the macro body contains
+    //     only the EndOfFile sentinel (HandleDefineDirective always appends one), and its loc is
+    //     checked by the `if (originalBodyBeginLoc.isValid())` guard below. If the sentinel loc
+    //     is invalid (as for a truly empty or builtin-injected macro), we skip registration.
+    if (macro->tokens.m_tokens.getCount() > 0 && macroInvocationLoc.isValid())
+    {
+        // m_tokens[0] is the first body token (HandleDefineDirective appends the EndOfFile
+        // sentinel *after* all body tokens, so token 0 is never the sentinel unless the macro
+        // is truly empty). The source-location allocator is monotone — each new token gets a
+        // strictly higher raw loc than all previous tokens in the same source file — so token 0
+        // has the lowest loc among all body tokens. The SLANG_ASSERT inside the scan loop below
+        // verifies this assumption for every body token at runtime.
+        SourceLoc originalBodyBeginLoc = macro->tokens.m_tokens[0].loc;
+        if (originalBodyBeginLoc.isValid())
+        {
+            // Scan body tokens to find the span [originalBodyBeginLoc, bodyEnd] in the
+            // definition file.
+            //
+            // Invariant: all body-token locs come from a single #define in one source file,
+            // so they all lie in the same monotone region with locs >= originalBodyBeginLoc.
+            // This means the UInt subtraction (bodyEnd - originalBodyBeginLoc) never wraps
+            // and the arithmetic below is safe.
+            //
+            // bodyEnd is the START loc of the last token (not the end of its text). That is
+            // sufficient because diagnostic locs always anchor on token-start positions (the
+            // lexer stores the start of each token, never a mid-token interior loc), so a
+            // range that covers every token-start loc covers every diagnostic position.
+            //
+            // bodyRangeSize = (bodyEnd - originalBodyBeginLoc) + 1, where the +1 ensures the
+            // range is inclusive: a single-token body has size 1, not 0.
+            SourceLoc bodyEnd = originalBodyBeginLoc;
+            for (const Token& t : macro->tokens.m_tokens)
+            {
+                if (t.type != TokenType::EndOfFile && t.loc.isValid())
+                {
+                    // Assert the monotone ordering: every body token must have
+                    // loc >= originalBodyBeginLoc (the first token's loc). This guards
+                    // the body-range arithmetic below, where subtracting
+                    // originalBodyBeginLoc from an arbitrary token loc must not wrap.
+                    SLANG_ASSERT(t.loc >= originalBodyBeginLoc);
+                    if (t.loc > bodyEnd)
+                        bodyEnd = t.loc;
+                }
+            }
+            m_bodyTokenRange = SourceRange{originalBodyBeginLoc, bodyEnd};
+
+            UInt bodyRangeSize = bodyEnd.getRaw() - originalBodyBeginLoc.getRaw() + 1;
+            SourceManager* sm = preprocessor->getSourceManager();
+            m_expansionRange = sm->registerMacroExpansion(
+                macro->getName()->text,
+                macroInvocationLoc,
+                originalBodyBeginLoc,
+                bodyRangeSize);
+        }
+    }
+}
+
+// Remap the loc of a body token in-place, for use when emitting ordinary body tokens
+// through the expansion stream. See _remapBodyLoc for the pure query version, which
+// is called directly for the ## paste operator loc (where we need the remapped loc
+// without mutating the operator token itself).
+void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
+{
+    token.loc = _remapBodyLoc(token.loc);
+}
+
+SourceLoc MacroInvocation::_remapBodyLoc(SourceLoc loc) const
+{
+    if (m_expansionRange.begin.isValid() && m_bodyTokenRange.contains(loc))
+    {
+        SourceLoc result = SourceLoc::fromRaw(
+            m_expansionRange.begin.getRaw() + (loc.getRaw() - m_bodyTokenRange.begin.getRaw()));
+        // Idempotency: the result must land in m_expansionRange, not m_bodyTokenRange.
+        // This is guaranteed by construction because allocateSourceRange is the single
+        // monotone allocator for all SourceLoc ranges — expansion ranges and body ranges
+        // are pairwise disjoint. If a token loc were ever double-remapped, the second
+        // call's m_bodyTokenRange.contains check would fail (the remapped loc is outside
+        // the body range) and the loc would be returned unchanged. The assert below
+        // verifies the first-remap invariant: the result is inside the expansion range.
+        SLANG_ASSERT(m_expansionRange.contains(result));
+        return result;
+    }
+    return loc;
 }
 
 void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
@@ -2011,6 +2125,7 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            _maybeRemapBodyTokenLoc(token);
             return token;
         }
 
@@ -2041,6 +2156,7 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            _maybeRemapBodyTokenLoc(token);
             return token;
         }
 
@@ -2105,7 +2221,11 @@ Token MacroInvocation::_readTokenImpl()
                 // The more complicated case is a token paste (`##`).
                 //
                 Index tokenPasteTokenIndex = nextOp.index0;
-                SourceLoc tokenPasteLoc = m_macro->tokens.m_tokens[tokenPasteTokenIndex].loc;
+                // Remap the ## operator's loc into the expansion view so the TokenPaste
+                // SourceView's m_initiatingSourceLoc lands inside the MacroExpansion view,
+                // keeping the full diagnostic chain intact for mixed paste/expansion stacks.
+                SourceLoc tokenPasteLoc =
+                    _remapBodyLoc(m_macro->tokens.m_tokens[tokenPasteTokenIndex].loc);
 
                 // A `##` must always appear between two macro ops (whether literal tokens
                 // or macro parameters) and it is supposed to paste together the last

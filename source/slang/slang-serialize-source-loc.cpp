@@ -50,7 +50,15 @@ SerialSourceLocData::SourceLoc SerialSourceLocWriter::addSourceLoc(SourceLoc sou
     SourceView* sourceView = m_sourceManager->findSourceView(sourceLoc);
     if (!sourceView)
     {
-        // If not found we just ingore
+        // If not found we just ignore.
+        // Note: macro-body expansion-range locs have no SourceView; they are intentionally
+        // discarded here because the container round-trip checker (slang-serialize-container.cpp,
+        // see the assertion in checkIRSerializeDecorationsRoundtrip) verifies locs using
+        // findSourceView on the *original* IR inst's loc, which would still be an expansion-range
+        // loc. If we serialized the unmapped loc here but the checker used the original loc, the
+        // two would not agree and the assertion would fire.
+        // Updating the serializer to produce the unmapped loc therefore requires a corresponding
+        // update to the checker — that is a separate, larger refactor.
         return SerialSourceLocData::SourceLoc(0);
     }
 
