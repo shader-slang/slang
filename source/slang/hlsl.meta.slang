@@ -19532,15 +19532,16 @@ __magic_type(RaytracingAccelerationStructureType)
 __intrinsic_type($(kIROp_RaytracingAccelerationStructureType))
 struct RaytracingAccelerationStructure
 {
-    // Here, we don't require 'raytracing' capability, instead, we add the
-    // extension directly in the generated code. The reason is that this
-    // struct is used in both raytracing and rayquery APIs, our current capability
-    // system cannot represent this struct with raytracing OR rayquery capability.
-    // So, we cannot add capability requirement on the struct itself.
-    // However, any use of this type will definitely require either raytracing or rayquery,
-    // so we have the guarantee that either raytracing or rayquery capability will be present.
-    // But if rayquery want to use this struct that is constructed from a descriptor handle,
-    // we need to make sure the raytracing extension is present.
+    // This struct is shared by the raytracing and rayquery APIs. The capability
+    // system cannot express "raytracing OR rayquery", so the struct carries no
+    // capability requirement of its own; any use of the type is guaranteed to pull
+    // in one of the two. The SPIR-V type-emit for RaytracingAccelerationStructureType
+    // registers the extension through the "any" mechanism
+    // (SPV_KHR_ray_tracing | SPV_KHR_ray_query) and resolves it to whichever ray
+    // capability is actually in effect. The uint64_t constructor below therefore must
+    // not declare an extension itself: hard-coding SPV_KHR_ray_tracing would leak it
+    // into ray-query-only modules that carry no RayTracingKHR capability, producing
+    // invalid SPIR-V (VUID-VkShaderModuleCreateInfo-pCode-08742).
     __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl_spirv)]
     [__readNone]
@@ -19550,7 +19551,6 @@ struct RaytracingAccelerationStructure
         {
         case spirv:
             return spirv_asm {
-                OpExtension "SPV_KHR_ray_tracing";
                 result: $$RaytracingAccelerationStructure = OpConvertUToAccelerationStructureKHR $address;
             };
         case glsl:
