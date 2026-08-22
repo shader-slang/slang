@@ -4934,10 +4934,10 @@ attribute_syntax [RemovedSince(languageVersion: int, message: String)] : Removed
 enum SideEffectBehavior
 {
     /// Causes a warning if the method is detected to have side-effects
-    Warn = 0,
+    Warn = $((int)SideEffectBehavior::Warn),
 
     /// Suppresses the warning
-    Allow = 1
+    Allow = $((int)SideEffectBehavior::Allow)
 };
 
 /// Mark a differentiable function to prefer recomputation over checkpointing when a value computed in the primal pass is needed
