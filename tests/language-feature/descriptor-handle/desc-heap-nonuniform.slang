@@ -5,11 +5,11 @@
 // emitted code still marks the heap index non-uniform regardless of opt-pass ordering.
 //
 // The property is asserted on the HLSL backend, where `NonUniformResourceIndex` is the SM6.6
-// surface form and its survival is directly observable. A SPIR-V `NonUniform` decoration on
-// descriptor-heap access is orthogonal to this PR: the equivalent pre-existing
-// `DescriptorHandle<T>(uint2(NonUniformResourceIndex(i), 0))` construction emits no `NonUniform`
-// decoration either (verified with and without `spvDescriptorHeapEXT`), so the untyped-handle
-// path has nothing to preserve or regress on that target.
+// surface form and its survival is directly observable. The SPIR-V `NonUniform` decoration on
+// descriptor-heap access is orthogonal to this PR and covered separately: shader-slang/slang#12110
+// makes the default (no `spvDescriptorHeapEXT`) SPIR-V heap lowering carry `NonUniform`, and
+// `desc-heap-nonuniform-spirv.slang` pins that behavior (including that the `spvDescriptorHeapEXT`
+// path stays undecorated, since it is non-uniform by default).
 
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -profile cs_6_6
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry computeMain -profile cs_6_6
