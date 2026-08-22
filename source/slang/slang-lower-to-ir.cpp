@@ -11014,19 +11014,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                     auto concreteType = irWitnessTable->getConcreteType();
 
-                    irSatisfyingWitnessTable =
-                        witnessBuilder->createWitnessTable(irWitnessTableBaseType, concreteType);
+                    // The mangled name is both the sub-witness-table's export name and its identity
+                    // operand, which distinguishes conformances that share the same interface and
+                    // concrete type.
+                    auto mangledName = getMangledNameForConformanceWitness(
+                        witnessContext->astBuilder,
+                        astReqWitnessTable->witnessedType,
+                        astReqWitnessTable->baseType,
+                        concreteType->getOp());
+
+                    irSatisfyingWitnessTable = witnessBuilder->createWitnessTable(
+                        irWitnessTableBaseType,
+                        concreteType,
+                        witnessBuilder->getStringValue(mangledName.getUnownedSlice()));
                     (*witnessTableMap)[astReqWitnessTable] = irSatisfyingWitnessTable;
 
                     // Avoid adding same decorations and child more than once.
                     if (!irSatisfyingWitnessTable->hasDecorationOrChild())
                     {
-                        auto mangledName = getMangledNameForConformanceWitness(
-                            witnessContext->astBuilder,
-                            astReqWitnessTable->witnessedType,
-                            astReqWitnessTable->baseType,
-                            concreteType->getOp());
-
                         witnessBuilder->addExportDecoration(
                             irSatisfyingWitnessTable,
                             mangledName.getUnownedSlice());
@@ -11393,10 +11398,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (subTypeIsCallable)
             context->setGlobalValue(inheritanceDecl, recursionPlaceholder);
 
+        // The conformance's canonical mangled name is the witness table's linkage name and also,
+        // for the non-synthesized case, its identity operand, which distinguishes conformances that
+        // share the same interface and concrete type.
+        String mangledName;
+        if (isGenericExtension)
+            mangledName =
+                getMangledNameForConformanceWitness(context->astBuilder, parentDecl, superType);
+        else
+            mangledName =
+                getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
+
         // Create the IR-level witness table
         IRInst* irWitnessTable;
         if (!inheritanceDecl->findModifier<SynthesizedModifier>())
-            irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+            irWitnessTable = subBuilder->createWitnessTable(
+                irWitnessTableBaseType,
+                irSubType,
+                subBuilder->getStringValue(mangledName.getUnownedSlice()));
         else
         {
             // Lower a synthesized inheritance declaration.
@@ -11434,20 +11453,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Avoid adding same decorations and child more than once.
         if (!irWitnessTable->hasDecorationOrChild())
         {
-            // Construct the mangled name for the witness table, which depends
-            // on the type that is conforming, and the type that it conforms to.
-            String mangledName;
-            if (isGenericExtension)
-            {
-                mangledName =
-                    getMangledNameForConformanceWitness(context->astBuilder, parentDecl, superType);
-            }
-            else
-            {
-                mangledName =
-                    getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
-            }
-
             // TODO(JS):
             // Should the mangled name take part in obfuscation if enabled?
 

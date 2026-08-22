@@ -2337,6 +2337,13 @@ struct IRWitnessTable : IRInst
     }
 
     IRType* getConcreteType() { return (IRType*)getOperand(0); }
+
+    /// The source-conformance identity of this witness table (an `IRStringLit` of the conformance
+    /// mangled name), or null if none was recorded. It participates in `IRInstKey` so two distinct
+    /// conformances that share the same (interface, concrete type) — as happens once enum lowering
+    /// erases an enum to its tag type — are not de-duplicated onto one node. Synthetic tables
+    /// record no identity and keep the `(interface, concreteType)` canonicalization.
+    IRInst* getConformanceIdentity() { return getOperandCount() > 1 ? getOperand(1) : nullptr; }
 };
 
 /// Represents an RTTI object.
@@ -4062,7 +4069,12 @@ $(type_info.return_type) $(type_info.method_name)(
     /// Creates an IRWitnessTable value.
     /// @param baseType: The comformant-to type of this witness.
     /// @param subType: The type that is doing the conforming.
-    IRWitnessTable* createWitnessTable(IRType* baseType, IRType* subType);
+    /// @param conformanceIdentity: Optional identity operand distinguishing this conformance from
+    ///        another of the same (interface, subType); see IRWitnessTable::getConformanceIdentity.
+    IRWitnessTable* createWitnessTable(
+        IRType* baseType,
+        IRType* subType,
+        IRInst* conformanceIdentity = nullptr);
     IRWitnessTableEntry* createWitnessTableEntry(
         IRWitnessTable* witnessTable,
         IRInst* requirementKey,
