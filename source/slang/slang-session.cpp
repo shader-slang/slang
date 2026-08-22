@@ -190,6 +190,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    installDiagnosticCallback(sink);
 
     if (isInLanguageServer())
     {
@@ -235,6 +236,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    installDiagnosticCallback(sink);
 
     if (isInLanguageServer())
     {
@@ -404,6 +406,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    installDiagnosticCallback(sink);
 
     // Attempting to create a "composite" of just one component type should
     // just return the component type itself, to avoid redundant work.
@@ -464,6 +467,7 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     }
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    installDiagnosticCallback(sink);
     try
     {
         auto specializedType =
@@ -849,8 +853,9 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentTy
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
     RefPtr<TypeConformance> result;
-    DiagnosticSink sink;
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+    installDiagnosticCallback(sink);
 
     try
     {
@@ -894,6 +899,80 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::getLoadedModule(SlangInt ind
     if (index >= 0 && index < loadedModulesList.getCount())
         return loadedModulesList[index].get();
     return nullptr;
+}
+
+SLANG_NO_THROW void SLANG_MCALL
+Linkage::setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData)
+{
+    m_diagnosticCallback = callback;
+    m_diagnosticCallbackData = userData;
+}
+
+// Static thunk: converts GenericDiagnostic + SourceManager* into SlangStructuredDiagnostic
+// and forwards it to the user-supplied callback stored on the Linkage.
+/* static */
+void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* sm, void* userData)
+{
+    auto* linkage = static_cast<Linkage*>(userData);
+    if (!linkage->m_diagnosticCallback)
+        return;
+
+    // Resolve the primary span location.
+    HumaneSourceLoc primaryBegin = (sm && diag.primarySpan.range.begin.isValid())
+                                       ? sm->getHumaneLoc(diag.primarySpan.range.begin)
+                                       : HumaneSourceLoc{};
+    HumaneSourceLoc primaryEnd = (sm && diag.primarySpan.range.end.isValid())
+                                     ? sm->getHumaneLoc(diag.primarySpan.range.end)
+                                     : HumaneSourceLoc{};
+
+    SlangDiagnosticSpan primarySpan = {};
+    primarySpan.filename = primaryBegin.pathInfo.foundPath.getBuffer();
+    primarySpan.startLine = (uint32_t)primaryBegin.line;
+    primarySpan.startCol = (uint32_t)primaryBegin.column;
+    primarySpan.endLine = (uint32_t)primaryEnd.line;
+    primarySpan.endCol = (uint32_t)primaryEnd.column;
+    primarySpan.message = diag.primarySpan.message.getBuffer();
+
+    // Resolve secondary spans.  Keep HumaneSourceLoc objects alive so that
+    // pathInfo.foundPath.getBuffer() pointers remain valid while we build the array.
+    // reserve() ensures no reallocation occurs during the loop, which would invalidate
+    // the getBuffer() pointers taken from earlier elements of secBeginLocs.
+    List<HumaneSourceLoc> secBeginLocs;
+    List<SlangDiagnosticSpan> secSpans;
+    secBeginLocs.reserve(diag.secondarySpans.getCount());
+    secSpans.reserve(diag.secondarySpans.getCount());
+    for (const DiagnosticSpan& sec : diag.secondarySpans)
+    {
+        HumaneSourceLoc b = (sm && sec.range.begin.isValid()) ? sm->getHumaneLoc(sec.range.begin)
+                                                              : HumaneSourceLoc{};
+        HumaneSourceLoc e =
+            (sm && sec.range.end.isValid()) ? sm->getHumaneLoc(sec.range.end) : HumaneSourceLoc{};
+        secBeginLocs.add(b);
+        SlangDiagnosticSpan s = {};
+        s.filename = secBeginLocs.getLast().pathInfo.foundPath.getBuffer();
+        s.startLine = (uint32_t)b.line;
+        s.startCol = (uint32_t)b.column;
+        s.endLine = (uint32_t)e.line;
+        s.endCol = (uint32_t)e.column;
+        s.message = sec.message.getBuffer();
+        secSpans.add(s);
+    }
+
+    SlangStructuredDiagnostic pub = {};
+    pub.severity = (SlangSeverity)diag.severity;
+    pub.code = diag.code;
+    pub.message = diag.message.getBuffer();
+    pub.primarySpan = primarySpan;
+    pub.secondarySpans = secSpans.getCount() > 0 ? secSpans.getBuffer() : nullptr;
+    pub.secondarySpanCount = (uint32_t)secSpans.getCount();
+
+    linkage->m_diagnosticCallback(&pub, linkage->m_diagnosticCallbackData);
+}
+
+void Linkage::installDiagnosticCallback(DiagnosticSink& sink) const
+{
+    if (m_diagnosticCallback)
+        sink.setRichCallback(richDiagnosticThunk, const_cast<Linkage*>(this));
 }
 
 void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)

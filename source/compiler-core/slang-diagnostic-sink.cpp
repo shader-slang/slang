@@ -652,6 +652,11 @@ bool DiagnosticSink::diagnoseRichImpl(
     GenericDiagnostic effectiveDiagnostic = diagnostic;
     effectiveDiagnostic.severity = effectiveSeverity;
 
+    if (m_richCallback)
+    {
+        m_richCallback(effectiveDiagnostic, sourceManager, m_richCallbackData);
+    }
+
     if (effectiveSeverity >= Severity::Error)
     {
         m_errorCount++;

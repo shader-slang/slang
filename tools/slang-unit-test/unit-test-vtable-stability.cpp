@@ -1684,6 +1684,11 @@ struct ISessionProbe : ISession
         lastSlot = 23;
         return SLANG_OK;
     }
+    SLANG_NO_THROW void SLANG_MCALL setDiagnosticCallback(SlangRichDiagnosticCallback, void*)
+        SLANG_OVERRIDE
+    {
+        lastSlot = 24;
+    }
 };
 
 SLANG_UNIT_TEST(vtableISession)
@@ -1699,6 +1704,8 @@ SLANG_UNIT_TEST(vtableISession)
     SLANG_CHECK(p.lastSlot == 17); // getLoadedModuleCount
     callSlot(&p, 23);
     SLANG_CHECK(p.lastSlot == 23); // getDeclSourceLocation
+    callSlot(&p, 24);
+    SLANG_CHECK(p.lastSlot == 24); // setDiagnosticCallback
 }
 
 // ---------------------------------------------------------------------------
