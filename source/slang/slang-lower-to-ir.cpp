@@ -6000,8 +6000,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
 
         NaturalSize size{0, NaturalSize::kInvalidAlignment};
-        if (!sizeOfLikeExpr->dataLayoutType ||
-            as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
+        // `countof` asks for an element count, which is unrelated to the byte
+        // size/alignment that `NaturalSize` computes, so it must never take the
+        // `calcSize` shortcut: for `countof(int[5])` that shortcut would fold to
+        // `size.alignment` (4) below instead of the element count (5). Always
+        // emit `kIROp_CountOf` and let `maybeSpecializeCountOf` fold it.
+        if (!as<CountOfExpr>(sizeOfLikeExpr) &&
+            (!sizeOfLikeExpr->dataLayoutType ||
+             as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType)))
         {
             // The layout should be the scalar data layout, so lets try and
             // lower to a constant already.
