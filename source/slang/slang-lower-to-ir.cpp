@@ -5150,7 +5150,7 @@ struct ExprLoweringContext
         InvokeExpr* expr,
         Index argIndex,
         ParamPassingMode actualParamPassingMode,
-        DeclRef<ParamDecl> paramDeclRef,
+        DeclRef<ParamDecl> defaultArgParamDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
@@ -5167,17 +5167,16 @@ struct ExprLoweringContext
             // that these parameters have default argument expressions
             // associated with them.
             //
-            // Currently we simply extract the initial-value expression
-            // from the parameter declaration and then lower it in
-            // the context of the caller.
+            // We extract the initial-value expression from the parameter declaration and lower it
+            // in the caller's context. The expression may carry substitutions — generic arguments
+            // that specialize the callee, or the this-type/witness for an interface requirement's
+            // default — which `_lowerSubstitutionEnv` below installs before it is lowered.
             //
-            // Note that the expression could involve subsitutions because
-            // in the general case it could depend on the generic parameters
-            // used the specialize the callee. For now we do not handle that
-            // case, and simply ignore generic arguments.
-            //
-            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), paramDeclRef);
-            SLANG_ASSERT(argExpr);
+            // Reaching here means the call omitted this argument, which the front-end permits only
+            // for a defaulted parameter, so a missing default is out-of-contract input: fail loudly
+            // in every configuration rather than dereferencing null.
+            SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), defaultArgParamDeclRef);
+            SLANG_RELEASE_ASSERT(argExpr);
 
             IRGenEnv subEnvStorage;
             IRGenEnv* subEnv = &subEnvStorage;
@@ -5212,8 +5211,6 @@ struct ExprLoweringContext
             //
             // Each of these options involves trade-offs, and we need to
             // make a conscious decision at some point.
-
-            // Assert that such an expression must have been present.
         }
     }
 
@@ -5236,9 +5233,27 @@ struct ExprLoweringContext
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<CallableDecl> funcDeclRef,
+        DeclRef<Decl> defaultArgSourceDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
+        // `defaultArgSourceDeclRef` is the callee overload resolution selected, before `resolve()`
+        // collapses an interface requirement-witness `LookupDeclRef` to the concrete satisfying
+        // method. It is the source for every omitted argument's default, because a default lives on
+        // the declaration that declared it and carries the conformance witness a `This`-dependent
+        // default needs: for an interface-typed call that is the requirement, whose defaults form
+        // the contract the call type-checked against; for an ordinary call it equals `funcDeclRef`,
+        // so the implementation's own default is used. A satisfying method matches the
+        // requirement's parameter list (order and types) for the conformance to have type-checked,
+        // so requirement parameter i is the default source for resolved parameter i; the `argIndex`
+        // bound below keeps the positional access in range regardless.
+        List<DeclRef<ParamDecl>> defaultSourceParams;
+        if (auto defaultSourceCallable = defaultArgSourceDeclRef.as<CallableDecl>())
+        {
+            for (auto p : getMembersOfType<ParamDecl>(getASTBuilder(), defaultSourceCallable))
+                defaultSourceParams.add(p);
+        }
+
         Count argCounter = 0;
         for (auto paramDeclRef : getMembersOfType<ParamDecl>(getASTBuilder(), funcDeclRef))
         {
@@ -5246,25 +5261,26 @@ struct ExprLoweringContext
             auto paramDirection = getParamPassingMode(paramDecl);
 
             Index argIndex = argCounter++;
-            addDirectCallArgs(expr, argIndex, paramDirection, paramDeclRef, ioArgs, ioFixups);
-        }
-    }
 
-    // Add arguments that appeared directly in an argument list
-    // to the list of argument values for a call.
-    void addDirectCallArgs(
-        InvokeExpr* expr,
-        DeclRef<Decl> funcDeclRef,
-        List<IRInst*>* ioArgs,
-        List<OutArgumentFixup>* ioFixups)
-    {
-        if (auto callableDeclRef = funcDeclRef.as<CallableDecl>())
-        {
-            addDirectCallArgs(expr, callableDeclRef, ioArgs, ioFixups);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("callee was not a callable decl");
+            // Take the default from the positionally-corresponding source parameter when it has
+            // one, falling back to this parameter otherwise (the source list can be shorter for a
+            // partial match, and only a source parameter that actually declares a default is
+            // usable).
+            DeclRef<ParamDecl> defaultParamDeclRef = paramDeclRef;
+            if (argIndex < defaultSourceParams.getCount())
+            {
+                auto candidate = defaultSourceParams[argIndex];
+                if (candidate.getDecl() && candidate.getDecl()->initExpr)
+                    defaultParamDeclRef = candidate;
+            }
+
+            addDirectCallArgs(
+                expr,
+                argIndex,
+                paramDirection,
+                defaultParamDeclRef,
+                ioArgs,
+                ioFixups);
         }
     }
 
@@ -5367,7 +5383,34 @@ struct ExprLoweringContext
                 }
             }
         }
-        // TODO: also need to handle this-type substitution here?
+        else if (auto lookupSubst = as<LookupDeclRef>(subst))
+        {
+            // A this-type substitution: the decl being referenced is an interface requirement
+            // reached through a conformance witness (e.g. lowering a requirement's default argument
+            // such as `int a = kDefault`, whose `kDefault` names another requirement member).
+            // Install the substituted `This` type and its witness so that when the referenced
+            // expression is lowered, `emitDeclRef` resolves each requirement reference through the
+            // witness table rather than as an abstract interface-`This` lookup. See
+            // shader-slang/slang#12700.
+            //
+            // Skip an abstract same-interface `This : IFoo` lookup (its sub-type is itself a
+            // `ThisType`): it carries no concrete conformer, so `emitDeclRef`'s abstract-`This`
+            // path is already correct and there is nothing concrete to install.
+            auto witness = lookupSubst->getWitness();
+            auto subType = witness->getSub();
+            if (!as<ThisType>(subType))
+            {
+                // Lower both values before assigning either field: the sub-type or witness may
+                // itself depend on the enclosing substitution environment installed above. A
+                // concrete conformance must lower to real IR values; a null here is a
+                // representation error, not an expected case.
+                auto irThisType = lowerType(subContext, subType);
+                auto irThisTypeWitness = lowerSimpleVal(subContext, witness);
+                SLANG_RELEASE_ASSERT(irThisType && irThisTypeWitness);
+                subContext->thisType = irThisType;
+                subContext->thisTypeWitness = irThisTypeWitness;
+            }
+        }
     }
 
     void validateInvokeExprArgsWithFunctionModifiers(
@@ -5580,7 +5623,16 @@ struct ExprLoweringContext
                 // we must call one of its accessors.
                 //
                 auto loweredBase = lowerSubExpr(baseExpr);
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+                // Pass the unresolved `resolvedInfo.funcDeclRef` as the default-argument source, as
+                // in the ordinary-call branch below: a `__subscript` interface requirement may
+                // carry a defaulted parameter the concrete implementation omits, and the resolved
+                // subscript would otherwise lack that default.
+                addDirectCallArgs(
+                    expr,
+                    funcDeclRef.template as<CallableDecl>(),
+                    resolvedInfo.funcDeclRef,
+                    &irArgs,
+                    &argFixups);
                 auto result = lowerStorageReference(
                     context,
                     type,
@@ -5697,8 +5749,15 @@ struct ExprLoweringContext
                     context,
                     funcDeclRef.template as<FunctionDeclBase>(),
                     funcTypeInfo);
-                // Calculate args by inspecting the decl-ref.
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+                // Pass both the resolved callee and the unresolved `resolvedInfo.funcDeclRef`: the
+                // latter still names the interface requirement, so a default argument the resolved
+                // concrete method lacks can be sourced from it.
+                addDirectCallArgs(
+                    expr,
+                    funcDeclRef.template as<CallableDecl>(),
+                    resolvedInfo.funcDeclRef,
+                    &irArgs,
+                    &argFixups);
             }
 
             validateInvokeExprArgsWithFunctionModifiers(
