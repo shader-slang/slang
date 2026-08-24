@@ -89,7 +89,7 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // artifact must derive the index from a stable shader identity rather
 // than from load order, or an unchanged shader recompiles whenever the
 // order shifts. Supplying the index at pipeline creation instead would
-// avoid that entirely; see the issue linked from the PR.
+// avoid that entirely; see issue #12541.
 void instrumentCoverage(
     IRModule* module,
     DiagnosticSink* sink,

@@ -666,8 +666,20 @@ static IRVarLayout* createCoverageBufferVarLayout(
 // Synthesize the coverage buffer as a fresh `IRGlobalParam` in the
 // linked module. No AST decl exists for this buffer; it enters the
 // pipeline at IR time so user-facing AST/reflection paths never see
-// it. Backend emit treats it identically to any other
-// `RWStructuredBuffer<uint>` global param.
+// it.
+//
+// `bindlessIndex` selects between two shapes of global, and it is the
+// only parameter here that changes the synthesized TYPE rather than
+// just where it binds:
+//
+//   < 0   one `RWStructuredBuffer<T>`. Backend emit treats it
+//         identically to any other structured-buffer global param.
+//   >= 0  an UNBOUNDED ARRAY of those buffers. Emit does not treat this
+//         identically: on SPIR-V it pulls in `RuntimeDescriptorArray`
+//         and every counter access becomes a two-level index,
+//         `__slang_coverage[bindlessIndex][slot]`. The array is unsized
+//         deliberately, so the shader does not constrain how many
+//         descriptors the host supplies.
 static IRGlobalParam* synthesizeCoverageBuffer(
     IRModule* module,
     TargetRequest* targetRequest,

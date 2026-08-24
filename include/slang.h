@@ -1331,7 +1331,7 @@ typedef uint32_t SlangSizeT;
                  //   identity rather than from load order, or an unchanged
                  //   shader recompiles whenever that order shifts. Supplying it
                  //   at pipeline creation instead would remove that constraint;
-                 //   see the issue linked from the PR. SPIR-V and GLSL only.
+                 //   see issue #12541. SPIR-V and GLSL only.
 
         // Do not assign an explicit value to CountOf. It must remain one past the last option,
         // which it derives implicitly from the preceding (highest-valued) enumerator.

@@ -1115,10 +1115,11 @@ Result linkAndOptimizeIR(
     int explicitBinding = -1;
     int explicitSpace = -1;
     int bindlessIndex = -1;
+    // One option set, read both here and inside the gate below.
+    auto& coverageOpts = codeGenContext->getTargetReq()->getOptionSet();
     {
-        auto& placementOpts = codeGenContext->getTargetReq()->getOptionSet();
         if (auto values =
-                placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBinding))
         {
             if (values->getCount() > 0)
             {
@@ -1133,7 +1134,7 @@ Result linkAndOptimizeIR(
         // descriptor set layout is the host's to choose and the compiler
         // cannot see it.
         if (auto values =
-                placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
         {
             if (values->getCount() > 0)
             {
@@ -1190,8 +1191,8 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.coverageTracing)
     {
         List<int> reservedSpaces;
-        auto& opts = codeGenContext->getTargetReq()->getOptionSet();
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageReservedSpace))
         {
             for (auto value : *values)
             {
@@ -1229,7 +1230,7 @@ Result linkAndOptimizeIR(
         int counterByteWidth = kDefaultCoverageCounterByteWidth;
         bool hasExplicitCounterByteWidth = false;
         if (auto values =
-                opts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageCounterByteWidth))
         {
             if (values->getCount() > 0)
             {
@@ -1270,7 +1271,8 @@ Result linkAndOptimizeIR(
         // verified against the Metal compiler — so the requested width is
         // honored there.
         bool coverageBoolean = false;
-        if (auto values = opts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
+        if (auto values =
+                coverageOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBoolean))
         {
             if (values->getCount() > 0)
                 coverageBoolean = (*values)[0].intValue != 0;
