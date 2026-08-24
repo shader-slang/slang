@@ -2690,6 +2690,10 @@ public:
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
 
+    void registerStructuralRayTracingStageConformance(
+        DeclRef<InterfaceDecl> superInterfaceDeclRef,
+        WitnessTable* witnessTable);
+
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,
         Type* subType,
@@ -3767,6 +3771,9 @@ public:
         InvokeExpr* invoke,
         FuncType* funcType,
         FunctionDeclBase* funcDeclBase);
+    bool diagnoseDirectStructuralRayTracingStageInvoke(
+        InvokeExpr* invoke,
+        FunctionDeclBase* functionDecl);
     Expr* CheckInvokeExprWithCheckedOperands(InvokeExpr* expr);
     // Get the type to use when referencing a declaration
     QualType GetTypeForDeclRef(DeclRef<Decl> declRef, SourceLoc loc);
