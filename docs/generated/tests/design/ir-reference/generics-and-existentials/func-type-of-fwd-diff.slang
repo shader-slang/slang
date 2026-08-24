@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/generics-and-existentials.md#dispatchers-and-existential-specialization
-//META: doc_section_digest=bc0665665f656ac971faa641f0f39e400ee7fe3fd77a4b39caa051bdc3690308
+//META: doc_section_digest=281f505f04ffec7b524f03c8f78892260d45c554e3e06b9a86d32cfe7c6ec9c0
 //META: purpose=A func-dependent derivative type lowers to FuncTypeOf(callable) — a Type-valued projection that names a callable without embedding it.
 //META: intent=functional
 //META: pipeline_stage=lower

@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#generics-and-existentials
-//META: doc_section_digest=d11d731c1f470905e85d4dccd140c912ec50e6d88afbda6ff67159fa80cd78b2
+//META: doc_section_digest=f9fbc5ab50420dd2b267ddb86a5eff193a88f8bd53dbaeb86a9ca9fdcaf05b23
 //META: purpose=A single generic function called with three distinct type arguments lowers to a single `IRGeneric` and three independent `call specialize(%g, T_k)` sites — each specialization is deferred and emitted at the use site, not at the definition.
 //META: intent=stress
 //META: pipeline_stage=lower
