@@ -19,7 +19,7 @@
 //
 // `Vec2` covers the first, `IScaled` covers the second across a module boundary.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 import "imported-interface-requirements-lib";
@@ -87,7 +87,14 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     var dpx = diffPair(2.0, 1.0);
     outputBuffer[2] = fwd_diff(scaleThenSquare<Doubler>)(d, dpx).d;
 
-    outputBuffer[3] = lengthSquared(v);
+    // Reverse mode through that same named requirement. Reverse-mode
+    // transcription reaches an interface's requirement list by a different route
+    // than forward mode, so the borrowed interface has to hold up under both.
+    var rpx = diffPair(2.0);
+    bwd_diff(scaleThenSquare<Doubler>)(d, rpx, 1.0);
+    outputBuffer[3] = rpx.d;
+
+    outputBuffer[4] = lengthSquared(v);
 }
 
 // d/dx (x^2 + y^2) at (3,4) along (1,0) = 2*3*1 = 6
@@ -95,6 +102,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 // d/dx (x^2 + y^2) at x=3 = 6
 //CHECK-NEXT: 6.0
 // d/dx (2x)^2 = 8x, at x=2 -> 16
+//CHECK-NEXT: 16.0
+// the same derivative taken in reverse mode
 //CHECK-NEXT: 16.0
 // 3^2 + 4^2 = 25
 //CHECK-NEXT: 25.0

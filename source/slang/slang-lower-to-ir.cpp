@@ -12114,9 +12114,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 
     /// Lower an interface owned by another module as a declaration, and arrange
-    /// for `prelinkIR` to supply its definition. Returns false when there is no
-    /// lowered IR to borrow, in which case the caller derives it from the AST as
-    /// before.
+    /// for `prelinkIR` to supply its definition.
+    ///
+    /// Returns true only when the interface belongs to another module *and* can be
+    /// borrowed safely, and writes the lowered value to `outVal`. Returns false --
+    /// leaving `outVal` untouched, which the caller relies on -- in three
+    /// different situations: the interface belongs to the module being lowered,
+    /// which is the common case since a module defines most of the interfaces it
+    /// mentions; the reference would be obfuscated, so the two halves could not be
+    /// paired by name; or the owning module has no lowered IR to borrow yet. In
+    /// every false case the caller derives the interface from the AST as before.
     ///
     /// Deriving an interface is expensive -- every requirement's type is lowered,
     /// and each carries an expanded capability set -- and it reconstructs
@@ -12140,17 +12147,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return false;
 
         // In one combination -- obfuscating a reference to a non-core module --
-        // the declaration emitted below would carry a hashed name while the symbol
-        // we look up carries the original. Derive from the AST instead;
-        // correctness first, and obfuscated builds are not the workload this
-        // optimises.
+        // the declaration emitted below would carry a hashed linkage name while
+        // the name we search by is the original, so the two could not be paired.
+        // Derive from the AST instead; correctness first, and obfuscated builds
+        // are not the workload this optimises.
         //
-        // The policy is read from `isLinkageNameObfuscated` rather than restated
-        // here, because this reading of it and the one inside
-        // `addLinkageDecoration` have to agree. If they ever disagree the result
-        // is not a missed optimisation: `prelinkIR` pairs the declaration with the
-        // queued symbol by mangled name and dereferences the lookup without a null
-        // check, so the mismatch surfaces as a crash in a later pass.
+        // This is an early-out rather than the only thing making obfuscation safe.
+        // When the owning module is lowered by the same obfuscating request its
+        // symbols are hashed too, so the search below finds nothing and falls
+        // through to the same place; removing this guard leaves the emitted code
+        // byte-identical for `tests/obfuscate/imported-interface-obfuscated.slang`.
+        // What the guard adds is not depending on that -- it states the condition
+        // directly instead of relying on a lookup happening to miss.
+        //
+        // The condition is read from `isLinkageNameObfuscated` rather than
+        // restated here, so it cannot drift from the copy inside
+        // `addLinkageDecoration`.
         if (isLinkageNameObfuscated(context, decl))
             return false;
 
