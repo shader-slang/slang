@@ -9,6 +9,7 @@ namespace Slang
 struct IRModule;
 
 IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind);
+IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInputOperationKind kind);
 
 bool identifyStructuralRayTracingStageInterfaces(
     Module* module,

@@ -137,6 +137,68 @@ static FunctionDeclBase* _findStageInvokeRequirement(InterfaceDecl* interfaceDec
     return nullptr;
 }
 
+static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
+    FunctionDeclBase* functionDecl)
+{
+    Decl* namedDecl = functionDecl;
+    if (as<AccessorDecl>(functionDecl))
+        namedDecl = as<PropertyDecl>(functionDecl->parentDecl);
+    auto name = namedDecl ? namedDecl->getName() : nullptr;
+    if (!name)
+        return StructuralRayTracingStageInputOperationKind::Count;
+
+    auto text = name->text.getUnownedSlice();
+    if (text == "distance")
+        return StructuralRayTracingStageInputOperationKind::RayTCurrent;
+    if (text == "hitKind")
+        return StructuralRayTracingStageInputOperationKind::HitKind;
+    if (text == "worldSpaceOrigin")
+        return StructuralRayTracingStageInputOperationKind::WorldRayOrigin;
+    if (text == "worldSpaceDirection")
+        return StructuralRayTracingStageInputOperationKind::WorldRayDirection;
+    if (text == "objectSpaceRay")
+        return StructuralRayTracingStageInputOperationKind::ObjectSpaceRay;
+    if (text == "primitiveIndex")
+        return StructuralRayTracingStageInputOperationKind::PrimitiveIndex;
+    if (text == "geometryIndex")
+        return StructuralRayTracingStageInputOperationKind::GeometryIndex;
+    if (text == "ignoreHit")
+        return StructuralRayTracingStageInputOperationKind::IgnoreHit;
+    if (text == "acceptHitAndEndSearch")
+        return StructuralRayTracingStageInputOperationKind::AcceptHitAndEndSearch;
+    if (text == "reportHit")
+    {
+        return functionDecl->getParameters().getCount() == 2
+                   ? StructuralRayTracingStageInputOperationKind::ReportHit
+                   : StructuralRayTracingStageInputOperationKind::ReportHitWithKind;
+    }
+    return StructuralRayTracingStageInputOperationKind::Count;
+}
+
+static void _registerStageInputOperations(
+    AggTypeDecl* inputType,
+    Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>& operations)
+{
+    for (auto member : inputType->getDirectMemberDecls())
+    {
+        if (auto propertyDecl = as<PropertyDecl>(member))
+        {
+            for (auto accessor : propertyDecl->getDirectMemberDeclsOfType<AccessorDecl>())
+            {
+                auto kind = _getStageInputOperationKind(accessor);
+                if (kind != StructuralRayTracingStageInputOperationKind::Count)
+                    operations[accessor] = kind;
+            }
+        }
+        else if (auto functionDecl = as<FunctionDeclBase>(member))
+        {
+            auto kind = _getStageInputOperationKind(functionDecl);
+            if (kind != StructuralRayTracingStageInputOperationKind::Count)
+                operations[functionDecl] = kind;
+        }
+    }
+}
+
 bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     Module* module,
     StructuralRayTracingStageKind* outMissingStage)
@@ -164,6 +226,7 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         m_stageInterfaces[i] = interfaces[i];
         m_stageInputTypes[i] = inputTypes[i];
         m_stageInvokeRequirements[i] = invokeRequirements[i];
+        _registerStageInputOperations(inputTypes[i], m_stageInputOperations);
     }
     for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
     {
@@ -229,6 +292,14 @@ StructuralRayTracingMetadataKind StructuralRayTracingDeclRegistry::getMetadataKi
             return StructuralRayTracingMetadataKind(i);
     }
     return StructuralRayTracingMetadataKind::Count;
+}
+
+StructuralRayTracingStageInputOperationKind StructuralRayTracingDeclRegistry::
+    getStageInputOperationKind(FunctionDeclBase* functionDecl) const
+{
+    if (auto kind = m_stageInputOperations.tryGetValue(functionDecl))
+        return *kind;
+    return StructuralRayTracingStageInputOperationKind::Count;
 }
 
 FunctionDeclBase* StructuralRayTracingDeclRegistry::getStageInvokeRequirement(

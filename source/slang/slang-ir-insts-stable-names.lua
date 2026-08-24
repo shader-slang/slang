@@ -879,5 +879,16 @@ return {
 	["Type.RaytracingStageInterface.any_hit_stage_interface"] = 903,
 	["Type.RaytracingStageInterface.intersection_stage_interface"] = 904,
 	["Type.RaytracingStageInterface.miss_stage_interface"] = 905,
-	["Type.RaytracingStageInterface.callable_stage_interface"] = 906
+	["Type.RaytracingStageInterface.callable_stage_interface"] = 906,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayTCurrent"] = 907,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetHitKind"] = 908,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetWorldRayOrigin"] = 909,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetWorldRayDirection"] = 910,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetObjectSpaceRay"] = 911,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetPrimitiveIndex"] = 912,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetGeometryIndex"] = 913,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingIgnoreHit"] = 914,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingAcceptHitAndEndSearch"] = 915,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingReportHit"] = 916,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingReportHitWithKind"] = 917
 }

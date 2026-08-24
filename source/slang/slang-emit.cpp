@@ -121,6 +121,7 @@
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-thread-switch-on-constant-phi.h"
+#include "slang-ir-synthesize-structural-ray-tracing.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-translate.h"
@@ -423,6 +424,8 @@ void calcRequiredLoweringPassSet(
     {
         result.autodiff = true;
     }
+    if (as<IRStructuralRayTracingStageInputOperation>(inst))
+        result.structuralRayTracingStageInput = true;
     // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
     if (auto attrType = as<IRAttributedType>(inst))
     {
@@ -1832,6 +1835,10 @@ Result linkAndOptimizeIR(
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     SLANG_PASS(performForceInlining);
+
+    if (requiredLoweringPassSet.structuralRayTracingStageInput &&
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
+        SLANG_PASS(lowerPortableStructuralRayTracingStageInputOperations);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
