@@ -48,3 +48,45 @@ jobs:
           $cl = Get-Command cl.exe -ErrorAction Stop
           Write-Host "cl.exe resolved at: $($cl.Source)"
           cl.exe /Bv
+
+  # One-off: build LLVM from source for windows/aarch64 (no GCS cache entry
+  # exists yet for this platform — see the llvm-prebuilts bucket listing)
+  # and capture the result as a workflow artifact, so it can be uploaded to
+  # gs://slang-ci-cache/llvm-prebuilts manually. common-setup's automatic
+  # upload only fires on `github.ref == 'refs/heads/master'
+  # (setup-llvm-from-gcs/action.yml), which a dispatch on this branch never
+  # satisfies — this job exists to get the built LLVM off the runner so it
+  # can be pushed to the same GCS key by hand instead. Delete this job once
+  # the cache entry has been seeded; it is not meant to be long-lived.
+  build-llvm-seed:
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: aarch64
+          config: release
+          build-llvm: "true"
+
+      - name: Archive LLVM install
+        shell: bash
+        run: |
+          cd build/llvm-project-install
+          tar -czf "${{ github.workspace }}/llvm-windows-cl-aarch64.tar.gz" .
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: llvm-windows-cl-aarch64
+          path: llvm-windows-cl-aarch64.tar.gz
+          retention-days: 3
