@@ -1938,10 +1938,10 @@ struct SpecializationContext
         // pass recovers via its outer re-drain; on-demand callers must do the same here, and since
         // `expanded` is cleared per drain (see `processSpecializationWorkListFromRoot`) each
         // re-drain gets a fresh full first walk.
-        bool changed = false;
+        bool anyChange = false;
         while (processSpecializationWorkListFromRoot(rootInst))
-            changed = true;
-        return changed;
+            anyChange = true;
+        return anyChange;
     }
 
     // Returns true if the call inst represents a call to
