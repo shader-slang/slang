@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-structural-ray-tracing.h"
 
 namespace Slang
 {
@@ -90,7 +91,12 @@ struct StructuralRayTracingStageParameterThreader
                 builder.addSimpleDecoration<IRGlobalInputDecoration>(parameter);
             if (m_isOutput)
                 builder.addSimpleDecoration<IRGlobalOutputDecoration>(parameter);
-            builder.addSemanticDecoration(parameter, UnownedTerminatedStringSlice(m_semanticName));
+            if (m_semanticName)
+            {
+                builder.addSemanticDecoration(
+                    parameter,
+                    UnownedTerminatedStringSlice(m_semanticName));
+            }
 
             IRTypeLayout::Builder typeLayoutBuilder(&builder);
             typeLayoutBuilder.addResourceUsage(m_resourceKind, LayoutSize(1));
@@ -150,12 +156,39 @@ static void _collectStageInputOperations(IRInst* parent, List<IRInst*>& operatio
     }
 }
 
+static void _collectStructuralEntryPoints(IRModule* module, List<IRFunc*>& entryPoints)
+{
+    for (auto child = module->getModuleInst()->getFirstChild(); child; child = child->getNextInst())
+    {
+        if (auto func = as<IRFunc>(child))
+        {
+            if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+                entryPoints.add(func);
+        }
+    }
+}
+
+static StructuralRayTracingHitAttributesKind _getHitAttributesKind(
+    IRStructuralRayTracingEntryPointInfoDecoration* info)
+{
+    return StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue());
+}
+
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
 {
     List<IRInst*> operations;
     _collectStageInputOperations(module->getModuleInst(), operations);
+    List<IRFunc*> structuralEntryPoints;
+    _collectStructuralEntryPoints(module, structuralEntryPoints);
 
     HashSet<IRType*> loweredPayloadTypes;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto payloadType = info->getPayloadType();
+        if (!as<IRVoidType>(payloadType))
+            loweredPayloadTypes.add(payloadType);
+    }
     for (auto operation : operations)
     {
         if (operation->getOp() != kIROp_StructuralRayTracingGetPayload)
@@ -164,9 +197,11 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         auto payloadPtrType = as<IRPtrTypeBase>(operation->getDataType());
         SLANG_ASSERT(payloadPtrType);
         auto payloadType = payloadPtrType->getValueType();
-        if (!loweredPayloadTypes.add(payloadType))
-            continue;
+        loweredPayloadTypes.add(payloadType);
+    }
 
+    for (auto payloadType : loweredPayloadTypes)
+    {
         IRBuilder builder(module);
         if (!payloadType->findDecoration<IRRayPayloadDecoration>())
             builder.addRayPayloadDecoration(payloadType);
@@ -178,6 +213,13 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
             "SV_RayPayload",
             true,
             true);
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (info->getPayloadType() == payloadType)
+                threader.findOrCreateParameter(entryPoint);
+        }
         for (auto candidate : operations)
         {
             if (candidate->getOp() != kIROp_StructuralRayTracingGetPayload)
@@ -189,16 +231,71 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         }
     }
 
+    HashSet<IRType*> loweredCallableDataTypes;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto callableDataType = info->getCallableDataType();
+        if (!as<IRVoidType>(callableDataType))
+            loweredCallableDataTypes.add(callableDataType);
+    }
+    for (auto operation : operations)
+    {
+        if (operation->getOp() != kIROp_StructuralRayTracingGetCallableData)
+            continue;
+
+        auto callableDataPtrType = as<IRPtrTypeBase>(operation->getDataType());
+        SLANG_ASSERT(callableDataPtrType);
+        loweredCallableDataTypes.add(callableDataPtrType->getValueType());
+    }
+
+    for (auto callableDataType : loweredCallableDataTypes)
+    {
+        IRBuilder builder(module);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            builder.getBorrowInOutParamType(callableDataType),
+            LayoutResourceKind::CallablePayload,
+            "data",
+            nullptr,
+            true,
+            true);
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (info->getCallableDataType() == callableDataType)
+                threader.findOrCreateParameter(entryPoint);
+        }
+        for (auto candidate : operations)
+        {
+            if (candidate->getOp() != kIROp_StructuralRayTracingGetCallableData)
+                continue;
+            auto candidatePtrType = as<IRPtrTypeBase>(candidate->getDataType());
+            SLANG_ASSERT(candidatePtrType);
+            if (candidatePtrType->getValueType() == callableDataType)
+                threader.lower(candidate);
+        }
+    }
+
     HashSet<IRType*> loweredHitAttributeTypes;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        if (_getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Custom)
+            loweredHitAttributeTypes.add(info->getHitAttributesType());
+    }
     for (auto operation : operations)
     {
         if (operation->getOp() != kIROp_StructuralRayTracingGetHitAttributes)
             continue;
 
         auto attributeType = operation->getDataType();
-        if (!loweredHitAttributeTypes.add(attributeType))
-            continue;
+        loweredHitAttributeTypes.add(attributeType);
+    }
 
+    for (auto attributeType : loweredHitAttributeTypes)
+    {
         StructuralRayTracingStageParameterThreader threader(
             module,
             attributeType,
@@ -207,6 +304,16 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
             "SV_IntersectionAttributes",
             true,
             false);
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (_getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Custom &&
+                info->getHitAttributesType() == attributeType)
+            {
+                threader.findOrCreateParameter(entryPoint);
+            }
+        }
         for (auto candidate : operations)
         {
             if (candidate->getOp() == kIROp_StructuralRayTracingGetHitAttributes &&
@@ -217,17 +324,23 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         }
     }
 
-    HashSet<IRType*> loweredTriangleBarycentricTypes;
+    bool needsTriangleHitAttributes = false;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        if (_getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Triangle)
+            needsTriangleHitAttributes = true;
+    }
     for (auto operation : operations)
     {
-        if (operation->getOp() != kIROp_StructuralRayTracingGetTriangleBarycentricCoord)
-            continue;
+        if (operation->getOp() == kIROp_StructuralRayTracingGetTriangleBarycentricCoord)
+            needsTriangleHitAttributes = true;
+    }
 
-        auto barycentricType = operation->getDataType();
-        if (!loweredTriangleBarycentricTypes.add(barycentricType))
-            continue;
-
+    if (needsTriangleHitAttributes)
+    {
         IRBuilder builder(module);
+        auto barycentricType = builder.getVectorType(builder.getFloatType(), 2);
         auto nativeAttributeType = builder.createStructType();
         builder.addNameHintDecoration(
             nativeAttributeType,
@@ -246,6 +359,13 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
             false,
             nativeAttributeType,
             barycentricKey);
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (_getHitAttributesKind(info) == StructuralRayTracingHitAttributesKind::Triangle)
+                threader.findOrCreateParameter(entryPoint);
+        }
         for (auto candidate : operations)
         {
             if (candidate->getOp() == kIROp_StructuralRayTracingGetTriangleBarycentricCoord &&
@@ -283,6 +403,15 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
         if (!stageInputOperation->hasFallback())
             operation->removeAndDeallocate();
+    }
+
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        if (auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        {
+            info->removeAndDeallocate();
+        }
     }
 }
 

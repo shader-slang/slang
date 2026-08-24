@@ -13,6 +13,7 @@
 //
 
 #include "slang-linkable.h"
+#include "slang-structural-ray-tracing.h"
 
 namespace Slang
 {
@@ -231,13 +232,17 @@ public:
         m_inferredCapabilityRequirements = caps;
     }
 
-    void setStructuralRayTracingInvokeMethod(FuncDecl* invokeMethod)
+    void setStructuralRayTracingInfo(const StructuralRayTracingEntryPointInfo& info)
     {
-        m_structuralRayTracingInvokeMethod = invokeMethod;
+        m_structuralRayTracingInfo = info;
     }
     FuncDecl* getStructuralRayTracingInvokeMethod() const
     {
-        return m_structuralRayTracingInvokeMethod;
+        return m_structuralRayTracingInfo.invokeMethod;
+    }
+    const StructuralRayTracingEntryPointInfo& getStructuralRayTracingInfo() const
+    {
+        return m_structuralRayTracingInfo;
     }
 
     /// Get the module that contains the entry point.
@@ -341,7 +346,7 @@ private:
     //
     DeclRef<FuncDecl> m_funcDeclRef;
 
-    FuncDecl* m_structuralRayTracingInvokeMethod = nullptr;
+    StructuralRayTracingEntryPointInfo m_structuralRayTracingInfo;
 
     /// The mangled name of the entry point function
     String m_mangledName;

@@ -51,7 +51,7 @@ struct ClosestHit : rt::IClosestHitShader<HitContext>
 }
 
 // HLSLCH: void updateClosestHitPayload_0(inout TestPayload_0 payload_0)
-// HLSLCH: [shader("closesthit")]void ClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload)
+// HLSLCH: [shader("closesthit")]void ClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // SPIRV: OpVariable %_ptr_IncomingRayPayloadKHR_TestPayload IncomingRayPayloadKHR
 // IR: structuralRayTracingGetPayload
 
@@ -69,7 +69,7 @@ struct AnyHit : rt::IAnyHitShader<HitContext>
 }
 
 // HLSLAH: void updateAnyHitPayload_0(inout TestPayload_0 payload_0)
-// HLSLAH: [shader("anyhit")]void AnyHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload)
+// HLSLAH: [shader("anyhit")]void AnyHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 
 void updateMissPayload(rt::MissInput<MissContext> input)
 {

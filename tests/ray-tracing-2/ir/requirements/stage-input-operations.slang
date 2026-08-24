@@ -5,21 +5,21 @@
 
 import slang.raytracing;
 
-struct Payload {}
-struct Record {}
+struct TestPayload {}
+struct TestRecord {}
 
-struct TraceContext : rt::ITraceContext
+struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = Payload;
+    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
 struct TriangleContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = TestTraceContext;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = TestRecord;
 }
 
 struct CustomAttributes
@@ -29,15 +29,15 @@ struct CustomAttributes
 
 struct ProceduralContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = TestTraceContext;
     typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
-    typealias Record = Record;
+    typealias Record = TestRecord;
 }
 
 struct MissContext : rt::IMissGroupContext
 {
-    typealias TraceContext = TraceContext;
-    typealias Record = Record;
+    typealias TraceContext = TestTraceContext;
+    typealias Record = TestRecord;
 }
 
 RWStructuredBuffer<float4> output;

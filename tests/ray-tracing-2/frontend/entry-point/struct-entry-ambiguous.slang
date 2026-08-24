@@ -4,21 +4,21 @@
 
 import slang.raytracing;
 
-struct Payload {}
-struct Record {}
+struct TestPayload {}
+struct TestRecord {}
 
-struct TraceContext : rt::ITraceContext
+struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = Payload;
+    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
 struct HitContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = TestTraceContext;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = TestRecord;
 }
 
 struct MultiStage : rt::IClosestHitShader<HitContext>, rt::IAnyHitShader<HitContext>
