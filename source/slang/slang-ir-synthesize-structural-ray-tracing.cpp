@@ -6,20 +6,34 @@
 namespace Slang
 {
 
-struct StructuralRayTracingPayloadThreader
+struct StructuralRayTracingStageParameterThreader
 {
-    StructuralRayTracingPayloadThreader(IRModule* module, IRType* payloadType)
+    StructuralRayTracingStageParameterThreader(
+        IRModule* module,
+        IRType* parameterType,
+        LayoutResourceKind resourceKind,
+        const char* parameterName,
+        const char* semanticName,
+        bool isInput,
+        bool isOutput)
         : m_module(module)
+        , m_parameterType(parameterType)
+        , m_resourceKind(resourceKind)
+        , m_parameterName(parameterName)
+        , m_semanticName(semanticName)
+        , m_isInput(isInput)
+        , m_isOutput(isOutput)
     {
-        IRBuilder builder(module);
-        m_payloadParamType = builder.getBorrowInOutParamType(payloadType);
-        if (!payloadType->findDecoration<IRRayPayloadDecoration>())
-            builder.addRayPayloadDecoration(payloadType);
     }
 
     IRModule* m_module;
-    IRType* m_payloadParamType;
-    Dictionary<IRFunc*, IRInst*> m_payloadParams;
+    IRType* m_parameterType;
+    LayoutResourceKind m_resourceKind;
+    const char* m_parameterName;
+    const char* m_semanticName;
+    bool m_isInput;
+    bool m_isOutput;
+    Dictionary<IRFunc*, IRInst*> m_parameters;
 
     IRFunc* findEnclosingFunc(IRInst* inst)
     {
@@ -31,42 +45,42 @@ struct StructuralRayTracingPayloadThreader
         return nullptr;
     }
 
-    IRInst* findOrCreatePayloadParam(IRInst* inst)
+    IRInst* findOrCreateParameter(IRInst* inst)
     {
         auto func = findEnclosingFunc(inst);
         SLANG_ASSERT(func);
-        return findOrCreatePayloadParam(func);
+        return findOrCreateParameter(func);
     }
 
-    IRInst* findOrCreatePayloadParam(IRFunc* func)
+    IRInst* findOrCreateParameter(IRFunc* func)
     {
-        if (auto found = m_payloadParams.tryGetValue(func))
+        if (auto found = m_parameters.tryGetValue(func))
             return *found;
 
         auto firstBlock = func->getFirstBlock();
         SLANG_ASSERT(firstBlock);
 
         IRBuilder builder(m_module);
-        auto payloadParam = builder.createParam(m_payloadParamType);
-        builder.addNameHintDecoration(payloadParam, UnownedTerminatedStringSlice("payload"));
-        payloadParam->insertBefore(firstBlock->getFirstOrdinaryInst());
-        m_payloadParams.add(func, payloadParam);
+        auto parameter = builder.createParam(m_parameterType);
+        builder.addNameHintDecoration(parameter, UnownedTerminatedStringSlice(m_parameterName));
+        parameter->insertBefore(firstBlock->getFirstOrdinaryInst());
+        m_parameters.add(func, parameter);
 
         if (func->findDecoration<IREntryPointDecoration>())
         {
             auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>();
-            builder.addSimpleDecoration<IRGlobalInputDecoration>(payloadParam);
-            builder.addSimpleDecoration<IRGlobalOutputDecoration>(payloadParam);
-            builder.addSemanticDecoration(
-                payloadParam,
-                UnownedTerminatedStringSlice("SV_RayPayload"));
+            if (m_isInput)
+                builder.addSimpleDecoration<IRGlobalInputDecoration>(parameter);
+            if (m_isOutput)
+                builder.addSimpleDecoration<IRGlobalOutputDecoration>(parameter);
+            builder.addSemanticDecoration(parameter, UnownedTerminatedStringSlice(m_semanticName));
 
             IRTypeLayout::Builder typeLayoutBuilder(&builder);
-            typeLayoutBuilder.addResourceUsage(LayoutResourceKind::RayPayload, LayoutSize(1));
+            typeLayoutBuilder.addResourceUsage(m_resourceKind, LayoutSize(1));
             IRVarLayout::Builder varLayoutBuilder(&builder, typeLayoutBuilder.build());
-            varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RayPayload);
+            varLayoutBuilder.findOrAddResourceInfo(m_resourceKind);
             varLayoutBuilder.setStage(entryPointDecoration->getProfile().getStage());
-            builder.addLayoutDecoration(payloadParam, varLayoutBuilder.build());
+            builder.addLayoutDecoration(parameter, varLayoutBuilder.build());
         }
 
         fixUpFuncType(func);
@@ -87,7 +101,7 @@ struct StructuralRayTracingPayloadThreader
             List<IRInst*> args;
             for (UInt i = 0; i < call->getArgCount(); ++i)
                 args.add(call->getArg(i));
-            args.add(findOrCreatePayloadParam(call));
+            args.add(findOrCreateParameter(call));
 
             builder.setInsertBefore(call);
             auto newCall = builder.emitCallInst(
@@ -99,13 +113,13 @@ struct StructuralRayTracingPayloadThreader
             call->removeAndDeallocate();
         }
 
-        return payloadParam;
+        return parameter;
     }
 
     void lower(IRInst* operation)
     {
-        auto payloadParam = findOrCreatePayloadParam(operation);
-        operation->replaceUsesWith(payloadParam);
+        auto parameter = findOrCreateParameter(operation);
+        operation->replaceUsesWith(parameter);
     }
 };
 
@@ -136,7 +150,17 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         if (!loweredPayloadTypes.add(payloadType))
             continue;
 
-        StructuralRayTracingPayloadThreader threader(module, payloadType);
+        IRBuilder builder(module);
+        if (!payloadType->findDecoration<IRRayPayloadDecoration>())
+            builder.addRayPayloadDecoration(payloadType);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            builder.getBorrowInOutParamType(payloadType),
+            LayoutResourceKind::RayPayload,
+            "payload",
+            "SV_RayPayload",
+            true,
+            true);
         for (auto candidate : operations)
         {
             if (candidate->getOp() != kIROp_StructuralRayTracingGetPayload)
@@ -148,13 +172,41 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         }
     }
 
+    HashSet<IRType*> loweredHitAttributeTypes;
+    for (auto operation : operations)
+    {
+        if (operation->getOp() != kIROp_StructuralRayTracingGetHitAttributes)
+            continue;
+
+        auto attributeType = operation->getDataType();
+        if (!loweredHitAttributeTypes.add(attributeType))
+            continue;
+
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            attributeType,
+            LayoutResourceKind::HitAttributes,
+            "attributes",
+            "SV_IntersectionAttributes",
+            true,
+            false);
+        for (auto candidate : operations)
+        {
+            if (candidate->getOp() == kIROp_StructuralRayTracingGetHitAttributes &&
+                candidate->getDataType() == attributeType)
+            {
+                threader.lower(candidate);
+            }
+        }
+    }
+
     IRBuilder builder(module);
     for (auto operation : operations)
     {
-        if (operation->getOp() == kIROp_StructuralRayTracingGetPayload)
+        auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
+        if (!stageInputOperation->hasFallback())
             continue;
 
-        auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
         builder.setInsertBefore(operation);
 
         List<IRInst*> arguments;
@@ -172,7 +224,8 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
 
     for (auto operation : operations)
     {
-        if (operation->getOp() == kIROp_StructuralRayTracingGetPayload)
+        auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
+        if (!stageInputOperation->hasFallback())
             operation->removeAndDeallocate();
     }
 }

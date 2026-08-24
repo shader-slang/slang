@@ -1200,6 +1200,7 @@ local insts = {
 	{
 		StructuralRayTracingStageInputOperation = {
 			{ structuralRayTracingGetPayload = { operands = { { "input" } } } },
+			{ structuralRayTracingGetHitAttributes = { operands = { { "input" } } } },
 			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },
