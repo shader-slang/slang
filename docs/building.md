@@ -301,6 +301,7 @@ works for any given binary.
 | `SLANG_EMBED_CORE_MODULE_SOURCE`      | `TRUE`                        | Embed the core module source in the binary                                                                                               |
 | `SLANG_ENABLE_DXIL`                   | `TRUE`                        | Enable generating DXIL using DXC                                                                                                         |
 | `SLANG_ENABLE_ASAN`                   | `FALSE`                       | Enable ASAN (address sanitizer)                                                                                                          |
+| `SLANG_ENABLE_TSAN`                   | `FALSE`                       | Enable TSAN (thread sanitizer); clang/gcc on non-Windows only, and mutually exclusive with `SLANG_ENABLE_ASAN`                           |
 | `SLANG_ENABLE_COVERAGE`               | `FALSE`                       | Enable code coverage instrumentation                                                                                                     |
 | `SLANG_ENABLE_FULL_IR_VALIDATION`     | `FALSE`                       | Enable full IR validation (SLOW!)                                                                                                        |
 | `SLANG_ENABLE_VALIDATION_VM_BYTECODE` | `TRUE`                        | Enable VM bytecode validation in the bytecode interpreter. Disabling skips runtime safety checks for malformed bytecode.                 |

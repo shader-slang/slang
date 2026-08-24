@@ -163,6 +163,19 @@ option(
     SLANG_ENABLE_ASAN
     "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
 )
+option(
+    SLANG_ENABLE_TSAN
+    "Enable ThreadSanitizer (TSan). Mutually exclusive with SLANG_ENABLE_ASAN."
+)
+# ASan and TSan instrument for different bug classes and cannot be combined in
+# a single build (their runtimes are incompatible), so reject the combination
+# up front rather than fail later at link time.
+if(SLANG_ENABLE_ASAN AND SLANG_ENABLE_TSAN)
+    message(
+        FATAL_ERROR
+        "SLANG_ENABLE_ASAN and SLANG_ENABLE_TSAN are mutually exclusive; enable at most one."
+    )
+endif()
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 option(
     SLANG_ENABLE_TIME_TRACE
@@ -369,6 +382,7 @@ if(
     AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
     AND SLANG_LIB_TYPE STREQUAL "SHARED"
     AND NOT SLANG_ENABLE_ASAN
+    AND NOT SLANG_ENABLE_TSAN
 )
     set(SLANG_ENABLE_MIMALLOC_DEFAULT ON)
 endif()
@@ -377,10 +391,10 @@ advanced_option(
     "Use mimalloc for Slang-owned allocations"
     ${SLANG_ENABLE_MIMALLOC_DEFAULT}
 )
-if(SLANG_ENABLE_MIMALLOC AND SLANG_ENABLE_ASAN)
+if(SLANG_ENABLE_MIMALLOC AND (SLANG_ENABLE_ASAN OR SLANG_ENABLE_TSAN))
     message(
         WARNING
-        "SLANG_ENABLE_MIMALLOC is enabled with SLANG_ENABLE_ASAN, but this mimalloc configuration does not enable ASan tracking"
+        "SLANG_ENABLE_MIMALLOC is enabled with a sanitizer (SLANG_ENABLE_ASAN or SLANG_ENABLE_TSAN); replacing the allocator may reduce sanitizer coverage because Slang-owned allocations bypass the sanitizer's interceptors"
     )
 endif()
 
