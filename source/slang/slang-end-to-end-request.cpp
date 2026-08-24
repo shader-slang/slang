@@ -1724,13 +1724,18 @@ SlangResult EndToEndCompileRequest::addLibraryReference(
     // Parse out of the blob's bytes, not the caller's.
     //
     // `RawBlob::create` *copies*, so `libBlob` holds the data at a different address than
-    // `libData`. Passing `libData` as the thing to parse while passing `libBlob` as the
-    // thing to retain used to be harmless, because the module was fully materialized before
-    // this returned and the caller's buffer was never read again. With on-demand loading it
-    // is a use-after-free waiting to happen: the RIFF chunk pointers, the fossil cursors and
-    // the resulting `SerializedArray` views would all refer into `libData`, deferred bodies
-    // would be decoded out of it long after this call, and the documented contract for
-    // `spAddLibraryReference` lets the caller free it as soon as the call returns.
+    // `libData`. Passing `libData` as the thing to parse while retaining `libBlob` left the
+    // RIFF chunk pointers, and every fossil cursor derived from them, referring into the
+    // caller's buffer while the object keeping memory alive was a different allocation --
+    // and `spAddLibraryReference`'s contract lets the caller free that buffer as soon as
+    // this call returns.
+    //
+    // This is a use-after-free that predates leaving instruction bodies encoded. AST
+    // declarations are already read on demand: `readSerializedModuleAST` keeps an
+    // `ASTSerialReadContext` alive past its own return and decodes the library's
+    // declarations later, during semantic checking of whatever `import`s them. Deferring
+    // IR bodies adds a second route into the same freed bytes, further out still --
+    // `SerializedArray` views decoded during linking and emit.
     //
     // The sibling overload in slang-module-library.cpp already does this correctly; this one
     // just handed over the wrong pointer.

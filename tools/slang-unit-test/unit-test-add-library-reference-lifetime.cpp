@@ -14,13 +14,14 @@ using namespace Slang;
 // returned.
 //
 // The documented contract is that the caller may release `libData` as soon as the call
-// returns, and that used to hold trivially: the module was fully materialized during the
-// call, so nothing read those bytes again. On-demand loading broke it. The bytes are
-// parsed into RIFF chunk pointers, fossil cursors and `SerializedArray` views, deferred
-// bodies keep those views, and a body is decoded much later -- during linking or emit.
-// The implementation built a blob with `RawBlob::create`, which *copies*, and then asked
-// the loader to parse the caller's pointer instead of the copy it retained, so every view
-// referred into memory nothing kept alive.
+// returns. The implementation built a blob with `RawBlob::create`, which *copies*, and then
+// asked the loader to parse the caller's pointer instead of the copy it retained, so every
+// RIFF chunk pointer and fossil cursor referred into memory nothing kept alive.
+//
+// That is a use-after-free without any help from on-demand IR: AST declarations are already
+// read lazily, so the library's declarations are decoded during semantic checking of the
+// `import` below -- after this call returned. Leaving instruction bodies encoded adds a
+// second route into the same bytes, later still, during linking and emit.
 //
 // The test poisons the caller's buffer in place rather than freeing it. Freed memory
 // often still reads back intact, which would make this pass under the bug; overwriting is
