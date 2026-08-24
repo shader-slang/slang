@@ -67,11 +67,6 @@ SLANG_UNIT_TEST(harnessSelfCheckSurvivesAThrowingTest)
     throw std::runtime_error("deliberate self-check exception");
 }
 
-// ...and the run must continue past it. This test passing is the assertion: it is
-// registered after the throwing test, so if the throw had torn the process down or
-// escaped the per-test handler, this line would never be reached and CI would not see
-// its `ok`. That carry-on property is the half of the handler's contract that the
-// non-zero exit alone does not pin.
 // A `Slang::Exception` must be reported with its message. This is the case the
 // driver's handler exists for and the one a `std::exception`-only catch would miss:
 // `SLANG_ASSERT` routes through `handleSignal`, which throws `InternalError` and
@@ -104,6 +99,25 @@ SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedRunError)
     getTestReporter()->message(TestMessageType::RunError, "deliberate self-check run error");
 }
 
+// A `TestFailure` message must fail the test too, not only `RunError`. The driver
+// classifies both as failures -- the enum defines `TestFailure` as describing how a
+// failure took place -- and that choice deserves a driver of its own rather than being
+// covered by inspection.
+SLANG_UNIT_TEST(harnessSelfCheckFailsOnAReportedTestFailure)
+{
+    if (!selfCheckArmed())
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    getTestReporter()->message(TestMessageType::TestFailure, "deliberate self-check test failure");
+}
+
+// ...and the run must continue past the failures above. This test passing is the
+// assertion: it is registered last, so if a throw had torn the process down or escaped
+// the per-test handler, this line would never be reached and CI would not see its `ok`.
+// That carry-on property is the half of the handler's contract that the non-zero exit
+// alone does not pin.
 SLANG_UNIT_TEST(harnessSelfCheckContinuesAfterAThrow)
 {
     if (!selfCheckArmed())

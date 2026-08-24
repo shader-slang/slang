@@ -368,11 +368,16 @@ SLANG_UNIT_TEST(irTrimOptimizableTypesRemovesAnUnusedField)
 // same answer as the precise path, and this pins that: same fixture, same outcome,
 // flag on.
 //
-// It deliberately does not claim more. Distinguishing the two paths properly needs a
-// fixture whose purity determination actually differs between them, which is a
-// different kind of fixture from anything `IRFixtureBuilder` builds today. This test
-// is the honest half of that: it catches a fast path that starts disagreeing on the
-// simple shapes, and says nothing about the shapes where disagreement is the point.
+// It deliberately does not claim more, and it is worth being exact about what is left
+// uncovered. The flag selects `SideEffectAnalysisOptions::None` instead of
+// `UseDominanceTree` (`slang-ir-dce.cpp`, in `shouldInstBeLiveIfParentIsLive`), and that
+// choice reaches only `IRInst::mightHaveSideEffects`. Telling the two apart therefore
+// needs a fixture where a purity determination depends on dominance -- a multi-block
+// function with a conditional side effect the precise path can reason about and the fast
+// one cannot -- which is a different kind of fixture from anything `IRFixtureBuilder`
+// builds today. This test is the honest half: it catches a fast path that starts
+// disagreeing on the simple shapes, and says nothing about the shapes where disagreement
+// is the whole point.
 SLANG_UNIT_TEST(irDeadCodeEliminationFastAnalysisAgreesOnSideEffectFreeFunctions)
 {
     StaticUnitTestEnv env(unitTestContext);

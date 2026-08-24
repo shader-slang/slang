@@ -143,12 +143,10 @@ jobs:
             exit 1
           fi
 
+          # GitHub runs `shell: bash` as `bash --noprofile --norc -eo pipefail`, so a
+          # non-zero status anywhere in this pipeline already fails the step -- `tee`
+          # does not mask it, and no explicit status check is needed here.
           "$test_path" | tee ordinary.log
-          # `tee` masks the binary's status, so read it from PIPESTATUS.
-          if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
-            echo "::error::the ordinary run failed"
-            exit 1
-          fi
 
           # The self-checks below ignore themselves in an ordinary run, which is what
           # exercises SLANG_IGNORE_TEST and the driver's Ignored tally. Assert that
@@ -210,9 +208,14 @@ jobs:
             echo "::error::the Slang::Exception message was not reported"
             exit 1
           fi
-          # A failure reported through message() rather than addResult must still fail.
+          # A failure reported through message() rather than addResult must still fail,
+          # for both message types the driver classifies as failures.
           if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckFailsOnAReportedRunError" selfcheck.log; then
             echo "::error::a RunError reported via message() did not fail the test"
+            exit 1
+          fi
+          if ! grep -qE "FAIL[[:space:]]+harnessSelfCheckFailsOnAReportedTestFailure" selfcheck.log; then
+            echo "::error::a TestFailure reported via message() did not fail the test"
             exit 1
           fi
           # The exception detail has to reach the log, or such a failure is not
