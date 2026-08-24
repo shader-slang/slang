@@ -1672,46 +1672,46 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     }
 }
 
-// A single authored modifier-validity rule (shader-slang/slang#12558): modifiers of class
-// `modifierClass` applied to nodes of class `nodeClass` get disposition `disposition`. Both axes
-// are `SyntaxClass`es so a rule may name an abstract base (e.g. `CallableDecl`) and cover all of
-// its concrete subclasses.
-struct ModifierValidityCheckingRule
+// A single data-driven modifier-validity rule: a modifier of class `modifierClass` applied to a
+// node of class `nodeClass` has the given `disposition`. Both axes are `SyntaxClass`es, so a rule
+// may name an abstract base (e.g. `CallableDecl`) and thereby cover all of its concrete subclasses.
+struct ModifierValidityRule
 {
     SyntaxClass<NodeBase> nodeClass;
     SyntaxClass<NodeBase> modifierClass;
     ModifierValidityDisposition disposition;
 };
 
-// The authored allow-list. First matching rule (in array order) wins; a pair matching no rule is
-// deny-by-default. Rows whose acceptance depends on a runtime predicate the class-only table
-// cannot express (global-vs-local, parent-struct, GLSL mode, ...) are intentionally absent and
-// handled by the legacy `checkModifierAllowedOnDecl` fallback instead. Consequently an `Allow` row
-// must be unconditional for its whole (node class, modifier class) range: because a matching rule
-// short-circuits the legacy fallback, an `Allow` row that overlaps a runtime-conditional legacy
-// restriction would silently permit the cases that restriction rejects.
-static const ModifierValidityCheckingRule kModifierValidityCheckingRules[] = {
+// The data-driven modifier-validity rules. The first matching rule (in array order) wins; a pair
+// matching no rule has no disposition here (`NoDisposition`). Rules whose applicability depends on
+// a runtime predicate this class-only table cannot express (global-vs-local, parent-struct, GLSL
+// mode, ...) are intentionally absent and are decided by `queryLegacyModifierValidityOnDecl`
+// instead. Consequently an `Allowed` rule must hold unconditionally for its whole (node class,
+// modifier class) range: because a matching rule takes precedence over the legacy decision, an
+// `Allowed` rule that overlapped a runtime-conditional legacy restriction would silently permit
+// the cases that restriction rejects.
+static const ModifierValidityRule kModifierValidityRules[] = {
     // Modifiers that are only meaningful on callable declarations.
     {getSyntaxClass<CallableDecl>(),
      getSyntaxClass<InlineModifier>(),
-     ModifierValidityDisposition::Allow},
+     ModifierValidityDisposition::Allowed},
     {getSyntaxClass<CallableDecl>(),
      getSyntaxClass<IntrinsicOpModifier>(),
-     ModifierValidityDisposition::Allow},
+     ModifierValidityDisposition::Allowed},
     {getSyntaxClass<CallableDecl>(),
      getSyntaxClass<SpecializedForTargetModifier>(),
-     ModifierValidityDisposition::Allow},
+     ModifierValidityDisposition::Allowed},
     {getSyntaxClass<CallableDecl>(),
      getSyntaxClass<PrefixModifier>(),
-     ModifierValidityDisposition::Allow},
+     ModifierValidityDisposition::Allowed},
     {getSyntaxClass<CallableDecl>(),
      getSyntaxClass<PostfixModifier>(),
-     ModifierValidityDisposition::Allow},
+     ModifierValidityDisposition::Allowed},
 
     // `export` (the `import`-re-export marker) is only meaningful on an `import` declaration.
     {getSyntaxClass<ImportDecl>(),
      getSyntaxClass<ExportedModifier>(),
-     ModifierValidityDisposition::Allow},
+     ModifierValidityDisposition::Allowed},
 
     // `inline` is meaningful only on a callable, not on an aggregate type declaration.
     {getSyntaxClass<AggTypeDecl>(),
@@ -1719,20 +1719,17 @@ static const ModifierValidityCheckingRule kModifierValidityCheckingRules[] = {
      ModifierValidityDisposition::Error},
 
     // A geometry-shader input primitive qualifier belongs on a geometry-shader parameter, not on
-    // an aggregate type declaration, where it has no meaning.
+    // an aggregate type declaration, where it has no meaning. This is diagnosed leniently (a
+    // warning today, an error in newer language versions) because such usage has historically been
+    // silently accepted.
     {getSyntaxClass<AggTypeDecl>(),
      getSyntaxClass<HLSLGeometryShaderInputPrimitiveTypeModifier>(),
-     ModifierValidityDisposition::Warn},
+     ModifierValidityDisposition::ErrorInNewLanguageVersion},
 };
 
-// Gates the deny-by-default *fall-through* diagnostic: the warning (current language version) /
-// error (Slang 202c) applied to a pair that matched no rule and was not accepted by the legacy
-// declaration check.
-static const bool kEnableModifierDenyByDefaultDiagnostic = false;
-
-// Index over `kModifierValidityCheckingRules`, bucketed by concrete modifier tag so a query only
-// scans the rules that mention the queried modifier. Populated once by the constructor and only
-// read thereafter (not a compiler-enforced `const`), which is what makes sharing it safe.
+// Index over `kModifierValidityRules`, bucketed by concrete modifier tag so a query only scans the
+// rules that mention the queried modifier. Populated once by the constructor and only read
+// thereafter (not a compiler-enforced `const`), which is what makes sharing it safe.
 struct ModifierRuleIndex
 {
     // `firstModifierTag` is the tag of the `Modifier` base class; `buckets[t - firstModifierTag]`
@@ -1748,10 +1745,10 @@ struct ModifierRuleIndex
         const Int modifierTagCount = modifierClass.getInfo()->tagCount;
         buckets.setCount(modifierTagCount);
 
-        for (Index ruleIndex = 0; ruleIndex < Index(SLANG_COUNT_OF(kModifierValidityCheckingRules));
+        for (Index ruleIndex = 0; ruleIndex < Index(SLANG_COUNT_OF(kModifierValidityRules));
              ++ruleIndex)
         {
-            auto& rule = kModifierValidityCheckingRules[ruleIndex];
+            auto& rule = kModifierValidityRules[ruleIndex];
             const Int ruleFirstTag = Int(rule.modifierClass.getTag());
             const Int ruleTagCount = rule.modifierClass.getInfo()->tagCount;
             for (Int tag = ruleFirstTag; tag < ruleFirstTag + ruleTagCount; ++tag)
@@ -1771,12 +1768,12 @@ struct ModifierRuleIndex
         // exception precedes its general fallback. Anything else is a footgun and is flagged:
         // general-before-specific (the specific row is dead), exact duplicates with conflicting
         // dispositions, or a partial overlap where neither row contains the other.
-        for (Index a = 0; a < Index(SLANG_COUNT_OF(kModifierValidityCheckingRules)); ++a)
+        for (Index a = 0; a < Index(SLANG_COUNT_OF(kModifierValidityRules)); ++a)
         {
-            for (Index b = a + 1; b < Index(SLANG_COUNT_OF(kModifierValidityCheckingRules)); ++b)
+            for (Index b = a + 1; b < Index(SLANG_COUNT_OF(kModifierValidityRules)); ++b)
             {
-                auto& ra = kModifierValidityCheckingRules[a];
-                auto& rb = kModifierValidityCheckingRules[b];
+                auto& ra = kModifierValidityRules[a];
+                auto& rb = kModifierValidityRules[b];
                 if (ra.disposition == rb.disposition)
                     continue;
                 // Bind through the const `SyntaxClassBase::isSubClassOf`; the derived
@@ -1805,27 +1802,21 @@ struct ModifierRuleIndex
 #endif
     }
 
-    // Query the disposition for concrete `modifierTag` applied to `nodeClass`, honoring
-    // first-match-wins in author order. Returns true and writes the matched rule's disposition to
-    // `outDisposition`, or returns false if no rule applies.
-    bool query(
-        ASTNodeType modifierTag,
-        SyntaxClassBase nodeClass,
-        ModifierValidityDisposition& outDisposition) const
+    // Return the disposition of the first rule (in author order) whose modifier class covers
+    // concrete `modifierTag` and whose node class covers `nodeClass`, or `NoDisposition` if no rule
+    // applies.
+    ModifierValidityDisposition query(ASTNodeType modifierTag, SyntaxClassBase nodeClass) const
     {
         const Int bucket = Int(modifierTag) - firstModifierTag;
         if (bucket < 0 || bucket >= buckets.getCount())
-            return false;
+            return ModifierValidityDisposition::NoDisposition;
         for (auto ruleIndex : buckets[bucket])
         {
-            auto& rule = kModifierValidityCheckingRules[ruleIndex];
+            auto& rule = kModifierValidityRules[ruleIndex];
             if (nodeClass.isSubClassOf(rule.nodeClass))
-            {
-                outDisposition = rule.disposition;
-                return true;
-            }
+                return rule.disposition;
         }
-        return false;
+        return ModifierValidityDisposition::NoDisposition;
     }
 };
 
@@ -1838,55 +1829,107 @@ static const ModifierRuleIndex& getModifierRuleIndex()
     return index;
 }
 
-bool queryModifierValidityOnNode(
-    Modifier* modifier,
-    SyntaxNodeBase* node,
-    ModifierValidityDisposition& outDisposition)
-{
-    return getModifierRuleIndex().query(modifier->astNodeType, node->getClass(), outDisposition);
-}
+// Decide the disposition of a modifier applied to a declaration using the legacy per-declaration
+// rules, whose applicability can depend on runtime predicates the data-driven table cannot express.
+// Defined below; forward-declared here because `queryModifierValidityOnSyntax` consults it.
+static ModifierValidityDisposition queryLegacyModifierValidityOnDecl(
+    bool isGLSLInput,
+    ASTNodeType modifierType,
+    Decl* decl);
 
-bool queryModifierValidityOnType(
+ModifierValidityDisposition queryModifierValidityOnSyntax(
+    SemanticsVisitor* visitor,
     Modifier* modifier,
-    Type* type,
-    ModifierValidityDisposition& outDisposition)
+    SyntaxNodeBase* node)
 {
-    return getModifierRuleIndex().query(modifier->astNodeType, type->getClass(), outDisposition);
-}
+    // A data-driven rule, when one applies, is authoritative.
+    auto disposition = getModifierRuleIndex().query(modifier->astNodeType, node->getClass());
+    if (disposition != ModifierValidityDisposition::NoDisposition)
+        return disposition;
 
-bool applyModifierDenyByDefault(SemanticsVisitor* visitor, Modifier* modifier)
-{
-    if (!kEnableModifierDenyByDefaultDiagnostic)
-        return false;
-    auto sink = visitor->getSink();
-    if (isSlang202cOrLater(visitor))
+    // Otherwise, for a declaration, fall back to the legacy per-declaration rules.
+    if (auto decl = as<Decl>(node))
     {
-        sink->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
-        return true;
+        auto moduleDecl = getModuleDecl(decl);
+        bool isGLSLInput = visitor->getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
+        if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
+            isGLSLInput = true;
+        return queryLegacyModifierValidityOnDecl(isGLSLInput, modifier->astNodeType, decl);
     }
-    sink->diagnose(Diagnostics::ModifierNotApplicableHere{.modifier = modifier});
-    return false;
+
+    return ModifierValidityDisposition::NoDisposition;
 }
 
-// The verdict of the legacy per-declaration modifier check. Unlike a plain bool, this
-// distinguishes a modifier the switch explicitly restricts and rejects (`Rejected`) from one the
-// switch does not restrict at all (`Unhandled`). The deny-by-default policy only applies to
-// `Unhandled`; `Allowed`/`Rejected` remain authoritative for the modifiers the switch does
-// restrict.
-enum class LegacyDeclModifierVerdict
+ModifierValidityDisposition queryModifierValidityOnType(Modifier* modifier, Type* type)
 {
-    Allowed,
-    Rejected,
-    Unhandled,
-};
+    return getModifierRuleIndex().query(modifier->astNodeType, type->getClass());
+}
 
-LegacyDeclModifierVerdict checkModifierAllowedOnDecl(
+ModifierValidityDisposition diagnoseModifierValidityIfNeeded(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    ModifierValidityDisposition disposition)
+{
+    auto sink = visitor->getSink();
+    switch (disposition)
+    {
+    case ModifierValidityDisposition::Allowed:
+        return ModifierValidityDisposition::Allowed;
+
+    case ModifierValidityDisposition::Error:
+        sink->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
+        return ModifierValidityDisposition::Error;
+
+    case ModifierValidityDisposition::ErrorInNewLanguageVersion:
+        // Invalid, but for source compatibility this is only an error in newer language versions;
+        // older versions get a warning and keep the modifier.
+        if (isSlang202cOrLater(visitor))
+        {
+            sink->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
+            return ModifierValidityDisposition::Error;
+        }
+        sink->diagnose(Diagnostics::ModifierNotApplicableHere{.modifier = modifier});
+        return ModifierValidityDisposition::Allowed;
+
+    case ModifierValidityDisposition::NoDisposition:
+        // The rules do not enumerate every valid modifier/subject pair (for example, a
+        // geometry-shader input primitive qualifier such as `triangle` is valid on a
+        // geometry-shader parameter but is not listed), so a modifier no rule speaks to is accepted
+        // with no diagnostic rather than rejected, to avoid rejecting valid constructs.
+        return ModifierValidityDisposition::Allowed;
+    }
+    return ModifierValidityDisposition::Allowed;
+}
+
+ModifierValidityDisposition validateModifierForType(
+    SemanticsVisitor* visitor,
+    Modifier* modifier,
+    Type* type)
+{
+    // `type` is the type the modifier is applied to; callers that might not have a resolved type
+    // (for example, an unresolved base expression) must guard the call rather than pass null.
+    SLANG_ASSERT(type);
+
+    // Only a modifier a rule explicitly rules on is diagnosed here; one no rule speaks to is left
+    // for the per-modifier type handling (`checkTypeModifier`) to judge, so it is not diagnosed
+    // twice.
+    auto disposition = queryModifierValidityOnType(modifier, type);
+    if (disposition == ModifierValidityDisposition::NoDisposition)
+        return ModifierValidityDisposition::Allowed;
+    return diagnoseModifierValidityIfNeeded(visitor, modifier, disposition);
+}
+
+// Decide the disposition of a modifier applied to a declaration using rules whose applicability
+// can depend on runtime predicates the data-driven table cannot express (global-vs-local, GLSL
+// mode, the parent struct's attributes, and so on). A modifier the switch explicitly restricts and
+// rejects yields `Error`; a modifier the switch does not restrict at all yields `NoDisposition`.
+static ModifierValidityDisposition queryLegacyModifierValidityOnDecl(
     bool isGLSLInput,
     ASTNodeType modifierType,
     Decl* decl)
 {
     auto verdict = [](bool allowed)
-    { return allowed ? LegacyDeclModifierVerdict::Allowed : LegacyDeclModifierVerdict::Rejected; };
+    { return allowed ? ModifierValidityDisposition::Allowed : ModifierValidityDisposition::Error; };
 
     switch (modifierType)
     {
@@ -1906,7 +1949,7 @@ LegacyDeclModifierVerdict checkModifierAllowedOnDecl(
         // If we are in GLSL mode, also allow these but otherwise fall to
         // the regular check
         if (isGLSLInput && as<EmptyDecl>(decl) && isGlobalDecl(decl))
-            return LegacyDeclModifierVerdict::Allowed;
+            return ModifierValidityDisposition::Allowed;
         [[fallthrough]];
 
     case ASTNodeType::RefModifier:
@@ -1925,7 +1968,7 @@ LegacyDeclModifierVerdict checkModifierAllowedOnDecl(
             if (auto structDecl = as<StructDecl>(varDecl->parentDecl))
             {
                 if (structDecl->findModifier<RayPayloadAttribute>())
-                    return LegacyDeclModifierVerdict::Allowed;
+                    return ModifierValidityDisposition::Allowed;
             }
         }
         return verdict(
@@ -2037,7 +2080,7 @@ LegacyDeclModifierVerdict checkModifierAllowedOnDecl(
     case ASTNodeType::HLSLGroupSharedModifier:
         // groupshared must be global or static.
         if (!as<VarDeclBase>(decl))
-            return LegacyDeclModifierVerdict::Rejected;
+            return ModifierValidityDisposition::Error;
         return verdict(isGlobalDecl(decl) || isEffectivelyStatic(decl));
     case ASTNodeType::DynModifier:
         return verdict(as<InterfaceDecl>(decl) || as<VarDecl>(decl) || as<ParamDecl>(decl));
@@ -2047,7 +2090,7 @@ LegacyDeclModifierVerdict checkModifierAllowedOnDecl(
             return verdict(as<FunctionDeclBase>(decl) && as<AggTypeDeclBase>(parent));
         }
     default:
-        return LegacyDeclModifierVerdict::Unhandled;
+        return ModifierValidityDisposition::NoDisposition;
     }
 }
 
@@ -2174,55 +2217,15 @@ Modifier* SemanticsVisitor::checkModifier(
         return checkedAttr;
     }
 
-    // An authored rule is authoritative; otherwise the legacy predicate-dependent declaration check
-    // stays in force, and only its `Unhandled` verdict (and any non-declaration node) reaches the
-    // staged deny-by-default fall-through (shader-slang/slang#12558).
-    if (ModifierValidityDisposition disposition;
-        queryModifierValidityOnNode(m, syntaxNode, disposition))
+    // `ignoreUnallowedModifier` keeps the modifier without validating it: it is set for modifiers
+    // that propagate from a shared-modifier group (which may be valid on some of the declarations
+    // they cover but not others) and while gathering completion suggestions.
+    if (!ignoreUnallowedModifier)
     {
-        switch (disposition)
-        {
-        case ModifierValidityDisposition::Allow:
-            break;
-        case ModifierValidityDisposition::Warn:
-            if (!ignoreUnallowedModifier)
-                getSink()->diagnose(Diagnostics::ModifierNotApplicableHere{.modifier = m});
-            break;
-        case ModifierValidityDisposition::Error:
-            if (!ignoreUnallowedModifier)
-            {
-                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = m});
-                return nullptr;
-            }
-            return m;
-        }
-    }
-    else
-    {
-        LegacyDeclModifierVerdict legacy = LegacyDeclModifierVerdict::Unhandled;
-        if (auto decl = as<Decl>(syntaxNode))
-        {
-            auto moduleDecl = getModuleDecl(decl);
-            bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-            if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
-                isGLSLInput = true;
-            legacy = checkModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl);
-        }
-
-        if (legacy == LegacyDeclModifierVerdict::Rejected)
-        {
-            if (!ignoreUnallowedModifier)
-            {
-                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = m});
-                return nullptr;
-            }
-            return m;
-        }
-        if (legacy == LegacyDeclModifierVerdict::Unhandled && !ignoreUnallowedModifier &&
-            applyModifierDenyByDefault(this, m))
-        {
+        auto disposition = queryModifierValidityOnSyntax(this, m, syntaxNode);
+        if (diagnoseModifierValidityIfNeeded(this, m, disposition) ==
+            ModifierValidityDisposition::Error)
             return nullptr;
-        }
     }
 
     if (as<ConstExprModifier>(m))

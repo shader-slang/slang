@@ -9306,31 +9306,12 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
     List<Val*> modifierVals;
     for (auto modifier : expr->modifiers)
     {
-        // Type-axis modifier-validity check (shader-slang/slang#12558). There is deliberately no
-        // deny-by-default fall-through here: the per-modifier handling below (`checkTypeModifier`)
-        // already validates the type modifiers it knows (`unorm`/`snorm`/`no_diff`, `const`,
-        // `volatile`), so a fall-through would emit a second diagnostic for the same modifier. A
-        // type-axis rule must therefore define its precedence against `checkTypeModifier` before it
-        // is added. The guard skips the null `baseType` an unresolved base name leaves behind.
-        if (baseType)
-        {
-            if (ModifierValidityDisposition disposition;
-                queryModifierValidityOnType(modifier, baseType, disposition))
-            {
-                switch (disposition)
-                {
-                case ModifierValidityDisposition::Error:
-                    getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = modifier});
-                    continue;
-                case ModifierValidityDisposition::Warn:
-                    getSink()->diagnose(
-                        Diagnostics::ModifierNotApplicableHere{.modifier = modifier});
-                    break;
-                case ModifierValidityDisposition::Allow:
-                    break;
-                }
-            }
-        }
+        // Drop a modifier that is not allowed on the type; the per-modifier handling below stays
+        // the authority on any modifier the validation does not itself reject. Skip validation when
+        // the base did not resolve to a type (an error was already diagnosed for the base).
+        if (baseType &&
+            validateModifierForType(this, modifier, baseType) == ModifierValidityDisposition::Error)
+            continue;
 
         if (auto matrixLayoutModifier = as<MatrixLayoutModifier>(modifier))
         {

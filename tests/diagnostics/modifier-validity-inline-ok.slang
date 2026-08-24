@@ -1,8 +1,8 @@
-// shader-slang/slang#12558: the `{CallableDecl, InlineModifier, Allow}` rule short-circuits the
-// legacy check, so `inline` on a function must keep compiling with no diagnostic. `inline` is not
-// used anywhere in the core module, so without this positive test a regression of that rule (wrong
-// class or disposition) would silently start rejecting valid `inline` functions. Exhaustive mode
-// (no `non-exhaustive`) fails on any spurious diagnostic on the function.
+// The `{CallableDecl, InlineModifier, Allowed}` rule takes precedence over the legacy check, so
+// `inline` on a function must keep compiling with no diagnostic. Without this positive test a
+// regression of that rule (wrong class or disposition) would silently start rejecting valid
+// `inline` functions. Exhaustive mode (no `non-exhaustive`) fails on any spurious diagnostic on
+// the function.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
