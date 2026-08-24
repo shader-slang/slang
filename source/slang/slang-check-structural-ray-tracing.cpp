@@ -69,6 +69,220 @@ static StructuralRayTracingStageKind _findStageImplementationFromParentConforman
     return StructuralRayTracingStageKind::Count;
 }
 
+static FunctionDeclBase* _getStageImplementationFromSubtypeWitness(
+    const StructuralRayTracingDeclRegistry& registry,
+    StructuralRayTracingStageKind stageKind,
+    SubtypeWitness* witness)
+{
+    witness = witness ? as<SubtypeWitness>(witness->resolve()) : nullptr;
+    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
+    {
+        auto inheritanceDecl = declaredWitness->getDeclRef().as<InheritanceDecl>().getDecl();
+        if (inheritanceDecl)
+        {
+            if (auto implementation =
+                    _getStageImplementation(registry, stageKind, inheritanceDecl->witnessTable))
+                return implementation;
+        }
+    }
+    else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
+    {
+        if (auto implementation = _getStageImplementationFromSubtypeWitness(
+                registry,
+                stageKind,
+                transitiveWitness->getSubToMid()))
+            return implementation;
+        return _getStageImplementationFromSubtypeWitness(
+            registry,
+            stageKind,
+            transitiveWitness->getMidToSup());
+    }
+    return nullptr;
+}
+
+static Stage _getNativeStage(StructuralRayTracingStageKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return Stage::ClosestHit;
+    case StructuralRayTracingStageKind::AnyHit:
+        return Stage::AnyHit;
+    case StructuralRayTracingStageKind::Intersection:
+        return Stage::Intersection;
+    case StructuralRayTracingStageKind::Miss:
+        return Stage::Miss;
+    case StructuralRayTracingStageKind::Callable:
+        return Stage::Callable;
+    default:
+        return Stage::Unknown;
+    }
+}
+
+static StructuralRayTracingStageKind _getStructuralStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::ClosestHit:
+        return StructuralRayTracingStageKind::ClosestHit;
+    case Stage::AnyHit:
+        return StructuralRayTracingStageKind::AnyHit;
+    case Stage::Intersection:
+        return StructuralRayTracingStageKind::Intersection;
+    case Stage::Miss:
+        return StructuralRayTracingStageKind::Miss;
+    case Stage::Callable:
+        return StructuralRayTracingStageKind::Callable;
+    default:
+        return StructuralRayTracingStageKind::Count;
+    }
+}
+
+static FuncDecl* _createStructuralEntryPointDecl(
+    Linkage* linkage,
+    Module* module,
+    AggTypeDecl* stageType)
+{
+    auto astBuilder = linkage->getASTBuilder();
+    auto moduleDecl = module->getModuleDecl();
+
+    auto funcDecl = astBuilder->create<FuncDecl>();
+    funcDecl->nameAndLoc = stageType->nameAndLoc;
+    funcDecl->loc = stageType->loc;
+    funcDecl->closingSourceLoc = stageType->closingSourceLoc;
+    funcDecl->parentDecl = moduleDecl;
+    funcDecl->returnType.type = astBuilder->getVoidType();
+    funcDecl->ownedScope = astBuilder->create<Scope>();
+    funcDecl->ownedScope->containerDecl = funcDecl;
+    funcDecl->ownedScope->parent = moduleDecl->ownedScope;
+
+    auto body = astBuilder->create<BlockStmt>();
+    body->scopeDecl = astBuilder->create<ScopeDecl>();
+    body->scopeDecl->ownedScope = astBuilder->create<Scope>();
+    body->scopeDecl->ownedScope->parent = funcDecl->ownedScope;
+    body->scopeDecl->parentDecl = funcDecl;
+    body->body = astBuilder->create<SeqStmt>();
+    body->loc = stageType->loc;
+    body->closingSourceLoc = stageType->closingSourceLoc;
+    funcDecl->body = body;
+    funcDecl->setCheckState(DeclCheckState::CapabilityChecked);
+
+    return funcDecl;
+}
+
+DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
+    Linkage* linkage,
+    Module* module,
+    Name* name,
+    Profile& ioProfile,
+    DiagnosticSink* sink,
+    bool* outFoundStruct,
+    FuncDecl** outInvokeMethod)
+{
+    *outFoundStruct = false;
+    *outInvokeMethod = nullptr;
+    auto& registry = linkage->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return DeclRef<FuncDecl>();
+
+    auto expr = module->findDeclFromString(getText(name), sink);
+    auto declRefExpr = as<DeclRefExpr>(expr);
+    auto stageTypeDeclRef =
+        declRefExpr ? declRefExpr->declRef.as<AggTypeDecl>() : DeclRef<AggTypeDecl>();
+    if (!stageTypeDeclRef || getModule(stageTypeDeclRef.getDecl()) != module)
+        return DeclRef<FuncDecl>();
+
+    *outFoundStruct = true;
+    SharedSemanticsContext sharedContext(linkage, module, sink);
+    for (auto dependency : module->getModuleDependencies())
+    {
+        auto moduleDecl = dependency->getModuleDecl();
+        if (sharedContext.importedModulesSet.add(moduleDecl))
+            sharedContext.importedModulesList.add(moduleDecl);
+    }
+    SemanticsVisitor visitor(&sharedContext);
+    visitor.ensureDecl(stageTypeDeclRef, DeclCheckState::ReadyForConformances);
+
+    FunctionDeclBase* stageImplementations[int(StructuralRayTracingStageKind::Count)] = {};
+    auto stageType = DeclRefType::create(linkage->getASTBuilder(), stageTypeDeclRef);
+    for (auto facet : visitor.getShared()->getInheritanceInfo(stageType).facets)
+    {
+        auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>();
+        auto kind = registry.getStageKind(interfaceDeclRef.getDecl());
+        if (kind != StructuralRayTracingStageKind::Count)
+        {
+            stageImplementations[int(kind)] =
+                _getStageImplementationFromSubtypeWitness(registry, kind, facet->subtypeWitness);
+        }
+    }
+
+    Count implementedStageCount = 0;
+    StructuralRayTracingStageKind onlyImplementedStage = StructuralRayTracingStageKind::Count;
+    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    {
+        if (stageImplementations[i])
+        {
+            ++implementedStageCount;
+            onlyImplementedStage = StructuralRayTracingStageKind(i);
+        }
+    }
+
+    if (implementedStageCount == 0)
+    {
+        sink->diagnose(Diagnostics::StructuralRayTracingEntryPointNotStage{
+            .stageType = stageTypeDeclRef.getDecl()});
+        return DeclRef<FuncDecl>();
+    }
+
+    auto requestedStage = ioProfile.getStage();
+    auto selectedStage = _getStructuralStage(requestedStage);
+    if (requestedStage != Stage::Unknown)
+    {
+        if (selectedStage == StructuralRayTracingStageKind::Count ||
+            !stageImplementations[int(selectedStage)])
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingEntryPointStageMismatch{
+                .stage = getStageName(requestedStage),
+                .stageType = stageTypeDeclRef.getDecl()});
+            return DeclRef<FuncDecl>();
+        }
+    }
+    else if (implementedStageCount == 1)
+    {
+        selectedStage = onlyImplementedStage;
+        ioProfile = Profile(_getNativeStage(selectedStage));
+    }
+    else
+    {
+        sink->diagnose(Diagnostics::StructuralRayTracingEntryPointAmbiguousStage{
+            .stageType = stageTypeDeclRef.getDecl()});
+        return DeclRef<FuncDecl>();
+    }
+
+    bool hasInstanceField = false;
+    for (auto field : stageTypeDeclRef.getDecl()->getFields())
+    {
+        if (!isEffectivelyStatic(field))
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingStageInstanceField{.field = field});
+            hasInstanceField = true;
+        }
+    }
+    if (hasInstanceField)
+        return DeclRef<FuncDecl>();
+
+    auto invokeMethod = as<FuncDecl>(stageImplementations[int(selectedStage)]);
+    if (!invokeMethod)
+    {
+        sink->diagnose(Diagnostics::InternalCompilerError{.location = stageTypeDeclRef.getLoc()});
+        return DeclRef<FuncDecl>();
+    }
+
+    *outInvokeMethod = invokeMethod;
+    auto funcDecl = _createStructuralEntryPointDecl(linkage, module, stageTypeDeclRef.getDecl());
+    return makeDeclRef(funcDecl);
+}
+
 enum class StructuralRayTracingRuntimeTypeKind
 {
     None,
