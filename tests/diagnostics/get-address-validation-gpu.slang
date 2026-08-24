@@ -19,27 +19,27 @@ void testCases(int param, int* p2, ConstantBuffer<Foo> cbParam)
 {
     // & param; // not allowed
     int* a = __getAddress(param);
-//diag:      ^^^^^^^^^^^^ invalid __getAddress usage
+//diag:      ^^^^^^^^^^^^ error E31160
 //diag:      ^^^^^^^^^^^^ cannot take the address of a function-local variable
     sink(a);
 
     // &p2; // not allowed
     int** b = __getAddress(p2);
-//diag:       ^^^^^^^^^^^^ invalid __getAddress usage
+//diag:       ^^^^^^^^^^^^ error E31160
 //diag:       ^^^^^^^^^^^^ cannot take the address of a function-local variable
     sink2(b);
 
     // &localVar; // not allowed
     int localVar = 0;
     int* c = __getAddress(localVar);
-//diag:      ^^^^^^^^^^^^ invalid __getAddress usage
+//diag:      ^^^^^^^^^^^^ error E31160
 //diag:      ^^^^^^^^^^^^ cannot take the address of a function-local variable
     sink(c);
 
     // &localVar2; // not allowed
     int* localVar2 = devicePointer;
     int** d = __getAddress(localVar2);
-//diag:       ^^^^^^^^^^^^ invalid __getAddress usage
+//diag:       ^^^^^^^^^^^^ error E31160
 //diag:       ^^^^^^^^^^^^ cannot take the address of a function-local variable
     sink2(d);
 
