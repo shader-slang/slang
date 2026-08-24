@@ -87,13 +87,19 @@ bool TargetRequest::isGLSLBasedTarget()
 }
 
 // static
-CapabilitySet TargetRequest::decodeCapabilityOption(const CompilerOptionValue& atomVal)
+CapabilitySet TargetRequest::decodeCapabilityOption(
+    const CompilerOptionValue& atomVal,
+    String* outName)
 {
     switch (atomVal.kind)
     {
     case CompilerOptionValueKind::Int:
+        if (outName)
+            *outName = capabilityNameToString(CapabilityName(atomVal.intValue));
         return CapabilitySet(CapabilityName(atomVal.intValue));
     case CompilerOptionValueKind::String:
+        if (outName)
+            *outName = atomVal.stringValue;
         return CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
     default:
         return CapabilitySet();
@@ -272,6 +278,19 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
     // diagnostics, which is not a supported way to call this function.
     SLANG_RELEASE_ASSERT(sink);
 
+    // A target's own `-capability` requests are fixed at target-construction time (see
+    // Linkage::addTarget()) and never change afterward, but checkEntryPoints() -- and
+    // therefore this function -- runs once per FrontEndCompileRequest, i.e. once per
+    // module load, not once per target's lifetime. Without this latch, a persistent
+    // session that loads many modules against the same target would re-derive and
+    // re-diagnose the identical incompatibility on every single load.
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_capabilitiesChecked)
+            return;
+        m_capabilitiesChecked = true;
+    }
+
     bool isGLSLTarget = isGLSLBasedTarget();
     auto cookedCaps = getTargetCaps();
 
@@ -288,29 +307,13 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
     List<SourcedCapabilityRequirement> requirements;
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        // Decode the option value into a display name and a CapabilitySet.
-        // decodeCapabilityOption returns an empty set for unknown/invalid entries.
+        // Decode the option value into a CapabilitySet and a display name in one place
+        // (decodeCapabilityOption is shared with getTargetCaps()). An unknown/invalid
+        // entry (e.g. SLANG_CAPABILITY_UNKNOWN, or a string that doesn't name a known
+        // capability) decodes to an empty CapabilitySet, which the isEmpty() check below
+        // skips -- there's no need for a separate up-front validity check.
         String requestedCapName;
-        switch (atomVal.kind)
-        {
-        case CompilerOptionValueKind::Int:
-            if (atomVal.intValue == SLANG_CAPABILITY_UNKNOWN)
-                continue;
-            requestedCapName = capabilityNameToString(CapabilityName(atomVal.intValue));
-            break;
-        case CompilerOptionValueKind::String:
-            {
-                auto capName = findCapabilityName(atomVal.stringValue.getUnownedSlice());
-                if (capName == CapabilityName::Invalid)
-                    continue;
-                requestedCapName = atomVal.stringValue;
-            }
-            break;
-        default:
-            continue;
-        }
-
-        CapabilitySet toAdd = decodeCapabilityOption(atomVal);
+        CapabilitySet toAdd = decodeCapabilityOption(atomVal, &requestedCapName);
         if (toAdd.isEmpty())
             continue;
 
@@ -318,7 +321,7 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         // to their glsl_spirv_* equivalents by getTargetCaps() (see isGLSLBasedTarget()'s
         // comment), so they are not an error here.
         //
-        // TODO(https://github.com/shader-slang/slang/issues/NNNN): this exemption is
+        // TODO(https://github.com/shader-slang/slang/issues/12703): this exemption is
         // broader than the conversion it is meant to mirror. getTargetCaps() only
         // converts SPIRV *version* atoms, but this test also exempts SPIRV *extension*
         // atoms via the same "belongs to the spirv target family" check, so a SPIRV

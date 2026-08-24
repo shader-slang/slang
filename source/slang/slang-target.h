@@ -173,16 +173,23 @@ public:
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
 private:
-    /// Returns true if this target emits GLSL or uses the GLSL-SPIRV pipeline.
-    /// Used to determine whether SPIRV capability atoms should be auto-converted
-    /// rather than treated as incompatible. Keep in sync with getTargetCaps().
+    /// Returns true if this target emits GLSL or uses the GLSL-SPIRV pipeline. Used to
+    /// determine whether SPIRV capability atoms should be auto-converted rather than
+    /// treated as incompatible. This is the single source of truth for that
+    /// classification: getTargetCaps() reads its own `isGLSLTarget` local from this
+    /// function rather than re-deriving it, so there is nothing else that needs to stay
+    /// in sync with it.
     bool isGLSLBasedTarget();
 
-    /// Decode one CompilerOptionValue (Int or String kind) from a Capability option
-    /// into a CapabilitySet.  Returns an empty set for unknown or invalid entries.
-    /// Shared between getTargetCaps() and checkCapabilities() to keep the decode
-    /// logic in one place.
-    static CapabilitySet decodeCapabilityOption(const CompilerOptionValue& atomVal);
+    /// Decode one CompilerOptionValue (Int or String kind) from a Capability option into
+    /// a CapabilitySet, optionally also writing the capability's display name (e.g.
+    /// "spirv_1_5") to `outName` for use in diagnostics. Returns an empty set for
+    /// unknown or invalid entries, in which case `*outName` is left unmodified. Shared
+    /// between getTargetCaps() (which only needs the CapabilitySet) and
+    /// checkCapabilities() (which needs both) to keep the decode logic in one place.
+    static CapabilitySet decodeCapabilityOption(
+        const CompilerOptionValue& atomVal,
+        String* outName = nullptr);
 
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
@@ -190,6 +197,14 @@ private:
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
     // Layout/codegen threads share one TargetRequest and lazily initialize this derived state.
     std::mutex m_mutex;
+    // Set once checkCapabilities() has diagnosed this target's explicitly requested
+    // capabilities. A target's own `-capability` requests don't change after the target
+    // is constructed (see Linkage::addTarget()), but checkCapabilities() is called once
+    // per FrontEndCompileRequest -- i.e. once per module load in a session, not once per
+    // target's lifetime -- so without this latch a persistent session that loads many
+    // modules against the same incompatible target would re-emit the same E36121
+    // diagnostic on every load.
+    bool m_capabilitiesChecked = false;
 };
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?
