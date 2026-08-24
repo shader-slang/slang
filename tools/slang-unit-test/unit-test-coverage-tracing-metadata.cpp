@@ -432,7 +432,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
 
     // A negative bindless index must be rejected, and only the API can
     // produce one: the CLI parser refuses negatives before they reach the
-    // compiler, so the E45118 guard is unreachable from a `.slang` test and
+    // compiler, so the E45117 guard is unreachable from a `.slang` test and
     // would silently rot without this. What it protects against is a quiet
     // fallback to the single-buffer form -- one descriptor binding per shader,
     // the opposite of what a caller asking for the bindless form wants.
@@ -488,7 +488,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         UnownedStringSlice diagnosticText(
             (const char*)codeDiagnostics->getBufferPointer(),
             codeDiagnostics->getBufferSize());
-        SLANG_CHECK(diagnosticText.indexOf(toSlice("45118")) >= 0);
+        SLANG_CHECK(diagnosticText.indexOf(toSlice("45117")) >= 0);
     }
 
     // CUDA follows the same synthetic-resource marshaling contract as
