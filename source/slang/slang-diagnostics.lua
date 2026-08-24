@@ -963,6 +963,34 @@ err(
 )
 
 err(
+    "structural-ray-tracing-stage-runtime-value",
+    20023,
+    "runtime use of a structural ray-tracing stage type",
+    span { loc = "location", message = "structural ray-tracing stage type '~type:type' has no runtime representation" }
+)
+
+err(
+    "structural-ray-tracing-input-storage",
+    20024,
+    "storage of a structural ray-tracing stage input",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' is compiler-provided and may only be used as a value parameter" }
+)
+
+err(
+    "structural-ray-tracing-type-construction",
+    20025,
+    "construction of a structural ray-tracing type",
+    span { loc = "location", message = "structural ray-tracing type '~type:type' cannot be constructed by user code" }
+)
+
+err(
+    "structural-ray-tracing-metadata-runtime-value",
+    20026,
+    "runtime use of structural ray-tracing metadata",
+    span { loc = "location", message = "structural ray-tracing metadata type '~type:type' has no runtime representation" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",

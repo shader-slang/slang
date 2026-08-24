@@ -8,6 +8,7 @@ namespace Slang
 
 class InterfaceDecl;
 class FunctionDeclBase;
+class AggTypeDecl;
 
 enum class StructuralRayTracingStageKind
 {
@@ -19,15 +20,32 @@ enum class StructuralRayTracingStageKind
     Count,
 };
 
+enum class StructuralRayTracingMetadataKind
+{
+    ShaderGroupSlot,
+    HitGroup,
+    MissGroup,
+    CallableGroup,
+    HitGroupList,
+    MissGroupList,
+    CallableGroupList,
+    TraceProgramLayout,
+    Count,
+};
+
 class StructuralRayTracingDeclRegistry
 {
 public:
     bool registerTrustedModule(
         Module* module,
         StructuralRayTracingStageKind* outMissingStage = nullptr);
+    bool isInitialized() const { return m_stageInterfaces[0] != nullptr; }
 
     InterfaceDecl* getStageInterface(StructuralRayTracingStageKind kind) const;
     StructuralRayTracingStageKind getStageKind(InterfaceDecl* interfaceDecl) const;
+    AggTypeDecl* getStageInputType(StructuralRayTracingStageKind kind) const;
+    StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
+    StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
     void registerStageImplementation(
@@ -37,7 +55,9 @@ public:
 
 private:
     InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
+    AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
+    InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
 };
 
