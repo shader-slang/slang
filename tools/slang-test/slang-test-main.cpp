@@ -562,6 +562,38 @@ static void applyMacroSubstitution(String filePath, TestDetails& details)
     }
 }
 
+// Normalizes and validates the output-path arguments of a parsed test directive, reporting any
+// rejection (an absolute `-o` / `-separate-debug-info-output` path) as a run error against
+// `filePath` so the test fails rather than silently running with an unportable path.
+static SlangResult _normalizeTestOutputPaths(
+    const String& filePath,
+    List<String>& args,
+    TestContext* context)
+{
+    String error;
+    const SlangResult res = normalizeTestOutputPathsForTestFile(filePath, args, error);
+    if (SLANG_FAILED(res))
+    {
+        if (context && context->getTestReporter())
+        {
+            context->getTestReporter()->messageFormat(
+                TestMessageType::RunError,
+                "Invalid test directive in file '%s': %s",
+                filePath.getBuffer(),
+                error.getBuffer());
+        }
+        else
+        {
+            fprintf(
+                stderr,
+                "Invalid test directive in file '%s': %s\n",
+                filePath.getBuffer(),
+                error.getBuffer());
+        }
+    }
+    return res;
+}
+
 // Try to read command-line options from the test file itself
 static SlangResult _gatherTestsForFile(
     TestCategorySet* categorySet,
@@ -742,7 +774,8 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
-            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
+            SLANG_RETURN_ON_FAIL(
+                _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
             outTestList->tests.add(testDetails);
         }
@@ -773,7 +806,8 @@ static SlangResult _gatherTestsForFile(
 
             // Apply the file wide options
             _combineOptions(categorySet, fileOptions, testDetails.options);
-            normalizeTestOutputPathsForTestFile(filePath, testDetails.options.args);
+            SLANG_RETURN_ON_FAIL(
+                _normalizeTestOutputPaths(filePath, testDetails.options.args, context));
 
             // Mark that it is a diagnostic test
             testDetails.options.type = TestOptions::Type::Diagnostic;
