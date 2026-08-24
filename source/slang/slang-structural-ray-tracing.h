@@ -34,6 +34,22 @@ enum class StructuralRayTracingMetadataKind
     Count,
 };
 
+enum class StructuralRayTracingStageInputOperationKind
+{
+    RayTCurrent,
+    HitKind,
+    WorldRayOrigin,
+    WorldRayDirection,
+    ObjectSpaceRay,
+    PrimitiveIndex,
+    GeometryIndex,
+    IgnoreHit,
+    AcceptHitAndEndSearch,
+    ReportHit,
+    ReportHitWithKind,
+    Count,
+};
+
 enum class RayTracingAPIFamily
 {
     Structural,
@@ -60,6 +76,8 @@ public:
     AggTypeDecl* getStageInputType(StructuralRayTracingStageKind kind) const;
     StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
     StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
+    StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
+        FunctionDeclBase* functionDecl) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
     void registerStageImplementation(
@@ -77,6 +95,8 @@ private:
     AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
+    Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>
+        m_stageInputOperations;
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
 };
