@@ -35,6 +35,7 @@
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir-strip.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
@@ -12151,8 +12152,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             operandCount++;
         }
 
-        // Allocate an IRInterfaceType with the `operandCount` operands.
-        IRInterfaceType* irInterface = subBuilder->createInterfaceType(operandCount, nullptr);
+        // Preserve compiler-owned stage identity when lowering the exact declarations
+        // registered from the trusted slang.raytracing standard module.
+        auto interfaceOp = kIROp_InterfaceType;
+        auto stageKind =
+            context->getLinkage()->getStructuralRayTracingDeclRegistry().getStageKind(decl);
+        if (stageKind != StructuralRayTracingStageKind::Count)
+            interfaceOp = getStructuralRayTracingStageInterfaceOp(stageKind);
+
+        IRInterfaceType* irInterface =
+            subBuilder->createInterfaceType(interfaceOp, operandCount, nullptr);
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.

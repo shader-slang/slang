@@ -753,6 +753,36 @@ local insts = {
 			},
 			{ interface = { struct_name = "InterfaceType", global = true } },
 			{
+				RaytracingStageInterface = {
+					global = true,
+					{
+						closest_hit_stage_interface = {
+							struct_name = "ClosestHitStageInterface",
+						},
+					},
+					{
+						any_hit_stage_interface = {
+							struct_name = "AnyHitStageInterface",
+						},
+					},
+					{
+						intersection_stage_interface = {
+							struct_name = "IntersectionStageInterface",
+						},
+					},
+					{
+						miss_stage_interface = {
+							struct_name = "MissStageInterface",
+						},
+					},
+					{
+						callable_stage_interface = {
+							struct_name = "CallableStageInterface",
+						},
+					},
+				},
+			},
+			{
 				associated_type = {
 					struct_name = "AssociatedType",
 					operands = { "constraintTypes", "IRInterfaceType", variadic = true },

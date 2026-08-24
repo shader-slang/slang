@@ -949,6 +949,13 @@ err(
 )
 
 err(
+    "compiler-owned-intrinsic-op",
+    20021,
+    "compiler-owned intrinsic operation",
+    span { loc = "location", message = "intrinsic operation '~operation' is reserved for compiler use" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
