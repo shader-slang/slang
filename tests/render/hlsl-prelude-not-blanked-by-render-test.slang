@@ -1,6 +1,9 @@
+//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
+
 // Regression test for shader-slang/slang#12462.
 //
-// The two directives below run in order within one file: the first exercises the
+// The two directives above run in order within one file: the first exercises the
 // render-test path (`-cpu` COMPARE_COMPUTE), the second asserts render-test did
 // not blank the HLSL prelude on the session they share.
 //
@@ -19,9 +22,6 @@
 // NVAPI overrides installed by render-test and slang-test (which use an absolute
 // path) — but is absent from a blanked prelude, so the `{{.*}}` pattern below is
 // the marker for "prelude still present".
-
-//TEST:COMPARE_COMPUTE(filecheck-buffer=BUF):-cpu -output-using-type
-//TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
