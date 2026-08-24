@@ -26,10 +26,54 @@ const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageK
     }
 }
 
-static InterfaceDecl* _findStageInterfaceInContainer(
+static const char* _getStageInputTypeName(StructuralRayTracingStageKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return "ClosestHitInput";
+    case StructuralRayTracingStageKind::AnyHit:
+        return "AnyHitInput";
+    case StructuralRayTracingStageKind::Intersection:
+        return "IntersectionInput";
+    case StructuralRayTracingStageKind::Miss:
+        return "MissInput";
+    case StructuralRayTracingStageKind::Callable:
+        return "CallableInput";
+    default:
+        return nullptr;
+    }
+}
+
+static const char* _getMetadataInterfaceName(StructuralRayTracingMetadataKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingMetadataKind::ShaderGroupSlot:
+        return "IShaderGroupSlot";
+    case StructuralRayTracingMetadataKind::HitGroup:
+        return "IHitGroup";
+    case StructuralRayTracingMetadataKind::MissGroup:
+        return "IMissGroup";
+    case StructuralRayTracingMetadataKind::CallableGroup:
+        return "ICallableGroup";
+    case StructuralRayTracingMetadataKind::HitGroupList:
+        return "IHitGroupList";
+    case StructuralRayTracingMetadataKind::MissGroupList:
+        return "IMissGroupList";
+    case StructuralRayTracingMetadataKind::CallableGroupList:
+        return "ICallableGroupList";
+    case StructuralRayTracingMetadataKind::TraceProgramLayout:
+        return "ITraceProgramLayout";
+    default:
+        return nullptr;
+    }
+}
+
+static Decl* _findNamedDeclInContainer(
     ContainerDecl* container,
     Name* rtName,
-    Name* interfaceName,
+    Name* declName,
     bool insideRayTracingNamespace)
 {
     for (auto decl : container->getDirectMemberDecls())
@@ -41,19 +85,13 @@ static InterfaceDecl* _findStageInterfaceInContainer(
         auto candidate = decl;
         if (auto genericDecl = as<GenericDecl>(candidate))
             candidate = genericDecl->inner;
-        if (insideNamespace && candidate->getName() == interfaceName)
-        {
-            if (auto interfaceDecl = as<InterfaceDecl>(candidate))
-                return interfaceDecl;
-        }
+        if (insideNamespace && candidate->getName() == declName)
+            return candidate;
 
         if (auto childContainer = as<ContainerDecl>(decl))
         {
-            if (auto result = _findStageInterfaceInContainer(
-                    childContainer,
-                    rtName,
-                    interfaceName,
-                    insideNamespace))
+            if (auto result =
+                    _findNamedDeclInContainer(childContainer, rtName, declName, insideNamespace))
             {
                 return result;
             }
@@ -62,14 +100,25 @@ static InterfaceDecl* _findStageInterfaceInContainer(
     return nullptr;
 }
 
-static InterfaceDecl* _findStageInterface(Module* module, StructuralRayTracingStageKind kind)
+static Decl* _findNamedDecl(Module* module, const char* name)
 {
     auto namePool = module->getASTBuilder()->getNamePool();
-    return _findStageInterfaceInContainer(
+    return _findNamedDeclInContainer(
         module->getModuleDecl(),
         namePool->getName("rt"),
-        namePool->getName(getStructuralRayTracingStageInterfaceName(kind)),
+        namePool->getName(name),
         false);
+}
+
+static InterfaceDecl* _findStageInterface(Module* module, StructuralRayTracingStageKind kind)
+{
+    return as<InterfaceDecl>(
+        _findNamedDecl(module, getStructuralRayTracingStageInterfaceName(kind)));
+}
+
+static AggTypeDecl* _findStageInputType(Module* module, StructuralRayTracingStageKind kind)
+{
+    return as<AggTypeDecl>(_findNamedDecl(module, _getStageInputTypeName(kind)));
 }
 
 static FunctionDeclBase* _findStageInvokeRequirement(InterfaceDecl* interfaceDecl)
@@ -93,14 +142,16 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     StructuralRayTracingStageKind* outMissingStage)
 {
     InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
+    AggTypeDecl* inputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* invokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
     {
         auto kind = StructuralRayTracingStageKind(i);
         interfaces[i] = _findStageInterface(module, kind);
+        inputTypes[i] = _findStageInputType(module, kind);
         if (interfaces[i])
             invokeRequirements[i] = _findStageInvokeRequirement(interfaces[i]);
-        if (!interfaces[i] || !invokeRequirements[i])
+        if (!interfaces[i] || !inputTypes[i] || !invokeRequirements[i])
         {
             if (outMissingStage)
                 *outMissingStage = kind;
@@ -111,7 +162,14 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
     {
         m_stageInterfaces[i] = interfaces[i];
+        m_stageInputTypes[i] = inputTypes[i];
         m_stageInvokeRequirements[i] = invokeRequirements[i];
+    }
+    for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
+    {
+        auto kind = StructuralRayTracingMetadataKind(i);
+        m_metadataInterfaces[i] =
+            as<InterfaceDecl>(_findNamedDecl(module, _getMetadataInterfaceName(kind)));
     }
     return true;
 }
@@ -128,12 +186,49 @@ InterfaceDecl* StructuralRayTracingDeclRegistry::getStageInterface(
 StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
     InterfaceDecl* interfaceDecl) const
 {
+    if (!interfaceDecl)
+        return StructuralRayTracingStageKind::Count;
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
     {
         if (m_stageInterfaces[i] == interfaceDecl)
             return StructuralRayTracingStageKind(i);
     }
     return StructuralRayTracingStageKind::Count;
+}
+
+AggTypeDecl* StructuralRayTracingDeclRegistry::getStageInputType(
+    StructuralRayTracingStageKind kind) const
+{
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingStageKind::Count))
+        return nullptr;
+    return m_stageInputTypes[index];
+}
+
+StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageInputKind(
+    AggTypeDecl* typeDecl) const
+{
+    if (!typeDecl)
+        return StructuralRayTracingStageKind::Count;
+    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    {
+        if (m_stageInputTypes[i] == typeDecl)
+            return StructuralRayTracingStageKind(i);
+    }
+    return StructuralRayTracingStageKind::Count;
+}
+
+StructuralRayTracingMetadataKind StructuralRayTracingDeclRegistry::getMetadataKind(
+    InterfaceDecl* interfaceDecl) const
+{
+    if (!interfaceDecl)
+        return StructuralRayTracingMetadataKind::Count;
+    for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
+    {
+        if (m_metadataInterfaces[i] == interfaceDecl)
+            return StructuralRayTracingMetadataKind(i);
+    }
+    return StructuralRayTracingMetadataKind::Count;
 }
 
 FunctionDeclBase* StructuralRayTracingDeclRegistry::getStageInvokeRequirement(
@@ -156,6 +251,8 @@ void StructuralRayTracingDeclRegistry::registerStageImplementation(
 StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
     FunctionDeclBase* implementation) const
 {
+    if (!implementation)
+        return StructuralRayTracingStageKind::Count;
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
     {
         if (m_stageInvokeRequirements[i] == implementation)

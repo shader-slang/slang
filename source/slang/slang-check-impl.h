@@ -2967,6 +2967,10 @@ public:
     void registerStructuralRayTracingStageConformance(
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         WitnessTable* witnessTable);
+    void diagnoseInvalidStructuralRayTracingVariableType(VarDeclBase* varDecl);
+    void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
+    void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
+    bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);
 
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,
