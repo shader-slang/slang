@@ -1,5 +1,7 @@
 #include "slang-check-impl.h"
+#include "slang-lookup.h"
 #include "slang-session.h"
+#include "slang-syntax.h"
 
 namespace Slang
 {
@@ -287,6 +289,164 @@ static FuncDecl* _createStructuralEntryPointDecl(
     return funcDecl;
 }
 
+struct StructuralStageContextInfo
+{
+    Type* type = nullptr;
+    SubtypeWitness* witness = nullptr;
+};
+
+static StructuralStageContextInfo _getStructuralStageContextInfo(FuncDecl* invokeMethod)
+{
+    if (!invokeMethod || invokeMethod->getParameters().getCount() != 1)
+        return {};
+
+    auto inputType = as<DeclRefType>(invokeMethod->getParameters()[0]->type.type);
+    if (!inputType)
+        return {};
+    auto genericApp = SubstitutionSet(inputType->getDeclRef()).findGenericAppDeclRef();
+    if (!genericApp || genericApp->getArgCount() < 2)
+        return {};
+
+    return {
+        as<Type>(genericApp->getArg(0)),
+        as<SubtypeWitness>(genericApp->getArg(1)->resolve()),
+    };
+}
+
+static Type* _getAssociatedType(
+    StructuralRayTracingDeclRegistry& registry,
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    StructuralRayTracingAssociatedTypeKind kind)
+{
+    if (!witness)
+        return nullptr;
+
+    auto requirement = registry.getAssociatedTypeRequirement(kind);
+    if (!requirement)
+        return nullptr;
+
+    auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
+    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
+        return as<Type>(requirementWitness.getVal()->resolve());
+    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::declRef)
+    {
+        auto type = DeclRefType::create(astBuilder, requirementWitness.getDeclRef());
+        return type ? as<Type>(type->resolve()) : nullptr;
+    }
+    return nullptr;
+}
+
+static Type* _getConcreteAssociatedType(
+    StructuralRayTracingDeclRegistry& registry,
+    SemanticsVisitor* visitor,
+    Type* type,
+    StructuralRayTracingAssociatedTypeKind kind)
+{
+    auto requirement = registry.getAssociatedTypeRequirement(kind);
+    if (!requirement || !type)
+        return nullptr;
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto typeDecl = declRefType->getDeclRef().as<AggTypeDecl>())
+            visitor->ensureDecl(typeDecl, DeclCheckState::ReadyForConformances);
+    }
+
+    auto lookupResult = lookUpMember(
+        visitor->getASTBuilder(),
+        visitor,
+        requirement->getName(),
+        type,
+        nullptr,
+        LookupMask::type,
+        LookupOptions::IgnoreBaseInterfaces);
+    if (!lookupResult.isValid() || lookupResult.isOverloaded())
+        return nullptr;
+
+    if (auto typeAlias = lookupResult.item.declRef.as<TypeDefDecl>())
+    {
+        visitor->ensureDecl(typeAlias, DeclCheckState::ReadyForLookup);
+        return as<Type>(getNamedType(visitor->getASTBuilder(), typeAlias)->resolve());
+    }
+    if (auto typeDecl = lookupResult.item.declRef.as<AggTypeDecl>())
+        return DeclRefType::create(visitor->getASTBuilder(), typeDecl);
+    return nullptr;
+}
+
+static bool _populateStructuralEntryPointInfo(
+    StructuralRayTracingDeclRegistry& registry,
+    SemanticsVisitor* visitor,
+    StructuralRayTracingStageKind stageKind,
+    FuncDecl* invokeMethod,
+    StructuralRayTracingEntryPointInfo* outInfo)
+{
+    outInfo->invokeMethod = invokeMethod;
+    auto context = _getStructuralStageContextInfo(invokeMethod);
+    outInfo->contextType = context.type;
+    if (!context.type || !context.witness)
+        return false;
+
+    auto astBuilder = visitor->getASTBuilder();
+
+    switch (stageKind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+    case StructuralRayTracingStageKind::AnyHit:
+        {
+            auto traceContext = _getAssociatedType(
+                registry,
+                astBuilder,
+                context.witness,
+                StructuralRayTracingAssociatedTypeKind::HitTraceContext);
+            outInfo->payloadType = _getConcreteAssociatedType(
+                registry,
+                visitor,
+                traceContext,
+                StructuralRayTracingAssociatedTypeKind::TracePayload);
+
+            auto primitive = _getAssociatedType(
+                registry,
+                astBuilder,
+                context.witness,
+                StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+            outInfo->hitAttributesType = _getConcreteAssociatedType(
+                registry,
+                visitor,
+                primitive,
+                StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
+            outInfo->hitAttributesKind = registry.getHitAttributesKind(primitive);
+            return outInfo->payloadType && outInfo->hitAttributesType &&
+                   outInfo->hitAttributesKind != StructuralRayTracingHitAttributesKind::None;
+        }
+    case StructuralRayTracingStageKind::Miss:
+        {
+            auto traceContext = _getAssociatedType(
+                registry,
+                astBuilder,
+                context.witness,
+                StructuralRayTracingAssociatedTypeKind::MissTraceContext);
+            outInfo->payloadType = _getConcreteAssociatedType(
+                registry,
+                visitor,
+                traceContext,
+                StructuralRayTracingAssociatedTypeKind::TracePayload);
+            return outInfo->payloadType != nullptr;
+        }
+    case StructuralRayTracingStageKind::Callable:
+        outInfo->callableDataType = _getAssociatedType(
+            registry,
+            astBuilder,
+            context.witness,
+            StructuralRayTracingAssociatedTypeKind::CallableData);
+        return outInfo->callableDataType != nullptr;
+    case StructuralRayTracingStageKind::Intersection:
+        return true;
+    default:
+        return false;
+    }
+}
+
 DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Linkage* linkage,
     Module* module,
@@ -294,10 +454,10 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Profile& ioProfile,
     DiagnosticSink* sink,
     bool* outFoundStruct,
-    FuncDecl** outInvokeMethod)
+    StructuralRayTracingEntryPointInfo* outInfo)
 {
     *outFoundStruct = false;
-    *outInvokeMethod = nullptr;
+    *outInfo = {};
     auto& registry = linkage->getStructuralRayTracingDeclRegistry();
     if (!registry.isInitialized())
         return DeclRef<FuncDecl>();
@@ -395,7 +555,16 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
         return DeclRef<FuncDecl>();
     }
 
-    *outInvokeMethod = invokeMethod;
+    if (!_populateStructuralEntryPointInfo(
+            registry,
+            &visitor,
+            selectedStage,
+            invokeMethod,
+            outInfo))
+    {
+        sink->diagnose(Diagnostics::InternalCompilerError{.location = stageTypeDeclRef.getLoc()});
+        return DeclRef<FuncDecl>();
+    }
     auto funcDecl = _createStructuralEntryPointDecl(linkage, module, stageTypeDeclRef.getDecl());
     return makeDeclRef(funcDecl);
 }

@@ -33,6 +33,8 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
     {
     case StructuralRayTracingStageInputOperationKind::Payload:
         return kIROp_StructuralRayTracingGetPayload;
+    case StructuralRayTracingStageInputOperationKind::CallableData:
+        return kIROp_StructuralRayTracingGetCallableData;
     case StructuralRayTracingStageInputOperationKind::HitAttributes:
         return kIROp_StructuralRayTracingGetHitAttributes;
     case StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord:

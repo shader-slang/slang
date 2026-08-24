@@ -137,6 +137,22 @@ static FunctionDeclBase* _findStageInvokeRequirement(InterfaceDecl* interfaceDec
     return nullptr;
 }
 
+static AssocTypeDecl* _findAssociatedTypeRequirement(
+    Module* module,
+    const char* interfaceName,
+    const char* requirementName)
+{
+    auto interfaceDecl = as<InterfaceDecl>(_findNamedDecl(module, interfaceName));
+    if (!interfaceDecl)
+        return nullptr;
+    for (auto member : interfaceDecl->getDirectMemberDeclsOfType<AssocTypeDecl>())
+    {
+        if (member->getName() && member->getName()->text == requirementName)
+            return member;
+    }
+    return nullptr;
+}
+
 static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
     FunctionDeclBase* functionDecl)
 {
@@ -150,6 +166,8 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
     auto text = name->text.getUnownedSlice();
     if (text == "payload")
         return StructuralRayTracingStageInputOperationKind::Payload;
+    if (text == "data")
+        return StructuralRayTracingStageInputOperationKind::CallableData;
     if (text == "attributes")
         return StructuralRayTracingStageInputOperationKind::HitAttributes;
     if (text == "barycentricCoord")
@@ -243,6 +261,21 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
 {
     m_trustedModuleDecl = module->getModuleDecl();
     m_rayTracerType = as<AggTypeDecl>(_findNamedDecl(module, "RayTracer"));
+    m_trianglePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "TrianglePrimitive"));
+    m_curvePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "CurvePrimitive"));
+
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::TracePayload)] =
+        _findAssociatedTypeRequirement(module, "ITraceContext", "Payload");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitTraceContext)] =
+        _findAssociatedTypeRequirement(module, "IHitContext", "TraceContext");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitPrimitive)] =
+        _findAssociatedTypeRequirement(module, "IHitContext", "Primitive");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes)] =
+        _findAssociatedTypeRequirement(module, "IIntersectionPrimitive", "Attributes");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissTraceContext)] =
+        _findAssociatedTypeRequirement(module, "IMissGroupContext", "TraceContext");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableData)] =
+        _findAssociatedTypeRequirement(module, "ICallableGroupContext", "CallableData");
 
     InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
     AggTypeDecl* inputTypes[int(StructuralRayTracingStageKind::Count)] = {};
@@ -282,6 +315,30 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
             as<InterfaceDecl>(_findNamedDecl(module, _getMetadataInterfaceName(kind)));
     }
     return true;
+}
+
+AssocTypeDecl* StructuralRayTracingDeclRegistry::getAssociatedTypeRequirement(
+    StructuralRayTracingAssociatedTypeKind kind) const
+{
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingAssociatedTypeKind::Count))
+        return nullptr;
+    return m_associatedTypeRequirements[index];
+}
+
+StructuralRayTracingHitAttributesKind StructuralRayTracingDeclRegistry::getHitAttributesKind(
+    Type* primitiveType) const
+{
+    primitiveType = primitiveType ? as<Type>(primitiveType->resolve()) : nullptr;
+    auto declRefType = as<DeclRefType>(primitiveType);
+    auto primitiveDecl =
+        declRefType ? declRefType->getDeclRef().as<AggTypeDecl>().getDecl() : nullptr;
+    if (primitiveDecl == m_trianglePrimitiveType)
+        return StructuralRayTracingHitAttributesKind::Triangle;
+    if (primitiveDecl == m_curvePrimitiveType)
+        return StructuralRayTracingHitAttributesKind::Curve;
+    return primitiveDecl ? StructuralRayTracingHitAttributesKind::Custom
+                         : StructuralRayTracingHitAttributesKind::None;
 }
 
 InterfaceDecl* StructuralRayTracingDeclRegistry::getStageInterface(

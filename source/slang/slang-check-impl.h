@@ -3910,7 +3910,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     Profile& ioProfile,
     DiagnosticSink* sink,
     bool* outFoundStruct,
-    FuncDecl** outInvokeMethod);
+    StructuralRayTracingEntryPointInfo* outInfo);
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
 void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink);
 
