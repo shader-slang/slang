@@ -126,9 +126,14 @@ To test against AST or IR that the frontend actually produced, use
 
 ```cpp
 Module* module = env.checkModuleFromSource("myTest", "struct Point { float x; }\n");
+SLANG_CHECK_ABORT(module != nullptr);               // null if the source failed to compile
 ModuleDecl* moduleDecl = module->getModuleDecl();   // checked AST
 IRModule* irModule = module->getIRModule();         // frontend-produced IR
 ```
+
+`checkModuleFromSource` returns null when the source fails to compile, so the
+result is checked before use. Pass `outDiagnostics` to recover the compiler's
+message in that case.
 
 Each module name must be unique within one environment, or the module cache
 returns the first module and the later case silently becomes a no-op. The helper

@@ -147,10 +147,13 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0
         run: cmake --build build --config "$cmake_config"
 
-      # slang-static-unit-test only exists when SLANG_LIB_TYPE=STATIC, which is
-      # exactly this matrix entry.
+      # slang-static-unit-test is defined only for SLANG_LIB_TYPE=STATIC, so gate on
+      # the option's value rather than its name alone -- a future SHARED entry in the
+      # sweep would otherwise reach the step and fail it for a missing binary.
       - name: Run slang-static-unit-test (${{ matrix.option }})
-        if: matrix.option == 'SLANG_LIB_TYPE' && matrix.windows_only != 'true'
+        if: >-
+          matrix.option == 'SLANG_LIB_TYPE' && matrix.value == 'STATIC' &&
+          matrix.windows_only != 'true'
         run: |
           test_path="build/$cmake_config/bin/slang-static-unit-test"
           if [[ ! -f "$test_path" ]]; then

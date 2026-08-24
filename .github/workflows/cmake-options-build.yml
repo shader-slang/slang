@@ -79,6 +79,13 @@ jobs:
       # rather than being repeated in each `if:` and having to be kept in lockstep by
       # hand. The build step deliberately does not use this: cross-compiled entries
       # still build, they just cannot run the result.
+      #
+      # Clause by clause, each excludes one case:
+      #   linux_only / windows_only      entry applies to one OS; skip on the others
+      #   container_only                 entry is only meaningful in the container job
+      #   skip_linux_aarch64             entry is unsupported on linux aarch64
+      #   !(windows && arch != '')       windows-aarch64 cross-compiles on an x64
+      #                                  runner and cannot execute what it builds
       SLANG_CI_CAN_RUN_BUILT_BINARY: ${{ (matrix.linux_only != 'true' || inputs.os == 'linux') && (matrix.windows_only != 'true' || inputs.os == 'windows') && matrix.container_only != 'true' && (matrix.skip_linux_aarch64 != 'true' || inputs.os != 'linux' || inputs.platform != 'aarch64') && !(inputs.os == 'windows' && inputs.arch != '') }}
     strategy:
       fail-fast: false
@@ -205,8 +212,15 @@ jobs:
       # cross-compile on an x64 runner and cannot execute what they build -- is
       # handled by the shared predicate, which the slangc version check below uses
       # too.
+      # Gated on the option's *value*, not only its name: the target is defined for
+      # SLANG_LIB_TYPE=STATIC and does not exist for SHARED. Testing the name alone
+      # happens to work while the matrix carries a single STATIC entry, and would turn
+      # a future SHARED entry into a spurious "expected slang-static-unit-test at ..."
+      # job failure rather than a skipped step.
       - name: Run slang-static-unit-test (${{ matrix.option }})
-        if: matrix.option == 'SLANG_LIB_TYPE' && env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
+        if: >-
+          matrix.option == 'SLANG_LIB_TYPE' && matrix.value == 'STATIC' &&
+          env.SLANG_CI_CAN_RUN_BUILT_BINARY == 'true'
         run: |
           # RUNNER_OS is provided by the runner, so nothing from the workflow
           # inputs is interpolated into this script.

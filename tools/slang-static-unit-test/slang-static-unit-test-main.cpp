@@ -191,6 +191,11 @@ int main(int argc, char** argv)
     // stopped happening — a refactor moving them into an intermediate static
     // library, or aggressive dead-section stripping — the suite would run
     // nothing and still report success.
+    //
+    // Unlike the other silent-success modes, this one has no self-check driving it:
+    // reaching it needs a binary with no registered tests, which cannot be produced
+    // from within the suite the way an unmatched filter or a deliberately failing
+    // check can. Left as an unexercised guard on purpose rather than by omission.
     if (testCount == 0)
     {
         fprintf(stderr, "error: no tests were registered\n");
