@@ -1308,7 +1308,7 @@ typedef uint32_t SlangSizeT;
                  //   resolve to no debug info), is an error. Only affects SPIR-V output.
 
         TraceCoverageBindlessIndex =
-            158, // int: PROTOTYPE. Synthesize `__slang_coverage` as an unbounded
+            158, // int: Synthesize `__slang_coverage` as an unbounded
                  //   descriptor array of structured buffers rather than a single
                  //   buffer, and index it with this value:
                  //   `__slang_coverage[N][slot]`. Many separately compiled
@@ -4876,6 +4876,13 @@ enum class CoverageBranchArmKind : uint32_t
 
 inline constexpr uint32_t kInvalidCoverageCounterIndex = 0xffffffffu;
 
+/// `SyntheticResourceInfo::arraySize` when the synthetic resource is an
+/// unbounded (runtime-sized) descriptor array, so the compiler cannot
+/// know how many descriptors the host will supply. This is
+/// `SLANG_UNBOUNDED_SIZE`'s meaning in the 32-bit width `arraySize`
+/// uses.
+inline constexpr uint32_t kUnboundedSyntheticResourceArraySize = 0xffffffffu;
+
 /// Per-coverage-entry attribution returned by
 /// `ICoverageTracingMetadata::getEntryInfo`. Use the leading
 /// `structSize` for ABI-versioned struct growth: future revisions
@@ -5114,7 +5121,15 @@ struct SyntheticResourceInfo
     BindingType bindingType = BindingType::Unknown;
 
     /// Number of logical resources in the synthetic binding. Most
-    /// current instrumentation resources are scalar (`1`).
+    /// instrumentation resources are scalar (`1`).
+    ///
+    /// `kUnboundedSyntheticResourceArraySize` when the resource is an
+    /// unbounded descriptor array whose descriptor count is a host
+    /// runtime decision the compiler cannot see -- the coverage buffer
+    /// under `-trace-coverage-bindless-index` is declared this way
+    /// deliberately, so that a shader does not constrain how many
+    /// shaders the host binds alongside it. A host sizing a descriptor
+    /// array must not read this as a count.
     uint32_t arraySize = 1;
 
     /// Whether the resource is global/root-scoped or attached to a

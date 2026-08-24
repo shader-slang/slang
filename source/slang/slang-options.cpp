@@ -661,7 +661,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::TraceCoverageBindlessIndex,
          "-trace-coverage-bindless-index",
          "-trace-coverage-bindless-index <index>",
-         "PROTOTYPE. Synthesize `__slang_coverage` as an unbounded descriptor "
+         "Synthesize `__slang_coverage` as an unbounded descriptor "
          "array of structured buffers rather than a single buffer, and index it "
          "with <index>: `__slang_coverage[<index>][slot]`. Many separately "
          "compiled shaders sharing one pipeline then occupy a single descriptor "

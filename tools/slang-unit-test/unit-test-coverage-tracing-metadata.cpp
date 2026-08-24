@@ -387,6 +387,11 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         slang::SyntheticResourceInfo info;
         SLANG_CHECK(bindlessSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
         SLANG_CHECK(info.bindlessIndex == kBindlessIndex);
+        // The array is unsized on purpose, so that a shader does not
+        // constrain how many shaders the host binds alongside it. Reporting
+        // `1` would describe a scalar binding and invite a host to size a
+        // one-element descriptor array.
+        SLANG_CHECK(info.arraySize == slang::kUnboundedSyntheticResourceArraySize);
         // The array's own placement is still reported the usual way: one
         // (space, binding) covers every shader, and the index selects
         // within it.

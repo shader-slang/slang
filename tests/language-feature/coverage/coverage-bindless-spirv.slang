@@ -1,4 +1,4 @@
-// PROTOTYPE. `-trace-coverage-bindless-index <index>` synthesizes `__slang_coverage`
+// `-trace-coverage-bindless-index <index>` synthesizes `__slang_coverage`
 // as an unbounded descriptor array of structured buffers instead of a single
 // buffer, so that many SEPARATELY COMPILED shaders sharing one pipeline can
 // occupy one descriptor binding instead of one binding each.

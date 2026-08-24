@@ -80,7 +80,7 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // instead of one binding each — at the cost of requiring descriptor
 // indexing, so it is rejected on non-Khronos targets.
 //
-// PROTOTYPE. The index is a compile-time constant and therefore part of
+// The index is a compile-time constant and therefore part of
 // the compiled artifact: a host that keys a shader cache on that
 // artifact must derive the index from a stable shader identity rather
 // than from load order, or an unchanged shader recompiles whenever the

@@ -1521,6 +1521,14 @@ void instrumentCoverage(
     // passed to `-trace-coverage-bindless-index`. Stays -1 in the
     // single-buffer form, matching the sentinel used by space/binding.
     syntheticResource.bindlessIndex = bindlessIndex;
+    // The bindless form declares `__slang_coverage` as an UNSIZED array,
+    // precisely so the shader does not constrain the host's descriptor
+    // count. Reporting `1` here would describe it as a scalar binding and
+    // invite a host to size a one-element descriptor array; report the
+    // unbounded sentinel instead. The single-buffer form really is scalar
+    // and keeps the `1` set at record construction.
+    if (bindlessIndex >= 0)
+        syntheticResource.arraySize = slang::kUnboundedSyntheticResourceArraySize;
 
     CoverageInstrumenter instrumenter(
         module,
