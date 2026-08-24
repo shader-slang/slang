@@ -56,41 +56,10 @@
 # A green nightly-slang-test.yml run on the same test is a
 # necessary but NOT sufficient condition. Two things differ there:
 # the binary is uninstrumented, and the test runs in a subprocess
-# test server, so a crash is reported as a failure rather than
-# taking the orchestrator with it. Entries here fall into both
-# camps — some crash only under coverage instrumentation, others
-# (e.g. the `unorm`/`snorm` pair) crash plain `slangc` too and are
-# merely *survivable* in the nightly because of that isolation.
-
-# `unorm`/`snorm` on a non-texture carrier SIGSEGVs slangc on Linux.
-# Tracked by _meta/findings/metadata-unorm-structured-buffer-element-sigsegv.yaml
-# and _meta/findings/ir-types-unorm-snorm-struct-field-sigsegv.yaml (both
-# `Attributed(Float, ...)` reached from a module-scope uniform; likely one
-# root cause). Both tests are in expected-failures.txt, so the subprocess
-# nightly buckets them as failed(expected); only the in-process coverage
-# pass turns them into an orchestrator SIGSEGV.
-#
-# Identified in coverage run 31235323797, job 93046595145 (linux):
-# `Segmentation fault (core dumped)` on both attempts immediately after
-# ir-reference/metadata/unorm-attr-on-rwtexture-element.slang passed, i.e.
-# on the next test in sorted order, unorm-attr-on-structured-buffer-element.
-# The whole tail of the suite (the rest of ir-reference, pipeline,
-# syntax-reference, target-pipelines) never ran and produced no coverage.
-#
-# Path note: this entry used to read
-# `.../metadata/unorm-attr-on-buffer-element.slang`. The 2026-08-04
-# regeneration round (source_commit 7e725f1) split that bundle's unorm
-# test into an rwtexture case and a structured-buffer case, which orphaned
-# the entry and re-enabled the crash — the same silent-rot failure mode
-# PR #11421's directory move caused earlier. `regenerate.py lint` now
-# fails on an exclude path that does not resolve.
-#
-# attributed-type-unorm-snorm.slang is excluded pre-emptively: the coverage
-# suite died in `metadata` before reaching `types`, so it has not been
-# observed crashing a coverage run, but its finding records the same exit
-# 139 on `-target hlsl` and it sits in the untested tail.
-docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffer-element.slang
-docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
+# test server, so a fault is reported as a failure rather than taking
+# the orchestrator with it. The exact failure mode varies per entry —
+# see each entry's own comment block for its symptom and how (or
+# whether) it also surfaces in the nightly.
 
 # Local coverage reproducer (RelWithDebInfo + -fprofile-instr-generate,
 # sequential -server-count 1): SIGSEGV in slang-test immediately after
