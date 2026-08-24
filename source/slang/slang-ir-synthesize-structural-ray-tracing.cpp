@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-structural-ray-tracing.h"
 
 namespace Slang
@@ -180,9 +181,35 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     return adapter;
 }
 
+static void _validateStructuralRayTracingGroupSlot(
+    IRInst* traceOperation,
+    IRIntLit* slotIndex,
+    const char* section,
+    HashSet<IRIntegerValue>& usedSlots,
+    DiagnosticSink* sink)
+{
+    auto value = slotIndex->getValue();
+    if (value < 0)
+    {
+        sink->diagnose(Diagnostics::InvalidStructuralRayTracingGroupSlot{
+            .section = section,
+            .slot = Int64(value),
+            .location = traceOperation->sourceLoc});
+        return;
+    }
+    if (!usedSlots.add(value))
+    {
+        sink->diagnose(Diagnostics::DuplicateStructuralRayTracingGroupSlot{
+            .section = section,
+            .slot = Int64(value),
+            .location = traceOperation->sourceLoc});
+    }
+}
+
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
-    List<IRFunc*>& ioEntryPoints)
+    List<IRFunc*>& ioEntryPoints,
+    DiagnosticSink* sink)
 {
     List<IRInst*> traceOperations;
     _collectTraceOperations(module->getModuleInst(), traceOperations);
@@ -202,10 +229,19 @@ void synthesizePortableStructuralRayTracingEntryPoints(
 
     for (auto operation : traceOperations)
     {
+        HashSet<IRIntegerValue> hitSlots;
+        HashSet<IRIntegerValue> missSlots;
+        HashSet<IRIntegerValue> callableSlots;
         for (auto decoration : operation->getDecorations())
         {
             if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
             {
+                _validateStructuralRayTracingGroupSlot(
+                    operation,
+                    group->getSlotIndex(),
+                    "hit",
+                    hitSlots,
+                    sink);
                 auto hitAttributesKind = StructuralRayTracingHitAttributesKind(
                     group->getHitAttributesKind()->getValue());
                 _generateStructuralRayTracingEntryPoint(
@@ -241,6 +277,12 @@ void synthesizePortableStructuralRayTracingEntryPoints(
             }
             else if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(decoration))
             {
+                _validateStructuralRayTracingGroupSlot(
+                    operation,
+                    group->getSlotIndex(),
+                    "miss",
+                    missSlots,
+                    sink);
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,
@@ -253,6 +295,12 @@ void synthesizePortableStructuralRayTracingEntryPoints(
             }
             else if (auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration))
             {
+                _validateStructuralRayTracingGroupSlot(
+                    operation,
+                    group->getSlotIndex(),
+                    "callable",
+                    callableSlots,
+                    sink);
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,
