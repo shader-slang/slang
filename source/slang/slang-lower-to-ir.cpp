@@ -1068,6 +1068,23 @@ static Type* _getStructuralRayTracingConcreteAssociatedType(
     if (!requirement || !type)
         return nullptr;
 
+    if (auto declRefType = as<DeclRefType>(type->resolve()))
+    {
+        auto aggregateDeclRef = declRefType->getDeclRef().as<AggTypeDecl>();
+        if (aggregateDeclRef)
+        {
+            for (auto member : aggregateDeclRef.getDecl()->getDirectMemberDecls())
+            {
+                auto typeAlias = as<TypeDefDecl>(member);
+                if (!typeAlias || typeAlias->getName() != requirement->getName())
+                    continue;
+                auto typeAliasDeclRef =
+                    context->astBuilder->getMemberDeclRef(aggregateDeclRef, typeAlias);
+                return as<Type>(getNamedType(context->astBuilder, typeAliasDeclRef)->resolve());
+            }
+        }
+    }
+
     auto lookupResult = lookUpMember(
         context->astBuilder,
         nullptr,
@@ -1169,6 +1186,17 @@ static DeclRef<CallableDecl> _findStructuralRayTracingStageInvokeInType(
     if (!stageDeclRef)
         return DeclRef<CallableDecl>();
 
+    auto getSignatureStageKind = [&](FunctionDeclBase* functionDecl)
+    {
+        auto parameters = functionDecl->getParameters();
+        if (parameters.getCount() != 1)
+            return StructuralRayTracingStageKind::Count;
+        auto inputType = as<DeclRefType>(parameters[0]->getType()->resolve());
+        auto inputTypeDecl =
+            inputType ? inputType->getDeclRef().as<AggTypeDecl>().getDecl() : nullptr;
+        return registry.getStageInputKind(inputTypeDecl);
+    };
+
     for (auto member : stageDeclRef.getDecl()->getDirectMemberDecls())
     {
         auto candidate = member;
@@ -1176,8 +1204,11 @@ static DeclRef<CallableDecl> _findStructuralRayTracingStageInvokeInType(
             candidate = genericDecl->inner;
         if (auto functionDecl = as<FunctionDeclBase>(candidate))
         {
-            if (registry.getStageKind(functionDecl) == stageKind)
+            if (registry.getStageKind(functionDecl) == stageKind ||
+                getSignatureStageKind(functionDecl) == stageKind)
+            {
                 return astBuilder->getMemberDeclRef(stageDeclRef, functionDecl).as<CallableDecl>();
+            }
         }
     }
     return DeclRef<CallableDecl>();
@@ -1185,6 +1216,7 @@ static DeclRef<CallableDecl> _findStructuralRayTracingStageInvokeInType(
 
 static StructuralRayTracingStageReference _lowerStructuralRayTracingStageReference(
     IRGenContext* context,
+    Type* groupType,
     SubtypeWitness* groupWitness,
     StructuralRayTracingAssociatedTypeKind associatedTypeKind,
     StructuralRayTracingStageKind stageKind)
@@ -1193,7 +1225,12 @@ static StructuralRayTracingStageReference _lowerStructuralRayTracingStageReferen
     StructuralRayTracingStageReference result = {builder->getVoidType(), builder->getVoidValue()};
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
     auto stageType =
-        registry.resolveAssociatedType(context->astBuilder, groupWitness, associatedTypeKind);
+        _getStructuralRayTracingConcreteAssociatedType(context, groupType, associatedTypeKind);
+    if (!stageType)
+    {
+        stageType =
+            registry.resolveAssociatedType(context->astBuilder, groupWitness, associatedTypeKind);
+    }
     SLANG_ASSERT(stageType);
     if (registry.isStagePlaceholder(stageKind, stageType))
         return result;
@@ -1234,6 +1271,7 @@ static void _addStructuralRayTracingHitGroupInfo(
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
     for (Index i = 0; i < groups.types->getTypeCount(); ++i)
     {
+        auto groupType = groups.types->getElementType(i);
         auto groupWitness = groups.witnesses->getWitness(i);
         auto slotType = registry.resolveAssociatedType(
             context->astBuilder,
@@ -1248,22 +1286,25 @@ static void _addStructuralRayTracingHitGroupInfo(
 
         auto closestHit = _lowerStructuralRayTracingStageReference(
             context,
+            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit,
             StructuralRayTracingStageKind::ClosestHit);
         auto anyHit = _lowerStructuralRayTracingStageReference(
             context,
+            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit,
             StructuralRayTracingStageKind::AnyHit);
         auto intersection = _lowerStructuralRayTracingStageReference(
             context,
+            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupIntersection,
             StructuralRayTracingStageKind::Intersection);
 
         IRInst* operands[] = {
-            lowerType(context, groups.types->getElementType(i)),
+            lowerType(context, groupType),
             lowerType(context, slotType),
             context->irBuilder->getIntValue(
                 context->irBuilder->getIntType(),
@@ -1301,6 +1342,7 @@ static void _addStructuralRayTracingMissGroupInfo(
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
     for (Index i = 0; i < groups.types->getTypeCount(); ++i)
     {
+        auto groupType = groups.types->getElementType(i);
         auto groupWitness = groups.witnesses->getWitness(i);
         auto slotType = registry.resolveAssociatedType(
             context->astBuilder,
@@ -1312,6 +1354,7 @@ static void _addStructuralRayTracingMissGroupInfo(
             StructuralRayTracingAssociatedTypeKind::MissGroupContext);
         auto miss = _lowerStructuralRayTracingStageReference(
             context,
+            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupMiss,
             StructuralRayTracingStageKind::Miss);
@@ -1326,7 +1369,7 @@ static void _addStructuralRayTracingMissGroupInfo(
             StructuralRayTracingAssociatedTypeKind::MissTraceContext);
 
         IRInst* operands[] = {
-            lowerType(context, groups.types->getElementType(i)),
+            lowerType(context, groupType),
             lowerType(context, slotType),
             context->irBuilder->getIntValue(
                 context->irBuilder->getIntType(),
@@ -1355,6 +1398,7 @@ static void _addStructuralRayTracingCallableGroupInfo(
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
     for (Index i = 0; i < groups.types->getTypeCount(); ++i)
     {
+        auto groupType = groups.types->getElementType(i);
         auto groupWitness = groups.witnesses->getWitness(i);
         auto slotType = registry.resolveAssociatedType(
             context->astBuilder,
@@ -1366,6 +1410,7 @@ static void _addStructuralRayTracingCallableGroupInfo(
             StructuralRayTracingAssociatedTypeKind::CallableGroupContext);
         auto callable = _lowerStructuralRayTracingStageReference(
             context,
+            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupCallable,
             StructuralRayTracingStageKind::Callable);
@@ -1381,7 +1426,7 @@ static void _addStructuralRayTracingCallableGroupInfo(
         SLANG_ASSERT(callableDataType);
 
         IRInst* operands[] = {
-            lowerType(context, groups.types->getElementType(i)),
+            lowerType(context, groupType),
             lowerType(context, slotType),
             context->irBuilder->getIntValue(
                 context->irBuilder->getIntType(),
