@@ -1,10 +1,11 @@
 name: Check GitHub Actions Workflows
 
 # actionlint is invoked bare below, so it discovers and lints exactly
-# .github/workflows/*.yml, using .github/actionlint.yaml as its config. Its
-# verdict therefore cannot be changed by a PR that touches nothing else, so the
-# pull_request paths: filter below keeps it off the majority of PRs, freeing a
-# GitHub-hosted runner slot against the org's concurrency cap.
+# .github/workflows/*.yml, using .github/actionlint.yaml as its config. Those
+# files are its only input, so a PR that modifies none of them cannot change its
+# verdict -- hence the pull_request paths: filter below, which keeps this check
+# off the majority of PRs and frees a GitHub-hosted runner slot against the
+# org's concurrency cap.
 #
 # There is deliberately no merge_group trigger: this check is not a required
 # status check, so a failure in the queue would not block the merge, and the run
