@@ -297,6 +297,9 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         _findAssociatedTypeRequirement(module, "IIntersectionPrimitive", "Attributes");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissTraceContext)] =
         _findAssociatedTypeRequirement(module, "IMissGroupContext", "TraceContext");
+    m_associatedTypeRequirements[int(
+        StructuralRayTracingAssociatedTypeKind::CallableTraceContext)] =
+        _findAssociatedTypeRequirement(module, "ICallableGroupContext", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableData)] =
         _findAssociatedTypeRequirement(module, "ICallableGroupContext", "CallableData");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramTraceContext)] =

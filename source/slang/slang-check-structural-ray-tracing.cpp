@@ -357,6 +357,7 @@ static bool _populateStructuralEntryPointInfo(
     FuncDecl* invokeMethod,
     StructuralRayTracingEntryPointInfo* outInfo)
 {
+    outInfo->stageKind = stageKind;
     outInfo->invokeMethod = invokeMethod;
     auto context = _getStructuralStageContextInfo(invokeMethod);
     outInfo->contextType = context.type;

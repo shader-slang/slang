@@ -1,9 +1,15 @@
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5 -dump-ir-after specializeModule
+//TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -profile glsl_460 -emit-spirv-directly
+//TEST:SIMPLE(filecheck=DXIL): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=REUSE): -experimental-feature -entry main -stage raygeneration -entry TestClosestHit -stage closesthit -target hlsl -profile sm_6_5
 
 import slang.raytracing;
 
 struct TestPayload
-{}
+{
+    uint value;
+}
 
 struct TestTraceContext : rt::ITraceContext
 {
@@ -63,9 +69,14 @@ struct TestIntersection : rt::IIntersectionShader<TestProceduralHitContext>
     void invoke(rt::IntersectionInput<TestProceduralHitContext> input) {}
 }
 
+struct TestProceduralSlot : rt::IShaderGroupSlot
+{
+    static const int index = 3;
+}
+
 struct TestProceduralHitGroup : rt::IHitGroup
 {
-    typealias Slot = rt::HitGroupSlot<3>;
+    typealias Slot = TestProceduralSlot;
     typealias Context = TestProceduralHitContext;
     typealias ClosestHit = TestProceduralClosestHit;
     typealias AnyHit = TestAnyHit;
@@ -91,7 +102,9 @@ struct TestMissGroup : rt::IMissGroup
 }
 
 struct TestCallableData
-{}
+{
+    uint value;
+}
 
 struct TestCallableContext : rt::ICallableGroupContext
 {
@@ -146,17 +159,52 @@ void main()
 // IR: [nameHint("TestClosestHit.invoke")]
 // IR: func %TestClosestHitx5Finvoke
 // IR: [structuralRayTracingCallableGroupInfo(%TestCallableGroup,
-// IR-SAME: %TestCallableContext, %TestCallable, %TestCallablex5Finvoke)]
+// IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 2 : Int, %TestCallableContext,
+// IR-SAME: %TestCallableData, %TestCallable,
+// IR-SAME: %TestCallablex5Finvoke)]
 // IR: [structuralRayTracingMissGroupInfo(%TestMissGroup,
-// IR-SAME: %TestMissContext, %TestMiss, %TestMissx5Finvoke)]
+// IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 1 : Int, %TestMissContext,
+// IR-SAME: %TestPayload, %TestMiss, %TestMissx5Finvoke)]
 // IR: [structuralRayTracingHitGroupInfo(%TestProceduralHitGroup,
-// IR-SAME: %TestProceduralHitContext, %TestProceduralClosestHit,
+// IR-SAME: %TestProceduralSlot, 3 : Int, %TestProceduralHitContext,
+// IR-SAME: %rtx5FBoundingBoxPrimitive, %TestPayload,
+// IR-SAME: %TestAttributes, 3 : Int, %TestProceduralClosestHit,
 // IR-SAME: %TestProceduralClosestHitx5Finvoke, %TestAnyHit, %TestAnyHitx5Finvoke,
 // IR-SAME: %TestIntersection, %TestIntersectionx5Finvoke)]
 // IR: [structuralRayTracingHitGroupInfo(%TestHitGroup,
-// IR-SAME: %TestHitContext, %TestClosestHit, %TestClosestHitx5Finvoke,
+// IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 0 : Int, %TestHitContext,
+// IR-SAME: %rtx5FTrianglePrimitive, %TestPayload, %rtx5FTriangleData,
+// IR-SAME: 1 : Int, %TestClosestHit, %TestClosestHitx5Finvoke,
 // IR-SAME: Void, void_constant, Void, void_constant)]
 // IR: structuralRayTracingTrace({{.*}}, %TestProgramLayout, %TestTraceContext,
 // IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup, %TestProceduralHitGroup),
 // IR-SAME: %rtx5FMissGroupList, TypePack(%TestMissGroup),
 // IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup),
+
+// HLSL-DAG: [shader("raygeneration")]void main()
+// HLSL-DAG: [shader("callable")]void TestCallable(inout TestCallableData_0
+// HLSL-DAG: [shader("miss")]void TestMiss(inout TestPayload_0
+// HLSL-DAG: [shader("closesthit")]void TestProceduralClosestHit(inout TestPayload_0
+// HLSL-DAG: [shader("anyhit")]void TestAnyHit(inout TestPayload_0
+// HLSL-DAG: [shader("intersection")]void TestIntersection()
+// HLSL-DAG: [shader("closesthit")]void TestClosestHit(inout TestPayload_0
+// HLSL-NOT: NoClosestHit
+// HLSL-NOT: NoAnyHit
+// HLSL-NOT: NoIntersection
+
+// SPIRV-DAG: OpEntryPoint RayGenerationKHR %main "main"
+// SPIRV-DAG: OpEntryPoint CallableKHR %TestCallable "TestCallable"
+// SPIRV-DAG: OpEntryPoint MissKHR %TestMiss "TestMiss"
+// SPIRV-DAG: OpEntryPoint ClosestHitKHR %TestProceduralClosestHit "TestProceduralClosestHit"
+// SPIRV-DAG: OpEntryPoint AnyHitKHR %TestAnyHit "TestAnyHit"
+// SPIRV-DAG: OpEntryPoint IntersectionKHR %TestIntersection "TestIntersection"
+// SPIRV-DAG: OpEntryPoint ClosestHitKHR %TestClosestHit "TestClosestHit"
+
+// DXIL-DAG: TestCallable
+// DXIL-DAG: TestMiss
+// DXIL-DAG: TestProceduralClosestHit
+// DXIL-DAG: TestAnyHit
+// DXIL-DAG: TestIntersection
+// DXIL-DAG: TestClosestHit
+
+// REUSE-COUNT-1: [shader("closesthit")]void TestClosestHit(
