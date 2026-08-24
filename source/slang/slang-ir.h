@@ -1747,9 +1747,26 @@ struct IRInterfaceRequirementEntry : IRInst
 FIDDLE()
 struct IRInterfaceType : IRType
 {
-    FIDDLE(leafInst())
+    FIDDLE(leafInst{noIsaImpl = true})
+
+    static bool isaImpl(IROp opIn)
+    {
+        const int op = kIROpMask_OpMask & opIn;
+        return op == kIROp_InterfaceType || (op >= kIROp_FirstRaytracingStageInterface &&
+                                             op <= kIROp_LastRaytracingStageInterface);
+    }
+    enum
+    {
+        kOp = kIROp_InterfaceType
+    };
 
     UInt getRequirementCount() { return getOperandCount(); }
+};
+
+FIDDLE()
+struct IRRaytracingStageInterface : IRInterfaceType
+{
+    FIDDLE(baseInst())
 };
 
 FIDDLE()
@@ -2258,7 +2275,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 28;
+    const static UInt k_maxSupportedModuleVersion = 29;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

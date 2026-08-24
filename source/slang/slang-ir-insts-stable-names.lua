@@ -874,5 +874,10 @@ return {
 	["imageGatherOffset"] = 898,
 	["getNaturalAlignment"] = 899,
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
-	["Attr.TypeAlignment"] = 901
+	["Attr.TypeAlignment"] = 901,
+	["Type.RaytracingStageInterface.closest_hit_stage_interface"] = 902,
+	["Type.RaytracingStageInterface.any_hit_stage_interface"] = 903,
+	["Type.RaytracingStageInterface.intersection_stage_interface"] = 904,
+	["Type.RaytracingStageInterface.miss_stage_interface"] = 905,
+	["Type.RaytracingStageInterface.callable_stage_interface"] = 906
 }
