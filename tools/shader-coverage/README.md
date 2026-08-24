@@ -178,11 +178,27 @@ SLANG_CHECK(syntheticResources != nullptr);
 SLANG_CHECK(syntheticResources->getResourceCount() == 1);
 uint32_t coverageResourceIndex = 0;
 
-slang::SyntheticResourceInfo resourceInfo = {};
+// Default-initialize so `structSize` is set to the size of the struct you
+// compiled against; a `memset` to zero would leave it 0 and the call would
+// fail with SLANG_E_INVALID_ARG.
+slang::SyntheticResourceInfo resourceInfo;
 if (SLANG_SUCCEEDED(syntheticResources->getResourceInfo(coverageResourceIndex, &resourceInfo)))
 {
     // Descriptor-backed targets: resourceInfo.space, resourceInfo.binding.
     // CPU/CUDA targets: resourceInfo.uniformOffset, resourceInfo.uniformStride.
+
+    // Bindless form (`-trace-coverage-bindless-index N`): which element of
+    // the descriptor array this shader was compiled to use. `-1` means the
+    // buffer is bound as a single descriptor, not as an array element, so
+    // there is no index to apply.
+    if (resourceInfo.bindlessIndex >= 0)
+    {
+        // The shader accesses `__slang_coverage[resourceInfo.bindlessIndex]`.
+        // `resourceInfo.arraySize` is
+        // `slang::kUnboundedSyntheticResourceArraySize` here: the array is
+        // unsized, so how many descriptors to supply is the host's decision
+        // and must not be read off this field as a count.
+    }
 }
 
 for (uint32_t i = 0; i < entryCount; ++i) {
