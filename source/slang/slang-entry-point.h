@@ -216,6 +216,15 @@ public:
     /// Get the stage that the entry point is for.
     Stage getStage() { return m_profile.getStage(); }
 
+    void setStructuralRayTracingInvokeMethod(FuncDecl* invokeMethod)
+    {
+        m_structuralRayTracingInvokeMethod = invokeMethod;
+    }
+    FuncDecl* getStructuralRayTracingInvokeMethod() const
+    {
+        return m_structuralRayTracingInvokeMethod;
+    }
+
     /// Get the module that contains the entry point.
     Module* getModule();
 
@@ -316,6 +325,8 @@ private:
     // The declaration of the entry-point function itself.
     //
     DeclRef<FuncDecl> m_funcDeclRef;
+
+    FuncDecl* m_structuralRayTracingInvokeMethod = nullptr;
 
     /// The mangled name of the entry point function
     String m_mangledName;

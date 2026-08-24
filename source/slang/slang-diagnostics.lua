@@ -4290,6 +4290,34 @@ err(
 )
 
 err(
+    "structural-ray-tracing-entry-point-not-stage",
+    38053,
+    "invalid structural ray-tracing entry point",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement an executable structural ray-tracing stage interface" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-stage-mismatch",
+    38054,
+    "structural ray-tracing entry point stage mismatch",
+    span { loc = "stageType:Decl", message = "struct '~stageType' does not implement the selected '~stage' stage" }
+)
+
+err(
+    "structural-ray-tracing-entry-point-ambiguous-stage",
+    38055,
+    "ambiguous structural ray-tracing entry point stage",
+    span { loc = "stageType:Decl", message = "struct '~stageType' implements more than one executable ray-tracing stage; use '-stage <name>' to select one" }
+)
+
+err(
+    "structural-ray-tracing-stage-instance-field",
+    38056,
+    "stateful structural ray-tracing stage",
+    span { loc = "field:Decl", message = "instance field '~field' is not allowed because structural ray-tracing stage implementations are compiler-created" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",

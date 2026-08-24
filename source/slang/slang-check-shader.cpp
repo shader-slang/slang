@@ -2625,6 +2625,29 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto sink = compileRequest->getSink();
 
     auto entryPointName = entryPointReq->getName();
+    auto entryPointProfile = entryPointReq->getProfile();
+    bool foundStructuralStage = false;
+    FuncDecl* structuralInvokeMethod = nullptr;
+    auto structuralEntryPointDeclRef = findStructuralRayTracingEntryPointByName(
+        linkage,
+        translationUnit->getModule(),
+        entryPointName,
+        entryPointProfile,
+        sink,
+        &foundStructuralStage,
+        &structuralInvokeMethod);
+    if (foundStructuralStage)
+    {
+        if (!structuralEntryPointDeclRef)
+            return nullptr;
+
+        auto entryPoint =
+            EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
+        entryPoint->setStructuralRayTracingInvokeMethod(structuralInvokeMethod);
+        validateEntryPoint(entryPoint, sink);
+        return sink->getErrorCount() ? nullptr : entryPoint;
+    }
+
     DeclRef<FuncDecl> entryPointFuncDeclRef =
         findFunctionDeclByName(translationUnit->getModule(), entryPointName, sink);
 
@@ -2645,7 +2668,6 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     // then we might be able to infer a stage for the entry point request if
     // it didn't have one, *or* issue a diagnostic if there is a mismatch with the profile.
 
-    auto entryPointProfile = entryPointReq->getProfile();
     resolveStageOfProfileWithEntryPoint(
         entryPointProfile,
         linkage->m_optionSet,
