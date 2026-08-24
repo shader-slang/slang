@@ -150,6 +150,8 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
     auto text = name->text.getUnownedSlice();
     if (text == "payload")
         return StructuralRayTracingStageInputOperationKind::Payload;
+    if (text == "attributes")
+        return StructuralRayTracingStageInputOperationKind::HitAttributes;
     if (text == "distance")
         return StructuralRayTracingStageInputOperationKind::RayTCurrent;
     if (text == "hitKind")
@@ -178,10 +180,10 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
 }
 
 static void _registerStageInputOperations(
-    AggTypeDecl* inputType,
+    ContainerDecl* container,
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>& operations)
 {
-    for (auto member : inputType->getDirectMemberDecls())
+    for (auto member : container->getDirectMemberDecls())
     {
         if (auto propertyDecl = as<PropertyDecl>(member))
         {
@@ -198,6 +200,36 @@ static void _registerStageInputOperations(
             if (kind != StructuralRayTracingStageInputOperationKind::Count)
                 operations[functionDecl] = kind;
         }
+    }
+}
+
+static void _registerStageInputExtensionOperations(
+    ContainerDecl* container,
+    AggTypeDecl* const* inputTypes,
+    Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>& operations)
+{
+    for (auto member : container->getDirectMemberDecls())
+    {
+        auto candidate = member;
+        if (auto genericDecl = as<GenericDecl>(candidate))
+            candidate = genericDecl->inner;
+
+        if (auto extensionDecl = as<ExtensionDecl>(candidate))
+        {
+            auto targetType = as<DeclRefType>(extensionDecl->targetType.type);
+            auto targetDecl = targetType ? targetType->getDeclRef().getDecl() : nullptr;
+            for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+            {
+                if (targetDecl == inputTypes[i])
+                {
+                    _registerStageInputOperations(extensionDecl, operations);
+                    break;
+                }
+            }
+        }
+
+        if (auto childContainer = as<ContainerDecl>(candidate))
+            _registerStageInputExtensionOperations(childContainer, inputTypes, operations);
     }
 }
 
@@ -233,6 +265,10 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         m_stageInvokeRequirements[i] = invokeRequirements[i];
         _registerStageInputOperations(inputTypes[i], m_stageInputOperations);
     }
+    _registerStageInputExtensionOperations(
+        module->getModuleDecl(),
+        inputTypes,
+        m_stageInputOperations);
     for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
     {
         auto kind = StructuralRayTracingMetadataKind(i);
