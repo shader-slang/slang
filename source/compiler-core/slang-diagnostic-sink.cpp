@@ -652,12 +652,13 @@ bool DiagnosticSink::diagnoseRichImpl(
     GenericDiagnostic effectiveDiagnostic = diagnostic;
     effectiveDiagnostic.severity = effectiveSeverity;
 
-    // m_richCallback is unset on the vast majority of sinks (only Linkage-owned sinks with
-    // a user-registered ISession::setDiagnosticCallback wire one up via setRichCallback());
-    // skip the call entirely rather than invoking a no-op thunk on every diagnostic.
-    if (m_richCallback)
+    // m_structuredCallback is unset on the vast majority of sinks (only Linkage-owned sinks
+    // with a user-registered ISession::setDiagnosticCallback wire one up via
+    // setStructuredCallback()); skip the call entirely rather than invoking a no-op thunk on
+    // every diagnostic.
+    if (m_structuredCallback)
     {
-        m_richCallback(effectiveDiagnostic, sourceManager, m_richCallbackData);
+        m_structuredCallback(effectiveDiagnostic, sourceManager, m_structuredCallbackData);
     }
 
     if (effectiveSeverity >= Severity::Error)

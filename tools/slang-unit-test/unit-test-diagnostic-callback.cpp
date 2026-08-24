@@ -1,6 +1,6 @@
 // unit-test-diagnostic-callback.cpp
 //
-// Tests for ISession::setDiagnosticCallback and the SlangRichDiagnosticCallback /
+// Tests for ISession::setDiagnosticCallback and the SlangStructuredDiagnosticCallback /
 // SlangStructuredDiagnostic API.
 
 #include "core/slang-basic.h"

@@ -2057,7 +2057,7 @@ public:                                                              \
         const char* message;  /**< Label shown at this location; may be empty. */
     };
 
-    /** A fully structured diagnostic, passed to SlangRichDiagnosticCallback.
+    /** A fully structured diagnostic, passed to SlangStructuredDiagnosticCallback.
 
         All `const char*` pointers are valid only for the duration of the callback invocation.
     */
@@ -2078,8 +2078,9 @@ public:                                                              \
         @param userData    The opaque pointer passed to setDiagnosticCallback.
         @return            Reserved for future use; currently ignored by the implementation.
     */
-    typedef bool (
-        *SlangRichDiagnosticCallback)(const SlangStructuredDiagnostic* diagnostic, void* userData);
+    typedef bool (*SlangStructuredDiagnosticCallback)(
+        const SlangStructuredDiagnostic* diagnostic,
+        void* userData);
 
     /*!
     @brief Get the build version 'tag' string. The string is the same as
@@ -4761,7 +4762,7 @@ struct ISession : public ISlangUnknown
         @param userData  Opaque pointer forwarded to the callback unchanged.
     */
     virtual SLANG_NO_THROW void SLANG_MCALL
-    setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData) = 0;
+    setDiagnosticCallback(SlangStructuredDiagnosticCallback callback, void* userData) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

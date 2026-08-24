@@ -451,16 +451,19 @@ public:
 
     /// Internal per-diagnostic callback, fired from diagnoseRichImpl before rendering.
     /// Carries the structured diagnostic and source manager for location resolution.
-    /// Set by Linkage to forward diagnostics to the user-supplied SlangRichDiagnosticCallback.
-    typedef void (
-        *RichDiagnosticCallback)(const GenericDiagnostic& diag, SourceManager* sm, void* userData);
-    RichDiagnosticCallback m_richCallback = nullptr;
-    void* m_richCallbackData = nullptr;
+    /// Set by Linkage to forward diagnostics to the user-supplied
+    /// SlangStructuredDiagnosticCallback.
+    typedef void (*StructuredDiagnosticCallback)(
+        const GenericDiagnostic& diag,
+        SourceManager* sm,
+        void* userData);
+    StructuredDiagnosticCallback m_structuredCallback = nullptr;
+    void* m_structuredCallbackData = nullptr;
 
-    void setRichCallback(RichDiagnosticCallback cb, void* data)
+    void setStructuredCallback(StructuredDiagnosticCallback cb, void* data)
     {
-        m_richCallback = cb;
-        m_richCallbackData = data;
+        m_structuredCallback = cb;
+        m_structuredCallbackData = data;
     }
 
 protected:

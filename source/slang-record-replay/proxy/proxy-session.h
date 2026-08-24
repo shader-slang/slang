@@ -342,7 +342,7 @@ public:
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
-    setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData) override
+    setDiagnosticCallback(SlangStructuredDiagnosticCallback callback, void* userData) override
     {
         getActual<slang::ISession>()->setDiagnosticCallback(callback, userData);
     }

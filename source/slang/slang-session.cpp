@@ -902,7 +902,7 @@ SLANG_NO_THROW slang::IModule* SLANG_MCALL Linkage::getLoadedModule(SlangInt ind
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-Linkage::setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData)
+Linkage::setDiagnosticCallback(SlangStructuredDiagnosticCallback callback, void* userData)
 {
     m_diagnosticCallback = callback;
     m_diagnosticCallbackData = userData;
@@ -924,7 +924,7 @@ static HumaneSourceLoc resolveHumaneLoc(SourceManager* sm, SourceLoc loc)
 
 // Build the public SlangDiagnosticSpan from an already-resolved begin/end location and a
 // label. This is the field-mapping step shared by the primary span and every secondary span
-// in richDiagnosticThunk below, factored out so the two call sites can't drift apart.
+// in structuredDiagnosticThunk below, factored out so the two call sites can't drift apart.
 //
 // `beginLoc` must outlive the returned SlangDiagnosticSpan: `filename` points directly into
 // `beginLoc.pathInfo.foundPath`'s internal buffer rather than copying it, so the caller is
@@ -948,7 +948,10 @@ static SlangDiagnosticSpan makeDiagnosticSpan(
 // Static thunk: converts GenericDiagnostic + SourceManager* into SlangStructuredDiagnostic
 // and forwards it to the user-supplied callback stored on the Linkage.
 /* static */
-void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* sm, void* userData)
+void Linkage::structuredDiagnosticThunk(
+    const GenericDiagnostic& diag,
+    SourceManager* sm,
+    void* userData)
 {
     auto* linkage = static_cast<Linkage*>(userData);
 
@@ -985,24 +988,24 @@ void Linkage::richDiagnosticThunk(const GenericDiagnostic& diag, SourceManager* 
         secSpans.add(makeDiagnosticSpan(secBeginLocs.getLast(), endLoc, sec.message));
     }
 
-    SlangStructuredDiagnostic pub = {};
-    pub.severity = (SlangSeverity)diag.severity;
-    pub.code = diag.code;
-    pub.message = diag.message.getBuffer();
-    pub.primarySpan = primarySpan;
-    pub.secondarySpans = secSpans.getCount() > 0 ? secSpans.getBuffer() : nullptr;
-    pub.secondarySpanCount = (uint32_t)secSpans.getCount();
+    SlangStructuredDiagnostic structuredDiag = {};
+    structuredDiag.severity = (SlangSeverity)diag.severity;
+    structuredDiag.code = diag.code;
+    structuredDiag.message = diag.message.getBuffer();
+    structuredDiag.primarySpan = primarySpan;
+    structuredDiag.secondarySpans = secSpans.getCount() > 0 ? secSpans.getBuffer() : nullptr;
+    structuredDiag.secondarySpanCount = (uint32_t)secSpans.getCount();
 
-    linkage->m_diagnosticCallback(&pub, linkage->m_diagnosticCallbackData);
+    linkage->m_diagnosticCallback(&structuredDiag, linkage->m_diagnosticCallbackData);
 }
 
 void Linkage::installDiagnosticCallback(DiagnosticSink& sink) const
 {
-    // No callback is registered, so there is nothing for richDiagnosticThunk to forward;
+    // No callback is registered, so there is nothing for structuredDiagnosticThunk to forward;
     // leave the sink's callback unset rather than wiring up a thunk that would immediately
     // no-op on every diagnostic.
     if (m_diagnosticCallback)
-        sink.setRichCallback(richDiagnosticThunk, const_cast<Linkage*>(this));
+        sink.setStructuredCallback(structuredDiagnosticThunk, const_cast<Linkage*>(this));
 }
 
 void Linkage::buildHash(DigestBuilder<SHA1>& builder, SlangInt targetIndex)

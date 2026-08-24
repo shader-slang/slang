@@ -186,7 +186,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) override;
     virtual SLANG_NO_THROW void SLANG_MCALL
-    setDiagnosticCallback(SlangRichDiagnosticCallback callback, void* userData) override;
+    setDiagnosticCallback(SlangStructuredDiagnosticCallback callback, void* userData) override;
 
     /// Install the user-registered diagnostic callback onto a freshly created sink.
     /// Called at every Linkage/ComponentType ISession method call site after sink creation.
@@ -194,7 +194,7 @@ public:
 
     /// Static thunk that converts a GenericDiagnostic to SlangStructuredDiagnostic and
     /// forwards it to the user-supplied callback stored on the Linkage.
-    static void richDiagnosticThunk(
+    static void structuredDiagnosticThunk(
         const GenericDiagnostic& diag,
         SourceManager* sm,
         void* userData);
@@ -505,7 +505,7 @@ private:
 
     RefPtr<SharedSemanticsContext> m_semanticsForReflection;
 
-    SlangRichDiagnosticCallback m_diagnosticCallback = nullptr;
+    SlangStructuredDiagnosticCallback m_diagnosticCallback = nullptr;
     void* m_diagnosticCallbackData = nullptr;
 };
 } // namespace Slang
