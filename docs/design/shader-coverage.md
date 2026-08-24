@@ -422,7 +422,9 @@ than LCOV-line-only. Every marker emits one entry, with
 `counterMode == Count` and `counterIndex` pointing at the runtime
 counter slot, but entries and counters are not one-to-one: line
 coverage coalesces the entries of a straight-line region onto a shared
-counter, so `getCounterCount()` is smaller than the entry count.
+counter, so `getCounterCount()` is never larger than the entry count,
+and smaller whenever a straight-line region is coalesced. A compile that
+enables only function and/or branch coverage leaves the two equal.
 Function and branch entries keep dedicated counters. Which entries
 share a counter is an implementation detail of the current producers,
 not a permanent metadata contract. The same

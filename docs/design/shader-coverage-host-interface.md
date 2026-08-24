@@ -63,8 +63,10 @@ function name, and branch entries by `(line, branch_site, branch_arm)`.
 Hosts must always map entries to counters through
 `CoverageEntryInfo::counterIndex` rather than assuming entry index
 equals counter index: line coverage already shares one counter across
-the entries of a straight-line region, so the entry count and
-`getCounterCount()` differ. Size the readback buffer from
+the entries of a straight-line region, so `getCounterCount()` is never
+larger than the entry count and is usually smaller. The two are equal
+when only function and/or branch coverage is enabled, since those modes
+use dedicated counters -- so rely on `<=`, not on the counts differing. Size the readback buffer from
 `getCounterCount()`, and accumulate per entry rather than per counter —
 a counter does not identify a single source location. Future
 source-region coverage may add ranged entries with derived counters

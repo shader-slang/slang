@@ -868,27 +868,19 @@ static bool isCoverageMarkerOp(IROp op)
 // dispatched through a witness table, for instance. Callers must treat
 // null conservatively, since an unresolvable body could do anything.
 //
-// The `specialize` unwrapping matters because coverage instrumentation
-// runs before `specializeModule`: a call to a generic such as
-// `dot(a, b)` reaches this pass as `call specialize(%dot, Float, 3)(...)`
-// rather than as a direct call to an `IRFunc`. Reporting that as
-// unresolvable would split a coalescing region at every generic call —
-// which is most numeric code — for no correctness benefit, because the
-// generic's body is right there to analyze.
+// Generic calls resolve here without any special handling on our part.
+// Coverage instrumentation runs before `specializeModule`, so a call to
+// a generic such as `dot(a, b)` still arrives as
+// `call specialize(%dot, Float, 3)(...)`; `getResolvedInstForDecorations`
+// loops, unwrapping every `IRSpecialize` through its base and every
+// `IRGeneric` through its return value, and only stops once the
+// candidate is neither. Nested multi-parameter generics fall out of the
+// same loop. Reporting such a call as unresolvable would split a
+// coalescing region at every generic call — which is most numeric code —
+// for no correctness benefit.
 static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
 {
-    callee = getResolvedInstForDecorations(callee);
-    if (auto func = as<IRFunc>(callee))
-        return func;
-    if (auto specialize = as<IRSpecialize>(callee))
-    {
-        // `findInnerMostGenericReturnVal` peels every nested
-        // `IRGeneric` layer, so a multi-parameter generic resolves in
-        // one step.
-        if (auto generic = as<IRGeneric>(getResolvedInstForDecorations(specialize->getOperand(0))))
-            return as<IRFunc>(findInnerMostGenericReturnVal(generic));
-    }
-    return nullptr;
+    return as<IRFunc>(getResolvedInstForDecorations(callee));
 }
 
 // Decides whether a call can fail to return to its caller, so that
@@ -918,9 +910,12 @@ static IRFunc* getStaticallyResolvedCallee(IRInst* callee)
 // not. Coalescing all four onto one counter would misreport one side
 // or the other, so the run must be split at the call.
 //
-// Results are memoized per function, and the analysis is a fixpoint
-// over the call graph so an exit deep in a callee still splits the
-// caller's run.
+// Results are memoized per function, and the analysis is a depth-first
+// walk of the call graph — not an iterated fixpoint — so an exit deep in
+// a callee still splits the caller's run. Cycles are broken by reporting
+// the re-entered function as possibly not returning, which keeps the
+// walk terminating without letting an optimistic answer escape into
+// other functions' cached results.
 //
 // Known gap: the ray-tracing hit terminators (`IgnoreHit`,
 // `AcceptHitAndEndSearch`) end the invocation at the target level, but
@@ -981,12 +976,25 @@ struct CoverageFunctionExitAnalysis
             return false;
         }
 
-        // Recursion is rejected for GPU targets by
-        // `checkForRecursiveFunctions` later in the pipeline. Treat a
-        // cycle as returning so the fixpoint terminates; a recursive
-        // program that reaches here is already ill-formed.
+        // Break call cycles conservatively: a function we are still in the
+        // middle of analyzing is reported as possibly not returning.
+        //
+        // Returning `false` here instead would be unsound, not merely
+        // imprecise. The optimistic answer does not stay local — a
+        // *different* function analyzed while this one is in progress
+        // consumes it and then caches its own result below, so one partner
+        // of a mutually recursive pair can be memoized as "returns
+        // normally" when it does not, and the outcome depends on which
+        // function the traversal happened to reach first. `true` cannot go
+        // wrong in that direction: it only ever adds a split.
+        //
+        // Recursion is not ruled out before this point. It is diagnosed by
+        // `checkForRecursiveFunctions`, which runs far later in
+        // `linkAndOptimizeIR` and, more to the point, only for non-CPU
+        // targets (`slang-ir-check-recursion.cpp`) — and CPU is a target
+        // coverage supports.
         if (!inProgress.add(func))
-            return false;
+            return true;
 
         bool result = false;
         bool sawNormalExit = false;
@@ -1073,6 +1081,17 @@ static void assignCoverageCounterSlots(
             auto previousOp = markerOps[openGroup];
             if (previousOp->getParent() == markerOp->getParent())
             {
+                // Two preconditions from `collectCoverageMarkerOps`, which
+                // walks each function's blocks in order and each block's
+                // insts in position order: markers from one block arrive
+                // contiguously, and within a block they arrive in position
+                // order. The walk below relies on the second — it scans
+                // forward from `previousOp` looking for `markerOp`, so if
+                // the two were ever reversed it would run to the end of the
+                // block without finding it and skip the split check
+                // entirely. Assert rather than trust a collection order
+                // defined 200 lines away.
+                SLANG_ASSERT(previousOp != markerOp);
                 // Same block: the run continues unless something
                 // between the two markers can abandon the invocation.
                 joinsOpenGroup = true;

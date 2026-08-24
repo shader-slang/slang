@@ -229,9 +229,11 @@ markers that provably execute together — those in one basic block with
 nothing between them that can abandon the invocation — onto a single
 counter and a single runtime probe. This is what keeps instrumented
 shader code small, since emitted size scales with probe count. Several
-entries therefore share a `counterIndex`, and `counterCount` is
-markedly smaller than the entry count (roughly half on the bundled
-demos). Function and branch entries keep a dedicated counter.
+entries therefore share a `counterIndex`, and `counterCount` is never
+larger than the entry count -- roughly half on the bundled demos.
+Function and branch entries keep a dedicated counter, so a compile that
+enables only those modes leaves the two counts equal; do not code
+against a strict inequality.
 
 Two consequences for hosts:
 
