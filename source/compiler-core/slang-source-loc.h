@@ -621,6 +621,11 @@ struct SourceManager
     ///
     /// Requires: entries in m_macroExpansions are sorted by range.begin (monotone from
     /// allocateSourceRange guarantees this under normal use).
+    ///
+    /// The returned pointer is an interior pointer into m_macroExpansions and is invalidated by
+    /// the next call to registerMacroExpansion on this manager (which may reallocate the
+    /// backing List). Callers must not hold the pointer across such a call; read what they need
+    /// from the entry immediately.
     const MacroExpansionEntry* findMacroExpansion(SourceLoc loc) const;
 
     /// Return the SourceView that covers the definition-file position for `loc`, resolving
@@ -655,10 +660,11 @@ struct SourceManager
 
     /// Get the humane source location for `loc`.
     ///
-    /// If `loc` is a per-invocation macro-expansion-range loc (produced by
-    /// _maybeRemapBodyTokenLoc in the preprocessor), it is transparently unmapped
-    /// to the original definition-file position before the line/column is computed.
-    /// Callers do not need to pre-process the loc; this method handles all cases.
+    /// If `loc` originated inside a macro body -- i.e. it was remapped into a per-invocation
+    /// expansion range rather than referring directly to definition-file text -- it is
+    /// transparently resolved back to the original definition-file position before the
+    /// line/column is computed. Callers do not need to pre-process the loc; this method
+    /// handles all cases.
     HumaneSourceLoc getHumaneLoc(SourceLoc loc, SourceLocType type = SourceLocType::Nominal);
 
     /// Get the path associated with a location

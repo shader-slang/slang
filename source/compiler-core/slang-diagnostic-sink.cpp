@@ -479,6 +479,17 @@ static void appendMacroExpansionNotes(
             DiagnosticNote note;
             note.message = msg.produceString();
             note.diagnosticInfo = &MiscDiagnostics::seeExpandedFromMacro;
+            // Unlike the token-paste branch below, this deliberately ignores the returned
+            // SourceView* and always emits the note, even if the unmap doesn't fully resolve.
+            // findSourceViewThroughExpansion's documented postcondition guarantees that on
+            // failure, spanLoc still holds the deepest definition-file loc reached -- a
+            // reasonable-effort location -- and the note itself ("expanded from macro 'X'") is
+            // always a true statement about this level of the chain regardless of how precisely
+            // its span resolves. The token-paste branch instead breaks on an unresolved loc
+            // because there the note's entire content ("see token pasted location") only makes
+            // sense if a real location can be shown; with no resolvable span it would be
+            // actively misleading rather than merely imprecise, so it's better to end the walk
+            // there than to emit a broken note.
             SourceLoc spanLoc = entry->callSiteLoc;
             sm->findSourceViewThroughExpansion(spanLoc); // unmap in-place; ignore returned view
             note.span.range = SourceRange{spanLoc, spanLoc + (Int)macroName.getLength()};

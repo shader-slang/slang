@@ -2,10 +2,12 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 // An empty-body macro. HandleDefineDirective always appends an EndOfFile sentinel, so
-// macro->tokens.m_tokens.getCount() is 1 (not 0). Registration is skipped when the
-// sentinel's loc is invalid, or proceeds but produces a size-1 range with no non-EOF
-// body tokens to remap. Either way, no body locs are remapped into the expansion range,
-// so no "expanded from macro 'EMPTY'" note is emitted for an error at the call site.
+// macro->tokens.m_tokens.getCount() is 1 (not 0), and for a #define with no replacement
+// tokens like this one, that sentinel's loc is valid (it points just past `#define EMPTY`
+// in this file). So registration proceeds and produces a size-1 expansion range -- but the
+// body-token scan in MacroInvocation's constructor only remaps non-EOF tokens, and there are
+// none here, so no body locs are ever remapped into that range. No "expanded from macro
+// 'EMPTY'" note is emitted for an error at the call site.
 #define EMPTY
 
 void test()
