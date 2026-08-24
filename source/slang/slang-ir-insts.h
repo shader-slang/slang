@@ -4093,6 +4093,7 @@ $(type_info.return_type) $(type_info.method_name)(
 
     // Create an empty `interface` type.
     IRInterfaceType* createInterfaceType(UInt operandCount, IRInst* const* operands);
+    IRInterfaceType* createInterfaceType(IROp op, UInt operandCount, IRInst* const* operands);
 
     // Create a global "key" to use for indexing into a `struct` type.
     IRStructKey* createStructKey();
