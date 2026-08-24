@@ -747,6 +747,14 @@ struct IRInst
 
     /// Out-of-line slow path behind `ensureBodyMaterialized`.
     void _materializeDeferredBody();
+
+    /// Materialize the parent's body, if this instruction has a parent. The sibling
+    /// links are the parent's to publish, so this is what makes them trustworthy.
+    SLANG_FORCE_INLINE void _materializeParent()
+    {
+        if (auto p = getParent())
+            p->ensureBodyMaterialized();
+    }
     template<typename T>
     T* findDecoration();
 
@@ -812,8 +820,34 @@ private:
     IRInst* _prev;
 
 public:
-    IRInst* getNextInst() const { return irLoadInstLink(_next); }
-    IRInst* getPrevInst() const { return irLoadInstLink(_prev); }
+    /// The next/previous instruction with the same parent.
+    ///
+    /// Materializes the parent's body first. The link lives in the parent's child
+    /// list, and a deferred body is published into it, so the parent is what has to
+    /// be materialized before the link can be trusted. Doing that here rather than at
+    /// the call sites is the point: a caller who does not know the nuance cannot get
+    /// it wrong, and when nothing is deferred the check is one relaxed load of a flag
+    /// that is already in cache.
+    IRInst* getNextInst()
+    {
+        _materializeParent();
+        return irLoadInstLink(_next);
+    }
+    IRInst* getPrevInst()
+    {
+        _materializeParent();
+        return irLoadInstLink(_prev);
+    }
+
+    /// The same links *without* materializing.
+    ///
+    /// For the decoration walk only, which must not materialize: forcing a body while
+    /// looking up a decoration would defeat on-demand loading entirely, and decoration
+    /// lookup is the hottest walk in the compiler. Named `peek` so that reaching for it
+    /// is a deliberate act rather than the path of least resistance -- `getNextInst`
+    /// is what ordinary traversal should use.
+    IRInst* peekNextInst() { return irLoadInstLink(_next); }
+    IRInst* peekPrevInst() { return irLoadInstLink(_prev); }
 
     /// Publish `value` as this instruction's next/previous link.
     ///

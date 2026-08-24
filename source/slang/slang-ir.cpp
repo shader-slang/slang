@@ -8936,9 +8936,11 @@ IRDecorationList IRInst::getDecorations()
 
 void IRDecorationList::Iterator::operator++()
 {
-    // Acquire, because for a global whose body is deferred this link is the one a
-    // concurrent materialization publishes into.
-    inst = inst->getNextInst();
+    // `peek` rather than `getNextInst`: this walk must not materialize, or looking up
+    // a decoration would force the body of every global it passes. Acquire, because for
+    // a global whose body is deferred this link is the one a concurrent materialization
+    // publishes into.
+    inst = inst->peekNextInst();
     // And stop here rather than at a saved sentinel, so a body appearing mid-walk ends
     // the iteration instead of being walked as though it were more decorations.
     if (inst && !as<IRDecoration>(inst))

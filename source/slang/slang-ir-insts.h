@@ -38,10 +38,12 @@ struct IRDecoration : IRInst
 
     IRDecoration* getNextDecoration()
     {
-        // The last decoration's link is where a deferred body attaches, so this step
-        // can race a concurrent materialization. `getNextInst` does the acquire that
-        // pairs with the release store publishing the chain.
-        return as<IRDecoration>(getNextInst());
+        // `peek` rather than `getNextInst`: materializing here would force a body
+        // merely to look up a decoration, which is what on-demand loading exists to
+        // avoid. The last decoration's link is where a deferred body attaches, so this
+        // step can race a concurrent materialization; the acquire inside `peek` pairs
+        // with the release store that publishes the chain.
+        return as<IRDecoration>(peekNextInst());
     }
 };
 
