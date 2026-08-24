@@ -46,7 +46,7 @@ All arithmetic operations on signed and unsigned integers wrap on overflow.
 
 All target platforms support the `int`/`int32_t` and `uint`/`uint32_t` types. The support for other types depends on the target and target capabilities. See [target platforms](../target-compatibility.md) for details.
 
-All integer types are stored in memory with their natural size and alignment on all target that support them.
+All integer types are stored in memory with their natural size and alignment on all targets that support them.
 
 ### Floating-Point Types {#floating}
 

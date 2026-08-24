@@ -185,6 +185,14 @@ StructuredBuffer and ByteAddressBuffer are translated to a shader storage buffer
 RWStructuredBuffer and RWByteAddressBuffer are translated to a shader storage buffer with `read-write` access.
 RasterizerOrderedStructuredBuffer and RasterizerOrderedByteAddressBuffer will use an extension, `SPV_EXT_fragment_shader_interlock`.
 
+By default (with no data-layout generic argument and no global layout flag), the element data of a `ConstantBuffer` or `ParameterBlock` uses the std140 layout, while `StructuredBuffer` / `RWStructuredBuffer` (and the read-only/read-write storage buffers they map to) use the std430 layout. Scalar and C/C++ layouts are strictly opt-in: they are only selected by an explicit request (see below) and are **never** enabled automatically based on the Vulkan or SPIR-V version. Raw buffers (`ByteAddressBuffer` / `RWByteAddressBuffer`) are laid out with the tight natural layout for their load/store accesses; use `-fvk-use-gl-layout` to make those accesses follow std430 instead.
+
+In Slang, _scalar_ layout and _natural_ layout are the same rules: the [Natural Layout](../language-reference/types-struct.md#natural-layout) of the language reference, which places each field at its natural alignment and does not round the overall struct size up to its alignment. The _C/C++_ layout (`CDataLayout` / `-fvk-use-c-layout`) is that same natural layout plus a final struct-size round-up — the [C-Style Layout](../language-reference/types-struct.md#c-style-layout) that mirrors typical C/C++ compilers.
+
+Because natural/scalar omits the struct-size round-up, it can be tighter than C for a nested struct: it can pack a trailing field into a preceding member struct's tail padding. It is not uniformly smaller than C, though — `bool`, for instance, is four bytes under natural/scalar but one byte under C.
+
+The std430 and std140 rules also round struct size up, but differ from natural, scalar, and C layout in their vector and array alignment. No Slang layout matches C for every type: an empty struct, for example, is zero bytes in Slang but one byte in C++.
+
 If you need to apply a different buffer layout for individual `ConstantBuffer` or `StructuredBuffer`, you can specify the layout as a second generic argument. E.g., `ConstantBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, Std140DataLayout>`, `StructuredBuffer<T, Std430DataLayout>`, `StructuredBuffer<T, ScalarDataLayout>` or `StructuredBuffer<T, CDataLayout>`.
 
 Note that there are compiler options, "-fvk-use-scalar-layout" / "-force-glsl-scalar-layout", "-fvk-use-dx-layout" and "-fvk-use-c-layout".
