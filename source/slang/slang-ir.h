@@ -793,12 +793,34 @@ struct IRInst
 
     IRInst* getParent() { return parent; }
 
-    // The next and previous instructions with the same parent
-    IRInst* next;
-    IRInst* prev;
+    /// The next and previous instructions with the same parent.
+    ///
+    /// Private on purpose, and reached only through the accessors below. A deferred
+    /// body is published by writing these links with release ordering, so a reader
+    /// that loads one with a plain read can observe a link to an instruction whose
+    /// contents are not yet visible to it. Making the members private moves that from
+    /// something each call site has to remember into something it cannot get wrong:
+    /// there is no way to read the link except through an acquire load, and no way to
+    /// write it except through a release store.
+    ///
+    /// The alternative -- leaving them public and wrapping each access at the call
+    /// site -- was what this replaced. It left roughly forty places where a plain
+    /// `->next` would compile and be wrong only on a weakly-ordered machine, under a
+    /// race that does not reproduce on x86-64.
+private:
+    IRInst* _next;
+    IRInst* _prev;
 
-    IRInst* getNextInst() { return next; }
-    IRInst* getPrevInst() { return prev; }
+public:
+    IRInst* getNextInst() const { return irLoadInstLink(_next); }
+    IRInst* getPrevInst() const { return irLoadInstLink(_prev); }
+
+    /// Publish `value` as this instruction's next/previous link.
+    ///
+    /// A release store, so everything written to `value` before this call is visible
+    /// to any thread that reaches it by following the link.
+    void setNextInst(IRInst* value) { irPublishInstLink(_next, value); }
+    void setPrevInst(IRInst* value) { irPublishInstLink(_prev, value); }
 
     // An instruction can have zero or more children, although
     // only certain instruction opcodes are allowed to have
@@ -848,7 +870,44 @@ struct IRInst
     // modes. Every accessor below materializes, so going through them is always
     // correct; there is deliberately no non-materializing variant to reach for.
     //
+    /// The decorations and children of this instruction, as a list.
+    ///
+    /// Private for the same reason as `_next`/`_prev`: the head of this list is the
+    /// other slot a deferred body is published into, so a plain read of it can observe
+    /// a link to instructions whose contents are not yet visible. Reads go through
+    /// `peekFirstDecorationOrChild()` (acquire) and writes through
+    /// `setFirstDecorationOrChild()` (release), so there is no spelling of an
+    /// unsynchronized access.
+    ///
+    /// The name is deliberately unchanged. `slang.natvis` and `slang_lldb.py` walk this
+    /// member by name to display IR in a debugger, and neither is checked by the
+    /// compiler -- renaming it would break IR inspection silently.
+private:
     IRInstListBase m_decorationsAndChildren;
+
+public:
+    /// Read the head of the list *without* materializing a deferred body.
+    ///
+    /// Decoration lookup depends on not paying for materialization -- materializing
+    /// during a decoration walk would defeat on-demand loading entirely -- so it reads
+    /// the head directly. Acquire, pairing with the release store that publishes a body.
+    IRInst* peekFirstDecorationOrChild() { return irLoadInstLink(m_decorationsAndChildren.first); }
+
+    /// Read the tail of the list without materializing a deferred body.
+    IRInst* peekLastDecorationOrChild() { return irLoadInstLink(m_decorationsAndChildren.last); }
+
+    /// Publish `value` as the head of the list, releasing everything written to the
+    /// chain behind it.
+    void setFirstDecorationOrChild(IRInst* value)
+    {
+        irPublishInstLink(m_decorationsAndChildren.first, value);
+    }
+
+    /// Publish `value` as the tail of the list.
+    void setLastDecorationOrChild(IRInst* value)
+    {
+        irPublishInstLink(m_decorationsAndChildren.last, value);
+    }
 
 
     /// Returns the head of the combined decoration/child list, materializing a
@@ -1111,14 +1170,14 @@ typename IRInstList<T>::Iterator IRInstList<T>::end()
     // allowed to observe a deferred body's link without going through
     // `ensureBodyMaterialized()`. Fixing only the base class covered the untyped walk and
     // left the typed one unsynchronized.
-    return Iterator(last ? irLoadInstLink(last->next) : nullptr);
+    return Iterator(last ? last->getNextInst() : nullptr);
 }
 
 template<typename T>
 IRModifiableInstList<T>::IRModifiableInstList(T* inParent, T* first, T* last)
 {
     parent = inParent;
-    for (auto item = first; item; item = item->next)
+    for (auto item = first; item; item = item->getNextInst())
     {
         workList.add(item);
         if (item == last)
@@ -1153,33 +1212,33 @@ IRFilteredInstList<T>::IRFilteredInstList(IRInst* fst, IRInst* lst)
     first = fst;
     last = lst;
 
-    auto lastIter = last ? last->next : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     while (first != lastIter && !as<T>(first))
-        first = first->next;
+        first = first->getNextInst();
     while (last && last != first && !as<T>(last))
-        last = last->prev;
+        last = last->getPrevInst();
 }
 
 template<typename T>
 void IRFilteredInstList<T>::Iterator::operator++()
 {
-    inst = inst->next;
+    inst = inst->getNextInst();
     while (inst != exclusiveLast && !as<T>(inst))
     {
-        inst = inst->next;
+        inst = inst->getNextInst();
     }
 }
 template<typename T>
 typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::begin()
 {
-    auto lastIter = last ? last->next : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     return IRFilteredInstList<T>::Iterator(first, lastIter);
 }
 
 template<typename T>
 typename IRFilteredInstList<T>::Iterator IRFilteredInstList<T>::end()
 {
-    auto lastIter = last ? last->next : nullptr;
+    auto lastIter = last ? last->getNextInst() : nullptr;
     return IRFilteredInstList<T>::Iterator(lastIter, lastIter);
 }
 

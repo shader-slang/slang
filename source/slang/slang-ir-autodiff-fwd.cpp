@@ -3255,7 +3255,7 @@ struct ForwardDiffTranslationContext
     InstPair translateBlock(IRBuilder* builder, IRBlock* origBlock)
     {
         HashSet<IRInst*> ignore;
-        for (auto inst = origBlock->getFirstInst(); inst; inst = inst->next)
+        for (auto inst = origBlock->getFirstInst(); inst; inst = inst->getNextInst())
         {
             if (inst->m_op == kIROp_Unmodified)
                 ignore.add(inst);

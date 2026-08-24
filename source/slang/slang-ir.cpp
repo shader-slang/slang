@@ -222,7 +222,7 @@ void IRInstListBase::Iterator::operator++()
 {
     if (inst)
     {
-        inst = irLoadInstLink(inst->next);
+        inst = inst->getNextInst();
     }
 }
 
@@ -232,7 +232,7 @@ IRInstListBase::Iterator IRInstListBase::begin()
 }
 IRInstListBase::Iterator IRInstListBase::end()
 {
-    return Iterator(last ? irLoadInstLink(last->next) : nullptr);
+    return Iterator(last ? last->getNextInst() : nullptr);
 }
 
 //
@@ -457,7 +457,7 @@ void IRBlock::addParam(IRParam* param)
     //
     if (auto lastParam = getLastParam())
     {
-        if (lastParam->next)
+        if (lastParam->getNextInst())
             param->insertAfter(lastParam);
         else
             param->insertAtEnd(this);
@@ -2888,7 +2888,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
             {
                 auto insertLoc = getInsertLoc().getInst();
                 bool isAfter = false;
-                for (auto cur = insertLoc->next; cur; cur = cur->next)
+                for (auto cur = insertLoc->getNextInst(); cur; cur = cur->getNextInst())
                 {
                     if (cur == foundInst)
                     {
@@ -8913,7 +8913,7 @@ IRDecoration* IRInst::getFirstDecoration()
     // materialize: decorations precede children, and `as<IRDecoration>` stops this
     // walk at the first non-decoration. The load is acquire because a deferred body
     // attaches here on a global that has no decorations.
-    return as<IRDecoration>(irLoadInstLink(m_decorationsAndChildren.first));
+    return as<IRDecoration>(peekFirstDecorationOrChild());
 }
 
 IRDecoration* IRInst::getLastDecoration()
@@ -8938,7 +8938,7 @@ void IRDecorationList::Iterator::operator++()
 {
     // Acquire, because for a global whose body is deferred this link is the one a
     // concurrent materialization publishes into.
-    inst = irLoadInstLink(inst->next);
+    inst = inst->getNextInst();
     // And stop here rather than at a saved sentinel, so a body appearing mid-walk ends
     // the iteration instead of being walked as though it were more decorations.
     if (inst && !as<IRDecoration>(inst))
@@ -9342,24 +9342,24 @@ void IRInst::_insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent)
 
     if (inPrev)
     {
-        inPrev->next = this;
+        inPrev->setNextInst(this);
     }
     else
     {
-        inParent->m_decorationsAndChildren.first = this;
+        inParent->setFirstDecorationOrChild(this);
     }
 
     if (inNext)
     {
-        inNext->prev = this;
+        inNext->setPrevInst(this);
     }
     else
     {
-        inParent->m_decorationsAndChildren.last = this;
+        inParent->setLastDecorationOrChild(this);
     }
 
-    this->prev = inPrev;
-    this->next = inNext;
+    this->setPrevInst(inPrev);
+    this->setNextInst(inNext);
     this->parent = inParent;
 
 #if _DEBUG
@@ -9434,25 +9434,25 @@ void IRInst::removeFromParent()
     if (pp)
     {
         SLANG_ASSERT(pp->getParent() == oldParent);
-        pp->next = nn;
+        pp->setNextInst(nn);
     }
     else
     {
-        oldParent->m_decorationsAndChildren.first = nn;
+        oldParent->setFirstDecorationOrChild(nn);
     }
 
     if (nn)
     {
         SLANG_ASSERT(nn->getParent() == oldParent);
-        nn->prev = pp;
+        nn->setPrevInst(pp);
     }
     else
     {
-        oldParent->m_decorationsAndChildren.last = pp;
+        oldParent->setLastDecorationOrChild(pp);
     }
 
-    prev = nullptr;
-    next = nullptr;
+    setPrevInst(nullptr);
+    setNextInst(nullptr);
     parent = nullptr;
 }
 

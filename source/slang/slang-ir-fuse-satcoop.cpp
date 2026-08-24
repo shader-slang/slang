@@ -58,7 +58,7 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
     };
 
     // Scan backwards to find which instructions g depends on, known as p
-    auto i = g->prev;
+    auto i = g->getPrevInst();
     while (i != f)
     {
         SLANG_ASSERT(i);
@@ -73,11 +73,11 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
 
         if (usedByG(i))
             ps.add(i);
-        i = i->prev;
+        i = i->getPrevInst();
     }
 
     // Scan forwards to compute instructions which depend on f, the instructions in q
-    i = f->next;
+    i = f->getNextInst();
     while (i != g)
     {
         if (usesF(i))
@@ -89,7 +89,7 @@ static IRInst* floatTogether(IRInst* f, IRInst* g)
             qs.add(i);
         }
 
-        i = i->next;
+        i = i->getNextInst();
     }
 
     // Now we can safely reorder things by moving p;f;g before everything else

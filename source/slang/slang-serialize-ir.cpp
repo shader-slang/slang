@@ -806,7 +806,7 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
     // publication, and it is one store: previously the chain was spliced onto the last
     // decoration on the first iteration, which let a concurrent decoration walk follow
     // that link into a chain that was still being decoded.
-    IRInst* const lastDecoration = inst->m_decorationsAndChildren.last;
+    IRInst* const lastDecoration = inst->peekLastDecorationOrChild();
     IRInst* bodyFirst = nullptr;
     IRInst* bodyLast = nullptr;
     for (Int64 i = 0; i < body.childCount; ++i)
@@ -814,26 +814,26 @@ void FlatModuleDecoder::materializeDeferredBody(IRInst* inst)
         auto child = decodeInst(inst, kBodyChildDepth);
         if (!child)
             continue;
-        child->prev = bodyLast;
+        child->setPrevInst(bodyLast);
         if (bodyLast)
-            bodyLast->next = child;
+            bodyLast->setNextInst(child);
         else
             bodyFirst = child;
         bodyLast = child;
     }
     if (bodyLast)
-        bodyLast->next = nullptr;
+        bodyLast->setNextInst(nullptr);
 
     if (bodyFirst)
     {
-        bodyFirst->prev = lastDecoration;
-        inst->m_decorationsAndChildren.last = bodyLast;
+        bodyFirst->setPrevInst(lastDecoration);
+        inst->setLastDecorationOrChild(bodyLast);
         // The publishing store. Release so that a reader which observes the link also
         // observes every field of every instruction in the chain behind it.
         if (lastDecoration)
-            irPublishInstLink(lastDecoration->next, bodyFirst);
+            lastDecoration->setNextInst(bodyFirst);
         else
-            irPublishInstLink(inst->m_decorationsAndChildren.first, bodyFirst);
+            inst->setFirstDecorationOrChild(bodyFirst);
     }
 
     deferBodies = savedDefer;
@@ -1064,17 +1064,17 @@ IRInst* FlatModuleDecoder::decodeInst(IRInst* parent, Int64 depth)
         if (!first)
             first = c;
         last = c;
-        c->prev = prev;
+        c->setPrevInst(prev);
         if (prev)
-            prev->next = c;
+            prev->setNextInst(c);
         prev = c;
     }
     if (last)
-        last->next = nullptr;
+        last->setNextInst(nullptr);
     if (inst)
     {
-        inst->m_decorationsAndChildren.first = first;
-        inst->m_decorationsAndChildren.last = last;
+        inst->setFirstDecorationOrChild(first);
+        inst->setLastDecorationOrChild(last);
     }
 
     // Now that the whole subtree has been walked, record how many instructions

@@ -90,7 +90,7 @@ void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
         {
             for (auto block : func->getBlocks())
             {
-                for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+                for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
                 {
                     _beforeComputeEmitProcessInstruction(func, inst, builder);
                 }
