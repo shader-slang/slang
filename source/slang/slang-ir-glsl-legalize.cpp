@@ -4837,7 +4837,8 @@ void legalizeEntryPointForGLSL(
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
-    ShaderExtensionTracker* glslExtensionTracker)
+    ShaderExtensionTracker* glslExtensionTracker,
+    bool preserveOriginalEntryPointName)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -4905,7 +4906,7 @@ void legalizeEntryPointForGLSL(
 
     // Rename the entrypoint to "main" to conform to GLSL standard,
     // if the compile options require us to do it.
-    if (!shouldUseOriginalEntryPointName(codeGenContext) &&
+    if (!preserveOriginalEntryPointName && !shouldUseOriginalEntryPointName(codeGenContext) &&
         codeGenContext->getEntryPointCount() == 1)
     {
         entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
@@ -5100,9 +5101,16 @@ void legalizeEntryPointsForGLSL(
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
 {
+    bool preserveOriginalEntryPointNames = funcs.getCount() > 1;
     for (auto func : funcs)
     {
-        legalizeEntryPointForGLSL(session, module, func, context, glslExtensionTracker);
+        legalizeEntryPointForGLSL(
+            session,
+            module,
+            func,
+            context,
+            glslExtensionTracker,
+            preserveOriginalEntryPointNames);
     }
 
     assignRayPayloadHitObjectAttributeLocations(module);
