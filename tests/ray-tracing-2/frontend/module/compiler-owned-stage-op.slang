@@ -35,3 +35,15 @@ __intrinsic_op(structuralRayTracingGetTriangleFrontFacing) bool fakeTriangleFron
 __intrinsic_op(structuralRayTracingTrace) void fakeStructuralTrace();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingTrace' is reserved for compiler use
+
+__intrinsic_op(structuralRayTracingHitGroupInfo) void fakeHitGroupInfo();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingHitGroupInfo' is reserved for compiler use
+
+__intrinsic_op(structuralRayTracingMissGroupInfo) void fakeMissGroupInfo();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingMissGroupInfo' is reserved for compiler use
+
+__intrinsic_op(structuralRayTracingCallableGroupInfo) void fakeCallableGroupInfo();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingCallableGroupInfo' is reserved for compiler use

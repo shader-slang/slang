@@ -10,6 +10,7 @@ class InterfaceDecl;
 class FunctionDeclBase;
 class AggTypeDecl;
 class AssocTypeDecl;
+class GenericTypeConstraintDecl;
 class Decl;
 class ModuleDecl;
 class FuncDecl;
@@ -73,6 +74,17 @@ enum class StructuralRayTracingAssociatedTypeKind
     ProgramHitGroups,
     ProgramMissGroups,
     ProgramCallableGroups,
+    HitGroupSlot,
+    HitGroupContext,
+    HitGroupClosestHit,
+    HitGroupAnyHit,
+    HitGroupIntersection,
+    MissGroupSlot,
+    MissGroupContext,
+    MissGroupMiss,
+    CallableGroupSlot,
+    CallableGroupContext,
+    CallableGroupCallable,
     Count,
 };
 
@@ -129,6 +141,11 @@ public:
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
+    SubtypeWitness* resolveAssociatedTypeConstraint(
+        ASTBuilder* astBuilder,
+        SubtypeWitness* witness,
+        StructuralRayTracingAssociatedTypeKind kind) const;
+    bool isStagePlaceholder(StructuralRayTracingStageKind kind, Type* type) const;
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
@@ -149,12 +166,15 @@ private:
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
     AssocTypeDecl*
         m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::Count)] = {};
+    GenericTypeConstraintDecl* m_associatedTypeConstraintRequirements[int(
+        StructuralRayTracingAssociatedTypeKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>
         m_stageInputOperations;
     ModuleDecl* m_trustedModuleDecl = nullptr;
     AggTypeDecl* m_rayTracerType = nullptr;
     AggTypeDecl* m_trianglePrimitiveType = nullptr;
     AggTypeDecl* m_curvePrimitiveType = nullptr;
+    AggTypeDecl* m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
 };
