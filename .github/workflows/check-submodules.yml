@@ -14,20 +14,8 @@ on:
 # unrelated PR is harmless — it simply never reports, and nothing waits on it.
 # The pull_request paths: filter above therefore restricts the work to PRs that
 # actually touch a submodule pointer, the workflow, or the script.
-#
-# There is deliberately no merge_group trigger. GitHub ignores paths: on
-# merge_group, so the check used to re-run over every submodule for every queue
-# entry -- and since it is not required, a failure there could not block the
-# merge, and the run was discarded with the temporary gh-readonly-queue branch.
-# Requiring it instead is not an option while the paths: filter above exists: a
-# path-skipped required check never reports and blocks the PR forever.
 jobs:
   check-submodules:
-    # pull_request is now this workflow's only trigger, so the guard just skips
-    # drafts. (Other check-* workflows carry a compound
-    # `github.event_name != 'pull_request' || ...` guard because they also have
-    # merge_group or workflow_dispatch triggers, where there is no draft state
-    # to read.)
     if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     # verify_reachable can escalate to a full `git fetch --unshallow` per submodule
