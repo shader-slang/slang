@@ -4279,6 +4279,11 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             if (funcDeclRefExpr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
 
+            if (funcDeclBase && diagnoseDirectStructuralRayTracingStageInvoke(invoke, funcDeclBase))
+            {
+                return CreateErrorExpr(invoke);
+            }
+
             Index paramCount = funcType->getParamCount();
 
             for (Index pp = 0; pp < paramCount; ++pp)

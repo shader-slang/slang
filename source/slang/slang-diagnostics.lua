@@ -956,6 +956,13 @@ err(
 )
 
 err(
+    "direct-structural-ray-tracing-stage-invoke",
+    20022,
+    "direct invocation of a structural ray-tracing stage",
+    span { loc = "location", message = "a structural ray-tracing stage method may only be invoked by compiler-generated dispatch" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
