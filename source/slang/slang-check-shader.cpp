@@ -1778,6 +1778,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
+    diagnoseMixedRayTracingAPIUse(entryPoint, sink);
 
     // An entry point is invoked by the pipeline, which has no channel for returning an error, so
     // it cannot declare `throws`. `getErrorCodeType` is used rather than reading `errorType`
@@ -3281,6 +3282,11 @@ void FrontEndCompileRequest::checkEntryPoints()
             auto translationUnit = translationUnits[tt];
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
         }
+    }
+
+    for (auto translationUnit : translationUnits)
+    {
+        diagnoseMixedRayTracingAPIsInModule(linkage, translationUnit->getModule(), sink);
     }
 }
 
