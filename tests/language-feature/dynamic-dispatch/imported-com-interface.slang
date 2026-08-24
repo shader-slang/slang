@@ -8,8 +8,14 @@
 // that happens *before* prelink runs. A declaration without it silently takes the
 // wrong branch and the witness table is not kept alive.
 //
-// The emitted GUID is the observable end of that chain: it can only be correct if
-// the decoration and its GUID survived the module boundary.
+// The emitted GUID is the observable end of that chain, and the chain is shorter
+// than it looks. Deleting the reproduction does not merely drop a GUID from an
+// otherwise-correct interface: `visitInheritanceDecl` decides the *shape* of the
+// lowered conformance from that decoration, so without it `Impl` is lowered as a
+// plain `RefObject` rather than a COM object. The emitted C++ then loses the
+// `IComService` interface struct, `SLANG_COM_OBJECT_IUNKNOWN_ALL`, `getInterface`
+// and the virtual `query` override along with the GUID -- verified by removing
+// the reproduction and recompiling this file.
 
 import "imported-com-interface-lib";
 

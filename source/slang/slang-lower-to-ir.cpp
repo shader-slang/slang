@@ -12189,14 +12189,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // "nothing to borrow" -- handled by falling through to AST derivation --
         // rather than an assumption about ordering that would fail silently.
         IRInst* borrowedSymbol = nullptr;
+        Index interfaceSymbolCount = 0;
         for (auto symbol : symbols)
         {
             if (as<IRInterfaceType>(getGenericReturnVal(symbol)))
             {
-                borrowedSymbol = symbol;
-                break;
+                if (!borrowedSymbol)
+                    borrowedSymbol = symbol;
+                interfaceSymbolCount++;
             }
         }
+
+        // The whole list is scanned rather than stopping at the first match, so
+        // that "exactly one of these is an interface" is checked rather than
+        // assumed. Taking the first and stopping would silently pick one of
+        // several if a second interface ever landed under one mangled name.
+        SLANG_RELEASE_ASSERT(
+            interfaceSymbolCount <= 1 &&
+            "more than one interface is registered under a single mangled name");
+
         if (!borrowedSymbol)
             return false;
 
