@@ -584,7 +584,10 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DisableWarnings,
          "-warnings-disable",
          "-warnings-disable <id>[,<id>...]",
-         "Disable specific warning ids."},
+         "Disable specific warnings, given by numeric id or name. A numeric id that this compiler "
+         "version does not recognize is silently ignored, so one option value can be shared across "
+         "compiler versions that do not all define the warning; an unrecognized warning name is "
+         "still reported as an error."},
         {OptionKind::WarningLevel,
          "-Wall,-Wextra,-Wpedantic",
          "-Wall | -Wextra | -Wpedantic",
