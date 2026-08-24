@@ -27,6 +27,37 @@ IROp getStructuralRayTracingStageInterfaceOp(StructuralRayTracingStageKind kind)
     }
 }
 
+IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInputOperationKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageInputOperationKind::RayTCurrent:
+        return kIROp_StructuralRayTracingGetRayTCurrent;
+    case StructuralRayTracingStageInputOperationKind::HitKind:
+        return kIROp_StructuralRayTracingGetHitKind;
+    case StructuralRayTracingStageInputOperationKind::WorldRayOrigin:
+        return kIROp_StructuralRayTracingGetWorldRayOrigin;
+    case StructuralRayTracingStageInputOperationKind::WorldRayDirection:
+        return kIROp_StructuralRayTracingGetWorldRayDirection;
+    case StructuralRayTracingStageInputOperationKind::ObjectSpaceRay:
+        return kIROp_StructuralRayTracingGetObjectSpaceRay;
+    case StructuralRayTracingStageInputOperationKind::PrimitiveIndex:
+        return kIROp_StructuralRayTracingGetPrimitiveIndex;
+    case StructuralRayTracingStageInputOperationKind::GeometryIndex:
+        return kIROp_StructuralRayTracingGetGeometryIndex;
+    case StructuralRayTracingStageInputOperationKind::IgnoreHit:
+        return kIROp_StructuralRayTracingIgnoreHit;
+    case StructuralRayTracingStageInputOperationKind::AcceptHitAndEndSearch:
+        return kIROp_StructuralRayTracingAcceptHitAndEndSearch;
+    case StructuralRayTracingStageInputOperationKind::ReportHit:
+        return kIROp_StructuralRayTracingReportHit;
+    case StructuralRayTracingStageInputOperationKind::ReportHitWithKind:
+        return kIROp_StructuralRayTracingReportHitWithKind;
+    default:
+        return kIROp_Invalid;
+    }
+}
+
 static IRInterfaceType* _findInterfaceType(IRInst* inst)
 {
     if (auto generic = as<IRGeneric>(inst))

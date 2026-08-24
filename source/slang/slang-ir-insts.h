@@ -1837,6 +1837,15 @@ struct IRAtomicOperation : IRInst
 };
 
 FIDDLE()
+struct IRStructuralRayTracingStageInputOperation : IRInst
+{
+    FIDDLE(baseInst())
+
+    IRInst* getFallback() { return getOperand(0); }
+    IRInst* getInput() { return getOperand(1); }
+};
+
+FIDDLE()
 struct IRAtomicLoad : IRAtomicOperation
 {
     FIDDLE(leafInst())
