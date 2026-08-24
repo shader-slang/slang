@@ -2064,7 +2064,9 @@ public:                                                              \
     struct SlangStructuredDiagnostic
     {
         SlangSeverity severity; /**< Effective severity after overrides. */
-        int64_t code; /**< Numeric error code, e.g. 30013 for E30013. Negative means no code. */
+        int64_t code; /**< Numeric error code, e.g. 30013 for E30013. Always non-negative for
+                           diagnostics currently emitted by the compiler; negative values are
+                           reserved to indicate the absence of a code. */
         const char* message;             /**< Primary human-readable message. */
         SlangDiagnosticSpan primarySpan; /**< Primary source location and label. */
         const SlangDiagnosticSpan*
@@ -4752,9 +4754,16 @@ struct ISession : public ISlangUnknown
         source spans.  All `const char*` pointers inside `SlangStructuredDiagnostic` are
         valid only for the duration of the callback.
 
-        Note: diagnostics emitted through the legacy `diagnose()` / `diagnoseRaw()` paths
-        (e.g. from downstream compilers such as DXC or glslang) are not delivered through
-        this callback; they appear only in the `outDiagnostics` blob as before.
+        Note: only diagnostics that flow through the compiler's structured/rich diagnostic
+        path reach this callback. A diagnostic emitted through the compiler's older,
+        unstructured reporting path (which most front-end diagnostics still use, in addition
+        to raw text from downstream compilers such as DXC or glslang) is not delivered here;
+        it appears only in the `outDiagnostics` blob as before.
+
+        There is no synchronization between registering/clearing the callback and diagnostics
+        being reported for compiles already in flight: do not call `setDiagnosticCallback` on
+        this session concurrently with, or while relying on, an in-progress operation on the
+        same session whose diagnostics you are observing through the callback.
 
         Pass `nullptr` for `callback` to remove a previously registered callback.
 
