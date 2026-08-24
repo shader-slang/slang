@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#layout-family
-//META: doc_section_digest=8133b77a147a20aa12fcc20641167e9fc2f42707469a60ef2b36207749f54a95
+//META: doc_section_digest=c1ef039f2fd0378a7cac58b8bb8282b937d992edac625ada2b1761464ceb475b
 //META: purpose=A cbuffer lowers to a parameterGroupTypeLayout whose first three operands are the container var layout, the element var layout, and the offset element type layout.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

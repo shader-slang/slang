@@ -1197,13 +1197,24 @@ struct AnyValueMarshallingContext
     void processPackInst(IRPackAnyValue* packInst)
     {
         auto operand = packInst->getValue();
-        auto func = ensureMarshallingFunc(
-            operand->getDataType(),
-            cast<IRAnyValueType>(packInst->getDataType()));
+        auto resultType = packInst->getDataType();
+
+        // Earlier lowering can make a symbolic AnyValue pack physically trivial. For example,
+        // lowering `UntaggedUnion({Foo, none})` to `Foo` turns `PackAnyValue<Foo>(foo)` into an
+        // identity. Remove that identity here, where all AnyValue packs are normally lowered, but
+        // retain genuine packs whose result is still an `IRAnyValueType`.
+        if (operand->getDataType() == resultType && !as<IRAnyValueType>(resultType))
+        {
+            packInst->replaceUsesWith(operand);
+            packInst->removeAndDeallocate();
+            return;
+        }
+
+        auto func = ensureMarshallingFunc(operand->getDataType(), cast<IRAnyValueType>(resultType));
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(packInst);
-        auto callInst = builder->emitCallInst(packInst->getDataType(), func.packFunc, 1, &operand);
+        auto callInst = builder->emitCallInst(resultType, func.packFunc, 1, &operand);
         packInst->replaceUsesWith(callInst);
         packInst->removeAndDeallocate();
     }
@@ -1211,14 +1222,23 @@ struct AnyValueMarshallingContext
     void processUnpackInst(IRUnpackAnyValue* unpackInst)
     {
         auto operand = unpackInst->getValue();
-        auto func = ensureMarshallingFunc(
-            unpackInst->getDataType(),
-            cast<IRAnyValueType>(operand->getDataType()));
+        auto resultType = unpackInst->getDataType();
+
+        // Apply the same normalization to an unpack whose symbolic input has lowered to its
+        // concrete result type. For example, `UnpackAnyValue<Foo>(foo)` becomes `foo`; handling it
+        // in the ordinary marshalling pass keeps direct-payload lowering free of a cleanup scan.
+        if (operand->getDataType() == resultType && !as<IRAnyValueType>(resultType))
+        {
+            unpackInst->replaceUsesWith(operand);
+            unpackInst->removeAndDeallocate();
+            return;
+        }
+
+        auto func = ensureMarshallingFunc(resultType, cast<IRAnyValueType>(operand->getDataType()));
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(unpackInst);
-        auto callInst =
-            builder->emitCallInst(unpackInst->getDataType(), func.unpackFunc, 1, &operand);
+        auto callInst = builder->emitCallInst(resultType, func.unpackFunc, 1, &operand);
         unpackInst->replaceUsesWith(callInst);
         unpackInst->removeAndDeallocate();
     }

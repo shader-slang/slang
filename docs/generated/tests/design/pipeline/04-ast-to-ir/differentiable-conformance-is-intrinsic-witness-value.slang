@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#differentiability-arrives-as-a-conformance
-//META: doc_section_digest=34ead772bac23de346f65addfa530c4a7fd4069f6482eaad6257c9095f426f4c
+//META: doc_section_digest=1e49047b7384aa02f4422984d4cadf39c1cb9318941ea04b8d9f04dec3712cc1
 //META: purpose=A `SynthesizedModifier`-tagged differentiability conformance lowers to one intrinsic inst typed `witness_table_t(...)` carrying the conformance's operands, instead of a real `IRWitnessTable` with requirement entries.
 //META: intent=boundary
 //META: pipeline_stage=lower

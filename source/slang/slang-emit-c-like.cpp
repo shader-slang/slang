@@ -3081,7 +3081,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_GetStringHash:
         {
             auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
+            // `getStringLit()` casts operand 0 without checking, so it cannot be used to decide
+            // whether the operand really is a literal; that is what the `else` below is for.
+            auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
             if (stringLit)
             {

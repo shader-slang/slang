@@ -441,7 +441,7 @@ flowchart TD
 | 18 | `lowerResultType` | [slang-ir-lower-result-type.cpp](../../../../source/slang/slang-ir-lower-result-type.cpp) | `reqSet.resultType` | Now runs **after** `lowerOptionalType`: `lowerResultType` depends on accurate `getAnyValueSize()` results, which requires Optional types to be lowered first (so that a throwing function returning `Optional<T>` keeps the result-struct shape stable). |
 | 19 | `detectUninitializedResources` | [slang-ir-detect-uninitialized-resources.cpp](../../../../source/slang/slang-ir-detect-uninitialized-resources.cpp) | (always) | After `calcRequiredLoweringPassSet` rebuilds gates. |
 | 20 | `removeAvailableInDownstreamModuleDecorations` | [slang-ir-strip.cpp](../../../../source/slang/slang-ir-strip.cpp) | `codeGenContext->removeAvailableInDownstreamIR` | |
-| 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
+| 21 | `checkForRecursiveTypes` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | Source-level recursion never reaches this run: the same function is called once already during IR generation ([slang-lower-to-ir.cpp line 15691](../../../../source/slang/slang-lower-to-ir.cpp)), a `struct` that contains itself (directly or through an array) is rejected there with error 41001, and that call site returns immediately afterwards, before `linkAndOptimizeIR` is reached. What this pass still catches is IR that never went through the earlier call — for instance a `.slang-module` serialized under `-disable-non-essential-validations` and then handed to a SPIR-V compile. |
 | 22 | `checkForRecursiveFunctions` | [slang-ir-check-recursion.cpp](../../../../source/slang/slang-ir-check-recursion.cpp) | `shouldRunNonEssentialValidation()` | |
 | 23 | `checkForOutOfBoundAccess` | [slang-check-out-of-bound-access.cpp](../../../../source/slang/slang-check-out-of-bound-access.cpp) | `shouldRunNonEssentialValidation()` | |
 | 24 | `checkForMissingReturns` | [slang-ir-missing-return.cpp](../../../../source/slang/slang-ir-missing-return.cpp) | `reqSet.missingReturn` (under non-essential validation) | |
@@ -675,7 +675,7 @@ flowchart TD
 | 30 | `specializeFuncsForBufferLoadArgs` | [slang-ir-specialize-buffer-load-arg.cpp](../../../../source/slang/slang-ir-specialize-buffer-load-arg.cpp) | `isKhronosTarget && emitSpirvDirectly` | Second invocation, line 2507; see Notable passes. |
 | 31 | `performForceInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | (always) | |
 | 32 | `performIntrinsicFunctionInlining` | [slang-ir-inline.cpp](../../../../source/slang/slang-ir-inline.cpp) | `emitSpirvDirectly` | |
-| 33 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | |
+| 33 | `eliminateMultiLevelBreak` | [slang-ir-eliminate-multilevel-break.cpp](../../../../source/slang/slang-ir-eliminate-multilevel-break.cpp) | (always) | The `SLANG_PASS` call at line 2527 of `slang-emit.cpp` is unconditional. As everywhere in these tables, `(always)` describes the call site and not the outcome: the pass only rewrites an exit that leaves more than one enclosing region, and whatever it introduces is still subject to row 34's `simplifyIR` and to Phase D's simplification loop, so a module can run the pass and show no difference. |
 | 34 | `simplifyIR` | [slang-ir-ssa-simplification.cpp](../../../../source/slang/slang-ir-ssa-simplification.cpp) | `!minimalOptimization` | With `removeTrivialSingleIterationLoops = true`; line 2530. |
 | 35 | `legalizeEmptyTypes` | [slang-ir-legalize-types.cpp](../../../../source/slang/slang-ir-legalize-types.cpp) | (always; required for AD 2.0) | |
 | 36 | `LivenessUtil::addVariableRangeStarts` | [slang-ir-liveness.cpp](../../../../source/slang/slang-ir-liveness.cpp) | `shouldTrackLiveness()` | Liveness mode gating. |
@@ -815,7 +815,7 @@ flowchart TD
 | 12 | Forward-declared pointer fixup loop | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always; loop body when `m_forwardDeclaredPointers != 0`) | See the Loops section. |
 | 13 | `diagnoseConflictingDescriptorHeapStrideOptions` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always; only diagnoses on conflict) | Direct call after the forward-pointer loop ([slang-emit-spirv.cpp line 12268](../../../../source/slang/slang-emit-spirv.cpp); the member is defined at line 7509). Re-checks the compile-API path for the `SPIRVUnifiedDescriptorHeapStride` + non-zero `SPIRVResourceHeapStride` conflict the CLI rejects at option-parse time; emits `SpirvConflictingDescriptorHeapStrideOptions`. See Notable passes. |
 | 14 | `emitSPIRVAnyExtension` / `emitSPIRVAnyCapabilities` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Emit deferred-choice extensions and capabilities. |
-| 15 | `emitFrontMatter` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | |
+| 15 | `emitFrontMatter` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Lines 1657-1687. Emits exactly two instructions unconditionally: `OpCapability Shader`, then `OpMemoryModel` with the module's addressing model (`Logical` unless `requirePhysicalStorageAddressing` moved it) and memory model — printing as `OpMemoryModel Logical GLSL450` on a default Vulkan compile. Called *last* (line 12290) but writing into the `Capabilities` / `MemoryModel` logical sections, so `emitPhysicalLayout` still flattens it to the front. Nothing else is unconditional front matter: `OpSource` comes from `emitSource` in step 11, and an extension such as `SPV_KHR_storage_buffer_storage_class` is requested on demand by the type needing it (line 2527, a `StorageBuffer` pointer). The `; SPIR-V` / `; Version:` lines are the disassembler rendering the module-header words written at lines 529-553, not instructions. |
 | 16 | `emitPhysicalLayout` | [slang-emit-spirv.cpp](../../../../source/slang/slang-emit-spirv.cpp) | (always) | Produces the final word stream. |
 | 17 | `optimizeSPIRV` | [slang-emit.cpp](../../../../source/slang/slang-emit.cpp) | `#if 0` (currently disabled) | Inline spirv-opt invocation inside `createArtifactFromIR` (lines 3312-3319), positioned before the downstream link/validate chain; left in for documentation, never executes. |
 | 18 | `compiler->link` (spirv-link) | (downstream tool) | `!isPrecompilation && !shouldSkipDownstreamLinking && spirvFiles.getCount() > 1` | Merges the freshly emitted SPIR-V with every `IREmbeddedDownstreamIR` of `CodeGenTarget::SPIRV` found in the program's IR modules. |
@@ -898,7 +898,8 @@ expression inside `linkAndOptimizeIR`.
 | `shouldIncludeSourceInDebugInfo()` (`-debug-info-include-source`) | Conjoined with `getDebugInfoLevel() == DebugInfoLevel::Minimal`, selects the per-file `OpSource` form in `emitSource`. See [Embedding source at `-g1`](#embedding-source-at--g1). |
 | `getDownstreamArgs("spirv-opt")` non-empty | Forces `needsOptimization`, so the spirv-opt downstream compile runs even at `-O0`. |
 | `getBoolOption(ValidateUniformity)` | `validateUniformity`. |
-| `getBoolOption(PreserveParameters)` | Phase A: changes the DCE keep-alive option; Phase D: emits unreferenced `IRGlobalParam`s into the SPIR-V module. |
+| `getMatrixLayoutMode()` (`-matrix-layout-row-major` / `-matrix-layout-column-major`) | Supplies the default layout that `specializeMatrixLayout` (Phase B step 3) fills into matrix types that left it unspecified. The emitted SPIR-V member decoration is the *transpose* of the source layout — a row-major source matrix emits `ColMajor`, a column-major one emits `RowMajor` — because what SPIR-V calls columns are what Slang calls rows ([slang-emit-spirv.cpp lines 7045-7068](../../../../source/slang/slang-emit-spirv.cpp)). |
+| `getBoolOption(PreserveParameters)` | Phase A: changes the DCE keep-alive option; Phase D: emits unreferenced `IRGlobalParam`s into the SPIR-V module ([slang-emit-spirv.cpp line 12214](../../../../source/slang/slang-emit-spirv.cpp)), complete with their `Binding` / `DescriptorSet` decorations but *without* listing them in the entry point's `OpEntryPoint` interface. Nothing downstream keeps them alive after that: the `spirv-opt` step runs `CreateAggressiveDCEPass` and deletes them again, so the preserved variable survives into the final module only at `-O0`, the one optimization level for which `needsOptimization` is false and the optimizer is never loaded ([slang-emit.cpp lines 3390-3397](../../../../source/slang/slang-emit.cpp)). |
 | `getBoolOption(GenerateWholeProgram)` | Phase D: emits every `IRFunc` with `IRDownstreamModuleExportDecoration`. |
 | `getBoolOption(EnableExperimentalPasses)` | `introduceExplicitGlobalContext` (Phase C). |
 | `getBoolOption(VulkanEmitReflection)` | `addUserTypeHintDecorations`. |
@@ -1019,7 +1020,10 @@ flips both knobs: most other backends accept the defaults. The
 `useRegisterAllocation` mode invokes the
 [slang-ir-ssa-register-allocate.cpp](../../../../source/slang/slang-ir-ssa-register-allocate.cpp)
 pass implicitly to coalesce SSA values into named temporaries
-before lowering.
+before lowering. In the emitted module that shows up as an
+`OpVariable` in the `Function` storage class with an `OpStore` on
+each incoming edge, where the default mode would have left an
+`OpPhi` in the merge block.
 
 ### `specializeFuncsForBufferLoadArgs` (invoked twice)
 
@@ -1062,6 +1066,35 @@ namespace; SPIR-V direct emit reuses it because the entry-point
 shape it produces is what the backend expects in both modes. The
 pass updates the `ShaderExtensionTracker` for either GLSL or
 SPIR-V depending on `target`.
+
+Two parts of that shared entry-point shape are visible in the SPIR-V
+output. First, every `SV_*` semantic is resolved by
+`getGLSLSystemValueInfo`
+([slang-ir-glsl-legalize.cpp line 51](../../../../source/slang/slang-ir-glsl-legalize.cpp)),
+a name-match chain giving each recognized semantic a `gl_*` builtin
+identity and a required type — `SV_DispatchThreadID` to
+`gl_GlobalInvocationID`, `SV_IsFrontFace` to `gl_FrontFacing`, and so
+on. A semantic it does not recognize falls through to
+`Diagnostics::UnknownSystemValueSemantic` (line 1012), error 49999
+"unknown system-value semantic", so an unrecognized `SV_*` fails the
+SPIR-V compile inside this pass rather than at emit. The `gl_*` name
+is not itself emitted: `maybeEmitSystemVal`
+([slang-emit-spirv.cpp line 7663](../../../../source/slang/slang-emit-spirv.cpp))
+re-derives a `BuiltIn` decoration from the same semantic name.
+
+Second, the two semantics with no 1:1 Vulkan builtin are rewritten
+arithmetically rather than renamed. `legalizeTargetBuiltinVar`
+(line 4726, called at the end of `legalizeEntryPointForGLSL` at line
+5037) replaces each load of an `SV_VertexID` parameter with
+`gl_VertexIndex - gl_BaseVertex`, and each `SV_InstanceID` load with
+`gl_InstanceIndex - gl_BaseInstance`: HLSL's indices are zero-based
+per draw while Vulkan's include the draw's base offset, so the
+subtraction is what keeps user code on HLSL semantics. In SPIR-V that
+is an `OpISub` of two builtin loads, and the `BaseVertex` /
+`BaseInstance` operands pull in `SpvCapabilityDrawParameters`
+([slang-emit-spirv.cpp lines 7673-7680](../../../../source/slang/slang-emit-spirv.cpp)).
+`SV_VulkanVertexID` / `SV_VulkanInstanceID` (lines 857 and 680) map
+straight to the bare index and are not rebased.
 
 ### `transformParamsToConstRef` on the SPIR-V arm
 
@@ -1155,7 +1188,19 @@ now records the `SV_DepthGreaterEqual` / `SV_DepthLessEqual` semantics as
 `kIROp_GLSLFragDepthLessDecoration` to the *entry point* rather than the
 `gl_FragDepth` var (a conservative-depth execution mode). For SPIR-V
 direct emit the decoration is inert — the SPIR-V emitter derives the
-mode independently — but the pass is shared with the via-GLSL path. The
+mode independently, from the var layout's `IRSystemValueSemanticAttr`
+rather than from the decoration — but the pass is shared with the
+via-GLSL path. `getDepthOutputExecutionMode`
+([slang-emit-spirv.cpp line 6066](../../../../source/slang/slang-emit-spirv.cpp))
+maps `SV_DepthGreaterEqual` to `SpvExecutionModeDepthGreater` and
+`SV_DepthLessEqual` to `SpvExecutionModeDepthLess`, and
+`maybeEmitEntryPointDepthReplacingExecutionMode` (line 6138) also
+requires `DepthReplacing`, which the Vulkan spec demands for any write
+to `FragDepth`. The emitted module therefore carries
+`OpExecutionMode <entry> DepthReplacing` alongside
+`OpExecutionMode <entry> DepthGreater` / `DepthLess`; an entry point
+mixing two depth semantics collapses to `DepthReplacing` alone (lines
+6154-6160). The
 geometry-shader default-input-primitive (`triangle`) fallback also moved
 from `legalizeEntryPointParameterForGLSL` to the end of
 `legalizeEntryPointForGLSL` so it runs only after all parameters are

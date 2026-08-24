@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#spirvasmoperand
-//META: doc_section_digest=b2230695d92295db8f6572962ce2cbfc6a94232db497c990333151c10edf01d5
+//META: doc_section_digest=30d7b2afee044e4800553745578314d872096bca3b9b7d00e70fdc652dd523c8
 //META: purpose=The glsl450 token in an inline-asm instruction becomes a dedicated operand instruction referencing the GLSL.std.450 instruction set.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

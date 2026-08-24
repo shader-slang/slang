@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/pipeline/overview.md#ir-passes
-//META: doc_section_digest=b85b32233cddf5f98eaa366eca12bec6d5e63cd6b7812236112834483f589f39
+//META: doc_section_digest=34a1a93797103f8be5a87169d293f14c96530b6a0d321516d44af0828be23f85
 //META: purpose=The IR transformation sequence between lowering and emit is target-sensitive, so one thread-group declaration is materialized in a different form on each target and dropped entirely on the targets that take it at dispatch time.
 //META: intent=functional
 //META: pipeline_stage=ir-pass
