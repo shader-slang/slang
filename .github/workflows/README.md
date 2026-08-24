@@ -227,12 +227,12 @@ PR against your branch, so a failed check can be fixed without a local checkout.
 
 ## 6. Release, tag, and publishing
 
-| Workflow                                                       | Trigger              | Purpose                                                                                                                                                                |
-| -------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `release.yml`                                                  | version tag          | Builds and publishes the release binaries.                                                                                                                             |
-| `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly | Extra Linux builds against older glibc.                                                                                                                                |
-| `container-publish-images.yml`                                 | `docker/**`          | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
-| `perf-push-benchmark-results.yml`                              | push to master       | Publishes MDL benchmark numbers.                                                                                                                                       |
+| Workflow                                                       | Trigger                | Purpose                                                                                                                                                                |
+| -------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release.yml`                                                  | version tag            | Builds and publishes the release binaries.                                                                                                                             |
+| `release-linux-glibc-2-27.yml`, `release-linux-glibc-2-28.yml` | version tag, nightly   | Extra Linux builds against older glibc.                                                                                                                                |
+| `container-publish-images.yml`                                 | push/PR on `docker/**` | Publishes the Linux CI container images. A PR validates the version contract only; it never builds a Dockerfile, since that would run PR code on a self-hosted runner. |
+| `perf-push-benchmark-results.yml`                              | push to master         | Publishes MDL benchmark numbers.                                                                                                                                       |
 
 ## 7. Manual only
 

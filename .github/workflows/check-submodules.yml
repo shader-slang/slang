@@ -23,7 +23,12 @@ on:
 # path-skipped required check never reports and blocks the PR forever.
 jobs:
   check-submodules:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    # pull_request is now this workflow's only trigger, so the guard just skips
+    # drafts. (Other check-* workflows carry a compound
+    # `github.event_name != 'pull_request' || ...` guard because they also have
+    # merge_group or workflow_dispatch triggers, where there is no draft state
+    # to read.)
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     # verify_reachable can escalate to a full `git fetch --unshallow` per submodule
     # against its upstream remote. Bound the job so a slow or unresponsive remote
