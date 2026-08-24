@@ -5168,18 +5168,16 @@ struct ExprLoweringContext
             // that these parameters have default argument expressions
             // associated with them.
             //
-            // Currently we simply extract the initial-value expression
-            // from the parameter declaration and then lower it in
-            // the context of the caller.
+            // We extract the initial-value expression from the parameter declaration and lower it
+            // in the context of the caller. The expression can depend on the generic parameters
+            // that specialize the callee; its substitutions are carried on the `SubstExpr` and
+            // applied by `_lowerSubstitutionEnv` below. (A default that references a member of
+            // `This` is still not resolved to the concrete implementation — see #12700.)
             //
-            // Note that the expression could involve subsitutions because
-            // in the general case it could depend on the generic parameters
-            // used the specialize the callee. For now we do not handle that
-            // case, and simply ignore generic arguments.
-            //
-            // `defaultArgSourceParamDeclRef`, when set, is the parameter of the declaration
-            // overload resolution selected; it is the authoritative default source (see the doc
-            // comment on the `DeclRef<CallableDecl>` overload).
+            // `defaultArgSourceParamDeclRef`, when set, is the parameter at this position of the
+            // declaration overload resolution selected; the omitted argument was checked against
+            // it, so it — not the witness-resolved callee's parameter — is the default source
+            // (see the doc comment on the `DeclRef<CallableDecl>` overload).
             DeclRef<ParamDecl> defaultParamDeclRef =
                 defaultArgSourceParamDeclRef ? defaultArgSourceParamDeclRef : paramDeclRef;
             SubstExpr<Expr> argExpr = getInitExpr(getASTBuilder(), defaultParamDeclRef);
@@ -5220,8 +5218,6 @@ struct ExprLoweringContext
             //
             // Each of these options involves trade-offs, and we need to
             // make a conscious decision at some point.
-
-            // Assert that such an expression must have been present.
         }
     }
 
@@ -5244,11 +5240,16 @@ struct ExprLoweringContext
     // Lower the arguments of a call to `funcDeclRef`. When overload resolution selected a
     // different declaration than the callee (e.g. an interface requirement whose default a
     // witness-resolved implementation does not redeclare, issue #12640), pass that selected
-    // declaration as `defaultArgSource`: an omitted argument then takes its default from that
-    // declaration's parameter, which lines up by position (guaranteed by conformance). Only the
-    // default's generic-argument substitutions are applied, so a default that references a member
-    // of `This` is not resolved to the concrete implementation and fails in later lowering; that
-    // is a separate, pre-existing checker-side gap tracked by #12700.
+    // declaration as `defaultArgSource`: an omitted argument at position `i` then takes its
+    // default from `defaultArgSource`'s parameter `i` rather than the callee's, so the whole
+    // call is defaulted consistently with the signature it was type-checked against. A parameter
+    // is only overridden when `defaultArgSource` actually has one at that position; the two lists
+    // are not required to have equal length (some witness redirects, e.g. autodiff intrinsics,
+    // relate declarations of different arity), and any position `defaultArgSource` does not cover
+    // falls back to the callee's own default. Only the default's generic-argument substitutions
+    // are applied, so a default that references a member of `This` is not resolved to the concrete
+    // implementation and fails in later lowering; that is a separate, pre-existing checker-side
+    // gap tracked by #12700.
     void addDirectCallArgs(
         InvokeExpr* expr,
         DeclRef<CallableDecl> funcDeclRef,
@@ -5592,6 +5593,16 @@ struct ExprLoweringContext
             // appropriately.
             auto funcDeclRef =
                 DeclRef<Decl>(as<DeclRefBase>(resolvedInfo.funcDeclRef.declRefBase->resolve()));
+
+            // When witness resolution redirected the callee to a different declaration than
+            // overload resolution selected, the selected declaration (`resolvedInfo.funcDeclRef`)
+            // is the authoritative source for the defaults of omitted arguments (issue #12640);
+            // for an ordinary call the two are the same declaration and the callee's own defaults
+            // are used. This applies equally to the subscript path below and the direct-call path.
+            DeclRef<Decl> defaultArgSource;
+            if (resolvedInfo.funcDeclRef.getDecl() != funcDeclRef.getDecl())
+                defaultArgSource = resolvedInfo.funcDeclRef;
+
             auto baseExpr = resolvedInfo.baseExpr;
             if (baseExpr)
             {
@@ -5616,7 +5627,7 @@ struct ExprLoweringContext
                 // we must call one of its accessors.
                 //
                 auto loweredBase = lowerSubExpr(baseExpr);
-                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups, defaultArgSource);
                 auto result = lowerStorageReference(
                     context,
                     type,
@@ -5733,14 +5744,7 @@ struct ExprLoweringContext
                     context,
                     funcDeclRef.template as<FunctionDeclBase>(),
                     funcTypeInfo);
-                // Calculate args by inspecting the decl-ref. When witness resolution redirected
-                // the callee to a different declaration than overload resolution selected, pass
-                // the selected declaration (`resolvedInfo.funcDeclRef`) as the authoritative
-                // source for omitted arguments' defaults (issue #12640); for an ordinary call the
-                // two are the same declaration and the callee's own defaults are used unchanged.
-                DeclRef<Decl> defaultArgSource;
-                if (resolvedInfo.funcDeclRef.getDecl() != funcDeclRef.getDecl())
-                    defaultArgSource = resolvedInfo.funcDeclRef;
+                // Calculate args by inspecting the decl-ref.
                 addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups, defaultArgSource);
             }
 
