@@ -17,40 +17,50 @@ namespace renderer_test
 {
 using namespace Slang;
 
-// Helper function to check if a feature name is valid
-static bool isValidFeatureName(
-    const UnownedStringSlice& featureName,
-    DiagnosticSink* sink,
-    SourceLoc loc)
+rhi::Feature getRenderFeatureFromName(const UnownedStringSlice& featureName)
 {
-    // WAR: Accept cooperative-matrix-2 sub-features until RHI backend supports them
-    // These features will be gracefully skipped at runtime if hardware doesn't support them
-    if (featureName.startsWith("cooperative-matrix-"))
+    // slang-rhi reports VK_NV_cooperative_matrix2 as one feature, but tests name the individual
+    // sub-features the extension provides. Resolve each of them to that single feature so a test
+    // gated on a sub-feature runs on hardware that supports the extension, rather than being
+    // skipped everywhere.
+    static const UnownedStringSlice kCooperativeMatrix2SubFeatures[] = {
+        UnownedStringSlice::fromLiteral("cooperative-matrix-block-loads"),
+        UnownedStringSlice::fromLiteral("cooperative-matrix-conversions"),
+        UnownedStringSlice::fromLiteral("cooperative-matrix-per-element-operations"),
+        UnownedStringSlice::fromLiteral("cooperative-matrix-reductions"),
+        UnownedStringSlice::fromLiteral("cooperative-matrix-tensor-addressing"),
+    };
+    for (const auto& subFeature : kCooperativeMatrix2SubFeatures)
     {
-        if (sink)
+        if (featureName == subFeature)
         {
-            sink->diagnoseRaw(
-                Severity::Warning,
-                "Using cooperative-matrix-2 feature that is not yet fully supported "
-                "in RHI backend. "
-                "Test will be skipped if hardware doesn't support it.");
+            return rhi::Feature::CooperativeMatrix2;
         }
-        return true;
     }
-#define SLANG_RHI_FEATURES_X(id, name) name,
-    static const char* kValidFeatureNames[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
+
+#define SLANG_RHI_FEATURES_X(id, name) {UnownedStringSlice::fromLiteral(name), rhi::Feature::id},
+    struct FeatureNameMapEntry
+    {
+        UnownedStringSlice name;
+        rhi::Feature feature;
+    };
+    static const FeatureNameMapEntry kFeatureNameMap[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
 #undef SLANG_RHI_FEATURES_X
 
-    static const int kFeatureCount = sizeof(kValidFeatureNames) / sizeof(kValidFeatureNames[0]);
-
-    for (int i = 0; i < kFeatureCount; i++)
+    for (const auto& entry : kFeatureNameMap)
     {
-        if (featureName == UnownedStringSlice(kValidFeatureNames[i]))
+        if (featureName == entry.name)
         {
-            return true;
+            return entry.feature;
         }
     }
-    return false;
+    return rhi::Feature::_Count;
+}
+
+/// Return true if `featureName` names a feature the runtime requirement check can evaluate.
+static bool isValidFeatureName(const UnownedStringSlice& featureName)
+{
+    return getRenderFeatureFromName(featureName) != rhi::Feature::_Count;
 }
 
 static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
@@ -162,7 +172,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
             for (const auto& value : values)
             {
                 // Validate that the feature name is recognized
-                if (!isValidFeatureName(value, &sink, featuresArg.loc))
+                if (!isValidFeatureName(value))
                 {
                     sink.diagnose(
                         featuresArg.loc,

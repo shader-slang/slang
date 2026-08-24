@@ -193,25 +193,6 @@ static void _outputProfileTime(uint64_t startTicks, uint64_t endTicks)
     out.print("profile-time=%g\n", time);
 }
 
-static rhi::Feature _getFeatureFromName(const UnownedStringSlice& featureName)
-{
-    struct FeatureNameMapEntry
-    {
-        const char* name;
-        rhi::Feature feature;
-    };
-
-#define SLANG_RHI_FEATURES_X(id, name) {name, rhi::Feature::id},
-    static const FeatureNameMapEntry kFeatureNameMap[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
-#undef SLANG_RHI_FEATURES_X
-
-    for (auto& entry : kFeatureNameMap)
-        if (featureName == UnownedStringSlice(entry.name))
-            return entry.feature;
-
-    return rhi::Feature::_Count;
-}
-
 class ProgramVars;
 
 struct ShaderOutputPlan
@@ -1918,7 +1899,7 @@ static SlangResult _innerMain(
 
         List<rhi::Feature> requiredFeatureList;
         for (auto& name : options.renderFeatures)
-            requiredFeatureList.add(_getFeatureFromName(name.getUnownedSlice()));
+            requiredFeatureList.add(getRenderFeatureFromName(name.getUnownedSlice()));
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();

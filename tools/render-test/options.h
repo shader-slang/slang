@@ -114,4 +114,15 @@ struct Options
         Options& outOptions);
 };
 
+/// Return the `rhi::Feature` a `-render-feature` name refers to, or `rhi::Feature::_Count` if the
+/// name is not recognized.
+///
+/// This is the single place that maps a test's feature name onto an RHI feature, so that option
+/// parsing (which rejects unknown names) and the runtime requirement check (which decides whether
+/// to skip a test) can never disagree. Besides the names generated from `SLANG_RHI_FEATURES`, it
+/// resolves the individual `VK_NV_cooperative_matrix2` sub-feature names used by tests -- slang-rhi
+/// exposes that extension only as the single `cooperative-matrix-2` feature, so each sub-feature
+/// name maps onto it.
+rhi::Feature getRenderFeatureFromName(const Slang::UnownedStringSlice& featureName);
+
 } // namespace renderer_test
