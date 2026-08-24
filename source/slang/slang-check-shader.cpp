@@ -1778,6 +1778,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
+    diagnoseMixedRayTracingAPIUse(entryPoint, sink);
 
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
@@ -3230,6 +3231,11 @@ void FrontEndCompileRequest::checkEntryPoints()
             auto translationUnit = translationUnits[tt];
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
         }
+    }
+
+    for (auto translationUnit : translationUnits)
+    {
+        diagnoseMixedRayTracingAPIsInModule(linkage, translationUnit->getModule(), sink);
     }
 }
 

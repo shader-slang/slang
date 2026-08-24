@@ -263,4 +263,29 @@ StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
     return StructuralRayTracingStageKind::Count;
 }
 
+bool StructuralRayTracingDeclRegistry::registerAPIUse(
+    Module* module,
+    RayTracingAPIFamily family,
+    Decl* decl,
+    Decl** outOtherDecl)
+{
+    *outOtherDecl = nullptr;
+    if (!module || !decl)
+        return false;
+
+    auto& usage = m_apiUsage.getOrAddValue(module, RayTracingAPIUsage());
+    auto& currentDecl =
+        family == RayTracingAPIFamily::Structural ? usage.structuralDecl : usage.legacyDecl;
+    auto otherDecl =
+        family == RayTracingAPIFamily::Structural ? usage.legacyDecl : usage.structuralDecl;
+    if (!currentDecl)
+        currentDecl = decl;
+    if (!otherDecl || usage.diagnosed)
+        return false;
+
+    usage.diagnosed = true;
+    *outOtherDecl = otherDecl;
+    return true;
+}
+
 } // namespace Slang
