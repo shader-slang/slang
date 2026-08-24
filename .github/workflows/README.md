@@ -9,6 +9,28 @@ which, and why a group exists. Deliberately omitted are cron minutes, runner
 pools, path filters, timeouts, and required-check names — those change often,
 and the file (or repo settings) already states them.
 
+## Naming
+
+A workflow file is named `<category>-<what-it-does>.yml`, so `ls` groups related
+workflows together and the prefix tells you which section below to look in:
+
+| Prefix        | Covers                                                              |
+| ------------- | ------------------------------------------------------------------- |
+| `check-`      | A focused PR gate or lint.                                          |
+| `ci-`         | CI infrastructure: reusable build/test blocks, monitors, and tools. |
+| `nightly-`    | A scheduled suite that is too slow or noisy to gate a PR.           |
+| `pr-`         | A caller of the PR board-sync engine.                               |
+| `perf-`       | Performance measurement and its published results.                  |
+| `regenerate-` | A slash-command auto-fix that rewrites a generated file.            |
+| `release-`    | A tagged release build.                                             |
+| `container-`  | The CI container images.                                            |
+| `sccache-`    | The shared compiler cache.                                          |
+| `issue-`      | Issue-triggered automation.                                         |
+
+`ci.yml` is the one deliberate exception: it is the umbrella entry point, not a
+member of the `ci-` family. Name a new workflow for the category it belongs to
+rather than adding a prefix of one.
+
 ## How the pieces fit
 
 Most workflows are thin: a **caller** declares the trigger, and a **reusable**
@@ -60,16 +82,16 @@ flowchart LR
 
 ## Trigger vocabulary
 
-| Trigger               | Meaning                                                                 |
-| --------------------- | ----------------------------------------------------------------------- |
-| `pull_request`        | Runs on an open PR, against a preview merge into the base branch.       |
-| `merge_group`         | Re-runs in the merge queue, against the queue's tentative merge commit. |
-| `pull_request_target` | PR events, run in the base repo's privileged context with secrets.      |
-| `workflow_call`       | Reusable: invoked by another workflow, never triggered on its own.      |
-| `workflow_run`        | Runs after a named workflow completes, privileged and without checkout. |
-| `repository_dispatch` | Triggered by a slash command relayed from a PR comment.                 |
-| `schedule`            | Cron-driven.                                                            |
-| `workflow_dispatch`   | Run manually from the Actions tab.                                      |
+| Trigger               | Meaning                                                                                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pull_request`        | Runs on an open PR, against a preview merge into the base branch.                                                                                                                                 |
+| `merge_group`         | Re-runs in the merge queue, against the queue's tentative merge commit.                                                                                                                           |
+| `pull_request_target` | PR events, run in the base repo's privileged context with secrets.                                                                                                                                |
+| `workflow_call`       | Reusable: invoked by another workflow, never triggered on its own.                                                                                                                                |
+| `workflow_run`        | Runs after a named workflow completes, in the base repo's privileged context. Checking out and running PR code here would expose secrets and write access, so these workflows stay metadata-only. |
+| `repository_dispatch` | Triggered by a slash command relayed from a PR comment.                                                                                                                                           |
+| `schedule`            | Cron-driven.                                                                                                                                                                                      |
+| `workflow_dispatch`   | Run manually from the Actions tab.                                                                                                                                                                |
 
 ## 1. PR gates
 
@@ -114,8 +136,8 @@ they can reuse an artifact CI already built: `check-cmdline-ref` and
 match their sources.
 
 One more file belongs to this group without appearing in the table, because it
-has neither trigger: `check-ir-version.yml` runs on `workflow_run`, after a CI
-run completes. It is the relay pattern — the IR-version check itself runs inside
+has neither a `pull_request` nor a `merge_group` trigger:
+`check-ir-version.yml` runs on `workflow_run`, after a CI run completes. It is the relay pattern — the IR-version check itself runs inside
 CI, which uploads its result as an artifact, and this workflow then posts the PR
 comment, because commenting needs a token the build job (possibly running a
 fork's code) must not hold.
@@ -163,10 +185,16 @@ not compete for the same runners.
 
 ## 4. PR board sync and bots
 
-The `pr-*` files are thin callers around `pr-board-sync.yml`; each exists
-because a different event is the only one carrying a particular signal, or the
-only one carrying secrets for a fork PR. See the second diagram, and read
-[`pr-board-sync.md`](pr-board-sync.md) before changing any of them.
+Two unrelated things share this section: the board sync, and the assorted
+event-driven bots.
+
+The `pr-*` files — the first four rows — are thin callers around
+`pr-board-sync.yml`; each exists because a different event is the only one
+carrying a particular signal, or the only one carrying secrets for a fork PR.
+See the second diagram, and read [`pr-board-sync.md`](pr-board-sync.md) before
+changing any of them. The remaining rows are standalone bots that call nothing
+and are grouped here only because they react to issue, comment, and review
+events rather than to a PR's code.
 
 | Workflow                                                | Purpose                                                      |
 | ------------------------------------------------------- | ------------------------------------------------------------ |
