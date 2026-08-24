@@ -739,11 +739,14 @@ struct AnyValueMarshallingContext
     // `DescriptorHandle` leaf, or a resource handle return -1 because their per-leaf
     // marshalling is not a verbatim word copy.
     //
-    // Matrices also return -1: `emitMarshallingCode` walks a column-major matrix
-    // column-by-column, but the emitted C++/CUDA `Matrix<T,R,C>` stores rows
-    // contiguously, so a whole-object copy would reorder the elements even though the
-    // leaf count and size match. Whole-object marshalling of matrices is therefore not
-    // byte-equivalent and must stay on the field-wise path.
+    // Matrices always return -1 (via the explicit `kIROp_MatrixType` case below). For a
+    // column-major matrix this is required for correctness: `emitMarshallingCode` walks it
+    // column-by-column, but the emitted C++/CUDA `Matrix<T,R,C>` stores rows contiguously,
+    // so a whole-object copy would reorder the elements even though the leaf count and size
+    // match. A row-major matrix is walked in storage order and would not be reordered, so
+    // rejecting it is a conservative choice rather than a byte-equivalence requirement (and
+    // on CUDA a matrix row is often a `float4`, which the alignment condition rejects
+    // anyway). Rejecting both keeps the predicate uniform and independent of matrix layout.
     IRIntegerValue countWordScalarLeaves(IRType* type)
     {
         if (isVerbatimWordScalar(type->getOp()))
@@ -758,8 +761,15 @@ struct AnyValueMarshallingContext
                 auto elementLeaves = countWordScalarLeaves(vecType->getElementType());
                 if (elementLeaves < 0)
                     return -1;
-                return elementLeaves * getIntVal(vecType->getElementCount());
+                auto total = elementLeaves * getIntVal(vecType->getElementCount());
+                // Reject a zero-width vector (e.g. `vector<float,0>`) for the same reason
+                // as an empty struct/array below: it contributes no payload words, but a
+                // value containing it is split by legalization into a non-simple tuple that
+                // the whole-object bit-cast cannot handle.
+                return total > 0 ? total : -1;
             }
+        case kIROp_MatrixType:
+            return -1;
         case kIROp_ArrayType:
             {
                 auto arrType = cast<IRArrayType>(type);
