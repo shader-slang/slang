@@ -15512,6 +15512,11 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
+static void _lowerStructuralRayTracingEntryPointBody(
+    IRGenContext* context,
+    EntryPoint* entryPoint,
+    IRFunc* entryPointFunc);
+
 static void lowerFrontEndEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15558,6 +15563,8 @@ static void lowerFrontEndEntryPointToIR(
     // specified duplicate entries in the entry point list), we can stop now.
     if (instToDecorate->findDecoration<IREntryPointDecoration>())
         return;
+
+    _lowerStructuralRayTracingEntryPointBody(context, entryPoint, as<IRFunc>(instToDecorate));
 
     {
 
@@ -15607,6 +15614,33 @@ static void lowerFrontEndEntryPointToIR(
         builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
 }
 
+static void _lowerStructuralRayTracingEntryPointBody(
+    IRGenContext* context,
+    EntryPoint* entryPoint,
+    IRFunc* entryPointFunc)
+{
+    auto invokeMethod = entryPoint->getStructuralRayTracingInvokeMethod();
+    if (!invokeMethod)
+        return;
+
+    auto invokeDeclRef = makeDeclRef(invokeMethod);
+    auto invokeFuncType = lowerType(context, getFuncType(context->astBuilder, invokeDeclRef));
+    auto invokeFunc =
+        as<IRFunc>(getSimpleVal(context, emitDeclRef(context, invokeDeclRef, invokeFuncType)));
+    SLANG_ASSERT(invokeFunc);
+
+    auto entryBlock = entryPointFunc->getFirstBlock();
+    auto terminator = entryBlock ? entryBlock->getTerminator() : nullptr;
+    SLANG_ASSERT(terminator);
+
+    IRBuilder callBuilder(entryPointFunc->getModule());
+    callBuilder.setInsertBefore(terminator);
+    List<IRInst*> args;
+    for (UInt i = 0; i < invokeFunc->getParamCount(); ++i)
+        args.add(callBuilder.emitDefaultConstruct(invokeFunc->getParamType(i)));
+    callBuilder.emitCallInst(invokeFunc->getResultType(), invokeFunc, args);
+}
+
 static void lowerProgramEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15626,6 +15660,11 @@ static void lowerProgramEntryPointToIR(
 
     auto loweredEntryPointFunc =
         getSimpleVal(context, emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
+
+    _lowerStructuralRayTracingEntryPointBody(
+        context,
+        entryPoint,
+        as<IRFunc>(loweredEntryPointFunc));
 
     if (!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
     {
