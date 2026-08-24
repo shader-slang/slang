@@ -977,6 +977,7 @@ LoweredValInfo emitCallToDeclRef(
             {
                 // The trusted trace method is declared in extension<ProgramLayout>.
                 Type* programLayoutType = nullptr;
+                SubtypeWitness* programLayoutWitness = nullptr;
                 for (auto parentDecl = functionDecl->parentDecl; parentDecl;
                      parentDecl = parentDecl->parentDecl)
                 {
@@ -986,19 +987,43 @@ LoweredValInfo emitCallToDeclRef(
 
                     auto genericApp =
                         SubstitutionSet(funcDeclRef).findGenericAppDeclRef(genericDecl);
-                    if (genericApp && genericApp->getArgs().getCount())
+                    if (genericApp && genericApp->getArgs().getCount() >= 2)
                     {
                         programLayoutType = as<Type>(genericApp->getArg(0));
-                        if (programLayoutType)
+                        programLayoutWitness = as<SubtypeWitness>(genericApp->getArg(1)->resolve());
+                        if (programLayoutType && programLayoutWitness)
                             break;
                     }
                 }
-                SLANG_ASSERT(programLayoutType);
+                SLANG_ASSERT(programLayoutType && programLayoutWitness);
+
+                auto traceContextType = structuralRayTracingRegistry.resolveAssociatedType(
+                    context->astBuilder,
+                    programLayoutWitness,
+                    StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
+                auto hitGroupsType = structuralRayTracingRegistry.resolveAssociatedType(
+                    context->astBuilder,
+                    programLayoutWitness,
+                    StructuralRayTracingAssociatedTypeKind::ProgramHitGroups);
+                auto missGroupsType = structuralRayTracingRegistry.resolveAssociatedType(
+                    context->astBuilder,
+                    programLayoutWitness,
+                    StructuralRayTracingAssociatedTypeKind::ProgramMissGroups);
+                auto callableGroupsType = structuralRayTracingRegistry.resolveAssociatedType(
+                    context->astBuilder,
+                    programLayoutWitness,
+                    StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups);
+                SLANG_ASSERT(
+                    traceContextType && hitGroupsType && missGroupsType && callableGroupsType);
 
                 List<IRInst*> operationArgs;
                 operationArgs.add(
                     getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
                 operationArgs.add(lowerType(context, programLayoutType));
+                operationArgs.add(lowerType(context, traceContextType));
+                operationArgs.add(lowerType(context, hitGroupsType));
+                operationArgs.add(lowerType(context, missGroupsType));
+                operationArgs.add(lowerType(context, callableGroupsType));
                 operationArgs.addRange(args, argCount);
                 return LoweredValInfo::simple(builder->emitIntrinsicInst(
                     type,

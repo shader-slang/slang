@@ -1222,6 +1222,10 @@ local insts = {
 			operands = {
 				{ "fallback" },
 				{ "programLayout" },
+				{ "traceContext" },
+				{ "hitGroups" },
+				{ "missGroups" },
+				{ "callableGroups" },
 				{ "tracer" },
 				{ "desc" },
 				{ "accelerationStructure" },
