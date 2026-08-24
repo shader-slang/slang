@@ -6,10 +6,16 @@
 //TEST:SIMPLE(filecheck=SPVAH): -experimental-feature -entry AnyHit -stage anyhit -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SPVIS): -experimental-feature -entry Intersection -stage intersection -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SPVMS): -experimental-feature -entry Miss -stage miss -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=HLSLLAYOUT): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
+//TEST:SIMPLE(filecheck=SPVLAYOUT): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
+//TEST:SIMPLE(filecheck=DXILLAYOUT): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_7
 
 import slang.raytracing;
 
-struct TestPayload {}
+struct TestPayload
+{
+    uint value;
+}
 struct TestRecord {}
 
 struct TestTraceContext : rt::ITraceContext
@@ -129,3 +135,75 @@ struct Miss : rt::IMissShader<MissContext>
 // SPVMS: OpEntryPoint MissKHR
 // SPVMS-DAG: BuiltIn WorldRayOriginKHR
 // SPVMS-DAG: BuiltIn WorldRayDirectionKHR
+
+typealias ClosestHitStage = ClosestHit;
+typealias AnyHitStage = AnyHit;
+typealias IntersectionStage = Intersection;
+typealias MissStage = Miss;
+
+struct TriangleHitGroup : rt::IHitGroup
+{
+    typealias Slot = rt::HitGroupSlot<0>;
+    typealias Context = TriangleContext;
+    typealias ClosestHit = ClosestHitStage;
+    typealias AnyHit = AnyHitStage;
+    typealias Intersection = rt::NoIntersection<Context>;
+}
+
+struct ProceduralHitGroup : rt::IHitGroup
+{
+    typealias Slot = rt::HitGroupSlot<1>;
+    typealias Context = ProceduralContext;
+    typealias ClosestHit = rt::NoClosestHit<Context>;
+    typealias AnyHit = rt::NoAnyHit<Context>;
+    typealias Intersection = IntersectionStage;
+}
+
+struct TestMissGroup : rt::IMissGroup
+{
+    typealias Slot = rt::MissSlot<0>;
+    typealias Context = MissContext;
+    typealias Miss = MissStage;
+}
+
+struct TestProgramLayout : rt::ITraceProgramLayout
+{
+    typealias TraceContext = TestTraceContext;
+    typealias HitGroups =
+        rt::HitGroupList<TestTraceContext, TriangleHitGroup, ProceduralHitGroup>;
+    typealias MissGroups = rt::MissGroupList<TestTraceContext, TestMissGroup>;
+    typealias CallableGroups = rt::NoCallableGroups<TestTraceContext>;
+}
+
+rt::AccelerationStructure scene;
+rt::TraceProgramDescriptor<TestProgramLayout> program;
+
+[shader("raygeneration")]
+void main()
+{
+    rt::RayTracer<TestProgramLayout> tracer;
+    rt::RayTraversalDesc desc = {};
+    TestPayload payload = {};
+    tracer.trace(desc, scene, program, payload);
+}
+
+// HLSLLAYOUT-DAG: WorldRayOrigin()
+// HLSLLAYOUT-DAG: IgnoreHit()
+// HLSLLAYOUT-DAG: ReportHit(
+// HLSLLAYOUT-DAG: [shader("closesthit")]void ClosestHit(
+// HLSLLAYOUT-DAG: [shader("anyhit")]void AnyHit(
+// HLSLLAYOUT-DAG: [shader("intersection")]void Intersection()
+// HLSLLAYOUT-DAG: [shader("miss")]void Miss(
+
+// SPVLAYOUT-DAG: OpEntryPoint RayGenerationKHR %main "main"
+// SPVLAYOUT-DAG: OpEntryPoint ClosestHitKHR %ClosestHit "ClosestHit"
+// SPVLAYOUT-DAG: OpEntryPoint AnyHitKHR %AnyHit "AnyHit"
+// SPVLAYOUT-DAG: OpEntryPoint IntersectionKHR %Intersection "Intersection"
+// SPVLAYOUT-DAG: OpEntryPoint MissKHR %Miss "Miss"
+// SPVLAYOUT-DAG: OpIgnoreIntersectionKHR
+// SPVLAYOUT-DAG: OpReportIntersectionKHR
+
+// DXILLAYOUT-DAG: ClosestHit
+// DXILLAYOUT-DAG: AnyHit
+// DXILLAYOUT-DAG: Intersection
+// DXILLAYOUT-DAG: Miss
