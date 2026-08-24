@@ -53,11 +53,11 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // MTL: void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}}
 // MTL-NOT: int thread*
 
-// CUDA: __device__ void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})
-// CUDA: __device__ void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}})
+// CUDA: void readImplicit_{{[0-9]+}}(int val_{{[0-9]+}})
+// CUDA: void readExplicit_{{[0-9]+}}(int val_{{[0-9]+}})
 
-// CPP: static void readImplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
-// CPP: static void readExplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
+// CPP: void readImplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
+// CPP: void readExplicit_{{[0-9]+}}(int32_t val_{{[0-9]+}}
 
 // WGSL: fn readImplicit_{{[0-9]+}}( val_{{[0-9]+}} : i32)
 // WGSL: fn readExplicit_{{[0-9]+}}( val_{{[0-9]+}} : i32)
