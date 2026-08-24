@@ -111,3 +111,51 @@ void main() {}
         diagnostics.indexOf("E36121") != -1,
         "target-level hlsl_nvapi capability should have triggered E36121 on SPIRV target");
 }
+
+// Verify that a capability requested via the String-kind CompilerOptionValue (rather than
+// the Int-kind atom ID every other test here and every `-capability` CLI invocation uses)
+// is still decoded and checked correctly. `TargetRequest::checkCapabilities()` and
+// `getTargetCaps()` share a `decodeCapabilityOption()` helper that switches on
+// `CompilerOptionValueKind`; this is the only regression coverage for its String branch.
+SLANG_UNIT_TEST(targetLevelStringCapabilityFlagged)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // Add hlsl_nvapi at the TARGET level, by name, as a String-kind entry.
+    slang::CompilerOptionEntry targetCapEntry = {};
+    targetCapEntry.name = slang::CompilerOptionName::Capability;
+    targetCapEntry.value.kind = slang::CompilerOptionValueKind::String;
+    targetCapEntry.value.stringValue0 = "hlsl_nvapi";
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_3");
+    targetDesc.compilerOptionEntries = &targetCapEntry;
+    targetDesc.compilerOptionEntryCount = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    const char* source = R"(
+[numthreads(1,1,1)]
+void main() {}
+)";
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    session->loadModuleFromSourceString("test", "test.slang", source, diagnosticBlob.writeRef());
+
+    String diagnostics;
+    if (diagnosticBlob)
+        diagnostics = String((const char*)diagnosticBlob->getBufferPointer());
+
+    SLANG_CHECK_MSG(
+        diagnostics.indexOf("E36121") != -1,
+        "String-kind target-level hlsl_nvapi capability should have triggered E36121 on SPIRV "
+        "target");
+}
