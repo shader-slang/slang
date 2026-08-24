@@ -2064,10 +2064,10 @@ public:                                                              \
     struct SlangStructuredDiagnostic
     {
         SlangSeverity severity; /**< Effective severity after overrides. */
-        int64_t code; /**< Numeric error code, e.g. 30013 for E30013. Always non-negative for
-                           diagnostics currently emitted by the compiler; negative values are
-                           reserved to indicate the absence of a code. */
-        const char* message;             /**< Primary human-readable message. */
+        int64_t code;        /**< Numeric error code, e.g. 30013 for E30013. Always non-negative for
+                                  diagnostics currently emitted by the compiler; negative values are
+                                  reserved to indicate the absence of a code. */
+        const char* message; /**< Primary human-readable message. */
         SlangDiagnosticSpan primarySpan; /**< Primary source location and label. */
         const SlangDiagnosticSpan*
             secondarySpans;          /**< Additional highlighted locations; may be null. */
