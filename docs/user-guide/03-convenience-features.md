@@ -852,8 +852,8 @@ enum DescriptorAccess
 {
     Unknown = -1,
     Read = 0,
-    Write = 1,
-    ReadWrite = 2,
+    Write = 2,
+    ReadWrite = 1,
     RasterizerOrdered = 3,
     Feedback = 4,
 }
