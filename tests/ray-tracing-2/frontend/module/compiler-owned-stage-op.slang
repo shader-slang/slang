@@ -16,6 +16,10 @@ __intrinsic_op(structuralRayTracingGetPayload) float fakePayloadOperation();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingGetPayload' is reserved for compiler use
 
+__intrinsic_op(structuralRayTracingGetHitAttributes) float fakeHitAttributesOperation();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingGetHitAttributes' is reserved for compiler use
+
 __intrinsic_op(structuralRayTracingTrace) void fakeStructuralTrace();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingTrace' is reserved for compiler use

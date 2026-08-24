@@ -36,6 +36,16 @@ public struct ClosestHitInput<Context>
     }
 }
 
+public extension<Context> ClosestHitInput<Context>
+    where Context : IHitContext
+    where Context.Primitive : ICustomIntersectionPrimitive
+{
+    public property Context.Primitive.Attributes attributes
+    {
+        get;
+    }
+}
+
 [require(anyhit)]
 public struct AnyHitInput<Context>
     where Context : IHitContext
@@ -68,6 +78,16 @@ public struct AnyHitInput<Context>
     public void ignoreHit() { IgnoreHit(); }
 
     public void acceptHitAndEndSearch() { AcceptHitAndEndSearch(); }
+}
+
+public extension<Context> AnyHitInput<Context>
+    where Context : IHitContext
+    where Context.Primitive : ICustomIntersectionPrimitive
+{
+    public property Context.Primitive.Attributes attributes
+    {
+        get;
+    }
 }
 
 [require(intersection)]
