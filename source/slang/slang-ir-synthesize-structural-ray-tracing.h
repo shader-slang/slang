@@ -7,11 +7,13 @@ namespace Slang
 
 struct IRModule;
 struct IRFunc;
+class DiagnosticSink;
 
 /// Generate native D3D/Vulkan entry-point adapters for stages selected by structural layouts.
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
-    List<IRFunc*>& ioEntryPoints);
+    List<IRFunc*>& ioEntryPoints,
+    DiagnosticSink* sink);
 
 /// Lower structural stage-input operations through their portable standard-module bodies.
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module);

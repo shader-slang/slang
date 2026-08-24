@@ -1432,7 +1432,7 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.structuralRayTracingTrace &&
         (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
     {
-        SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints);
+        SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
         outLinkedIR.entryPoints = irEntryPoints;
     }
 

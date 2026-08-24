@@ -4326,6 +4326,20 @@ err(
 )
 
 err(
+    "invalid-structural-ray-tracing-group-slot",
+    38058,
+    "invalid structural ray-tracing group slot",
+    span { loc = "location", message = "~section group slot ~slot:Int must be non-negative" }
+)
+
+err(
+    "duplicate-structural-ray-tracing-group-slot",
+    38059,
+    "duplicate structural ray-tracing group slot",
+    span { loc = "location", message = "~section group slot ~slot:Int is declared more than once in the trace program" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",
