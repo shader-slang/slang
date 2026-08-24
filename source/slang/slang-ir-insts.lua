@@ -1221,6 +1221,7 @@ local insts = {
 		structuralRayTracingTrace = {
 			operands = {
 				{ "fallback" },
+				{ "programLayout" },
 				{ "tracer" },
 				{ "desc" },
 				{ "accelerationStructure" },

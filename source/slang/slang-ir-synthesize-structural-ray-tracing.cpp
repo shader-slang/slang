@@ -433,17 +433,23 @@ void lowerPortableStructuralRayTracingTraceOperations(IRModule* module)
     IRBuilder builder(module);
     for (auto operation : operations)
     {
+        auto traceOperation = cast<IRStructuralRayTracingTrace>(operation);
         builder.setInsertBefore(operation);
 
-        List<IRInst*> arguments;
-        for (UInt i = 1; i < operation->getOperandCount(); ++i)
-            arguments.add(operation->getOperand(i));
+        IRInst* arguments[] =
+        {
+            traceOperation->getTracer(),
+            traceOperation->getDesc(),
+            traceOperation->getAccelerationStructure(),
+            traceOperation->getDescriptor(),
+            traceOperation->getPayload(),
+        };
 
         auto call = builder.emitCallInst(
-            operation->getDataType(),
-            operation->getOperand(0),
-            arguments.getCount(),
-            arguments.getBuffer());
+            traceOperation->getDataType(),
+            traceOperation->getFallback(),
+            SLANG_COUNT_OF(arguments),
+            arguments);
         operation->replaceUsesWith(call);
         operation->removeAndDeallocate();
     }
