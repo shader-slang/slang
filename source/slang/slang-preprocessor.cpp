@@ -1511,6 +1511,18 @@ MacroInvocation::MacroInvocation(
     // Register this invocation in the SourceManager side table so the diagnostic renderer can emit
     // "expanded from macro 'X'" notes.
     //
+    // Cost: this allocates a range of bodyRangeSize raw SourceLoc values per invocation (see
+    // allocateSourceRange below), not per macro definition. This is the same per-invocation
+    // allocation shape as the SourceFile/SourceView design that PR #6165 was reverted for in
+    // #11116 -- the difference is the size of what gets allocated. The reverted design allocated
+    // a full file-sized SourceView per invocation (up to 1.2MB of the 32-bit loc space for a
+    // single hlsl.meta.slang macro body); this design allocates only bodyRangeSize raw locs (the
+    // macro body's own token span, typically tens to hundreds of bytes) and no SourceFile/
+    // SourceView at all. A translation unit with an extreme number of invocations of a
+    // large-bodied macro can still consume a meaningful share of the 32-bit loc space; if that
+    // ever exhausts it, allocateSourceRange's SLANG_RELEASE_ASSERT (slang-source-loc.cpp) fails
+    // loudly rather than aliasing existing ranges.
+    //
     // We skip two cases where tracking is not useful:
     //   - Builtins: their body tokens have invalid locs (no definition file), so there is nothing
     //     meaningful to point back to.
