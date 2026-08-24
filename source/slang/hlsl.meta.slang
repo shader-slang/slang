@@ -14238,6 +14238,126 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
     }
 }
 
+
+// A builtin scalar conforms to the scalar mathable tier and also carries a (degenerate) inner
+// product (`dot(a, b) == a * b`), so it conforms to `ISupportsInnerProduct` too — letting a generic
+// `<T : ISupportsInnerProduct>` function accept scalars and not just vectors. Both interfaces refine
+// `IReal`, so one extension conforming to both supplies every requirement and pins `Element` once.
+__generic<T : __BuiltinFloatingPointType>
+extension T : IScalarReal, ISupportsInnerProduct
+{
+    // The scalar element of a scalar is itself. Pinned here (rather than left to be inferred) so
+    // that `Element` is unambiguous: `T` also inherits an `Element` from `ITexelElement` (which
+    // every `__BuiltinArithmeticType` scalar conforms to).
+    typealias Element = This;
+
+    // Each witness forwards to the existing free math function of the same name, which is already
+    // constrained to `__BuiltinFloatingPointType` and carries the full per-target implementation
+    // (and its `[require(...)]` capability set). Because no free forwarder over `IReal` exists, the
+    // call resolves to that builtin overload rather than back to this witness, so there is no
+    // recursion; forwarding also keeps the per-target intrinsics in one place instead of duplicating
+    // them here.
+    [__readNone] This pow(This y)  { return pow(this, y); }
+    [__readNone] This exp()        { return exp(this); }
+    [__readNone] This exp2()       { return exp2(this); }
+    [__readNone] This log()        { return log(this); }
+    [__readNone] This log2()       { return log2(this); }
+    [__readNone] This log10()      { return log10(this); }
+    [__readNone] This sqrt()       { return sqrt(this); }
+    [__readNone] This rsqrt()      { return rsqrt(this); }
+    [__readNone] This sin()        { return sin(this); }
+    [__readNone] This cos()        { return cos(this); }
+    [__readNone] This tan()        { return tan(this); }
+
+    [__readNone] This min(This other) { return min(this, other); }
+    [__readNone] This max(This other) { return max(this, other); }
+    [__readNone] This saturate()      { return saturate(this); }
+    // `rcp` forwards to the free `rcp` like the ops above, rather than inheriting the broad-tier
+    // default `This(1.0).div(this)`. `override` is required because `rcp` is a defaulted requirement
+    // inherited transitively from `IFloatingPoint`.
+    [__readNone] override This rcp()  { return rcp(this); }
+    // Spelled `This` rather than `Element`: a builtin scalar inherits an `Element` from both `IReal`
+    // and `ITexelElement`, so the bare name is ambiguous here; `This` is `Element` for a
+    // scalar and satisfies `ISupportsInnerProduct.dot`'s `Element` return type.
+    // A scalar's inner product is just the product; spelled with `*` rather than forwarding to the
+    // free `dot`, whose WGSL lowering expects vector operands. Returns `This` (== `Element` here).
+    [__readNone] This dot(This other) { return this * other; }
+}
+
+// A vector of a mathable scalar is itself mathable. Bounding the element type on
+// `__BuiltinFloatingPointType` (rather than on `IReal`) is what makes `vector<T, N>` pick up its
+// existing `IFloat`/`IComparable` conformance, which `IReal` refines. A vector also carries a
+// meaningful inner product, so it conforms to `ISupportsInnerProduct`.
+__generic<T : __BuiltinFloatingPointType, let N : int>
+extension vector<T, N> : ISupportsInnerProduct
+{
+    typealias Element = T;
+
+    // Each witness forwards to the existing free math function for the same vector type, which
+    // already carries the full per-target implementation. As with the scalar witnesses, no free
+    // forwarder over `IReal` exists, so the call resolves to that builtin overload and does not
+    // recurse into this witness.
+    [__readNone] This pow(This y)  { return pow(this, y); }
+    [__readNone] This exp()        { return exp(this); }
+    [__readNone] This exp2()       { return exp2(this); }
+    [__readNone] This log()        { return log(this); }
+    [__readNone] This log2()       { return log2(this); }
+    [__readNone] This log10()      { return log10(this); }
+    [__readNone] This sqrt()       { return sqrt(this); }
+    [__readNone] This rsqrt()      { return rsqrt(this); }
+    [__readNone] This sin()        { return sin(this); }
+    [__readNone] This cos()        { return cos(this); }
+    [__readNone] This tan()        { return tan(this); }
+
+    [__readNone] This min(This other) { return min(this, other); }
+    [__readNone] This max(This other) { return max(this, other); }
+    [__readNone] This saturate()      { return saturate(this); }
+    // `override` is required for this transitively-inherited defaulted requirement (as on the scalar above).
+    [__readNone] override This rcp()  { return rcp(this); }
+    [__readNone] Element dot(This other) { return dot(this, other); }
+}
+
+// A matrix of a mathable scalar is likewise mathable, satisfied row-by-row via each row vector's
+// `IReal` methods. This draft defines no matrix `dot`/inner product, so matrix conforms to `IReal`
+// rather than `ISupportsInnerProduct`.
+__generic<T : __BuiltinFloatingPointType, let R : int, let C : int, let L : int>
+extension matrix<T, R, C, L> : IReal
+{
+    typealias Element = T;
+
+    // Matrix witnesses delegate row by row to each row vector's `IReal` method. Indexing a matrix
+    // row yields a `vector<T, C>` regardless of the layout `L`, so this conforms every matrix
+    // layout (default, `row_major`, `column_major`) without needing a layout-specific free
+    // function — the free math functions are declared only for the default-layout `matrix<T,R,C>`.
+    [__readNone] This pow(This y)  { This r; for (int i = 0; i < R; ++i) r[i] = this[i].pow(y[i]); return r; }
+    [__readNone] This exp()        { This r; for (int i = 0; i < R; ++i) r[i] = this[i].exp();     return r; }
+    [__readNone] This exp2()       { This r; for (int i = 0; i < R; ++i) r[i] = this[i].exp2();    return r; }
+    [__readNone] This log()        { This r; for (int i = 0; i < R; ++i) r[i] = this[i].log();     return r; }
+    [__readNone] This log2()       { This r; for (int i = 0; i < R; ++i) r[i] = this[i].log2();    return r; }
+    [__readNone] This log10()      { This r; for (int i = 0; i < R; ++i) r[i] = this[i].log10();   return r; }
+    [__readNone] This sqrt()       { This r; for (int i = 0; i < R; ++i) r[i] = this[i].sqrt();    return r; }
+    [__readNone] This rsqrt()      { This r; for (int i = 0; i < R; ++i) r[i] = this[i].rsqrt();   return r; }
+    [__readNone] This sin()        { This r; for (int i = 0; i < R; ++i) r[i] = this[i].sin();     return r; }
+    [__readNone] This cos()        { This r; for (int i = 0; i < R; ++i) r[i] = this[i].cos();     return r; }
+    [__readNone] This tan()        { This r; for (int i = 0; i < R; ++i) r[i] = this[i].tan();     return r; }
+
+    [__readNone] This min(This other) { This r; for (int i = 0; i < R; ++i) r[i] = this[i].min(other[i]); return r; }
+    [__readNone] This max(This other) { This r; for (int i = 0; i < R; ++i) r[i] = this[i].max(other[i]); return r; }
+    [__readNone] This saturate()      { This r; for (int i = 0; i < R; ++i) r[i] = this[i].saturate();    return r; }
+
+    // Like the sibling witnesses above, this delegates row by row (the free elementwise `matrix rcp`
+    // exists but is declared only for the default layout, so it cannot serve `matrix<T,R,C,L>`). It
+    // must `override` the broad-tier default rather than inherit it: the default `This(1.0).div(this)`
+    // is a `matrix / matrix` division, which does not lower on Metal/WGSL. (`override` is required for
+    // this transitively-inherited defaulted requirement, as on scalar/vector above.)
+    [__readNone] override This rcp() { This r; for (int i = 0; i < R; ++i) r[i] = rcp(this[i]); return r; }
+}
+
+// Invariant: no free-function forwarder over `IReal` for ANY derivative-registered math function
+// (`pow`/`exp`/`log`/`sqrt`/`sin`/...). A second overload of such a name breaks that function's
+// `[ForwardDerivativeOf]`/`[BackwardDerivativeOf]` registration (E31148) — not specific to `pow`.
+// Access the math as methods instead.
+
 /// Raise positive base value to a power.
 /// @param x The base value, must be >= 0.
 /// @param y The exponent value.

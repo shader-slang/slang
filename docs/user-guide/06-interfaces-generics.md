@@ -1389,7 +1389,10 @@ Slang supports the following builtin interfaces:
 - `ILogical`, provides methods for all bit operations and logical `and`, `or`, `not` operations. Also provides a method for explicit conversion from `int`. Implemented by all builtin integer scalar, vector, and matrix types.
 - `IInteger`, represents a logical integer that supports both `IArithmetic` and `ILogical` operations. Implemented by all builtin integer scalar types.
 - `IDifferentiable`, represents a value that is differentiable.
-- `IFloat`, represents a logical float that supports `IArithmetic`, `ILogical`, and `IDifferentiable` operations. Also provides methods to convert to and from `float`. Implemented by all builtin floating-point scalar, vector, and matrix types.
+- `IFloatingPoint`, represents a logical float that supports `IArithmetic` and `IDifferentiable` operations, plus conversion to and from `float` and a `rcp` reciprocal. Implemented by all builtin floating-point scalar, vector, and matrix types. `IFloat` is a retained alias of `IFloatingPoint`, so existing `: IFloat` conformances and `<T : IFloat>` constraints keep working.
+- `IReal`, refines `IFloatingPoint` with the standard real-valued math functions (`pow`, `exp`, `log`, `sqrt`, `sin`, `cos`, `tan`, ...) and componentwise `min`/`max`/`saturate`, uniformly across scalar, vector, and matrix. Constrain a generic type parameter to `IReal` (rather than `IFloatingPoint`) when the function needs transcendental math.
+- `ISupportsInnerProduct`, refines `IReal` with a `dot` inner product.
+- `IScalarFloatingPoint` and `IScalarReal`, scalar-only refinements of `IFloatingPoint` and `IReal` for generic code that must reject vector and matrix arguments.
 - `IArray<T>`, represents a logical array that supports retrieving an element of type `T` from an index. Implemented by array types, vectors, matrices, and `StructuredBuffer`.
 - `IRWArray<T>`, represents a logical array whose elements are mutable. Implemented by array types, vectors, matrices, `RWStructuredBuffer`, and `RasterizerOrderedStructuredBuffer`.
 - `IFunc<TResult, TParams...>`, represents a callable object (with `operator()`) that returns `TResult` and takes `TParams...` as argument.
@@ -1402,10 +1405,10 @@ Slang supports the following builtin interfaces:
 - `__BuiltinArithmeticType`, implemented by all integer and floating-point scalar types.
 - `__BuiltinLogicalType`, implemented by all integer types and the `bool` type.
 
-Operator overloads are defined for `IArithmetic`, `ILogical`, `IInteger`, `IFloat`, `__BuiltinIntegerType`, `__BuiltinFloatingPointType`, `__BuiltinArithmeticType`, and `__BuiltinLogicalType` types, so the following code is valid:
+Operator overloads are defined for `IArithmetic`, `ILogical`, `IInteger`, `IFloatingPoint`, `__BuiltinIntegerType`, `__BuiltinFloatingPointType`, `__BuiltinArithmeticType`, and `__BuiltinLogicalType` types, so the following code is valid:
 
 ```csharp
-T f<T:IFloat>(T x, T y)
+T f<T:IFloatingPoint>(T x, T y)
 {
     if (x > T(0))
         return x + y;

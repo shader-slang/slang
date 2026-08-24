@@ -274,12 +274,19 @@ interface IInteger : IArithmetic, ILogical
 ///
 /// Implemented by builtin scalar types: `float`, `half`, `double`.
 ///
-/// Also implemented by `vector<T, N>` where `T` is one of the above scalar types.
+/// Also implemented by `vector<T, N>` and `matrix<T, R, C>` where `T` is one of the above scalar types.
+///
+/// This is the broad base of the floating-point interface tower. Its arithmetic requirements
+/// (`+ - * /`, `scale`, `toFloat`) are `[Differentiable]`; the reciprocal `rcp` (plain division) is
+/// the one exception — it is not yet marked `[Differentiable]`. The standard math library (`pow`,
+/// `exp`, `sin`, ...) lives on the `IReal` refinement, so a generic function that needs
+/// transcendental math should constrain its type parameter to `IReal` rather than to
+/// `IFloatingPoint`.
 ///
 /// @remarks This interface can be used to define generic functions that work with floating-point-like types. See example below.
 /// @example The following code defines a generic function that computes `a*b+1`, where `a`, `b` can be any floating point scalar or vector types.
 /// ```csharp
-/// T compute<T:IFloat>(T a, T b)
+/// T compute<T:IFloatingPoint>(T a, T b)
 /// {
 ///     return a * b + T(1.0f);
 /// }
@@ -301,7 +308,7 @@ interface IInteger : IArithmetic, ILogical
 /// }
 /// ```
 ///
-interface IFloat : IArithmetic, IDifferentiable
+interface IFloatingPoint : IArithmetic, IDifferentiable
 {
     /// Initializes a value of the conforming type form a `float`.
     [Differentiable]
@@ -341,6 +348,108 @@ interface IFloat : IArithmetic, IDifferentiable
     /// Multiplies a value of the conforming type by a floating point scale factor..
     [Differentiable]
     This scale<T:__BuiltinFloatingPointType>(T scale);
+
+    /// Returns the reciprocal `1 / this` — plain division, not a transcendental, so it lives on the
+    /// broad tier rather than on `IReal`. A conformer may `override` it with a target `rcp`
+    /// intrinsic; the default keeps existing `: IFloat` conformers source-compatible without
+    /// requiring one. The builtin scalar/vector/matrix conformances all override it.
+    This rcp() { return This(1.0).div(this); }
+}
+
+/// Alias of `IFloatingPoint`, retained so existing `: IFloat` conformances and `<T : IFloat>`
+/// constraints keep compiling.
+typealias IFloat = IFloatingPoint;
+
+/// A floating-point type on which the standard real-valued math functions (`pow`, `exp`, `log`,
+/// `sqrt`, `sin`, `cos`, `tan`, ...) plus componentwise `min`/`max`/`saturate` are available,
+/// uniformly across scalar, vector, and matrix. Constrain to `IReal` (rather than `IFloatingPoint`)
+/// when a generic function needs that math:
+/// ```csharp
+/// T smoothPow<T : IReal>(T base, T exponent)
+/// {
+///     return base.pow(exponent);
+/// }
+/// ```
+/// The requirements are instance methods, satisfied for the builtin types in `hlsl.meta.slang`.
+interface IReal : IFloatingPoint
+{
+    /// The scalar element type of this value: `This` itself for a scalar, `T` for a `vector<T,N>`
+    /// or `matrix<T,R,C>`. Lets generic code name the underlying scalar (e.g. to form a literal).
+    /// Constrained to `IReal` (not merely `IFloatingPoint`) so the scalar `Element` result of `dot`
+    /// can itself be fed back into further `IReal` math.
+    associatedtype Element : IReal;
+
+    /// Returns this value raised to the power `y`.
+    This pow(This y);
+
+    /// Returns the base-e exponential of this value.
+    This exp();
+
+    /// Returns the base-2 exponential of this value.
+    This exp2();
+
+    /// Returns the natural (base-e) logarithm of this value.
+    This log();
+
+    /// Returns the base-2 logarithm of this value.
+    This log2();
+
+    /// Returns the base-10 logarithm of this value.
+    This log10();
+
+    /// Returns the non-negative square root of this value.
+    This sqrt();
+
+    /// Returns the reciprocal square root of this value.
+    This rsqrt();
+
+    /// Returns the sine of this value (interpreted as radians).
+    This sin();
+
+    /// Returns the cosine of this value (interpreted as radians).
+    This cos();
+
+    /// Returns the tangent of this value (interpreted as radians).
+    This tan();
+
+    /// Componentwise minimum of this value and `other` (per component for vectors and matrices,
+    /// plain minimum for scalars). NaN/denormal handling follows each target's native `min` and is
+    /// therefore not uniform across backends.
+    This min(This other);
+
+    /// Componentwise maximum of this value and `other`. As with `min`, NaN handling is the target's
+    /// native `max` and not uniform across backends.
+    This max(This other);
+
+    /// Clamps each component of this value to the `[0, 1]` range.
+    This saturate();
+}
+
+/// A floating-point type that also supports a scalar-valued inner product (`dot`).
+///
+/// Kept as a separate capability rather than a requirement on `IReal` because not every
+/// floating-point-like type has a meaningful inner product; a caller that needs one constrains
+/// to `ISupportsInnerProduct` explicitly. The result is the scalar `Element` type.
+interface ISupportsInnerProduct : IReal
+{
+    /// Returns the inner (dot) product of this value with `other`, a scalar of type `Element`.
+    Element dot(This other);
+}
+
+/// Marker refinement of `IFloatingPoint` for the scalar floating-point tier: the builtin scalars
+/// `float`/`half`/`double` conform, while `vector` and `matrix` do not. Constrain a generic to it
+/// to accept scalar floats but reject vectors and matrices.
+interface IScalarFloatingPoint : IFloatingPoint
+{
+    // Intentionally requirement-free: the scalar pinning it would otherwise carry (`Element == This`)
+    // has no interface `where`-clause syntax yet, so the marker adds no requirements of its own.
+}
+
+/// Marker refinement of `IReal` and `IScalarFloatingPoint`: the scalar "mathable" tier. The builtin
+/// scalars conform, while `vector` and `matrix` do not; use it when a generic needs `IReal`'s math
+/// under a scalar-only constraint.
+interface IScalarReal : IReal, IScalarFloatingPoint
+{
 }
 
 // Interface for value types that support arithmetic through IArithmetic-style methods
@@ -913,13 +1022,14 @@ interface IFloatingPointCoopElement : ICoopElement
 
 
 /// Represents builtin floating point scalar types.
-/// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
+/// To define generic functions that work with both scalar and vector types, use `IFloatingPoint`
+/// (for arithmetic) or `IReal` (for arithmetic plus the standard math functions) instead.
 ///
 /// Implemented by `float`, `half` and `double` types.
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
-interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPointCoopElement
+interface __BuiltinFloatingPointType : __BuiltinRealType, IFloatingPoint, IFloatingPointCoopElement
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]

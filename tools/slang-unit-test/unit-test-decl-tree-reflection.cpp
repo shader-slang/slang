@@ -241,7 +241,9 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(typeParamTConstraintCount == 2);
     auto typeParamTConstraintType1 =
         genericReflection->getTypeParameterConstraintType(typeParamT, 0);
-    SLANG_CHECK(getTypeFullName(typeParamTConstraintType1) == "IFloat");
+    // The source writes the constraint as `IFloat`, which is now a `typealias` for the canonical
+    // `IFloatingPoint` interface; reflection resolves the alias and reports the underlying name.
+    SLANG_CHECK(getTypeFullName(typeParamTConstraintType1) == "IFloatingPoint");
     auto typeParamTConstraintType2 =
         genericReflection->getTypeParameterConstraintType(typeParamT, 1);
     SLANG_CHECK(getTypeFullName(typeParamTConstraintType2) == "IArithmetic");

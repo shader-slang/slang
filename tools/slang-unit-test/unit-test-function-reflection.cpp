@@ -163,10 +163,14 @@ SLANG_UNIT_TEST(functionReflection)
 
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection->getParameterCount() == 2);
+    // The parameters are declared with `IFloat`, now a `typealias` for the canonical
+    // `IFloatingPoint` interface; reflection resolves the alias and reports the underlying name.
     SLANG_CHECK(
-        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) == "IFloat");
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(0)->getType()) ==
+        "IFloatingPoint");
     SLANG_CHECK(
-        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) == "IFloat");
+        getTypeFullName(resolvedFunctionReflection->getParameterByIndex(1)->getType()) ==
+        "IFloatingPoint");
 
     // bar2 (T : IFloat, float3) -> int
     //
