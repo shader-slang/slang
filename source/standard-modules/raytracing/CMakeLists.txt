@@ -8,6 +8,8 @@ set(
     stage-inputs.slang
     stage-contracts.slang
     program-layout.slang
+    descriptor.slang
+    trace.slang
 )
 
 set(

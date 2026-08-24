@@ -1212,6 +1212,18 @@ local insts = {
 			{ structuralRayTracingReportHitWithKind = { min_operands = 5 } },
 		},
 	},
+	{
+		structuralRayTracingTrace = {
+			operands = {
+				{ "fallback" },
+				{ "tracer" },
+				{ "desc" },
+				{ "accelerationStructure" },
+				{ "descriptor" },
+				{ "payload" },
+			},
+		},
+	},
 	{ param = {} },
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },
