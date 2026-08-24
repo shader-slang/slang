@@ -60,8 +60,33 @@ public struct MultiLevelAccelerationStructure<let maxLevelCount : int>
     : IAccelerationStructure
 {}
 
-// Built-in primitive data becomes a zero-storage property view when stage-input lowering lands.
-public struct TriangleData {}
+// Built-in primitive data is exposed as a zero-storage property view. Each property maps
+// independently to the corresponding target ABI state.
+public struct TriangleData
+{
+    [require(raytracing_anyhit_closesthit)]
+    public property float2 barycentricCoord
+    {
+        get;
+    }
+
+    [require(raytracing_anyhit_closesthit)]
+    public property bool frontFacing
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+                return HitKind() == HIT_KIND_TRIANGLE_FRONT_FACE;
+            default:
+                return false;
+            }
+        }
+    }
+}
 
 [require(metal)]
 public struct CurveData {}

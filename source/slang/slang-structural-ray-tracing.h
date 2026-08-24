@@ -39,6 +39,8 @@ enum class StructuralRayTracingStageInputOperationKind
 {
     Payload,
     HitAttributes,
+    TriangleBarycentricCoord,
+    TriangleFrontFacing,
     RayTCurrent,
     HitKind,
     WorldRayOrigin,

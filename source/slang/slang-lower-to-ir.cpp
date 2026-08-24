@@ -993,7 +993,9 @@ LoweredValInfo emitCallToDeclRef(
                 SLANG_ASSERT(operation != kIROp_Invalid);
                 List<IRInst*> operationArgs;
                 if (operationKind != StructuralRayTracingStageInputOperationKind::Payload &&
-                    operationKind != StructuralRayTracingStageInputOperationKind::HitAttributes)
+                    operationKind != StructuralRayTracingStageInputOperationKind::HitAttributes &&
+                    operationKind !=
+                        StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord)
                 {
                     operationArgs.add(
                         getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
