@@ -10,6 +10,7 @@ class InterfaceDecl;
 class FunctionDeclBase;
 class AggTypeDecl;
 class Decl;
+class ModuleDecl;
 
 enum class StructuralRayTracingStageKind
 {
@@ -78,6 +79,7 @@ public:
     StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
     StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
         FunctionDeclBase* functionDecl) const;
+    bool isTraceMethod(FunctionDeclBase* functionDecl) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
     void registerStageImplementation(
@@ -97,6 +99,8 @@ private:
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>
         m_stageInputOperations;
+    ModuleDecl* m_trustedModuleDecl = nullptr;
+    AggTypeDecl* m_rayTracerType = nullptr;
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
 };

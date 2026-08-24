@@ -11,3 +11,7 @@ __intrinsic_op(any_hit_stage_interface) void fakeStageOperation();
 __intrinsic_op(structuralRayTracingGetRayTCurrent) float fakeStageInputOperation();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingGetRayTCurrent' is reserved for compiler use
+
+__intrinsic_op(structuralRayTracingTrace) void fakeStructuralTrace();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingTrace' is reserved for compiler use
