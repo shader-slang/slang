@@ -24,18 +24,135 @@ static FunctionDeclBase* _getStageImplementation(
     return as<FunctionDeclBase>(implementation);
 }
 
+static void _registerRayTracingAPIUse(
+    Linkage* linkage,
+    Module* module,
+    RayTracingAPIFamily family,
+    Decl* decl,
+    DiagnosticSink* sink)
+{
+    auto& registry = linkage->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return;
+
+    Decl* otherDecl = nullptr;
+    if (!registry.registerAPIUse(module, family, decl, &otherDecl))
+        return;
+
+    auto currentAPI = family == RayTracingAPIFamily::Structural ? "structural" : "legacy";
+    auto otherAPI = family == RayTracingAPIFamily::Structural ? "legacy" : "structural";
+    sink->diagnose(Diagnostics::MixedRayTracingApis{
+        .currentAPI = currentAPI,
+        .otherAPI = otherAPI,
+        .currentDecl = decl,
+        .otherDecl = otherDecl});
+}
+
 void SemanticsVisitor::registerStructuralRayTracingStageConformance(
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable)
 {
     auto& registry = getLinkage()->getStructuralRayTracingDeclRegistry();
     auto stageKind = registry.getStageKind(superInterfaceDeclRef.getDecl());
-    if (stageKind == StructuralRayTracingStageKind::Count || !witnessTable)
+    auto metadataKind = registry.getMetadataKind(superInterfaceDeclRef.getDecl());
+    if ((stageKind == StructuralRayTracingStageKind::Count &&
+         metadataKind == StructuralRayTracingMetadataKind::Count) ||
+        !witnessTable)
+        return;
+
+    auto witnessedType = as<DeclRefType>(witnessTable->witnessedType);
+    auto witnessedDecl = witnessedType ? witnessedType->getDeclRef().getDecl() : nullptr;
+    if (witnessedDecl)
+    {
+        _registerRayTracingAPIUse(
+            getLinkage(),
+            getModule(witnessedDecl),
+            RayTracingAPIFamily::Structural,
+            witnessedDecl,
+            getSink());
+    }
+
+    if (stageKind == StructuralRayTracingStageKind::Count)
         return;
 
     registry.registerStageImplementation(
         _getStageImplementation(registry, stageKind, witnessTable),
         stageKind);
+}
+
+static bool _isLegacyRayTracingStage(Stage stage)
+{
+    switch (stage)
+    {
+    case Stage::ClosestHit:
+    case Stage::AnyHit:
+    case Stage::Intersection:
+    case Stage::Miss:
+    case Stage::Callable:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink)
+{
+    if (!_isLegacyRayTracingStage(entryPoint->getStage()))
+        return;
+
+    auto entryPointDecl = entryPoint->getFuncDecl();
+    auto family = entryPoint->getStructuralRayTracingInvokeMethod()
+                      ? RayTracingAPIFamily::Structural
+                      : RayTracingAPIFamily::Legacy;
+    _registerRayTracingAPIUse(
+        entryPoint->getLinkage(),
+        getModule(entryPointDecl),
+        family,
+        entryPointDecl,
+        sink);
+}
+
+static void _registerAttributedLegacyEntryPoints(
+    Linkage* linkage,
+    Module* module,
+    ContainerDecl* containerDecl,
+    DiagnosticSink* sink)
+{
+    for (auto member : containerDecl->getDirectMemberDecls())
+    {
+        auto innerMember = member;
+        if (auto genericDecl = as<GenericDecl>(innerMember))
+            innerMember = genericDecl->inner;
+
+        if (auto functionDecl = as<FuncDecl>(innerMember))
+        {
+            if (auto entryPointAttr = functionDecl->findModifier<EntryPointAttribute>())
+            {
+                auto stage =
+                    getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
+                if (_isLegacyRayTracingStage(stage))
+                {
+                    _registerRayTracingAPIUse(
+                        linkage,
+                        module,
+                        RayTracingAPIFamily::Legacy,
+                        functionDecl,
+                        sink);
+                }
+            }
+        }
+
+        if (auto childContainer = as<ContainerDecl>(innerMember))
+            _registerAttributedLegacyEntryPoints(linkage, module, childContainer, sink);
+    }
+}
+
+void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink)
+{
+    auto& registry = linkage->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return;
+    _registerAttributedLegacyEntryPoints(linkage, module, module->getModuleDecl(), sink);
 }
 
 static StructuralRayTracingStageKind _findStageImplementationFromParentConformance(

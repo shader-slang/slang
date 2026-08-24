@@ -4318,6 +4318,14 @@ err(
 )
 
 err(
+    "mixed-ray-tracing-apis",
+    38057,
+    "cannot mix legacy and structural ray-tracing APIs in one module",
+    span { loc = "currentDecl:Decl", message = "this declaration uses the ~currentAPI API" },
+    note { message = "the same module also uses the ~otherAPI API", span { loc = "otherDecl:Decl" } }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",
