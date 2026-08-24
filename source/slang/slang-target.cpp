@@ -271,6 +271,30 @@ CapabilitySet TargetRequest::getTargetCaps()
     return cookedCapabilities;
 }
 
+// Distinguishes a SPIRV *version* request (e.g. `spirv_1_5`) from a SPIRV *extension*-only request
+// (e.g. `SPV_KHR_ray_tracing`) -- the two are indistinguishable in the flattened atom closure (a
+// version alias bundles extension atoms; an extension implies a version floor), so the test is over
+// the non-implied (leaf) atoms: a version alias keeps its version atom as a leaf while an extension
+// implies its version floor away, hence a version was requested iff a version leaf survives.
+static bool isSpirvVersionRequest(const CapabilitySet& caps)
+{
+    auto* spirvTargetSet = caps.getCapabilityTargetSets().tryGetValue(CapabilityAtom::spirv);
+    if (!spirvTargetSet)
+        return false;
+
+    for (auto& stageSet : spirvTargetSet->getShaderStageSets())
+    {
+        if (!stageSet.second.atomSet)
+            continue;
+        for (auto atom : stageSet.second.atomSet->newSetWithoutImpliedAtoms())
+        {
+            if (isSpirvVersionAtom(asAtom(atom)))
+                return true;
+        }
+    }
+    return false;
+}
+
 void TargetRequest::checkCapabilities(DiagnosticSink* sink)
 {
     // Every call site (currently only `FrontEndCompileRequest::checkEntryPoints()`) has a
@@ -317,21 +341,9 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
         if (toAdd.isEmpty())
             continue;
 
-        // For GLSL-SPIRV pipeline targets, SPIRV version caps are intentionally converted
-        // to their glsl_spirv_* equivalents by getTargetCaps() (see isGLSLBasedTarget()'s
-        // comment), so they are not an error here.
-        //
-        // TODO(https://github.com/shader-slang/slang/issues/12703): this exemption is
-        // broader than the conversion it is meant to mirror. getTargetCaps() only
-        // converts SPIRV *version* atoms, but this test also exempts SPIRV *extension*
-        // atoms via the same "belongs to the spirv target family" check, so a SPIRV
-        // extension capability requested on a GLSL-based target is silently dropped by
-        // both getTargetCaps() and this check instead of being flagged. That mismatch
-        // predates this function (getTargetCaps() has always silently dropped
-        // incompatible explicit capability requests) and needs its own fix to
-        // getTargetCaps()'s conversion/exemption logic; narrowing just this test would
-        // just move where the silent drop happens.
-        if (isGLSLTarget && toAdd.getCapabilityTargetSets().containsKey(CapabilityAtom::spirv))
+        // On GLSL-based targets getTargetCaps() converts a requested SPIRV version to its
+        // glsl_spirv_* equivalent but has no realization for a SPIRV extension.
+        if (isGLSLTarget && isSpirvVersionRequest(toAdd))
             continue;
 
         requirements.add({toAdd, atomVal.capabilitySource, requestedCapName});
