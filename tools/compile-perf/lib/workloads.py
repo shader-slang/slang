@@ -706,28 +706,53 @@ def gen_codegen(n):
     s.append('[shader("compute")]\n[numthreads(64,1,1)]\n')
     s.append("void computeMain(uint3 tid : SV_DispatchThreadID)\n{\n")
     s.append("    float x = outBuf[tid.x];\n    float acc = x;\n")
+    # Transcendental-free by design. `sin`/`cos` are a single builtin op on the
+    # GPU-language targets, but on CUDA they lower to libdevice's software
+    # `::sinf`/`::cosf`, which expand to roughly 135 PTX instructions apiece --
+    # enough that the emitted PTX for `codegen_ptx` is prelude expansion rather
+    # than the shader this workload exists to scale (shader-slang/slang#12621).
+    # `fma` is one hardware instruction on CUDA and has a native arm on every
+    # target this generator feeds (`hlsl.meta.slang`, `T fma(T,T,T)`).
+    #
+    # Two properties of the original body are deliberately preserved. The
+    # retained `sqrt(abs(acc))` keeps the recurrence non-affine, so the O(n)
+    # chain cannot fold to a closed form; and the subtraction keeps the linear
+    # coefficient below 1 (1.0009 - 0.125), so `acc` stays polynomial in `i` as
+    # it was before rather than compounding geometrically.
     for i in range(n):
         s.append(
-            f"    acc = acc * 1.0009 + sin(acc + {i}.0) * 0.5 - cos(acc * 0.5) * 0.25 + sqrt(abs(acc) + {i + 1}.0);\n"
+            f"    acc = fma(acc, 1.0009, {i}.0) - fma(acc, 0.5, {i + 1}.0) * 0.25 + sqrt(abs(acc) + {i + 1}.0);\n"
         )
     s.append("    outBuf[tid.x] = acc;\n}\n")
     return {"codegen.slang": "".join(s)}
+
+
+# gen_codegen feeds eight nightly-only workload specs, so a re-introduced
+# transcendental would surface as a quietly mis-attributed data point rather than
+# a failure. Pin the property that matters -- no `sin`/`cos` in the emitted body --
+# and not the formula text, which must stay free to be retuned.
+_cg_src = gen_codegen(1)["codegen.slang"]
+assert "sin(" not in _cg_src and "cos(" not in _cg_src, \
+    "gen_codegen must stay transcendental-free: sin/cos expand to ~135 PTX " \
+    "instructions each on CUDA and swamp the emitted downstream output (#12621)"
+del _cg_src
 
 
 def gen_vector_ops(n):
     """Dense fixed-width vector operator traffic, deliberately free of
     transcendentals.
 
-    The other codegen workloads use ``sin``/``cos`` as body filler. That is
-    harmless for Slang-side timing, but on the downstream side those two calls
-    dominate everything else -- they expand to hundreds of PTX instructions each
-    -- so a downstream measurement taken on them reports the cost of libdevice's
-    transcendentals rather than of whatever the workload is named for.
+    ``gen_codegen`` above is now transcendental-free too, which stops its
+    emitted PTX from being libdevice expansion (#12621). That makes its
+    downstream number attributable, but it does not make it a signal for the
+    prelude's operator definitions: its body is scalar `float` math, so almost
+    none of the fixed-width vector operator surface is instantiated by it.
 
     This one uses only vector arithmetic, comparison and selection, so its
-    downstream cost is the prelude's fixed-width operator definitions and their
-    instantiations. That makes it a usable signal for changes to those
-    operators.
+    downstream cost *is* the prelude's fixed-width operator definitions and
+    their instantiations. That makes it a usable signal for changes to those
+    operators -- the case `gen_codegen` cannot cover no matter what filler it
+    uses.
 
     The body cycles through six operator families, so that the workload stays a
     signal for the whole surface rather than one corner of it. In `i % 6` order:
