@@ -153,6 +153,40 @@ SLANG_UNIT_TEST(PackageManifestJSON)
         readManifestText("missing-license-files.json", missingLicenseFilesText, manifest, error)));
 }
 
+SLANG_UNIT_TEST(PackageLocalRegistryJSON)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String path = Path::combine(temp.path, "overrides.json");
+    List<LocalPackage> packages;
+    LocalPackage package;
+    package.name = "noise";
+    package.path = "../noise";
+    packages.add(package);
+    package.name = "helper";
+    package.path = ".slang/edit/helper";
+    package.baseCommit = "0000000000000000000000000000000000000000";
+    packages.add(package);
+
+    String error;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLocalPackages(path, packages, error)));
+    List<LocalPackage> roundTrip;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(path, roundTrip, error)));
+    SLANG_CHECK(roundTrip.getCount() == 2);
+    SLANG_CHECK(roundTrip[0].path == "../noise");
+    SLANG_CHECK(roundTrip[0].baseCommit.getLength() == 0);
+    SLANG_CHECK(roundTrip[1].path == ".slang/edit/helper");
+    SLANG_CHECK(roundTrip[1].baseCommit == package.baseCommit);
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::writeAllText(path, "{\"overrides\":{\"noise\":{\"path\":\"/absolute/noise\"}}}")));
+    SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::writeAllText(
+        path,
+        "{\"overrides\":{\"noise\":{\"path\":\"../noise\",\"base_commit\":\"bad\"}}}")));
+    SLANG_CHECK(SLANG_FAILED(readLocalPackages(path, roundTrip, error)));
+}
+
 SLANG_UNIT_TEST(PackageToolInit)
 {
     TemporaryDirectory temp;
@@ -166,6 +200,10 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(File::exists(Path::combine(temp.path, "tests")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "docs")));
     SLANG_CHECK(File::exists(Path::combine(temp.path, "LICENSE")));
+    String gitIgnore;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::readAllText(Path::combine(temp.path, ".gitignore"), gitIgnore)));
+    SLANG_CHECK(gitIgnore.getUnownedSlice().indexOf(UnownedStringSlice(".slang/")) >= 0);
 
     Manifest manifest;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
@@ -184,7 +222,7 @@ SLANG_UNIT_TEST(PackageToolInit)
     SLANG_CHECK(!File::exists(Path::combine(invalidRoot, "slang-package.json")));
 }
 
-SLANG_UNIT_TEST(PackageToolLockedFetchUsesJSONLockName)
+SLANG_UNIT_TEST(PackageToolFetchRequiresLock)
 {
     TemporaryDirectory temp;
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
@@ -194,11 +232,249 @@ SLANG_UNIT_TEST(PackageToolLockedFetchUsesJSONLockName)
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
 
-    const char* fetchArguments[] = {"slang-package", "fetch", "--locked"};
+    const char* fetchArguments[] = {"slang-package", "fetch"};
     SLANG_CHECK(SLANG_FAILED(
         executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
     SLANG_CHECK(
         error.getUnownedSlice().indexOf(UnownedStringSlice("slang-package-lock.json")) >= 0);
+}
+
+SLANG_UNIT_TEST(PackageToolLocalOverrideUpdatesDefinitiveLock)
+{
+    TemporaryDirectory temp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(temp)));
+    String error;
+    const char* initArguments[] = {"slang-package", "init"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(initArguments), initArguments, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::writeAllText(Path::combine(temp.path, "LICENSE"), "Root license\n")));
+
+    Manifest root;
+    String rootManifestPath = Path::combine(temp.path, "slang-package.json");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readManifest(rootManifestPath, root, error)));
+    Dependency dependency;
+    dependency.name = "noise";
+    dependency.git = "memory:noise";
+    dependency.version = ">=1.0.0";
+    root.dependencies.add(dependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeManifest(rootManifestPath, root, error)));
+
+    LockedPackage locked;
+    locked.name = "noise";
+    locked.git = dependency.git;
+    locked.tag = "v1.0.0";
+    locked.commit = "0000000000000000000000000000000000000000";
+    locked.exports.add("src");
+    PackageTool::LockFile lock;
+    lock.packages.add(locked);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+
+    TemporaryDirectory localTemp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(localTemp)));
+    const String& localRoot = localTemp.path;
+    Manifest local;
+    local.name = "noise";
+    local.version = "1.1.0";
+    local.exports.add("src");
+    local.licenseFiles.add("LICENSE");
+    Dependency localDependency;
+    localDependency.name = "helper";
+    localDependency.git = "memory:helper";
+    localDependency.version = ">=2.0.0";
+    local.dependencies.add(localDependency);
+    localDependency.name = "noise";
+    localDependency.git = "memory:noise";
+    localDependency.version = ">=1.0.0";
+    local.dependencies.add(localDependency);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(localRoot, "slang-package.json"), local, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(localRoot, "LICENSE"), "Noise license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(localRoot, "src", "noise.slang"), "module noise;\n")));
+
+    String relativeLocalRoot = Path::getRelativePath(temp.path, localRoot);
+    const char* overrideArguments[] = {
+        "slang-package",
+        "override",
+        "noise",
+        relativeLocalRoot.getBuffer(),
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(overrideArguments),
+        overrideArguments,
+        error)));
+
+    TemporaryDirectory helperTemp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(helperTemp)));
+    Manifest helper;
+    helper.name = "helper";
+    helper.version = "2.0.0";
+    helper.exports.add("src");
+    helper.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(helperTemp.path, "slang-package.json"), helper, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(helperTemp.path, "LICENSE"), "Helper license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(helperTemp.path, "src", "helper.slang"), "module helper;\n")));
+    String relativeHelperRoot = Path::getRelativePath(temp.path, helperTemp.path);
+    const char* helperOverrideArguments[] = {
+        "slang-package",
+        "override",
+        "helper",
+        relativeHelperRoot.getBuffer(),
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(helperOverrideArguments),
+        helperOverrideArguments,
+        error)));
+
+    const char* validateArguments[] = {"slang-package", "validate"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateArguments),
+        validateArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("does not match its lock")) >= 0);
+
+    const char* updateArguments[] = {"slang-package", "update", "--from-local"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        readLockFile(Path::combine(temp.path, "slang-package-lock.json"), lock, error)));
+    SLANG_CHECK(lock.packages.getCount() == 2);
+    for (const auto& package : lock.packages)
+    {
+        SLANG_CHECK(package.path.getLength() != 0);
+        SLANG_CHECK(package.tag.getLength() == 0);
+        SLANG_CHECK(package.commit.getLength() == 0);
+    }
+    SLANG_CHECK(lock.packages[0].name == "helper");
+    SLANG_CHECK(lock.packages[0].version == "2.0.0");
+    SLANG_CHECK(lock.packages[1].name == "noise");
+    SLANG_CHECK(lock.packages[1].version == "1.1.0");
+    SLANG_CHECK(lock.packages[1].dependencies.getCount() == 2);
+    SLANG_CHECK(lock.packages[1].dependencies[0].name == "helper");
+    SLANG_CHECK(lock.packages[1].dependencies[1].name == "noise");
+
+    const char* unoverrideNoiseArguments[] = {"slang-package", "unoverride", "noise"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(unoverrideNoiseArguments),
+        unoverrideNoiseArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("lock still points")) >= 0);
+    const char* uneditNoiseArguments[] = {"slang-package", "unedit", "noise"};
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(uneditNoiseArguments),
+        uneditNoiseArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("not editable")) >= 0);
+
+    String lockBeforeFailedUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(
+        Path::combine(temp.path, "slang-package-lock.json"),
+        lockBeforeFailedUpdate)));
+    TemporaryDirectory unusedTemp;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_makeTemporaryDirectory(unusedTemp)));
+    Manifest unused;
+    unused.name = "unused";
+    unused.version = "1.0.0";
+    unused.exports.add("src");
+    unused.licenseFiles.add("LICENSE");
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(unusedTemp.path, "slang-package.json"), unused, error)));
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(_writeFile(Path::combine(unusedTemp.path, "LICENSE"), "Unused license\n")));
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _writeFile(Path::combine(unusedTemp.path, "src", "unused.slang"), "module unused;\n")));
+    String relativeUnusedRoot = Path::getRelativePath(temp.path, unusedTemp.path);
+    const char* unusedOverrideArguments[] = {
+        "slang-package",
+        "override",
+        "unused",
+        relativeUnusedRoot.getBuffer(),
+    };
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(unusedOverrideArguments),
+        unusedOverrideArguments,
+        error)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(updateArguments), updateArguments, error)));
+    String lockAfterFailedUpdate;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(File::readAllText(
+        Path::combine(temp.path, "slang-package-lock.json"),
+        lockAfterFailedUpdate)));
+    SLANG_CHECK(lockAfterFailedUpdate == lockBeforeFailedUpdate);
+    const char* unoverrideUnusedArguments[] = {"slang-package", "unoverride", "unused"};
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(unoverrideUnusedArguments),
+        unoverrideUnusedArguments,
+        error)));
+
+    const char* fetchArguments[] = {"slang-package", "fetch"};
+    SLANG_CHECK(SLANG_SUCCEEDED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    String searchPaths;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        File::readAllText(Path::combine(temp.path, ".slang", "search-paths"), searchPaths)));
+    String expectedSearchPath = Path::combine(relativeLocalRoot, "src");
+    SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
+    expectedSearchPath = Path::combine(relativeHelperRoot, "src");
+    SLANG_CHECK(searchPaths.getUnownedSlice().indexOf(expectedSearchPath.getUnownedSlice()) >= 0);
+
+    String registryPath = Path::combine(temp.path, ".slang", "overrides.json");
+    List<LocalPackage> registeredPackages;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(readLocalPackages(registryPath, registeredPackages, error)));
+    Index noiseRegistration = -1;
+    for (Index i = 0; i < registeredPackages.getCount(); ++i)
+    {
+        if (registeredPackages[i].name == "noise")
+            noiseRegistration = i;
+    }
+    SLANG_CHECK_ABORT(noiseRegistration >= 0);
+    registeredPackages[noiseRegistration].path = relativeHelperRoot;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLocalPackages(registryPath, registeredPackages, error)));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("does not match")) >= 0);
+    registeredPackages[noiseRegistration].path = relativeLocalRoot;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(writeLocalPackages(registryPath, registeredPackages, error)));
+
+    local.dependencies[0].version = ">=2.0.0 <3.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(localRoot, "slang-package.json"), local, error)));
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateArguments),
+        validateArguments,
+        error)));
+    SLANG_CHECK(
+        error.getUnownedSlice().indexOf(UnownedStringSlice("dependencies do not match")) >= 0);
+    local.dependencies[0].version = ">=2.0.0";
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        writeManifest(Path::combine(localRoot, "slang-package.json"), local, error)));
+
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(File::remove(Path::combine(temp.path, ".slang", "overrides.json"))));
+    SLANG_CHECK(SLANG_FAILED(
+        executeInDirectory(temp.path, SLANG_COUNT_OF(fetchArguments), fetchArguments, error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is not registered")) >= 0);
+    SLANG_CHECK(SLANG_FAILED(executeInDirectory(
+        temp.path,
+        SLANG_COUNT_OF(validateArguments),
+        validateArguments,
+        error)));
+    SLANG_CHECK(error.getUnownedSlice().indexOf(UnownedStringSlice("is not registered")) >= 0);
 }
 
 SLANG_UNIT_TEST(PackageValidateStructureAndLicense)

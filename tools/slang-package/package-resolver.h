@@ -47,6 +47,14 @@ SlangResult resolveDependencies(
     LockFile& outLock,
     String& outError);
 
+/// Resolve dependencies using registered local manifests and Git for the remaining packages.
+SlangResult resolveDependenciesFromLocalPackages(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const List<LocalPackage>& localPackages,
+    LockFile& outLock,
+    String& outError);
+
 } // namespace PackageTool
 } // namespace Slang
 

@@ -5,6 +5,7 @@
 #include "core/slang-io.h"
 #include "package-git.h"
 #include "package-json.h"
+#include "package-local.h"
 
 namespace Slang
 {
@@ -65,6 +66,74 @@ public:
             outError));
         String sourceName = git + "@" + candidate.tag + ":slang-package.json";
         return readManifestText(sourceName, manifestText, outManifest, outError);
+    }
+};
+
+class LocalPackageResolverSource : public IPackageResolverSource
+{
+public:
+    String projectRoot;
+    const List<LocalPackage>* localPackages = nullptr;
+    GitPackageResolverSource gitSource;
+
+    SlangResult initialize(String& outError)
+    {
+        gitSource.projectRoot = projectRoot;
+        return gitSource.initialize(outError);
+    }
+
+    virtual SlangResult listReleaseTags(
+        const String& packageName,
+        const String& git,
+        List<TagCandidate>& outCandidates,
+        String& outError) override
+    {
+        Index localIndex = findLocalPackageIndex(*localPackages, packageName);
+        if (localIndex < 0)
+            return gitSource.listReleaseTags(packageName, git, outCandidates, outError);
+
+        Manifest manifest;
+        SLANG_RETURN_ON_FAIL(readLocalPackageManifest(
+            projectRoot,
+            (*localPackages)[localIndex],
+            manifest,
+            outError));
+        TagCandidate candidate;
+        if (SLANG_FAILED(
+                SemanticVersion::parse(manifest.version.getUnownedSlice(), candidate.version)))
+        {
+            outError = String("Registered local package has an invalid version: ") + packageName;
+            return SLANG_FAIL;
+        }
+        candidate.tag = String("v") + manifest.version;
+        candidate.path = (*localPackages)[localIndex].path;
+        outCandidates.clear();
+        outCandidates.add(candidate);
+        return SLANG_OK;
+    }
+
+    virtual SlangResult loadManifest(
+        const String& packageName,
+        const String& git,
+        const TagCandidate& candidate,
+        Manifest& outManifest,
+        String& outError) override
+    {
+        if (!candidate.path.getLength())
+            return gitSource.loadManifest(packageName, git, candidate, outManifest, outError);
+
+        Index localIndex = findLocalPackageIndex(*localPackages, packageName);
+        if (localIndex < 0 || (*localPackages)[localIndex].path != candidate.path)
+        {
+            outError =
+                String("Local package registration changed during resolution: ") + packageName;
+            return SLANG_FAIL;
+        }
+        return readLocalPackageManifest(
+            projectRoot,
+            (*localPackages)[localIndex],
+            outManifest,
+            outError);
     }
 };
 
@@ -148,10 +217,14 @@ private:
         if (package.selected)
         {
             SemanticVersion selectedVersion;
-            if (SLANG_FAILED(parseReleaseTag(package.locked.tag, selectedVersion)))
+            SlangResult versionResult = package.locked.path.getLength()
+                                            ? SemanticVersion::parse(
+                                                  package.locked.version.getUnownedSlice(),
+                                                  selectedVersion)
+                                            : parseReleaseTag(package.locked.tag, selectedVersion);
+            if (SLANG_FAILED(versionResult))
             {
-                outError =
-                    String("Selected package has an invalid release tag: ") + package.locked.tag;
+                outError = String("Selected package has an invalid version: ") + package.name;
                 return SLANG_FAIL;
             }
             if (!constraint.matches(selectedVersion))
@@ -239,9 +312,18 @@ private:
             selected.selected = true;
             selected.locked.name = selected.name;
             selected.locked.git = selected.git;
-            selected.locked.tag = candidate.tag;
-            selected.locked.commit = candidate.commit;
+            if (candidate.path.getLength())
+            {
+                selected.locked.version = manifest.version;
+                selected.locked.path = candidate.path;
+            }
+            else
+            {
+                selected.locked.tag = candidate.tag;
+                selected.locked.commit = candidate.commit;
+            }
             selected.locked.exports = manifest.exports;
+            selected.locked.dependencies = manifest.dependencies;
 
             bool dependencyConflict = false;
             for (const auto& dependency : manifest.dependencies)
@@ -286,6 +368,20 @@ SlangResult resolveDependencies(
 {
     GitPackageResolverSource source;
     source.projectRoot = projectRoot;
+    SLANG_RETURN_ON_FAIL(source.initialize(outError));
+    return resolveDependenciesWithSource(manifest, source, outLock, outError);
+}
+
+SlangResult resolveDependenciesFromLocalPackages(
+    const String& projectRoot,
+    const Manifest& manifest,
+    const List<LocalPackage>& localPackages,
+    LockFile& outLock,
+    String& outError)
+{
+    LocalPackageResolverSource source;
+    source.projectRoot = projectRoot;
+    source.localPackages = &localPackages;
     SLANG_RETURN_ON_FAIL(source.initialize(outError));
     return resolveDependenciesWithSource(manifest, source, outLock, outError);
 }

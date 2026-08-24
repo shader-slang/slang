@@ -3,8 +3,10 @@
 #include "package-tool.h"
 
 #include "core/slang-io.h"
+#include "core/slang-string-util.h"
 #include "package-git.h"
 #include "package-json.h"
+#include "package-local.h"
 #include "package-lock.h"
 #include "package-resolver.h"
 #include "package-validate.h"
@@ -27,11 +29,17 @@ static void _printHelp()
         "\n"
         "Commands:\n"
         "  init             Create a package manifest and standard directories.\n"
-        "  fetch [--locked] Materialize dependencies from the lock file.\n"
+        "  fetch            Materialize dependencies from the lock file.\n"
         "  update           Re-resolve dependencies and update the lock file.\n"
+        "  update --from-local\n"
+        "                   Resolve registered local package manifests into the lock.\n"
         "  validate         Validate package structure and the locked dependency closure.\n"
         "  edit <name>      Create an editable dependency checkout.\n"
         "  unedit <name>    Remove an editable checkout.\n"
+        "  override <name> <path>\n"
+        "                   Use an existing local package directory.\n"
+        "  unoverride <name>\n"
+        "                   Stop using an existing local package directory.\n"
         "  help             Show this help text.\n");
 }
 
@@ -58,20 +66,24 @@ static LockedPackage* _findLockedPackage(LockFile& lock, const String& name)
 static SlangResult _writeSearchPaths(
     const String& projectRoot,
     const LockFile& lock,
+    const List<LocalPackage>& localPackages,
     String& outError)
 {
     StringBuilder searchPaths;
     for (const auto& package : lock.packages)
     {
-        String editablePath = Path::combine(".slang", "edit", package.name);
-        String editableDirectory = Path::combine(projectRoot, editablePath);
-        SlangPathType editablePathType;
-        if (SLANG_SUCCEEDED(Path::getPathType(editableDirectory, &editablePathType)) &&
-            editablePathType == SLANG_PATH_TYPE_DIRECTORY)
+        Index localIndex = findLocalPackageIndex(localPackages, package.name);
+        if (localIndex >= 0)
         {
             for (const auto& exportPath : package.exports)
-                searchPaths << Path::combine(editablePath, exportPath) << "\n";
+                searchPaths << Path::combine(localPackages[localIndex].path, exportPath) << "\n";
             continue;
+        }
+        if (package.path.getLength())
+        {
+            outError = String("Locked local package '") + package.name +
+                       "' is not registered in .slang/overrides.json.";
+            return SLANG_FAIL;
         }
 
         String packageRoot = Path::combine(".slang", "packages", package.name);
@@ -90,7 +102,11 @@ static SlangResult _writeSearchPaths(
     return SLANG_OK;
 }
 
-static SlangResult _materialize(const String& projectRoot, const LockFile& lock, String& outError)
+static SlangResult _materialize(
+    const String& projectRoot,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    String& outError)
 {
     String packagesRoot = Path::combine(projectRoot, ".slang", "packages");
     if (!Path::createDirectoryRecursive(packagesRoot))
@@ -101,6 +117,15 @@ static SlangResult _materialize(const String& projectRoot, const LockFile& lock,
 
     for (const auto& package : lock.packages)
     {
+        if (findLocalPackageIndex(localPackages, package.name) >= 0)
+            continue;
+        if (package.path.getLength())
+        {
+            outError = String("Locked local package '") + package.name +
+                       "' is not registered in .slang/overrides.json.";
+            return SLANG_FAIL;
+        }
+
         List<TagCandidate> candidates;
         SLANG_RETURN_ON_FAIL(listReleaseTags(package.git, candidates, outError));
         const TagCandidate* matchingTag = nullptr;
@@ -123,7 +148,7 @@ static SlangResult _materialize(const String& projectRoot, const LockFile& lock,
         SLANG_RETURN_ON_FAIL(
             materializeRevision(projectRoot, package.git, package.commit, destination, outError));
     }
-    return _writeSearchPaths(projectRoot, lock, outError);
+    return _writeSearchPaths(projectRoot, lock, localPackages, outError);
 }
 
 static SlangResult _readProjectManifest(
@@ -139,12 +164,11 @@ static SlangResult _readProjectLock(const String& projectRoot, LockFile& outLock
     return readLockFile(Path::combine(projectRoot, kLockName), outLock, outError);
 }
 
-/// Verify that the root manifest's direct requirements are represented by the lock.
+/// Verify that the lock is exactly the reachable graph required by its stored package manifests.
 ///
-/// Transitive requirements are fixed by each locked package commit, so they cannot drift without
-/// changing a commit recorded in the lock.
+/// Each lock entry stores the dependency requirements from the manifest that produced it. This
+/// lets fetch validate both Git and local package graphs without rediscovering metadata.
 static SlangResult _validateLockAgainstManifest(
-    const String& projectRoot,
     const Manifest& manifest,
     const LockFile& lock,
     String& outError)
@@ -168,24 +192,7 @@ static SlangResult _validateLockAgainstManifest(
     for (Index pendingIndex = 0; pendingIndex < pendingPackages.getCount(); ++pendingIndex)
     {
         const LockedPackage& package = lock.packages[pendingPackages[pendingIndex]];
-        String repositoryPath =
-            Path::combine(projectRoot, Path::combine(".slang", "cache", package.name));
-        SLANG_RETURN_ON_FAIL(ensureRepository(projectRoot, package.git, repositoryPath, outError));
-        String manifestText;
-        SLANG_RETURN_ON_FAIL(readFileAtRevision(
-            repositoryPath,
-            package.commit,
-            kManifestName,
-            manifestText,
-            outError));
-        Manifest packageManifest;
-        SLANG_RETURN_ON_FAIL(readManifestText(
-            package.git + "@" + package.commit + ":" + kManifestName,
-            manifestText,
-            packageManifest,
-            outError));
-        SLANG_RETURN_ON_FAIL(validateLockedPackageManifest(package, packageManifest, outError));
-        for (const auto& dependency : packageManifest.dependencies)
+        for (const auto& dependency : package.dependencies)
         {
             Index dependencyIndex;
             SLANG_RETURN_ON_FAIL(
@@ -204,6 +211,55 @@ static SlangResult _validateLockAgainstManifest(
         {
             outError = String("Lock file contains unreachable package '") + lock.packages[i].name +
                        "'. Run 'slang package update'.";
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
+}
+
+/// Verify that every registered local tree matches its locked slot and every path lock is
+/// registered.
+static SlangResult _validateLocalPackages(
+    const String& projectRoot,
+    const LockFile& lock,
+    const List<LocalPackage>& localPackages,
+    String& outError)
+{
+    for (const auto& localPackage : localPackages)
+    {
+        Index packageIndex = findLockedPackageIndex(lock, localPackage.name);
+        if (packageIndex < 0)
+        {
+            outError =
+                String("Registered local package is not present in the lock: ") + localPackage.name;
+            return SLANG_FAIL;
+        }
+        const LockedPackage* package = &lock.packages[packageIndex];
+        if (package->path.getLength() && package->path != localPackage.path)
+        {
+            outError = String("Locked path for package '") + package->name +
+                       "' does not match .slang/overrides.json. Run "
+                       "'slang package update --from-local'.";
+            return SLANG_FAIL;
+        }
+        Manifest manifest;
+        SLANG_RETURN_ON_FAIL(
+            readLocalPackageManifest(projectRoot, localPackage, manifest, outError));
+        if (SLANG_FAILED(validateLockedPackageManifest(*package, manifest, outError)))
+        {
+            outError = outError +
+                       " Align the local manifest with the selected upstream graph, or run "
+                       "'slang package update --from-local' to record local manifest changes.";
+            return SLANG_FAIL;
+        }
+    }
+    for (const auto& package : lock.packages)
+    {
+        if (package.path.getLength() && findLocalPackageIndex(localPackages, package.name) < 0)
+        {
+            outError = String("Locked local package '") + package.name +
+                       "' is not registered in .slang/overrides.json. Run "
+                       "'slang package update' to restore a published pin.";
             return SLANG_FAIL;
         }
     }
@@ -248,48 +304,98 @@ static SlangResult _init(const String& projectRoot, String& outError)
         outError = String("Cannot create license placeholder: ") + licensePath;
         return SLANG_FAIL;
     }
+    String gitIgnorePath = Path::combine(projectRoot, ".gitignore");
+    String gitIgnore;
+    if (File::exists(gitIgnorePath) && SLANG_FAILED(File::readAllText(gitIgnorePath, gitIgnore)))
+    {
+        outError = String("Cannot read .gitignore: ") + gitIgnorePath;
+        return SLANG_FAIL;
+    }
+    bool ignoresPackageState = false;
+    for (auto line : LineParser(gitIgnore.getUnownedSlice()))
+    {
+        UnownedStringSlice trimmed = line.trim();
+        ignoresPackageState = ignoresPackageState || trimmed == ".slang" || trimmed == ".slang/";
+    }
+    if (!ignoresPackageState)
+    {
+        StringBuilder updatedIgnore;
+        updatedIgnore << gitIgnore;
+        if (gitIgnore.getLength() && gitIgnore[gitIgnore.getLength() - 1] != '\n')
+            updatedIgnore << "\n";
+        updatedIgnore << ".slang/\n";
+        if (SLANG_FAILED(File::writeAllText(gitIgnorePath, updatedIgnore)))
+        {
+            outError = String("Cannot add package-local state to .gitignore: ") + gitIgnorePath;
+            return SLANG_FAIL;
+        }
+    }
     SLANG_RETURN_ON_FAIL(writeManifest(manifestPath, manifest, outError));
     fprintf(stdout, "Initialized package '%s'.\n", manifest.name.getBuffer());
     return SLANG_OK;
 }
 
-static SlangResult _fetch(const String& projectRoot, bool lockedOnly, String& outError)
+static SlangResult _fetch(const String& projectRoot, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
     String lockPath = Path::combine(projectRoot, kLockName);
-    LockFile lock;
-    if (File::exists(lockPath))
+    if (!File::exists(lockPath))
     {
-        SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
-        SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(projectRoot, manifest, lock, outError));
-    }
-    else
-    {
-        if (lockedOnly)
-        {
-            outError = "fetch --locked requires slang-package-lock.json.";
-            return SLANG_FAIL;
-        }
-        SLANG_RETURN_ON_FAIL(resolveDependencies(projectRoot, manifest, lock, outError));
-        SLANG_RETURN_ON_FAIL(writeLockFile(lockPath, lock, outError));
+        outError =
+            "fetch requires slang-package-lock.json. Run 'slang package update' to create it.";
+        return SLANG_FAIL;
     }
 
-    SLANG_RETURN_ON_FAIL(_materialize(projectRoot, lock, outError));
+    LockFile lock;
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(_validateLockAgainstManifest(manifest, lock, outError));
+    SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(_materialize(projectRoot, lock, localPackages, outError));
     fprintf(stdout, "Fetched %lld package(s).\n", (long long)lock.packages.getCount());
     return SLANG_OK;
 }
 
-static SlangResult _update(const String& projectRoot, String& outError)
+static SlangResult _update(const String& projectRoot, bool fromLocal, String& outError)
 {
     Manifest manifest;
     SLANG_RETURN_ON_FAIL(_readProjectManifest(projectRoot, manifest, outError));
 
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    if (fromLocal && localPackages.getCount() == 0)
+    {
+        outError = "update --from-local requires a registered local package.";
+        return SLANG_FAIL;
+    }
+
     LockFile lock;
-    SLANG_RETURN_ON_FAIL(resolveDependencies(projectRoot, manifest, lock, outError));
+    if (fromLocal)
+    {
+        SLANG_RETURN_ON_FAIL(resolveDependenciesFromLocalPackages(
+            projectRoot,
+            manifest,
+            localPackages,
+            lock,
+            outError));
+    }
+    else
+    {
+        SLANG_RETURN_ON_FAIL(resolveDependencies(projectRoot, manifest, lock, outError));
+    }
+    SLANG_RETURN_ON_FAIL(_validateLocalPackages(projectRoot, lock, localPackages, outError));
     SLANG_RETURN_ON_FAIL(writeLockFile(Path::combine(projectRoot, kLockName), lock, outError));
-    SLANG_RETURN_ON_FAIL(_materialize(projectRoot, lock, outError));
+    SLANG_RETURN_ON_FAIL(_materialize(projectRoot, lock, localPackages, outError));
+    if (fromLocal)
+    {
+        fprintf(
+            stdout,
+            "The lock now contains local paths and requires this project's "
+            ".slang/overrides.json.\n");
+    }
     fprintf(stdout, "Updated %lld package(s).\n", (long long)lock.packages.getCount());
     return SLANG_OK;
 }
@@ -301,6 +407,48 @@ static SlangResult _validate(const String& projectRoot, String& outError)
     return SLANG_OK;
 }
 
+static SlangResult _registerLocalPackage(
+    const String& projectRoot,
+    const String& name,
+    const String& path,
+    const String& baseCommit,
+    List<LocalPackage>& ioPackages,
+    String& outError)
+{
+    if (findLocalPackageIndex(ioPackages, name) >= 0)
+    {
+        outError = String("Package already has a registered local tree: ") + name;
+        return SLANG_FAIL;
+    }
+
+    String inputPath = Path::isAbsolute(path) ? path : Path::combine(projectRoot, path);
+    String canonicalPath;
+    SlangPathType type;
+    if (SLANG_FAILED(Path::getPathType(inputPath, &type)) || type != SLANG_PATH_TYPE_DIRECTORY ||
+        SLANG_FAILED(Path::getCanonical(inputPath, canonicalPath)))
+    {
+        outError = String("Local package directory does not exist: ") + path;
+        return SLANG_FAIL;
+    }
+    String relativePath = Path::getRelativePath(projectRoot, canonicalPath);
+    if (Path::isAbsolute(relativePath))
+    {
+        outError = "Local package must be on the same filesystem as the project.";
+        return SLANG_FAIL;
+    }
+
+    LocalPackage package;
+    package.name = name;
+    package.path = relativePath;
+    package.baseCommit = baseCommit;
+    Manifest manifest;
+    SLANG_RETURN_ON_FAIL(readLocalPackageManifest(projectRoot, package, manifest, outError));
+    ioPackages.add(package);
+    ioPackages.sort([](const LocalPackage& left, const LocalPackage& right)
+                    { return left.name < right.name; });
+    return writeProjectLocalPackages(projectRoot, ioPackages, outError);
+}
+
 static SlangResult _edit(const String& projectRoot, const String& name, String& outError)
 {
     LockFile lock;
@@ -309,6 +457,11 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
     if (!package)
     {
         outError = String("Package is not present in the lock file: ") + name;
+        return SLANG_FAIL;
+    }
+    if (package->path.getLength())
+    {
+        outError = String("Package already has a local path in the lock: ") + name;
         return SLANG_FAIL;
     }
     String editRoot = Path::combine(projectRoot, ".slang", "edit");
@@ -326,7 +479,20 @@ static SlangResult _edit(const String& projectRoot, const String& name, String& 
     }
     SLANG_RETURN_ON_FAIL(
         materializeRevision(projectRoot, package->git, package->commit, destination, outError));
-    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, lock, outError));
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    if (SLANG_FAILED(_registerLocalPackage(
+            projectRoot,
+            name,
+            destination,
+            package->commit,
+            localPackages,
+            outError)))
+    {
+        Path::removeNonEmpty(destination);
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, lock, localPackages, outError));
     fprintf(stdout, "Package '%s' is now editable.\n", name.getBuffer());
     return SLANG_OK;
 }
@@ -341,7 +507,31 @@ static SlangResult _unedit(const String& projectRoot, const String& name, String
         outError = String("Package is not present in the lock file: ") + name;
         return SLANG_FAIL;
     }
-    String destination = Path::combine(projectRoot, Path::combine(".slang", "edit", name));
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    Index localIndex = findLocalPackageIndex(localPackages, name);
+    if (localIndex < 0 || !localPackages[localIndex].baseCommit.getLength())
+    {
+        outError = String("Package is not editable: ") + name;
+        return SLANG_FAIL;
+    }
+    if (package->path.getLength())
+    {
+        outError = String("The lock still points at this editable package. Run "
+                          "'slang package update' before unedit.");
+        return SLANG_FAIL;
+    }
+    String destination;
+    SLANG_RETURN_ON_FAIL(
+        getLocalPackageRoot(projectRoot, localPackages[localIndex], destination, outError));
+    String canonicalEditRoot;
+    if (SLANG_FAILED(
+            Path::getCanonical(Path::combine(projectRoot, ".slang", "edit"), canonicalEditRoot)) ||
+        Path::getParentDirectory(destination) != canonicalEditRoot)
+    {
+        outError = String("Editable package registration points outside .slang/edit: ") + name;
+        return SLANG_FAIL;
+    }
     SlangPathType type;
     if (SLANG_FAILED(Path::getPathType(destination, &type)) || type != SLANG_PATH_TYPE_DIRECTORY)
     {
@@ -349,8 +539,11 @@ static SlangResult _unedit(const String& projectRoot, const String& name, String
         return SLANG_FAIL;
     }
     bool isSafeToRemove = false;
-    SLANG_RETURN_ON_FAIL(
-        isWorkingTreeSafeToRemove(destination, package->commit, isSafeToRemove, outError));
+    SLANG_RETURN_ON_FAIL(isWorkingTreeSafeToRemove(
+        destination,
+        localPackages[localIndex].baseCommit,
+        isSafeToRemove,
+        outError));
     if (!isSafeToRemove)
     {
         outError =
@@ -364,8 +557,64 @@ static SlangResult _unedit(const String& projectRoot, const String& name, String
         outError = String("Cannot remove editable checkout: ") + destination;
         return SLANG_FAIL;
     }
-    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, lock, outError));
+    localPackages.removeAt(localIndex);
+    SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, lock, localPackages, outError));
     fprintf(stdout, "Package '%s' is no longer editable.\n", name.getBuffer());
+    return SLANG_OK;
+}
+
+static SlangResult _override(
+    const String& projectRoot,
+    const String& name,
+    const String& path,
+    String& outError)
+{
+    LockFile lock;
+    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(
+        _registerLocalPackage(projectRoot, name, path, String(), localPackages, outError));
+    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, lock, localPackages, outError));
+    fprintf(
+        stdout,
+        "Package '%s' now uses '%s'. Run 'slang package update --from-local' if its manifest "
+        "differs from the lock.\n",
+        name.getBuffer(),
+        path.getBuffer());
+    return SLANG_OK;
+}
+
+static SlangResult _unoverride(const String& projectRoot, const String& name, String& outError)
+{
+    LockFile lock;
+    SLANG_RETURN_ON_FAIL(_readProjectLock(projectRoot, lock, outError));
+    Index packageIndex = findLockedPackageIndex(lock, name);
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
+    Index localIndex = findLocalPackageIndex(localPackages, name);
+    if (localIndex < 0)
+    {
+        outError = String("Package has no registered local tree: ") + name;
+        return SLANG_FAIL;
+    }
+    if (localPackages[localIndex].baseCommit.getLength())
+    {
+        outError = String("Package is editable; use 'slang package unedit ") + name + "'.";
+        return SLANG_FAIL;
+    }
+    if (packageIndex >= 0 && lock.packages[packageIndex].path.getLength())
+    {
+        outError = String("The lock still points at this local package. Run "
+                          "'slang package update' before unoverride.");
+        return SLANG_FAIL;
+    }
+    localPackages.removeAt(localIndex);
+    SLANG_RETURN_ON_FAIL(writeProjectLocalPackages(projectRoot, localPackages, outError));
+    SLANG_RETURN_ON_FAIL(_writeSearchPaths(projectRoot, lock, localPackages, outError));
+    fprintf(stdout, "Package '%s' no longer uses a local override.\n", name.getBuffer());
     return SLANG_OK;
 }
 
@@ -385,21 +634,22 @@ SlangResult executeInDirectory(
     String command = argv[1];
     if (command == "init" && argc == 2)
         return _init(projectRoot, outError);
-    if (command == "fetch")
-    {
-        if (argc == 2)
-            return _fetch(projectRoot, false, outError);
-        if (argc == 3 && String(argv[2]) == "--locked")
-            return _fetch(projectRoot, true, outError);
-    }
+    if (command == "fetch" && argc == 2)
+        return _fetch(projectRoot, outError);
     if (command == "update" && argc == 2)
-        return _update(projectRoot, outError);
+        return _update(projectRoot, false, outError);
+    if (command == "update" && argc == 3 && String(argv[2]) == "--from-local")
+        return _update(projectRoot, true, outError);
     if (command == "validate" && argc == 2)
         return _validate(projectRoot, outError);
     if (command == "edit" && argc == 3)
         return _edit(projectRoot, argv[2], outError);
     if (command == "unedit" && argc == 3)
         return _unedit(projectRoot, argv[2], outError);
+    if (command == "override" && argc == 4)
+        return _override(projectRoot, argv[2], argv[3], outError);
+    if (command == "unoverride" && argc == 3)
+        return _unoverride(projectRoot, argv[2], outError);
 
     outError = String("Invalid command or arguments. Run '") + argv[0] + " help'.";
     return SLANG_FAIL;

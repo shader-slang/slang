@@ -185,6 +185,18 @@ static bool _isCommitHash(const String& commit)
     return true;
 }
 
+static bool _isSafeLocalPath(const String& path)
+{
+    if (path.getLength() == 0 || Path::isAbsolute(path))
+        return false;
+    for (auto c : path.getUnownedSlice())
+    {
+        if (c < ' ' || c == '"' || c == '\'')
+            return false;
+    }
+    return true;
+}
+
 static SlangResult _readRelativePathArray(
     JSONContainer* container,
     const JSONValue& object,
@@ -419,23 +431,65 @@ static SlangResult _readLockedPackage(
         return SLANG_FAIL;
     }
     SLANG_RETURN_ON_FAIL(
-        _readRequiredString(container, pair.value, "tag", outPackage.tag, outError));
-    SemanticVersion ignored;
-    if (SLANG_FAILED(parseReleaseTag(outPackage.tag, ignored)))
+        _readOptionalString(container, pair.value, "path", outPackage.path, outError));
+    SemanticVersion ignoredVersion;
+    if (outPackage.path.getLength())
     {
-        outError = String("Locked tag is not a release tag: ") + outPackage.tag;
-        return SLANG_FAIL;
+        if (_find(container, pair.value, "tag").isValid() ||
+            _find(container, pair.value, "commit").isValid())
+        {
+            outError = String("Locked local package cannot also contain tag or commit: ") +
+                       outPackage.name;
+            return SLANG_FAIL;
+        }
+        if (!_isSafeLocalPath(outPackage.path))
+        {
+            outError = String("Locked local path must be relative: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(container, pair.value, "version", outPackage.version, outError));
+        if (SLANG_FAILED(
+                SemanticVersion::parse(outPackage.version.getUnownedSlice(), ignoredVersion)))
+        {
+            outError = String("Locked local package has an invalid version: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
     }
-    SLANG_RETURN_ON_FAIL(
-        _readRequiredString(container, pair.value, "commit", outPackage.commit, outError));
-    if (!_isCommitHash(outPackage.commit))
+    else
     {
-        outError =
-            String("Locked commit must be an exact hexadecimal object ID: ") + outPackage.name;
-        return SLANG_FAIL;
+        if (_find(container, pair.value, "version").isValid())
+        {
+            outError =
+                String("Locked Git package cannot contain a local version: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(container, pair.value, "tag", outPackage.tag, outError));
+        if (SLANG_FAILED(parseReleaseTag(outPackage.tag, ignoredVersion)))
+        {
+            outError = String("Locked tag is not a release tag: ") + outPackage.tag;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(container, pair.value, "commit", outPackage.commit, outError));
+        if (!_isCommitHash(outPackage.commit))
+        {
+            outError =
+                String("Locked commit must be an exact hexadecimal object ID: ") + outPackage.name;
+            return SLANG_FAIL;
+        }
     }
     SLANG_RETURN_ON_FAIL(
         _readRelativePathArray(container, pair.value, "exports", outPackage.exports, outError));
+    if (!_find(container, pair.value, "dependencies").isValid())
+    {
+        outError = String("Locked package is missing dependency requirements: ") + outPackage.name +
+                   ". Run 'slang package update'.";
+        return SLANG_FAIL;
+    }
+    SLANG_RETURN_ON_FAIL(
+        _readDependencies(container, pair.value, outPackage.dependencies, outError));
 
     return SLANG_OK;
 }
@@ -491,12 +545,27 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
         writer.startObject(SourceLoc());
         _writeKey(writer, "git");
         writer.addStringValue(package.git.getUnownedSlice(), SourceLoc());
-        _writeKey(writer, "tag");
-        writer.addStringValue(package.tag.getUnownedSlice(), SourceLoc());
-        _writeKey(writer, "commit");
-        writer.addStringValue(package.commit.getUnownedSlice(), SourceLoc());
+        if (package.path.getLength())
+        {
+            _writeKey(writer, "version");
+            writer.addStringValue(package.version.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "path");
+            writer.addStringValue(package.path.getUnownedSlice(), SourceLoc());
+        }
+        else
+        {
+            _writeKey(writer, "tag");
+            writer.addStringValue(package.tag.getUnownedSlice(), SourceLoc());
+            _writeKey(writer, "commit");
+            writer.addStringValue(package.commit.getUnownedSlice(), SourceLoc());
+        }
         _writeKey(writer, "exports");
         _writeStringArray(writer, package.exports);
+        _writeKey(writer, "dependencies");
+        writer.startObject(SourceLoc());
+        for (const auto& dependency : package.dependencies)
+            _writeDependency(writer, dependency);
+        writer.endObject(SourceLoc());
         writer.endObject(SourceLoc());
     }
     writer.endObject(SourceLoc());
@@ -505,6 +574,92 @@ SlangResult writeLockFile(const String& path, const LockFile& lock, String& outE
     if (SLANG_FAILED(File::writeAllText(path, writer.getBuilder())))
     {
         outError = String("Cannot write lock file: ") + path;
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
+SlangResult readLocalPackages(const String& path, List<LocalPackage>& outPackages, String& outError)
+{
+    ParsedJSON json;
+    SLANG_RETURN_ON_FAIL(_parseJSON(path, json, outError));
+    JSONValue overrides = _find(json.container, json.root, "overrides");
+    if (overrides.getKind() != JSONValue::Kind::Object)
+    {
+        outError = "Field 'overrides' must be an object.";
+        return SLANG_FAIL;
+    }
+
+    outPackages.clear();
+    for (auto pair : json.container->getObject(overrides))
+    {
+        LocalPackage package;
+        package.name = json.container->getStringFromKey(pair.key);
+        if (!isValidPackageName(package.name) || pair.value.getKind() != JSONValue::Kind::Object)
+        {
+            outError = String("Invalid local package entry: ") + package.name;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            _readRequiredString(json.container, pair.value, "path", package.path, outError));
+        if (!_isSafeLocalPath(package.path))
+        {
+            outError = String("Local package path must be relative: ") + package.name;
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(_readOptionalString(
+            json.container,
+            pair.value,
+            "base_commit",
+            package.baseCommit,
+            outError));
+        if (package.baseCommit.getLength() && !_isCommitHash(package.baseCommit))
+        {
+            outError = String("Local package base commit is invalid: ") + package.name;
+            return SLANG_FAIL;
+        }
+        bool duplicate = false;
+        for (const auto& existing : outPackages)
+            duplicate = duplicate || existing.name == package.name;
+        if (duplicate)
+        {
+            outError = String("Duplicate local package entry: ") + package.name;
+            return SLANG_FAIL;
+        }
+        outPackages.add(package);
+    }
+    return SLANG_OK;
+}
+
+SlangResult writeLocalPackages(
+    const String& path,
+    const List<LocalPackage>& packages,
+    String& outError)
+{
+    JSONWriter writer(JSONWriter::IndentationStyle::Allman);
+    writer.startObject(SourceLoc());
+    _writeKey(writer, "overrides");
+    writer.startObject(SourceLoc());
+    for (const auto& package : packages)
+    {
+        SLANG_RELEASE_ASSERT(isValidPackageName(package.name));
+        writer.addUnquotedKey(package.name.getUnownedSlice(), SourceLoc());
+        writer.startObject(SourceLoc());
+        _writeKey(writer, "path");
+        writer.addStringValue(package.path.getUnownedSlice(), SourceLoc());
+        if (package.baseCommit.getLength())
+        {
+            _writeKey(writer, "base_commit");
+            writer.addStringValue(package.baseCommit.getUnownedSlice(), SourceLoc());
+        }
+        writer.endObject(SourceLoc());
+    }
+    writer.endObject(SourceLoc());
+    writer.endObject(SourceLoc());
+    writer.getBuilder() << "\n";
+    if (SLANG_FAILED(File::writeAllText(path, writer.getBuilder())))
+    {
+        outError = String("Cannot write local package registry: ") + path;
         return SLANG_FAIL;
     }
     return SLANG_OK;

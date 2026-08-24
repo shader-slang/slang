@@ -431,6 +431,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             ${slang_SOURCE_DIR}/source/slang/slang-repro-validator.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-git.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-json.cpp
+            ${slang_SOURCE_DIR}/tools/slang-package/package-local.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-lock.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-resolver.cpp
             ${slang_SOURCE_DIR}/tools/slang-package/package-tool.cpp

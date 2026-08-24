@@ -35,13 +35,23 @@ struct LockedPackage
     String git;
     String tag;
     String commit;
+    String version;
+    String path;
     List<String> exports;
+    List<Dependency> dependencies;
 };
 
 struct LockFile
 {
     Int lockVersion = 1;
     List<LockedPackage> packages;
+};
+
+struct LocalPackage
+{
+    String name;
+    String path;
+    String baseCommit;
 };
 
 enum class VersionComparison
@@ -70,6 +80,7 @@ struct TagCandidate
 {
     String tag;
     String commit;
+    String path;
     SemanticVersion version;
 };
 

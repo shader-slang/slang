@@ -5,6 +5,7 @@
 #include "compiler-core/slang-lexer.h"
 #include "core/slang-io.h"
 #include "package-json.h"
+#include "package-local.h"
 #include "package-lock.h"
 #include "package-types.h"
 
@@ -437,16 +438,39 @@ static SlangResult _validatePackageTree(
 static SlangResult _readMaterializedManifest(
     const String& projectRoot,
     const LockedPackage& package,
+    const List<LocalPackage>& localPackages,
+    String& outPackageRoot,
     Manifest& outManifest,
     String& outError)
 {
-    String packageRoot =
-        Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+    Index localIndex = findLocalPackageIndex(localPackages, package.name);
+    if (localIndex >= 0)
+    {
+        if (package.path.getLength() && package.path != localPackages[localIndex].path)
+        {
+            outError = String("Locked path for package '") + package.name +
+                       "' does not match .slang/overrides.json.";
+            return SLANG_FAIL;
+        }
+        SLANG_RETURN_ON_FAIL(
+            getLocalPackageRoot(projectRoot, localPackages[localIndex], outPackageRoot, outError));
+    }
+    else
+    {
+        if (package.path.getLength())
+        {
+            outError = String("Locked local package '") + package.name +
+                       "' is not registered in .slang/overrides.json.";
+            return SLANG_FAIL;
+        }
+        outPackageRoot =
+            Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
+    }
     if (SLANG_FAILED(
-            readManifest(Path::combine(packageRoot, kManifestName), outManifest, outError)))
+            readManifest(Path::combine(outPackageRoot, kManifestName), outManifest, outError)))
     {
         outError = String("Cannot validate materialized package '") + package.name +
-                   "'. Run 'slang package fetch --locked'. " + outError;
+                   "'. Run 'slang package fetch'. " + outError;
         return SLANG_FAIL;
     }
     return validateLockedPackageManifest(package, outManifest, outError);
@@ -462,11 +486,15 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     SLANG_RETURN_ON_FAIL(_validatePackageTree(projectRoot, rootManifest, modules, outError));
 
     String lockPath = Path::combine(projectRoot, kLockName);
-    if (rootManifest.dependencies.getCount() == 0 && !File::exists(lockPath))
-        return SLANG_OK;
+    List<LocalPackage> localPackages;
+    SLANG_RETURN_ON_FAIL(readProjectLocalPackages(projectRoot, localPackages, outError));
     if (!File::exists(lockPath))
     {
-        outError = "Package dependencies require slang-package-lock.json.";
+        if (rootManifest.dependencies.getCount() == 0 && localPackages.getCount() == 0)
+            return SLANG_OK;
+        outError = localPackages.getCount()
+                       ? "Registered local packages require slang-package-lock.json."
+                       : "Package dependencies require slang-package-lock.json.";
         return SLANG_FAIL;
     }
 
@@ -474,12 +502,25 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     SLANG_RETURN_ON_FAIL(readLockFile(lockPath, lock, outError));
     List<Manifest> packageManifests;
     packageManifests.setCount(lock.packages.getCount());
+    List<String> packageRoots;
+    packageRoots.setCount(lock.packages.getCount());
     for (Index i = 0; i < lock.packages.getCount(); ++i)
         SLANG_RETURN_ON_FAIL(_readMaterializedManifest(
             projectRoot,
             lock.packages[i],
+            localPackages,
+            packageRoots[i],
             packageManifests[i],
             outError));
+    for (const auto& localPackage : localPackages)
+    {
+        if (findLockedPackageIndex(lock, localPackage.name) < 0)
+        {
+            outError =
+                String("Registered local package is not present in the lock: ") + localPackage.name;
+            return SLANG_FAIL;
+        }
+    }
 
     List<bool> reachable;
     reachable.setCount(lock.packages.getCount());
@@ -499,7 +540,6 @@ SlangResult validateProject(const String& projectRoot, String& outError)
     for (Index pendingIndex = 0; pendingIndex < pending.getCount(); ++pendingIndex)
     {
         Index index = pending[pendingIndex];
-        const LockedPackage& package = lock.packages[index];
         const Manifest& manifest = packageManifests[index];
         for (const auto& dependency : manifest.dependencies)
         {
@@ -513,24 +553,8 @@ SlangResult validateProject(const String& projectRoot, String& outError)
             }
         }
 
-        String lockedRoot =
-            Path::combine(Path::combine(projectRoot, ".slang", "packages"), package.name);
-        String editableRoot =
-            Path::combine(Path::combine(projectRoot, ".slang", "edit"), package.name);
-        SlangPathType editableType;
-        String sourceRoot = SLANG_SUCCEEDED(Path::getPathType(editableRoot, &editableType)) &&
-                                    editableType == SLANG_PATH_TYPE_DIRECTORY
-                                ? editableRoot
-                                : lockedRoot;
-        Manifest sourceManifest;
         SLANG_RETURN_ON_FAIL(
-            readManifest(Path::combine(sourceRoot, kManifestName), sourceManifest, outError));
-        if (sourceManifest.name != package.name)
-        {
-            outError = String("Package source manifest has the wrong name: ") + sourceRoot;
-            return SLANG_FAIL;
-        }
-        SLANG_RETURN_ON_FAIL(_validatePackageTree(sourceRoot, sourceManifest, modules, outError));
+            _validatePackageTree(packageRoots[index], manifest, modules, outError));
     }
     for (Index i = 0; i < reachable.getCount(); ++i)
     {

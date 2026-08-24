@@ -44,10 +44,13 @@ SlangResult validateLockedDependency(
     SlangResult constraintResult = parseDependencyConstraint(dependency, constraint, outError);
     if (SLANG_FAILED(constraintResult))
         return constraintResult;
-    if (SLANG_FAILED(parseReleaseTag(lockedPackage.tag, lockedVersion)) ||
-        !constraint.matches(lockedVersion))
+    SlangResult versionResult =
+        lockedPackage.path.getLength()
+            ? SemanticVersion::parse(lockedPackage.version.getUnownedSlice(), lockedVersion)
+            : parseReleaseTag(lockedPackage.tag, lockedVersion);
+    if (SLANG_FAILED(versionResult) || !constraint.matches(lockedVersion))
     {
-        outError = String("Locked tag no longer satisfies dependency '") + dependency.name +
+        outError = String("Locked version no longer satisfies dependency '") + dependency.name +
                    "'. Run 'slang package update'.";
         return SLANG_FAIL;
     }
@@ -65,14 +68,17 @@ SlangResult validateLockedPackageManifest(
         return SLANG_FAIL;
     }
 
-    SemanticVersion tagVersion;
+    SemanticVersion lockedVersion;
     SemanticVersion manifestVersion;
-    if (SLANG_FAILED(parseReleaseTag(package.tag, tagVersion)) ||
+    SlangResult versionResult =
+        package.path.getLength()
+            ? SemanticVersion::parse(package.version.getUnownedSlice(), lockedVersion)
+            : parseReleaseTag(package.tag, lockedVersion);
+    if (SLANG_FAILED(versionResult) ||
         SLANG_FAILED(SemanticVersion::parse(manifest.version.getUnownedSlice(), manifestVersion)) ||
-        tagVersion != manifestVersion)
+        lockedVersion != manifestVersion)
     {
-        outError =
-            String("Locked package manifest version does not match its tag: ") + package.name;
+        outError = String("Package manifest version does not match its lock: ") + package.name;
         return SLANG_FAIL;
     }
 
@@ -90,6 +96,33 @@ SlangResult validateLockedPackageManifest(
         {
             outError =
                 String("Locked package manifest exports do not match its lock: ") + package.name;
+            return SLANG_FAIL;
+        }
+    }
+
+    if (manifest.dependencies.getCount() != package.dependencies.getCount())
+    {
+        outError = String("Package manifest dependencies do not match its lock: ") + package.name;
+        return SLANG_FAIL;
+    }
+    for (const auto& dependency : manifest.dependencies)
+    {
+        bool found = false;
+        for (const auto& lockedDependency : package.dependencies)
+        {
+            if (dependency.name == lockedDependency.name &&
+                dependency.git == lockedDependency.git &&
+                dependency.version == lockedDependency.version &&
+                dependency.tag == lockedDependency.tag)
+            {
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+        {
+            outError =
+                String("Package manifest dependencies do not match its lock: ") + package.name;
             return SLANG_FAIL;
         }
     }

@@ -53,13 +53,14 @@ satisfying version, and reports an error when no version satisfies the full grap
 
 ## Locking and fetching
 
-`slang package fetch` resolves a project without a lockfile, writes `slang-package-lock.json`, and
-checks out every direct and transitive dependency under `.slang/packages/`. The generated lockfile
-records the exact tag and commit for every package. Later fetches use those commits without
-resolving again.
+`slang package update` resolves the manifest against Git release tags and writes
+`slang-package-lock.json`. The lockfile is the definitive dependency graph. `slang package fetch`
+requires that lockfile, checks that it still satisfies the manifest, and checks out every direct
+and transitive Git dependency under `.slang/packages/`. Fetch never changes dependency resolution.
 
-Use `slang package fetch --locked` in CI to require an existing compatible lockfile. Use
-`slang package update` to query tags and resolve a new lockfile deliberately.
+Run `slang package update` deliberately when manifest constraints or upstream releases change.
+Normal CI and developer builds use `slang package fetch`; a missing or inconsistent lock is an
+error.
 
 The tool invokes the `git` executable from the system path. Existing Git credential and SSH
 configuration therefore applies without separate package-tool authentication. Git locations
@@ -84,12 +85,29 @@ Every `.slang` file below `src/acme/noise/` belongs to that module and must inst
 ## Creating and editing packages
 
 `slang package init` creates `slang-package.json` and the conventional directories in the current
-directory.
+directory. It also adds `.slang/` to `.gitignore`; that directory contains generated checkouts,
+search paths, and developer-local registrations.
 
 `slang package edit NAME` creates a project-local working copy under `.slang/edit/NAME`. Search
-paths prefer that copy, while the lockfile retains the original resolved commit. Use
+paths prefer that copy, while the lockfile initially retains the original resolved commit. Use
 `slang package unedit NAME` to return to the locked checkout. `unedit` refuses to remove a checkout
-that has local changes, local commits, or stashes.
+that has local changes, local commits, or stashes. It also refuses while the lock has a local-path
+entry for the package; run normal `slang package update` first to restore a published pin.
+
+`slang package override NAME PATH` uses an existing local package directory instead. Both commands
+register the local tree in `.slang/overrides.json`, which must remain uncommitted. An edit records
+its original commit so `unedit` can check that removal is safe; an override does not copy or modify
+the supplied directory. `slang package unoverride NAME` removes an override registration.
+`unoverride` refuses while the lock has a local-path entry for the package; run normal
+`slang package update` first to restore a published pin.
+
+A registered local manifest must agree with the lock. If its version, exports, or dependencies
+change, `fetch` and `validate` report the drift. Run `slang package update --from-local` to resolve
+the changed local manifests and their transitive requirements into the definitive lock. Local
+packages are then represented by `path` and `version` entries. Such a lock requires matching
+registrations in `.slang/overrides.json`; it therefore fails explicitly on another machine or in
+CI. Run normal `slang package update` before removing the registration or committing a portable
+published resolution.
 
 Fetched package trees contain source only. Compilation output must be written outside these trees
 because the same source commit can be compiled against different resolved dependency graphs.
