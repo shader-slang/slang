@@ -1,11 +1,13 @@
 # Statically Linked Unit Testing
 
-This document describes `slang-static-unit-test`: what it is for, why it is a
-separate executable, and how to add tests to it.
+`slang-static-unit-test` is an executable that links the compiler statically so
+that unit tests can call non-exported `source/slang` entry points directly. This
+document specifies its scope, the conditions under which it is built, and how to
+add tests to it.
 
-## The problem
+## Scope
 
-Slang has two kinds of test today.
+Slang has three kinds of test. Two of them cannot reach compiler internals.
 
 `.slang` tests run by `slang-test` cover language behaviour and target codegen
 well, but they can only assert on what the compiler *reports or emits* —
@@ -20,19 +22,18 @@ cannot link against `eliminateDeadCode` or `IRBuilder`. This is why existing uni
 tests that want to reach those entry points go through the public C API and
 construct a full `Session` even when the thing under test is much smaller.
 
-Some behaviour is impractical to test either way. Consider the contract of global
-dead-code elimination: *an unreferenced top-level function without a
-`[KeepAlive]` decoration is removed*. The frontend deliberately keeps entry
-points and their callees alive, which is precisely the condition the pass
-discriminates on, so a `.slang` test cannot easily construct a module where the
-distinction is observable.
+Some contracts are impractical to test either way. Global dead-code elimination
+removes an unreferenced top-level function that carries no `[KeepAlive]`
+decoration. The frontend keeps entry points and their transitive callees alive,
+which is the condition the pass discriminates on, so a `.slang` test cannot
+readily construct a module in which the distinction is observable.
 
-## The approach
+## Design
 
-`slang-static-unit-test` is an executable that links the compiler **statically**.
-Static linkage resolves internal symbols at link time, so no export annotation
-or source change is needed: `#include "slang/slang-ir-dce.h"` and call
-`eliminateDeadCode` directly.
+The target links the compiler statically. Static linkage resolves non-exported
+symbols at link time, so no export annotation or change to `source/slang` is
+required: a test includes `slang/slang-ir-dce.h` and calls `eliminateDeadCode`
+directly.
 
 It is defined only when `SLANG_LIB_TYPE=STATIC`, with `SLANG_ENABLE_TESTS` and
 `SLANG_ENABLE_SLANG_RHI` both on. Under a shared build the link would fail by
@@ -41,19 +42,29 @@ dependency of these tests -- they never touch the RHI -- it is inherited from
 the `unit-test` object library they share with `slang-unit-test`, whose own
 guard requires it.
 
-### Why a separate executable rather than static-linking `slang-unit-test`
+### Separate executable
 
-`slang-unit-test` is a `MODULE` that `slang-test` loads with `dlopen`, and the
-host creates compiler objects and passes them across that boundary — see
-`UnitTestContext::slangGlobalSession`. If the compiler were linked statically
-into both, the host and the plugin would each hold their own copy of it, and an
-object created by one would be used by the other. Internal downcasts, RTTI
-identity, the IR opcode tables, and allocator state would all diverge.
+These tests are a separate executable rather than a statically linked
+`slang-unit-test`, because the plugin arrangement is incompatible with static
+linkage.
 
-A separate executable avoids this by construction: one process, one copy of the
-compiler, and no compiler objects crossing a boundary. It also means a static
-configuration produces no shared library at all, so there is no question of the
-same translation units being linked into two artifacts.
+`slang-unit-test` is a `MODULE` that `slang-test` loads with `dlopen`. The host
+creates compiler objects and passes them across that boundary — see
+`UnitTestContext::slangGlobalSession`. Linking the compiler statically into both
+would give the host and the plugin one copy each, so an object created by one
+would be consumed by the other, and internal downcasts, RTTI identity, the IR
+opcode tables and allocator state would all diverge.
+
+A separate executable holds one process, one copy of the compiler, and no
+compiler objects crossing a boundary. A static configuration also produces no
+shared library, so the same translation units are never linked into two
+artifacts.
+
+The test registry is a function-local static in `_getTestModule()`
+(`tools/unit-test/slang-unit-test.cpp`), giving each linked image its own. The
+two suites therefore register independently, and a test name may exist in both
+without conflict; a duplicate name within a single binary is a link error, as
+for any other symbol.
 
 ## Writing a test
 
@@ -130,7 +141,7 @@ add — running a liveness-based pass on it can remove more than expected. Confi
 the invariants of the stage you are working with before encoding them in
 assertions.
 
-## Which kind of test to write
+## Choosing a test kind
 
 | Testing | Use |
 | --- | --- |
@@ -138,8 +149,10 @@ assertions.
 | Public API behaviour, reflection, compilation requests | `slang-unit-test` |
 | An IR pass contract, AST invariants, mangling, checker output | `slang-static-unit-test` |
 
-`slang-static-unit-test` is for what the other two cannot reach. It is not a
-replacement for either, and existing tests have no reason to move into it.
+`slang-static-unit-test` covers what the other two cannot reach. It complements
+them rather than replacing either: a test that can be written against the public
+API belongs in `slang-unit-test`, which additionally exercises the shared library
+as it ships.
 
 ## Building and running
 
