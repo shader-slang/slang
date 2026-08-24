@@ -5728,6 +5728,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         auto tupleType = context.astBuilder->getTupleType(types.getView());
         return _createTypeLayout(context, tupleType);
     }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        // Every modifier a `ModifiedType` can carry (`noDiff`, `unorm`, `snorm`)
+        // is layout-transparent: `unorm`/`snorm` only select a texture image
+        // format at emit and never change storage size or alignment. So the type
+        // lays out exactly as its base.
+        return _createTypeLayout(context, modifiedType->getBase());
+    }
     else if (auto tupleType = as<TupleType>(type))
     {
         // A `Tuple` type is laid out exactly the same way as a `struct` type,
