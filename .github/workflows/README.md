@@ -11,25 +11,32 @@ and the file (or repo settings) already states them.
 
 ## Naming
 
-A workflow file is named `<category>-<what-it-does>.yml`, so `ls` groups related
-workflows together and the prefix tells you which section below to look in:
+A workflow file is named `<subsystem>-<what-it-does>.yml`, so `ls` groups
+related workflows together and the prefix tells you which section below to look
+in. Every prefix currently in use:
 
-| Prefix        | Covers                                                              |
-| ------------- | ------------------------------------------------------------------- |
-| `check-`      | A focused PR gate or lint.                                          |
-| `ci-`         | CI infrastructure: reusable build/test blocks, monitors, and tools. |
-| `nightly-`    | A scheduled suite that is too slow or noisy to gate a PR.           |
-| `pr-`         | A caller of the PR board-sync engine.                               |
-| `perf-`       | Performance measurement and its published results.                  |
-| `regenerate-` | A slash-command auto-fix that rewrites a generated file.            |
-| `release-`    | A tagged release build.                                             |
-| `container-`  | The CI container images.                                            |
-| `sccache-`    | The shared compiler cache.                                          |
-| `issue-`      | Issue-triggered automation.                                         |
+| Prefix           | Covers                                                              |
+| ---------------- | ------------------------------------------------------------------- |
+| `ci-`            | CI infrastructure: reusable build/test blocks, monitors, and tools. |
+| `check-`         | A focused PR gate or lint.                                          |
+| `pr-`            | The PR board-sync engine and the thin callers that drive it.        |
+| `nightly-`       | A scheduled suite too slow or noisy to gate a PR.                   |
+| `release-`       | A tagged release build.                                             |
+| `regenerate-`    | A slash-command auto-fix that rewrites a generated file.            |
+| `cmake-options-` | The non-default CMake option matrix and its builds.                 |
+| `claude-`        | Claude-driven review and CI-failure automation.                     |
+| `perf-`          | Performance measurement and its published results.                  |
+| `container-`     | The CI container images.                                            |
+| `sccache-`       | The shared compiler cache.                                          |
+| `issue-`         | Issue-triggered automation.                                         |
+| `reuse-`         | REUSE/SPDX license compliance.                                      |
+| `slash-command-` | The PR-comment command dispatcher.                                  |
 
-`ci.yml` is the one deliberate exception: it is the umbrella entry point, not a
-member of the `ci-` family. Name a new workflow for the category it belongs to
-rather than adding a prefix of one.
+Where a subsystem has an entry point as well as members, the entry point drops
+the suffix and is named for the subsystem alone: `ci.yml` is the umbrella the
+`ci-*` blocks serve, and likewise `release.yml`, `cmake-options.yml`, and
+`claude.yml`. Name a new workflow for the subsystem it belongs to rather than
+adding a prefix of one.
 
 ## How the pieces fit
 
