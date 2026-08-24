@@ -10643,7 +10643,10 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     // and/or is in the middle of checking it?
     RefPtr<WitnessTable> witnessTable;
     if (context->mapInterfaceToWitnessTable.tryGetValue(superInterfaceDeclRef, witnessTable))
+    {
+        registerStructuralRayTracingStageConformance(superInterfaceDeclRef, witnessTable);
         return witnessTable;
+    }
 
     // We need to check the declaration of the interface
     // before we can check that we conform to it.
@@ -10677,6 +10680,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
             witnessTable))
         return nullptr;
 
+    registerStructuralRayTracingStageConformance(superInterfaceDeclRef, witnessTable);
     return witnessTable;
 }
 
@@ -10994,6 +10998,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
     // The conformance was satisfied if all the requirements were satisfied.
     //
+    if (result)
+        registerStructuralRayTracingStageConformance(superInterfaceDeclRef, witnessTable);
     return result;
 }
 

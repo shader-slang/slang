@@ -72,16 +72,35 @@ static InterfaceDecl* _findStageInterface(Module* module, StructuralRayTracingSt
         false);
 }
 
+static FunctionDeclBase* _findStageInvokeRequirement(InterfaceDecl* interfaceDecl)
+{
+    for (auto member : interfaceDecl->getDirectMemberDecls())
+    {
+        auto candidate = member;
+        if (auto genericDecl = as<GenericDecl>(candidate))
+            candidate = genericDecl->inner;
+        if (auto functionDecl = as<FunctionDeclBase>(candidate))
+        {
+            if (functionDecl->getName() && functionDecl->getName()->text == "invoke")
+                return functionDecl;
+        }
+    }
+    return nullptr;
+}
+
 bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     Module* module,
     StructuralRayTracingStageKind* outMissingStage)
 {
     InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
+    FunctionDeclBase* invokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
     {
         auto kind = StructuralRayTracingStageKind(i);
         interfaces[i] = _findStageInterface(module, kind);
-        if (!interfaces[i])
+        if (interfaces[i])
+            invokeRequirements[i] = _findStageInvokeRequirement(interfaces[i]);
+        if (!interfaces[i] || !invokeRequirements[i])
         {
             if (outMissingStage)
                 *outMissingStage = kind;
@@ -90,7 +109,10 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     }
 
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    {
         m_stageInterfaces[i] = interfaces[i];
+        m_stageInvokeRequirements[i] = invokeRequirements[i];
+    }
     return true;
 }
 
@@ -111,6 +133,36 @@ StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
         if (m_stageInterfaces[i] == interfaceDecl)
             return StructuralRayTracingStageKind(i);
     }
+    return StructuralRayTracingStageKind::Count;
+}
+
+FunctionDeclBase* StructuralRayTracingDeclRegistry::getStageInvokeRequirement(
+    StructuralRayTracingStageKind kind) const
+{
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingStageKind::Count))
+        return nullptr;
+    return m_stageInvokeRequirements[index];
+}
+
+void StructuralRayTracingDeclRegistry::registerStageImplementation(
+    FunctionDeclBase* implementation,
+    StructuralRayTracingStageKind kind)
+{
+    if (implementation && kind != StructuralRayTracingStageKind::Count)
+        m_stageImplementations[implementation] = kind;
+}
+
+StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
+    FunctionDeclBase* implementation) const
+{
+    for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
+    {
+        if (m_stageInvokeRequirements[i] == implementation)
+            return StructuralRayTracingStageKind(i);
+    }
+    if (auto kind = m_stageImplementations.tryGetValue(implementation))
+        return *kind;
     return StructuralRayTracingStageKind::Count;
 }
 
