@@ -2745,6 +2745,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         validateArrayElementTypeForVariable(varDecl);
     }
 
+    diagnoseInvalidStructuralRayTracingVariableType(varDecl);
+
     // If there is a matrix layout modifier or texture format modifier, we will modify the type now.
     maybeApplyLayoutModifier(varDecl);
 
@@ -15590,7 +15592,10 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     for (auto paramDecl : decl->getParameters())
     {
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
+        diagnoseInvalidStructuralRayTracingVariableType(paramDecl);
     }
+
+    diagnoseInvalidStructuralRayTracingCallableResult(decl);
 
     maybeInferPrefixModifierForOperator(decl);
 
@@ -16647,6 +16652,7 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
 {
     SemanticsVisitor subVisitor(withDeclToExcludeFromLookup(decl));
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
+    diagnoseInvalidStructuralRayTracingPropertyType(decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
 }

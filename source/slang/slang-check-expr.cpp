@@ -4246,6 +4246,9 @@ void SemanticsVisitor::_checkAliasedOutArguments(
 
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
+    if (diagnoseInvalidStructuralRayTracingConstruction(expr))
+        return CreateErrorExpr(expr);
+
     auto rs = ResolveInvoke(expr);
     if (auto invoke = as<InvokeExpr>(rs))
     {

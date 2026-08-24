@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -experimental-feature
+//TEST:SIMPLE: -experimental-feature -no-codegen
 
 import slang.raytracing;
 
@@ -19,12 +19,5 @@ struct TestHitContext : rt::IHitContext
     typealias Record = TestRecord;
 }
 
-struct TestClosestHit : rt::IClosestHitShader<TestHitContext>
-{
-    void invoke(rt::ClosestHitInput<TestHitContext> input)
-    {
-        this.invoke(input);
-//CHECK:     ^^^^^^ direct invocation of a structural ray-tracing stage
-//CHECK:     ^^^^^^ a structural ray-tracing stage method may only be invoked by compiler-generated dispatch
-    }
-}
+[require(closesthit)]
+void closestHitHelper(rt::ClosestHitInput<TestHitContext> input) {}
