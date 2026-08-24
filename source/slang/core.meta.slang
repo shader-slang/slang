@@ -4094,6 +4094,11 @@ extension half : IArithmeticAtomicable {}
 ///
 /// Operators `+=`, `-=`, `&=`, `|=`, `^=`, `++`, `--` are overloaded to
 /// operate on `Atomic<T>`.
+///
+/// `Atomic<T>` is non-copyable: its identity is its address, so it cannot be used
+/// as a local variable, passed or returned by value, or copied via a `[mutating]`
+/// method's implicit copy-in/copy-out. Access it in place through a buffer or
+/// `groupshared` variable instead.
 __magic_type(AtomicType)
 __intrinsic_type($(kIROp_AtomicType))
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
