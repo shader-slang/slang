@@ -27,7 +27,8 @@ public struct RayTraversalDesc
 public interface IAccelerationStructure {}
 
 // Portable TLAS-to-BLAS / IAS-to-primitive-AS traversal.
-public struct AccelerationStructure : IAccelerationStructure {}
+public extension RaytracingAccelerationStructure : IAccelerationStructure {}
+public typealias AccelerationStructure = RaytracingAccelerationStructure;
 
 // Metal traversal with an explicit maximum acceleration-structure depth.
 [require(metal)]
