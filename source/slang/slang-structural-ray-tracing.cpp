@@ -203,6 +203,9 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     Module* module,
     StructuralRayTracingStageKind* outMissingStage)
 {
+    m_trustedModuleDecl = module->getModuleDecl();
+    m_rayTracerType = as<AggTypeDecl>(_findNamedDecl(module, "RayTracer"));
+
     InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
     AggTypeDecl* inputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* invokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
@@ -300,6 +303,33 @@ StructuralRayTracingStageInputOperationKind StructuralRayTracingDeclRegistry::
     if (auto kind = m_stageInputOperations.tryGetValue(functionDecl))
         return *kind;
     return StructuralRayTracingStageInputOperationKind::Count;
+}
+
+bool StructuralRayTracingDeclRegistry::isTraceMethod(FunctionDeclBase* functionDecl) const
+{
+    if (!functionDecl || !m_trustedModuleDecl || !m_rayTracerType || !functionDecl->getName() ||
+        functionDecl->getName()->text != "trace")
+    {
+        return false;
+    }
+
+    ExtensionDecl* extensionDecl = nullptr;
+    ModuleDecl* moduleDecl = nullptr;
+    for (auto parent = functionDecl->parentDecl; parent; parent = parent->parentDecl)
+    {
+        if (!extensionDecl)
+            extensionDecl = as<ExtensionDecl>(parent);
+        if (auto candidateModule = as<ModuleDecl>(parent))
+        {
+            moduleDecl = candidateModule;
+            break;
+        }
+    }
+    if (moduleDecl != m_trustedModuleDecl || !extensionDecl)
+        return false;
+
+    auto targetType = as<DeclRefType>(extensionDecl->targetType.type);
+    return targetType && targetType->getDeclRef().getDecl() == m_rayTracerType;
 }
 
 FunctionDeclBase* StructuralRayTracingDeclRegistry::getStageInvokeRequirement(

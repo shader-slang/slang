@@ -10107,7 +10107,8 @@ static IROp parseIROp(Parser* parser, Token& outToken)
 
     if ((op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface) ||
         (op >= kIROp_FirstStructuralRayTracingStageInputOperation &&
-         op <= kIROp_LastStructuralRayTracingStageInputOperation))
+         op <= kIROp_LastStructuralRayTracingStageInputOperation) ||
+        op == kIROp_StructuralRayTracingTrace)
     {
         parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
             .operation = outToken.getContent(),
