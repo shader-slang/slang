@@ -73,7 +73,7 @@ SLANG_UNIT_TEST(diagnosticCallbackErrorSeverity)
     ComPtr<slang::IBlob> diag;
     auto* mod = session->loadModuleFromSourceString("m", "m.slang", src, diag.writeRef());
     // Module may be null (error) — that's fine, we only care about callback invocations.
-    (void)mod;
+    SLANG_UNUSED(mod);
 
     SLANG_CHECK(captured.getCount() > 0);
     bool sawError = false;
@@ -93,10 +93,9 @@ SLANG_UNIT_TEST(diagnosticCallbackWarningSeverity)
     List<CapturedDiagnostic> captured;
     session->setDiagnosticCallback(collectCallback, &captured);
 
-    // A global variable in a shader module produces E39019
-    // "global-uniform-not-expected" — a warning, not an error — during linking/codegen.
-    // For the loadModule stage we use an unused variable to provoke a warning.
-    // 'int a;' at module scope is a global uniform: warning E39019.
+    // A non-static global variable at module scope ('globalUnused' below) is an implicit
+    // uniform, which triggers warning E39019 ("global-uniform-not-expected") once the module
+    // is compiled to a target — not at loadModule() time, which only parses and type-checks.
     const char* src = R"(
         int globalUnused;
         [shader("compute")]
@@ -223,15 +222,18 @@ SLANG_UNIT_TEST(diagnosticCallbackTargetStage)
     auto* mod = session->loadModuleFromSourceString("m", "m.slang", src, modDiag.writeRef());
     SLANG_CHECK_ABORT(mod != nullptr);
 
-    int countAfterLoad = count;
-
     ComPtr<slang::IComponentType> linked;
     mod->link(linked.writeRef(), nullptr);
     SLANG_CHECK_ABORT(linked != nullptr);
+
+    // Snapshot the count after link() (not just after loadModule()) so the assertion below
+    // isolates diagnostics produced specifically by getTargetCode(), rather than potentially
+    // being satisfied by a diagnostic from link() instead.
+    int countBeforeTarget = count;
 
     ComPtr<slang::IBlob> code, targetDiag;
     linked->getTargetCode(0, code.writeRef(), targetDiag.writeRef());
 
     // The target stage must have added at least one more callback invocation.
-    SLANG_CHECK(count > countAfterLoad);
+    SLANG_CHECK(count > countBeforeTarget);
 }
