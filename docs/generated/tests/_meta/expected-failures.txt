@@ -140,13 +140,6 @@ docs/generated/tests/design/ast-reference/statements/switchstmt-case-decl-used-i
 # after human triage.)
 docs/generated/tests/design/cross-cutting/core-module/core-int8-min-return-boundary.slang
 
-# Pending: docs/generated/tests/_meta/findings/ir-types-unorm-snorm-struct-field-sigsegv.yaml
-# A struct with a `unorm float` / `snorm float` field used as a module-scope
-# `uniform` segfaults slangc (exit 139) on every target tried (hlsl, glsl,
-# spirv-asm, metal, cpp), with and without `-dump-ir`. (Will become a
-# tracking issue after human triage.)
-docs/generated/tests/design/ir-reference/types/attributed-type-unorm-snorm.slang
-
 # Pending: docs/generated/tests/_meta/findings/metal-append-buffer-params-missing-binding-slot.yaml
 # On `-target metal` the element and counter pointers that
 # `lowerAppendConsumeStructuredBuffers` synthesizes for an
@@ -172,6 +165,22 @@ docs/generated/tests/design/ir-reference/metadata/unorm-attr-on-structured-buffe
 # pre-fix shape (a surviving/pointer-returning `Cell_value_ref` helper), so they
 # now fail against the fixed compiler until the doc/test agents regenerate these
 # generated tests. They stay listed as awaiting-regeneration, not compiler bugs.
+# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-metal-unknown-addressspace-abort.yaml
+# Pending: docs/generated/tests/_meta/findings/declarations-refaccessor-spirv-invalid-funcall-return-type.yaml
+# The emission fan-out for the `ref`-accessor claim reaches the last two
+# shader targets and both are broken: `-target metal` (directive `.1`) aborts
+# with the internal error "Unknown addressspace encountered", and
+# `-target spirv-asm` (directive `.2`) declares the accessor helper as
+# `OpTypeFunction %int %_ptr_Function_Cell` while calling it as
+# `OpFunctionCall %_ptr_Function_int`, so the module fails spirv-val.
+# The entries name the two sub-tests rather than the file because the file's
+# first directive (`-target hlsl`) still passes and must keep reporting.
+# NOTE: `lint_expected_failures` resolves each entry as a path on disk, so it
+# flags these two sub-test names as unresolvable; the lint rule does not yet
+# know about slang-test's `<file>.<n>` sub-test naming. Remove these entries
+# when either back-end is fixed. (Will become a tracking issue after human
+# triage.)
+docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.1
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property.slang.2
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property-glsl.slang
 docs/generated/tests/design/ast-reference/declarations/refaccessor-property-wgsl.slang
@@ -190,6 +199,17 @@ docs/generated/tests/design/target-pipelines/hlsl/prelude-nvapi-include-conditio
 # `-target hlsl` directive (`.2`) is affected -- the cuda and cpp directives in
 # the same file do not read the HLSL prelude and must keep reporting.
 docs/generated/tests/design/pipeline/06-emit/preludes-included-by-cuda-cpp-and-hlsl.slang.2
+# Same leak, fifth victim, and the reason it was not listed with the others is
+# the same: it passed when it was generated. It asserts the guarded
+# `#ifdef SLANG_HLSL_ENABLE_NVAPI` / `#include "nvHLSLExtns.h"` block, which is
+# exactly what the blanked prelude drops, so the `CHECK` for the `#ifdef` finds
+# nothing. Failed on nightly runs 31863743484, 31926143161 and 31993906894 with
+# the same FileCheck positions each time (`actual-output:7:34` scanning from,
+# `10:14` possible match), i.e. deterministic rather than flaky. Confirmed to be
+# the ordering leak and not the test: it passes alone under
+# `slang-test -use-test-server -server-count 1`, and fails in the same process
+# when a `-cpu` COMPARE_COMPUTE test is run before it.
+docs/generated/tests/design/target-pipelines/hlsl/nvapi-front-matter-defines-enable-macro.slang
 
 # https://github.com/shader-slang/slang/issues/12443 — `Size(N)` enum
 # construction is rejected inside a generic function's array bound with

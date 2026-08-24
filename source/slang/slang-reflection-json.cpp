@@ -1134,6 +1134,78 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
     writer << "\n}";
 }
 
+// Emit a scope's `"parameters"` array from the fields of `structTypeLayout`, which holds the
+// scope's contents: one field per parameter declared in that scope. A scope's contents are always
+// modeled as a `struct`, so this is required to be a `Struct` layout — possibly with zero fields,
+// which correctly yields `"parameters": []`.
+static void emitReflectionScopeParametersJSON(
+    PrettyWriter& writer,
+    slang::TypeLayoutReflection* structTypeLayout)
+{
+    SLANG_ASSERT(structTypeLayout->getKind() == slang::TypeReflection::Kind::Struct);
+
+    writer.maybeComma();
+    writer << "\"parameters\": [\n";
+    writer.indent();
+    auto paramCount = structTypeLayout->getFieldCount();
+    for (auto pp : makeRange(paramCount))
+    {
+        if (pp != 0)
+            writer << ",\n";
+        emitReflectionParamJSON(writer, structTypeLayout->getFieldByIndex(pp));
+    }
+    writer.dedent();
+    writer << "\n]";
+}
+
+// Describe a program scope (the global scope, or an entry point's scope) as a JSON object,
+// following the same kind-based traversal as `printScope` in `examples/reflection-api/main.cpp`.
+// The key detail the flat `parameters` list cannot express is the binding of the constant buffer
+// that a scope's parameters are automatically gathered into: that container occupies a register /
+// descriptor slot / space of its own, reported here as the scope's `binding`.
+//
+// A scope layout is one of exactly two shapes, so both are handled explicitly and anything else
+// asserts. `ScopeLayoutBuilder::endLayout` (`slang-parameter-binding.cpp`) builds the scope as a
+// `StructTypeLayout` of its parameters, then passes it to `createConstantBufferTypeLayoutIfNeeded`,
+// which either returns that struct unchanged (an unwrapped scope, `kind: "none"`) or wraps it in a
+// parameter-group layout whose element var-layout is that same struct (`kind: "constantBuffer"`).
+static void emitReflectionScopeJSON(
+    PrettyWriter& writer,
+    slang::VariableLayoutReflection* scopeVarLayout)
+{
+    writer << "{\n";
+    writer.indent();
+    CommaTrackerRAII commaTracker(writer);
+
+    auto scopeTypeLayout = scopeVarLayout->getTypeLayout();
+    switch (scopeTypeLayout->getKind())
+    {
+    case slang::TypeReflection::Kind::Struct:
+        writer.maybeComma();
+        writer << "\"kind\": \"none\"";
+        emitReflectionScopeParametersJSON(writer, scopeTypeLayout);
+        break;
+
+    case slang::TypeReflection::Kind::ConstantBuffer:
+        writer.maybeComma();
+        writer << "\"kind\": \"constantBuffer\"";
+
+        emitReflectionVarBindingInfoJSON(writer, scopeTypeLayout->getContainerVarLayout());
+
+        emitReflectionScopeParametersJSON(
+            writer,
+            scopeTypeLayout->getElementVarLayout()->getTypeLayout());
+        break;
+
+    default:
+        SLANG_ASSERT(!"unexpected type layout kind for a program scope");
+        break;
+    }
+
+    writer.dedent();
+    writer << "\n}";
+}
+
 
 static void emitEntryPointParamJSON(
     PrettyWriter& writer,
@@ -1232,6 +1304,9 @@ static void emitReflectionEntryPointJSON(
         break;
     }
 
+    writer << ",\n\"scope\": ";
+    emitReflectionScopeJSON(writer, entryPoint->getVarLayout());
+
     auto entryPointParameterCount = entryPoint->getParameterCount();
     if (entryPointParameterCount)
     {
@@ -1308,6 +1383,10 @@ static void emitReflectionJSON(
 {
     writer << "{\n";
     writer.indent();
+
+    // Absence of this field is implicitly version "1.0" (before the scope objects existed).
+    writer << "\"version\": \"1.1\",\n";
+
     writer << "\"parameters\": [\n";
     writer.indent();
 
@@ -1323,6 +1402,9 @@ static void emitReflectionJSON(
 
     writer.dedent();
     writer << "\n]";
+
+    writer << ",\n\"globalScope\": ";
+    emitReflectionScopeJSON(writer, programReflection->getGlobalParamsVarLayout());
 
     auto entryPointCount = programReflection->getEntryPointCount();
     if (entryPointCount)
