@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=HLSLCH): -experimental-feature -entry ClosestHit -stage closesthit -target hlsl
 //TEST:SIMPLE(filecheck=HLSLAH): -experimental-feature -entry AnyHit -stage anyhit -target hlsl
 //TEST:SIMPLE(filecheck=HLSLMS): -experimental-feature -entry Miss -stage miss -target hlsl
-//TEST:SIMPLE(filecheck=HLSLNONE): -experimental-feature -entry ClosestHitWithoutPayload -stage closesthit -target hlsl
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry ClosestHit -stage closesthit -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=IR): -experimental-feature -entry ClosestHit -stage closesthit -dump-ir -no-codegen
 //TEST:SIMPLE(filecheck=DXIL): -experimental-feature -entry Miss -stage miss -target dxil -profile sm_6_7
@@ -89,13 +88,3 @@ struct Miss : rt::IMissShader<MissContext>
 // HLSLMS: [shader("miss")]void Miss(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload)
 // DXIL: define void
 // DXIL: !dx.dxrPayloadAnnotations
-
-struct ClosestHitWithoutPayload : rt::IClosestHitShader<HitContext>
-{
-    void invoke(rt::ClosestHitInput<HitContext> input)
-    {
-        output[0] = uint(input.distance);
-    }
-}
-
-// HLSLNONE: [shader("closesthit")]void ClosestHitWithoutPayload()

@@ -38,6 +38,7 @@ enum class StructuralRayTracingMetadataKind
 enum class StructuralRayTracingStageInputOperationKind
 {
     Payload,
+    HitAttributes,
     RayTCurrent,
     HitKind,
     WorldRayOrigin,
