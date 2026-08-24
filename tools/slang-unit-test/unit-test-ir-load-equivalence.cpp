@@ -87,9 +87,10 @@ SlangResult _compileWith(
 // nature: the decoration-subtree bug found during review produced no diagnostic, just a
 // global value that had lost its children.
 //
-// Deliberately narrow: one shader, output and exit status compared. For breadth across
-// the whole test corpus, see extras/check-load-mode-equivalence.py, which is a development
-// aid rather than something to run on every build.
+// Deliberately narrow: one shader, output and exit status compared. Breadth across the
+// whole test corpus needs a bulk sweep -- two compiles per shader over thousands of
+// shaders -- which is a development aid rather than something to run on every build, and
+// is proposed separately in shader-slang/slang#12704.
 SLANG_UNIT_TEST(irLoadEquivalence)
 {
     // Remember the caller's setting, so this test does not leak a mode into the rest of
@@ -177,7 +178,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     //
     // Known limit: this cannot catch the decoration-subtree bug, since no decoration in
     // the builtin modules has children. `irDeferredBodyKeepsDecorationChildren` covers
-    // that by building the shape; breadth comes from extras/check-load-mode-equivalence.py.
+    // that by building the shape; breadth would come from a corpus-wide sweep
+    // (shader-slang/slang#12704), which is too slow to run per build.
     SLANG_CHECK(onDemandIR.exitCode == 0);
     SLANG_CHECK(onDemandIR.exitCode == eagerIR.exitCode);
     SLANG_CHECK(onDemandIR.err.getLength() > 0);
