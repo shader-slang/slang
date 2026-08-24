@@ -3,6 +3,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-decl.h"
 #include "slang-module.h"
+#include "slang-syntax.h"
 
 namespace Slang
 {
@@ -276,6 +277,15 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         _findAssociatedTypeRequirement(module, "IMissGroupContext", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableData)] =
         _findAssociatedTypeRequirement(module, "ICallableGroupContext", "CallableData");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramTraceContext)] =
+        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "TraceContext");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramHitGroups)] =
+        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "HitGroups");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramMissGroups)] =
+        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "MissGroups");
+    m_associatedTypeRequirements[int(
+        StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups)] =
+        _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "CallableGroups");
 
     InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
     AggTypeDecl* inputTypes[int(StructuralRayTracingStageKind::Count)] = {};
@@ -324,6 +334,29 @@ AssocTypeDecl* StructuralRayTracingDeclRegistry::getAssociatedTypeRequirement(
     if (index < 0 || index >= int(StructuralRayTracingAssociatedTypeKind::Count))
         return nullptr;
     return m_associatedTypeRequirements[index];
+}
+
+Type* StructuralRayTracingDeclRegistry::resolveAssociatedType(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    StructuralRayTracingAssociatedTypeKind kind) const
+{
+    if (!witness)
+        return nullptr;
+
+    auto requirement = getAssociatedTypeRequirement(kind);
+    if (!requirement)
+        return nullptr;
+
+    auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
+    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
+        return as<Type>(requirementWitness.getVal()->resolve());
+    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::declRef)
+    {
+        auto type = DeclRefType::create(astBuilder, requirementWitness.getDeclRef());
+        return type ? as<Type>(type->resolve()) : nullptr;
+    }
+    return nullptr;
 }
 
 StructuralRayTracingHitAttributesKind StructuralRayTracingDeclRegistry::getHitAttributesKind(
