@@ -970,9 +970,9 @@ class NamedExpressionType : public Type
 /// direction-neutral mode, since their output direction is intrinsic to the
 /// type rather than to an explicit `out` modifier.
 ///
-/// `astBuilder` is used to apply generic substitutions when inspecting field
-/// types. Passing null is accepted but may miss non-copyable fields inside
-/// generic field types.
+/// `astBuilder` must be the non-null ASTBuilder that owns `paramType`'s declaration;
+/// it is used to apply generic substitutions when inspecting field types (e.g.
+/// resolving a generic struct's field type against its type arguments).
 ///
 ParamPassingMode adjustParamPassingModeBasedOnParamType(
     ParamPassingMode originalMode,
