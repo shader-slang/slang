@@ -69,6 +69,7 @@ enum class StructuralRayTracingAssociatedTypeKind
     HitPrimitive,
     PrimitiveAttributes,
     MissTraceContext,
+    CallableTraceContext,
     CallableData,
     ProgramTraceContext,
     ProgramHitGroups,
@@ -104,6 +105,7 @@ enum class StructuralRayTracingHitAttributesKind
 
 struct StructuralRayTracingEntryPointInfo
 {
+    StructuralRayTracingStageKind stageKind = StructuralRayTracingStageKind::Count;
     FuncDecl* invokeMethod = nullptr;
     Type* contextType = nullptr;
     Type* payloadType = nullptr;

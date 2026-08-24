@@ -1429,6 +1429,13 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
+    if (requiredLoweringPassSet.structuralRayTracingTrace &&
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
+    {
+        SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints);
+        outLinkedIR.entryPoints = irEntryPoints;
+    }
+
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 

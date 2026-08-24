@@ -40,6 +40,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
+#include "slang-lookup.h"
 #include "slang-mangle.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
@@ -982,11 +983,136 @@ static StructuralRayTracingGroupPack _getStructuralRayTracingGroupPack(
     return result;
 }
 
+static IntegerLiteralValue _getStructuralRayTracingSlotIndex(IRGenContext* context, Type* slotType)
+{
+    auto lookupResult = lookUpMember(
+        context->astBuilder,
+        nullptr,
+        context->astBuilder->getNamePool()->getName("index"),
+        slotType,
+        nullptr,
+        LookupMask::Value,
+        LookupOptions::IgnoreBaseInterfaces);
+    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    {
+        if (auto slotIndexDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
+        {
+            auto slotIndexDecl = slotIndexDeclRef.getDecl();
+            if (auto constantValue = as<ConstantIntVal>(slotIndexDecl->val))
+                return constantValue->getValue();
+            if (auto value = slotIndexDecl->val)
+            {
+                value = as<IntVal>(
+                    value->substitute(context->astBuilder, SubstitutionSet(slotIndexDeclRef)));
+                if (auto constantValue = as<ConstantIntVal>(value ? value->resolve() : nullptr))
+                    return constantValue->getValue();
+            }
+            if (auto literal = as<IntegerLiteralExpr>(slotIndexDecl->initExpr))
+                return literal->value;
+        }
+    }
+    if (auto declRefType = as<DeclRefType>(slotType))
+    {
+        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
+        {
+            for (auto argument : genericApp->getArgs())
+            {
+                if (auto value = as<ConstantIntVal>(argument->resolve()))
+                    return value->getValue();
+            }
+        }
+    }
+    SLANG_UNEXPECTED("structural ray-tracing group slot is not concrete");
+}
+
 struct StructuralRayTracingStageReference
 {
     IRType* type = nullptr;
     IRInst* invoke = nullptr;
 };
+
+struct StructuralRayTracingHitContextInfo
+{
+    Type* primitiveType = nullptr;
+    Type* payloadType = nullptr;
+    Type* hitAttributesType = nullptr;
+    StructuralRayTracingHitAttributesKind hitAttributesKind =
+        StructuralRayTracingHitAttributesKind::None;
+};
+
+static Type* _getStructuralRayTracingPayloadType(
+    IRGenContext* context,
+    SubtypeWitness* contextWitness,
+    StructuralRayTracingAssociatedTypeKind traceContextKind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto traceContextWitness = registry.resolveAssociatedTypeConstraint(
+        context->astBuilder,
+        contextWitness,
+        traceContextKind);
+    auto payloadType = registry.resolveAssociatedType(
+        context->astBuilder,
+        traceContextWitness,
+        StructuralRayTracingAssociatedTypeKind::TracePayload);
+    SLANG_ASSERT(payloadType);
+    return payloadType;
+}
+
+static Type* _getStructuralRayTracingConcreteAssociatedType(
+    IRGenContext* context,
+    Type* type,
+    StructuralRayTracingAssociatedTypeKind kind)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto requirement = registry.getAssociatedTypeRequirement(kind);
+    if (!requirement || !type)
+        return nullptr;
+
+    auto lookupResult = lookUpMember(
+        context->astBuilder,
+        nullptr,
+        requirement->getName(),
+        type,
+        nullptr,
+        LookupMask::type,
+        LookupOptions::IgnoreBaseInterfaces);
+    if (!lookupResult.isValid() || lookupResult.isOverloaded())
+        return nullptr;
+    if (auto typeAlias = lookupResult.item.declRef.as<TypeDefDecl>())
+        return as<Type>(getNamedType(context->astBuilder, typeAlias)->resolve());
+    if (auto typeDecl = lookupResult.item.declRef.as<AggTypeDecl>())
+        return DeclRefType::create(context->astBuilder, typeDecl);
+    return nullptr;
+}
+
+static StructuralRayTracingHitContextInfo _getStructuralRayTracingHitContextInfo(
+    IRGenContext* context,
+    SubtypeWitness* groupWitness)
+{
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    auto contextWitness = registry.resolveAssociatedTypeConstraint(
+        context->astBuilder,
+        groupWitness,
+        StructuralRayTracingAssociatedTypeKind::HitGroupContext);
+    SLANG_ASSERT(contextWitness);
+
+    StructuralRayTracingHitContextInfo result;
+    result.payloadType = _getStructuralRayTracingPayloadType(
+        context,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::HitTraceContext);
+    result.primitiveType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+    result.hitAttributesType = _getStructuralRayTracingConcreteAssociatedType(
+        context,
+        result.primitiveType,
+        StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
+    SLANG_ASSERT(result.primitiveType && result.hitAttributesType);
+    result.hitAttributesKind = registry.getHitAttributesKind(result.primitiveType);
+    return result;
+}
 
 static DeclRef<CallableDecl> _findStructuralRayTracingStageInvoke(
     ASTBuilder* astBuilder,
@@ -1118,6 +1244,7 @@ static void _addStructuralRayTracingHitGroupInfo(
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupContext);
         SLANG_ASSERT(slotType && contextType);
+        auto contextInfo = _getStructuralRayTracingHitContextInfo(context, groupWitness);
 
         auto closestHit = _lowerStructuralRayTracingStageReference(
             context,
@@ -1138,7 +1265,16 @@ static void _addStructuralRayTracingHitGroupInfo(
         IRInst* operands[] = {
             lowerType(context, groups.types->getElementType(i)),
             lowerType(context, slotType),
+            context->irBuilder->getIntValue(
+                context->irBuilder->getIntType(),
+                _getStructuralRayTracingSlotIndex(context, slotType)),
             lowerType(context, contextType),
+            lowerType(context, contextInfo.primitiveType),
+            lowerType(context, contextInfo.payloadType),
+            lowerType(context, contextInfo.hitAttributesType),
+            context->irBuilder->getIntValue(
+                context->irBuilder->getIntType(),
+                IRIntegerValue(contextInfo.hitAttributesKind)),
             closestHit.type,
             closestHit.invoke,
             anyHit.type,
@@ -1180,11 +1316,23 @@ static void _addStructuralRayTracingMissGroupInfo(
             StructuralRayTracingAssociatedTypeKind::MissGroupMiss,
             StructuralRayTracingStageKind::Miss);
         SLANG_ASSERT(slotType && contextType);
+        auto contextWitness = registry.resolveAssociatedTypeConstraint(
+            context->astBuilder,
+            groupWitness,
+            StructuralRayTracingAssociatedTypeKind::MissGroupContext);
+        auto payloadType = _getStructuralRayTracingPayloadType(
+            context,
+            contextWitness,
+            StructuralRayTracingAssociatedTypeKind::MissTraceContext);
 
         IRInst* operands[] = {
             lowerType(context, groups.types->getElementType(i)),
             lowerType(context, slotType),
+            context->irBuilder->getIntValue(
+                context->irBuilder->getIntType(),
+                _getStructuralRayTracingSlotIndex(context, slotType)),
             lowerType(context, contextType),
+            lowerType(context, payloadType),
             miss.type,
             miss.invoke,
         };
@@ -1222,11 +1370,24 @@ static void _addStructuralRayTracingCallableGroupInfo(
             StructuralRayTracingAssociatedTypeKind::CallableGroupCallable,
             StructuralRayTracingStageKind::Callable);
         SLANG_ASSERT(slotType && contextType);
+        auto contextWitness = registry.resolveAssociatedTypeConstraint(
+            context->astBuilder,
+            groupWitness,
+            StructuralRayTracingAssociatedTypeKind::CallableGroupContext);
+        auto callableDataType = registry.resolveAssociatedType(
+            context->astBuilder,
+            contextWitness,
+            StructuralRayTracingAssociatedTypeKind::CallableData);
+        SLANG_ASSERT(callableDataType);
 
         IRInst* operands[] = {
             lowerType(context, groups.types->getElementType(i)),
             lowerType(context, slotType),
+            context->irBuilder->getIntValue(
+                context->irBuilder->getIntType(),
+                _getStructuralRayTracingSlotIndex(context, slotType)),
             lowerType(context, contextType),
+            lowerType(context, callableDataType),
             callable.type,
             callable.invoke,
         };
@@ -15763,10 +15924,20 @@ static void _lowerStructuralRayTracingEntryPointBody(
         return;
 
     auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
+    auto invokeDeclRef = makeDeclRef(invokeMethod);
+    auto invokeFuncType = lowerType(context, getFuncType(context->astBuilder, invokeDeclRef));
+    auto invokeFunc =
+        as<IRFunc>(getSimpleVal(context, emitDeclRef(context, invokeDeclRef, invokeFuncType)));
+    SLANG_ASSERT(invokeFunc);
+
     if (!entryPointFunc->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
     {
         auto voidType = context->irBuilder->getVoidType();
         IRInst* operands[] = {
+            context->irBuilder->getIntValue(
+                context->irBuilder->getIntType(),
+                IRIntegerValue(structuralInfo.stageKind)),
+            invokeFunc,
             lowerType(context, structuralInfo.contextType),
             structuralInfo.payloadType ? lowerType(context, structuralInfo.payloadType) : voidType,
             structuralInfo.hitAttributesType ? lowerType(context, structuralInfo.hitAttributesType)
@@ -15783,12 +15954,6 @@ static void _lowerStructuralRayTracingEntryPointBody(
             operands,
             SLANG_COUNT_OF(operands));
     }
-
-    auto invokeDeclRef = makeDeclRef(invokeMethod);
-    auto invokeFuncType = lowerType(context, getFuncType(context->astBuilder, invokeDeclRef));
-    auto invokeFunc =
-        as<IRFunc>(getSimpleVal(context, emitDeclRef(context, invokeDeclRef, invokeFuncType)));
-    SLANG_ASSERT(invokeFunc);
 
     auto entryBlock = entryPointFunc->getFirstBlock();
     auto terminator = entryBlock ? entryBlock->getTerminator() : nullptr;
