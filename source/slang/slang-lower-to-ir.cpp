@@ -3720,6 +3720,11 @@ ParamPassingMode getExplicitlyDeclaredParamPassingMode(ParamDecl* paramDecl)
 /// checker rejects infinite-size types), so the depth limit is only a safety guard.
 static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, int depth)
 {
+    // Every caller reaches this function with the ASTBuilder that owns the enclosing
+    // declaration (IRGenContext::astBuilder or SemanticsVisitor::m_astBuilder), so a
+    // null astBuilder is out of contract here, not a case this function needs to handle.
+    SLANG_ASSERT(astBuilder);
+
     // Guard against pathologically deep type graphs (e.g. a 143-level acyclic chain with
     // Atomic<T> at the bottom). kMaxTypeNestingDepth matches the limit used by other
     // recursive type walkers (slang-type-layout.cpp, slang-check-decl.cpp). Unlike those
@@ -3737,29 +3742,42 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, int 
     // but its decl is not a StructDecl, so the struct branch below would miss it).
     if (auto arrayType = as<ArrayExpressionType>(type))
         return typeContainsNonCopyableImpl(arrayType->getElementType(), astBuilder, depth + 1);
+    // Non-decl-ref types (builtin scalars/vectors/matrices, resource types, pointers, etc.)
+    // can never carry a `[__NonCopyableType]` attribute or struct fields, so they are
+    // trivially copyable as far as this transitive check is concerned.
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
         return false;
-    if (declRefType->getDeclRef().getDecl()->findModifier<NonCopyableTypeAttribute>())
+    // Reuse isNonCopyableType for the direct-attribute check, rather than re-testing
+    // NonCopyableTypeAttribute here, so "what makes a type non-copyable" stays defined
+    // in exactly one place.
+    if (isNonCopyableType(type))
         return true;
     if (auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl()))
     {
         auto substs = SubstitutionSet(declRefType->getDeclRef());
         for (auto field : structDecl->getFields())
         {
+            // A field's declared type can be null while the declaration is still being
+            // checked or was left unresolved after a checking error (e.g. the language
+            // server runs IR lowering over ASTs with diagnostics). Such a field cannot
+            // itself name a non-copyable type, so skipping it here is conservative and
+            // matches the null-type-checking pattern used throughout the front end
+            // (see e.g. SemanticsDeclHeaderVisitor::checkVarDeclCommon in
+            // slang-check-decl.cpp).
             if (!field->type.type)
                 continue;
-            Type* fieldType = astBuilder ? substituteType(substs, astBuilder, field->type.type)
-                                         : field->type.type;
+            Type* fieldType = substituteType(substs, astBuilder, field->type.type);
             if (typeContainsNonCopyableImpl(fieldType, astBuilder, depth + 1))
                 return true;
         }
         for (auto inh : structDecl->getMembersOfType<InheritanceDecl>())
         {
+            // Same rationale as the field-type null check above: an unresolved base-type
+            // expression cannot name a non-copyable type, so it is safe to skip.
             if (!inh->base.type)
                 continue;
-            Type* baseType =
-                astBuilder ? substituteType(substs, astBuilder, inh->base.type) : inh->base.type;
+            Type* baseType = substituteType(substs, astBuilder, inh->base.type);
             // Only follow struct inheritance, not interface conformances.
             // InheritanceDecl is used for both; filtering here prevents treating
             // interface base types as struct fields and descending into them.
@@ -3775,8 +3793,9 @@ static bool typeContainsNonCopyableImpl(Type* type, ASTBuilder* astBuilder, int 
 
 /// Returns true if `type` is, or transitively contains, a non-copyable field.
 /// Used to determine whether copy-in/copy-out semantics are invalid for a type.
-/// `astBuilder` is used to apply generic substitutions when traversing struct fields;
-/// if null, substitutions are skipped (generic cases may be missed).
+/// `astBuilder` must be the non-null ASTBuilder that owns `type`'s declaration; it is
+/// used to apply generic substitutions when traversing struct fields (e.g. resolving
+/// `Wrapper<T>`'s field type `T` to `Atomic<int>` when `T` is bound to `Atomic<int>`).
 static bool typeContainsNonCopyable(Type* type, ASTBuilder* astBuilder)
 {
     return typeContainsNonCopyableImpl(type, astBuilder, 0);
