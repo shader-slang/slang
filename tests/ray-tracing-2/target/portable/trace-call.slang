@@ -48,7 +48,8 @@ void main()
     output[0] = payload.value;
 }
 
-// IR: structuralRayTracingTrace
+// IR: struct [[PROGRAM_LAYOUT:%ProgramLayout]] : Type
+// IR: structuralRayTracingTrace({{.*}}, [[PROGRAM_LAYOUT]],
 // HLSL: TraceRay(
 // HLSL-SAME: .rayFlags
 // SPIRV: OpTraceRayKHR

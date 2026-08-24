@@ -975,9 +975,30 @@ LoweredValInfo emitCallToDeclRef(
         {
             if (structuralRayTracingRegistry.isTraceMethod(functionDecl))
             {
+                // The trusted trace method is declared in extension<ProgramLayout>.
+                Type* programLayoutType = nullptr;
+                for (auto parentDecl = functionDecl->parentDecl; parentDecl;
+                     parentDecl = parentDecl->parentDecl)
+                {
+                    auto genericDecl = as<GenericDecl>(parentDecl);
+                    if (!genericDecl)
+                        continue;
+
+                    auto genericApp =
+                        SubstitutionSet(funcDeclRef).findGenericAppDeclRef(genericDecl);
+                    if (genericApp && genericApp->getArgs().getCount())
+                    {
+                        programLayoutType = as<Type>(genericApp->getArg(0));
+                        if (programLayoutType)
+                            break;
+                    }
+                }
+                SLANG_ASSERT(programLayoutType);
+
                 List<IRInst*> operationArgs;
                 operationArgs.add(
                     getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
+                operationArgs.add(lowerType(context, programLayoutType));
                 operationArgs.addRange(args, argCount);
                 return LoweredValInfo::simple(builder->emitIntrinsicInst(
                     type,
