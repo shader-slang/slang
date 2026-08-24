@@ -967,6 +967,30 @@ LoweredValInfo emitCallToDeclRef(
     auto builder = context->irBuilder;
 
     auto funcDecl = funcDeclRef.getDecl();
+    auto& structuralRayTracingRegistry =
+        context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (structuralRayTracingRegistry.isInitialized())
+    {
+        if (auto functionDecl = as<FunctionDeclBase>(funcDecl))
+        {
+            auto operationKind =
+                structuralRayTracingRegistry.getStageInputOperationKind(functionDecl);
+            if (operationKind != StructuralRayTracingStageInputOperationKind::Count)
+            {
+                auto operation = getStructuralRayTracingStageInputOperationOp(operationKind);
+                SLANG_ASSERT(operation != kIROp_Invalid);
+                List<IRInst*> operationArgs;
+                operationArgs.add(
+                    getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
+                operationArgs.addRange(args, argCount);
+                return LoweredValInfo::simple(builder->emitIntrinsicInst(
+                    type,
+                    operation,
+                    operationArgs.getCount(),
+                    operationArgs.getBuffer()));
+            }
+        }
+    }
     if (auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
     {
         // The intrinsic op maps to a single IR instruction,

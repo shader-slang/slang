@@ -1197,6 +1197,21 @@ local insts = {
 	{ GetWorkGroupSize = { hoistable = true } },
 	-- An inst that returns the current stage of the calling entry point.
 	{ GetCurrentStage = {} },
+	{
+		StructuralRayTracingStageInputOperation = {
+			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldRayDirection = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetObjectSpaceRay = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetPrimitiveIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetGeometryIndex = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingIgnoreHit = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingAcceptHitAndEndSearch = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingReportHit = { min_operands = 4 } },
+			{ structuralRayTracingReportHitWithKind = { min_operands = 5 } },
+		},
+	},
 	{ param = {} },
 	{ field = { struct_name = "StructField", min_operands = 2 } },
 	{ var = {} },
