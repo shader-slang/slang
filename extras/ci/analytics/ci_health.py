@@ -319,7 +319,7 @@ def fetch_pending_approvals(repo):
     is a PR that sits until its job timeout and then reports as a test failure.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    from gh_api import gh_api_list
+    from gh_api import find_pr_number_by_head, gh_api_list
 
     runs, err = gh_api_list(
         f"repos/{repo}/actions/runs?status=waiting&per_page=100",
@@ -338,6 +338,14 @@ def fetch_pending_approvals(repo):
             )
         except ValueError:
             waited_min = 0
+        prs = run.get("pull_requests") or []
+        pr_number = prs[0].get("number") if prs else None
+        if pr_number is None and run.get("event") == "pull_request":
+            # A run triggered from a fork branch has an empty `pull_requests`
+            # field (GitHub only populates it for same-repo branches), so the
+            # PR has to be looked up by head owner/branch instead.
+            head_owner = ((run.get("head_repository") or {}).get("owner") or {}).get("login")
+            pr_number = find_pr_number_by_head(repo, head_owner, run.get("head_branch"))
         pending.append(
             {
                 "run_id": run.get("id"),
@@ -347,6 +355,7 @@ def fetch_pending_approvals(repo):
                 "branch": run.get("head_branch", ""),
                 "title": run.get("display_title", ""),
                 "waited_min": waited_min,
+                "pr_number": pr_number,
             }
         )
     pending.sort(key=lambda p: p["waited_min"], reverse=True)
@@ -1235,7 +1244,7 @@ def render_pending_approvals(data):
 
     html += """
 <table>
-  <tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
+  <tr><th>Waiting</th><th>Run</th><th>PR</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>
 """
     for p in pending:
         # A merge-queue run holds up the whole queue, not just its own PR.
@@ -1243,10 +1252,13 @@ def render_pending_approvals(data):
         event_cell = (
             f"<strong>{_esc(event)}</strong>" if event == "merge_group" else _esc(event)
         )
+        pr_number = p.get("pr_number")
+        pr_cell = _link(f"https://github.com/shader-slang/slang/pull/{pr_number}/changes", f"#{pr_number}") if pr_number else ""
         html += (
             "  <tr>"
             f"<td>{p['waited_min']} min</td>"
             f"<td>{_link(p['url'], p['title'] or str(p['run_id']))}</td>"
+            f"<td>{pr_cell}</td>"
             f"<td>{_esc(p['actor'])}</td>"
             f"<td>{event_cell}</td>"
             f"<td>{_esc(p['branch'])}</td>"
@@ -1363,17 +1375,57 @@ PENDING_APPROVALS_JS = """
       var now = Date.now();
       var pending = runs.map(function (r) {
         var waited = Math.floor((now - new Date(r.created_at).getTime()) / 60000);
+        var prs = r.pull_requests || [];
         return {
           run_id: r.id,
           url: r.html_url,
           actor: (r.actor || {}).login || "?",
           event: r.event || "",
           branch: r.head_branch || "",
+          head_owner: ((r.head_repository || {}).owner || {}).login || "",
           title: r.display_title || String(r.id),
           waited: waited,
+          pr_number: prs.length ? prs[0].number : null,
         };
       }).sort(function (a, b) { return b.waited - a.waited; });
 
+      // A run triggered from a fork branch has an empty `pull_requests`
+      // field (GitHub only populates it for same-repo branches), so the PR
+      // has to be looked up separately by head owner/branch. Dedup by
+      // owner/branch (several waiting runs can share one PR) and cap the
+      // number of lookups so a burst of unresolved fork runs cannot fire
+      // more requests than an unauthenticated client's rate limit allows.
+      var MAX_HEAD_LOOKUPS = 20;
+      var seenKeys = {};
+      var uniqueTargets = [];
+      pending.forEach(function (p) {
+        if (p.pr_number !== null || p.event !== "pull_request" || !p.head_owner) return;
+        var key = p.head_owner + ":" + p.branch;
+        if (seenKeys[key]) return;
+        seenKeys[key] = true;
+        if (uniqueTargets.length < MAX_HEAD_LOOKUPS) uniqueTargets.push(key);
+      });
+
+      var lookups = uniqueTargets.map(function (key) {
+        var lookupUrl = "https://api.github.com/repos/" + repo + "/pulls?head=" +
+          encodeURIComponent(key.split(":")[0]) + ":" + encodeURIComponent(key.split(":").slice(1).join(":")) +
+          "&state=open";
+        return fetch(lookupUrl)
+          .then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (prs) {
+            if (!prs.length) return;
+            pending.forEach(function (p) {
+              if (p.pr_number === null && (p.head_owner + ":" + p.branch) === key) {
+                p.pr_number = prs[0].number;
+              }
+            });
+          })
+          .catch(function () {});
+      });
+
+      return Promise.all(lookups).then(function () { return pending; });
+    })
+    .then(function (pending) {
       var oldest = pending.length ? pending[0].waited : 0;
       var fg, bg, label, summary;
       if (!pending.length) {
@@ -1396,13 +1448,17 @@ PENDING_APPROVALS_JS = """
         label + '</span><strong style="margin-left:8px">' + esc(summary) + '</strong></div>';
 
       if (pending.length) {
-        html += '<table><tr><th>Waiting</th><th>Run</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
+        html += '<table><tr><th>Waiting</th><th>Run</th><th>PR</th><th>Actor</th><th>Trigger</th><th>Branch</th></tr>';
         pending.forEach(function (p) {
           var event = p.event === "merge_group"
             ? "<strong>merge_group</strong>" : esc(p.event);
+          var pr = p.pr_number
+            ? '<a href="https://github.com/shader-slang/slang/pull/' + p.pr_number + '/changes">#' + p.pr_number + '</a>'
+            : '';
           html += '<tr>' +
             '<td>' + p.waited + ' min</td>' +
             '<td><a href="' + esc(p.url) + '">' + esc(p.title) + '</a></td>' +
+            '<td>' + pr + '</td>' +
             '<td>' + esc(p.actor) + '</td>' +
             '<td>' + event + '</td>' +
             '<td>' + esc(p.branch) + '</td>' +

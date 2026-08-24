@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/metadata.md#attr-family
-//META: doc_section_digest=2da76dd4726862c0040f126154c48b23ed2237c18f88f175659ae9d45c2fec5d
+//META: doc_section_digest=0e7a8ec2a490ce368dde09c10d45863e67fc1e491cc433074fe4f7bbf890e750
 //META: purpose=The Aligned attribute records the access alignment of a load or a store, appearing in the operand tail of those instructions rather than in a type layout.
 //META: intent=functional
 //META: pipeline_stage=ir-pass

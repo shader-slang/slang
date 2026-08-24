@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#interpolation-and-shader-io
-//META: doc_section_digest=9dcc3971ffe320daffa3155aa97909cc164f7f1f53867e82746329293f4841f5
+//META: doc_section_digest=53ad1d566b89727f915f7a684edad14e039800bbbb1330d913ea0c67195afd17
 //META: purpose=A function parameter declared with the precise modifier carries a precise decoration with no operands.
 //META: intent=functional
 //META: pipeline_stage=lower

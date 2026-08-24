@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: dbfbda1756b7d272688648c15ee13dc082b3c386232d82ea279b83af5aa49b07
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 222f123db9618a770d0c176108af6e0d45268a23ffc2b9fb944eef03bbe467fa
 source_doc: docs/generated/design/ir-reference/types.md
-source_doc_digest: 1ac36304cd4af4e2aa7a864ddcb931755eb560fada6501e212f7a3fc7f39ffd0
+source_doc_digest: 0646630fb3eb5eb5e51b1b5710124cdc8a8dcdf8f5c52e5369a37c0cc8f4aaa8
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -52,10 +52,25 @@ already covers at the category level (`Vec`, `Array`, `Ptr` from a local
 which opcode" direction belongs to `pipeline/04-ast-to-ir` and
 `ast-reference/types`.
 
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md). **Partial**:
+this covers `#differentiation-types`, rewritten by the doc-gap fill (#12477);
+the rest of the document is not yet enumerated.
+
+1. Which context-channel family a function gets is decided at semantic-checking time by the differentiation attribute on the primal function.
+2. `[Differentiable]` / `[BackwardDifferentiable]` yield the `BackwardDiffIntermediateContextType` / `BackwardDiffMinimalContextType` pair.
+3. `[TreatAsDifferentiable]` yields the `TrivialBackwardDiffIntermediateContextType` / `TrivialBackwardDiffMinimalContextType` pair.
+4. `[BackwardDerivative(fn)]` / `[BackwardDerivativeOf(fn)]` yield the `BackwardContextFromLegacyBwdDiffFunc` / `BackwardMinimalContextFromLegacyBwdDiffFunc` pair, which carry the user function as a second operand.
+5. The two opcode columns are not alternatives: both structs are synthesized for every differentiable function and the witness table names both.
+
 ## Functional coverage
 
 | Claim                                                                                                                                                                                                             | Intent     | Anchor                                                                                                                                                 | Tests                                                                                      |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| C2, C5: A `[Differentiable]` primal function names both the BackwardDiffIntermediateContextType and BackwardDiffMinimalContextType entries in one witness table. | functional | [#differentiation-types](../../../../design/ir-reference/types.md#differentiation-types) | [`differentiation-context-differentiable-attribute.slang`](differentiation-context-differentiable-attribute.slang) |
+| C3: `[TreatAsDifferentiable]` replaces both entries with the Trivial\* pair. | boundary   | [#differentiation-types](../../../../design/ir-reference/types.md#differentiation-types) | [`differentiation-context-treat-as-differentiable-attribute.slang`](differentiation-context-treat-as-differentiable-attribute.slang) |
+| C4: `[BackwardDerivative(fn)]` replaces both entries with the FromLegacyBwdDiffFunc pair, carrying the user-written derivative as a second operand. | functional | [#differentiation-types](../../../../design/ir-reference/types.md#differentiation-types) | [`differentiation-context-user-backward-derivative.slang`](differentiation-context-user-backward-derivative.slang) |
 | An unsized array (runtime extent) is typed UnsizedArray(elementType) in the IR dump.                                                                                                                              | functional | [#array-vs-unsizedarray](../../../../design/ir-reference/types.md#array-vs-unsizedarray)                                                               | [`array-unsized.slang`](array-unsized.slang)                                               |
 | A fixed-size array field appears as Array(elementType, elementCount) in the IR dump.                                                                                                                              | functional | [#arrays](../../../../design/ir-reference/types.md#arrays)                                                                                             | [`array-fixed-size.slang`](array-fixed-size.slang)                                         |
 | Boundary: minimum non-trivial array size (1) appears as Array(Int, 1 : Int) in the IR.                                                                                                                            | boundary   | [#arrays](../../../../design/ir-reference/types.md#arrays)                                                                                             | [`array-size-one.slang`](array-size-one.slang)                                             |

@@ -21,6 +21,20 @@ The cross-vendor `GL_EXT_shader_invocation_reorder` extension provides broader c
 
 Native DXR 1.3 support (SM 6.9) provides `HitObject` without requiring NVAPI.
 
+### CUDA (OptiX)
+
+SER on CUDA is implemented on top of OptiX's native `optixTraverse` / `optixMakeHitObject` /
+`optixInvoke` APIs. Version requirements on the CUDA compiler include path (NVRTC for the `ptx`
+target):
+
+- **OptiX 8.0** — the floor for `HitObject.TraceRay`, which lowers to the native `optixTraverse`
+  introduced in 8.0.
+- **OptiX 8.1** — required for the full `HitObject` surface (`MakeHit` / `MakeMiss` / `MakeNop` /
+  `Invoke` and the `IsHit` / `GetInstanceIndex` / … query accessors), which lower to the
+  `optixMakeHitObject` / `optixInvoke` / `optixHitObjectGet*` APIs introduced in 8.1.
+- **OptiX 7.x** — ordinary ray tracing with `TraceRay` (which lowers to `optixTrace`) continues to
+  work; SER is unavailable.
+
 ## Links
 
 * [SER white paper for NVAPI](https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf)
