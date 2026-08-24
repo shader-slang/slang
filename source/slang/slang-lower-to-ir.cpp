@@ -12116,14 +12116,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     /// Lower an interface owned by another module as a declaration, and arrange
     /// for `prelinkIR` to supply its definition.
     ///
-    /// Returns true only when the interface belongs to another module *and* can be
-    /// borrowed safely, and writes the lowered value to `outVal`. Returns false --
-    /// leaving `outVal` untouched, which the caller relies on -- in three
-    /// different situations: the interface belongs to the module being lowered,
-    /// which is the common case since a module defines most of the interfaces it
-    /// mentions; the reference would be obfuscated, so the two halves could not be
-    /// paired by name; or the owning module has no lowered IR to borrow yet. In
-    /// every false case the caller derives the interface from the AST as before.
+    /// Returns true only when the interface belongs to another module *and* a
+    /// definition was found to borrow, and writes the lowered value to `outVal`.
+    /// Returns false in every other case, leaving `outVal` untouched -- the caller
+    /// relies on that -- and derives the interface from the AST as before. Those
+    /// cases, in the order the body tests them: the interface belongs to the
+    /// module being lowered, which is the common one since a module defines most
+    /// of the interfaces it mentions; the reference would be obfuscated, so the
+    /// declaration and the owning module's symbol could not be paired by name; the
+    /// decl has no owning module, or that module has no lowered IR yet; and no
+    /// interface is registered under the mangled name in a module that does have
+    /// IR.
     ///
     /// Deriving an interface is expensive -- every requirement's type is lowered,
     /// and each carries an expanded capability set -- and it reconstructs
@@ -12498,6 +12501,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        // Adding a decoration here is also a decision about
+        // `tryBorrowInterfaceFromOwningModule`, which lowers an interface owned by
+        // another module and reproduces only some of what follows. It has to
+        // reproduce a decoration exactly when something reads that decoration off
+        // an `IRInterfaceType` before `prelinkIR` runs; otherwise the definition
+        // prelink clones in supplies it. The comment there records the current
+        // answer for each of these, and is the only place that records it -- the
+        // invariant is about which passes *read* a decoration, so neither site can
+        // check it locally.
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
