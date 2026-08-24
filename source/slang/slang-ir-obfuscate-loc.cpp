@@ -127,13 +127,23 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // is updated to the unmapped loc below; for regular locs it stays equal to curLoc.
                 SourceLoc definitionLoc = instWithLoc.loc;
 
-                // Ignore any core module locs in the hash
-                if (instWithLoc.loc.getRaw() < endCoreModuleLoc.getRaw())
-                {
-                    continue;
-                }
-
-                // If the definitionLoc isn't in the view, lookup the view it is in
+                // Resolve definitionLoc to a concrete SourceView, unmapping through the macro
+                // expansion side table first if this is a per-invocation expansion-range loc.
+                //
+                // This must happen *before* the core-module skip check below, not after. A macro
+                // that is both defined and invoked inside the core module (e.g. a helper macro
+                // used within hlsl.meta.slang itself) has its body-token locs remapped into an
+                // expansion-range loc that itself falls below endCoreModuleLoc, but that raw
+                // expansion-range loc has no backing SourceView on its own -- only the unmapped
+                // definition-file loc does. The source-map loop further down calls
+                // findSourceViewRecursively(pair.definitionLoc) unconditionally on every LocPair,
+                // including ones skipped from the hash by the core-module check, so
+                // definitionLoc must already be resolved to a real file loc (or the LocPair must
+                // never have been added) by the time we get there. Checking core-module-ness
+                // against the still-unmapped expansion-range loc, as the code used to do, left
+                // definitionLoc pointing at an unresolvable loc for exactly this case, and the
+                // source-map loop's SLANG_ASSERT(curView) would fire on it.
+                bool viewChanged = false;
                 if (sourceView == nullptr || !sourceView->getRange().contains(definitionLoc))
                 {
                     sourceView = sourceManager->findSourceViewRecursively(definitionLoc);
@@ -161,7 +171,20 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                             continue;
                         }
                     }
+                    viewChanged = true;
+                }
 
+                // Ignore any core module locs in the hash. definitionLoc is already resolved to
+                // a real definition-file loc at this point (see above), so this correctly
+                // recognizes a core-module-defined macro's remapped body locs as core-module
+                // locs too, not just unremapped ones.
+                if (definitionLoc.getRaw() < endCoreModuleLoc.getRaw())
+                {
+                    continue;
+                }
+
+                if (viewChanged)
+                {
                     const auto pathInfo = sourceView->getViewPathInfo();
                     const auto name = pathInfo.getName();
                     const auto nameHash = getStableHashCode32(name.getBuffer(), name.getLength());
