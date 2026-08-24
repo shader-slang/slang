@@ -6126,15 +6126,6 @@ static SlangResult runUnitTestModule(
     return SLANG_OK;
 }
 
-static void cleanupRenderTestDeviceCache(TestContext& context)
-{
-    auto cleanFunc = context.getCleanDeviceCacheFunc("render-test");
-    if (cleanFunc)
-    {
-        cleanFunc();
-    }
-}
-
 SlangResult innerMain(int argc, char** argv)
 {
     auto stdWriters = StdWriters::initDefaultSingleton();
@@ -6520,8 +6511,6 @@ SlangResult innerMain(int argc, char** argv)
         reporter.reconcilePendingRetries();
 
         reporter.outputSummary();
-
-        cleanupRenderTestDeviceCache(context);
 
         // An abort is a failure in its own right, whatever ended up recorded.
         //

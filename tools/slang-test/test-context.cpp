@@ -138,6 +138,15 @@ TestContext::~TestContext()
             LanguageServerProtocol::ExitParams::methodName,
             JSONValue::makeInt(0));
     }
+
+    // Tear down render-test-tool's process-lifetime GPU state (its device cache and slang-rhi's
+    // global RHI instance, which joins the worker pool) here so it runs on every exit path while
+    // the tool-library handle -- a member destroyed only after this body -- is still valid to call
+    // into.
+    if (auto cleanFunc = getCleanDeviceCacheFunc("render-test"))
+    {
+        cleanFunc();
+    }
 }
 
 TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, const String& name)

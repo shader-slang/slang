@@ -2058,9 +2058,14 @@ static SlangResult _innerMain(
     return SLANG_OK;
 }
 
+// Release the cached devices, then destroy the global RHI instance. Order matters: `RHI::destroy()`
+// (reached via `rhiDestroyInstance()`) requires no live devices, and destroying it is what joins
+// slang-rhi's worker pool -- whose only join site is `~Pool()` -- so the devices must be released
+// first via `DeviceCache::cleanCache()`.
 SLANG_TEST_TOOL_API void cleanDeviceCache()
 {
     DeviceCache::cleanCache();
+    rhiDestroyInstance();
 }
 
 SLANG_TEST_TOOL_API SlangResult innerMain(
