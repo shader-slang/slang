@@ -40,12 +40,15 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
 
 // A compiled `.slang-module` an `import` loads is recorded only as a module dependency, never a
 // file dependency, so `-depfile` omits it and consumers miss the rebuild edge to the importer.
-// Append each such module dependency, deduplicated against the file dependencies already emitted.
+// Append each such module dependency; `alreadyListedPaths` skips a path already written (both the
+// file dependencies and any module path repeated across the closure).
 static void _collectExtraModuleDependencyPaths(
     EndToEndCompileRequest* compileRequest,
     List<String>& outPaths)
 {
-    auto program = compileRequest->getFrontEndReq()->getGlobalAndEntryPointsComponentType();
+    // Use the same unspecialized program the file dependencies come from (`getDependencyFilePath`),
+    // so the module set and the dedup set are drawn from one consistent dependency closure.
+    auto program = compileRequest->getUnspecializedGlobalAndEntryPointsComponentType();
 
     HashSet<String> alreadyListedPaths;
     int fileDependencyCount = compileRequest->getDependencyFileCount();

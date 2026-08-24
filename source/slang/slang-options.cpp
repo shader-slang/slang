@@ -460,7 +460,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::DepFile,
          "-depfile",
          "-depfile <path>",
-         "Save the source file dependency list in a file.\n"
+         "Save the dependency list in a file. Lists source files and any imported precompiled\n"
+         ".slang-module files.\n"
          "Uses Makefile dependency syntax: <output>: <dep> <dep...>\n"
          "When no -o is given, - is used as the make target (output goes to stdout)."},
         {OptionKind::EntryPointName,

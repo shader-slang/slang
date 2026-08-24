@@ -60,7 +60,9 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 **-depfile &lt;path&gt;**
 
-Save the source file dependency list in a file. 
+Save the dependency list in a file. Lists source files and any imported precompiled 
+
+.slang-module files. 
 
 Uses Makefile dependency syntax: &lt;output&gt;: &lt;dep&gt; &lt;dep...&gt; 
 

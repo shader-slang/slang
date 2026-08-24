@@ -14,14 +14,22 @@ static bool _contains(const String& text, const char* expected)
     return text.getUnownedSlice().indexOf(UnownedStringSlice(expected)) >= 0;
 }
 
-/// Returns true if any whitespace-delimited dependency token in `depContent` has `fileName` as its
-/// final path component. Unlike `_contains`, this distinguishes `a.slang` from `a.slang-module`
-/// (the former is a substring of the latter), so a test can assert one is present without the
-/// other.
+/// Returns true if any space-delimited token on the first line of `depContent` (the single
+/// `<output>: <dep> <dep...>` statement these tests produce) has `fileName` as its final path
+/// component. Splitting on space (not all whitespace) and taking only the first line pins the
+/// dependency to the same line as the target — so a regression that orphans a dependency onto its
+/// own line, or drops the terminating newline, is caught rather than passing. It also distinguishes
+/// `a.slang` from `a.slang-module` (the former is a substring of the latter).
 static bool _listsDependencyFile(const String& depContent, const char* fileName)
 {
+    UnownedStringSlice firstLine = depContent.getUnownedSlice();
+    Index newlinePos = firstLine.indexOf('\n');
+    if (newlinePos < 0)
+        return false; // A well-formed statement is newline-terminated; its absence is a failure.
+    firstLine = firstLine.head(newlinePos);
+
     List<UnownedStringSlice> tokens;
-    StringUtil::splitOnWhitespace(depContent.getUnownedSlice(), tokens);
+    StringUtil::split(firstLine, ' ', tokens);
     UnownedStringSlice name(fileName);
     for (auto token : tokens)
     {
@@ -408,5 +416,67 @@ SLANG_UNIT_TEST(DepfileOutput)
             _listsDependencyFile(depContent, Path::getFileName(modBinPath).getBuffer()),
             "depfile must list the .slang-module when the module's own source is gone, even if a "
             "secondary dependency remains");
+        // The surviving `#include`d source is what distinguishes this from the source-absent case:
+        // it resolves and is listed as a file dependency alongside the module file.
+        SLANG_CHECK_MSG(
+            _listsDependencyFile(depContent, Path::getFileName(includePath).getBuffer()),
+            "depfile missing the surviving secondary #include dependency");
+    }
+
+    // --- Test 6: a module imported from source (no `.slang-module` on disk) lists no module file
+    // ---
+    //
+    // The negative counterpart to Tests 3-5: when only `a.slang` exists, `import a;` compiles it
+    // from source, so there is no `.slang-module` to append and the depfile lists only sources.
+    {
+        TempDir dir;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempDir("slangc-df-srconly", dir)));
+
+        const String modSrcPath = Path::combine(dir.path, "a.slang");
+        const String modBinName = "a.slang-module";
+        const String consumerPath = Path::combine(dir.path, "b.slang");
+        const String spvPath = Path::combine(dir.path, "b.spv");
+
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            File::writeAllText(modSrcPath, "module a;\npublic void func(int x) {}\n")));
+        SLANG_CHECK(SLANG_SUCCEEDED(File::writeAllText(
+            consumerPath,
+            "import a;\n[shader(\"compute\")] void main() { func(1); }\n")));
+
+        TempFile depFile;
+        SLANG_CHECK(SLANG_SUCCEEDED(_makeTempFile("slangc-df-srconly-dep", depFile)));
+
+        List<String> args;
+        args.add("-target");
+        args.add("spirv");
+        args.add("-entry");
+        args.add("main");
+        args.add("-stage");
+        args.add("compute");
+        args.add("-o");
+        args.add(spvPath);
+        args.add("-depfile");
+        args.add(depFile.path);
+        args.add(consumerPath);
+
+        ExecuteResult result;
+        SLANG_CHECK(SLANG_SUCCEEDED(_runSlangc(unitTestContext, args, result)));
+        if (result.resultCode != 0)
+            getTestReporter()->message(TestMessageType::Info, result.standardError.getBuffer());
+        SLANG_CHECK(result.resultCode == 0);
+
+        TempFile spvGuard;
+        spvGuard.path = spvPath;
+
+        String depContent;
+        SLANG_CHECK(SLANG_SUCCEEDED(File::readAllText(depFile.path, depContent)));
+        getTestReporter()->message(TestMessageType::Info, depContent.getBuffer());
+
+        SLANG_CHECK_MSG(
+            _listsDependencyFile(depContent, Path::getFileName(modSrcPath).getBuffer()),
+            "depfile missing the module source dependency");
+        SLANG_CHECK_MSG(
+            !_listsDependencyFile(depContent, modBinName.getBuffer()),
+            "depfile must not list a .slang-module that was never produced");
     }
 }
