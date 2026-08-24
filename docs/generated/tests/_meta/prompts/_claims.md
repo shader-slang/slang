@@ -178,8 +178,13 @@ disciplined way to read an authoritative source for the variants it
 
 5. **`CHECK` tightness.** Pin the token that *identifies the cell* — the
    specific op (`OpAtomicAnd`), decoration (`ArrayStride 2`), or layout
-   token — tightly, and leave incidental names / IDs / registers wild
-   (`%{{[0-9]+}}`, `a_{{[0-9]+}}`). A cell whose distinguishing token you
+   token — tightly, and leave everything the claim does not rest on wild:
+   names / IDs / registers (`%{{[0-9]+}}`, `a_{{[0-9]+}}`), and equally
+   the declaration specifiers and qualifiers around the token under test
+   (`__device__`, `__noinline__`, `inline`, `static`). Those are stable
+   rather than volatile, so they read as safe to pin, but they are not
+   what the claim is about — see [`_common.md`](_common.md) § FileCheck /
+   CHECK pattern hygiene, rule 8. A cell whose distinguishing token you
    cannot name is a cell you have not differentiated — fold it back into
    the collapse step above.
 
