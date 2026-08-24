@@ -1125,6 +1125,7 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
 
     // We'll use a temporary diagnostic sink
     DiagnosticSink sink(&localSourceManager, nullptr);
+    installDiagnosticCallback(sink);
 
     // RAII type to make make sure current SourceManager is restored after parse.
     // Use RAII - to make sure everything is reset even if an exception is thrown.
