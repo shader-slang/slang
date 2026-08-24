@@ -966,7 +966,7 @@ struct CoverageInstrumenter
     IRType* intType;
     // The `RWStructuredBuffer<T>` type itself — the ARRAY ELEMENT type in
     // the bindless form, and the global's own type otherwise.
-    IRType* singleBufferType = nullptr;
+    IRType* bufferElementType = nullptr;
     // Caller opted in to boolean recording (`-trace-coverage-boolean`): each
     // counter is written with a plain non-atomic store of 1 instead of an
     // atomic add, recording whether the entry executed (0 / non-zero) rather
@@ -1005,9 +1005,11 @@ struct CoverageInstrumenter
             globalType = cast<IRArrayTypeBase>(globalType)->getElementType();
         auto bufferType = cast<IRHLSLStructuredBufferTypeBase>(globalType);
         // Kept for the bindless element extract below: the two-operand
-        // `emitElementExtract` cannot infer an element type through an
-        // unsized array of structured buffers, and asserts instead.
-        singleBufferType = (IRType*)bufferType;
+        // `emitElementExtract` (`slang-ir.cpp`) infers an element type only
+        // through `IRArrayType`, not `IRUnsizedArrayType`, and hits a
+        // `SLANG_RELEASE_ASSERT` on the latter -- so the explicit-type
+        // overload is required here and needs this type kept.
+        bufferElementType = (IRType*)bufferType;
         counterElementType = bufferType->getElementType();
         counterElementPtrType = tmpBuilder.getPtrType(counterElementType);
         intType = tmpBuilder.getIntType();
@@ -1089,7 +1091,7 @@ struct CoverageInstrumenter
         if (bindlessIndex >= 0)
         {
             bufferInst = builder.emitElementExtract(
-                singleBufferType,
+                bufferElementType,
                 coverageBuffer,
                 builder.getIntValue(intType, (IRIntegerValue)bindlessIndex));
         }

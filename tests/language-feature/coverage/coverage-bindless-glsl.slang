@@ -24,8 +24,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     }
 }
 
-// One binding for the whole array, at the space the host asked for — the
-// binding is 0 because an unsized array must own its descriptor set.
+// One binding for the whole array, at the (binding, space) the host pinned.
+// The binding is 0 here only because this run asks for 0 -- an unsized array
+// does NOT force binding 0, and a non-zero pinned binding is honored; the
+// SPIR-V companion pins that with an explicit `Binding 5` run.
 //CHECK: layout(std430, binding = 0, set = 31) buffer
 // The trailing `[]` after the block instance name is the descriptor array;
 // without it this would be a single buffer again.

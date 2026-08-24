@@ -16,6 +16,7 @@
 // emitted BEFORE the code, so a stray `NonUniform` would sit in the region
 // that check never looks at, and the test would pass while asserting nothing.
 //TEST:SIMPLE(filecheck=NOUNIFORM):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-binding 0 31 -trace-coverage-bindless-index 7
+//TEST:SIMPLE(filecheck=NONZERO):-target spirv-asm -stage compute -entry computeMain -profile spirv_1_5 -trace-coverage -trace-coverage-binding 5 31 -trace-coverage-bindless-index 7
 
 RWStructuredBuffer<uint> outBuf;
 
@@ -37,6 +38,13 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 
 // One binding for the whole array, at the slot the host pinned. This is the
 // point of the mode: not one binding per shader.
+//
+// `Binding 0` alone would not prove the binding component of
+// `-trace-coverage-binding` is honored here, because auto-allocation also
+// lands the coverage buffer at binding 0 (see
+// coverage-vulkan-bindless-auto-binding-spirv.slang) -- only the space would
+// carry any signal. The NONZERO run at the bottom of this file is what
+// actually pins it.
 //CHECK-DAG: OpDecorate %__slang_coverage Binding 0
 //CHECK-DAG: OpDecorate %__slang_coverage DescriptorSet 31
 
@@ -51,3 +59,9 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // construction. Marking it non-uniform would push every counter increment onto
 // the non-uniform descriptor-indexing path for nothing.
 //NOUNIFORM-NOT: NonUniform
+
+// The bindless form does not force the array to binding 0: an explicitly
+// pinned non-zero binding is honored, so `-trace-coverage-binding` composes
+// with `-trace-coverage-bindless-index` rather than being partly ignored.
+//NONZERO-DAG: OpDecorate %__slang_coverage Binding 5
+//NONZERO-DAG: OpDecorate %__slang_coverage DescriptorSet 31
