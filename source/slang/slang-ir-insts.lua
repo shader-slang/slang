@@ -1200,6 +1200,7 @@ local insts = {
 	{
 		StructuralRayTracingStageInputOperation = {
 			{ structuralRayTracingGetPayload = { operands = { { "input" } } } },
+			{ structuralRayTracingGetCallableData = { operands = { { "input" } } } },
 			{ structuralRayTracingGetHitAttributes = { operands = { { "input" } } } },
 			{ structuralRayTracingGetTriangleBarycentricCoord = { operands = { { "input" } } } },
 			{ structuralRayTracingGetTriangleFrontFacing = { operands = { { "fallback" }, { "input" } } } },
@@ -2152,6 +2153,18 @@ local insts = {
 						{ "profileInst", "IRIntLit" },
 						{ "name", "IRStringLit" },
 						{ "moduleName", "IRStringLit", optional = true },
+					},
+				},
+			},
+			{
+				structuralRayTracingEntryPointInfo = {
+					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
+					operands = {
+						{ "contextType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "callableDataType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
 					},
 				},
 			},

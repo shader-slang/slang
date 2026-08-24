@@ -9,8 +9,11 @@ namespace Slang
 class InterfaceDecl;
 class FunctionDeclBase;
 class AggTypeDecl;
+class AssocTypeDecl;
 class Decl;
 class ModuleDecl;
+class FuncDecl;
+class Type;
 
 enum class StructuralRayTracingStageKind
 {
@@ -38,6 +41,7 @@ enum class StructuralRayTracingMetadataKind
 enum class StructuralRayTracingStageInputOperationKind
 {
     Payload,
+    CallableData,
     HitAttributes,
     TriangleBarycentricCoord,
     TriangleFrontFacing,
@@ -55,10 +59,40 @@ enum class StructuralRayTracingStageInputOperationKind
     Count,
 };
 
+enum class StructuralRayTracingAssociatedTypeKind
+{
+    TracePayload,
+    HitTraceContext,
+    HitPrimitive,
+    PrimitiveAttributes,
+    MissTraceContext,
+    CallableData,
+    Count,
+};
+
 enum class RayTracingAPIFamily
 {
     Structural,
     Legacy,
+};
+
+enum class StructuralRayTracingHitAttributesKind
+{
+    None,
+    Triangle,
+    Curve,
+    Custom,
+};
+
+struct StructuralRayTracingEntryPointInfo
+{
+    FuncDecl* invokeMethod = nullptr;
+    Type* contextType = nullptr;
+    Type* payloadType = nullptr;
+    Type* hitAttributesType = nullptr;
+    Type* callableDataType = nullptr;
+    StructuralRayTracingHitAttributesKind hitAttributesKind =
+        StructuralRayTracingHitAttributesKind::None;
 };
 
 struct RayTracingAPIUsage
@@ -84,6 +118,8 @@ public:
     StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
         FunctionDeclBase* functionDecl) const;
     bool isTraceMethod(FunctionDeclBase* functionDecl) const;
+    AssocTypeDecl* getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind kind) const;
+    StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
     void registerStageImplementation(
@@ -101,10 +137,14 @@ private:
     AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
+    AssocTypeDecl*
+        m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageInputOperationKind>
         m_stageInputOperations;
     ModuleDecl* m_trustedModuleDecl = nullptr;
     AggTypeDecl* m_rayTracerType = nullptr;
+    AggTypeDecl* m_trianglePrimitiveType = nullptr;
+    AggTypeDecl* m_curvePrimitiveType = nullptr;
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
 };

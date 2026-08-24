@@ -423,8 +423,11 @@ void calcRequiredLoweringPassSet(
     {
         result.autodiff = true;
     }
-    if (as<IRStructuralRayTracingStageInputOperation>(inst))
+    if (as<IRStructuralRayTracingStageInputOperation>(inst) ||
+        as<IRStructuralRayTracingEntryPointInfoDecoration>(inst))
+    {
         result.structuralRayTracingStageInput = true;
+    }
     if (inst->getOp() == kIROp_StructuralRayTracingTrace)
         result.structuralRayTracingTrace = true;
     // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.

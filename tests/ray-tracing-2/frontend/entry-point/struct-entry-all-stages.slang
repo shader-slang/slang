@@ -6,35 +6,35 @@
 
 import slang.raytracing;
 
-struct Payload {}
-struct Record {}
-struct Attributes {}
+struct TestPayload {}
+struct TestRecord {}
+struct TestAttributes {}
 
-struct TraceContext : rt::ITraceContext
+struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = Payload;
+    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
 struct HitContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
-    typealias Primitive = rt::BoundingBoxPrimitive<Attributes>;
-    typealias Record = Record;
+    typealias TraceContext = TestTraceContext;
+    typealias Primitive = rt::BoundingBoxPrimitive<TestAttributes>;
+    typealias Record = TestRecord;
 }
 
 struct MissContext : rt::IMissGroupContext
 {
-    typealias TraceContext = TraceContext;
-    typealias Record = Record;
+    typealias TraceContext = TestTraceContext;
+    typealias Record = TestRecord;
 }
 
 struct CallableContext : rt::ICallableGroupContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = TestTraceContext;
     typealias CallableData = uint;
-    typealias Record = Record;
+    typealias Record = TestRecord;
 }
 
 struct ClosestHit : rt::IClosestHitShader<HitContext>

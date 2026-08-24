@@ -1846,6 +1846,7 @@ struct IRStructuralRayTracingStageInputOperation : IRInst
         switch (getOp())
         {
         case kIROp_StructuralRayTracingGetPayload:
+        case kIROp_StructuralRayTracingGetCallableData:
         case kIROp_StructuralRayTracingGetHitAttributes:
         case kIROp_StructuralRayTracingGetTriangleBarycentricCoord:
             return false;

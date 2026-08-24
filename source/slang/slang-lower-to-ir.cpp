@@ -993,6 +993,7 @@ LoweredValInfo emitCallToDeclRef(
                 SLANG_ASSERT(operation != kIROp_Invalid);
                 List<IRInst*> operationArgs;
                 if (operationKind != StructuralRayTracingStageInputOperationKind::Payload &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::CallableData &&
                     operationKind != StructuralRayTracingStageInputOperationKind::HitAttributes &&
                     operationKind !=
                         StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord)
@@ -15411,6 +15412,28 @@ static void _lowerStructuralRayTracingEntryPointBody(
     auto invokeMethod = entryPoint->getStructuralRayTracingInvokeMethod();
     if (!invokeMethod)
         return;
+
+    auto& structuralInfo = entryPoint->getStructuralRayTracingInfo();
+    if (!entryPointFunc->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+    {
+        auto voidType = context->irBuilder->getVoidType();
+        IRInst* operands[] = {
+            lowerType(context, structuralInfo.contextType),
+            structuralInfo.payloadType ? lowerType(context, structuralInfo.payloadType) : voidType,
+            structuralInfo.hitAttributesType ? lowerType(context, structuralInfo.hitAttributesType)
+                                             : voidType,
+            structuralInfo.callableDataType ? lowerType(context, structuralInfo.callableDataType)
+                                            : voidType,
+            context->irBuilder->getIntValue(
+                context->irBuilder->getIntType(),
+                IRIntegerValue(structuralInfo.hitAttributesKind)),
+        };
+        context->irBuilder->addDecoration(
+            entryPointFunc,
+            kIROp_StructuralRayTracingEntryPointInfoDecoration,
+            operands,
+            SLANG_COUNT_OF(operands));
+    }
 
     auto invokeDeclRef = makeDeclRef(invokeMethod);
     auto invokeFuncType = lowerType(context, getFuncType(context->astBuilder, invokeDeclRef));

@@ -2628,7 +2628,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     auto entryPointName = entryPointReq->getName();
     auto entryPointProfile = entryPointReq->getProfile();
     bool foundStructuralStage = false;
-    FuncDecl* structuralInvokeMethod = nullptr;
+    StructuralRayTracingEntryPointInfo structuralInfo;
     auto structuralEntryPointDeclRef = findStructuralRayTracingEntryPointByName(
         linkage,
         translationUnit->getModule(),
@@ -2636,7 +2636,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         entryPointProfile,
         sink,
         &foundStructuralStage,
-        &structuralInvokeMethod);
+        &structuralInfo);
     if (foundStructuralStage)
     {
         if (!structuralEntryPointDeclRef)
@@ -2644,7 +2644,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
 
         auto entryPoint =
             EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
-        entryPoint->setStructuralRayTracingInvokeMethod(structuralInvokeMethod);
+        entryPoint->setStructuralRayTracingInfo(structuralInfo);
         validateEntryPoint(entryPoint, sink);
         return sink->getErrorCount() ? nullptr : entryPoint;
     }
