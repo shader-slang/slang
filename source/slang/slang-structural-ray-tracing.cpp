@@ -148,6 +148,8 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::Count;
 
     auto text = name->text.getUnownedSlice();
+    if (text == "payload")
+        return StructuralRayTracingStageInputOperationKind::Payload;
     if (text == "distance")
         return StructuralRayTracingStageInputOperationKind::RayTCurrent;
     if (text == "hitKind")

@@ -1841,8 +1841,15 @@ struct IRStructuralRayTracingStageInputOperation : IRInst
 {
     FIDDLE(baseInst())
 
-    IRInst* getFallback() { return getOperand(0); }
-    IRInst* getInput() { return getOperand(1); }
+    IRInst* getFallback()
+    {
+        SLANG_ASSERT(getOp() != kIROp_StructuralRayTracingGetPayload);
+        return getOperand(0);
+    }
+    IRInst* getInput()
+    {
+        return getOperand(getOp() == kIROp_StructuralRayTracingGetPayload ? 0 : 1);
+    }
 };
 
 FIDDLE()
