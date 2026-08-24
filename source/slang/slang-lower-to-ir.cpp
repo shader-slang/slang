@@ -6706,8 +6706,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(irType));
             }
-            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>())
+            else if (auto aggTypeDeclRef = declRef.as<AggTypeDecl>();
+                     aggTypeDeclRef && (aggTypeDeclRef.as<StructDecl>() ||
+                                        aggTypeDeclRef.as<SynthesizedStructDecl>() ||
+                                        aggTypeDeclRef.as<ClassDecl>() ||
+                                        aggTypeDeclRef.as<GLSLInterfaceBlockDecl>()))
             {
+                // Build the default value as an IRMakeStruct over instance members only for
+                // concrete, field-owning aggregates. Other AggTypeDecl subclasses are opaque
+                // until specialization (associated type, `This` type, global generic parameter;
+                // enum and interface are already handled by earlier branches) and own no
+                // concrete fields, so they fall through to emitDefaultConstruct below — building
+                // a MakeStruct from their empty member list yields a zero-operand IRMakeStruct
+                // that reads out of bounds once specialization resolves it to a non-empty struct
+                // (shader-slang/slang#12708). This list must stay exhaustive over field-owning
+                // kinds: one omitted here would silently fall through to a zero-filled default,
+                // dropping its members' default initializers. StructDecl covers its subclasses
+                // (e.g. LambdaDecl); SynthesizedStructDecl derives directly from AggTypeDecl, so
+                // it is listed alongside the other direct subclasses.
                 List<IRInst*> args;
 
                 if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())

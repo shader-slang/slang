@@ -2230,6 +2230,17 @@ struct TypeFlowSpecializationContext
         if (!structType)
             return none();
 
+        // `IRMakeStruct` carries exactly one operand per struct field, positionally
+        // (including the synthesized leading field for a base struct). The loop below
+        // relies on that parity, so enforce it rather than read past the operand array.
+        UIndex fieldCount = 0;
+        for (auto field : structType->getFields())
+        {
+            SLANG_UNUSED(field);
+            fieldCount++;
+        }
+        SLANG_RELEASE_ASSERT(makeStruct->getOperandCount() == fieldCount);
+
         UIndex operandIndex = 0;
         for (auto field : structType->getFields())
         {
