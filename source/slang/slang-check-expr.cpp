@@ -5768,8 +5768,27 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType, QualType
             }
         case ParamPassingMode::Ref:
             {
-                // Not allowed..
-                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                // A type that transitively contains a non-copyable field (e.g.
+                // `Atomic<T>`) is promoted from `BorrowInOut` to `Ref` by
+                // `adjustParamPassingModeBasedOnParamType` (slang-lower-to-ir.cpp), so the
+                // parameter is always passed by reference to its original storage, never
+                // copied. Such a type can still conform to `IDifferentiable` (only a
+                // directly `[__NonCopyableType]`-marked type is barred from interface
+                // conformance), so a differential pair type may still exist here. Mirror
+                // the `BorrowInOut` case above, but wrap with `getRefParamType` instead of
+                // `getBorrowInOutParamType` so the checked backward-diff signature agrees
+                // with the IR-level one built by `BwdDiffFuncType::_resolveImplOverride`
+                // (slang-ast-type.cpp).
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getRefParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getRefParamType(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()})));
+                }
             }
 
             break;
