@@ -4,12 +4,17 @@ namespace rt
 {
 
 // These are compiler-provided, zero-storage views. The compiler recognizes the exact accessors
-// below and retains their source bodies as the D3D/Vulkan implementation while it lowers Metal
-// through generated stage context.
+// below, maps storage-free properties such as payload to the target ABI, and retains the ordinary
+// source bodies where they already express the D3D/Vulkan implementation.
 [require(closesthit)]
 public struct ClosestHitInput<Context>
     where Context : IHitContext
 {
+    public property Context.TraceContext.Payload payload
+    {
+        ref;
+    }
+
     public property float distance
     {
         get { return RayTCurrent(); }
@@ -35,6 +40,11 @@ public struct ClosestHitInput<Context>
 public struct AnyHitInput<Context>
     where Context : IHitContext
 {
+    public property Context.TraceContext.Payload payload
+    {
+        ref;
+    }
+
     public property float distance
     {
         get { return RayTCurrent(); }
@@ -142,6 +152,11 @@ public struct IntersectionInput<Context>
 public struct MissInput<Context>
     where Context : IMissGroupContext
 {
+    public property Context.TraceContext.Payload payload
+    {
+        ref;
+    }
+
     public property float3 worldSpaceOrigin
     {
         get { return WorldRayOrigin(); }

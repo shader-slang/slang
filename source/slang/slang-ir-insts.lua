@@ -1199,6 +1199,7 @@ local insts = {
 	{ GetCurrentStage = {} },
 	{
 		StructuralRayTracingStageInputOperation = {
+			{ structuralRayTracingGetPayload = { operands = { { "input" } } } },
 			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },
