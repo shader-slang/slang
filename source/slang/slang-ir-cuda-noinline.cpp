@@ -52,7 +52,7 @@ static bool isOrdinaryCUDADeviceFunction(IRFunc* func, CapabilitySet const& targ
         return false;
     UnownedStringSlice intrinsicDef;
     IRInst* intrinsicInst;
-    if (findTargetIntrinsicDefinition(func, targetCaps, intrinsicDef, intrinsicInst))
+    if (Slang::findTargetIntrinsicDefinition(func, targetCaps, intrinsicDef, intrinsicInst))
         return false;
     return true;
 }
