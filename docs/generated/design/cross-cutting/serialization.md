@@ -60,6 +60,13 @@ because preserving readable diagnostics across deserialization
 requires re-establishing the `SourceManager`'s view of files and
 expansions.
 
+From the command line, `slangc <source> -o <output>.slang-module`
+writes a container, and `-dump-module` and `-get-module-info` read one
+back: the first prints the deserialized IR, the second the module's
+name, its module version, and the version of the compiler that wrote
+it. Those three fields are exactly what `readSerializedModuleInfo`
+returns, without deserializing the instruction graph.
+
 ## Backends
 
 ### Generic serialize
@@ -196,6 +203,19 @@ those codes is the `ModuleChunk` / `ContainerChunk` / `DebugChunk`
 accessor types in
 [slang-serialize-container.h](../../../../source/slang/slang-serialize-container.h).
 
+Not every payload a `.slang-module` can carry is a chunk of its own.
+The precompiled downstream artefact that `-embed-downstream-ir`
+requests is not added to the RIFF hierarchy; it rides inside the IR
+payload as an ordinary instruction. `EmbeddedDownstreamIR` carries the
+target code as an integer literal and the artefact as a blob literal,
+and it has a stable name like any other opcode
+([slang-ir-insts-stable-names.lua](../../../../source/slang/slang-ir-insts-stable-names.lua)),
+so it is written by the same `kIROp_StringLit` / `kIROp_BlobLit` case
+of `serializeAsFlatModule` that handles string literals — the blob's
+bytes land in `stringLengths` / `stringChars`. Reading the file back
+with `-dump-module` therefore prints it inside the IR listing, as
+`EmbeddedDownstreamIR(<targetCode> : Int, ...)`.
+
 The RIFF wrapping is what allows tools to inspect partial structure
 of a `.slang-module` file (chunk types, sizes) without parsing the
 inner serialized content — useful for sanity checks and recovery.
@@ -228,6 +248,29 @@ bool / integer / float / pointer constant. On load,
 allocates every instruction up front and then a recursive lambda
 rebuilds the parent/child links and resolves operand pointers by
 indexing back into the allocated `insts` array.
+
+A worked example makes the shape of `operandIndices` concrete. Take a
+module whose only content is the integer constant `42` of type `Int`.
+Preorder traversal numbers the module instruction 0 and its children
+after it — literals are moved to the end of the module's child list by
+`kReorderInstructionsForSerialization` — giving:
+
+| index | `instAllocInfo`            | `childCounts` | `operandIndices` slice |
+| ----- | -------------------------- | ------------- | ---------------------- |
+| 0     | `ModuleInst`, 0 operands   | 2             | `-1`                   |
+| 1     | `IntType`, 0 operands      | 0             | `-1`                   |
+| 2     | `IntLit`, 0 operands       | 0             | `1`                    |
+
+`operandIndices` is the concatenation of those slices, `[-1, -1, 1]`.
+Every instruction contributes its type-use slot whether or not it has a
+type, followed by its operands; nothing marks where one instruction's
+run ends, so the reader recovers that from
+`instAllocInfo[i].operandCount`. The two `-1` entries here are not
+missing operands but missing *types* — of the module instruction and of
+`IntType` itself — since `instMap` maps `nullptr` to `-1` once and the
+same encoding then covers a null type and a null operand. The
+constant's value is not in this table at all: `42` is the single entry
+of `literals`.
 
 Because the flat tables come from a file that may be malformed,
 `deserializeFromFlatModule` treats their relationships as
@@ -266,15 +309,30 @@ in
 [slang-source-loc.h](../../../../source/compiler-core/slang-source-loc.h)
 is meaningful only relative to the live `SourceManager` of the
 session that produced it. The serializer therefore captures, per
-contributing source file, its path, its source-location range, and
-line-start records (both unadjusted and `#line`-adjusted) for just the
-lines a serialized location actually reaches, plus the file's total
-line count, alongside the integer locations. The reader rebuilds the
-full line-break array from those records, and reconstructs each file
-into a fresh
+contributing source file, its path, its source-location range, its
+total line count, and one line-start record for each line a serialized
+location actually reaches, alongside the integer locations. The reader
+rebuilds the full line-break array from those records, and
+reconstructs each file into a fresh
 `SourceManager` on load with `createSourceFileWithSize` (a
 placeholder-sized file plus a single view — the file's content is not
 serialized).
+
+A reached line lands in exactly one of two lists, chosen by whether a
+`#line` directive was in effect there: `SerialSourceLocWriter::addSourceLoc`
+adds a plain `LineInfo` (physical line index plus its start offset)
+when the view has no entry covering the location, and an
+`AdjustedLineInfo` — that same physical `LineInfo`, plus the remapped
+line index and the overridden path — when it does. Neither list is a
+substitute for the other on load. The reader takes the *physical*
+`LineInfo` out of both lists to rebuild the line-break array, and then
+turns each `AdjustedLineInfo` back into a `SourceView::Entry` whose
+`m_lineAdjust` is the remapped index minus the physical one. That is
+the representation a live `SourceManager` uses for a `#line` override
+in the first place, so a reloaded location resolves to the physical
+line or to the remapped line and path depending on which the consumer
+asks for, exactly as in the session that wrote it; the remapping is
+never baked into the line table.
 
 Driver: [slang-serialize-source-loc.cpp](../../../../source/slang/slang-serialize-source-loc.cpp).
 
@@ -310,6 +368,25 @@ it against `kSupportedSerializationVersion` (currently `1`) and returns
 the place a future multi-version reader would branch. The full design is
 described in
 [../../../design/backwards-compat-for-ir-modules.md](../../../design/backwards-compat-for-ir-modules.md).
+
+Two different version numbers are in play, and only one of them can
+fail a load. `IRModuleInfo::serializationVersion` versions the *fossil
+schema* of the payload; it is the value `readSerializedModuleIR_`
+compares, and that comparison is the only version check on the read
+path. The module carries a second, unrelated number: `IRModule::m_version`
+is serialized next to the module's name in `handleIRModule` and handed
+straight back out by `readSerializedModuleInfo`, never compared to
+anything. It versions the module's IR semantics rather than its
+encoding, and it is what `-get-module-info` prints as `Module Version`;
+the inclusive window `-get-supported-module-versions` prints
+(`IRModule::k_minSupportedModuleVersion` and
+`k_maxSupportedModuleVersion`, declared in `slang-ir.h`, which is
+outside this page's watched paths) bounds *that* number. The two are
+therefore separate namespaces: a module whose `Module Version` sits
+inside the published window still fails to load if its
+`serializationVersion` is not the single value this reader accepts, and
+no code in the watched paths rejects a module for falling outside the
+window.
 
 The `Unrecognized` opcode that appears at the head of
 [slang-ir-insts.lua](../../../../source/slang/slang-ir-insts.lua) plays

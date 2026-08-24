@@ -244,6 +244,10 @@ public:
     virtual bool isEnd() SLANG_OVERRIDE;
     virtual SlangResult flush() SLANG_OVERRIDE;
 
+    /// True when the backing stream has no more bytes, even if this stream still has buffered
+    /// bytes available to consume.
+    bool isSourceEnd() const { return m_stream == nullptr || m_stream->isEnd(); }
+
     /// Will read assuming backing stream is
     SlangResult update();
 

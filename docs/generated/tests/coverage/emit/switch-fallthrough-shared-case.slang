@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T15:00:00Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=620238fbdc64454143e731292800028152e8e67e2b491ba038b7ff1979f8cb84
+//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
 //META: purpose=Verifies a `switch` with shared empty cases and a fall-through case emits shared case labels and pins the per-target fall-through shape (HLSL duplicates the default body, GLSL/SPIR-V do not).
 //META: intent=characterization
 //META: covers=source/slang/slang-emit-c-like.cpp

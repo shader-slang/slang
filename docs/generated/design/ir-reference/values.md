@@ -168,8 +168,8 @@ and `Poison`; only its concrete children are listed here.
 
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
-| `LoadFromUninitializedMemory` | `LoadFromUninitializedMemory` | — | | (synthesized) | A load from uninitialized memory; like LLVM's `freeze(undef)`. Frontend diagnostics surface uses. |
-| `Poison` | `Poison` | — | H | (synthesized) | Infectious undefined value; analogue of LLVM `poison`. Hoistable, so all poison values of the same type dedupe to one inst (built via `IRBuilder::getPoison`). |
+| `LoadFromUninitializedMemory` | `LoadFromUninitializedMemory` | — | | (synthesized by SSA construction) | A load from uninitialized memory; like LLVM's `freeze(undef)`. Emitted by `readVarRec` in the SSA pass ([slang-ir-ssa.cpp](../../../../source/slang/slang-ir-ssa.cpp) lines 1033 and 1121) when a variable is read on a path with no reaching store; built by `IRBuilder::emitLoadFromUninitializedMemory` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3289). Frontend diagnostics surface uses. |
+| `Poison` | `Poison` | — | H | (synthesized by legalization and autodiff passes) | Infectious undefined value; analogue of LLVM `poison`. Hoistable, so all poison values of the same type dedupe to one inst. Unlike the row above it has no single owning pass: `IRBuilder::getPoison` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 3297) is called wherever an operation provably has no defined result — empty-array legalization ([slang-ir-legalize-empty-array.cpp](../../../../source/slang/slang-ir-legalize-empty-array.cpp) line 89 onward), vector-type legalization, `Conditional<T>` lowering, GLSL varying legalization, and reverse-mode autodiff among them. |
 | `defaultConstruct` | `DefaultConstruct`‡ | — | | `DefaultConstructExpr` (`visitDefaultConstructExpr`, line 6737) and `getDefaultVal` (line 6643); also synthesized in IR passes | Produces a default-initialized value of the result type; nullary (`IRBuilder::emitDefaultConstructRaw`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4144). |
 
 ### Arithmetic and bitwise
@@ -276,12 +276,12 @@ The `DescriptorHandle<T>` conversions below *are* owned by this page.
 | Opcode | C++ wrapper | Operands | Flags | AST origin | Summary |
 | --- | --- | --- | --- | --- | --- |
 | `BuiltinCast` | `BuiltinCast` | `val` | | `BuiltinCastExpr` (`visitBuiltinCastExpr`, line 7185) | Fallback emitted by `emitCast` when either side's `TypeCastStyle` is `Unknown` (i.e. not a scalar / pointer / enum), leaving the conversion for a later pass. |
-| `bitCast` | `BitCast` | `val` | | core-module `__intrinsic_op($(kIROp_BitCast))` declarations, e.g. the GLSL `*BitsTo*` family ([glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 832 onward) | Reinterpret bits without changing them; also the `Ptr` → `Ptr` entry of the `emitCast` table, and `IRBuilder::emitBitCast` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6646). There is no `BitCastExpr` AST node. |
+| `bitCast` | `BitCast` | `val` | | core-module `bit_cast<T, U>` ([core.meta.slang](../../../../source/slang/core.meta.slang) line 3377) and the other `__intrinsic_op($(kIROp_BitCast))` declarations, e.g. the GLSL `*BitsTo*` family ([glsl.meta.slang](../../../../source/slang/glsl.meta.slang) line 832 onward) | Reinterpret bits without changing them; also the `Ptr` → `Ptr` entry of the `emitCast` table, and `IRBuilder::emitBitCast` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6646). There is no `BitCastExpr` AST node. The HLSL-compatibility reinterpret builtins `asuint` / `asint` / `asfloat` / `asdouble` are *not* a surface for this opcode: they are declared with `__intrinsic_asm` rather than `__intrinsic_op` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 8391 onward), so they stay `call` instructions through the whole value pipeline and are resolved by the target-intrinsic mechanism at emit. |
 | `reinterpret` | `Reinterpret` | `val` | | core-module `reinterpret<T,U>` ([core.meta.slang](../../../../source/slang/core.meta.slang) line 3406) | Same bit pattern, different type tag; less restrictive than `bitCast` (any scalar / vector / matrix / struct / array). There is no `ReinterpretExpr` AST node. |
 | `ReinterpretOptional` | `ReinterpretOptional` | `val` | | **no producer at HEAD** | Covariant `Optional<T>` → `Optional<U>` conversion. The comment at [slang-ir-typeflow-set.cpp](../../../../source/slang/slang-ir-typeflow-set.cpp) line 266 says the set-upcast path emits it, but the code returns `openOptional(...)`, which builds the if-else directly; `lowerReinterpretOptional` only consumes instances that never appear. See [live-but-unproduced opcodes](#live-but-unproduced-opcodes). |
 | `unmodified` | `Unmodified` | `val` | | core-module `unused` / `unmodified` ([core.meta.slang](../../../../source/slang/core.meta.slang) lines 3431, 3438) | No-op cast that marks an `out` / `inout` parameter as deliberately untouched, silencing the uninitialized-use warning. |
-| `outImplicitCast` | `OutImplicitCast` | `baseAddress`† | | `out`-argument lowering in `tryGetAddress` (line 10181) | Implicit cast at the boundary of an `out` parameter. Despite the Lua name `value` the operand is the *address* of the caller's variable, and the result type is a `Ptr`. |
-| `inOutImplicitCast` | `InOutImplicitCast` | `baseAddress`† | | `inout` / borrowed-`inout` argument lowering in `tryGetAddress` (line 10177) | The `inout` counterpart; same pointer-in / pointer-out shape. |
+| `outImplicitCast` | `OutImplicitCast` | `baseAddress`† | | `OutImplicitCastExpr` (`visitLValueImplicitCastExpr`, line 7756), materialized by `tryGetAddress` (line 10193) | Implicit cast at the boundary of an `out` parameter. Despite the Lua name `value` the operand is the *address* of the caller's variable, and the result type is a `Ptr`. A same-type argument does *not* produce it — that case passes the caller's `var` pointer through unchanged. See [`out` / `inout` argument casts](#out--inout-argument-casts). |
+| `inOutImplicitCast` | `InOutImplicitCast` | `baseAddress`† | | `InOutImplicitCastExpr` (`visitLValueImplicitCastExpr`, line 7756), materialized by `tryGetAddress` (line 10189) | The `inout` / borrowed-`inout` counterpart; same pointer-in / pointer-out shape and the same narrow reachability condition. |
 | `intCast` | `IntCast`‡ | `value` | | `emitCast` table (Int→Int, Int→Bool, Bool→Int) | Integer-to-integer cast (sign / zero extension chosen by types). |
 | `floatCast` | `FloatCast`‡ | `value` | | `emitCast` table (Float→Float) | Float-to-float cast (precision change). |
 | `castIntToFloat` | `CastIntToFloat`‡ | `value` | | `emitCast` table (Int→Float, Bool→Float) | Int-to-float conversion. |
@@ -293,7 +293,7 @@ The `DescriptorHandle<T>` conversions below *are* owned by this page.
 | `PtrCast` | `PtrCast` | `value` | | — (no producer at `source_commit`) | Cast between pointer types of different element types; only the emitters and instruction-classification switches mention it. |
 | `CastEnumToInt` | `CastEnumToInt` | `value` | | `emitCast` table (Enum→Int and the first half of Enum→Float / Enum→Bool / Enum→Ptr) | Casts an enum value to its underlying integer tag. |
 | `CastIntToEnum` | `CastIntToEnum` | `value` | | `emitCast` table (Int→Enum, Bool→Enum, and the second half of Float→Enum / Ptr→Enum) | Casts an integer to an enum type. |
-| `EnumCast` | `EnumCast` | `value` | | `emitCast` table (Enum→Enum) | Casts between two enum types with the same underlying type. |
+| `EnumCast` | `EnumCast` | `value` | | `emitCast` table (Enum→Enum) | Casts between two enum types with the same underlying type. Enum-to-enum conversion written in Slang source does not reach this cell: the checker's explicit-coercion path for an enum target ([slang-check-conversion.cpp](../../../../source/slang/slang-check-conversion.cpp) line 2197) first coerces the operand to the *target* enum's tag type and then wraps that tag in the target enum, so it builds two nested `BuiltinCastExpr` nodes and lowering emits a `CastEnumToInt` followed by a `CastIntToEnum`. The Enum→Enum cell is reached only where a single `emitCast` call already has both enum types in hand. |
 | `CastUInt2ToDescriptorHandle` | `CastUInt2ToDescriptorHandle` | `value` | | `DescriptorHandle<T>.__init(uint2)` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27475) | Packs a `uint2` as a descriptor handle. |
 | `CastDescriptorHandleToUInt2` | `CastDescriptorHandleToUInt2` | `value` | | `uint2.__init(DescriptorHandle<T>)` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27531) | Unpacks a descriptor handle to a `uint2`. |
 | `CastUInt64ToDescriptorHandle` | `CastUInt64ToDescriptorHandle` | `value` | | `DescriptorHandle<T>.__init(uint64_t)` ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 27482) | Packs a `uint64_t` as a descriptor handle. |
@@ -320,7 +320,7 @@ The `DescriptorHandle<T>` conversions below *are* owned by this page.
 | `getAddr` | `GetAddress` | `ptr` | | — (no producer at `source_commit`) | Would mark a pointer as "an address obtained explicitly". `IRBuilder::emitGetAddress` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 6062) has no callers; `__getAddress` lowers to `assumeAddress` instead. |
 | `assumeAddress` | `AssumeAddress` | `addr` | | `__getAddress(...)` address-of lowering (line 5821) | Marks an address as obtained via `__getAddress` so IR validation can reject cases the target disallows (a local variable, a function parameter); lowered away to its operand after validation. |
 | `swizzle` | `Swizzle`‡ | `base, index0, index1, ...`† (`min=1`) | | `SwizzleExpr` (`visitSwizzleExpr`, line 7933 for rvalues, line 7794 for lvalues) | Reads a swizzle of a vector. `getBase()` is operand 0; `getElementIndex(i)` is operand `i + 1`, and `getElementCount()` is `getOperandCount() - 1`. Each index is an integer literal. |
-| `swizzleSet` | `SwizzleSet`‡ | `base, source, index0, ...`† (`min=2`) | | Assignment to a swizzle lvalue (`assign`, line 10315) | Returns a copy of `base` with the selected lanes replaced by `source`. `getElementIndex(i)` is operand `i + 2`. |
+| `swizzleSet` | `SwizzleSet`‡ | `base, source, index0, ...`† (`min=2`) | | Assignment to a swizzle lvalue whose base has no address (`assign`, line 10327) | Returns a copy of `base` with the selected lanes replaced by `source`. `getElementIndex(i)` is operand `i + 2`. Reached only when `tryGetAddress` cannot turn the swizzle's base into a pointer — see [`swizzle`, `swizzleSet`, `swizzledStore`](#swizzle-swizzleset-swizzledstore). |
 | `swizzledStore` | `SwizzledStore`‡ | `dest, source, index0, ...` (`min=2`) | | Assignment to a swizzle lvalue when the destination is addressable (`assign`, line 10260) | Stores selected lanes through a pointer. The Lua comment notes this is expected to be reduced to a write-mask form eventually. |
 | `matrixSwizzleStore` | `MatrixSwizzleStore`‡ | `dest, source, (row, col)...` (`min=2`) | | Assignment to a matrix-swizzle lvalue (`assign`, line 10392) | Stores selected matrix elements through a pointer. Indices come in *pairs*: `getElementRow(i)` is operand `2 + 2i` and `getElementCol(i)` is operand `2 + 2i + 1`, so `getElementCount()` is `(getOperandCount() - 2) / 2`. |
 | `updateElement` | `UpdateElement`‡ | `base, newElement, accessKey0, ...`† | | (synthesized) | Functional update: returns a copy of `base` with one nested element replaced. See [`updateElement`](#updateelement). |
@@ -363,7 +363,7 @@ becomes a `makeVector`.
 | `makeArrayFromElement` | `MakeArrayFromElement` | `element` | | `MakeArrayFromElementExpr` (`visitMakeArrayFromElementExpr`, line 6757); core-module array-splat intrinsic ([diff.meta.slang](../../../../source/slang/diff.meta.slang) line 1359); also `getDefaultVal` for array types (line 6672) | Splats a single element into a fixed-size array. |
 | `makeCoopVector` | `MakeCoopVector` | `components...`† | | `InitializerListExpr` (line 6910) | Constructs a cooperative-vector value. |
 | `makeCoopVectorFromValuePack` | `MakeCoopVectorFromValuePack` | `valuePack` | | Core-module coop-vector intrinsic ([hlsl.meta.slang](../../../../source/slang/hlsl.meta.slang) line 31970) | Constructs a cooperative-vector value from a `valuePack`. |
-| `makeCoopMatrixFromScalar` | `MakeCoopMatrixFromScalar` | `scalarValue`† | | (synthesized) | Constructs a cooperative-matrix value from a scalar (`IRBuilder::emitMakeCoopMatrixFromScalar`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4931). |
+| `makeCoopMatrixFromScalar` | `MakeCoopMatrixFromScalar` | `scalarValue`† | | (synthesized by `IRBuilder::emitDefaultConstruct`) | Constructs a cooperative-matrix value from a scalar (`IRBuilder::emitMakeCoopMatrixFromScalar`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4940). No `__intrinsic_op` in any core module names this opcode, and its emitter's only caller is the `CoopMatrixType` case of `IRBuilder::emitDefaultConstruct` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4291), so it never arises from a call written in Slang source. |
 | `makeStruct` | `MakeStruct` | `fieldValues...`† | | `InitializerListExpr` (line 6970) and `getDefaultVal` (line 6731) | Constructs a struct from its field values, in declaration order. |
 | `makeTuple` | `MakeTuple` | `elements...`† | | `TupleExpr` (`visitTupleExpr`, line 6519) and `InitializerListExpr` (line 6965); core-module tuple constructors ([core.meta.slang](../../../../source/slang/core.meta.slang) lines 1943, 1948) | Constructs a tuple. |
 | `makeTargetTuple` | `MakeTargetTuple` | `elements...`† | | (synthesized) | Tuple-typed value keyed by target name, used by `targetSwitch` (see [control-flow.md](control-flow.md#switch-and-targetswitch)); built by `IRBuilder::emitMakeTargetTuple` ([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4708). |
@@ -379,7 +379,7 @@ becomes a `makeVector`.
 | --- | --- | --- | --- | --- | --- |
 | `matrixReshape` | `MatrixReshape` | `matrix` | | Core-module `matrix.__init(matrix<T,R,C,L>)` reshaping overloads, generated at [core.meta.slang](../../../../source/slang/core.meta.slang) line 2867 | Reshapes a matrix to a different row / column count with the same element type. |
 | `vectorReshape` | `VectorReshape` | `vector` | | (synthesized) | Reshapes a vector (`IRBuilder::emitVectorReshape`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4596). |
-| `getTupleElement` | `GetTupleElement`‡ | `tuple, elementIndex`† (`min=2`) | | `MemberExpr` on a tuple; `EachExpr` (`visitEachExpr`, line 6554) | Reads one element of a tuple. |
+| `getTupleElement` | `GetTupleElement`‡ | `tuple, elementIndex`† (`min=2`) | | `EachExpr` (`visitEachExpr`, line 6560) | Reads one element of a tuple, and `visitEachExpr` is the *only* site in lowering that emits it. Positional member access is not a second surface: the member names of a `Tuple` are swizzle components ([core.meta.slang](../../../../source/slang/core.meta.slang) line 1929), so `checkTupleSwizzleExpr` ([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp) line 8251) rewrites `t._0` into a swizzle and lowering emits `swizzle` — the same opcode that reads vector lanes. |
 | `getTargetTupleElement` | `GetTargetTupleElement`‡ | `tuple, elementIndex`† | | (synthesized) | Reads one element of a target tuple (`IRBuilder::emitTargetTupleGetElement`, [slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 4715). |
 
 ### Result / Optional / Conditional helpers
@@ -486,6 +486,26 @@ and `IRIntLit`, `IRFloatLit`, `IRBoolLit`, `IRStringLit`, and `IRPtrLit`
 derive from it at lines 1109-1146. `IRVoidLit` and `IRBlobLit` carry no
 distinct payload accessors and are FIDDLE-generated.
 
+The IR dump reflects that encoding rather than hiding it.
+`shouldFoldInstIntoUses`
+([slang-ir.cpp](../../../../source/slang/slang-ir.cpp) line 7822)
+folds every `IRConstant` into its use sites, so a literal never gets a
+definition line of its own; it is printed inline wherever it is used,
+by `dumpInstExpr` (line 8164):
+
+```
+add(%a, 42 : Int)
+return_val(void_constant)
+```
+
+The inline spelling is `<value> : <Type>` for `IntLit` and `FloatLit`,
+a bare `true` / `false` for `BoolLit` (no type clause), the quoted
+bytes for `StringLit`, `<ptr>` for `PtrLit`, and `<binary blob>` for
+`BlobLit`. `VoidLit` has no case in that switch and falls through to
+the generic form, which prints the opcode name — `void_constant`. The
+one exception to the folding is `IRDumpOptions::Mode::Detailed`, which
+turns folding off so the dump mirrors the instruction list exactly.
+
 ### C++ wrappers: hand-written vs generated
 
 Every opcode on this page has an `IR<struct_name>` wrapper struct;
@@ -579,6 +599,32 @@ is the one member of the group whose trailing operands are *pairs*:
 operands `2 + 2i` and `2 + 2i + 1`, so a reader who assumes one index
 per element will double-count.
 
+Which of `swizzleSet` and `swizzledStore` an assignment produces is
+decided by whether the swizzle's *base* has an address. `assign`
+([slang-lower-to-ir.cpp](../../../../source/slang/slang-lower-to-ir.cpp)
+line 10249) runs `tryGetAddress` over the base first: if that yields a
+pointer it emits `swizzledStore` (or a plain `store` through
+`getElementPtr` when only one lane is selected), and otherwise it
+loads the whole base, applies `swizzleSet`, and tail-recursively
+assigns the updated value back through whatever write the base does
+support.
+
+A base without an address is a `property` or `__subscript` that has
+`get` / `set` accessors but no `ref` accessor: such an access lowers
+to a `BoundStorage`, and `tryGetAddress` can only turn a
+`BoundStorage` into a pointer by calling a `ref` accessor (line
+10042).
+
+```slang
+struct S
+{
+    float4 v;
+    property P : float4 { get { return v; } set { v = newValue; } }
+}
+// s.P.xy = float2(1, 2);  -> get, swizzleSet, set
+// s.v.xy = float2(1, 2);  -> swizzledStore
+```
+
 ### `updateElement`
 
 `updateElement` is a functional update: it returns a copy of an
@@ -653,6 +699,19 @@ vector, `makeMatrixFromScalar` for a matrix, `makeOptionalNone` for an
 set. So a `defaultConstruct` in the IR usually means the type was one
 it could not decompose.
 
+The types it cannot decompose are the ones with no case in that
+switch: an opaque resource or sampler type (`Texture2D`,
+`SamplerState`, a structured buffer), an interface-typed value, an
+unspecialized generic type parameter, and an associated type all fall
+straight through to the fallback. Two shapes that look decomposable
+join them — an array or cooperative vector whose element count is not
+an `IRIntLit` (a `let N : int` generic parameter, before
+specialization), and one whose literal count exceeds the 4096-element
+cap the same code applies. `fallback` defaults to `true`
+([slang-ir-insts.h](../../../../source/slang/slang-ir-insts.h) line
+3849), so all of those cases do produce the opcode rather than
+returning null to the caller.
+
 ### `MakeUInt64`
 
 `makeUInt64(low, high)` constructs a 64-bit value from two 32-bit
@@ -660,6 +719,27 @@ halves. The opcode exists because several targets do not have a
 direct `uint64` literal form; the IR carries the two halves as
 explicit operands so the backend can emit either a single literal
 (when supported) or the two halves combined at runtime.
+
+### `out` / `inout` argument casts
+
+`outImplicitCast` and `inOutImplicitCast` have no cast expression of
+their own in ordinary source, and they are far rarer than their
+`AST origin` cell suggests. An argument whose type already matches the
+parameter produces no cast: the caller's `var` pointer is passed
+straight through. The opcodes appear only for an argument that is an
+l-value of a *different* type which the checker is willing to
+round-trip through a temporary, and that set is narrow —
+`_canLValueCoerceScalarType`
+([slang-check-expr.cpp](../../../../source/slang/slang-check-expr.cpp)
+line 3854) accepts only two integer types of the same width, or the
+vector / matrix forms of such a pair, so `int` / `uint` is close to
+the whole surface. There the checker rewrites the argument into an
+`OutImplicitCastExpr` or `InOutImplicitCastExpr` (line 4333), the
+lvalue lowering visitor records it as an `ImplicitCastedLValue`, and
+`tryGetAddress` materializes the opcode with the caller's address as
+its operand so the callee can write to a temporary that is copied
+back. A type difference the coercion does not cover is rejected at
+semantic check before lowering runs.
 
 ### Descriptor-handle conversions
 

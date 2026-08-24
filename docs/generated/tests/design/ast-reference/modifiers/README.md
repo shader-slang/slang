@@ -1,11 +1,11 @@
 ---
 generated: true
 model: claude-opus-5[1m]
-generated_at: 2026-08-04T00:00:00+00:00
-source_commit: 7e725f15572c6589ee6d738a8856fb3348f11617
-watched_paths_digest: 2cc71107bef9f32ac0ba4fee313c730f9a5e78f23f9fbb7266ea943026e9030b
+generated_at: 2026-08-13T00:00:00+00:00
+source_commit: c0e5ca5c55ff5ea6b210ac9418bac04728cc45e0
+watched_paths_digest: 377a2d857db29e87bcc44f87d7b606adab97df6fd96e02b137bae9ab3cdb396d
 source_doc: docs/generated/design/ast-reference/modifiers.md
-source_doc_digest: e0fde5cbdfb01c579e7a31530d3365bdb8349db84d26a5fb36997c42ecc183ec
+source_doc_digest: 863716a44fb4c952e1da36ea310bcc228cb8ec6bb5b8458538899a1e5cdea749
 warning: "Auto-generated. May drift from source. Do not edit by hand."
 ---
 
@@ -69,10 +69,146 @@ Realignment notes for this revision of the source doc:
   That test passed vacuously and has been replaced by an HLSL pair that
   observes the storage-shape difference the modifier actually causes.
 
-The bundle is 60 files, the manifest's `size_cap_files` for this key. The
-doc's node tables enumerate several hundred classes, so the cap -- not the
-claim list -- is what bounds the bundle; the families left over are listed
-under `## Untested claims` with the reason each was deferred.
+The bundle is 62 files, two over the manifest's `size_cap_files: 60` for this
+key. The doc's node tables enumerate several hundred classes, so the cap --
+not the claim list -- is what bounds the bundle; the families left over are
+listed under `## Untested claims` with the reason each was deferred. The two
+files over the cap are the pair this revision's doc-gap fill made testable:
+the `[format(...)]` argument form and the `[UnscopedEnum]`-on-`enum class`
+conflict. Both are diagnostics with a pinned code, and there is no existing
+test in the bundle they could be folded into, so the overflow is reported
+here rather than resolved by dropping coverage.
+
+## Claims
+
+Enumerated per [`_claims.md` §1](../../../_meta/prompts/_claims.md), grouped by
+the document's own headings. The page catalogues several hundred `Modifier`
+subclasses, most of which are core-module bindings or checker-internal markers
+with no user spelling at all. Enumerating those at one claim per table row
+would produce a list in which almost every entry reads "this class exists", so
+the internal tables are enumerated as **one claim per table** and carried in
+`## Untested claims` with reason `internal-source-fact`; the user-spellable
+surfaces and every prose claim under `## Notable nodes` are enumerated
+individually.
+
+**User-observable**
+
+_`#parameter-direction-and-storage-class-modifiers`_
+
+1. `in`, `out` and `inout` are the parameter directions, `inout` being a refinement of `out`.
+2. `__ref` is the `ref` parameter passing mode, and the un-prefixed `ref` is _not_ a parameter modifier -- it spells a `ref` property accessor instead.
+3. `__constref` is the borrow parameter passing mode, and there is no `borrow` surface spelling.
+4. `const`, `inline`, `constexpr` and `extern` are the storage classes.
+
+_`#visibility-modifiers` / `#visibility-modifiers-and-language-version`_
+
+5. `public`, `private` and `internal` are the three visibility modifiers.
+6. The default when a decl names no visibility is per-module rather than global: legacy Slang treats everything as `public` and the modern language defaults to `internal`.
+
+_`#compatibility-and-hlsl-storage-class-modifiers`_
+
+7. `groupshared`, `static`, `uniform`, `volatile` and `precise` are the HLSL storage-class modifiers.
+
+_`#interpolation-modes`_
+
+8. `nointerpolation`, `noperspective`, `linear`, `sample`, `centroid` and `pervertex` are the interpolation modes.
+
+_`#matrix-layout-modifiers`_
+
+9. `row_major` and `column_major` are the HLSL matrix-layout keywords.
+10. Both keywords parse into the *HLSL* classes regardless of input dialect; the two `GLSL*` classes record the inverted convention in the hierarchy but no parse path constructs either, so the inversion is not observable today.
+
+_`#hlsl-geometry-shader-input-primitive-modifiers` / `#hlsl-mesh-shader-output--payload-modifiers`_
+
+11. `point`, `line`, `triangle`, `lineadj` and `triangleadj` are the geometry-shader input-primitive markers.
+12. `vertices`, `indices`, `primitives` and `payload` are the mesh / amplification output markers.
+
+_`#hlsl-semantics--sv`_
+
+13. `: NAME` is the simple semantic; `: register(...)` and `: packoffset(...)` are the layout-bearing forms; `: read(...)` / `: write(...)` are the ray-payload access semantics.
+
+_`#glsl-preprocessor--layout--format`_
+
+14. `globallycoherent` and the GLSL memory qualifiers (`coherent`, `volatile`, `readonly`, `writeonly`, `restrict`) may be written on a declaration.
+
+_`#type-modifiers-wrapping-the-type-rather-than-the-declaration`_
+
+15. `unorm` and `snorm` are the resource-element format modifiers.
+16. `no_diff` is the type-level differentiation modifier.
+17. `BitFieldModifier` carries a C-style bitfield width, with `offset` and the backing decl filled in during checking.
+
+_`#modifiers-vs-attributes`_
+
+18. A modifier is a bare keyword the parser knows by name; an attribute is `[ident(args)]` built as an `UncheckedAttribute` and resolved by the checker against an `AttributeDecl`.
+19. A group may be written either `[a]` or `[[a]]`.
+20. Several attributes may share one group and the comma between them is optional, so `[a, b]` and `[a b]` parse the same way.
+21. `parseAttributeName` flattens a `::`-qualified name into one identifier by replacing each `::` with `_`, which is why `[vk::binding(0)]` resolves against an `AttributeDecl` named `vk_binding`; a leading `::` becomes a leading `_`.
+
+_`#compile-time-hint-attributes-loops--branches--opt-levels`_
+
+22. `[unroll(N)]` is a hint forwarded to the downstream compiler that does not change Slang's own behaviour, so the loop survives into the emitted code carrying the hint.
+23. `[ForceUnroll(N)]` is performed by Slang itself before emitting target code, so no loop remains in the output.
+24. `[branch]` and `[flatten]` are the branch hints; `[loop]`, `[fastopt]`, `[forcecase]`, `[call]` and `[allow_uav_condition]` are the remaining loop / branch hints.
+25. `[UnscopedEnum]` makes the enum's cases resolve unqualified because the parser also adds a `static const` alias for each case to the enclosing container; it is added from the user-written attribute or implicitly when a non-generic plain `enum` is compiled with `-unscoped-enum`.
+26. `EnumClassModifier` is the marker the parser adds for the `enum class` spelling, and the conflicting shape it exists to detect is an explicit `[UnscopedEnum]` on an `enum class`.
+27. `[Flags]` numbers cases without an explicit initialiser with successive powers of two rather than consecutive integers.
+28. `[ForceInline]` inlines a callee and `[noinline]` keeps it as its own function.
+29. `[deprecated(message)]` reports a diagnostic at each use.
+
+_`#capability--target-attributes`_
+
+30. `[require(capability)]` ties a declaration to capability atoms and makes a call from an entry point that lacks them a checking error.
+31. `[format("rgba32f")]`, also spelled `[vk::image_format("rgba16f")]`, takes its argument as a `String`, so the format name must be a quoted string literal and not a bare identifier.
+
+_`#layout--binding-attributes`_
+
+32. `[push_constant]`, `[vk::binding(...)]`, `[vk::location(...)]`, `[SpecializationConstant]` and the rest of the layout / binding attributes record what the declaration said.
+
+_`#stage-specific-entry-point-attributes`_
+
+33. `[numthreads(x,y,z)]` (also spelled `[NumThreads(...)]`), `[shader("stage")]`, `[WaveSize(N)]`, `[earlydepthstencil]`, `[maxvertexcount(N)]`, `[instance(count)]` and the tessellation attributes are the stage-specific entry-point attributes.
+
+_`#work-graph-node-attributes` / `#work-graph-node-attribute-spellings`_
+
+34. The eight work-graph attributes are spelled in the experimental `workgraph.slang` standard module rather than in `core.meta.slang`.
+35. `NodeDispatchGridAttribute` records a grid fixed in the source and `NodeMaxDispatchGridAttribute` only an upper bound, and since both carry the same `x`/`y`/`z` triple it is the class, not the field shape, that tells them apart.
+
+_`#ray-tracing-attributes`_
+
+36. `[raypayload]` and the `__vulkan*` payload attributes are the ray-tracing attributes; several are also the checked form of a GLSL `layout(...)` entry.
+
+_`#mutability--autodiff-annotations`_
+
+37. `[mutating]` permits assigning through `this` and `[nonmutating]` does not.
+38. A call to a `[NoDiscard]` function used as a bare expression statement is error `30059`, "result of `[NoDiscard]` function is discarded", while binding the result is accepted.
+
+_`#differentiability-attributes` / `#differentiable-attribute-family`_
+
+39. The plain `[Differentiable(order = 0)]` maps to `BackwardDifferentiableAttribute` exactly like the explicit `[BackwardDifferentiable(order = 0)]`; only `[ForwardDifferentiable]` maps to the forward class.
+40. `[ForwardDerivative(fn)]` and `[BackwardDerivative(fn)]` bind an explicit derivative function, and the `DerivativeOf` spellings declare a function as another's derivative.
+41. The attribute is a front-end marker, not a fact later stages re-read: checking synthesizes an `IForwardDifferentiable` conformance and the differentiability queries hand back the resulting witness.
+
+_`#inheritance-control-attributes`_
+
+42. `[open]` on an aggregate type lets it be inherited from or implemented by types declared in other modules, and this is also the default for a type carrying neither attribute.
+43. `[sealed]` rejects the cross-module relationship -- inheriting from it or conforming to it from another module -- while a type in the declaring module may still implement it.
+
+_`#cuda--python--ffi-attributes`_
+
+44. `[CudaKernel]`, `[CudaDeviceExport]`, `[CudaHost]`, `[TorchEntryPoint]`, `[PyExport(name)]`, `[DllImport(...)]` and `[DllExport]` are the CUDA / Python / FFI attributes.
+
+**Internal-source facts** (one claim per internal table or prose subsection; carried in `## Untested claims`)
+
+45. The family-hierarchy graph and the abstract intermediates it names.
+46. `UncheckedAttribute` is the parse-time shape of an attribute, with a `scope` recording where to look the name up.
+47. The `Override / require / export / import boilerplate` table.
+48. The `Internal / synthesized modifiers` table -- markers the checker adds that never come from user syntax.
+49. The `Intrinsic and target-binding modifiers` table, and the prose claims about `IntrinsicOpModifier`, `TargetIntrinsicModifier` and `SpecializedForTargetModifier`.
+50. The `Implicit parameter-group machinery` table.
+51. The `Unchecked GLSL layout attributes` table and the `GLSLLayout*Modifier` begin / entry / end group shape that checking rewrites into `Attribute`-rooted equivalents.
+52. `MemoryQualifierSetModifier` aggregates several GLSL memory qualifiers on one declaration into a bitmask while the individual modifiers still exist at parse time.
+53. There is no `HLSLAttribute`, `LayoutModifier` or `HLSLLayoutModifier` class; the layout-related roles are split across `HLSLLayoutSemantic`, `MatrixLayoutModifier` and the `GLSLLayout*` group.
+54. The surface spelling of an attribute comes from `attribute_syntax` declarations in `core.meta.slang`, `diff.meta.slang`, `hlsl.meta.slang` and `workgraph.slang`, not from the C++ modifier header.
 
 ## Functional coverage
 
@@ -80,6 +216,7 @@ under `## Untested claims` with the reason each was deferred.
 | --------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The `[format("...")]` attribute selects the image format recorded on the emitted SPIR-V image type.                                     | functional | [#capability--target-attributes](../../../../design/ast-reference/modifiers.md#capability--target-attributes)                                                               | [`format-attribute-emits-spirv-image-format.slang`](format-attribute-emits-spirv-image-format.slang)                                                 |
 | The `[vk::image_format("...")]` spelling is the alternate form of the format attribute and selects the same emitted image format.       | functional | [#capability--target-attributes](../../../../design/ast-reference/modifiers.md#capability--target-attributes)                                                               | [`vk-image-format-alternate-spelling.slang`](vk-image-format-alternate-spelling.slang)                                                               |
+| The format attribute's argument is declared as a String, so a bare identifier such as [format(rgba32f)] is rejected with E33071 rather than being read as a format name. | negative | [#capability--target-attributes](../../../../design/ast-reference/modifiers.md#capability--target-attributes) | [`format-attribute-bare-identifier-rejected.slang`](format-attribute-bare-identifier-rejected.slang) |
 | `[require(capability)]` makes a call from an entry point that lacks the capability a checking error.                                    | negative   | [#capability--target-attributes](../../../../design/ast-reference/modifiers.md#capability--target-attributes)                                                               | [`require-capability-rejects-incompatible-target.slang`](require-capability-rejects-incompatible-target.slang)                                       |
 | `[require(spirv)]` lets a function be called from an entry point compiled for a target that supplies the capability.                    | functional | [#capability--target-attributes](../../../../design/ast-reference/modifiers.md#capability--target-attributes)                                                               | [`require-capability-accepts-matching-target.slang`](require-capability-accepts-matching-target.slang)                                               |
 | A function-scope `static` variable retains its value across calls to the function.                                                      | functional | [#compatibility-and-hlsl-storage-class-modifiers](../../../../design/ast-reference/modifiers.md#compatibility-and-hlsl-storage-class-modifiers)                             | [`static-local-persists-across-calls.slang`](static-local-persists-across-calls.slang)                                                               |
@@ -92,6 +229,7 @@ under `## Untested claims` with the reason each was deferred.
 | `[ForceUnroll]` unrolls the loop inside Slang, so no loop remains in the emitted HLSL.                                                  | functional | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels)         | [`force-unroll-attribute-eliminates-loop.slang`](force-unroll-attribute-eliminates-loop.slang)                                                       |
 | `[UnscopedEnum]` written by the user on a plain enum makes its cases resolvable without qualification.                                  | functional | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels)         | [`unscoped-enum-attribute-unqualified-case-access.slang`](unscoped-enum-attribute-unqualified-case-access.slang)                                     |
 | `[deprecated(message)]` makes each use of the declaration report a deprecation diagnostic.                                              | negative   | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels)         | [`deprecated-attribute-warns-at-use.slang`](deprecated-attribute-warns-at-use.slang)                                                                 |
+| The enum class marker exists to detect an explicit UnscopedEnum on an enum class, and that combination is rejected as a conflicting modifier. | negative | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels) | [`unscoped-enum-on-enum-class-rejected.slang`](unscoped-enum-on-enum-class-rejected.slang) |
 | `[noinline]` keeps the helper as its own function in emitted HLSL.                                                                      | functional | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels)         | [`noinline-helper-survives-on-hlsl.slang`](noinline-helper-survives-on-hlsl.slang)                                                                   |
 | `[unroll]` on a loop appears as an unroll attribute in the emitted code.                                                                | functional | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels)         | [`unroll-attribute-fanout-on-glsl.slang`](unroll-attribute-fanout-on-glsl.slang), [`unroll-attribute-on-hlsl.slang`](unroll-attribute-on-hlsl.slang) |
 | `[CudaKernel]` marks a function as a CUDA kernel; the emitted CUDA carries the `__global__` decoration.                                 | functional | [#cuda--python--ffi-attributes](../../../../design/ast-reference/modifiers.md#cuda--python--ffi-attributes)                                                                 | [`cuda-kernel-emits-global-decoration.slang`](cuda-kernel-emits-global-decoration.slang)                                                             |
@@ -156,9 +294,11 @@ under `## Untested claims` with the reason each was deferred.
 | The remaining differentiability rows: `[TreatAsDifferentiable]`, `[HasTrivialForwardDerivative]`, `[BackwardDerivative(fn)]`, `[ForwardDerivativeOf(fn)]`, `[BackwardDerivativeOf(fn)]`, `[PrimalSubstitute(fn)]`, `[NoDiffThis]`, `[DerivativeMember(...)]`, `[MaybeDifferentiable]`.                              | out-of-bundle          | [#differentiability-attributes](../../../../design/ast-reference/modifiers.md#differentiability-attributes)                                                                 | The family's three distinct roles -- marker, explicit-derivative binding, and forward/backward mode asymmetry -- are each covered here by one representative; the individual autodiff transforms belong to the `pipeline/05-ir-passes` bundle.                                                                                                                                |
 | The `Override / require / export / import boilerplate` table (`override`, `require`, `HLSLExportModifier`, `ExportedModifier`, `TransparentModifier`, `FromCoreModuleModifier`, `PrefixModifier`, `PostfixModifier`).                                                                                               | needs-multi-file-test  | [#override--require--export--import-boilerplate](../../../../design/ast-reference/modifiers.md#override--require--export--import-boilerplate)                               | The export/import half is only observable across two compilation units -- a module exporting a symbol and a second importing it -- which a single-file `//TEST` cannot set up.                                                                                                                                                                                                |
 | The default visibility of a declaration depends on the module's language version: legacy Slang treats everything as `public` while the modern language defaults to `internal`.                                                                                                                                      | needs-multi-file-test  | [#visibility-modifiers-and-language-version](../../../../design/ast-reference/modifiers.md#visibility-modifiers-and-language-version)                                       | A default of `internal` rather than `public` only changes behaviour when a second module tries to reach the declaration; within one file both defaults permit the access.                                                                                                                                                                                                     |
+| `[open]` lets a type be inherited from or implemented by types declared in other modules and is the default for a type carrying neither attribute, while `[sealed]` rejects exactly that cross-module relationship. | needs-multi-file-test | [#inheritance-control-attributes](../../../../design/ast-reference/modifiers.md#inheritance-control-attributes) | Both halves are about a *second* module reaching the type. Within one file `[open]`, `[sealed]` and an unannotated type all behave identically, which is what [`open-interface-allows-implementation.slang`](open-interface-allows-implementation.slang) and [`sealed-interface-allows-direct-conformance.slang`](sealed-interface-allows-direct-conformance.slang) cover; the rejection needs a second `.slang` compiled against the first. |
+| `__constref` is the borrow parameter passing mode and there is no `borrow` surface spelling. | out-of-bundle | [#parameter-direction-and-storage-class-modifiers](../../../../design/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers) | The mode's observable behaviour -- a read-only borrow of the caller's storage, contrasted against the `__ref` alias -- is covered by `paramtype-ref-and-constref.slang` in the `design/ast-reference/types` bundle, which owns the `BorrowInParamType` row for the same surface. |
 | The `Implicit parameter-group machinery` table (`ImplicitParameterGroupVariableModifier`, `ImplicitParameterGroupElementTypeModifier`, `ParameterGroupReflectionName`, `SharedModifiers`, `HasInterfaceDefaultImplModifier`).                                                                                       | internal-source-fact   | [#implicit-parameter-group-machinery](../../../../design/ast-reference/modifiers.md#implicit-parameter-group-machinery)                                                     | These mark compiler-introduced declarations; a user cannot write them, and the reflection name they carry is a reflection-API surface rather than a `slangc` text-output one.                                                                                                                                                                                                 |
 | The Python / FFI attributes (`[TorchEntryPoint]`, `[PyExport(name)]`, `[DllImport(...)]`, `[DllExport]`, `[AutoPyBindCUDA]`).                                                                                                                                                                                       | requires-external-tool | [#cuda--python--ffi-attributes](../../../../design/ast-reference/modifiers.md#cuda--python--ffi-attributes)                                                                 | Their role is only realised by a host Python / PyTorch / dynamic-loader runtime consuming the emitted artefact, which the `slang-test` harness does not invoke.                                                                                                                                                                                                               |
-| `GLSLRowMajorLayoutModifier` maps to _column_ and `GLSLColumnMajorLayoutModifier` maps to _row_, inverting the HLSL spellings.                                                                                                                                                                                      | needs-cli-test         | [#matrix-layout-modifiers](../../../../design/ast-reference/modifiers.md#matrix-layout-modifiers)                                                                           | The GLSL-flavoured spellings are only reachable in the compiler's GLSL-input compile mode, so verifying the inversion needs a `slangc` invocation with that mode enabled rather than a Slang-source test.                                                                                                                                                                     |
+| Both the `row_major` and `column_major` keywords parse into the HLSL classes regardless of input dialect; the two `GLSL*` classes record the inverted convention in the hierarchy but no parse path constructs either. | internal-source-fact | [#matrix-layout-modifiers](../../../../design/ast-reference/modifiers.md#matrix-layout-modifiers) | The doc now states that nothing under `source/` creates either class, so there is no input mode in which the inversion is observable; the claim is a statement about the C++ hierarchy only. The observable half -- what the HLSL keywords do to emitted storage -- is covered by the two matrix-layout tests. |
 | There is no `HLSLAttribute`, `LayoutModifier`, or `HLSLLayoutModifier` base class; the layout-related roles are split across `HLSLLayoutSemantic`, `MatrixLayoutModifier`, and the `GLSLLayout*` group.                                                                                                             | internal-source-fact   | [#absent-groupings-no-hlslattribute-or-layoutmodifier-base](../../../../design/ast-reference/modifiers.md#absent-groupings-no-hlslattribute-or-layoutmodifier-base)         | A claim about which class names do _not_ exist in the source has no program text that could confirm or refute it.                                                                                                                                                                                                                                                             |
 | The `[branch]` and `[flatten]` branch-hint attributes are forwarded to emitted HLSL.                                                                                                                                                                                                                                | unsupported-on-target  | [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels)         | Only HLSL and SPIR-V spell the two branch hints. Recompiling the same shader to -target glsl / -target metal / -target wgsl emits a plain `if` / `else` pair with no hint token at all, so there is no marker to assert without weakening the CHECK.                                                                                                                          |
 | `[earlydepthstencil]` on a fragment entry point survives to emitted HLSL.                                                                                                                                                                                                                                           | unsupported-on-target  | [#stage-specific-entry-point-attributes](../../../../design/ast-reference/modifiers.md#stage-specific-entry-point-attributes)                                               | WGSL has no early-depth-stencil entry-point attribute, so -target wgsl emits the fragment function with no equivalent marker. HLSL, GLSL, Metal and SPIR-V each carry their own form and are covered by the test.                                                                                                                                                             |
@@ -180,17 +320,7 @@ under `## Untested claims` with the reason each was deferred.
 
 | Anchor                                                                                                                                                              | Kind                  | Gap                                                                                                                                                                                                                                                                                                                                                                              | Suggested addition                                                                                                                                                                                                  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [#parameter-direction-and-storage-class-modifiers](../../../../design/ast-reference/modifiers.md#parameter-direction-and-storage-class-modifiers)                   | missing-surface       | The `RefModifier` row is summarised as "`ref` parameter passing mode" and `BorrowModifier` as "`borrow` parameter passing mode", but neither bare keyword is accepted: `void bump(ref int x)` is rejected at the `int` token with an "unexpected identifier, expected `,`" parse error. The spellings that do parse are `__ref` and `__constref`.                                | Change the two Summary cells to quote the accepted spellings `__ref` and `__constref`, and note that the un-prefixed `ref` / `borrow` forms are not surface syntax today.                                           |
 | [#matrix-layout-modifiers](../../../../design/ast-reference/modifiers.md#matrix-layout-modifiers)                                                                   | missing-example       | The four matrix-layout rows name the classes and their keywords but never say what a reader would see differently. In emitted HLSL a `row_major` constant-buffer matrix is re-laid-out into a generated row-array storage struct, while a `column_major` one stays a native `float4x4`.                                                                                          | Add a short before/after example under the table showing the two emitted field shapes, so a reader knows which spelling triggers the storage rewrite.                                                               |
-| [#matrix-layout-modifiers](../../../../design/ast-reference/modifiers.md#matrix-layout-modifiers)                                                                   | missing-surface       | The `GLSLRowMajorLayoutModifier` / `GLSLColumnMajorLayoutModifier` rows describe an intentional row/column inversion but do not name the input dialect or compile mode in which those two classes are produced, so a reader cannot construct a program that exercises the inversion.                                                                                             | Name the GLSL-input compile mode, and the flag that enables it, in the two GLSL rows, and add a one-line example pairing a GLSL `layout(row_major)` input with the Slang-convention result.                         |
-| [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels) | missing-example       | The `UnrollAttribute` and `ForceUnrollAttribute` rows read as near-synonyms ("`[unroll(N)]`" and "`[ForceUnroll]`"). In practice they are not: `[unroll]` leaves the loop intact and forwards a hint to the downstream compiler, while `[ForceUnroll]` is performed inside Slang and no loop survives into the emitted code.                                                     | State in each row which side performs the unrolling, and add a one-line emitted-code example for each so the distinction is legible without reading the passes.                                                     |
-| [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels) | undocumented-behavior | The `UnscopedEnumAttribute` row explains when the attribute is attached -- user-written, or implicitly under `-unscoped-enum` for a non-generic plain `enum` -- but never states its effect.                                                                                                                                                                                     | Add one sentence stating the scoping consequence: the enum's cases become visible in the enclosing scope and resolve without the `EnumName.` qualification.                                                         |
-| [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels) | undocumented-behavior | The `FlagsAttribute` row's Summary is only the spelling "`[Flags]`". The observable effect is that cases without explicit initialisers are numbered with consecutive powers of two (1, 2, 4) rather than consecutive integers.                                                                                                                                                   | Replace the bare spelling with a sentence naming the power-of-two numbering, and show a three-case example with the resulting values.                                                                               |
-| [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels) | ambiguous-claim       | The `EnumClassModifier` row says it is "used to detect conflicting explicit scoped/unscoped enum declarations" but names neither the conflicting spelling, presumably `[UnscopedEnum]` on an `enum class`, nor the diagnostic that fires, so a negative test cannot pin an expectation.                                                                                          | Name the concrete conflicting shape in the Summary and cite the diagnostic code and message emitted when the conflict is detected.                                                                                  |
-| [#mutability--autodiff-annotations](../../../../design/ast-reference/modifiers.md#mutability--autodiff-annotations)                                                 | missing-example       | The `NoDiscardAttribute` row says the attribute "flags a function whose result must not be discarded" but names no diagnostic. The compiler reports `error[E30059]: result of '[NoDiscard]' function is discarded` at the call site.                                                                                                                                             | Cite `E30059` in the row and add a two-line example contrasting a consumed call with a discarded one.                                                                                                               |
-| [#capability--target-attributes](../../../../design/ast-reference/modifiers.md#capability--target-attributes)                                                       | missing-example       | The `FormatAttribute` row writes the spelling as "`[format(...)]`" without indicating the argument's form. Writing the format as a bare identifier -- `[format(rgba32f)]` -- is rejected with `error[E33071]: expected a string literal`; the accepted form quotes it.                                                                                                           | Show the argument as a quoted string in both spellings, e.g. `[format("rgba32f")]` and `[vk::image_format("rgba16f")]`.                                                                                             |
+| [#compile-time-hint-attributes-loops--branches--opt-levels](../../../../design/ast-reference/modifiers.md#compile-time-hint-attributes-loops--branches--opt-levels) | missing-example | The `EnumClassModifier` row now names the conflicting shape -- an explicit `[UnscopedEnum]` on an `enum class` -- but still cites no diagnostic, so a reader cannot tell whether the conflict is an error, a warning, or a silent precedence rule. The compiler reports `error[E31202]: duplicate modifier` with the message "modifier 'UnscopedEnum' is redundant or conflicting with existing modifier 'class'". | Cite `E31202` and its message in the row, next to the conflicting shape it already names. |
 | [#interpolation-modes](../../../../design/ast-reference/modifiers.md#interpolation-modes)                                                                           | undocumented-behavior | The interpolation-mode table lists six modifiers but does not say which of them may be combined on one declaration. A reader cannot tell whether `nointerpolation sample float4 x;` is valid, diagnosed, or silently resolved to one of the two.                                                                                                                                 | Add a sentence stating whether the modes are mutually exclusive, and if a conflict is diagnosed, cite the diagnostic.                                                                                               |
-| [#inheritance-control-attributes](../../../../design/ast-reference/modifiers.md#inheritance-control-attributes)                                                     | undocumented-behavior | The two-row inheritance-control table gives only the spellings `[open]` and `[sealed]`. It does not say what `[sealed]` forbids, nor what an interface carrying neither attribute defaults to, so the only negative shape a test could pin would be guesswork.                                                                                                                   | State the default for an unannotated interface and describe exactly which relationship `[sealed]` rejects -- further interface inheritance, type conformance, or cross-module conformance -- citing the diagnostic. |
-| [#visibility-modifiers](../../../../design/ast-reference/modifiers.md#visibility-modifiers)                                                                         | undocumented-behavior | The `Visibility modifiers` table presents `public` / `private` / `internal` with `internal` parenthetically marked "(default in modern Slang)", but the rule that the default depends on the module's language version lives only in the later `Visibility modifiers and language version` subsection. A reader working from the table would not know the default is per-module. | Add a cross-reference from the `InternalModifier` row to the language-version subsection, or restate the version-dependent default inline.                                                                          |
 | [#internal--synthesized-modifiers](../../../../design/ast-reference/modifiers.md#internal--synthesized-modifiers)                                                   | undocumented-behavior | The `Internal / synthesized modifiers` table lists eleven modifiers without saying which compiler phase introduces each. A reader cannot tell whether `IgnoreForLookupModifier` is attached at parse, during checking, or during IR lowering.                                                                                                                                    | Add an "Introduced by" column, or one sentence per row naming the phase that attaches the modifier.                                                                                                                 |
-| [#work-graph-node-attributes](../../../../design/ast-reference/modifiers.md#work-graph-node-attributes)                                                             | ambiguous-claim       | The heading `Work-graph node attributes` appears twice in the page: once as the node table under `## Nodes` and once as prose under `## Notable nodes`. The two headings generate the same anchor, so any citation to `#work-graph-node-attributes` silently resolves to the first and the prose subsection is unreachable by link.                                              | Rename one of the two headings, for example the prose one to "Work-graph node attribute spellings", so each has a distinct anchor.                                                                                  |

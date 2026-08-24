@@ -29,7 +29,18 @@ concurrency:
 jobs:
   agentic-tests:
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    # Headroom, not a target. This job builds Slang from scratch (~30 min) and
+    # then runs the whole generated suite (~12 min), so it has been finishing in
+    # the low 40s of minutes against the 45 it used to be allowed: 44m37s on
+    # 2026-08-15 and 44m42s on 2026-08-16 both landed under the wire, and a
+    # 2026-08-20 re-run was cancelled at 45m06s having already passed every test
+    # it reached. A cancelled job reports as a red X indistinguishable from a
+    # real regression, so the cap was costing triage time on a suite that was
+    # healthy. 45 was set in #11380 when the suite was first wired in; it has
+    # since grown past 6000 tests without the cap moving. 60 leaves roughly a
+    # third of the budget spare at current durations; if runs start creeping into
+    # the mid-50s, raise the cap again rather than trimming the suite to fit it.
+    timeout-minutes: 60
     permissions:
       id-token: write # Workload Identity for GCS-cached LLVM
       contents: read
@@ -220,3 +231,39 @@ jobs:
           path: slang-test-output.log
           retention-days: 14
           if-no-files-found: ignore
+
+  # Post the nightly's result to Slack. Scheduled runs only, so manual
+  # workflow_dispatch verification runs stay quiet. A separate job (rather
+  # than in-job steps) is required because the agentic-tests job ends with
+  # `exit $rc`, which would skip any trailing steps on a red run.
+  #
+  # Requires the SLACK_WEBHOOK_AGENTIC_TESTS repository secret pointing at
+  # the target channel's Slack Workflow webhook, whose variable key is
+  # "Agentic-Nightly" (mirrors how the sibling nightlies map a single
+  # payload key to their message).
+  notify:
+    needs: [agentic-tests]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        if: needs.agentic-tests.result == 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Agentic-Nightly": ":green-check-mark: Agentic nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_AGENTIC_TESTS }}
+
+      - name: Failure notification
+        if: needs.agentic-tests.result != 'success'
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "Agentic-Nightly": ":alert: Agentic nightly: ${{ needs.agentic-tests.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_AGENTIC_TESTS }}

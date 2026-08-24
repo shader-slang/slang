@@ -1,0 +1,59 @@
+schema_version: 1
+id: slangi-as-operator-struct-upcast-segfault
+bundle: coverage/check-expr
+suspected_kind: sigsegv
+title: "slangi segfaults on `derived as Base` struct upcast through the as operator"
+observed_at: "2026-08-05T00:00:00+00:00"
+scope: ir
+evidence:
+  command: "build/RelWithDebInfo/bin/slangi <file>"
+  repro_source: |
+    //TEST:INTERPRET(filecheck=CHECK):
+    struct A { int x; }
+    struct B : A { int y; }
+    void main()
+    {
+        B b; b.x = 5; b.y = 6;
+        Optional<A> o = b as A;
+        if (o.hasValue) printf("%d\n", o.value.x);
+    }
+  source_slang: docs/generated/tests/coverage/check-expr/tuple-swizzle-out-of-range-diag.slang
+  observed_summary: |
+    Using the `as` operator to upcast a struct value to its base struct segfaults slangi.
+    The whole program is:
+      //TEST:INTERPRET(filecheck=CHECK):
+      struct A { int x; }
+      struct B : A { int y; }
+      void main()
+      {
+          B b; b.x = 5; b.y = 6;
+          Optional<A> o = b as A;
+          if (o.hasValue) printf("%d\n", o.value.x);
+      }
+    slangi exits with signal 11 (exit code 139) and prints nothing. Two controls in the
+    same shape run fine under slangi and print 5:
+      - dropping the `as` entirely (`printf("%d\n", b.x);`)
+      - doing the same upcast implicitly (`A a = b; printf("%d\n", a.x);`)
+    The same source compiled with `slangc -target hlsl -entry test -stage fragment`
+    (with `main` renamed and the printf replaced by a return) succeeds with only the
+    expected "support for inheritance is unstable" warning, so the failure is specific
+    to the interpreter path.
+  exit_code: 139
+  stderr_tail: "Segmentation fault"
+expected:
+  claim: |
+    `b as A` where `struct B : A` has a static subtype witness should either evaluate to
+    an `Optional<A>` holding the upcast value or be rejected with a diagnostic; the
+    interpreter must not crash, particularly when the equivalent implicit upcast
+    (`A a = b;`) runs correctly in the same program.
+  citation_kind: sibling-test
+  citation: tests/language-feature/interface-as-rhs-error.slang
+provenance:
+  agent_model: claude-opus-5[1m]
+  source_commit: 5634a0ea1b
+  doc_anchor: docs/generated/design/pipeline/03-semantic-check.md#failure-modes
+agent_self_assessment:
+  confidence: high
+  alternatives_considered:
+    - "Struct inheritance is deprecated, so this is out of contract: it warns but is still accepted, and the implicit upcast of the same value works — a deprecation should not manifest as a segfault."
+    - "The crash is in checking rather than execution: unlikely — slangc reaches code emit for the same source without crashing, so the failure appears after the front end."

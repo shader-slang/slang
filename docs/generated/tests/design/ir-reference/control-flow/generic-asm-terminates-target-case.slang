@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/control-flow.md#terminators-defer-and-asm
-//META: doc_section_digest=8197d918039016a312fb02c828516cb8f62b7d3234a740d1e588d091a11132ad
+//META: doc_section_digest=029c3ad8e80459695c368f631c27cd9dc7c680edc27dcfad4ccc0058dd4c74f2
 //META: purpose=An __intrinsic_asm statement lowers to the GenericAsm terminator carrying the inline target text as its operand 0 string literal.
 //META: intent=functional
 //META: pipeline_stage=lower

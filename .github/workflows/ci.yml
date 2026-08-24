@@ -317,6 +317,58 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "build"]'
 
+  # Vet-and-approve gate for the Falcor-only rebuild below. A job that
+  # calls a reusable workflow via `uses:` cannot itself carry
+  # `environment:` (GitHub only allows name/uses/with/secrets/needs/if/
+  # permissions on such jobs), so the approval gate has to live on this
+  # plain job instead, with the build depending on it.
+  falcor-build-approval-gate:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    environment: falcor-ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only runs `echo`; no GITHUB_TOKEN scopes are needed.
+    permissions: {}
+    steps:
+      - name: Approved
+        run: echo "Falcor rebuild approved."
+
+  # A separate build for test-falcor, gated behind the same falcor-ci
+  # approval as the test job itself. The regular Windows-release build
+  # above runs eagerly and its slang-tests-* artifact expires (1-day
+  # retention, and GitHub's download URLs are short-lived signed URLs)
+  # long before a PR sitting in the Falcor approval queue gets looked at.
+  # Building again here, only once approved, means the artifact this job
+  # produces is always fresh when test-falcor actually needs it. The
+  # other six consumers of build-windows-release-cl-x86_64-gpu's artifact
+  # (dx/vk/cuda/rhi tests, MaterialX, compile-regression, benchmark) are
+  # unaffected -- they keep using the eagerly-built, ungated artifact.
+  #
+  # If test-falcor fails on a stale/inaccessible artifact from this job
+  # (observed: the bridge relay's own GitHub API artifact lookup can fail
+  # for an unrelated attempt/token reason even when the artifact itself is
+  # neither expired nor deleted -- see PR #12614 discussion), GitHub's
+  # "Re-run failed jobs" will NOT rebuild here: re-run only ever
+  # propagates to jobs downstream of a failure, never to an upstream job
+  # that already succeeded (confirmed by a GitHub Actions maintainer,
+  # https://github.com/actions/runner/issues/1961). Use "Re-run all jobs"
+  # instead in that case, which forces this job to run fresh. This is a
+  # known, accepted cost: a real Falcor regression needing a code fix
+  # already forces a full re-run via a new commit, so this only affects
+  # the narrower case of a transient retry with no code change.
+  build-windows-release-cl-x86_64-gpu-falcor:
+    needs: [filter, falcor-build-approval-gate]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "build"]'
+      artifact-name-suffix: "-falcor"
+
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
@@ -324,7 +376,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: debug
-      server-count: 4
+      server-count: 8
 
   test-linux-debug-gcc-x86_64-rhi:
     needs: [filter, build-linux-debug-gcc-x86_64]
@@ -339,7 +391,7 @@ jobs:
     uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
-      server-count: 4
+      server-count: 8
 
   test-linux-release-gcc-x86_64-rhi:
     needs: [filter, build-linux-release-gcc-x86_64]
@@ -359,7 +411,7 @@ jobs:
       config: release
       runs-on: '["Linux", "self-hosted", "SM80Plus"]'
       gpu-tier: sm80plus
-      server-count: 4
+      server-count: 8
 
   # Linux x86_64 CPU-only tests (GitHub-hosted; no GPU).
   # Runs the test suite filtered to CPU and LLVM backends via
@@ -378,9 +430,7 @@ jobs:
       runs-on: '["ubuntu-24.04"]'
       full-gpu-tests: false
       cpu-only: true
-      # Keep the CPU-only tier off the persistent test-server while we
-      # investigate intermittent JSON RPC failures on GitHub-hosted runners.
-      server-count: 1
+      server-count: 4
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -456,8 +506,13 @@ jobs:
       runs-on: '["ubuntu-24.04-arm"]'
       full-gpu-tests: false
 
-  # Windows GPU tests (self-hosted)
-  test-windows-debug-cl-x86_64-gpu:
+  # Windows GPU tests (self-hosted).
+  # Each config is split into three parallel jobs to reduce wall-clock time:
+  #   -gpu-dx:   dx11+dx12+wgpu
+  #   -gpu-vk:   vk+cpu+llvm + no-API tests
+  #   -gpu-cuda: cuda
+  # The three jobs run concurrently on separate runners.
+  test-windows-debug-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -468,6 +523,35 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+
+  test-windows-debug-cl-x86_64-gpu-vk:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cpu+llvm
+      gpu-tier: t4
+
+  test-windows-debug-cl-x86_64-gpu-cuda:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: cuda
       gpu-tier: t4
 
   test-windows-debug-cl-x86_64-gpu-rhi:
@@ -481,7 +565,7 @@ jobs:
       config: debug
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  test-windows-release-cl-x86_64-gpu:
+  test-windows-release-cl-x86_64-gpu-dx:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
@@ -492,6 +576,35 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
       full-gpu-tests: true
+      api: dx11+dx12+wgpu
+      gpu-tier: t4
+
+  test-windows-release-cl-x86_64-gpu-vk:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: vk+cpu+llvm
+      gpu-tier: t4
+
+  test-windows-release-cl-x86_64-gpu-cuda:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      full-gpu-tests: true
+      api: cuda
       gpu-tier: t4
 
   test-windows-release-cl-x86_64-gpu-rhi:
@@ -611,12 +724,14 @@ jobs:
           fi
 
   test-falcor:
-    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    needs: [filter, build-windows-release-cl-x86_64-gpu-falcor]
     if: needs.filter.outputs.should-run == 'true'
     permissions:
       contents: read
       actions: read
     uses: ./.github/workflows/ci-falcor-test.yml
+    with:
+      slang-artifact-name: slang-tests-windows-x86_64-cl-release-falcor
 
   test-compile-regression:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
@@ -654,9 +769,13 @@ jobs:
         build-macos-release-clang-aarch64,
         build-windows-debug-cl-x86_64-gpu,
         build-windows-release-cl-x86_64-gpu,
-        test-windows-release-cl-x86_64-gpu,
+        test-windows-release-cl-x86_64-gpu-dx,
+        test-windows-release-cl-x86_64-gpu-vk,
+        test-windows-release-cl-x86_64-gpu-cuda,
         test-windows-release-cl-x86_64-gpu-rhi,
-        test-windows-debug-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu-dx,
+        test-windows-debug-cl-x86_64-gpu-vk,
+        test-windows-debug-cl-x86_64-gpu-cuda,
         test-windows-debug-cl-x86_64-gpu-rhi,
         test-macos-release-clang-aarch64,
         test-macos-release-clang-aarch64-rhi,
