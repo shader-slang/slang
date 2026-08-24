@@ -36,6 +36,42 @@ struct TestHitGroup : rt::IHitGroup
     typealias Intersection = rt::NoIntersection<TestHitContext>;
 }
 
+struct TestAttributes
+{
+    float2 normal;
+}
+
+struct TestProceduralHitContext : rt::IHitContext
+{
+    typealias TraceContext = TestTraceContext;
+    typealias Primitive = rt::BoundingBoxPrimitive<TestAttributes>;
+    typealias Record = TestRecord;
+}
+
+struct TestProceduralClosestHit : rt::IClosestHitShader<TestProceduralHitContext>
+{
+    void invoke(rt::ClosestHitInput<TestProceduralHitContext> input) {}
+}
+
+struct TestAnyHit : rt::IAnyHitShader<TestProceduralHitContext>
+{
+    void invoke(rt::AnyHitInput<TestProceduralHitContext> input) {}
+}
+
+struct TestIntersection : rt::IIntersectionShader<TestProceduralHitContext>
+{
+    void invoke(rt::IntersectionInput<TestProceduralHitContext> input) {}
+}
+
+struct TestProceduralHitGroup : rt::IHitGroup
+{
+    typealias Slot = rt::HitGroupSlot<3>;
+    typealias Context = TestProceduralHitContext;
+    typealias ClosestHit = TestProceduralClosestHit;
+    typealias AnyHit = TestAnyHit;
+    typealias Intersection = TestIntersection;
+}
+
 struct TestMissContext : rt::IMissGroupContext
 {
     typealias TraceContext = TestTraceContext;
@@ -79,7 +115,8 @@ struct TestCallableGroup : rt::ICallableGroup
 struct TestProgramLayout : rt::ITraceProgramLayout
 {
     typealias TraceContext = TestTraceContext;
-    typealias HitGroups = rt::HitGroupList<TestTraceContext, TestHitGroup>;
+    typealias HitGroups =
+        rt::HitGroupList<TestTraceContext, TestHitGroup, TestProceduralHitGroup>;
     typealias MissGroups = rt::MissGroupList<TestTraceContext, TestMissGroup>;
     typealias CallableGroups = rt::CallableGroupList<TestTraceContext, TestCallableGroup>;
 }
@@ -96,7 +133,30 @@ void main()
     tracer.trace(desc, scene, program, payload);
 }
 
+// IR: [nameHint("TestCallable.invoke")]
+// IR: func %TestCallablex5Finvoke
+// IR: [nameHint("TestMiss.invoke")]
+// IR: func %TestMissx5Finvoke
+// IR: [nameHint("TestProceduralClosestHit.invoke")]
+// IR: func %TestProceduralClosestHitx5Finvoke
+// IR: [nameHint("TestAnyHit.invoke")]
+// IR: func %TestAnyHitx5Finvoke
+// IR: [nameHint("TestIntersection.invoke")]
+// IR: func %TestIntersectionx5Finvoke
+// IR: [nameHint("TestClosestHit.invoke")]
+// IR: func %TestClosestHitx5Finvoke
+// IR: [structuralRayTracingCallableGroupInfo(%TestCallableGroup,
+// IR-SAME: %TestCallableContext, %TestCallable, %TestCallablex5Finvoke)]
+// IR: [structuralRayTracingMissGroupInfo(%TestMissGroup,
+// IR-SAME: %TestMissContext, %TestMiss, %TestMissx5Finvoke)]
+// IR: [structuralRayTracingHitGroupInfo(%TestProceduralHitGroup,
+// IR-SAME: %TestProceduralHitContext, %TestProceduralClosestHit,
+// IR-SAME: %TestProceduralClosestHitx5Finvoke, %TestAnyHit, %TestAnyHitx5Finvoke,
+// IR-SAME: %TestIntersection, %TestIntersectionx5Finvoke)]
+// IR: [structuralRayTracingHitGroupInfo(%TestHitGroup,
+// IR-SAME: %TestHitContext, %TestClosestHit, %TestClosestHitx5Finvoke,
+// IR-SAME: Void, void_constant, Void, void_constant)]
 // IR: structuralRayTracingTrace({{.*}}, %TestProgramLayout, %TestTraceContext,
-// IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup),
+// IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup, %TestProceduralHitGroup),
 // IR-SAME: %rtx5FMissGroupList, TypePack(%TestMissGroup),
 // IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup),
