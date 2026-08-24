@@ -890,5 +890,6 @@ return {
 	["StructuralRayTracingStageInputOperation.structuralRayTracingIgnoreHit"] = 914,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingAcceptHitAndEndSearch"] = 915,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingReportHit"] = 916,
-	["StructuralRayTracingStageInputOperation.structuralRayTracingReportHitWithKind"] = 917
+	["StructuralRayTracingStageInputOperation.structuralRayTracingReportHitWithKind"] = 917,
+	["structuralRayTracingTrace"] = 918
 }

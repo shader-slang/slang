@@ -973,6 +973,18 @@ LoweredValInfo emitCallToDeclRef(
     {
         if (auto functionDecl = as<FunctionDeclBase>(funcDecl))
         {
+            if (structuralRayTracingRegistry.isTraceMethod(functionDecl))
+            {
+                List<IRInst*> operationArgs;
+                operationArgs.add(
+                    getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
+                operationArgs.addRange(args, argCount);
+                return LoweredValInfo::simple(builder->emitIntrinsicInst(
+                    type,
+                    kIROp_StructuralRayTracingTrace,
+                    operationArgs.getCount(),
+                    operationArgs.getBuffer()));
+            }
             auto operationKind =
                 structuralRayTracingRegistry.getStageInputOperationKind(functionDecl);
             if (operationKind != StructuralRayTracingStageInputOperationKind::Count)

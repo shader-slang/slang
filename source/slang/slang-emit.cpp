@@ -426,6 +426,8 @@ void calcRequiredLoweringPassSet(
     }
     if (as<IRStructuralRayTracingStageInputOperation>(inst))
         result.structuralRayTracingStageInput = true;
+    if (inst->getOp() == kIROp_StructuralRayTracingTrace)
+        result.structuralRayTracingTrace = true;
     // no_diff is an attribute payload, not a distinct opcode, so it needs findAttr.
     if (auto attrType = as<IRAttributedType>(inst))
     {
@@ -1832,6 +1834,10 @@ Result linkAndOptimizeIR(
     default:
         SLANG_PASS(lowerCooperativeVectors, sink);
     }
+
+    if (requiredLoweringPassSet.structuralRayTracingTrace &&
+        (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest)))
+        SLANG_PASS(lowerPortableStructuralRayTracingTraceOperations);
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     SLANG_PASS(performForceInlining);
