@@ -313,30 +313,6 @@ static StructuralStageContextInfo _getStructuralStageContextInfo(FuncDecl* invok
     };
 }
 
-static Type* _getAssociatedType(
-    StructuralRayTracingDeclRegistry& registry,
-    ASTBuilder* astBuilder,
-    SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind)
-{
-    if (!witness)
-        return nullptr;
-
-    auto requirement = registry.getAssociatedTypeRequirement(kind);
-    if (!requirement)
-        return nullptr;
-
-    auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
-    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
-        return as<Type>(requirementWitness.getVal()->resolve());
-    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::declRef)
-    {
-        auto type = DeclRefType::create(astBuilder, requirementWitness.getDeclRef());
-        return type ? as<Type>(type->resolve()) : nullptr;
-    }
-    return nullptr;
-}
-
 static Type* _getConcreteAssociatedType(
     StructuralRayTracingDeclRegistry& registry,
     SemanticsVisitor* visitor,
@@ -394,8 +370,7 @@ static bool _populateStructuralEntryPointInfo(
     case StructuralRayTracingStageKind::ClosestHit:
     case StructuralRayTracingStageKind::AnyHit:
         {
-            auto traceContext = _getAssociatedType(
-                registry,
+            auto traceContext = registry.resolveAssociatedType(
                 astBuilder,
                 context.witness,
                 StructuralRayTracingAssociatedTypeKind::HitTraceContext);
@@ -405,8 +380,7 @@ static bool _populateStructuralEntryPointInfo(
                 traceContext,
                 StructuralRayTracingAssociatedTypeKind::TracePayload);
 
-            auto primitive = _getAssociatedType(
-                registry,
+            auto primitive = registry.resolveAssociatedType(
                 astBuilder,
                 context.witness,
                 StructuralRayTracingAssociatedTypeKind::HitPrimitive);
@@ -421,8 +395,7 @@ static bool _populateStructuralEntryPointInfo(
         }
     case StructuralRayTracingStageKind::Miss:
         {
-            auto traceContext = _getAssociatedType(
-                registry,
+            auto traceContext = registry.resolveAssociatedType(
                 astBuilder,
                 context.witness,
                 StructuralRayTracingAssociatedTypeKind::MissTraceContext);
@@ -434,8 +407,7 @@ static bool _populateStructuralEntryPointInfo(
             return outInfo->payloadType != nullptr;
         }
     case StructuralRayTracingStageKind::Callable:
-        outInfo->callableDataType = _getAssociatedType(
-            registry,
+        outInfo->callableDataType = registry.resolveAssociatedType(
             astBuilder,
             context.witness,
             StructuralRayTracingAssociatedTypeKind::CallableData);

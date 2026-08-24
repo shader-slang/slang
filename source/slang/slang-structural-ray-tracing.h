@@ -14,6 +14,8 @@ class Decl;
 class ModuleDecl;
 class FuncDecl;
 class Type;
+class ASTBuilder;
+class SubtypeWitness;
 
 enum class StructuralRayTracingStageKind
 {
@@ -67,6 +69,10 @@ enum class StructuralRayTracingAssociatedTypeKind
     PrimitiveAttributes,
     MissTraceContext,
     CallableData,
+    ProgramTraceContext,
+    ProgramHitGroups,
+    ProgramMissGroups,
+    ProgramCallableGroups,
     Count,
 };
 
@@ -119,6 +125,10 @@ public:
         FunctionDeclBase* functionDecl) const;
     bool isTraceMethod(FunctionDeclBase* functionDecl) const;
     AssocTypeDecl* getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind kind) const;
+    Type* resolveAssociatedType(
+        ASTBuilder* astBuilder,
+        SubtypeWitness* witness,
+        StructuralRayTracingAssociatedTypeKind kind) const;
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
