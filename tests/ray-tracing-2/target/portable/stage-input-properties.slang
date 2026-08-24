@@ -9,21 +9,21 @@
 
 import slang.raytracing;
 
-struct Payload {}
-struct Record {}
+struct TestPayload {}
+struct TestRecord {}
 
-struct TraceContext : rt::ITraceContext
+struct TestTraceContext : rt::ITraceContext
 {
-    typealias Payload = Payload;
+    typealias Payload = TestPayload;
     typealias AccelerationStructure = rt::AccelerationStructure;
     typealias Motion = rt::NoMotion;
 }
 
 struct TriangleContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = TestTraceContext;
     typealias Primitive = rt::TrianglePrimitive;
-    typealias Record = Record;
+    typealias Record = TestRecord;
 }
 
 struct CustomAttributes
@@ -33,15 +33,15 @@ struct CustomAttributes
 
 struct ProceduralContext : rt::IHitContext
 {
-    typealias TraceContext = TraceContext;
+    typealias TraceContext = TestTraceContext;
     typealias Primitive = rt::BoundingBoxPrimitive<CustomAttributes>;
-    typealias Record = Record;
+    typealias Record = TestRecord;
 }
 
 struct MissContext : rt::IMissGroupContext
 {
-    typealias TraceContext = TraceContext;
-    typealias Record = Record;
+    typealias TraceContext = TestTraceContext;
+    typealias Record = TestRecord;
 }
 
 RWStructuredBuffer<float4> output;
@@ -62,7 +62,7 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
 // HLSLCH-DAG: WorldRayDirection()
 // HLSLCH-DAG: RayTCurrent()
 // HLSLCH-DAG: HitKind()
-// HLSLCH: [shader("closesthit")]void ClosestHit()
+// HLSLCH: [shader("closesthit")]void ClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // SPVCH: OpEntryPoint ClosestHitKHR
 // SPVCH-DAG: BuiltIn WorldRayOriginKHR
 // SPVCH-DAG: BuiltIn WorldRayDirectionKHR
@@ -82,7 +82,7 @@ struct AnyHit : rt::IAnyHitShader<TriangleContext>
 
 // HLSLAH-DAG: IgnoreHit()
 // HLSLAH-DAG: AcceptHitAndEndSearch()
-// HLSLAH: [shader("anyhit")]void AnyHit()
+// HLSLAH: [shader("anyhit")]void AnyHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // SPVAH: OpEntryPoint AnyHitKHR
 // SPVAH: OpIgnoreIntersectionKHR
 // SPVAH: OpTerminateRayKHR
@@ -125,7 +125,7 @@ struct Miss : rt::IMissShader<MissContext>
 
 // HLSLMS-DAG: WorldRayOrigin()
 // HLSLMS-DAG: WorldRayDirection()
-// HLSLMS: [shader("miss")]void Miss()
+// HLSLMS: [shader("miss")]void Miss(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload)
 // SPVMS: OpEntryPoint MissKHR
 // SPVMS-DAG: BuiltIn WorldRayOriginKHR
 // SPVMS-DAG: BuiltIn WorldRayDirectionKHR

@@ -211,6 +211,11 @@ public struct MissInput<Context>
 [require(callable)]
 public struct CallableInput<Context>
     where Context : ICallableGroupContext
-{}
+{
+    public property Context.CallableData data
+    {
+        ref;
+    }
+}
 
 } // namespace rt
