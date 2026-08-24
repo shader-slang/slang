@@ -12142,8 +12142,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     /// `getRequirementCount()`, and specialization and witness-table lowering
     /// scan the entries.
     ///
-    /// This is the same handoff `lowerFuncDeclInContext` uses to make an imported
-    /// `[__unsafeForceInlineEarly]` function's body available locally.
+    /// The prelink registration is the same handoff `lowerFuncDeclInContext` uses
+    /// to make an imported `[__unsafeForceInlineEarly]` function's body available
+    /// locally. The policy around it differs, and deliberately: that path lowers
+    /// the function *and* registers it, gated on the force-inline attribute,
+    /// while this one registers *instead of* deriving, for every cross-module
+    /// interface. It also bails out when the linkage name would be obfuscated,
+    /// which the function path does not do -- an asymmetry that is a gap there
+    /// rather than caution here. Compiling a non-core imported
+    /// `[__unsafeForceInlineEarly]` function with `-obfuscate` makes that path
+    /// index an empty symbol list, which is a pre-existing defect on the function
+    /// side and not something this function inherits.
     bool tryBorrowInterfaceFromOwningModule(InterfaceDecl* decl, LoweredValInfo& outVal)
     {
         if (!isDeclInDifferentModule(context, decl))
@@ -12188,6 +12197,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // it explicitly means the "no interface under this name" case is a plain
         // "nothing to borrow" -- handled by falling through to AST derivation --
         // rather than an assumption about ordering that would fail silently.
+        //
+        // `getGenericReturnVal` covers both shapes an interface can take here: it
+        // returns its argument unchanged for a non-generic symbol, and the inner
+        // value for an `IRGeneric`. The generic case is not hypothetical --
+        // `addLinkageDecoration` hoists linkage to the outermost generic, so a
+        // generic interface is registered under its mangled name as the
+        // `IRGeneric` wrapper, and that wrapper is what gets queued for prelink.
+        // The declaration built below is wrapped to match by `emitOuterGenerics`.
         IRInst* borrowedSymbol = nullptr;
         Index interfaceSymbolCount = 0;
         for (auto symbol : symbols)
