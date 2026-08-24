@@ -2172,6 +2172,8 @@ local insts = {
 				structuralRayTracingEntryPointInfo = {
 					struct_name = "StructuralRayTracingEntryPointInfoDecoration",
 					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "invoke" },
 						{ "contextType", "IRType" },
 						{ "payloadType", "IRType" },
 						{ "hitAttributesType", "IRType" },
@@ -2186,7 +2188,12 @@ local insts = {
 					operands = {
 						{ "groupType", "IRType" },
 						{ "slotType", "IRType" },
+						{ "slotIndex", "IRIntLit" },
 						{ "contextType", "IRType" },
+						{ "primitiveType", "IRType" },
+						{ "payloadType", "IRType" },
+						{ "hitAttributesType", "IRType" },
+						{ "hitAttributesKind", "IRIntLit" },
 						{ "closestHitType", "IRType" },
 						{ "closestHit" },
 						{ "anyHitType", "IRType" },
@@ -2202,7 +2209,9 @@ local insts = {
 					operands = {
 						{ "groupType", "IRType" },
 						{ "slotType", "IRType" },
+						{ "slotIndex", "IRIntLit" },
 						{ "contextType", "IRType" },
+						{ "payloadType", "IRType" },
 						{ "missType", "IRType" },
 						{ "miss" },
 					},
@@ -2214,7 +2223,9 @@ local insts = {
 					operands = {
 						{ "groupType", "IRType" },
 						{ "slotType", "IRType" },
+						{ "slotIndex", "IRIntLit" },
 						{ "contextType", "IRType" },
+						{ "callableDataType", "IRType" },
 						{ "callableType", "IRType" },
 						{ "callable" },
 					},

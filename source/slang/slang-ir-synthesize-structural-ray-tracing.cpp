@@ -7,6 +7,269 @@
 namespace Slang
 {
 
+static void _collectTraceOperations(IRInst* parent, List<IRInst*>& operations);
+
+static Stage _getStructuralRayTracingNativeStage(StructuralRayTracingStageKind kind)
+{
+    switch (kind)
+    {
+    case StructuralRayTracingStageKind::ClosestHit:
+        return Stage::ClosestHit;
+    case StructuralRayTracingStageKind::AnyHit:
+        return Stage::AnyHit;
+    case StructuralRayTracingStageKind::Intersection:
+        return Stage::Intersection;
+    case StructuralRayTracingStageKind::Miss:
+        return Stage::Miss;
+    case StructuralRayTracingStageKind::Callable:
+        return Stage::Callable;
+    default:
+        return Stage::Unknown;
+    }
+}
+
+static IRFunc* _getStructuralRayTracingStageFunc(IRInst* value)
+{
+    return as<IRFunc>(value);
+}
+
+static String _getStructuralRayTracingStageName(IRType* stageType, IRFunc* invoke)
+{
+    if (stageType)
+    {
+        if (auto nameHint = stageType->findDecoration<IRNameHintDecoration>())
+            return String(nameHint->getName());
+    }
+    if (invoke)
+    {
+        if (auto nameHint = invoke->findDecoration<IRNameHintDecoration>())
+        {
+            auto name = nameHint->getName();
+            Index separator = name.indexOf(toSlice(".invoke"));
+            return separator >= 0 ? String(name.head(separator)) : String(name);
+        }
+    }
+    return "structuralRayTracingStage";
+}
+
+static void _addEmptyStructuralRayTracingEntryPointLayout(
+    IRBuilder& builder,
+    IRFunc* func,
+    Stage stage)
+{
+    IRStructTypeLayout::Builder paramsTypeLayoutBuilder(&builder);
+    IRVarLayout::Builder paramsLayoutBuilder(&builder, paramsTypeLayoutBuilder.build());
+    paramsLayoutBuilder.setStage(stage);
+
+    IRTypeLayout::Builder resultTypeLayoutBuilder(&builder);
+    IRVarLayout::Builder resultLayoutBuilder(&builder, resultTypeLayoutBuilder.build());
+    resultLayoutBuilder.setStage(stage);
+
+    auto entryPointLayout =
+        builder.getEntryPointLayout(paramsLayoutBuilder.build(), resultLayoutBuilder.build());
+    builder.addLayoutDecoration(func, entryPointLayout);
+}
+
+static void _addStructuralRayTracingEntryPointInfo(
+    IRBuilder& builder,
+    IRFunc* adapter,
+    StructuralRayTracingStageKind stageKind,
+    IRFunc* invoke,
+    IRType* contextType,
+    IRType* payloadType,
+    IRType* hitAttributesType,
+    StructuralRayTracingHitAttributesKind hitAttributesKind,
+    IRType* callableDataType)
+{
+    auto voidType = builder.getVoidType();
+    IRInst* operands[] = {
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)),
+        invoke,
+        contextType ? contextType : voidType,
+        payloadType ? payloadType : voidType,
+        hitAttributesType ? hitAttributesType : voidType,
+        callableDataType ? callableDataType : voidType,
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(hitAttributesKind)),
+    };
+    builder.addDecoration(
+        adapter,
+        kIROp_StructuralRayTracingEntryPointInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
+struct StructuralRayTracingGeneratedEntryPoint
+{
+    StructuralRayTracingStageKind stageKind;
+    IRFunc* invoke;
+    IRFunc* adapter;
+};
+
+static IRFunc* _findGeneratedStructuralRayTracingEntryPoint(
+    const List<StructuralRayTracingGeneratedEntryPoint>& generated,
+    StructuralRayTracingStageKind stageKind,
+    IRFunc* invoke)
+{
+    for (auto& item : generated)
+    {
+        if (item.stageKind == stageKind && item.invoke == invoke)
+            return item.adapter;
+    }
+    return nullptr;
+}
+
+static IRFunc* _generateStructuralRayTracingEntryPoint(
+    IRModule* module,
+    List<IRFunc*>& ioEntryPoints,
+    List<StructuralRayTracingGeneratedEntryPoint>& generated,
+    StructuralRayTracingStageKind stageKind,
+    IRType* stageType,
+    IRInst* invokeValue,
+    IRType* contextType,
+    IRType* payloadType = nullptr,
+    IRType* hitAttributesType = nullptr,
+    StructuralRayTracingHitAttributesKind hitAttributesKind =
+        StructuralRayTracingHitAttributesKind::None,
+    IRType* callableDataType = nullptr)
+{
+    auto invoke = _getStructuralRayTracingStageFunc(invokeValue);
+    if (!invoke)
+        return nullptr;
+    if (auto existing = _findGeneratedStructuralRayTracingEntryPoint(generated, stageKind, invoke))
+    {
+        return existing;
+    }
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    auto adapter = builder.createFunc();
+    adapter->setFullType(builder.getFuncType(List<IRType*>(), builder.getVoidType()));
+
+    auto stage = _getStructuralRayTracingNativeStage(stageKind);
+    auto name = _getStructuralRayTracingStageName(stageType, invoke);
+    builder.addNameHintDecoration(adapter, name.getUnownedSlice());
+    builder.addEntryPointDecoration(
+        adapter,
+        Profile(stage),
+        name.getUnownedSlice(),
+        toSlice("structural-ray-tracing"));
+    builder.addKeepAliveDecoration(adapter);
+    _addEmptyStructuralRayTracingEntryPointLayout(builder, adapter, stage);
+    _addStructuralRayTracingEntryPointInfo(
+        builder,
+        adapter,
+        stageKind,
+        invoke,
+        contextType,
+        payloadType,
+        hitAttributesType,
+        hitAttributesKind,
+        callableDataType);
+
+    builder.setInsertInto(adapter);
+    builder.emitBlock();
+    List<IRInst*> arguments;
+    for (UInt i = 0; i < invoke->getParamCount(); ++i)
+        arguments.add(builder.emitDefaultConstruct(invoke->getParamType(i)));
+    builder
+        .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
+    builder.emitReturn();
+
+    generated.add({stageKind, invoke, adapter});
+    ioEntryPoints.add(adapter);
+    return adapter;
+}
+
+void synthesizePortableStructuralRayTracingEntryPoints(
+    IRModule* module,
+    List<IRFunc*>& ioEntryPoints)
+{
+    List<IRInst*> traceOperations;
+    _collectTraceOperations(module->getModuleInst(), traceOperations);
+    List<StructuralRayTracingGeneratedEntryPoint> generated;
+
+    for (auto entryPoint : ioEntryPoints)
+    {
+        if (auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        {
+            generated.add(
+                {StructuralRayTracingStageKind(info->getStageKind()->getValue()),
+                 as<IRFunc>(info->getInvoke()),
+                 entryPoint});
+        }
+    }
+
+    for (auto operation : traceOperations)
+    {
+        for (auto decoration : operation->getDecorations())
+        {
+            if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+            {
+                auto hitAttributesKind = StructuralRayTracingHitAttributesKind(
+                    group->getHitAttributesKind()->getValue());
+                _generateStructuralRayTracingEntryPoint(
+                    module,
+                    ioEntryPoints,
+                    generated,
+                    StructuralRayTracingStageKind::ClosestHit,
+                    group->getClosestHitType(),
+                    group->getClosestHit(),
+                    group->getContextType(),
+                    group->getPayloadType(),
+                    group->getHitAttributesType(),
+                    hitAttributesKind);
+                _generateStructuralRayTracingEntryPoint(
+                    module,
+                    ioEntryPoints,
+                    generated,
+                    StructuralRayTracingStageKind::AnyHit,
+                    group->getAnyHitType(),
+                    group->getAnyHit(),
+                    group->getContextType(),
+                    group->getPayloadType(),
+                    group->getHitAttributesType(),
+                    hitAttributesKind);
+                _generateStructuralRayTracingEntryPoint(
+                    module,
+                    ioEntryPoints,
+                    generated,
+                    StructuralRayTracingStageKind::Intersection,
+                    group->getIntersectionType(),
+                    group->getIntersection(),
+                    group->getContextType());
+            }
+            else if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(decoration))
+            {
+                _generateStructuralRayTracingEntryPoint(
+                    module,
+                    ioEntryPoints,
+                    generated,
+                    StructuralRayTracingStageKind::Miss,
+                    group->getMissType(),
+                    group->getMiss(),
+                    group->getContextType(),
+                    group->getPayloadType());
+            }
+            else if (auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration))
+            {
+                _generateStructuralRayTracingEntryPoint(
+                    module,
+                    ioEntryPoints,
+                    generated,
+                    StructuralRayTracingStageKind::Callable,
+                    group->getCallableType(),
+                    group->getCallable(),
+                    group->getContextType(),
+                    nullptr,
+                    nullptr,
+                    StructuralRayTracingHitAttributesKind::None,
+                    group->getCallableDataType());
+            }
+        }
+    }
+}
+
 struct StructuralRayTracingStageParameterThreader
 {
     StructuralRayTracingStageParameterThreader(
@@ -436,8 +699,7 @@ void lowerPortableStructuralRayTracingTraceOperations(IRModule* module)
         auto traceOperation = cast<IRStructuralRayTracingTrace>(operation);
         builder.setInsertBefore(operation);
 
-        IRInst* arguments[] =
-        {
+        IRInst* arguments[] = {
             traceOperation->getTracer(),
             traceOperation->getDesc(),
             traceOperation->getAccelerationStructure(),
