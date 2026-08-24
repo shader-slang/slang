@@ -150,7 +150,8 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
                                     const char* profileName,
                                     bool lineCoverageEnabled = true,
                                     bool functionCoverageEnabled = false,
-                                    bool branchCoverageEnabled = false)
+                                    bool branchCoverageEnabled = false,
+                                    int bindlessIndex = -1)
     {
         MetadataBundle bundle;
 
@@ -162,7 +163,7 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         sessionDesc.targetCount = 1;
         sessionDesc.targets = &targetDesc;
 
-        slang::CompilerOptionEntry coverageOptions[3] = {};
+        slang::CompilerOptionEntry coverageOptions[4] = {};
         uint32_t coverageOptionCount = 0;
         auto addBoolOption = [&](slang::CompilerOptionName name)
         {
@@ -177,6 +178,13 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
             addBoolOption(slang::CompilerOptionName::TraceFunctionCoverage);
         if (branchCoverageEnabled)
             addBoolOption(slang::CompilerOptionName::TraceBranchCoverage);
+        if (bindlessIndex >= 0)
+        {
+            auto& option = coverageOptions[coverageOptionCount++];
+            option.name = slang::CompilerOptionName::TraceCoverageBindlessIndex;
+            option.value.kind = slang::CompilerOptionValueKind::Int;
+            option.value.intValue0 = bindlessIndex;
+        }
         sessionDesc.compilerOptionEntries = coverageOptions;
         sessionDesc.compilerOptionEntryCount = coverageOptionCount;
 
@@ -338,6 +346,10 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(info.entryPointIndex == -1);
         SLANG_CHECK(info.debugName != nullptr);
         SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
+        // Single-buffer form: the buffer is bound as one descriptor rather
+        // than as an element of an array, so the index reports the same
+        // "not applicable" sentinel that space/binding use.
+        SLANG_CHECK(info.bindlessIndex == -1);
 
         // CPU/CUDA-style targets must expose the concrete
         // marshaling location in the generated global params
@@ -357,6 +369,60 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         uint32_t lookedUpIndex = ~0u;
         SLANG_CHECK(syntheticResources->findResourceIndexByID(info.id, &lookedUpIndex) == SLANG_OK);
         SLANG_CHECK(lookedUpIndex == coverageResourceIndex);
+    }
+
+    // Bindless form: the host asked for a specific element of the
+    // descriptor array at compile time, and must be able to read that
+    // element back off the metadata afterwards instead of having to
+    // remember what it passed. Without this the index is the one piece of
+    // the binding a host cannot recover from the compiled result.
+    {
+        const int kBindlessIndex = 7;
+        auto bindlessBundle =
+            createMetadataBundle(SLANG_SPIRV, "spirv_1_5", true, false, false, kBindlessIndex);
+        auto* bindlessSyntheticResources = bindlessBundle.syntheticResources;
+        SLANG_CHECK(bindlessSyntheticResources != nullptr);
+        SLANG_CHECK(bindlessSyntheticResources->getResourceCount() == 1);
+
+        slang::SyntheticResourceInfo info;
+        SLANG_CHECK(bindlessSyntheticResources->getResourceInfo(0, &info) == SLANG_OK);
+        SLANG_CHECK(info.bindlessIndex == kBindlessIndex);
+        // The array's own placement is still reported the usual way: one
+        // (space, binding) covers every shader, and the index selects
+        // within it.
+        SLANG_CHECK(info.space >= 0);
+        SLANG_CHECK(info.binding >= 0);
+
+        // A caller compiled against the v1 struct has no storage for the
+        // index. The implementation must accept its structSize and leave
+        // the caller's memory alone rather than writing past the end of
+        // the struct it was given.
+        {
+            slang::SyntheticResourceInfo v1Info;
+            v1Info.structSize =
+                SLANG_OFFSET_OF(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
+            v1Info.bindlessIndex = 0x5eed;
+            SLANG_CHECK(bindlessSyntheticResources->getResourceInfo(0, &v1Info) == SLANG_OK);
+            SLANG_CHECK(v1Info.bindlessIndex == 0x5eed);
+            // The v1 fields must still be populated.
+            SLANG_CHECK(v1Info.space >= 0);
+            SLANG_CHECK(v1Info.binding >= 0);
+            SLANG_CHECK(v1Info.debugName != nullptr);
+        }
+
+        // The manifest carries the index too, so a host driving slangc from
+        // the command line can recover it the same way an in-process host
+        // can.
+        ComPtr<ISlangBlob> bindlessManifest;
+        SLANG_CHECK(
+            slang_writeCoverageManifestJson(bindlessBundle.coverage, bindlessManifest.writeRef()) ==
+            SLANG_OK);
+        ParsedJson bindlessParsed;
+        SLANG_CHECK(parseJsonBlob(bindlessManifest, bindlessParsed) == SLANG_OK);
+        auto* bindlessContainer = bindlessParsed.container.Ptr();
+        JSONValue bindlessBuffer = findJsonField(bindlessContainer, bindlessParsed.root, "buffer");
+        SLANG_CHECK(bindlessBuffer.isValid());
+        checkJsonIntField(bindlessContainer, bindlessBuffer, "bindless_index", kBindlessIndex);
     }
 
     // CUDA follows the same synthetic-resource marshaling contract as
@@ -402,6 +468,10 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         SLANG_CHECK(info.entryPointIndex == -1);
         SLANG_CHECK(info.debugName != nullptr);
         SLANG_CHECK(UnownedStringSlice(info.debugName) == toSlice("__slang_coverage"));
+        // Single-buffer form: the buffer is bound as one descriptor rather
+        // than as an element of an array, so the index reports the same
+        // "not applicable" sentinel that space/binding use.
+        SLANG_CHECK(info.bindlessIndex == -1);
         SLANG_CHECK(info.uniformOffset == -1);
         SLANG_CHECK(info.uniformStride == 0);
 
@@ -433,6 +503,9 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue buffer = findJsonField(container, parsed.root, "buffer");
         SLANG_CHECK(buffer.isValid());
         checkJsonStringField(container, buffer, "name", "__slang_coverage");
+        // Absent, not zero, in the single-buffer form: an existing manifest
+        // stays byte-identical to what it was before bindless existed.
+        SLANG_CHECK(!findJsonField(container, buffer, "bindless_index").isValid());
         checkJsonStringField(container, buffer, "element_type", "uint64");
         checkJsonIntField(container, buffer, "element_stride", 8);
         SLANG_CHECK(findJsonField(container, buffer, "space").isValid());
@@ -538,6 +611,9 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         JSONValue buffer = findJsonField(container, parsed.root, "buffer");
         SLANG_CHECK(buffer.isValid());
         checkJsonStringField(container, buffer, "name", "__slang_coverage");
+        // Absent, not zero, in the single-buffer form: an existing manifest
+        // stays byte-identical to what it was before bindless existed.
+        SLANG_CHECK(!findJsonField(container, buffer, "bindless_index").isValid());
         checkJsonStringField(container, buffer, "element_type", "uint64");
         checkJsonIntField(container, buffer, "element_stride", 8);
         SLANG_CHECK(findJsonField(container, buffer, "uniform_offset").isValid());

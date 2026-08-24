@@ -1248,6 +1248,12 @@ slang_writeCoverageManifestJson(slang::ICoverageTracingMetadata* metadata, ISlan
                 out << ",\n    \"space\": " << (int64_t)resourceInfo.space;
             if (resourceInfo.binding >= 0)
                 out << ",\n    \"binding\": " << (int64_t)resourceInfo.binding;
+            // Present only in the bindless form, where the buffer is one
+            // element of an unbounded descriptor array. Emitted on the same
+            // >= 0 convention as space/binding so a single-buffer manifest
+            // is byte-identical to before.
+            if (resourceInfo.bindlessIndex >= 0)
+                out << ",\n    \"bindless_index\": " << (int64_t)resourceInfo.bindlessIndex;
             if (resourceInfo.uniformOffset >= 0)
                 out << ",\n    \"uniform_offset\": " << (int64_t)resourceInfo.uniformOffset;
             if (resourceInfo.uniformStride > 0)

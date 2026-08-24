@@ -5161,6 +5161,22 @@ struct SyntheticResourceInfo
     /// returned pointer is valid for the lifetime of the metadata
     /// object.
     const char* debugName = nullptr;
+
+    /// Index of this shader's element within the synthetic resource's
+    /// descriptor array, or `-1` when the resource is bound as a single
+    /// descriptor rather than as an element of an array.
+    ///
+    /// Coverage sets this from `-trace-coverage-bindless-index`. In that
+    /// form `__slang_coverage` is an unbounded array of buffers, so a
+    /// single `(space, binding)` serves every shader in a pipeline and
+    /// each shader accesses `__slang_coverage[bindlessIndex]`. Reading it
+    /// back here saves a host from having to track the value it passed at
+    /// compile time in order to report on the result.
+    ///
+    /// This field is past the v1 struct size, so it is only written when
+    /// the caller's `structSize` covers it. A caller compiled against an
+    /// older header keeps its own struct layout and never sees it.
+    int32_t bindlessIndex = -1;
 };
 
 struct ISyntheticResourceMetadata : public ISlangCastable

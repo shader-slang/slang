@@ -388,6 +388,14 @@ static constexpr size_t kCoverageBufferInfoV1MinSize =
 static constexpr size_t kSyntheticResourceInfoV1MinSize =
     offsetof(slang::SyntheticResourceInfo, debugName) + sizeof(const char*);
 
+#define SLANG_WRITE_OPTIONAL_SYNTHETIC_RESOURCE_FIELD(outInfo, fieldName, value)              \
+    do                                                                                        \
+    {                                                                                         \
+        if ((outInfo)->structSize >=                                                          \
+            offsetof(slang::SyntheticResourceInfo, fieldName) + sizeof((outInfo)->fieldName)) \
+            (outInfo)->fieldName = (value);                                                   \
+    } while (0)
+
 #define SLANG_WRITE_OPTIONAL_COVERAGE_ENTRY_FIELD(outInfo, fieldName, value)              \
     do                                                                                    \
     {                                                                                     \
@@ -522,6 +530,9 @@ SlangResult ArtifactPostEmitMetadata::getResourceInfo(
     outInfo->uniformOffset = record.uniformOffset;
     outInfo->uniformStride = record.uniformStride;
     outInfo->debugName = record.debugName.getLength() ? record.debugName.getBuffer() : nullptr;
+    // Past the v1 size, so only written when the caller's struct has room
+    // for it. A v1 caller keeps its own layout and is left untouched.
+    SLANG_WRITE_OPTIONAL_SYNTHETIC_RESOURCE_FIELD(outInfo, bindlessIndex, record.bindlessIndex);
     return SLANG_OK;
 }
 

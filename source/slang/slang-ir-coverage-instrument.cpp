@@ -1516,6 +1516,11 @@ void instrumentCoverage(
     syntheticResource.binding = chosenBinding;
     syntheticResource.uniformOffset = -1;
     syntheticResource.uniformStride = 0;
+    // Report the array element this shader was compiled to use, so a host
+    // can recover it from the metadata rather than tracking the value it
+    // passed to `-trace-coverage-bindless-index`. Stays -1 in the
+    // single-buffer form, matching the sentinel used by space/binding.
+    syntheticResource.bindlessIndex = bindlessIndex;
 
     CoverageInstrumenter instrumenter(
         module,
