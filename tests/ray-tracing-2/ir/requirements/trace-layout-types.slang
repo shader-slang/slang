@@ -97,4 +97,6 @@ void main()
 }
 
 // IR: structuralRayTracingTrace({{.*}}, %TestProgramLayout, %TestTraceContext,
-// IR-SAME: %rtx5FHitGroupList, %rtx5FMissGroupList, %rtx5FCallableGroupList,
+// IR-SAME: %rtx5FHitGroupList, TypePack(%TestHitGroup),
+// IR-SAME: %rtx5FMissGroupList, TypePack(%TestMissGroup),
+// IR-SAME: %rtx5FCallableGroupList, TypePack(%TestCallableGroup),

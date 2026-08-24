@@ -951,6 +951,24 @@ IRInst* AstOrIRType::getIRType(IRGenContext* context)
     return irType;
 }
 
+static ConcreteTypePack* _getStructuralRayTracingGroupTypePack(
+    ASTBuilder* astBuilder,
+    Type* groupListType)
+{
+    if (auto declRefType = as<DeclRefType>(groupListType))
+    {
+        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
+        {
+            for (auto argument : genericApp->getArgs())
+            {
+                if (auto typePack = as<ConcreteTypePack>(argument->resolve()))
+                    return typePack;
+            }
+        }
+    }
+    return astBuilder->getTypePack(ArrayView<Type*>());
+}
+
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -1015,6 +1033,12 @@ LoweredValInfo emitCallToDeclRef(
                     StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups);
                 SLANG_ASSERT(
                     traceContextType && hitGroupsType && missGroupsType && callableGroupsType);
+                auto lowerGroupTypePack = [&](Type* groupListType)
+                {
+                    return lowerType(
+                        context,
+                        _getStructuralRayTracingGroupTypePack(context->astBuilder, groupListType));
+                };
 
                 List<IRInst*> operationArgs;
                 operationArgs.add(
@@ -1022,8 +1046,11 @@ LoweredValInfo emitCallToDeclRef(
                 operationArgs.add(lowerType(context, programLayoutType));
                 operationArgs.add(lowerType(context, traceContextType));
                 operationArgs.add(lowerType(context, hitGroupsType));
+                operationArgs.add(lowerGroupTypePack(hitGroupsType));
                 operationArgs.add(lowerType(context, missGroupsType));
+                operationArgs.add(lowerGroupTypePack(missGroupsType));
                 operationArgs.add(lowerType(context, callableGroupsType));
+                operationArgs.add(lowerGroupTypePack(callableGroupsType));
                 operationArgs.addRange(args, argCount);
                 return LoweredValInfo::simple(builder->emitIntrinsicInst(
                     type,
