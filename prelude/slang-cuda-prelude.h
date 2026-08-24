@@ -4839,6 +4839,9 @@ __forceinline__ __device__ bool optixHitObjectIsLSSHit(OptixTraversableHandle* O
 }
 #endif
 
+// Native optixTraverse is an OptiX 8.0+ SER symbol; guard so the prelude stays compilable on
+// OptiX 7.x, where these wrappers would otherwise reference an undeclared function.
+#if (OPTIX_VERSION >= 80000)
 // Internal helper to call optixTraverse with the right number of register arguments
 template<typename T, size_t N = (sizeof(T) + 3) / 4>
 __forceinline__ __device__ void optixTraverseWithRegs(
@@ -5254,6 +5257,7 @@ __forceinline__ __device__ void optixTraverse(
         MultiplierForGeometryContributionToHitGroupIndex,
         MissShaderIndex);
 }
+#endif // OPTIX_VERSION >= 80000
 
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ bool slangOptixHitObjectIsHit(OptixTraversableHandle* hitObj)
