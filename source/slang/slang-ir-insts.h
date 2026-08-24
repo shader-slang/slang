@@ -1847,6 +1847,7 @@ struct IRStructuralRayTracingStageInputOperation : IRInst
         {
         case kIROp_StructuralRayTracingGetPayload:
         case kIROp_StructuralRayTracingGetHitAttributes:
+        case kIROp_StructuralRayTracingGetTriangleBarycentricCoord:
             return false;
         default:
             return true;

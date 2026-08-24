@@ -896,5 +896,7 @@ return {
 	["StructuralRayTracingStageInputOperation.structuralRayTracingReportHitWithKind"] = 920,
 	["structuralRayTracingTrace"] = 921,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetPayload"] = 922,
-	["StructuralRayTracingStageInputOperation.structuralRayTracingGetHitAttributes"] = 923
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetHitAttributes"] = 923,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetTriangleBarycentricCoord"] = 924,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetTriangleFrontFacing"] = 925
 }
