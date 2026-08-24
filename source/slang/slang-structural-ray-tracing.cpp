@@ -154,6 +154,22 @@ static AssocTypeDecl* _findAssociatedTypeRequirement(
     return nullptr;
 }
 
+static GenericTypeConstraintDecl* _findAssociatedTypeConstraint(AssocTypeDecl* associatedType)
+{
+    if (!associatedType)
+        return nullptr;
+    auto parentInterface = as<InterfaceDecl>(associatedType->parentDecl);
+    if (!parentInterface)
+        return nullptr;
+    for (auto constraint : parentInterface->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    {
+        auto subType = as<DeclRefType>(constraint->sub.type);
+        if (subType && subType->getDeclRef().getDecl() == associatedType)
+            return constraint;
+    }
+    return nullptr;
+}
+
 static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
     FunctionDeclBase* functionDecl)
 {
@@ -264,6 +280,12 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     m_rayTracerType = as<AggTypeDecl>(_findNamedDecl(module, "RayTracer"));
     m_trianglePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "TrianglePrimitive"));
     m_curvePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "CurvePrimitive"));
+    m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::ClosestHit)] =
+        as<AggTypeDecl>(_findNamedDecl(module, "NoClosestHit"));
+    m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::AnyHit)] =
+        as<AggTypeDecl>(_findNamedDecl(module, "NoAnyHit"));
+    m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Intersection)] =
+        as<AggTypeDecl>(_findNamedDecl(module, "NoIntersection"));
 
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::TracePayload)] =
         _findAssociatedTypeRequirement(module, "ITraceContext", "Payload");
@@ -286,6 +308,37 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     m_associatedTypeRequirements[int(
         StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups)] =
         _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "CallableGroups");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupSlot)] =
+        _findAssociatedTypeRequirement(module, "IHitGroup", "Slot");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupContext)] =
+        _findAssociatedTypeRequirement(module, "IHitGroup", "Context");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit)] =
+        _findAssociatedTypeRequirement(module, "IHitGroup", "ClosestHit");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit)] =
+        _findAssociatedTypeRequirement(module, "IHitGroup", "AnyHit");
+    m_associatedTypeRequirements[int(
+        StructuralRayTracingAssociatedTypeKind::HitGroupIntersection)] =
+        _findAssociatedTypeRequirement(module, "IHitGroup", "Intersection");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissGroupSlot)] =
+        _findAssociatedTypeRequirement(module, "IMissGroup", "Slot");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissGroupContext)] =
+        _findAssociatedTypeRequirement(module, "IMissGroup", "Context");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissGroupMiss)] =
+        _findAssociatedTypeRequirement(module, "IMissGroup", "Miss");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableGroupSlot)] =
+        _findAssociatedTypeRequirement(module, "ICallableGroup", "Slot");
+    m_associatedTypeRequirements[int(
+        StructuralRayTracingAssociatedTypeKind::CallableGroupContext)] =
+        _findAssociatedTypeRequirement(module, "ICallableGroup", "Context");
+    m_associatedTypeRequirements[int(
+        StructuralRayTracingAssociatedTypeKind::CallableGroupCallable)] =
+        _findAssociatedTypeRequirement(module, "ICallableGroup", "Callable");
+
+    for (int i = 0; i < int(StructuralRayTracingAssociatedTypeKind::Count); ++i)
+    {
+        m_associatedTypeConstraintRequirements[i] =
+            _findAssociatedTypeConstraint(m_associatedTypeRequirements[i]);
+    }
 
     InterfaceDecl* interfaces[int(StructuralRayTracingStageKind::Count)] = {};
     AggTypeDecl* inputTypes[int(StructuralRayTracingStageKind::Count)] = {};
@@ -357,6 +410,42 @@ Type* StructuralRayTracingDeclRegistry::resolveAssociatedType(
         return type ? as<Type>(type->resolve()) : nullptr;
     }
     return nullptr;
+}
+
+SubtypeWitness* StructuralRayTracingDeclRegistry::resolveAssociatedTypeConstraint(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    StructuralRayTracingAssociatedTypeKind kind) const
+{
+    if (!witness)
+        return nullptr;
+
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingAssociatedTypeKind::Count))
+        return nullptr;
+    auto requirement = m_associatedTypeConstraintRequirements[index];
+    if (!requirement)
+        return nullptr;
+
+    auto requirementWitness = tryLookUpRequirementWitness(astBuilder, witness, requirement);
+    if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
+        return as<SubtypeWitness>(requirementWitness.getVal()->resolve());
+    return nullptr;
+}
+
+bool StructuralRayTracingDeclRegistry::isStagePlaceholder(
+    StructuralRayTracingStageKind kind,
+    Type* type) const
+{
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingStageKind::Count) ||
+        !m_stagePlaceholderTypes[index])
+    {
+        return false;
+    }
+    type = type ? as<Type>(type->resolve()) : nullptr;
+    auto declRefType = as<DeclRefType>(type);
+    return declRefType && declRefType->getDeclRef().getDecl() == m_stagePlaceholderTypes[index];
 }
 
 StructuralRayTracingHitAttributesKind StructuralRayTracingDeclRegistry::getHitAttributesKind(

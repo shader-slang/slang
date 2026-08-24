@@ -2176,6 +2176,46 @@ local insts = {
 					},
 				},
 			},
+			{
+				structuralRayTracingHitGroupInfo = {
+					struct_name = "StructuralRayTracingHitGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "slotType", "IRType" },
+						{ "contextType", "IRType" },
+						{ "closestHitType", "IRType" },
+						{ "closestHit" },
+						{ "anyHitType", "IRType" },
+						{ "anyHit" },
+						{ "intersectionType", "IRType" },
+						{ "intersection" },
+					},
+				},
+			},
+			{
+				structuralRayTracingMissGroupInfo = {
+					struct_name = "StructuralRayTracingMissGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "slotType", "IRType" },
+						{ "contextType", "IRType" },
+						{ "missType", "IRType" },
+						{ "miss" },
+					},
+				},
+			},
+			{
+				structuralRayTracingCallableGroupInfo = {
+					struct_name = "StructuralRayTracingCallableGroupInfoDecoration",
+					operands = {
+						{ "groupType", "IRType" },
+						{ "slotType", "IRType" },
+						{ "contextType", "IRType" },
+						{ "callableType", "IRType" },
+						{ "callable" },
+					},
+				},
+			},
 			{ CudaKernel = { struct_name = "CudaKernelDecoration" } },
 			{ CudaHost = { struct_name = "CudaHostDecoration" } },
 			{
