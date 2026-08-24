@@ -5,6 +5,7 @@
 #include "core/slang-shared-library.h"
 #include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-markdown.h"
@@ -1975,6 +1976,37 @@ RefPtr<Module> Linkage::_findOrImportModuleWithoutPolicy(
                     /*isSpeculativeLoad*/ true);
                 if (module)
                 {
+                    if (moduleName->text == "slang/raytracing")
+                    {
+                        // Only the packaged standard-module fallback is trusted to define the
+                        // compiler-owned structural ray-tracing interfaces. A module found through
+                        // an ordinary user search path must remain an ordinary source module even
+                        // if it uses the same import name.
+                        StructuralRayTracingStageKind missingStage;
+                        if (!m_structuralRayTracingDeclRegistry.registerTrustedModule(
+                                module,
+                                &missingStage) ||
+                            !identifyStructuralRayTracingStageInterfaces(
+                                module,
+                                m_structuralRayTracingDeclRegistry,
+                                &missingStage))
+                        {
+                            sink->diagnose(Diagnostics::CannotResolveImportedDecl{
+                                .declName = getStructuralRayTracingStageInterfaceName(missingStage),
+                                .moduleName = getText(moduleName)});
+                        }
+                    }
+                    if (auto irModule = module->getIRModule())
+                    {
+                        if (irModule->getModuleInst()
+                                ->findDecoration<IRExperimentalModuleDecoration>() &&
+                            !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
+                        {
+                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
+                                .module = getText(moduleName),
+                                .loc = requestingLoc});
+                        }
+                    }
                     return module;
                 }
             }

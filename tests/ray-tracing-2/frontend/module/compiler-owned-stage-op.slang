@@ -1,0 +1,7 @@
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+
+__intrinsic_type(closest_hit_stage_interface) struct FakeStageInterface;
+// CHECK: ^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'closest_hit_stage_interface' is reserved for compiler use
+
+__intrinsic_op(any_hit_stage_interface) void fakeStageOperation();
+// CHECK:                ^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'any_hit_stage_interface' is reserved for compiler use
