@@ -46,6 +46,16 @@ public extension<Context> ClosestHitInput<Context>
     }
 }
 
+public extension<Context> ClosestHitInput<Context>
+    where Context : IHitContext
+    where Context.Primitive == TrianglePrimitive
+{
+    public property TriangleData triangle
+    {
+        get { return {}; }
+    }
+}
+
 [require(anyhit)]
 public struct AnyHitInput<Context>
     where Context : IHitContext
@@ -87,6 +97,16 @@ public extension<Context> AnyHitInput<Context>
     public property Context.Primitive.Attributes attributes
     {
         get;
+    }
+}
+
+public extension<Context> AnyHitInput<Context>
+    where Context : IHitContext
+    where Context.Primitive == TrianglePrimitive
+{
+    public property TriangleData triangle
+    {
+        get { return {}; }
     }
 }
 

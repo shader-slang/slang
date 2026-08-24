@@ -15,7 +15,9 @@ struct StructuralRayTracingStageParameterThreader
         const char* parameterName,
         const char* semanticName,
         bool isInput,
-        bool isOutput)
+        bool isOutput,
+        IRType* entryPointParameterType = nullptr,
+        IRStructKey* entryPointValueKey = nullptr)
         : m_module(module)
         , m_parameterType(parameterType)
         , m_resourceKind(resourceKind)
@@ -23,6 +25,8 @@ struct StructuralRayTracingStageParameterThreader
         , m_semanticName(semanticName)
         , m_isInput(isInput)
         , m_isOutput(isOutput)
+        , m_entryPointParameterType(entryPointParameterType)
+        , m_entryPointValueKey(entryPointValueKey)
     {
     }
 
@@ -33,6 +37,8 @@ struct StructuralRayTracingStageParameterThreader
     const char* m_semanticName;
     bool m_isInput;
     bool m_isOutput;
+    IRType* m_entryPointParameterType;
+    IRStructKey* m_entryPointValueKey;
     Dictionary<IRFunc*, IRInst*> m_parameters;
 
     IRFunc* findEnclosingFunc(IRInst* inst)
@@ -61,14 +67,25 @@ struct StructuralRayTracingStageParameterThreader
         SLANG_ASSERT(firstBlock);
 
         IRBuilder builder(m_module);
-        auto parameter = builder.createParam(m_parameterType);
+        auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>();
+        auto physicalParameterType = entryPointDecoration && m_entryPointParameterType
+                                         ? m_entryPointParameterType
+                                         : m_parameterType;
+        auto parameter = builder.createParam(physicalParameterType);
         builder.addNameHintDecoration(parameter, UnownedTerminatedStringSlice(m_parameterName));
         parameter->insertBefore(firstBlock->getFirstOrdinaryInst());
-        m_parameters.add(func, parameter);
 
-        if (func->findDecoration<IREntryPointDecoration>())
+        IRInst* parameterValue = parameter;
+        if (entryPointDecoration && m_entryPointValueKey)
         {
-            auto entryPointDecoration = func->findDecoration<IREntryPointDecoration>();
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+            parameterValue =
+                builder.emitFieldExtract(m_parameterType, parameter, m_entryPointValueKey);
+        }
+        m_parameters.add(func, parameterValue);
+
+        if (entryPointDecoration)
+        {
             if (m_isInput)
                 builder.addSimpleDecoration<IRGlobalInputDecoration>(parameter);
             if (m_isOutput)
@@ -113,7 +130,7 @@ struct StructuralRayTracingStageParameterThreader
             call->removeAndDeallocate();
         }
 
-        return parameter;
+        return parameterValue;
     }
 
     void lower(IRInst* operation)
@@ -194,6 +211,45 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
         {
             if (candidate->getOp() == kIROp_StructuralRayTracingGetHitAttributes &&
                 candidate->getDataType() == attributeType)
+            {
+                threader.lower(candidate);
+            }
+        }
+    }
+
+    HashSet<IRType*> loweredTriangleBarycentricTypes;
+    for (auto operation : operations)
+    {
+        if (operation->getOp() != kIROp_StructuralRayTracingGetTriangleBarycentricCoord)
+            continue;
+
+        auto barycentricType = operation->getDataType();
+        if (!loweredTriangleBarycentricTypes.add(barycentricType))
+            continue;
+
+        IRBuilder builder(module);
+        auto nativeAttributeType = builder.createStructType();
+        builder.addNameHintDecoration(
+            nativeAttributeType,
+            UnownedTerminatedStringSlice("StructuralTriangleHitAttributes"));
+        auto barycentricKey = builder.createStructKey();
+        builder.addNameHintDecoration(barycentricKey, UnownedTerminatedStringSlice("barycentrics"));
+        builder.createStructField(nativeAttributeType, barycentricKey, barycentricType);
+
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            barycentricType,
+            LayoutResourceKind::HitAttributes,
+            "attributes",
+            "SV_IntersectionAttributes",
+            true,
+            false,
+            nativeAttributeType,
+            barycentricKey);
+        for (auto candidate : operations)
+        {
+            if (candidate->getOp() == kIROp_StructuralRayTracingGetTriangleBarycentricCoord &&
+                candidate->getDataType() == barycentricType)
             {
                 threader.lower(candidate);
             }
