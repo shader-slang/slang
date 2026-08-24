@@ -76,11 +76,15 @@ SLANG_UNIT_TEST(diagnosticCallbackErrorSeverity)
     SLANG_UNUSED(mod);
 
     SLANG_CHECK(captured.getCount() > 0);
-    bool sawError = false;
+    // 30015 is E30015 ("undefined identifier"), the specific diagnostic 'undefined' is expected
+    // to provoke. This may cascade into further errors (e.g. a placeholder error for the
+    // resulting ErrorType), so look for E30015 specifically rather than asserting every
+    // error-severity diagnostic carries this code.
+    bool sawExpectedError = false;
     for (auto& c : captured)
-        if (c.severity == SLANG_SEVERITY_ERROR)
-            sawError = true;
-    SLANG_CHECK(sawError);
+        if (c.severity == SLANG_SEVERITY_ERROR && c.code == 30015)
+            sawExpectedError = true;
+    SLANG_CHECK(sawExpectedError);
 }
 
 // 2. Callback fires with SLANG_SEVERITY_WARNING for a warning (not an error).
@@ -115,11 +119,14 @@ SLANG_UNIT_TEST(diagnosticCallbackWarningSeverity)
     ComPtr<slang::IBlob> targetDiag;
     linked->getTargetCode(0, code.writeRef(), targetDiag.writeRef());
 
-    bool sawWarning = false;
+    // 39019 is E39019 ("global-uniform-not-expected"), the specific diagnostic 'globalUnused'
+    // is expected to provoke; look for it specifically rather than asserting every
+    // warning-severity diagnostic carries this code.
+    bool sawExpectedWarning = false;
     for (auto& c : captured)
-        if (c.severity == SLANG_SEVERITY_WARNING)
-            sawWarning = true;
-    SLANG_CHECK(sawWarning);
+        if (c.severity == SLANG_SEVERITY_WARNING && c.code == 39019)
+            sawExpectedWarning = true;
+    SLANG_CHECK(sawExpectedWarning);
 }
 
 // 3. Callback and blob agree: every diagnostic the callback sees also appears in the blob.
@@ -236,4 +243,78 @@ SLANG_UNIT_TEST(diagnosticCallbackTargetStage)
 
     // The target stage must have added at least one more callback invocation.
     SLANG_CHECK(count > countBeforeTarget);
+}
+
+// 7. Registering a new callback replaces the previous one: only the newest callback fires,
+// with its own userData.
+SLANG_UNIT_TEST(diagnosticCallbackReplacement)
+{
+    ComPtr<slang::IGlobalSession> gs;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, gs.writeRef()) == SLANG_OK);
+    auto session = makeSession(gs);
+
+    int countA = 0;
+    int countB = 0;
+    session->setDiagnosticCallback(countCallback, &countA);
+    session->setDiagnosticCallback(countCallback, &countB);
+
+    const char* src = "int x = undefined;";
+    ComPtr<slang::IBlob> d;
+    session->loadModuleFromSourceString("m", "m.slang", src, d.writeRef());
+
+    // Only the most recently registered callback (with userData == &countB) fired.
+    SLANG_CHECK(countA == 0);
+    SLANG_CHECK(countB > 0);
+}
+
+// 8. A diagnostic disabled via CompilerOptionName::DisableWarning does not reach the callback,
+// confirming the callback reports severity "after overrides are applied" as documented.
+SLANG_UNIT_TEST(diagnosticCallbackSeverityOverride)
+{
+    ComPtr<slang::IGlobalSession> gs;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, gs.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc target = {};
+    target.format = SLANG_SPIRV_ASM;
+    target.profile = gs->findProfile("sm_5_0");
+
+    // Disable E39019 ("global-uniform-not-expected") for this session, the same diagnostic
+    // exercised by diagnosticCallbackWarningSeverity above.
+    slang::CompilerOptionEntry disableWarning = {};
+    disableWarning.name = slang::CompilerOptionName::DisableWarning;
+    disableWarning.value.kind = slang::CompilerOptionValueKind::String;
+    disableWarning.value.stringValue0 = "39019";
+
+    slang::SessionDesc desc = {};
+    desc.targetCount = 1;
+    desc.targets = &target;
+    desc.compilerOptionEntries = &disableWarning;
+    desc.compilerOptionEntryCount = 1;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(gs->createSession(desc, session.writeRef()) == SLANG_OK);
+
+    List<CapturedDiagnostic> captured;
+    session->setDiagnosticCallback(collectCallback, &captured);
+
+    const char* src = R"(
+        int globalUnused;
+        [shader("compute")]
+        [numthreads(1,1,1)]
+        void main() {}
+    )";
+    ComPtr<slang::IBlob> modDiag;
+    auto* mod = session->loadModuleFromSourceString("m", "m.slang", src, modDiag.writeRef());
+    SLANG_CHECK_ABORT(mod != nullptr);
+
+    ComPtr<slang::IComponentType> linked;
+    mod->link(linked.writeRef(), nullptr);
+    SLANG_CHECK_ABORT(linked != nullptr);
+
+    ComPtr<slang::IBlob> code, targetDiag;
+    linked->getTargetCode(0, code.writeRef(), targetDiag.writeRef());
+
+    // The disabled diagnostic must never reach the callback, at any severity.
+    for (auto& c : captured)
+        SLANG_CHECK(c.code != 39019);
 }
