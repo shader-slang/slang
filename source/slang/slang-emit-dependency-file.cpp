@@ -38,47 +38,17 @@ static void _escapeDependencyString(const char* string, StringBuilder& outBuilde
     }
 }
 
-// A compiled `.slang-module` an `import` loads is recorded only as a module dependency, never a
-// file dependency, so `-depfile` omits it and consumers miss the rebuild edge to the importer.
-// Append each such module dependency; `alreadyListedPaths` skips a path already written (both the
-// file dependencies and any module path repeated across the closure).
-static void _collectExtraModuleDependencyPaths(
-    EndToEndCompileRequest* compileRequest,
-    List<String>& outPaths)
-{
-    // Use the same unspecialized program the file dependencies come from (`getDependencyFilePath`),
-    // so the module set and the dedup set are drawn from one consistent dependency closure.
-    auto program = compileRequest->getUnspecializedGlobalAndEntryPointsComponentType();
-
-    HashSet<String> alreadyListedPaths;
-    int fileDependencyCount = compileRequest->getDependencyFileCount();
-    for (int i = 0; i < fileDependencyCount; ++i)
-        alreadyListedPaths.add(compileRequest->getDependencyFilePath(i));
-
-    for (auto module : program->getModuleDependencies())
-    {
-        // Classify on the file path; a source-loaded module has a `.slang` path already emitted.
-        const char* filePath = module->getFilePath();
-        if (!filePath || !UnownedStringSlice(filePath).endsWith(toSlice(".slang-module")))
-            continue;
-        // Emit the same identity representation `getDependencyFilePath` uses for file dependencies.
-        const char* emitPath = module->getUniqueIdentity();
-        if (!emitPath)
-            emitPath = filePath;
-        String emitPathString(emitPath);
-        if (alreadyListedPaths.add(emitPathString))
-            outPaths.add(emitPathString);
-    }
-}
-
 // Writes a "<output-file>: <dep> <dep...>" line to the stream.
 // When outputPath is empty (output to stdout), "-" is used as the make target placeholder.
 // writtenStdoutSentinel prevents duplicate "-: ..." lines across multiple call sites.
+//
+// Each dependency is written as " <escaped-path>" (separator first) and the statement is
+// newline-terminated, so the count of dependencies need not be known in advance — the module
+// dependencies below are filtered as they are emitted rather than pre-collected into a list.
 static void _writeDependencyStatement(
     Stream& stream,
     EndToEndCompileRequest* compileRequest,
     const String& outputPath,
-    const List<String>& extraModuleDependencyPaths,
     bool& writtenStdoutSentinel)
 {
     StringBuilder builder;
@@ -95,26 +65,48 @@ static void _writeDependencyStatement(
         _writeString(stream, builder.begin());
         builder.clear();
     }
-    _writeString(stream, ": ");
+    _writeString(stream, ":");
 
+    auto writeDependency = [&](const char* path)
+    {
+        builder.clear();
+        _escapeDependencyString(path, builder);
+        _writeString(stream, " ");
+        _writeString(stream, builder.begin());
+    };
+
+    // Track the paths already written so a module whose `.slang-module` identity coincides with a
+    // listed source (a module imported from source) is not emitted twice.
+    HashSet<String> alreadyListedPaths;
     int dependencyCount = compileRequest->getDependencyFileCount();
-    Index extraCount = extraModuleDependencyPaths.getCount();
-    Index totalCount = Index(dependencyCount) + extraCount;
-    Index writtenCount = 0;
     for (int dependencyIndex = 0; dependencyIndex < dependencyCount; ++dependencyIndex)
     {
-        builder.clear();
-        _escapeDependencyString(compileRequest->getDependencyFilePath(dependencyIndex), builder);
-        _writeString(stream, builder.begin());
-        _writeString(stream, (++writtenCount < totalCount) ? " " : "\n");
+        const char* dependencyPath = compileRequest->getDependencyFilePath(dependencyIndex);
+        alreadyListedPaths.add(dependencyPath);
+        writeDependency(dependencyPath);
     }
-    for (auto& extraPath : extraModuleDependencyPaths)
+
+    // A compiled `.slang-module` an `import` loads is recorded only as a module dependency, never a
+    // file dependency, so `-depfile` would otherwise omit it and a consumer would miss the rebuild
+    // edge to the importer. Append each such module file, skipping any path already listed as a
+    // source. Draw the modules from the same unspecialized program the file dependencies come from
+    // (`getDependencyFilePath`), so the module set and the dedup set share one dependency closure.
+    auto program = compileRequest->getUnspecializedGlobalAndEntryPointsComponentType();
+    for (auto module : program->getModuleDependencies())
     {
-        builder.clear();
-        _escapeDependencyString(extraPath.begin(), builder);
-        _writeString(stream, builder.begin());
-        _writeString(stream, (++writtenCount < totalCount) ? " " : "\n");
+        // Classify on the file path; a source-loaded module has a `.slang` path already emitted.
+        const char* filePath = module->getFilePath();
+        if (!filePath || !UnownedStringSlice(filePath).endsWith(toSlice(".slang-module")))
+            continue;
+        // Emit the same identity representation `getDependencyFilePath` uses for file dependencies.
+        const char* emitPath = module->getUniqueIdentity();
+        if (!emitPath)
+            emitPath = filePath;
+        if (alreadyListedPaths.add(String(emitPath)))
+            writeDependency(emitPath);
     }
+
+    _writeString(stream, "\n");
 }
 
 // Writes a file with dependency info, with one line in the output file per compile product.
@@ -133,9 +125,6 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
     auto linkage = compileRequest->getLinkage();
     auto program = compileRequest->getSpecializedGlobalAndEntryPointsComponentType();
 
-    List<String> extraModuleDependencyPaths;
-    _collectExtraModuleDependencyPaths(compileRequest, extraModuleDependencyPaths);
-
     bool writtenStdoutSentinel = false;
 
     // Iterate over all the targets and their outputs
@@ -151,7 +140,6 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
                     stream,
                     compileRequest,
                     targetInfo->wholeTargetOutputPath,
-                    extraModuleDependencyPaths,
                     writtenStdoutSentinel);
             }
         }
@@ -170,7 +158,6 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
                             stream,
                             compileRequest,
                             outputPath,
-                            extraModuleDependencyPaths,
                             writtenStdoutSentinel);
                     }
                 }
@@ -186,7 +173,6 @@ SlangResult writeDependencyFile(EndToEndCompileRequest* compileRequest)
             stream,
             compileRequest,
             compileRequest->m_containerOutputPath,
-            extraModuleDependencyPaths,
             writtenStdoutSentinel);
     }
 
