@@ -410,6 +410,10 @@ public:
 
     SourceManager* getSourceManager() { return m_sourceManager; }
 
+    StructuralRayTracingDeclRegistry& getStructuralRayTracingDeclRegistry()
+    {
+        return m_structuralRayTracingDeclRegistry;
+    }
     const StructuralRayTracingDeclRegistry& getStructuralRayTracingDeclRegistry() const
     {
         return m_structuralRayTracingDeclRegistry;

@@ -11365,6 +11365,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
         {
         case ConformanceInterfaceCheckStatus::Checking:
         case ConformanceInterfaceCheckStatus::Succeeded:
+            registerStructuralRayTracingStageConformance(superInterfaceDeclRef, witnessTable);
             return witnessTable;
         case ConformanceInterfaceCheckStatus::Failed:
             return nullptr;
@@ -11423,6 +11424,7 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
     }
 
     interfaceState->status = ConformanceInterfaceCheckStatus::Succeeded;
+    registerStructuralRayTracingStageConformance(superInterfaceDeclRef, witnessTable);
     return witnessTable;
 }
 
@@ -11732,6 +11734,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
 
     // The conformance was satisfied if all the requirements were satisfied.
     //
+    if (result)
+        registerStructuralRayTracingStageConformance(superInterfaceDeclRef, witnessTable);
     return result;
 }
 
