@@ -539,6 +539,11 @@ struct SharedIRGenContext
     // prelink into the current module after lowering.
     List<IRInst*> externalSymbolsToPrelink;
 
+    // The IR functions lowered for this translation unit's declared entry points, recorded before
+    // the source-order declaration walk so module-scope declarations that must decorate every entry
+    // point (e.g. GLSL `layout(derivative_group_*NV) in;`) have the exact set to iterate.
+    List<IRInst*> m_entryPointFuncs;
+
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -10700,9 +10705,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         if (entryPoints.getCount() != 0)
             return;
-        for (const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
-            if (d->findDecoration<IREntryPointDecoration>())
-                entryPoints.add(d);
+        // Return this module's declared entry-point functions, captured exactly in
+        // `generateIRForTranslationUnit` before the source-order declaration walk (see
+        // `SharedIRGenContext::m_entryPointFuncs`). Using that recorded set — rather than scanning
+        // decorations — is what keeps a non-entry `[numthreads]` helper out of the derivative-group
+        // decoration this feeds (#12392).
+        for (auto entryPointFunc : context->shared->m_entryPointFuncs)
+            entryPoints.add(entryPointFunc);
     }
 
     LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
@@ -15253,98 +15262,6 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return info;
 }
 
-static void lowerFrontEndEntryPointToIR(
-    IRGenContext* context,
-    EntryPoint* entryPoint,
-    String moduleName)
-{
-    // TODO: We should emit an entry point as a dedicated IR function
-    // (distinct from the IR function used if it were called normally),
-    // with a mangled name based on the original function name plus
-    // the stage for which it is being compiled as an entry point (so
-    // that entry points for distinct stages always have distinct names).
-    //
-    // For now we just have an (implicit) constraint that a given
-    // function should only be used as an entry point for one stage,
-    // and any such function should *not* be used as an ordinary function.
-
-    auto entryPointFuncDecl = entryPoint->getFuncDecl();
-
-    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
-    {
-        // If the entry point doesn't have an explicit `[shader("...")]` attribute,
-        // then we make sure to add one here, so the lowering logic knows it is an
-        // entry point.
-        auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet =
-            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
-        addModifier(entryPointFuncDecl, entryPointAttr);
-    }
-
-    auto builder = context->irBuilder;
-    builder->setInsertInto(builder->getModule()->getModuleInst());
-
-    auto loweredEntryPointFunc = getSimpleVal(context, ensureDecl(context, entryPointFuncDecl));
-
-    // Attach a marker decoration so that we recognize
-    // this as an entry point.
-    //
-    IRInst* instToDecorate = loweredEntryPointFunc;
-    if (auto irGeneric = as<IRGeneric>(instToDecorate))
-    {
-        instToDecorate = findGenericReturnVal(irGeneric);
-    }
-
-    // If the entry-point decorations has already been created (because the user
-    // specified duplicate entries in the entry point list), we can stop now.
-    if (instToDecorate->findDecoration<IREntryPointDecoration>())
-        return;
-
-    {
-
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
-        builder->addEntryPointDecoration(
-            instToDecorate,
-            entryPoint->getProfile(),
-            entryPointName->text.getUnownedSlice(),
-            moduleName.getUnownedSlice());
-    }
-
-    // The `[Shader64BitIndexing]` attribute requires the `spvShader64BitIndexingEXT` capability,
-    // which the semantic checker unions into `inferredCapabilityRequirements` for the attributed
-    // function and, transitively, for every entry point that can reach it through its call graph.
-    // The corresponding SPIR-V `Shader64BitIndexingEXT` execution mode (and its owning
-    // `OpCapability`/`OpExtension`) is entry-point scoped, so we lift the requirement onto the
-    // entry point here (never onto an attributed callee, where an execution mode would be invalid).
-    // The SPIR-V back-end emits all three from this single decoration. Reading the inferred
-    // capability set rather than the attribute directly covers the direct, call-graph, and
-    // `[require(spvShader64BitIndexingEXT)]` cases uniformly.
-    if (auto inferredCaps = entryPointFuncDecl->inferredCapabilityRequirements)
-    {
-        CapabilitySet caps{inferredCaps};
-        bool requiresShader64BitIndexing = false;
-        // Scan for membership of the atom in *any* alternative of the capability set. We iterate
-        // `getAtomSets()` rather than calling `caps.implies(spvShader64BitIndexingEXT)` because
-        // `implies()` is AND-across-all-alternatives: it would only report the atom when *every*
-        // target alternative requires it, which is too strict for a presence test.
-        for (auto atomSet : caps.getAtomSets())
-        {
-            for (auto atomVal : atomSet)
-            {
-                if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
-                {
-                    requiresShader64BitIndexing = true;
-                    break;
-                }
-            }
-            if (requiresShader64BitIndexing)
-                break;
-        }
-        if (requiresShader64BitIndexing)
-            builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(instToDecorate);
-    }
-}
-
 static void lowerProgramEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
@@ -15521,20 +15438,38 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // For now, we will assume that *all* global-scope declarations
     // represent public/exported symbols.
-
-    // First, ensure that all entry points have been emitted,
-    // in case they require special handling.
+    //
+    // Note: we deliberately do *not* attach `IREntryPointDecoration`s here. Whether a given
+    // function is compiled as an entry point is a per-invocation codegen decision that is not known
+    // during (target-independent) module lowering, so the decoration is instead introduced where
+    // selection is known: on the codegen-selected functions during linking
+    // (`specializeIRForEntryPoint`).
+    //
+    // We do, however, still lower the entry-point functions *first*, before walking the module's
+    // declarations in source order below. A module-scope declaration can attach an
+    // entry-point-scoped decoration to every entry point of the module (e.g. GLSL
+    // `layout(derivative_group_*NV) in;`, handled in `visitEmptyDecl`, which scans the
+    // already-lowered functions). If such a declaration precedes the entry-point function in
+    // source, the function must already be lowered when it is scanned; lowering the entry points up
+    // front makes that scan independent of source order.
+    HashSet<IRInst*> seenEntryPointFuncs;
     for (auto entryPoint : translationUnit->getEntryPoints())
     {
-        List<SourceFile*> sources = translationUnit->getSourceFiles();
-        SourceFile* source = sources.getFirst();
-        PathInfo pInfo = source->getPathInfo();
-        String path = pInfo.getMostUniqueIdentity();
-        lowerFrontEndEntryPointToIR(context, entryPoint, Path::getFileNameWithoutExt(path));
+        auto loweredFunc = getSimpleVal(context, ensureDecl(context, entryPoint->getFuncDecl()));
+        if (!loweredFunc)
+            continue;
+        // A generic entry point lowers to an `IRGeneric` whose return value is the function; the
+        // entry-point identity belongs on that inner function, not the generic wrapper.
+        if (auto irGeneric = as<IRGeneric>(loweredFunc))
+            loweredFunc = findGenericReturnVal(irGeneric);
+        // The same function can be requested as an entry point more than once (e.g. duplicate
+        // entries in the entry-point list); record it once.
+        if (seenEntryPointFuncs.add(loweredFunc))
+            sharedContext->m_entryPointFuncs.add(loweredFunc);
     }
 
     //
-    // Next, ensure that all other global declarations have
+    // Ensure that all global declarations have
     // been emitted.
     for (auto decl : translationUnit->getModuleDecl()->getDirectMemberDecls())
     {
@@ -16556,6 +16491,38 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         auto irEntryPointLayout = lowerEntryPointLayout(context, entryPointLayout);
 
         builder->addLayoutDecoration(irFunc, irEntryPointLayout);
+
+        // The `[Shader64BitIndexing]` attribute requires the `spvShader64BitIndexingEXT`
+        // capability, which the semantic checker unions into `inferredCapabilityRequirements` for
+        // the attributed function and, transitively, for every entry point that can reach it
+        // through its call graph. The corresponding SPIR-V `Shader64BitIndexingEXT` execution mode
+        // (and its owning `OpCapability`/`OpExtension`) is entry-point scoped, so we lift the
+        // requirement onto the entry point here (never onto an attributed callee, where an
+        // execution mode would be invalid). The SPIR-V back-end emits all three from this single
+        // decoration. Reading the inferred capability set rather than the attribute directly covers
+        // the direct, call-graph, and `[require(spvShader64BitIndexingEXT)]` cases uniformly.
+        {
+            bool requiresShader64BitIndexing = false;
+            // Scan for membership of the atom in *any* alternative of the capability set. We
+            // iterate `getAtomSets()` rather than calling `set.implies(spvShader64BitIndexingEXT)`
+            // because `implies()` is AND-across-all-alternatives: it would only report the atom
+            // when *every* target alternative requires it, which is too strict for a presence test.
+            for (auto atomSet : set.getAtomSets())
+            {
+                for (auto atomVal : atomSet)
+                {
+                    if (asAtom(atomVal) == CapabilityAtom::spvShader64BitIndexingEXT)
+                    {
+                        requiresShader64BitIndexing = true;
+                        break;
+                    }
+                }
+                if (requiresShader64BitIndexing)
+                    break;
+            }
+            if (requiresShader64BitIndexing)
+                builder->addSimpleDecoration<IRShader64BitIndexingDecoration>(irFunc);
+        }
     }
 
     // Lets strip and run DCE here

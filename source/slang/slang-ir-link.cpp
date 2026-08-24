@@ -543,6 +543,10 @@ static void cloneExtraDecorationsFromInst(
         case kIROp_IntrinsicOpDecoration:
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
+        // Entry-point-scoped and introduced by the `TargetProgram` layout IR alongside the
+        // entry-point layout (see `createIRModuleForLayout`), so it must be carried onto the
+        // linked entry-point function the same way `LayoutDecoration` is.
+        case kIROp_Shader64BitIndexingDecoration:
             if (!clonedInst->findDecorationImpl(decoration->getOp()))
             {
                 cloneInst(context, builder, decoration);
@@ -1233,13 +1237,17 @@ IRFunc* specializeIRForEntryPoint(
     {
         if (!nameOverride.getLength())
             nameOverride = getUnownedStringSliceText(entryPoint->getName());
+        // A deserialized/pass-through entry point has no owning `Module`, so guard the module-name
+        // operand against a null `getModule()`.
+        auto entryPointModule = entryPoint->getModule();
         IRInst* operands[] = {
             context->builder->getIntValue(
                 context->builder->getIntType(),
                 entryPoint->getProfile().raw),
             context->builder->getStringValue(nameOverride),
             context->builder->getStringValue(
-                UnownedStringSlice(entryPoint->getModule()->getName()))};
+                entryPointModule ? UnownedStringSlice(entryPointModule->getName())
+                                 : UnownedStringSlice())};
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
 
