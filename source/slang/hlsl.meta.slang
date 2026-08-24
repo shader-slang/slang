@@ -10124,6 +10124,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     case wgsl: __intrinsic_asm "dot";
     default:
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
@@ -10196,6 +10197,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
     default:
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;

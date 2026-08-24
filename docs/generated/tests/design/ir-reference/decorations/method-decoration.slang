@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/decorations.md#other
-//META: doc_section_digest=892b92052aae4d71e1cd28cc1ecd17d43d75413f857441cfa244f1066aa8c1fb
+//META: doc_section_digest=0d0762e4e59612e4c842da9adb0ce25510dfd2380e8ab427638f4c6b2bd64f9a
 //META: purpose=A member function declared on a struct lowers to a func with a method decoration attached.
 //META: intent=functional
 //META: pipeline_stage=lower

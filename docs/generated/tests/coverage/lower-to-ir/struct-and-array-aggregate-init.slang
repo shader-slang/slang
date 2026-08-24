@@ -3,7 +3,7 @@
 //META: generated_at=2026-06-11T13:43:23Z
 //META: source_commit=ef1068b5485e09b3a7afadba2e25f9541e29af42
 //META: doc_ref=docs/generated/design/pipeline/04-ast-to-ir.md#mapping-ast-constructs-to-ir
-//META: doc_section_digest=620238fbdc64454143e731292800028152e8e67e2b491ba038b7ff1979f8cb84
+//META: doc_section_digest=1195a752790819415908e083ce9656a353d4764f2fab38cc5aa27d92f184c486
 //META: purpose=Verifies brace aggregate initializers for a struct and a fixed-size array lower so each member/element gets its listed value.
 //META: intent=characterization
 //META: covers=source/slang/slang-lower-to-ir.cpp

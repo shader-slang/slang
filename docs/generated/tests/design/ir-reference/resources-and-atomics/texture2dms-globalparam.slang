@@ -3,7 +3,7 @@
 //META: generated_at=2026-08-04T00:00:00+00:00
 //META: source_commit=7e725f15572c6589ee6d738a8856fb3348f11617
 //META: doc_ref=docs/generated/design/ir-reference/resources-and-atomics.md#shader-io
-//META: doc_section_digest=3ebd10067ff5f6123adbd965e4471fda38311d82079a24af41d8faab3a3f45cc
+//META: doc_section_digest=212a9e3fd4ca324be91b034872f2b7a9afdb1fe8ac5acfc9f068664d69c3e326
 //META: purpose=A module-scope `Texture2DMS<T>` parameter surfaces as a `global_param` whose result type is `TextureType(..., TextureShape2DType, 0, 1, ...)`, with the multi-sample flag set.
 //META: intent=expansion
 //META: pipeline_stage=lower

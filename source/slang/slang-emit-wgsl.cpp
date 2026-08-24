@@ -725,6 +725,16 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitType((IRType*)type->getOperand(0));
             return;
         }
+    case kIROp_AttributedType:
+        {
+            // An attribute (`unorm`/`snorm`, `no_diff`) is a semantic marker that
+            // does not change representation and has no WGSL spelling, so the type
+            // is emitted as its base. Without this, a `unorm float` used as a
+            // struct member or structured-buffer element type reaches here and the
+            // `default` arm emits nothing, producing invalid WGSL (`array<>`).
+            emitType(cast<IRAttributedType>(type)->getBaseType());
+            return;
+        }
     default:
         break;
     }
@@ -1708,7 +1718,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_GetStringHash:
         {
             auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
+            // Checked, unlike `getStringLit()`, so a non-literal operand reaches the
+            // unhandled-inst path below instead of being read as string data.
+            auto stringLit = as<IRStringLit>(getStringHashInst->getOperand(0));
 
             if (stringLit)
             {
