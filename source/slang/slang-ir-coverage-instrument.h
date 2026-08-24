@@ -78,7 +78,11 @@ static constexpr int kDefaultCoverageCounterByteWidth = 8;
 // `__slang_coverage[bindlessIndex][slot]`. Many separately compiled
 // shaders sharing one pipeline then occupy a single descriptor binding
 // instead of one binding each — at the cost of requiring descriptor
-// indexing, so it is rejected on non-Khronos targets.
+// indexing. A caller must therefore only pass `bindlessIndex >= 0` for a
+// Khronos target: the user-facing rejection belongs in `linkAndOptimizeIR`,
+// which validates it before this pass is gated on the module having any
+// coverage markers, so that a module with nothing instrumentable still
+// diagnoses. This pass asserts the invariant rather than re-reporting it.
 //
 // The index is a compile-time constant and therefore part of
 // the compiled artifact: a host that keys a shader cache on that

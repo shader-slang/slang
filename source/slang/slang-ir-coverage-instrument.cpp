@@ -1396,17 +1396,14 @@ void instrumentCoverage(
     // The bindless form needs descriptor indexing, which only the Khronos
     // targets have here: an unbounded array of buffers has no meaning on
     // CPU/CUDA (no descriptors to index) and no verified lowering on the
-    // others. Reject rather than silently falling back to the single-buffer
-    // form — a host that asked for one binding and got one binding PER
-    // SHADER would only find out from a pipeline-layout mismatch at runtime.
-    if (bindlessIndex >= 0 && !isKhronosTarget(targetRequest))
-    {
-        if (sink)
-            sink->diagnose(Diagnostics::CoverageBindlessTargetNotSupported{});
-        for (auto op : markerOps)
-            op->removeAndDeallocate();
-        return;
-    }
+    // others.
+    //
+    // The user-facing rejection lives in `linkAndOptimizeIR`, which validates
+    // the option before this pass is gated on having marker ops at all, so an
+    // empty module still diagnoses. By the time we get here the combination
+    // has already been rejected, and reaching it means a caller skipped that
+    // validation rather than that a user asked for something unsupported.
+    SLANG_RELEASE_ASSERT(bindlessIndex < 0 || isKhronosTarget(targetRequest));
 
     // Reject a user-declared global parameter named `__slang_coverage`.
     // The IR coverage pass synthesizes its own hidden buffer with that

@@ -1105,7 +1105,8 @@ Result linkAndOptimizeIR(
     // so this pass is independent of debug-info state. It writes its
     // source-entry mapping into `metadata`, exposed to hosts via
     // ICoverageTracingMetadata.
-    // Placement options are read and validated OUTSIDE the gate below.
+    // Placement options are read and validated OUTSIDE the gate below --
+    // value kind, value range, and target support alike.
     // `requiredLoweringPassSet.coverageTracing` is derived from coverage marker
     // ops present in the IR, so a shader with nothing instrumentable in it
     // would otherwise accept a contradictory or unsupported option set in
@@ -1125,17 +1126,34 @@ Result linkAndOptimizeIR(
                 explicitSpace = (int)(*values)[0].intValue2;
             }
         }
-        // PROTOTYPE: `-trace-coverage-bindless-index <index>`. -1 leaves the
-        // ordinary single-buffer form; >= 0 selects the
-        // unbounded-descriptor-array form. WHERE the array lives is a separate
-        // decision that stays with `-trace-coverage-binding` (or
-        // auto-allocation), because the host's descriptor set layout is the
-        // host's to choose and the compiler cannot see it.
+        // `-trace-coverage-bindless-index <index>`. -1 leaves the ordinary
+        // single-buffer form; >= 0 selects the unbounded-descriptor-array
+        // form. WHERE the array lives is a separate decision that stays with
+        // `-trace-coverage-binding` (or auto-allocation), because the host's
+        // descriptor set layout is the host's to choose and the compiler
+        // cannot see it.
         if (auto values =
                 placementOpts.options.tryGetValue(CompilerOptionName::TraceCoverageBindlessIndex))
         {
             if (values->getCount() > 0)
             {
+                // A host setting this through the API can supply any value
+                // kind. Reading `intValue` off a string-valued entry would
+                // yield 0 and quietly select array element 0, so reject the
+                // wrong kind rather than acting on a value that was never
+                // meant as an index. Matches the reserved-space handling
+                // below.
+                if ((*values)[0].kind != CompilerOptionValueKind::Int)
+                {
+                    if (sink)
+                    {
+                        SLANG_DIAGNOSE_UNEXPECTED(
+                            sink,
+                            SourceLoc(),
+                            "TraceCoverageBindlessIndex option value must be an integer");
+                    }
+                    return SLANG_FAIL;
+                }
                 // The CLI parser rejects negatives, but a host setting this
                 // through the API bypasses it, and a negative index would
                 // silently fall back to the single-buffer form -- one binding
@@ -1149,6 +1167,23 @@ Result linkAndOptimizeIR(
                 }
                 bindlessIndex = requestedIndex;
             }
+        }
+        // Target support is validated here rather than inside
+        // `instrumentCoverage` for the same reason the value checks are: the
+        // pass only runs when `requiredLoweringPassSet.coverageTracing` is
+        // set, and that flag is derived from coverage marker ops present in
+        // the IR. A module with nothing instrumentable in it -- an empty or
+        // declaration-only translation unit -- never opens that gate, so a
+        // request for the bindless form on a target that cannot express it
+        // would compile clean and report nothing. The host would then learn
+        // it did not get the shared binding it asked for from a
+        // pipeline-layout mismatch at runtime, which is precisely the failure
+        // this option exists to remove.
+        if (bindlessIndex >= 0 && !isKhronosTarget(targetRequest))
+        {
+            if (sink)
+                sink->diagnose(Diagnostics::CoverageBindlessTargetNotSupported{});
+            return SLANG_FAIL;
         }
     }
 

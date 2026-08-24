@@ -430,6 +430,67 @@ SLANG_UNIT_TEST(coverageTracingMetadata)
         checkJsonIntField(bindlessContainer, bindlessBuffer, "bindless_index", kBindlessIndex);
     }
 
+    // A negative bindless index must be rejected, and only the API can
+    // produce one: the CLI parser refuses negatives before they reach the
+    // compiler, so the E45118 guard is unreachable from a `.slang` test and
+    // would silently rot without this. What it protects against is a quiet
+    // fallback to the single-buffer form -- one descriptor binding per shader,
+    // the opposite of what a caller asking for the bindless form wants.
+    {
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = globalSession->findProfile("spirv_1_5");
+
+        slang::CompilerOptionEntry options[2] = {};
+        options[0].name = slang::CompilerOptionName::TraceCoverage;
+        options[0].value.kind = slang::CompilerOptionValueKind::Int;
+        options[0].value.intValue0 = 1;
+        options[1].name = slang::CompilerOptionName::TraceCoverageBindlessIndex;
+        options[1].value.kind = slang::CompilerOptionValueKind::Int;
+        options[1].value.intValue0 = -2;
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.compilerOptionEntries = options;
+        sessionDesc.compilerOptionEntryCount = 2;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> diagnostics;
+        auto module = session->loadModuleFromSourceString(
+            "negativeBindless",
+            "negativeBindless.slang",
+            shaderSource,
+            diagnostics.writeRef());
+        SLANG_CHECK(module != nullptr);
+
+        ComPtr<slang::IEntryPoint> entryPoint;
+        module->findEntryPointByName("computeMain", entryPoint.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
+
+        slang::IComponentType* components[] = {module, entryPoint};
+        ComPtr<slang::IComponentType> program;
+        SLANG_CHECK(
+            session->createCompositeComponentType(components, 2, program.writeRef(), nullptr) ==
+            SLANG_OK);
+        ComPtr<slang::IComponentType> linked;
+        SLANG_CHECK(program->link(linked.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+        // Code generation is where the option is validated, so the failure
+        // surfaces here rather than at link time.
+        ComPtr<slang::IBlob> codeBlob;
+        ComPtr<slang::IBlob> codeDiagnostics;
+        SLANG_CHECK(SLANG_FAILED(
+            linked->getEntryPointCode(0, 0, codeBlob.writeRef(), codeDiagnostics.writeRef())));
+        SLANG_CHECK(codeDiagnostics != nullptr);
+        UnownedStringSlice diagnosticText(
+            (const char*)codeDiagnostics->getBufferPointer(),
+            codeDiagnostics->getBufferSize());
+        SLANG_CHECK(diagnosticText.indexOf(toSlice("45118")) >= 0);
+    }
+
     // CUDA follows the same synthetic-resource marshaling contract as
     // CPU: the coverage buffer is discoverable through a concrete
     // uniform payload offset/stride rather than through descriptor

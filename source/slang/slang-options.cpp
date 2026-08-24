@@ -671,7 +671,7 @@ void initCommandOptions(CommandOptions& options)
          "leave it to auto-allocation. If the host declares the descriptor "
          "array with a VARIABLE descriptor count, Vulkan requires it to be the "
          "highest-numbered binding in its set; a fixed descriptor count carries "
-         "no such restriction. That is the host's layout to satisfy -- the "
+         "no such restriction. That is the host's layout to satisfy, and the "
          "compiler cannot see it. "
          "<index> is a compile-time constant and so becomes part of the "
          "compiled output: a host that keys a shader cache on that output must "
