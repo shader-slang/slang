@@ -86,4 +86,20 @@ SLANG_UNIT_TEST(structuralRayTracingMultipleSlotsVulkan)
     runMultipleSlots(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runTriangleAttributesFlags(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingTriangleAttributesFlags(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingTriangleAttributesFlagsD3D12)
+{
+    runTriangleAttributesFlags(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingTriangleAttributesFlagsVulkan)
+{
+    runTriangleAttributesFlags(unitTestContext, DeviceType::Vulkan);
+}
+
 } // namespace gfx_test

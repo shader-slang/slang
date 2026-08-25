@@ -577,4 +577,110 @@ void runStructuralRayTracingMultipleSlots(IDevice* device)
     }
 }
 
+void runStructuralRayTracingTriangleAttributesFlags(IDevice* device)
+{
+    if (!device->hasFeature(Feature::RayTracing))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    auto queue = device->getQueue(QueueType::Graphics);
+    SLANG_CHECK_ABORT(queue != nullptr);
+    StructuralRayTracingTriangleScene scene(
+        device,
+        queue,
+        AccelerationStructureInstanceFlags::None);
+
+    static const EntryDesc kEntries[] = {
+        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
+        {"RuntimeAnyHit", SLANG_STAGE_ANY_HIT},
+        {"RuntimeMiss", SLANG_STAGE_MISS},
+    };
+    ComPtr<IShaderProgram> program;
+    GFX_CHECK_CALL_ABORT(loadProgram(
+        device,
+        "triangle-attributes-flags",
+        kEntries,
+        SLANG_COUNT_OF(kEntries),
+        program.writeRef()));
+
+    HitGroupDesc hitGroup = {};
+    hitGroup.hitGroupName = "hitGroup0";
+    hitGroup.closestHitEntryPoint = "RuntimeClosestHit";
+    hitGroup.anyHitEntryPoint = "RuntimeAnyHit";
+
+    RayTracingPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = program;
+    pipelineDesc.hitGroups = &hitGroup;
+    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.maxRecursion = 1;
+    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 8;
+    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+
+    ComPtr<IRayTracingPipeline> pipeline;
+    GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
+
+    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kMissNames[] = {"RuntimeMiss"};
+    static const char* kHitGroupNames[] = {"hitGroup0"};
+    ShaderTableDesc shaderTableDesc = {};
+    shaderTableDesc.program = program;
+    shaderTableDesc.rayGenShaderCount = SLANG_COUNT_OF(kRayGenerationNames);
+    shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
+    shaderTableDesc.missShaderCount = SLANG_COUNT_OF(kMissNames);
+    shaderTableDesc.missShaderEntryPointNames = kMissNames;
+    shaderTableDesc.hitGroupCount = SLANG_COUNT_OF(kHitGroupNames);
+    shaderTableDesc.hitGroupNames = kHitGroupNames;
+
+    ComPtr<IShaderTable> shaderTable;
+    GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+
+    BufferDesc resultDesc = {};
+    resultDesc.size = sizeof(StructuralRayTracingTriangleAttributesFlagsResult) * 10;
+    resultDesc.elementSize = sizeof(StructuralRayTracingTriangleAttributesFlagsResult);
+    resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    resultDesc.defaultState = ResourceState::UnorderedAccess;
+    auto results = device->createBuffer(resultDesc);
+    SLANG_CHECK_ABORT(results != nullptr);
+
+    auto commandEncoder = queue->createCommandEncoder();
+    auto passEncoder = commandEncoder->beginRayTracingPass();
+    auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
+    ShaderCursor root(rootObject);
+    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    passEncoder->dispatchRays(0, 10, 1, 1);
+    passEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    ComPtr<ISlangBlob> resultBlob;
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    auto actual = static_cast<const StructuralRayTracingTriangleAttributesFlagsResult*>(
+        resultBlob->getBufferPointer());
+    static const StructuralRayTracingTriangleAttributesFlagsResult kExpected[] = {
+        {3, 0, 25, 25, 0, 1, 10},
+        {2, 0, 0, 0, 0, 1, 10},
+        {2, 1, 25, 25, 0, 1, 10},
+        {3, 1, 25, 25, 0, 1, 10},
+        {40, 0, 0, 0, 0, 1, 10},
+        {2, 0, 0, 0, 0, 1, 10},
+        {3, 0, 25, 25, 0, 1, 10},
+        {2, 0, 0, 0, 0, 1, 10},
+        {3, 1, 25, 25, 0, 1, 10},
+        {3, 0, 25, 25, 0, 1, 10},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
+    {
+        SLANG_CHECK(actual[i].stage == kExpected[i].stage);
+        SLANG_CHECK(actual[i].anyHitCount == kExpected[i].anyHitCount);
+        SLANG_CHECK(actual[i].barycentricX == kExpected[i].barycentricX);
+        SLANG_CHECK(actual[i].barycentricY == kExpected[i].barycentricY);
+        SLANG_CHECK(actual[i].frontFacing == kExpected[i].frontFacing);
+        SLANG_CHECK(actual[i].flagsMatch == kExpected[i].flagsMatch);
+        SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
+    }
+}
+
 } // namespace gfx_test

@@ -124,7 +124,8 @@ void createSingleInstanceTopLevel(
 
 StructuralRayTracingTriangleScene::StructuralRayTracingTriangleScene(
     IDevice* device,
-    ICommandQueue* queue)
+    ICommandQueue* queue,
+    AccelerationStructureInstanceFlags instanceFlags)
 {
     BufferDesc vertexDesc = {};
     vertexDesc.size = sizeof(kTriangleVertices);
@@ -176,7 +177,7 @@ StructuralRayTracingTriangleScene::StructuralRayTracingTriangleScene(
         device,
         queue,
         bottomLevel,
-        AccelerationStructureInstanceFlags::TriangleFacingCullDisable,
+        instanceFlags,
         instanceBuffer,
         topLevel);
 }
