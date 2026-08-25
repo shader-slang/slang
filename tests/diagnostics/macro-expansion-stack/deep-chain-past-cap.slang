@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
+//TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 // Regression test for a macro-expansion chain deeper than
 // SourceManager::kMaxMacroExpansionDepth (1024, slang-source-loc.h). The chain-walk
@@ -6,8 +7,11 @@
 // findSourceViewThroughExpansion (slang-source-loc.cpp) both cap their iteration at this
 // depth so a malformed or adversarial chain cannot loop forever. This test verifies that
 // exceeding the cap (1030 levels of nesting, 6 past the limit) does not crash or hang
-// the compiler, and that the error at the bottom of the chain is still reported (even
-// though the "expanded from macro" note chain is truncated once the cap is reached).
+// the compiler, that the error at the bottom of the chain is still reported, and (via the
+// CHECK-COUNT/CHECK-NOT pair below, which only the real-FileCheck TEST:SIMPLE run above
+// can express -- the diag=CHECK harness has no such directives) that the "expanded from
+// macro" note chain is truncated at exactly the cap and not silently emitted in full or
+// dropped entirely.
 
 #define M0 UndefinedType x;
 #define M1 M0
@@ -1048,4 +1052,12 @@ void test()
 
 // The bottom-of-chain error must still be reported even past the depth cap.
 //CHECK: undefined identifier 'UndefinedType'.
+
+// The chain has 1030 levels (M0 through M1029 as call sites), so an uncapped walk would
+// emit 1030 "expanded from macro" notes. With the cap at 1024, exactly 1024 must appear:
+// not fewer (that would mean the walk stopped early) and not all 1030 (that would mean
+// the cap isn't being enforced). Only the FileCheck run recognizes CHECK-COUNT/CHECK-NOT;
+// the diag=CHECK harness above has no such directives and only checks the error itself.
+//CHECK-COUNT-1024: expanded from macro
+//CHECK-NOT: expanded from macro
 
