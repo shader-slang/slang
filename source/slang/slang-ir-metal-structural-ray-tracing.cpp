@@ -149,44 +149,76 @@ static IRFunc* _generateVisibleStageAdapter(
 struct MetalCandidateResultInfo
 {
     IRStructType* type = nullptr;
+    IRStructKey* acceptKey = nullptr;
+    IRStructKey* continueSearchKey = nullptr;
+    IRStructKey* distanceKey = nullptr;
 };
 
-static MetalCandidateResultInfo _createMetalCandidateResultType(IRModule* module)
+static MetalCandidateResultInfo _createMetalCandidateResultType(
+    IRModule* module,
+    const char* name,
+    bool includeDistance)
 {
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
 
     MetalCandidateResultInfo result;
     result.type = builder.createStructType();
-    builder.addNameHintDecoration(
-        result.type,
-        UnownedTerminatedStringSlice("StructuralRayTracingCandidateResult"));
+    builder.addNameHintDecoration(result.type, UnownedTerminatedStringSlice(name));
 
-    auto acceptKey = builder.createStructKey();
-    builder.addNameHintDecoration(acceptKey, UnownedTerminatedStringSlice("accept"));
-    builder.addTargetSystemValueDecoration(acceptKey, toSlice("accept_intersection"));
-    builder.createStructField(result.type, acceptKey, builder.getBoolType());
+    result.acceptKey = builder.createStructKey();
+    builder.addNameHintDecoration(result.acceptKey, UnownedTerminatedStringSlice("accept"));
+    builder.addTargetSystemValueDecoration(result.acceptKey, toSlice("accept_intersection"));
+    builder.createStructField(result.type, result.acceptKey, builder.getBoolType());
 
-    auto continueSearchKey = builder.createStructKey();
+    result.continueSearchKey = builder.createStructKey();
     builder.addNameHintDecoration(
-        continueSearchKey,
+        result.continueSearchKey,
         UnownedTerminatedStringSlice("continueSearch"));
-    builder.addTargetSystemValueDecoration(continueSearchKey, toSlice("continue_search"));
-    builder.createStructField(result.type, continueSearchKey, builder.getBoolType());
+    builder.addTargetSystemValueDecoration(result.continueSearchKey, toSlice("continue_search"));
+    builder.createStructField(result.type, result.continueSearchKey, builder.getBoolType());
+
+    if (includeDistance)
+    {
+        result.distanceKey = builder.createStructKey();
+        builder.addNameHintDecoration(result.distanceKey, UnownedTerminatedStringSlice("distance"));
+        builder.addTargetSystemValueDecoration(result.distanceKey, toSlice("distance"));
+        builder.createStructField(result.type, result.distanceKey, builder.getFloatType());
+    }
     return result;
 }
 
 static IRInst* _emitMetalCandidateResult(
     IRBuilder& builder,
     const MetalCandidateResultInfo& resultInfo,
-    bool accept,
-    bool continueSearch)
+    IRInst* accept,
+    IRInst* continueSearch,
+    IRInst* distance = nullptr)
 {
-    IRInst* values[] = {
+    List<IRInst*> values;
+    values.add(accept);
+    values.add(continueSearch);
+    if (resultInfo.distanceKey)
+    {
+        SLANG_ASSERT(distance);
+        values.add(distance);
+    }
+    return builder.emitMakeStruct(resultInfo.type, values.getCount(), values.getBuffer());
+}
+
+static IRInst* _emitMetalCandidateResult(
+    IRBuilder& builder,
+    const MetalCandidateResultInfo& resultInfo,
+    bool accept,
+    bool continueSearch,
+    IRInst* distance = nullptr)
+{
+    return _emitMetalCandidateResult(
+        builder,
+        resultInfo,
         builder.getBoolValue(accept),
         builder.getBoolValue(continueSearch),
-    };
-    return builder.emitMakeStruct(resultInfo.type, SLANG_COUNT_OF(values), values);
+        distance);
 }
 
 static String _getMetalCandidateName(IRType* groupType)
@@ -203,17 +235,15 @@ static String _getMetalCandidateName(IRType* groupType)
 static void _collectCallsAndAnyHitTerminations(
     IRInst* parent,
     List<IRCall*>& calls,
-    bool& hasAnyHitTermination)
+    bool& hasCandidateOperation)
 {
     for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
     {
-        _collectCallsAndAnyHitTerminations(child, calls, hasAnyHitTermination);
+        _collectCallsAndAnyHitTerminations(child, calls, hasCandidateOperation);
         if (auto call = as<IRCall>(child))
             calls.add(call);
-        else if (
-            child->getOp() == kIROp_StructuralRayTracingIgnoreHit ||
-            child->getOp() == kIROp_StructuralRayTracingAcceptHitAndEndSearch)
-            hasAnyHitTermination = true;
+        else if (as<IRStructuralRayTracingStageInputOperation>(child))
+            hasCandidateOperation = true;
     }
 }
 
@@ -223,8 +253,8 @@ static bool _functionCanReach(IRFunc* function, IRFunc* target, HashSet<IRFunc*>
         return false;
 
     List<IRCall*> calls;
-    bool hasAnyHitTermination = false;
-    _collectCallsAndAnyHitTerminations(function, calls, hasAnyHitTermination);
+    bool hasCandidateOperation = false;
+    _collectCallsAndAnyHitTerminations(function, calls, hasCandidateOperation);
     for (auto call : calls)
     {
         auto callee = as<IRFunc>(call->getCallee());
@@ -238,7 +268,7 @@ static bool _functionCanReach(IRFunc* function, IRFunc* target, HashSet<IRFunc*>
     return false;
 }
 
-static void _inlineAnyHitTerminatingCalls(IRFunc* adapter)
+static void _inlineCandidateOperationCalls(IRFunc* adapter)
 {
     List<IRFunc*> reachableFunctions;
     HashSet<IRFunc*> reachableFunctionSet;
@@ -247,8 +277,8 @@ static void _inlineAnyHitTerminatingCalls(IRFunc* adapter)
     for (Index i = 0; i < reachableFunctions.getCount(); ++i)
     {
         List<IRCall*> calls;
-        bool hasAnyHitTermination = false;
-        _collectCallsAndAnyHitTerminations(reachableFunctions[i], calls, hasAnyHitTermination);
+        bool hasCandidateOperation = false;
+        _collectCallsAndAnyHitTerminations(reachableFunctions[i], calls, hasCandidateOperation);
         for (auto call : calls)
         {
             if (auto callee = as<IRFunc>(call->getCallee()))
@@ -263,9 +293,9 @@ static void _inlineAnyHitTerminatingCalls(IRFunc* adapter)
     for (auto func : reachableFunctions)
     {
         List<IRCall*> calls;
-        bool hasAnyHitTermination = false;
-        _collectCallsAndAnyHitTerminations(func, calls, hasAnyHitTermination);
-        if (hasAnyHitTermination)
+        bool hasCandidateOperation = false;
+        _collectCallsAndAnyHitTerminations(func, calls, hasCandidateOperation);
+        if (hasCandidateOperation)
             terminatingFunctions.add(func);
     }
 
@@ -278,8 +308,8 @@ static void _inlineAnyHitTerminatingCalls(IRFunc* adapter)
             if (terminatingFunctions.contains(func))
                 continue;
             List<IRCall*> calls;
-            bool hasAnyHitTermination = false;
-            _collectCallsAndAnyHitTerminations(func, calls, hasAnyHitTermination);
+            bool hasCandidateOperation = false;
+            _collectCallsAndAnyHitTerminations(func, calls, hasCandidateOperation);
             for (auto call : calls)
             {
                 if (auto callee = as<IRFunc>(call->getCallee()))
@@ -306,8 +336,8 @@ static void _inlineAnyHitTerminatingCalls(IRFunc* adapter)
     for (;;)
     {
         List<IRCall*> calls;
-        bool hasAnyHitTermination = false;
-        _collectCallsAndAnyHitTerminations(adapter, calls, hasAnyHitTermination);
+        bool hasCandidateOperation = false;
+        _collectCallsAndAnyHitTerminations(adapter, calls, hasCandidateOperation);
         IRCall* callToInline = nullptr;
         for (auto call : calls)
         {
@@ -419,8 +449,355 @@ static IRFunc* _generateTriangleAnyHitCandidateAdapter(
         .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
     builder.emitReturn(_emitMetalCandidateResult(builder, resultInfo, true, true));
 
-    _inlineAnyHitTerminatingCalls(adapter);
+    _inlineCandidateOperationCalls(adapter);
     _lowerAnyHitTerminations(adapter, resultInfo);
+    generated.add(groupType, adapter);
+    return adapter;
+}
+
+struct MetalProceduralCandidateState
+{
+    IRVar* hasCandidate = nullptr;
+    IRVar* currentMaxDistance = nullptr;
+    IRVar* distance = nullptr;
+    IRVar* hitKind = nullptr;
+    IRVar* attributes = nullptr;
+    IRInst* minDistance = nullptr;
+};
+
+static void _collectReportHitOperations(IRInst* parent, List<IRInst*>& operations)
+{
+    for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
+    {
+        _collectReportHitOperations(child, operations);
+        if (child->getOp() == kIROp_StructuralRayTracingReportHit ||
+            child->getOp() == kIROp_StructuralRayTracingReportHitWithKind)
+        {
+            operations.add(child);
+        }
+    }
+}
+
+static IRBlock* _splitBlockAfter(IRFunc* function, IRInst* inst, IRParam*& outResultParam)
+{
+    IRBuilder builder(function);
+    auto continuation = builder.createBlock();
+    function->addBlock(continuation);
+    builder.setInsertInto(continuation);
+    outResultParam = builder.emitParam(builder.getBoolType());
+
+    for (auto suffix = inst->getNextInst(); suffix;)
+    {
+        auto next = suffix->getNextInst();
+        suffix->insertAtEnd(continuation);
+        suffix = next;
+    }
+    return continuation;
+}
+
+static void _emitBranchWithBool(IRBuilder& builder, IRBlock* target, bool value)
+{
+    auto argument = builder.getBoolValue(value);
+    builder.emitBranch(target, 1, &argument);
+}
+
+static void _collectStageInputOperations(IRInst* parent, List<IRInst*>& operations)
+{
+    for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
+    {
+        _collectStageInputOperations(child, operations);
+        if (as<IRStructuralRayTracingStageInputOperation>(child))
+            operations.add(child);
+    }
+}
+
+static void _lowerAnyHitDecisionInputs(
+    IRFunc* helper,
+    IRInst* attributes,
+    IRInst* distance,
+    IRInst* hitKind)
+{
+    List<IRInst*> operations;
+    _collectStageInputOperations(helper, operations);
+    for (auto operation : operations)
+    {
+        IRInst* replacement = nullptr;
+        switch (operation->getOp())
+        {
+        case kIROp_StructuralRayTracingGetHitAttributes:
+            replacement = attributes;
+            break;
+        case kIROp_StructuralRayTracingGetRayTCurrent:
+            replacement = distance;
+            break;
+        case kIROp_StructuralRayTracingGetHitKind:
+            replacement = hitKind;
+            break;
+        default:
+            break;
+        }
+        if (replacement)
+        {
+            operation->replaceUsesWith(replacement);
+            operation->removeAndDeallocate();
+        }
+    }
+}
+
+static IRFunc* _generateAnyHitDecisionHelper(
+    IRModule* module,
+    const MetalCandidateResultInfo& resultInfo,
+    IRStructuralRayTracingHitGroupInfoDecoration* group)
+{
+    auto invoke = as<IRFunc>(group->getAnyHit());
+    if (!invoke)
+        return nullptr;
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    auto helper = builder.createFunc();
+    auto attributesType = cast<IRType>(group->getHitAttributesType());
+    IRType* parameterTypes[] = {
+        builder.getBorrowInParamType(attributesType, AddressSpace::ThreadLocal),
+        builder.getFloatType(),
+        builder.getUIntType(),
+    };
+    helper->setFullType(
+        builder.getFuncType(SLANG_COUNT_OF(parameterTypes), parameterTypes, resultInfo.type));
+
+    auto name = _getMetalCandidateName(group->getGroupType());
+    name.append(".anyHit");
+    builder.addNameHintDecoration(helper, name.getUnownedSlice());
+    _addStructuralStageInfo(
+        builder,
+        helper,
+        StructuralRayTracingStageKind::AnyHit,
+        invoke,
+        group->getContextType(),
+        group->getPayloadType(),
+        group->getHitAttributesType(),
+        StructuralRayTracingHitAttributesKind::Custom);
+
+    builder.setInsertInto(helper);
+    builder.emitBlock();
+    auto attributesAddress = builder.emitParam(parameterTypes[0]);
+    auto distance = builder.emitParam(builder.getFloatType());
+    auto hitKind = builder.emitParam(builder.getUIntType());
+    builder.addNameHintDecoration(
+        attributesAddress,
+        UnownedTerminatedStringSlice("attributesAddress"));
+    builder.addNameHintDecoration(distance, UnownedTerminatedStringSlice("distance"));
+    builder.addNameHintDecoration(hitKind, UnownedTerminatedStringSlice("hitKind"));
+    auto attributes = builder.emitLoad(attributesAddress);
+
+    List<IRInst*> arguments;
+    for (UInt i = 0; i < invoke->getParamCount(); ++i)
+        arguments.add(builder.emitDefaultConstruct(invoke->getParamType(i)));
+    builder
+        .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
+    builder.emitReturn(_emitMetalCandidateResult(builder, resultInfo, true, true));
+
+    _inlineCandidateOperationCalls(helper);
+    _lowerAnyHitDecisionInputs(helper, attributes, distance, hitKind);
+    _lowerAnyHitTerminations(helper, resultInfo);
+    return helper;
+}
+
+static void _lowerProceduralReportHitOperations(
+    IRFunc* adapter,
+    const MetalProceduralCandidateState& state,
+    IRFunc* anyHitDecision,
+    const MetalCandidateResultInfo& filterResultInfo,
+    const MetalCandidateResultInfo& proceduralResultInfo)
+{
+    List<IRInst*> operations;
+    _collectReportHitOperations(adapter, operations);
+
+    for (auto operation : operations)
+    {
+        const bool hasHitKind = operation->getOp() == kIROp_StructuralRayTracingReportHitWithKind;
+        auto distance = operation->getOperand(2);
+        auto hitKind = hasHitKind ? operation->getOperand(3) : nullptr;
+        auto attributes = operation->getOperand(hasHitKind ? 4 : 3);
+        auto originalBlock = cast<IRBlock>(operation->getParent());
+
+        IRParam* reportResult = nullptr;
+        auto continuation = _splitBlockAfter(adapter, operation, reportResult);
+        operation->replaceUsesWith(reportResult);
+        operation->removeAndDeallocate();
+
+        IRBuilder builder(adapter);
+        auto effectiveHitKind = hitKind ? hitKind : builder.getIntValue(builder.getUIntType(), 0);
+        auto acceptedBlock = builder.createBlock();
+        auto rejectedBlock = builder.createBlock();
+        adapter->addBlock(acceptedBlock);
+        adapter->addBlock(rejectedBlock);
+
+        builder.setInsertInto(originalBlock);
+        auto aboveMin = builder.emitGeq(distance, state.minDistance);
+        auto belowMax = builder.emitGeq(builder.emitLoad(state.currentMaxDistance), distance);
+        auto inRange = builder.emitAnd(builder.getBoolType(), aboveMin, belowMax);
+        builder.emitIfElse(inRange, acceptedBlock, rejectedBlock, continuation);
+
+        builder.setInsertInto(acceptedBlock);
+        IRInst* continueSearch = nullptr;
+        if (anyHitDecision)
+        {
+            auto attributesAddress = builder.emitVar(attributes->getDataType());
+            builder.emitStore(attributesAddress, attributes);
+            IRInst* arguments[] = {attributesAddress, distance, effectiveHitKind};
+            auto decision = builder.emitCallInst(
+                filterResultInfo.type,
+                anyHitDecision,
+                SLANG_COUNT_OF(arguments),
+                arguments);
+            auto filterAccepted = builder.emitFieldExtract(decision, filterResultInfo.acceptKey);
+            continueSearch = builder.emitFieldExtract(decision, filterResultInfo.continueSearchKey);
+
+            auto filteredAcceptedBlock = builder.createBlock();
+            adapter->addBlock(filteredAcceptedBlock);
+            builder.emitIfElse(filterAccepted, filteredAcceptedBlock, rejectedBlock, continuation);
+            builder.setInsertInto(filteredAcceptedBlock);
+        }
+
+        builder.emitStore(state.hasCandidate, builder.getBoolValue(true));
+        builder.emitStore(state.currentMaxDistance, distance);
+        builder.emitStore(state.distance, distance);
+        builder.emitStore(state.hitKind, effectiveHitKind);
+        builder.emitStore(state.attributes, attributes);
+        if (continueSearch)
+        {
+            auto continuingBlock = builder.createBlock();
+            auto endingBlock = builder.createBlock();
+            adapter->addBlock(continuingBlock);
+            adapter->addBlock(endingBlock);
+            builder.emitIfElse(continueSearch, continuingBlock, endingBlock, continuation);
+
+            builder.setInsertInto(continuingBlock);
+            _emitBranchWithBool(builder, continuation, true);
+
+            builder.setInsertInto(endingBlock);
+            builder.emitReturn(
+                _emitMetalCandidateResult(builder, proceduralResultInfo, true, false, distance));
+        }
+        else
+        {
+            _emitBranchWithBool(builder, continuation, true);
+        }
+
+        builder.setInsertInto(rejectedBlock);
+        _emitBranchWithBool(builder, continuation, false);
+    }
+}
+
+static IRFunc* _generateBoundingBoxCandidateAdapter(
+    IRModule* module,
+    Dictionary<IRInst*, IRFunc*>& generated,
+    HashSet<IRFunc*>& generatedHelpers,
+    const MetalCandidateResultInfo& filterResultInfo,
+    const MetalCandidateResultInfo& proceduralResultInfo,
+    IRStructuralRayTracingHitGroupInfoDecoration* group)
+{
+    auto invoke = as<IRFunc>(group->getIntersection());
+    if (!invoke)
+        return nullptr;
+    auto groupType = group->getGroupType();
+    if (auto existing = generated.tryGetValue(groupType))
+        return *existing;
+
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+    auto adapter = builder.createFunc();
+    IRType* parameterTypes[] = {builder.getFloatType(), builder.getFloatType()};
+    adapter->setFullType(builder.getFuncType(
+        SLANG_COUNT_OF(parameterTypes),
+        parameterTypes,
+        proceduralResultInfo.type));
+
+    auto name = _getMetalCandidateName(groupType);
+    builder.addNameHintDecoration(adapter, name.getUnownedSlice());
+    builder.addKeepAliveDecoration(adapter);
+    IRInst* intersectionOperands[] = {
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(MetalStructuralRayTracingGeometryKind::BoundingBox)),
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(MetalStructuralRayTracingTag::Instancing)),
+        builder.getIntValue(builder.getIntType(), 0),
+    };
+    builder.addDecoration(
+        adapter,
+        kIROp_MetalIntersectionFunctionDecoration,
+        intersectionOperands,
+        SLANG_COUNT_OF(intersectionOperands));
+    _addStructuralStageInfo(
+        builder,
+        adapter,
+        StructuralRayTracingStageKind::Intersection,
+        invoke,
+        group->getContextType(),
+        group->getPayloadType(),
+        group->getHitAttributesType(),
+        StructuralRayTracingHitAttributesKind::Custom);
+
+    builder.setInsertInto(adapter);
+    builder.emitBlock();
+    auto minDistance = builder.emitParam(builder.getFloatType());
+    builder.addNameHintDecoration(minDistance, UnownedTerminatedStringSlice("minDistance"));
+    builder.addTargetSystemValueDecoration(minDistance, toSlice("min_distance"));
+    auto maxDistance = builder.emitParam(builder.getFloatType());
+    builder.addNameHintDecoration(maxDistance, UnownedTerminatedStringSlice("maxDistance"));
+    builder.addTargetSystemValueDecoration(maxDistance, toSlice("max_distance"));
+
+    MetalProceduralCandidateState state;
+    state.minDistance = minDistance;
+    state.hasCandidate = builder.emitVar(builder.getBoolType());
+    state.currentMaxDistance = builder.emitVar(builder.getFloatType());
+    state.distance = builder.emitVar(builder.getFloatType());
+    state.hitKind = builder.emitVar(builder.getUIntType());
+    state.attributes = builder.emitVar(cast<IRType>(group->getHitAttributesType()));
+    builder.addNameHintDecoration(state.hasCandidate, UnownedTerminatedStringSlice("hasCandidate"));
+    builder.addNameHintDecoration(
+        state.currentMaxDistance,
+        UnownedTerminatedStringSlice("currentMaxDistance"));
+    builder.addNameHintDecoration(
+        state.distance,
+        UnownedTerminatedStringSlice("candidateDistance"));
+    builder.addNameHintDecoration(state.hitKind, UnownedTerminatedStringSlice("candidateHitKind"));
+    builder.addNameHintDecoration(
+        state.attributes,
+        UnownedTerminatedStringSlice("candidateAttributes"));
+    builder.emitStore(state.hasCandidate, builder.getBoolValue(false));
+    builder.emitStore(state.currentMaxDistance, maxDistance);
+    builder.emitStore(state.distance, builder.getFloatValue(builder.getFloatType(), 0.0));
+    builder.emitStore(state.hitKind, builder.getIntValue(builder.getUIntType(), 0));
+    builder.emitStore(
+        state.attributes,
+        builder.emitDefaultConstruct(cast<IRType>(group->getHitAttributesType())));
+
+    List<IRInst*> arguments;
+    for (UInt i = 0; i < invoke->getParamCount(); ++i)
+        arguments.add(builder.emitDefaultConstruct(invoke->getParamType(i)));
+    builder
+        .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
+    builder.emitReturn(_emitMetalCandidateResult(
+        builder,
+        proceduralResultInfo,
+        builder.emitLoad(state.hasCandidate),
+        builder.getBoolValue(true),
+        builder.emitLoad(state.distance)));
+
+    _inlineCandidateOperationCalls(adapter);
+    auto anyHitDecision = _generateAnyHitDecisionHelper(module, filterResultInfo, group);
+    if (anyHitDecision)
+        generatedHelpers.add(anyHitDecision);
+    _lowerProceduralReportHitOperations(
+        adapter,
+        state,
+        anyHitDecision,
+        filterResultInfo,
+        proceduralResultInfo);
     generated.add(groupType, adapter);
     return adapter;
 }
@@ -647,7 +1024,9 @@ static bool _lowerNonEmptyTrace(
     Dictionary<IRFunc*, IRFunc*>& generatedClosestHitAdapters,
     Dictionary<IRInst*, IRFunc*>& generatedCandidateAdapters,
     HashSet<IRFunc*>& candidateAdapterSet,
-    const MetalCandidateResultInfo& candidateResultInfo)
+    HashSet<IRFunc*>& candidateHelperSet,
+    const MetalCandidateResultInfo& filterResultInfo,
+    const MetalCandidateResultInfo& proceduralResultInfo)
 {
     IRBuilder builder(module);
     MetalTraceDescriptorInfo descriptorInfo;
@@ -686,7 +1065,21 @@ static bool _lowerNonEmptyTrace(
                 if (auto candidate = _generateTriangleAnyHitCandidateAdapter(
                         module,
                         generatedCandidateAdapters,
-                        candidateResultInfo,
+                        filterResultInfo,
+                        group))
+                {
+                    hasIntersectionFunctions = true;
+                    candidateAdapterSet.add(candidate);
+                }
+            }
+            else if (hitAttributesKind == StructuralRayTracingHitAttributesKind::Custom)
+            {
+                if (auto candidate = _generateBoundingBoxCandidateAdapter(
+                        module,
+                        generatedCandidateAdapters,
+                        candidateHelperSet,
+                        filterResultInfo,
+                        proceduralResultInfo,
                         group))
                 {
                     hasIntersectionFunctions = true;
@@ -815,7 +1208,11 @@ void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoin
     Dictionary<IRFunc*, IRFunc*> generatedClosestHitAdapters;
     Dictionary<IRInst*, IRFunc*> generatedCandidateAdapters;
     HashSet<IRFunc*> candidateAdapterSet;
-    auto candidateResultInfo = _createMetalCandidateResultType(module);
+    HashSet<IRFunc*> candidateHelperSet;
+    auto filterResultInfo =
+        _createMetalCandidateResultType(module, "StructuralRayTracingFilterResult", false);
+    auto proceduralResultInfo =
+        _createMetalCandidateResultType(module, "StructuralRayTracingIntersectionResult", true);
     for (auto operation : operations)
     {
         auto trace = cast<IRStructuralRayTracingTrace>(operation);
@@ -846,7 +1243,9 @@ void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoin
                 generatedClosestHitAdapters,
                 generatedCandidateAdapters,
                 candidateAdapterSet,
-                candidateResultInfo));
+                candidateHelperSet,
+                filterResultInfo,
+                proceduralResultInfo));
         }
     }
 
@@ -860,6 +1259,13 @@ void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoin
         {
             info->removeAndDeallocate();
         }
+    }
+    for (auto helper : candidateHelperSet)
+    {
+        if (auto readNone = helper->findDecoration<IRReadNoneDecoration>())
+            readNone->removeAndDeallocate();
+        if (auto info = helper->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+            info->removeAndDeallocate();
     }
 
     // Keep this parameter while the pass grows into adapter synthesis. It also documents that the
