@@ -1754,6 +1754,9 @@ Other
 `all`
 > User should not use this capability
 
+`metal_raytracing_extended_limits`
+> Enables Metal ray-tracing acceleration structures built with extended limits.
+
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
 

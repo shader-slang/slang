@@ -7,6 +7,15 @@ public interface IRayMotion {}
 
 public struct NoMotion : IRayMotion {}
 
+[require(metallib_2_4)]
+public struct PrimitiveMotion : IRayMotion {}
+
+[require(metallib_2_4)]
+public struct InstanceMotion : IRayMotion {}
+
+[require(metallib_2_4)]
+public struct PrimitiveAndInstanceMotion : IRayMotion {}
+
 // Reuse the native ray representation so the portable D3D/Vulkan trace path needs no conversion.
 // Lowercase properties provide the structural API spelling without adding storage.
 public typealias RayDesc = RayDesc;
@@ -41,6 +50,7 @@ public extension RayDesc
 public struct RayTraversalDesc
 {
     public RayDesc ray;
+    public float time;
     public RAY_FLAG rayFlags;
     public uint instanceMask;
     public uint sbtOffset;
@@ -109,7 +119,7 @@ public struct TrianglePrimitive : IIntersectionPrimitive
     public typealias Attributes = TriangleData;
 }
 
-[require(metal)]
+[require(metallib_3_1)]
 public struct CurvePrimitive : IIntersectionPrimitive
 {
     public typealias Attributes = CurveData;
