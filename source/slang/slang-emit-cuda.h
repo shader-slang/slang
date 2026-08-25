@@ -130,6 +130,21 @@ protected:
 
     SlangResult _calcCUDATextureTypeName(IRTextureTypeBase* texType, StringBuilder& outName);
 
+    // Emit the byte-addressed x coordinate / y / z texel coordinates of a
+    // `sured` surface reduction (see `tryEmitTextureAtomic`).
+    void _emitSuredByteXCoord(const struct CUDATextureAtomicClass& info, IRInst* coord);
+    void _emitSuredCoordComponent(IRInst* coord, const char* component);
+
+    /// Try to emit an atomic operation whose destination is a texture texel
+    /// (`RWTexture[coord]`, canonically an `IRImageSubscript` at the root of the
+    /// atomic's pointer) as a PTX `sured` surface reduction. Returns false when
+    /// `inst` is not a texel atomic (a buffer / groupshared atomic, which the
+    /// caller emits through the normal scalar-pointer path). Returns true when
+    /// the instruction was fully handled: either the `sured` was emitted, or the
+    /// case is unsupported on CUDA and an `E41405` diagnostic was produced so it
+    /// never falls through to the invalid `surfObj[coord]` emission.
+    bool tryEmitTextureAtomic(IRInst* inst);
+
     void _emitInitializerList(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListContent(IRType* elementType, IRUse* operands, Index operandCount);
     void _emitInitializerListValue(IRType* elementType, IRInst* value);

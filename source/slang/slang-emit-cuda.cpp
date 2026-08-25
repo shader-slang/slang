@@ -3,6 +3,7 @@
 
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 
@@ -672,8 +673,398 @@ void CUDASourceEmitter::emitIntrinsicCallExprImpl(
     Super::emitIntrinsicCallExprImpl(inst, intrinsicDefinition, intrinsicInst, inOuterPrec);
 }
 
+// The subset of PTX `sured` surface-reduction operations Slang can lower to.
+// Only the ops that ptxas accepts as a `sured.b.<op>` are listed; the mnemonic
+// doubles as the C++ helper suffix (`__slang_surface_reduce_<op>`) and the PTX
+// op token, so it must match `prelude/slang-cuda-prelude.h` exactly.
+enum class CUDASurfaceReduceOp
+{
+    Add,
+    Min,
+    Max,
+    And,
+    Or,
+};
+
+// The result of classifying a texture-texel atomic for CUDA emission. Either the
+// atomic can be lowered to a `sured` (all `supported*` fields are populated) or
+// it cannot, in which case `E41405` is the right response. The classifier is the
+// single source of truth for both the `sured` path and the diagnostic, so they
+// can never disagree about which cases are supported.
+struct CUDATextureAtomicClass
+{
+    bool supported = false;
+
+    // Populated only when `supported` is true:
+    CUDASurfaceReduceOp op = CUDASurfaceReduceOp::Add;
+    IRImageSubscript* imageSubscript = nullptr;
+    IRInst* value = nullptr;
+    UnownedStringSlice ctype;      // PTX channel-type token: u32/s32/u64/s64/b32.
+    Int geomDimensions = 0;        // 1, 2, or 3.
+    Int64 byteXStride = 0;         // Backing-element size, for byte-addressing x.
+    Int64 componentByteOffset = 0; // Channel byte offset for a vector-texel component.
+};
+
+// Map an atomic opcode to a `sured`-supported reduction op, or fail. `AtomicSub`
+// / `Inc` / `Dec` are intentionally *not* mapped: they are not reachable from
+// `Interlocked*` on a texture today, and `sured` has no subtract, so they take
+// the unsupported path if they ever appear.
+static bool _getCUDASurfaceReduceOp(IROp op, CUDASurfaceReduceOp& outOp)
+{
+    switch (op)
+    {
+    case kIROp_AtomicAdd:
+        outOp = CUDASurfaceReduceOp::Add;
+        return true;
+    case kIROp_AtomicMin:
+        outOp = CUDASurfaceReduceOp::Min;
+        return true;
+    case kIROp_AtomicMax:
+        outOp = CUDASurfaceReduceOp::Max;
+        return true;
+    case kIROp_AtomicAnd:
+        outOp = CUDASurfaceReduceOp::And;
+        return true;
+    case kIROp_AtomicOr:
+        outOp = CUDASurfaceReduceOp::Or;
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Return the geometry dimension count (1/2/3) of a non-array, non-multisample
+// texture whose subscript backs `sured`, or 0 for a shape `sured` cannot address
+// (cube, buffer, array, multisample).
+static Int _getCUDASuredGeomDimensions(IRTextureTypeBase* texType)
+{
+    if (texType->isArray() || texType->isMultisample())
+        return 0;
+    switch (texType->GetBaseShape())
+    {
+    case SLANG_TEXTURE_1D:
+        return 1;
+    case SLANG_TEXTURE_2D:
+        return 2;
+    case SLANG_TEXTURE_3D:
+        return 3;
+    default:
+        return 0;
+    }
+}
+
+// Classify a texture-texel atomic for CUDA. `imageSubscript` is the already
+// recovered `IRImageSubscript` root; `accessChain` is the sequence of component
+// indices between the atomic pointer and that root (empty for a scalar texel,
+// one constant index for a `RWTexture<vectorN>[coord].c` component). Returns a
+// classification with `supported == false` for anything the emitter must
+// diagnose instead of lowering.
+//
+// Backing-format handling is deliberately conservative: CUDA does not run
+// `resolveTextureFormat`, so an explicit `IRFormatDecoration` is used when
+// present and otherwise the texel element type is used only when it
+// unambiguously matches the atomic value type. A packed / narrow / converting
+// format, or a sub-32-bit channel, would make the byte offset wrong, so those
+// are left unsupported rather than guessed.
+static CUDATextureAtomicClass classifyTextureAtomicForCuda(
+    IRInst* atomic,
+    IRImageSubscript* imageSubscript,
+    const List<IRInst*>& accessChain)
+{
+    CUDATextureAtomicClass result;
+
+    // PTX `sured` has no result register; the reducible overloads discard the
+    // prior value. If the result is observed, this is the read-modify-write
+    // overload, which `sured` cannot express.
+    if (atomic->hasUses())
+        return result;
+
+    CUDASurfaceReduceOp op;
+    if (!_getCUDASurfaceReduceOp(atomic->getOp(), op))
+        return result;
+
+    // The texture type sits behind the image operand (possibly through a
+    // pointer, as the Metal emitter also accounts for).
+    auto imageType = imageSubscript->getImage()->getDataType();
+    auto texType = as<IRTextureTypeBase>(imageType);
+    if (!texType)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(imageType))
+            texType = as<IRTextureTypeBase>(ptrType->getValueType());
+    }
+    if (!texType)
+        return result;
+
+    const Int geom = _getCUDASuredGeomDimensions(texType);
+    if (geom == 0)
+        return result;
+
+    // The atomic value must be a scalar 32/64-bit integer.
+    IRInst* value = atomic->getOperand(1);
+    IRType* valueType = value->getDataType();
+    bool valueIs64 = false;
+    bool valueIsSigned = false;
+    switch (valueType->getOp())
+    {
+    case kIROp_IntType:
+        valueIsSigned = true;
+        break;
+    case kIROp_UIntType:
+        break;
+    case kIROp_Int64Type:
+        valueIs64 = true;
+        valueIsSigned = true;
+        break;
+    case kIROp_UInt64Type:
+        valueIs64 = true;
+        break;
+    default:
+        return result; // Non-32/64-bit-integer (float, 8/16-bit, ...).
+    }
+
+    // and/or have no 64-bit `sured` form.
+    if (valueIs64 && (op == CUDASurfaceReduceOp::And || op == CUDASurfaceReduceOp::Or))
+        return result;
+
+    // The channel element type of the texel. For a scalar texel it is the
+    // element type; for a vector texel it is that vector's element type.
+    IRType* channelType = texType->getElementType();
+    Int channelCount = 1;
+    if (auto vecType = as<IRVectorType>(channelType))
+    {
+        channelCount = (Int)getIntVal(vecType->getElementCount());
+        channelType = vecType->getElementType();
+    }
+
+    // A component GEP is only valid as a single constant index into a vector
+    // texel; any deeper or non-constant chain would make the byte offset wrong.
+    Int componentIndex = 0;
+    if (accessChain.getCount() > 1)
+        return result;
+    if (accessChain.getCount() == 1)
+    {
+        if (channelCount <= 1)
+            return result; // Component index into a non-vector texel.
+        auto indexLit = as<IRIntLit>(accessChain[0]);
+        if (!indexLit)
+            return result; // Non-constant component index.
+        componentIndex = (Int)getIntVal(indexLit);
+        if (componentIndex < 0 || componentIndex >= channelCount)
+            return result;
+    }
+
+    // The channel must itself be a plain 32/64-bit integer matching the value
+    // width, so that one channel is exactly one `sured` element.
+    Int channelBytes = 0;
+    bool channelMatchesValue = false;
+    switch (channelType->getOp())
+    {
+    case kIROp_IntType:
+    case kIROp_UIntType:
+        channelBytes = 4;
+        channelMatchesValue = !valueIs64;
+        break;
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+        channelBytes = 8;
+        channelMatchesValue = valueIs64;
+        break;
+    default:
+        return result; // Sub-32-bit / non-integer channel: byte math unprovable.
+    }
+    if (!channelMatchesValue)
+        return result;
+
+    // The x coordinate is byte-addressed, so we need the backing-element size.
+    // Prefer an explicit format decoration; fall back to the element type only
+    // when it unambiguously matches (no format conversion).
+    Int64 byteXStride = 0;
+    if (auto formatDecoration = imageSubscript->getImage()->findDecoration<IRFormatDecoration>())
+    {
+        const auto& info = getImageFormatInfo(formatDecoration->getFormat());
+        // A format whose channel count or per-channel size disagrees with the
+        // texel element type means a conversion/packing the byte math would get
+        // wrong; only accept a format that is exactly `channelCount` channels of
+        // `channelBytes` each.
+        if ((Int)info.channelCount != channelCount ||
+            (Int)info.sizeInBytes != channelCount * channelBytes)
+        {
+            return result;
+        }
+        byteXStride = info.sizeInBytes;
+    }
+    else
+    {
+        // No explicit format: assume the backing format matches the element
+        // type used for access (the same assumption `_calcBackingElementSizeInBytes`
+        // makes for surface reads/writes).
+        byteXStride = channelCount * channelBytes;
+    }
+
+    // Choose the PTX channel-type token. `add` is sign-agnostic (use unsigned);
+    // and/or are bitwise (`b32`); min/max honor signedness.
+    UnownedStringSlice ctype;
+    switch (op)
+    {
+    case CUDASurfaceReduceOp::Add:
+        ctype = valueIs64 ? toSlice("u64") : toSlice("u32");
+        break;
+    case CUDASurfaceReduceOp::And:
+    case CUDASurfaceReduceOp::Or:
+        ctype = toSlice("b32");
+        break;
+    case CUDASurfaceReduceOp::Min:
+    case CUDASurfaceReduceOp::Max:
+        if (valueIs64)
+            ctype = valueIsSigned ? toSlice("s64") : toSlice("u64");
+        else
+            ctype = valueIsSigned ? toSlice("s32") : toSlice("u32");
+        break;
+    }
+
+    result.supported = true;
+    result.op = op;
+    result.imageSubscript = imageSubscript;
+    result.value = value;
+    result.ctype = ctype;
+    result.geomDimensions = geom;
+    result.byteXStride = byteXStride;
+    result.componentByteOffset = (Int64)componentIndex * channelBytes;
+    return result;
+}
+
+// Emit the byte-addressed x coordinate for a `sured` call: the texel x scaled by
+// the backing-element size, plus the channel byte offset for a vector-texel
+// component. This mirrors the `($1).x * $E` scaling the surface write path uses.
+void CUDASourceEmitter::_emitSuredByteXCoord(const CUDATextureAtomicClass& info, IRInst* coord)
+{
+    m_writer->emit("(");
+    // For a multi-dimensional coordinate the x component is the first element.
+    if (as<IRVectorType>(coord->getDataType()))
+    {
+        m_writer->emit("(");
+        emitOperand(coord, getInfo(EmitOp::Postfix));
+        m_writer->emit(").x");
+    }
+    else
+    {
+        emitOperand(coord, getInfo(EmitOp::General));
+    }
+    m_writer->emit(") * ");
+    m_writer->emitInt64(info.byteXStride);
+    if (info.componentByteOffset != 0)
+    {
+        m_writer->emit(" + ");
+        m_writer->emitInt64(info.componentByteOffset);
+    }
+}
+
+// Emit the y (and, for 3D, z) texel coordinates of a `sured` call from a vector
+// coordinate operand.
+void CUDASourceEmitter::_emitSuredCoordComponent(IRInst* coord, const char* component)
+{
+    m_writer->emit("(");
+    emitOperand(coord, getInfo(EmitOp::Postfix));
+    m_writer->emit(").");
+    m_writer->emit(component);
+}
+
+bool CUDASourceEmitter::tryEmitTextureAtomic(IRInst* inst)
+{
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (!atomic)
+        return false;
+
+    // Recover the `IRImageSubscript` root and the component access chain between
+    // it and the atomic's pointer (e.g. the `.y` GEP for a vector-texel
+    // component). A non-texel atomic (buffer / groupshared) roots at a different
+    // opcode, so this returns false and the caller uses the normal path.
+    List<IRInst*> accessChain;
+    IRInst* root = getRootAddr(atomic->getPtr(), accessChain);
+    auto imageSubscript = as<IRImageSubscript>(root);
+    if (!imageSubscript)
+        return false;
+
+    auto diagnoseUnsupported = [&]()
+    {
+        auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+        getSink()->diagnose(Diagnostics::AtomicOnTextureNotSupportedOnTarget{
+            .target = getTargetReq()->getTarget(),
+            .location = loc});
+    };
+
+    // A sample coordinate means a multisampled texture, which `sured` cannot
+    // address.
+    if (imageSubscript->hasSampleCoord())
+    {
+        diagnoseUnsupported();
+        return true;
+    }
+
+    CUDATextureAtomicClass info = classifyTextureAtomicForCuda(atomic, imageSubscript, accessChain);
+    if (!info.supported)
+    {
+        diagnoseUnsupported();
+        return true;
+    }
+
+    // Emit `__slang_surface_reduce_<op>(surfObj, byteX[, y[, z]], value);`.
+    m_writer->emit("__slang_surface_reduce_");
+    switch (info.op)
+    {
+    case CUDASurfaceReduceOp::Add:
+        m_writer->emit("add");
+        break;
+    case CUDASurfaceReduceOp::Min:
+        m_writer->emit("min");
+        break;
+    case CUDASurfaceReduceOp::Max:
+        m_writer->emit("max");
+        break;
+    case CUDASurfaceReduceOp::And:
+        m_writer->emit("and");
+        break;
+    case CUDASurfaceReduceOp::Or:
+        m_writer->emit("or");
+        break;
+    }
+    m_writer->emit("(");
+    emitOperand(imageSubscript->getImage(), getInfo(EmitOp::General));
+    m_writer->emit(", ");
+
+    IRInst* coord = imageSubscript->getCoord();
+    _emitSuredByteXCoord(info, coord);
+    if (info.geomDimensions >= 2)
+    {
+        m_writer->emit(", ");
+        _emitSuredCoordComponent(coord, "y");
+    }
+    if (info.geomDimensions >= 3)
+    {
+        m_writer->emit(", ");
+        _emitSuredCoordComponent(coord, "z");
+    }
+    m_writer->emit(", ");
+    emitOperand(info.value, getInfo(EmitOp::General));
+    m_writer->emit(");\n");
+    return true;
+}
+
 bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    // Intercept every atomic whose destination is a texture texel *before* the
+    // opcode-specific emission below: CUDA has no `surfObj[coord]` l-value, so a
+    // texel atomic must either lower to a `sured` surface reduction or be
+    // diagnosed (E41405) here, never fall through to the invalid buffer path.
+    // The classification (and its diagnosis of the unsupported complement) lives
+    // at this emit point rather than a pre-emit pass because DCE / inlining run
+    // in between, so only the liveness seen here is authoritative.
+    if (as<IRAtomicOperation>(inst))
+    {
+        if (tryEmitTextureAtomic(inst))
+            return true;
+    }
+
     switch (inst->getOp())
     {
     case kIROp_StructuredBufferGetDimensions:

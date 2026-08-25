@@ -39,6 +39,7 @@ Items with ^ means there is some discussion about support later in the document 
 | [`[unroll]`](#unroll]                                | Yes   | Yes       | Yes ^   | Yes            | No ^  | Limited + |
 | Atomics                                              | Yes   | Yes       | Yes     | Yes            | Yes   | No +      |
 | [Atomics on RWBuffer](#rwbuffer-atomics)             | Yes   | Yes       | Yes     | No             | Yes   | No +      |
+| [Atomics on RWTexture](#rwtexture-atomics)           | Yes   | Yes       | Yes     | Partial ^      | Yes   | No +      |
 | [Sampler Feedback](#sampler-feedback)                | No    | Yes       | No +    | No             | No    | Yes ^     |
 | [RWByteAddressBuffer Atomic](#byte-address-atomic)   | No    | Yes ^     | Yes ^   | Yes            | Yes   | No +      |
 | [Shader Execution Reordering](#ser)                  | No    | Yes ^     | Yes ^   | No             | No    | No        |
@@ -235,6 +236,27 @@ Slang does have a cross target mechanism to [unroll loops](language-reference/06
 For VK the GLSL output from Slang seems plausible, but VK binding fails in tests harness.
 
 On CUDA RWBuffer becomes CUsurfObject, which is a 'texture' type and does not support atomics.
+
+On the CPU atomics are not supported, but will be in the future.
+
+<a id="rwtexture-atomics"></a>
+
+## Atomics on RWTexture
+
+On CUDA an `RWTexture` becomes a `CUsurfObject`, which has no C-level atomic
+operations; the only device-side atomic surface read-modify-write is the PTX
+`sured` (surface reduction) instruction. Slang lowers the result-discarding
+`InterlockedAdd` / `InterlockedMin` / `InterlockedMax` / `InterlockedAnd` /
+`InterlockedOr` on a scalar (or single vector component) 32/64-bit integer texel
+of a 1D/2D/3D `RWTexture` to `sured` (`InterlockedAnd`/`InterlockedOr` are 32-bit
+only). `sured` has no result register, so the read-modify-write overload that
+returns the previous value cannot be lowered, and `sured` has no `xor` form, no
+array/multisampled geometry, and no 64-bit bitwise variant. Those unsupported
+cases (e.g. `uint prev; InterlockedAdd(rwTexture[coord], value, prev);`,
+`InterlockedXor(rwTexture[coord], value)`, or an atomic on an
+`RWTexture2DArray`) are rejected with diagnostic `E41405` rather than emitting
+code NVRTC cannot compile. See issue
+[#12636](https://github.com/shader-slang/slang/issues/12636).
 
 On the CPU atomics are not supported, but will be in the future.
 
