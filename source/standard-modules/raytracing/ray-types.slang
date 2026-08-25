@@ -109,11 +109,15 @@ public struct CurveData
     }
 }
 
+// These sealed markers keep the public primitive set closed. Applications select one of the
+// public primitive types below instead of introducing an unsupported native geometry kind.
+[sealed]
 public interface IIntersectionPrimitive
 {
     associatedtype Attributes;
 }
 
+[sealed]
 public interface ICustomIntersectionPrimitive : IIntersectionPrimitive {}
 
 public struct TrianglePrimitive : IIntersectionPrimitive
