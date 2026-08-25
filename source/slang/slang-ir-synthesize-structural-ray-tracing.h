@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/slang-dictionary.h"
 #include "core/slang-list.h"
 
 namespace Slang
@@ -7,6 +8,7 @@ namespace Slang
 
 struct IRModule;
 struct IRFunc;
+struct IRInst;
 class DiagnosticSink;
 
 /// Generate native D3D/Vulkan entry-point adapters for stages selected by structural layouts.
@@ -19,7 +21,9 @@ void synthesizePortableStructuralRayTracingEntryPoints(
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module);
 
 /// Thread compiler-provided payload parameters through generated Metal visible-stage adapters.
-void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module);
+void lowerMetalStructuralRayTracingStageInputOperations(
+    IRModule* module,
+    const Dictionary<IRFunc*, IRInst*>& entryPointPayloadValues);
 
 /// Lower structural trace operations through their portable standard-module bodies.
 void lowerPortableStructuralRayTracingTraceOperations(IRModule* module);

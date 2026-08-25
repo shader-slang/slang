@@ -66,6 +66,7 @@ static String _getStructuralStageName(IRType* stageType, IRFunc* invoke)
 
 struct MetalStageRequirements
 {
+    bool hitAttributes = false;
     bool triangleBarycentricCoord = false;
     bool triangleFrontFacing = false;
     bool curveParameter = false;
@@ -99,6 +100,9 @@ static void _collectMetalStageRequirements(
             }
             switch (inst->getOp())
             {
+            case kIROp_StructuralRayTracingGetHitAttributes:
+                requirements.hitAttributes = true;
+                break;
             case kIROp_StructuralRayTracingGetTriangleBarycentricCoord:
                 requirements.triangleBarycentricCoord = true;
                 break;
@@ -150,6 +154,7 @@ static MetalStageRequirements _combineMetalStageRequirements(
 {
     MetalStageRequirements result;
 #define SLANG_COMBINE_REQUIREMENT(NAME) result.NAME = left.NAME || right.NAME
+    SLANG_COMBINE_REQUIREMENT(hitAttributes);
     SLANG_COMBINE_REQUIREMENT(triangleBarycentricCoord);
     SLANG_COMBINE_REQUIREMENT(triangleFrontFacing);
     SLANG_COMBINE_REQUIREMENT(curveParameter);
@@ -161,6 +166,119 @@ static MetalStageRequirements _combineMetalStageRequirements(
     SLANG_COMBINE_REQUIREMENT(primitiveIndex);
     SLANG_COMBINE_REQUIREMENT(geometryIndex);
 #undef SLANG_COMBINE_REQUIREMENT
+    return result;
+}
+
+static UInt _getMetalStageRequirementMask(const MetalStageRequirements& requirements)
+{
+    UInt result = 0;
+#define SLANG_ADD_REQUIREMENT(NAME, ENUM_NAME) \
+    if (requirements.NAME)                     \
+    result |= UInt(MetalStructuralRayTracingStageRequirement::ENUM_NAME)
+    SLANG_ADD_REQUIREMENT(hitAttributes, HitAttributes);
+    SLANG_ADD_REQUIREMENT(triangleBarycentricCoord, TriangleBarycentricCoord);
+    SLANG_ADD_REQUIREMENT(triangleFrontFacing, TriangleFrontFacing);
+    SLANG_ADD_REQUIREMENT(curveParameter, CurveParameter);
+    SLANG_ADD_REQUIREMENT(distance, Distance);
+    SLANG_ADD_REQUIREMENT(hitKind, HitKind);
+    SLANG_ADD_REQUIREMENT(worldSpaceOrigin, WorldSpaceOrigin);
+    SLANG_ADD_REQUIREMENT(worldSpaceDirection, WorldSpaceDirection);
+#undef SLANG_ADD_REQUIREMENT
+    return result;
+}
+
+static MetalStageRequirements _getMetalStageRequirements(
+    IRStructuralRayTracingTrace* trace,
+    StructuralRayTracingStageKind stageKind)
+{
+    MetalStageRequirements result;
+    for (auto decoration : trace->getDecorations())
+    {
+        IRInst* invoke = nullptr;
+        if (stageKind == StructuralRayTracingStageKind::ClosestHit)
+        {
+            if (auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration))
+                invoke = group->getClosestHit();
+        }
+        else if (stageKind == StructuralRayTracingStageKind::Miss)
+        {
+            if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(decoration))
+                invoke = group->getMiss();
+        }
+        if (invoke)
+            result = _combineMetalStageRequirements(result, _getMetalStageRequirements(invoke));
+    }
+    return result;
+}
+
+class MetalRayDataInfo : public RefObject
+{
+public:
+    IRStructType* type = nullptr;
+    IRStructKey* payloadKey = nullptr;
+    IRStructKey* customHitKindKey = nullptr;
+    Dictionary<IRInst*, IRStructKey*> customAttributeKeys;
+};
+
+static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
+    IRModule* module,
+    IRStructuralRayTracingTrace* trace)
+{
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    auto result = RefPtr<MetalRayDataInfo>(new MetalRayDataInfo());
+    result->type = builder.createStructType();
+    StringBuilder name;
+    if (auto nameHint = trace->getProgramLayout()->findDecoration<IRNameHintDecoration>())
+        name << nameHint->getName();
+    else
+        name << "StructuralRayTracingProgram";
+    name << ".rayData";
+    builder.addNameHintDecoration(result->type, name.getUnownedSlice());
+
+    auto payloadPointerType = cast<IRPtrTypeBase>(trace->getPayload()->getDataType());
+    result->payloadKey = builder.createStructKey();
+    builder.addNameHintDecoration(result->payloadKey, UnownedTerminatedStringSlice("payload"));
+    builder.createStructField(result->type, result->payloadKey, payloadPointerType->getValueType());
+
+    bool needsCustomHitKind = false;
+    for (auto decoration : trace->getDecorations())
+    {
+        auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
+        if (!group ||
+            StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue()) !=
+                StructuralRayTracingHitAttributesKind::Custom)
+        {
+            continue;
+        }
+
+        auto requirements = _getMetalStageRequirements(group->getClosestHit());
+        if (requirements.hitKind)
+            needsCustomHitKind = true;
+        if (!requirements.hitAttributes)
+            continue;
+
+        auto key = builder.createStructKey();
+        StringBuilder fieldName;
+        if (auto groupName = group->getGroupType()->findDecoration<IRNameHintDecoration>())
+            fieldName << groupName->getName();
+        else
+            fieldName << "hitGroup";
+        fieldName << ".attributes";
+        builder.addNameHintDecoration(key, fieldName.getUnownedSlice());
+        builder.createStructField(result->type, key, cast<IRType>(group->getHitAttributesType()));
+        result->customAttributeKeys.add(group->getGroupType(), key);
+    }
+
+    if (needsCustomHitKind)
+    {
+        result->customHitKindKey = builder.createStructKey();
+        builder.addNameHintDecoration(
+            result->customHitKindKey,
+            UnownedTerminatedStringSlice("customHitKind"));
+        builder.createStructField(result->type, result->customHitKindKey, builder.getUIntType());
+    }
     return result;
 }
 
@@ -234,9 +352,72 @@ static void _addStructuralStageInfo(
         SLANG_COUNT_OF(operands));
 }
 
+static void _collectStageInputOperations(IRInst* parent, List<IRInst*>& operations);
+static void _inlineCandidateOperationCalls(IRFunc* adapter);
+
+struct MetalVisibleInputValues
+{
+    IRInst* hitAttributes = nullptr;
+    IRInst* triangleBarycentricCoord = nullptr;
+    IRInst* triangleFrontFacing = nullptr;
+    IRInst* curveParameter = nullptr;
+    IRInst* distance = nullptr;
+    IRInst* hitKind = nullptr;
+    IRInst* worldSpaceOrigin = nullptr;
+    IRInst* worldSpaceDirection = nullptr;
+};
+
+static void _lowerMetalVisibleInputOperations(
+    IRFunc* adapter,
+    const MetalVisibleInputValues& values)
+{
+    List<IRInst*> operations;
+    _collectStageInputOperations(adapter, operations);
+    for (auto operation : operations)
+    {
+        IRInst* replacement = nullptr;
+        switch (operation->getOp())
+        {
+        case kIROp_StructuralRayTracingGetHitAttributes:
+            replacement = values.hitAttributes;
+            break;
+        case kIROp_StructuralRayTracingGetTriangleBarycentricCoord:
+            replacement = values.triangleBarycentricCoord;
+            break;
+        case kIROp_StructuralRayTracingGetTriangleFrontFacing:
+            replacement = values.triangleFrontFacing;
+            break;
+        case kIROp_StructuralRayTracingGetCurveParameter:
+            replacement = values.curveParameter;
+            break;
+        case kIROp_StructuralRayTracingGetRayTCurrent:
+            replacement = values.distance;
+            break;
+        case kIROp_StructuralRayTracingGetHitKind:
+            replacement = values.hitKind;
+            break;
+        case kIROp_StructuralRayTracingGetWorldRayOrigin:
+            replacement = values.worldSpaceOrigin;
+            break;
+        case kIROp_StructuralRayTracingGetWorldRayDirection:
+            replacement = values.worldSpaceDirection;
+            break;
+        default:
+            break;
+        }
+        if (replacement)
+        {
+            operation->replaceUsesWith(replacement);
+            operation->removeAndDeallocate();
+        }
+    }
+}
+
 static IRFunc* _generateVisibleStageAdapter(
     IRModule* module,
-    Dictionary<IRFunc*, IRFunc*>& generated,
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generated,
+    Dictionary<IRFunc*, IRInst*>& payloadValues,
+    IRInst* groupType,
     StructuralRayTracingStageKind stageKind,
     IRType* stageType,
     IRInst* invokeValue,
@@ -244,19 +425,36 @@ static IRFunc* _generateVisibleStageAdapter(
     IRType* payloadType,
     IRType* hitAttributesType,
     StructuralRayTracingHitAttributesKind hitAttributesKind,
-    IRType* payloadPointerType)
+    const MetalStageRequirements& tableRequirements,
+    MetalRayDataInfo* rayDataInfo)
 {
     auto invoke = as<IRFunc>(invokeValue);
     if (!invoke)
         return nullptr;
-    if (auto existing = generated.tryGetValue(invoke))
+    KeyValuePair<IRInst*, IRInst*> generatedKey(groupType, rayDataInfo->type);
+    if (auto existing = generated.tryGetValue(generatedKey))
         return *existing;
 
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
     auto adapter = builder.createFunc();
     List<IRType*> parameterTypes;
-    parameterTypes.add(payloadPointerType);
+    auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
+    parameterTypes.add(rayDataPointerType);
+    if (tableRequirements.distance)
+        parameterTypes.add(builder.getFloatType());
+    if (tableRequirements.hitKind)
+        parameterTypes.add(builder.getUIntType());
+    if (tableRequirements.triangleBarycentricCoord)
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 2));
+    if (tableRequirements.triangleFrontFacing)
+        parameterTypes.add(builder.getBoolType());
+    if (tableRequirements.curveParameter)
+        parameterTypes.add(builder.getFloatType());
+    if (tableRequirements.worldSpaceOrigin)
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    if (tableRequirements.worldSpaceDirection)
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     adapter->setFullType(builder.getFuncType(parameterTypes, builder.getVoidType()));
 
     auto name = _getStructuralStageName(stageType, invoke);
@@ -275,8 +473,48 @@ static IRFunc* _generateVisibleStageAdapter(
 
     builder.setInsertInto(adapter);
     builder.emitBlock();
-    auto payload = builder.emitParam(payloadPointerType);
-    builder.addNameHintDecoration(payload, UnownedTerminatedStringSlice("payload"));
+    auto rayData = builder.emitParam(rayDataPointerType);
+    builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
+
+    auto emitNamedParam = [&](IRType* type, const char* name)
+    {
+        auto param = builder.emitParam(type);
+        builder.addNameHintDecoration(param, UnownedTerminatedStringSlice(name));
+        return param;
+    };
+
+    MetalVisibleInputValues values;
+    if (tableRequirements.distance)
+        values.distance = emitNamedParam(builder.getFloatType(), "distance");
+    if (tableRequirements.hitKind)
+        values.hitKind = emitNamedParam(builder.getUIntType(), "hitKind");
+    if (tableRequirements.triangleBarycentricCoord)
+        values.triangleBarycentricCoord =
+            emitNamedParam(builder.getVectorType(builder.getFloatType(), 2), "barycentricCoord");
+    if (tableRequirements.triangleFrontFacing)
+        values.triangleFrontFacing = emitNamedParam(builder.getBoolType(), "frontFacing");
+    if (tableRequirements.curveParameter)
+        values.curveParameter = emitNamedParam(builder.getFloatType(), "curveParameter");
+    if (tableRequirements.worldSpaceOrigin)
+        values.worldSpaceOrigin =
+            emitNamedParam(builder.getVectorType(builder.getFloatType(), 3), "worldSpaceOrigin");
+    if (tableRequirements.worldSpaceDirection)
+        values.worldSpaceDirection =
+            emitNamedParam(builder.getVectorType(builder.getFloatType(), 3), "worldSpaceDirection");
+
+    auto payload = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
+    payloadValues[adapter] = payload;
+
+    if (hitAttributesKind == StructuralRayTracingHitAttributesKind::Custom)
+    {
+        if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(groupType))
+            values.hitAttributes = builder.emitLoad(builder.emitFieldAddress(rayData, *key));
+        if (rayDataInfo->customHitKindKey)
+        {
+            values.hitKind =
+                builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->customHitKindKey));
+        }
+    }
 
     List<IRInst*> arguments;
     for (UInt i = 0; i < invoke->getParamCount(); ++i)
@@ -285,7 +523,9 @@ static IRFunc* _generateVisibleStageAdapter(
         .emitCallInst(invoke->getResultType(), invoke, arguments.getCount(), arguments.getBuffer());
     builder.emitReturn();
 
-    generated.add(invoke, adapter);
+    _inlineCandidateOperationCalls(adapter);
+    _lowerMetalVisibleInputOperations(adapter, values);
+    generated.add(generatedKey, adapter);
     return adapter;
 }
 
@@ -596,16 +836,21 @@ static void _lowerMetalCandidateInputOperations(
 
 static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
     IRModule* module,
-    Dictionary<KeyValuePair<IRInst*, UInt>, IRFunc*>& generated,
+    Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>& generated,
+    Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     const MetalCandidateResultInfo& resultInfo,
     IRStructuralRayTracingHitGroupInfoDecoration* group,
-    UInt tagMask)
+    UInt tagMask,
+    MetalRayDataInfo* rayDataInfo)
 {
     auto invoke = as<IRFunc>(group->getAnyHit());
     if (!invoke)
         return nullptr;
     auto groupType = group->getGroupType();
-    KeyValuePair<IRInst*, UInt> generatedKey(groupType, tagMask);
+    KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*> generatedKey(
+        KeyValuePair<IRInst*, UInt>(groupType, tagMask),
+        rayDataInfo->type);
     if (auto existing = generated.tryGetValue(generatedKey))
         return *existing;
 
@@ -635,6 +880,8 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     if (requirements.worldSpaceDirection)
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
+    parameterTypes.add(rayDataPointerType);
     adapter->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
 
     auto name = _getMetalCandidateName(groupType);
@@ -708,6 +955,10 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
             "worldSpaceDirection",
             "world_space_direction");
     }
+    auto rayData = builder.emitParam(rayDataPointerType);
+    builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
+    candidateRayDataParams[adapter] = rayData;
+    payloadValues[adapter] = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
     if (requirements.hitKind)
     {
         if (hitAttributesKind == StructuralRayTracingHitAttributesKind::Triangle)
@@ -753,6 +1004,8 @@ struct MetalProceduralCandidateState
     IRInst* worldSpaceOrigin = nullptr;
     IRInst* worldSpaceDirection = nullptr;
     IRInst* opaque = nullptr;
+    IRInst* committedAttributes = nullptr;
+    IRInst* committedHitKind = nullptr;
 };
 
 static void _collectReportHitOperations(IRInst* parent, List<IRInst*>& operations)
@@ -1005,6 +1258,10 @@ static void _lowerProceduralReportHitOperations(
         builder.emitStore(state.distance, distance);
         builder.emitStore(state.hitKind, effectiveHitKind);
         builder.emitStore(state.attributes, attributes);
+        if (state.committedAttributes)
+            builder.emitStore(state.committedAttributes, attributes);
+        if (state.committedHitKind)
+            builder.emitStore(state.committedHitKind, effectiveHitKind);
         if (continueSearch)
         {
             auto continuingBlock = builder.createBlock();
@@ -1086,18 +1343,23 @@ static void _lowerProceduralIntersectionInputs(
 
 static IRFunc* _generateBoundingBoxCandidateAdapter(
     IRModule* module,
-    Dictionary<KeyValuePair<IRInst*, UInt>, IRFunc*>& generated,
+    Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>& generated,
     HashSet<IRFunc*>& generatedHelpers,
+    Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     const MetalCandidateResultInfo& filterResultInfo,
     const MetalCandidateResultInfo& proceduralResultInfo,
     IRStructuralRayTracingHitGroupInfoDecoration* group,
-    UInt tagMask)
+    UInt tagMask,
+    MetalRayDataInfo* rayDataInfo)
 {
     auto invoke = as<IRFunc>(group->getIntersection());
     if (!invoke)
         return nullptr;
     auto groupType = group->getGroupType();
-    KeyValuePair<IRInst*, UInt> generatedKey(groupType, tagMask);
+    KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*> generatedKey(
+        KeyValuePair<IRInst*, UInt>(groupType, tagMask),
+        rayDataInfo->type);
     if (auto existing = generated.tryGetValue(generatedKey))
         return *existing;
 
@@ -1126,6 +1388,8 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     if (as<IRFunc>(group->getAnyHit()))
         parameterTypes.add(builder.getBoolType());
+    auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
+    parameterTypes.add(rayDataPointerType);
     adapter->setFullType(builder.getFuncType(parameterTypes, proceduralResultInfo.type));
 
     auto name = _getMetalCandidateName(groupType);
@@ -1217,6 +1481,10 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     {
         opaque = _emitMetalSystemValueParam(builder, builder.getBoolType(), "opaque", "opaque");
     }
+    auto rayData = builder.emitParam(rayDataPointerType);
+    builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
+    candidateRayDataParams[adapter] = rayData;
+    payloadValues[adapter] = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
 
     MetalProceduralCandidateState state;
     state.minDistance = minDistance;
@@ -1228,6 +1496,10 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     state.worldSpaceOrigin = worldSpaceOrigin;
     state.worldSpaceDirection = worldSpaceDirection;
     state.opaque = opaque;
+    if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(groupType))
+        state.committedAttributes = builder.emitFieldAddress(rayData, *key);
+    if (rayDataInfo->customHitKindKey)
+        state.committedHitKind = builder.emitFieldAddress(rayData, rayDataInfo->customHitKindKey);
     builder.addNameHintDecoration(state.hasCandidate, UnownedTerminatedStringSlice("hasCandidate"));
     builder.addNameHintDecoration(
         state.currentMaxDistance,
@@ -1290,22 +1562,10 @@ static void _collectReturns(IRInst* parent, List<IRReturn*>& returns)
     }
 }
 
-static void _convertCandidatePayloadToRayData(IRFunc* adapter)
+static void _convertCandidateParameterToRayData(IRFunc* adapter, IRParam* rayDataParam)
 {
-    auto info = adapter->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
-    if (!info || as<IRVoidType>(info->getPayloadType()))
-        return;
-
-    auto payloadType = cast<IRType>(info->getPayloadType());
-    IRParam* payloadParam = nullptr;
-    for (auto param : adapter->getParams())
-    {
-        auto ptrType = as<IRPtrTypeBase>(param->getDataType());
-        if (ptrType && ptrType->getValueType() == payloadType)
-            payloadParam = param;
-    }
-    if (!payloadParam)
-        return;
+    auto rayDataPointerType = cast<IRPtrTypeBase>(rayDataParam->getDataType());
+    auto rayDataType = rayDataPointerType->getValueType();
 
     auto firstBlock = adapter->getFirstBlock();
     SLANG_ASSERT(firstBlock);
@@ -1314,21 +1574,21 @@ static void _convertCandidatePayloadToRayData(IRFunc* adapter)
 
     IRBuilder builder(adapter);
     builder.setInsertBefore(firstOrdinaryInst);
-    auto payloadStorage = builder.emitVar(payloadType);
-    builder.addNameHintDecoration(payloadStorage, UnownedTerminatedStringSlice("payloadStorage"));
-    payloadParam->replaceUsesWith(payloadStorage);
-    builder.emitStore(payloadStorage, builder.emitLoad(payloadParam));
+    auto rayDataStorage = builder.emitVar(rayDataType);
+    builder.addNameHintDecoration(rayDataStorage, UnownedTerminatedStringSlice("rayDataStorage"));
+    rayDataParam->replaceUsesWith(rayDataStorage);
+    builder.emitStore(rayDataStorage, builder.emitLoad(rayDataParam));
 
     List<IRReturn*> returns;
     _collectReturns(adapter, returns);
     for (auto returnInst : returns)
     {
         builder.setInsertBefore(returnInst);
-        builder.emitStore(payloadParam, builder.emitLoad(payloadStorage));
+        builder.emitStore(rayDataParam, builder.emitLoad(rayDataStorage));
     }
 
-    payloadParam->setFullType(builder.getRefParamType(payloadType, AddressSpace::Generic));
-    builder.addTargetSystemValueDecoration(payloadParam, toSlice("payload"));
+    rayDataParam->setFullType(builder.getRefParamType(rayDataType, AddressSpace::Generic));
+    builder.addTargetSystemValueDecoration(rayDataParam, toSlice("payload"));
     fixUpFuncType(adapter);
 }
 
@@ -1336,12 +1596,6 @@ static void _getStructFields(IRStructType* type, List<IRStructField*>& fields)
 {
     for (auto field : type->getFields())
         fields.add(field);
-}
-
-static IRPtrType* _getMetalPayloadPointerType(IRBuilder& builder, IRInst* payload)
-{
-    auto payloadPointerType = cast<IRPtrTypeBase>(payload->getDataType());
-    return builder.getPtrType(payloadPointerType->getValueType(), AddressSpace::ThreadLocal);
 }
 
 struct MetalTraceDescriptorInfo
@@ -1353,14 +1607,42 @@ struct MetalTraceDescriptorInfo
     IRStructField* callableFunctionsField = nullptr;
     IRStructField* recordsField = nullptr;
     IRType* intersectionFunctionTableType = nullptr;
-    IRType* visibleFunctionTableType = nullptr;
+    IRType* missFunctionTableType = nullptr;
+    IRType* closestHitFunctionTableType = nullptr;
 };
+
+static IRFuncType* _getMetalVisibleFunctionSignature(
+    IRBuilder& builder,
+    IRType* rayDataType,
+    const MetalStageRequirements& requirements)
+{
+    List<IRType*> parameterTypes;
+    parameterTypes.add(builder.getPtrType(rayDataType, AddressSpace::ThreadLocal));
+    if (requirements.distance)
+        parameterTypes.add(builder.getFloatType());
+    if (requirements.hitKind)
+        parameterTypes.add(builder.getUIntType());
+    if (requirements.triangleBarycentricCoord)
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 2));
+    if (requirements.triangleFrontFacing)
+        parameterTypes.add(builder.getBoolType());
+    if (requirements.curveParameter)
+        parameterTypes.add(builder.getFloatType());
+    if (requirements.worldSpaceOrigin)
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    if (requirements.worldSpaceDirection)
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    return builder.getFuncType(parameterTypes, builder.getVoidType());
+}
 
 static bool _prepareTraceDescriptor(
     IRBuilder& builder,
     IRStructuralRayTracingTrace* trace,
     UInt tagMaskValue,
     IRIntegerValue maxLevelsValue,
+    const MetalStageRequirements& missRequirements,
+    const MetalStageRequirements& closestHitRequirements,
+    MetalRayDataInfo* rayDataInfo,
     MetalTraceDescriptorInfo& outInfo)
 {
     auto descriptorType = as<IRStructType>(trace->getDescriptor()->getDataType());
@@ -1394,16 +1676,16 @@ static bool _prepareTraceDescriptor(
         SLANG_COUNT_OF(intersectionTableOperands),
         intersectionTableOperands);
 
-    List<IRType*> visibleFunctionParameters;
-    visibleFunctionParameters.add(_getMetalPayloadPointerType(builder, trace->getPayload()));
-    auto visibleFunctionSignature =
-        builder.getFuncType(visibleFunctionParameters, builder.getVoidType());
-    auto visibleFunctionTableType =
-        builder.getType(kIROp_MetalVisibleFunctionTable, visibleFunctionSignature);
+    auto missFunctionTableType = builder.getType(
+        kIROp_MetalVisibleFunctionTable,
+        _getMetalVisibleFunctionSignature(builder, rayDataInfo->type, missRequirements));
+    auto closestHitFunctionTableType = builder.getType(
+        kIROp_MetalVisibleFunctionTable,
+        _getMetalVisibleFunctionSignature(builder, rayDataInfo->type, closestHitRequirements));
 
     resourceFields[0]->setFieldType(intersectionFunctionTableType);
-    resourceFields[1]->setFieldType(visibleFunctionTableType);
-    resourceFields[2]->setFieldType(visibleFunctionTableType);
+    resourceFields[1]->setFieldType(missFunctionTableType);
+    resourceFields[2]->setFieldType(closestHitFunctionTableType);
 
     outInfo.descriptorResourcesField = descriptorFields[0];
     outInfo.intersectionFunctionsField = resourceFields[0];
@@ -1412,7 +1694,8 @@ static bool _prepareTraceDescriptor(
     outInfo.callableFunctionsField = resourceFields[3];
     outInfo.recordsField = resourceFields[4];
     outInfo.intersectionFunctionTableType = intersectionFunctionTableType;
-    outInfo.visibleFunctionTableType = visibleFunctionTableType;
+    outInfo.missFunctionTableType = missFunctionTableType;
+    outInfo.closestHitFunctionTableType = closestHitFunctionTableType;
     return true;
 }
 
@@ -1499,25 +1782,39 @@ static void _getRayTraversalDescValues(
 static bool _lowerNonEmptyTrace(
     IRModule* module,
     IRStructuralRayTracingTrace* trace,
-    Dictionary<IRFunc*, IRFunc*>& generatedMissAdapters,
-    Dictionary<IRFunc*, IRFunc*>& generatedClosestHitAdapters,
-    Dictionary<KeyValuePair<IRInst*, UInt>, IRFunc*>& generatedCandidateAdapters,
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generatedMissAdapters,
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generatedClosestHitAdapters,
+    Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>&
+        generatedCandidateAdapters,
     HashSet<IRFunc*>& candidateAdapterSet,
     HashSet<IRFunc*>& candidateHelperSet,
+    Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
+    MetalRayDataInfo* rayDataInfo,
     const MetalCandidateResultInfo& filterResultInfo,
     const MetalCandidateResultInfo& proceduralResultInfo)
 {
     IRBuilder builder(module);
     auto tagMask = _getSharedMetalTagMask(trace);
+    auto missRequirements = _getMetalStageRequirements(trace, StructuralRayTracingStageKind::Miss);
+    auto closestHitRequirements =
+        _getMetalStageRequirements(trace, StructuralRayTracingStageKind::ClosestHit);
     IRIntegerValue maxLevels = 0;
     MetalTraceDescriptorInfo descriptorInfo;
-    if (!_prepareTraceDescriptor(builder, trace, tagMask, maxLevels, descriptorInfo))
+    if (!_prepareTraceDescriptor(
+            builder,
+            trace,
+            tagMask,
+            maxLevels,
+            missRequirements,
+            closestHitRequirements,
+            rayDataInfo,
+            descriptorInfo))
         return false;
 
     bool hasMissFunctions = false;
     bool hasClosestHitFunctions = false;
     bool hasIntersectionFunctions = false;
-    auto metalPayloadPointerType = _getMetalPayloadPointerType(builder, trace->getPayload());
     for (auto decoration : trace->getDecorations())
     {
         if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(decoration))
@@ -1525,6 +1822,8 @@ static bool _lowerNonEmptyTrace(
             if (_generateVisibleStageAdapter(
                     module,
                     generatedMissAdapters,
+                    payloadValues,
+                    group->getGroupType(),
                     StructuralRayTracingStageKind::Miss,
                     group->getMissType(),
                     group->getMiss(),
@@ -1532,7 +1831,8 @@ static bool _lowerNonEmptyTrace(
                     group->getPayloadType(),
                     nullptr,
                     StructuralRayTracingHitAttributesKind::None,
-                    metalPayloadPointerType))
+                    missRequirements,
+                    rayDataInfo))
             {
                 hasMissFunctions = true;
             }
@@ -1547,9 +1847,12 @@ static bool _lowerNonEmptyTrace(
                 if (auto candidate = _generateBuiltInAnyHitCandidateAdapter(
                         module,
                         generatedCandidateAdapters,
+                        payloadValues,
+                        candidateRayDataParams,
                         filterResultInfo,
                         group,
-                        tagMask))
+                        tagMask,
+                        rayDataInfo))
                 {
                     hasIntersectionFunctions = true;
                     candidateAdapterSet.add(candidate);
@@ -1561,10 +1864,13 @@ static bool _lowerNonEmptyTrace(
                         module,
                         generatedCandidateAdapters,
                         candidateHelperSet,
+                        payloadValues,
+                        candidateRayDataParams,
                         filterResultInfo,
                         proceduralResultInfo,
                         group,
-                        tagMask))
+                        tagMask,
+                        rayDataInfo))
                 {
                     hasIntersectionFunctions = true;
                     candidateAdapterSet.add(candidate);
@@ -1573,6 +1879,8 @@ static bool _lowerNonEmptyTrace(
             if (_generateVisibleStageAdapter(
                     module,
                     generatedClosestHitAdapters,
+                    payloadValues,
+                    group->getGroupType(),
                     StructuralRayTracingStageKind::ClosestHit,
                     group->getClosestHitType(),
                     group->getClosestHit(),
@@ -1580,7 +1888,8 @@ static bool _lowerNonEmptyTrace(
                     group->getPayloadType(),
                     group->getHitAttributesType(),
                     hitAttributesKind,
-                    metalPayloadPointerType))
+                    closestHitRequirements,
+                    rayDataInfo))
             {
                 hasClosestHitFunctions = true;
             }
@@ -1631,10 +1940,21 @@ static bool _lowerNonEmptyTrace(
         sbtStride,
         missIndex);
 
+    auto rayData = builder.emitVar(rayDataInfo->type);
+    builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
+    auto rayDataPayload = builder.emitFieldAddress(rayData, rayDataInfo->payloadKey);
+    builder.emitStore(rayDataPayload, builder.emitLoad(trace->getPayload()));
+
     auto intType = builder.getIntType();
     IRInst* operands[] = {
         builder.getIntValue(intType, IRIntegerValue(tagMask)),
         builder.getIntValue(intType, maxLevels),
+        builder.getIntValue(
+            intType,
+            IRIntegerValue(_getMetalStageRequirementMask(missRequirements))),
+        builder.getIntValue(
+            intType,
+            IRIntegerValue(_getMetalStageRequirementMask(closestHitRequirements))),
         builder.getIntValue(intType, IRIntegerValue(_getGeometryKind(trace))),
         builder.getBoolValue(hasIntersectionFunctions),
         builder.getBoolValue(hasMissFunctions),
@@ -1653,13 +1973,14 @@ static bool _lowerNonEmptyTrace(
         missFunctions,
         closestHitFunctions,
         records,
-        trace->getPayload(),
+        rayData,
     };
     builder.emitIntrinsicInst(
         builder.getVoidType(),
         kIROp_MetalStructuralRayTracingTrace,
         SLANG_COUNT_OF(operands),
         operands);
+    builder.emitStore(trace->getPayload(), builder.emitLoad(rayDataPayload));
     trace->removeAndDeallocate();
     return true;
 }
@@ -1688,11 +2009,15 @@ void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoin
     buildEntryPointReferenceGraph(referencingEntryPoints, module);
 
     IRBuilder builder(module);
-    Dictionary<IRFunc*, IRFunc*> generatedMissAdapters;
-    Dictionary<IRFunc*, IRFunc*> generatedClosestHitAdapters;
-    Dictionary<KeyValuePair<IRInst*, UInt>, IRFunc*> generatedCandidateAdapters;
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*> generatedMissAdapters;
+    Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*> generatedClosestHitAdapters;
+    Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>
+        generatedCandidateAdapters;
     HashSet<IRFunc*> candidateAdapterSet;
     HashSet<IRFunc*> candidateHelperSet;
+    Dictionary<IRFunc*, IRInst*> payloadValues;
+    Dictionary<IRFunc*, IRParam*> candidateRayDataParams;
+    Dictionary<IRInst*, RefPtr<MetalRayDataInfo>> rayDataInfos;
     auto filterResultInfo =
         _createMetalCandidateResultType(module, "StructuralRayTracingFilterResult", false);
     auto proceduralResultInfo =
@@ -1720,6 +2045,14 @@ void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoin
         }
         else
         {
+            RefPtr<MetalRayDataInfo> rayDataInfo;
+            if (auto existing = rayDataInfos.tryGetValue(trace->getProgramLayout()))
+                rayDataInfo = *existing;
+            else
+            {
+                rayDataInfo = _createMetalRayDataInfo(module, trace);
+                rayDataInfos.add(trace->getProgramLayout(), rayDataInfo);
+            }
             SLANG_ASSERT(_lowerNonEmptyTrace(
                 module,
                 trace,
@@ -1728,15 +2061,20 @@ void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoin
                 generatedCandidateAdapters,
                 candidateAdapterSet,
                 candidateHelperSet,
+                payloadValues,
+                candidateRayDataParams,
+                rayDataInfo,
                 filterResultInfo,
                 proceduralResultInfo));
         }
     }
 
-    lowerMetalStructuralRayTracingPayloadOperations(module);
+    lowerMetalStructuralRayTracingStageInputOperations(module, payloadValues);
     for (auto adapter : candidateAdapterSet)
     {
-        _convertCandidatePayloadToRayData(adapter);
+        auto rayDataParam = candidateRayDataParams.tryGetValue(adapter);
+        SLANG_ASSERT(rayDataParam);
+        _convertCandidateParameterToRayData(adapter, *rayDataParam);
         if (auto readNone = adapter->findDecoration<IRReadNoneDecoration>())
             readNone->removeAndDeallocate();
         if (auto info = adapter->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
