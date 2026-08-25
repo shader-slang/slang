@@ -19,6 +19,8 @@ struct TestTraceContext : rt::ITraceContext
 struct TestCallableData
 {
     uint value;
+    uint dispatchIndex;
+    uint dispatchWidth;
 }
 
 struct TestCallableRecord
@@ -49,6 +51,8 @@ struct SecondCallable : rt::ICallableShader<TestCallableContext>
     void invoke(rt::CallableInput<TestCallableContext> input)
     {
         input.data.value *= input.record.value;
+        input.data.dispatchIndex = input.dispatchRaysIndex.x;
+        input.data.dispatchWidth = input.dispatchRaysDimensions.x;
     }
 }
 
@@ -88,7 +92,7 @@ void callSecond(inout TestCallableData data)
 void main()
 {
     rt::RayTracer<TestProgramLayout> tracer;
-    TestCallableData data = {1};
+    TestCallableData data = {1, 0, 0};
     tracer.callShader<TestCallableContext>(0, program, data);
     output[0] = data.value;
 }
@@ -96,12 +100,14 @@ void main()
 // HLSL-DAG: CallShader(1U,
 // HLSL-DAG: [shader("callable")]void FirstCallable
 // HLSL-DAG: [shader("callable")]void SecondCallable
+// HLSL-DAG: DispatchRaysIndex()
+// HLSL-DAG: DispatchRaysDimensions()
 
 // SPIRV-DAG: OpEntryPoint CallableKHR %FirstCallable "FirstCallable"
 // SPIRV-DAG: OpEntryPoint CallableKHR %SecondCallable "SecondCallable"
 // SPIRV: OpExecuteCallableKHR %uint_1
 
-// METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint constant*, uint device*)> callableFunctions_0;
-// METAL: {{\[\[visible\]\]}} void SecondCallable_0
-// METAL: {{\[\[visible\]\]}} void FirstCallable_0(TestCallableData_0 thread* [[DATA:data_[0-9]+]], uint constant* [[RESOURCES:descriptorResources_[0-9]+]], uint device* [[RECORDS:descriptorData_[0-9]+]])
-// METAL: ((rt_TraceProgramDescriptorResources_default_0 constant*)([[RESOURCES]]))->callableFunctions_0[1U]([[DATA]], (constant uint*)([[RESOURCES]]), [[RECORDS]]);
+// METAL: metal::visible_function_table<void(TestCallableData_0 thread*, uint3, uint3, uint constant*, uint device*)> callableFunctions_0;
+// METAL: {{\[\[visible\]\]}} void SecondCallable_0(TestCallableData_0 thread* {{data_[0-9]+}}, uint3 {{dispatchRaysIndex_[0-9]+}}, uint3 {{dispatchRaysDimensions_[0-9]+}}, uint constant* {{descriptorResources_[0-9]+}}, uint device* {{descriptorData_[0-9]+}})
+// METAL: {{\[\[visible\]\]}} void FirstCallable_0(TestCallableData_0 thread* [[DATA:data_[0-9]+]], uint3 [[INDEX:dispatchRaysIndex_[0-9]+]], uint3 [[DIMENSIONS:dispatchRaysDimensions_[0-9]+]], uint constant* [[RESOURCES:descriptorResources_[0-9]+]], uint device* [[RECORDS:descriptorData_[0-9]+]])
+// METAL: ((rt_TraceProgramDescriptorResources_default_0 constant*)([[RESOURCES]]))->callableFunctions_0[1U]([[DATA]], [[INDEX]], [[DIMENSIONS]], (constant uint*)([[RESOURCES]]), [[RECORDS]]);

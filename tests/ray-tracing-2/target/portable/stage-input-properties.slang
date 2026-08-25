@@ -65,7 +65,8 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
             float(input.hitKind + input.rayFlags) + input.objectToWorld[0][0] +
                 input.worldToObject[0][0],
             float(input.primitiveIndex + input.geometryIndex + input.instanceIndex +
-                  input.instanceID));
+                  input.instanceID + input.dispatchRaysIndex.x +
+                  input.dispatchRaysDimensions.x));
     }
 }
 
@@ -83,6 +84,8 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
 // HLSLCH-DAG: ObjectRayDirection()
 // HLSLCH-DAG: ObjectToWorld4x3()
 // HLSLCH-DAG: WorldToObject4x3()
+// HLSLCH-DAG: DispatchRaysIndex()
+// HLSLCH-DAG: DispatchRaysDimensions()
 // HLSLCH: [shader("closesthit")]void ClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // SPVCH: OpEntryPoint ClosestHitKHR
 // SPVCH-DAG: BuiltIn WorldRayOriginKHR
@@ -99,6 +102,8 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
 // SPVCH-DAG: BuiltIn ObjectRayDirectionKHR
 // SPVCH-DAG: BuiltIn ObjectToWorldKHR
 // SPVCH-DAG: BuiltIn WorldToObjectKHR
+// SPVCH-DAG: BuiltIn LaunchIdKHR
+// SPVCH-DAG: BuiltIn LaunchSizeKHR
 
 struct AnyHit : rt::IAnyHitShader<TriangleContext>
 {
@@ -110,7 +115,8 @@ struct AnyHit : rt::IAnyHitShader<TriangleContext>
                                           input.geometryIndex + input.instanceIndex +
                                           input.instanceID) +
                 objectRay.origin.x + objectRay.direction.x + input.objectToWorld[0][0] +
-                input.worldToObject[0][0] >
+                input.worldToObject[0][0] + float(input.dispatchRaysIndex.x) +
+                float(input.dispatchRaysDimensions.x) >
             0.0)
             input.ignoreHit();
         if (input.hitKind != 0)
@@ -136,7 +142,8 @@ struct Intersection : rt::IIntersectionShader<ProceduralContext>
                            float(input.geometryIndex + input.instanceIndex + input.instanceID +
                                  input.rayFlags) +
                            input.minDistance + input.objectToWorld[0][0] +
-                           input.worldToObject[0][0];
+                           input.worldToObject[0][0] + float(input.dispatchRaysIndex.x) +
+                           float(input.dispatchRaysDimensions.x);
         if (!input.reportHit(ray.tMin + input.objectToWorld[0][0], attributes))
             input.reportHit(ray.tMax, 1, attributes);
     }
@@ -166,7 +173,8 @@ struct Miss : rt::IMissShader<MissContext>
     {
         output[0] = float4(
             input.worldSpaceOrigin + input.worldSpaceDirection,
-            input.minDistance + input.distance + float(input.rayFlags));
+            input.minDistance + input.distance + float(input.rayFlags) +
+                float(input.dispatchRaysIndex.x + input.dispatchRaysDimensions.x));
     }
 }
 
@@ -176,6 +184,8 @@ struct Miss : rt::IMissShader<MissContext>
 // SPVMS: OpEntryPoint MissKHR
 // SPVMS-DAG: BuiltIn WorldRayOriginKHR
 // SPVMS-DAG: BuiltIn WorldRayDirectionKHR
+// SPVMS-DAG: BuiltIn LaunchIdKHR
+// SPVMS-DAG: BuiltIn LaunchSizeKHR
 
 typealias ClosestHitStage = ClosestHit;
 typealias AnyHitStage = AnyHit;
@@ -266,3 +276,5 @@ void main()
 // METALLAYOUT-DAG: _slang_result.user_instance_id
 // METALLAYOUT-DAG: _slang_result.object_to_world_transform
 // METALLAYOUT-DAG: _slang_result.world_to_object_transform
+// METALLAYOUT-DAG: uint3 dispatchRaysIndex_{{[0-9]+}} {{\[\[thread_position_in_grid\]\]}}
+// METALLAYOUT-DAG: uint3 dispatchRaysDimensions_{{[0-9]+}} {{\[\[threads_per_grid\]\]}}
