@@ -457,50 +457,6 @@ Type* StructuralRayTracingDeclRegistry::resolveAssociatedType(
     return nullptr;
 }
 
-Type* StructuralRayTracingDeclRegistry::resolveConcreteAssociatedType(
-    ASTBuilder* astBuilder,
-    Type* conformingType,
-    SubtypeWitness* witness,
-    StructuralRayTracingAssociatedTypeKind kind) const
-{
-    auto requirement = getAssociatedTypeRequirement(kind);
-    if (!requirement || !conformingType)
-        return resolveAssociatedType(astBuilder, witness, kind);
-
-    if (auto declRefType = as<DeclRefType>(conformingType->resolve()))
-    {
-        auto aggregateDeclRef = declRefType->getDeclRef().as<AggTypeDecl>();
-        if (aggregateDeclRef)
-        {
-            for (auto member : aggregateDeclRef.getDecl()->getDirectMemberDecls())
-            {
-                auto typeAlias = as<TypeDefDecl>(member);
-                if (!typeAlias || typeAlias->getName() != requirement->getName())
-                    continue;
-                auto typeAliasDeclRef = astBuilder->getMemberDeclRef(aggregateDeclRef, typeAlias);
-                return as<Type>(getNamedType(astBuilder, typeAliasDeclRef)->resolve());
-            }
-        }
-    }
-
-    auto lookupResult = lookUpMember(
-        astBuilder,
-        nullptr,
-        requirement->getName(),
-        conformingType,
-        nullptr,
-        LookupMask::type,
-        LookupOptions::IgnoreBaseInterfaces);
-    if (lookupResult.isValid() && !lookupResult.isOverloaded())
-    {
-        if (auto typeAlias = lookupResult.item.declRef.as<TypeDefDecl>())
-            return as<Type>(getNamedType(astBuilder, typeAlias)->resolve());
-        if (auto typeDecl = lookupResult.item.declRef.as<AggTypeDecl>())
-            return DeclRefType::create(astBuilder, typeDecl);
-    }
-    return resolveAssociatedType(astBuilder, witness, kind);
-}
-
 SubtypeWitness* StructuralRayTracingDeclRegistry::resolveAssociatedTypeConstraint(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
@@ -552,25 +508,6 @@ bool StructuralRayTracingDeclRegistry::tryGetShaderGroupSlotIndex(
                 if (auto constantValue = as<ConstantIntVal>(value ? value->resolve() : nullptr))
                 {
                     outIndex = constantValue->getValue();
-                    return true;
-                }
-            }
-            if (auto literal = as<IntegerLiteralExpr>(slotIndexDecl->initExpr))
-            {
-                outIndex = literal->value;
-                return true;
-            }
-        }
-    }
-    if (auto declRefType = as<DeclRefType>(slotType))
-    {
-        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
-        {
-            for (auto argument : genericApp->getArgs())
-            {
-                if (auto value = as<ConstantIntVal>(argument->resolve()))
-                {
-                    outIndex = value->getValue();
                     return true;
                 }
             }

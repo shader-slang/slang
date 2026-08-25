@@ -171,11 +171,6 @@ public:
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
-    Type* resolveConcreteAssociatedType(
-        ASTBuilder* astBuilder,
-        Type* conformingType,
-        SubtypeWitness* witness,
-        StructuralRayTracingAssociatedTypeKind kind) const;
     SubtypeWitness* resolveAssociatedTypeConstraint(
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,

@@ -97,24 +97,6 @@ static IRInterfaceType* _findInterfaceType(IRInst* inst)
     return as<IRInterfaceType>(inst);
 }
 
-static IRInterfaceType* _findInterfaceTypeByNameHint(IRInst* inst, UnownedStringSlice expectedName)
-{
-    if (auto interfaceType = as<IRInterfaceType>(inst))
-    {
-        if (auto nameHint = interfaceType->findDecoration<IRNameHintDecoration>())
-        {
-            if (nameHint->getName() == expectedName)
-                return interfaceType;
-        }
-    }
-    for (auto child : inst->getDecorationsAndChildren())
-    {
-        if (auto result = _findInterfaceTypeByNameHint(child, expectedName))
-            return result;
-    }
-    return nullptr;
-}
-
 bool identifyStructuralRayTracingStageInterfaces(
     Module* module,
     const StructuralRayTracingDeclRegistry& registry,
@@ -149,23 +131,6 @@ bool identifyStructuralRayTracingStageInterfaces(
             // serialized interface receives its compiler-owned nominal identity.
             interfaceType->m_op = expectedOp;
             found = true;
-        }
-
-        if (!found)
-        {
-            StringBuilder expectedName;
-            expectedName << "rt." << getStructuralRayTracingStageInterfaceName(kind);
-            if (auto interfaceType = _findInterfaceTypeByNameHint(
-                    irModule->getModuleInst(),
-                    expectedName.getUnownedSlice()))
-            {
-                if (interfaceType->getOp() == kIROp_InterfaceType ||
-                    interfaceType->getOp() == expectedOp)
-                {
-                    interfaceType->m_op = expectedOp;
-                    found = true;
-                }
-            }
         }
 
         if (!found)

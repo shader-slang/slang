@@ -1050,10 +1050,13 @@ static StructuralRayTracingHitContextInfo _getStructuralRayTracingHitContextInfo
         context->astBuilder,
         contextWitness,
         StructuralRayTracingAssociatedTypeKind::HitRecord);
-    result.hitAttributesType = registry.resolveConcreteAssociatedType(
+    auto primitiveWitness = registry.resolveAssociatedTypeConstraint(
         context->astBuilder,
-        result.primitiveType,
-        nullptr,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+    result.hitAttributesType = registry.resolveAssociatedType(
+        context->astBuilder,
+        primitiveWitness,
         StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
     SLANG_ASSERT(result.primitiveType && result.recordType && result.hitAttributesType);
     result.hitAttributesKind = registry.getHitAttributesKind(result.primitiveType);
@@ -1145,7 +1148,6 @@ static DeclRef<CallableDecl> _findStructuralRayTracingStageInvokeInType(
 
 static StructuralRayTracingStageReference _lowerStructuralRayTracingStageReference(
     IRGenContext* context,
-    Type* groupType,
     SubtypeWitness* groupWitness,
     StructuralRayTracingAssociatedTypeKind associatedTypeKind,
     StructuralRayTracingStageKind stageKind)
@@ -1153,9 +1155,8 @@ static StructuralRayTracingStageReference _lowerStructuralRayTracingStageReferen
     auto builder = context->irBuilder;
     StructuralRayTracingStageReference result = {builder->getVoidType(), builder->getVoidValue()};
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
-    auto stageType = registry.resolveConcreteAssociatedType(
+    auto stageType = registry.resolveAssociatedType(
         context->astBuilder,
-        groupType,
         groupWitness,
         associatedTypeKind);
     SLANG_ASSERT(stageType);
@@ -1213,19 +1214,16 @@ static void _addStructuralRayTracingHitGroupInfo(
 
         auto closestHit = _lowerStructuralRayTracingStageReference(
             context,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit,
             StructuralRayTracingStageKind::ClosestHit);
         auto anyHit = _lowerStructuralRayTracingStageReference(
             context,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit,
             StructuralRayTracingStageKind::AnyHit);
         auto intersection = _lowerStructuralRayTracingStageReference(
             context,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupIntersection,
             StructuralRayTracingStageKind::Intersection);
@@ -1282,7 +1280,6 @@ static void _addStructuralRayTracingMissGroupInfo(
             StructuralRayTracingAssociatedTypeKind::MissGroupContext);
         auto miss = _lowerStructuralRayTracingStageReference(
             context,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupMiss,
             StructuralRayTracingStageKind::Miss);
@@ -1344,7 +1341,6 @@ static void _addStructuralRayTracingCallableGroupInfo(
             StructuralRayTracingAssociatedTypeKind::CallableGroupContext);
         auto callable = _lowerStructuralRayTracingStageReference(
             context,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupCallable,
             StructuralRayTracingStageKind::Callable);
