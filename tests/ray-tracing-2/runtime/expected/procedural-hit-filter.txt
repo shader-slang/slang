@@ -1,0 +1,2 @@
+ray 0: stage=3 candidate=9 anyHitCount=2 dispatchWidth=2
+ray 1: stage=2 candidate=0 anyHitCount=0 dispatchWidth=2

@@ -27,6 +27,15 @@ static const Vertex kTriangleVertices[] = {
 
 static const uint32_t kTriangleIndices[] = {0, 1, 2};
 
+static const AccelerationStructureAABB kProceduralAabb = {
+    -0.5f,
+    -0.5f,
+    0.5f,
+    0.5f,
+    0.5f,
+    2.0f,
+};
+
 ComPtr<IBuffer> createScratchBuffer(IDevice* device, Size size)
 {
     BufferDesc desc = {};
@@ -34,6 +43,81 @@ ComPtr<IBuffer> createScratchBuffer(IDevice* device, Size size)
     desc.usage = BufferUsage::UnorderedAccess;
     desc.defaultState = ResourceState::UnorderedAccess;
     return device->createBuffer(desc);
+}
+
+void createSingleInstanceTopLevel(
+    IDevice* device,
+    ICommandQueue* queue,
+    IAccelerationStructure* bottomLevel,
+    AccelerationStructureInstanceFlags flags,
+    ComPtr<IBuffer>& outInstanceBuffer,
+    ComPtr<IAccelerationStructure>& outTopLevel)
+{
+    AccelerationStructureInstanceDescGeneric genericInstance = {};
+    static const float kIdentityTransform[12] = {
+        1.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+    };
+    memcpy(genericInstance.transform, kIdentityTransform, sizeof(kIdentityTransform));
+    genericInstance.instanceID = 0;
+    genericInstance.instanceMask = 0xff;
+    genericInstance.instanceContributionToHitGroupIndex = 0;
+    genericInstance.flags = flags;
+    genericInstance.accelerationStructure = bottomLevel->getHandle();
+
+    auto instanceType = getAccelerationStructureInstanceDescType(device);
+    auto instanceStride = getAccelerationStructureInstanceDescSize(instanceType);
+    std::vector<uint8_t> nativeInstance(instanceStride);
+    convertAccelerationStructureInstanceDescs(
+        1,
+        instanceType,
+        nativeInstance.data(),
+        instanceStride,
+        &genericInstance,
+        sizeof(genericInstance));
+
+    BufferDesc instanceDesc = {};
+    instanceDesc.size = nativeInstance.size();
+    instanceDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
+    instanceDesc.defaultState = ResourceState::ShaderResource;
+    outInstanceBuffer = device->createBuffer(instanceDesc, nativeInstance.data());
+    SLANG_CHECK_ABORT(outInstanceBuffer != nullptr);
+
+    AccelerationStructureBuildInput instanceInput = {};
+    instanceInput.type = AccelerationStructureBuildInputType::Instances;
+    instanceInput.instances.instanceBuffer = outInstanceBuffer;
+    instanceInput.instances.instanceStride = uint32_t(instanceStride);
+    instanceInput.instances.instanceCount = 1;
+
+    AccelerationStructureBuildDesc topBuild = {};
+    topBuild.inputs = &instanceInput;
+    topBuild.inputCount = 1;
+
+    AccelerationStructureSizes topSizes = {};
+    GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(topBuild, &topSizes));
+    auto topScratch = createScratchBuffer(device, topSizes.scratchSize);
+    SLANG_CHECK_ABORT(topScratch != nullptr);
+
+    AccelerationStructureDesc topDesc = {};
+    topDesc.kind = AccelerationStructureKind::TopLevel;
+    topDesc.size = topSizes.accelerationStructureSize;
+    GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(topDesc, outTopLevel.writeRef()));
+
+    auto commandEncoder = queue->createCommandEncoder();
+    commandEncoder
+        ->buildAccelerationStructure(topBuild, outTopLevel, nullptr, topScratch, 0, nullptr);
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
 }
 
 } // namespace
@@ -88,70 +172,61 @@ StructuralRayTracingTriangleScene::StructuralRayTracingTriangleScene(
     GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
     GFX_CHECK_CALL_ABORT(queue->waitOnHost());
 
-    AccelerationStructureInstanceDescGeneric genericInstance = {};
-    static const float kIdentityTransform[12] = {
-        1.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        1.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        0.0f,
-        1.0f,
-        0.0f,
-    };
-    memcpy(genericInstance.transform, kIdentityTransform, sizeof(kIdentityTransform));
-    genericInstance.instanceID = 0;
-    genericInstance.instanceMask = 0xff;
-    genericInstance.instanceContributionToHitGroupIndex = 0;
-    genericInstance.flags = AccelerationStructureInstanceFlags::TriangleFacingCullDisable;
-    genericInstance.accelerationStructure = bottomLevel->getHandle();
+    createSingleInstanceTopLevel(
+        device,
+        queue,
+        bottomLevel,
+        AccelerationStructureInstanceFlags::TriangleFacingCullDisable,
+        instanceBuffer,
+        topLevel);
+}
 
-    auto instanceType = getAccelerationStructureInstanceDescType(device);
-    auto instanceStride = getAccelerationStructureInstanceDescSize(instanceType);
-    std::vector<uint8_t> nativeInstance(instanceStride);
-    convertAccelerationStructureInstanceDescs(
-        1,
-        instanceType,
-        nativeInstance.data(),
-        instanceStride,
-        &genericInstance,
-        sizeof(genericInstance));
+StructuralRayTracingProceduralScene::StructuralRayTracingProceduralScene(
+    IDevice* device,
+    ICommandQueue* queue)
+{
+    BufferDesc aabbDesc = {};
+    aabbDesc.size = sizeof(kProceduralAabb);
+    aabbDesc.usage = BufferUsage::AccelerationStructureBuildInput;
+    aabbDesc.defaultState = ResourceState::AccelerationStructureBuildInput;
+    aabbBuffer = device->createBuffer(aabbDesc, &kProceduralAabb);
+    SLANG_CHECK_ABORT(aabbBuffer != nullptr);
 
-    BufferDesc instanceDesc = {};
-    instanceDesc.size = nativeInstance.size();
-    instanceDesc.usage = BufferUsage::ShaderResource | BufferUsage::AccelerationStructureBuildInput;
-    instanceDesc.defaultState = ResourceState::ShaderResource;
-    instanceBuffer = device->createBuffer(instanceDesc, nativeInstance.data());
-    SLANG_CHECK_ABORT(instanceBuffer != nullptr);
+    AccelerationStructureBuildInput proceduralInput = {};
+    proceduralInput.type = AccelerationStructureBuildInputType::ProceduralPrimitives;
+    proceduralInput.proceduralPrimitives.aabbBuffers[0] = aabbBuffer;
+    proceduralInput.proceduralPrimitives.aabbBufferCount = 1;
+    proceduralInput.proceduralPrimitives.aabbStride = sizeof(AccelerationStructureAABB);
+    proceduralInput.proceduralPrimitives.primitiveCount = 1;
+    proceduralInput.proceduralPrimitives.flags = AccelerationStructureGeometryFlags::None;
 
-    AccelerationStructureBuildInput instanceInput = {};
-    instanceInput.type = AccelerationStructureBuildInputType::Instances;
-    instanceInput.instances.instanceBuffer = instanceBuffer;
-    instanceInput.instances.instanceStride = uint32_t(instanceStride);
-    instanceInput.instances.instanceCount = 1;
+    AccelerationStructureBuildDesc bottomBuild = {};
+    bottomBuild.inputs = &proceduralInput;
+    bottomBuild.inputCount = 1;
 
-    AccelerationStructureBuildDesc topBuild = {};
-    topBuild.inputs = &instanceInput;
-    topBuild.inputCount = 1;
+    AccelerationStructureSizes bottomSizes = {};
+    GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(bottomBuild, &bottomSizes));
+    auto bottomScratch = createScratchBuffer(device, bottomSizes.scratchSize);
+    SLANG_CHECK_ABORT(bottomScratch != nullptr);
 
-    AccelerationStructureSizes topSizes = {};
-    GFX_CHECK_CALL_ABORT(device->getAccelerationStructureSizes(topBuild, &topSizes));
-    auto topScratch = createScratchBuffer(device, topSizes.scratchSize);
-    SLANG_CHECK_ABORT(topScratch != nullptr);
+    AccelerationStructureDesc bottomDesc = {};
+    bottomDesc.kind = AccelerationStructureKind::BottomLevel;
+    bottomDesc.size = bottomSizes.accelerationStructureSize;
+    GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(bottomDesc, bottomLevel.writeRef()));
 
-    AccelerationStructureDesc topDesc = {};
-    topDesc.kind = AccelerationStructureKind::TopLevel;
-    topDesc.size = topSizes.accelerationStructureSize;
-    GFX_CHECK_CALL_ABORT(device->createAccelerationStructure(topDesc, topLevel.writeRef()));
-
-    commandEncoder = queue->createCommandEncoder();
-    commandEncoder->buildAccelerationStructure(topBuild, topLevel, nullptr, topScratch, 0, nullptr);
+    auto commandEncoder = queue->createCommandEncoder();
+    commandEncoder
+        ->buildAccelerationStructure(bottomBuild, bottomLevel, nullptr, bottomScratch, 0, nullptr);
     GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
     GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    createSingleInstanceTopLevel(
+        device,
+        queue,
+        bottomLevel,
+        AccelerationStructureInstanceFlags::None,
+        instanceBuffer,
+        topLevel);
 }
 
 } // namespace gfx_test
