@@ -2,6 +2,7 @@
 
 #include "slang-ast-builder.h"
 #include "slang-ast-decl.h"
+#include "slang-lookup.h"
 #include "slang-module.h"
 #include "slang-syntax.h"
 
@@ -293,15 +294,21 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         _findAssociatedTypeRequirement(module, "IHitContext", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitPrimitive)] =
         _findAssociatedTypeRequirement(module, "IHitContext", "Primitive");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitRecord)] =
+        _findAssociatedTypeRequirement(module, "IHitContext", "Record");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes)] =
         _findAssociatedTypeRequirement(module, "IIntersectionPrimitive", "Attributes");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissTraceContext)] =
         _findAssociatedTypeRequirement(module, "IMissGroupContext", "TraceContext");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::MissRecord)] =
+        _findAssociatedTypeRequirement(module, "IMissGroupContext", "Record");
     m_associatedTypeRequirements[int(
         StructuralRayTracingAssociatedTypeKind::CallableTraceContext)] =
         _findAssociatedTypeRequirement(module, "ICallableGroupContext", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableData)] =
         _findAssociatedTypeRequirement(module, "ICallableGroupContext", "CallableData");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::CallableRecord)] =
+        _findAssociatedTypeRequirement(module, "ICallableGroupContext", "Record");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramTraceContext)] =
         _findAssociatedTypeRequirement(module, "ITraceProgramLayout", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::ProgramHitGroups)] =
@@ -415,6 +422,50 @@ Type* StructuralRayTracingDeclRegistry::resolveAssociatedType(
     return nullptr;
 }
 
+Type* StructuralRayTracingDeclRegistry::resolveConcreteAssociatedType(
+    ASTBuilder* astBuilder,
+    Type* conformingType,
+    SubtypeWitness* witness,
+    StructuralRayTracingAssociatedTypeKind kind) const
+{
+    auto requirement = getAssociatedTypeRequirement(kind);
+    if (!requirement || !conformingType)
+        return resolveAssociatedType(astBuilder, witness, kind);
+
+    if (auto declRefType = as<DeclRefType>(conformingType->resolve()))
+    {
+        auto aggregateDeclRef = declRefType->getDeclRef().as<AggTypeDecl>();
+        if (aggregateDeclRef)
+        {
+            for (auto member : aggregateDeclRef.getDecl()->getDirectMemberDecls())
+            {
+                auto typeAlias = as<TypeDefDecl>(member);
+                if (!typeAlias || typeAlias->getName() != requirement->getName())
+                    continue;
+                auto typeAliasDeclRef = astBuilder->getMemberDeclRef(aggregateDeclRef, typeAlias);
+                return as<Type>(getNamedType(astBuilder, typeAliasDeclRef)->resolve());
+            }
+        }
+    }
+
+    auto lookupResult = lookUpMember(
+        astBuilder,
+        nullptr,
+        requirement->getName(),
+        conformingType,
+        nullptr,
+        LookupMask::type,
+        LookupOptions::IgnoreBaseInterfaces);
+    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    {
+        if (auto typeAlias = lookupResult.item.declRef.as<TypeDefDecl>())
+            return as<Type>(getNamedType(astBuilder, typeAlias)->resolve());
+        if (auto typeDecl = lookupResult.item.declRef.as<AggTypeDecl>())
+            return DeclRefType::create(astBuilder, typeDecl);
+    }
+    return resolveAssociatedType(astBuilder, witness, kind);
+}
+
 SubtypeWitness* StructuralRayTracingDeclRegistry::resolveAssociatedTypeConstraint(
     ASTBuilder* astBuilder,
     SubtypeWitness* witness,
@@ -434,6 +485,63 @@ SubtypeWitness* StructuralRayTracingDeclRegistry::resolveAssociatedTypeConstrain
     if (requirementWitness.getFlavor() == RequirementWitness::Flavor::val)
         return as<SubtypeWitness>(requirementWitness.getVal()->resolve());
     return nullptr;
+}
+
+bool StructuralRayTracingDeclRegistry::tryGetShaderGroupSlotIndex(
+    ASTBuilder* astBuilder,
+    Type* slotType,
+    int64_t& outIndex) const
+{
+    auto lookupResult = lookUpMember(
+        astBuilder,
+        nullptr,
+        astBuilder->getNamePool()->getName("index"),
+        slotType,
+        nullptr,
+        LookupMask::Value,
+        LookupOptions::IgnoreBaseInterfaces);
+    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    {
+        if (auto slotIndexDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
+        {
+            auto slotIndexDecl = slotIndexDeclRef.getDecl();
+            if (auto constantValue = as<ConstantIntVal>(slotIndexDecl->val))
+            {
+                outIndex = constantValue->getValue();
+                return true;
+            }
+            if (auto value = slotIndexDecl->val)
+            {
+                value =
+                    as<IntVal>(value->substitute(astBuilder, SubstitutionSet(slotIndexDeclRef)));
+                if (auto constantValue = as<ConstantIntVal>(value ? value->resolve() : nullptr))
+                {
+                    outIndex = constantValue->getValue();
+                    return true;
+                }
+            }
+            if (auto literal = as<IntegerLiteralExpr>(slotIndexDecl->initExpr))
+            {
+                outIndex = literal->value;
+                return true;
+            }
+        }
+    }
+    if (auto declRefType = as<DeclRefType>(slotType))
+    {
+        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
+        {
+            for (auto argument : genericApp->getArgs())
+            {
+                if (auto value = as<ConstantIntVal>(argument->resolve()))
+                {
+                    outIndex = value->getValue();
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 bool StructuralRayTracingDeclRegistry::isStagePlaceholder(
@@ -521,6 +629,15 @@ StructuralRayTracingMetadataKind StructuralRayTracingDeclRegistry::getMetadataKi
             return StructuralRayTracingMetadataKind(i);
     }
     return StructuralRayTracingMetadataKind::Count;
+}
+
+InterfaceDecl* StructuralRayTracingDeclRegistry::getMetadataInterface(
+    StructuralRayTracingMetadataKind kind) const
+{
+    auto index = int(kind);
+    if (index < 0 || index >= int(StructuralRayTracingMetadataKind::Count))
+        return nullptr;
+    return m_metadataInterfaces[index];
 }
 
 StructuralRayTracingStageInputOperationKind StructuralRayTracingDeclRegistry::

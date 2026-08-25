@@ -985,43 +985,10 @@ static StructuralRayTracingGroupPack _getStructuralRayTracingGroupPack(
 
 static IntegerLiteralValue _getStructuralRayTracingSlotIndex(IRGenContext* context, Type* slotType)
 {
-    auto lookupResult = lookUpMember(
-        context->astBuilder,
-        nullptr,
-        context->astBuilder->getNamePool()->getName("index"),
-        slotType,
-        nullptr,
-        LookupMask::Value,
-        LookupOptions::IgnoreBaseInterfaces);
-    if (lookupResult.isValid() && !lookupResult.isOverloaded())
-    {
-        if (auto slotIndexDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
-        {
-            auto slotIndexDecl = slotIndexDeclRef.getDecl();
-            if (auto constantValue = as<ConstantIntVal>(slotIndexDecl->val))
-                return constantValue->getValue();
-            if (auto value = slotIndexDecl->val)
-            {
-                value = as<IntVal>(
-                    value->substitute(context->astBuilder, SubstitutionSet(slotIndexDeclRef)));
-                if (auto constantValue = as<ConstantIntVal>(value ? value->resolve() : nullptr))
-                    return constantValue->getValue();
-            }
-            if (auto literal = as<IntegerLiteralExpr>(slotIndexDecl->initExpr))
-                return literal->value;
-        }
-    }
-    if (auto declRefType = as<DeclRefType>(slotType))
-    {
-        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
-        {
-            for (auto argument : genericApp->getArgs())
-            {
-                if (auto value = as<ConstantIntVal>(argument->resolve()))
-                    return value->getValue();
-            }
-        }
-    }
+    IntegerLiteralValue index = 0;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    if (registry.tryGetShaderGroupSlotIndex(context->astBuilder, slotType, index))
+        return index;
     SLANG_UNEXPECTED("structural ray-tracing group slot is not concrete");
 }
 
@@ -1058,50 +1025,6 @@ static Type* _getStructuralRayTracingPayloadType(
     return payloadType;
 }
 
-static Type* _getStructuralRayTracingConcreteAssociatedType(
-    IRGenContext* context,
-    Type* type,
-    StructuralRayTracingAssociatedTypeKind kind)
-{
-    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
-    auto requirement = registry.getAssociatedTypeRequirement(kind);
-    if (!requirement || !type)
-        return nullptr;
-
-    if (auto declRefType = as<DeclRefType>(type->resolve()))
-    {
-        auto aggregateDeclRef = declRefType->getDeclRef().as<AggTypeDecl>();
-        if (aggregateDeclRef)
-        {
-            for (auto member : aggregateDeclRef.getDecl()->getDirectMemberDecls())
-            {
-                auto typeAlias = as<TypeDefDecl>(member);
-                if (!typeAlias || typeAlias->getName() != requirement->getName())
-                    continue;
-                auto typeAliasDeclRef =
-                    context->astBuilder->getMemberDeclRef(aggregateDeclRef, typeAlias);
-                return as<Type>(getNamedType(context->astBuilder, typeAliasDeclRef)->resolve());
-            }
-        }
-    }
-
-    auto lookupResult = lookUpMember(
-        context->astBuilder,
-        nullptr,
-        requirement->getName(),
-        type,
-        nullptr,
-        LookupMask::type,
-        LookupOptions::IgnoreBaseInterfaces);
-    if (!lookupResult.isValid() || lookupResult.isOverloaded())
-        return nullptr;
-    if (auto typeAlias = lookupResult.item.declRef.as<TypeDefDecl>())
-        return as<Type>(getNamedType(context->astBuilder, typeAlias)->resolve());
-    if (auto typeDecl = lookupResult.item.declRef.as<AggTypeDecl>())
-        return DeclRefType::create(context->astBuilder, typeDecl);
-    return nullptr;
-}
-
 static StructuralRayTracingHitContextInfo _getStructuralRayTracingHitContextInfo(
     IRGenContext* context,
     SubtypeWitness* groupWitness)
@@ -1122,9 +1045,10 @@ static StructuralRayTracingHitContextInfo _getStructuralRayTracingHitContextInfo
         context->astBuilder,
         contextWitness,
         StructuralRayTracingAssociatedTypeKind::HitPrimitive);
-    result.hitAttributesType = _getStructuralRayTracingConcreteAssociatedType(
-        context,
+    result.hitAttributesType = registry.resolveConcreteAssociatedType(
+        context->astBuilder,
         result.primitiveType,
+        nullptr,
         StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
     SLANG_ASSERT(result.primitiveType && result.hitAttributesType);
     result.hitAttributesKind = registry.getHitAttributesKind(result.primitiveType);
@@ -1224,13 +1148,11 @@ static StructuralRayTracingStageReference _lowerStructuralRayTracingStageReferen
     auto builder = context->irBuilder;
     StructuralRayTracingStageReference result = {builder->getVoidType(), builder->getVoidValue()};
     auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
-    auto stageType =
-        _getStructuralRayTracingConcreteAssociatedType(context, groupType, associatedTypeKind);
-    if (!stageType)
-    {
-        stageType =
-            registry.resolveAssociatedType(context->astBuilder, groupWitness, associatedTypeKind);
-    }
+    auto stageType = registry.resolveConcreteAssociatedType(
+        context->astBuilder,
+        groupType,
+        groupWitness,
+        associatedTypeKind);
     SLANG_ASSERT(stageType);
     if (registry.isStagePlaceholder(stageKind, stageType))
         return result;
