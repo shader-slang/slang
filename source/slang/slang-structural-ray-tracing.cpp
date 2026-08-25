@@ -732,4 +732,41 @@ bool StructuralRayTracingDeclRegistry::registerAPIUse(
     return true;
 }
 
+void StructuralRayTracingDeclRegistry::registerFunctionCall(
+    FunctionDeclBase* caller,
+    FunctionDeclBase* callee)
+{
+    if (!caller || !callee || !isInitialized())
+        return;
+
+    m_functionCallees.getOrAddValue(caller, HashSet<FunctionDeclBase*>()).add(callee);
+    if (isTraceMethod(callee))
+        m_structuralTraceCallers.add(caller);
+}
+
+bool StructuralRayTracingDeclRegistry::functionReachesStructuralTrace(
+    FunctionDeclBase* function) const
+{
+    if (!function)
+        return false;
+
+    HashSet<FunctionDeclBase*> visited;
+    List<FunctionDeclBase*> workList;
+    workList.add(function);
+    for (Index i = 0; i < workList.getCount(); ++i)
+    {
+        auto current = workList[i];
+        if (!visited.add(current))
+            continue;
+        if (m_structuralTraceCallers.contains(current))
+            return true;
+        if (auto callees = m_functionCallees.tryGetValue(current))
+        {
+            for (auto callee : *callees)
+                workList.add(callee);
+        }
+    }
+    return false;
+}
+
 } // namespace Slang

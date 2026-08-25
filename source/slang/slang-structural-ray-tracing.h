@@ -171,6 +171,8 @@ public:
         RayTracingAPIFamily family,
         Decl* decl,
         Decl** outOtherDecl);
+    void registerFunctionCall(FunctionDeclBase* caller, FunctionDeclBase* callee);
+    bool functionReachesStructuralTrace(FunctionDeclBase* function) const;
 
 private:
     InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
@@ -190,6 +192,8 @@ private:
     AggTypeDecl* m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
+    Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
+    HashSet<FunctionDeclBase*> m_structuralTraceCallers;
 };
 
 const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind);
