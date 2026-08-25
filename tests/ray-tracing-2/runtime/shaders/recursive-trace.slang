@@ -14,9 +14,14 @@
 // SPIRV-COUNT-2: OpTraceRayKHR
 // SPIRV_CLOSEST: OpEntryPoint ClosestHitKHR {{.*}} "main"
 // SPIRV_CLOSEST: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
-// METAL-COUNT-2: .intersect(
-// METAL-DAG: {{\[\[visible\]\]}} void RuntimeClosestHit
-// METAL-DAG: {{\[\[visible\]\]}} void RuntimeMiss
+// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*, uchar thread*)> closestHitFunctions_0;
+// METAL: .intersect(
+// METAL: (thread uchar*)kernelContext
+// METAL: .intersect(
+// METAL: (thread uchar*)&kernelContext
+// METAL: {{\[\[visible\]\]}} void RuntimeMiss
+// METAL: {{\[\[visible\]\]}} void RuntimeClosestHit
+// METAL-SAME: uchar thread* kernelContext_
 
 import slang.raytracing;
 

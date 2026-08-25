@@ -477,6 +477,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         m_writer->emit(")");
         m_writer->emit(", ");
         emitOperand(callShader->getRecords(), getInfo(EmitOp::General));
+        if (cast<IRBoolLit>(callShader->getHasGlobalContext())->getValue())
+        {
+            m_writer->emit(", (thread uchar*)");
+            emitOperand(callShader->getGlobalContext(), getInfo(EmitOp::General));
+        }
         m_writer->emit(");\n");
         return true;
     }
@@ -627,6 +632,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 emitOperand(trace->getDescriptorResources(), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
+            if (cast<IRBoolLit>(trace->getMissHasGlobalContext())->getValue())
+            {
+                m_writer->emit(", (thread uchar*)");
+                emitOperand(trace->getGlobalContext(), getInfo(EmitOp::General));
+            }
             m_writer->emit(");\n");
         }
         m_writer->dedent();
@@ -771,6 +781,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit("(constant uint*)(");
                 emitOperand(trace->getDescriptorResources(), getInfo(EmitOp::General));
                 m_writer->emit(")");
+            }
+            if (cast<IRBoolLit>(trace->getClosestHitHasGlobalContext())->getValue())
+            {
+                m_writer->emit(", (thread uchar*)");
+                emitOperand(trace->getGlobalContext(), getInfo(EmitOp::General));
             }
             m_writer->emit(");\n");
             m_writer->dedent();
