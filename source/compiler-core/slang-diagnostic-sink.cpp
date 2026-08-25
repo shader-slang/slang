@@ -433,12 +433,6 @@ static void _tokenLengthNoteDiagnostic(
     }
 }
 
-// Alias of SourceManager::kMaxMacroExpansionDepth so the loop bound reads as a named constant.
-// The same limit is used by findSourceViewThroughExpansion; a chain that terminates there also
-// terminates here without further notes. The cap makes loop termination unconditional under
-// adversarial or malformed input; well-formed programs never reach it.
-static constexpr int kMaxMacroExpansionDiagnosticDepth = SourceManager::kMaxMacroExpansionDepth;
-
 /// Build the sequence of "expanded from macro 'X'" and "see token-paste location" notes
 /// that appear below the primary diagnostic message, and append them to `notes`.
 ///
@@ -461,7 +455,7 @@ static void appendMacroExpansionNotes(
     SLANG_ASSERT(primaryLoc.isValid());
 
     SourceLoc currentLoc = primaryLoc;
-    for (int depth = 0; depth < kMaxMacroExpansionDiagnosticDepth; ++depth)
+    for (int depth = 0; depth < SourceManager::kMaxMacroExpansionDepth; ++depth)
     {
         if (const auto* entry = sm->findMacroExpansion(currentLoc))
         {

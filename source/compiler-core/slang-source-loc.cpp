@@ -1084,12 +1084,6 @@ void SourceManager::addSourceFileIfNotExist(const String& uniqueIdentity, Source
     m_sourceFileMap.addIfNotExists(uniqueIdentity, sourceFile);
 }
 
-// Cap on the expansion-unmap chain depth in findSourceViewThroughExpansion (see
-// kMaxMacroExpansionDepth in slang-source-loc.h). The same limit is used by the diagnostic note
-// builders so a chain that terminates here also terminates there. The cap makes loop termination
-// unconditional under adversarial or malformed input; well-formed programs will never reach it.
-static constexpr int kMaxMacroExpansionUnmapDepth = SourceManager::kMaxMacroExpansionDepth;
-
 SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
 {
     // Problem: when a SourceLoc lives in a per-invocation expansion range (allocated by
@@ -1119,7 +1113,7 @@ SourceView* SourceManager::findSourceViewThroughExpansion(SourceLoc& loc) const
     // pass's definition-file lookup), so we expose it as a distinct call that callers opt into
     // explicitly.
     SourceView* view = findSourceViewRecursively(loc);
-    for (int depth = 0; depth < kMaxMacroExpansionUnmapDepth && !view; ++depth)
+    for (int depth = 0; depth < kMaxMacroExpansionDepth && !view; ++depth)
     {
         const MacroExpansionEntry* entry = findMacroExpansion(loc);
         if (!entry)
