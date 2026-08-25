@@ -461,6 +461,16 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         emitOperand(callShader->getCallableIndex(), getInfo(EmitOp::General));
         m_writer->emit("](");
         emitOperand(callShader->getData(), getInfo(EmitOp::General));
+        if (cast<IRBoolLit>(callShader->getHasDispatchRaysIndex())->getValue())
+        {
+            m_writer->emit(", ");
+            emitOperand(callShader->getDispatchRaysIndex(), getInfo(EmitOp::General));
+        }
+        if (cast<IRBoolLit>(callShader->getHasDispatchRaysDimensions())->getValue())
+        {
+            m_writer->emit(", ");
+            emitOperand(callShader->getDispatchRaysDimensions(), getInfo(EmitOp::General));
+        }
         m_writer->emit(", ");
         m_writer->emit("(constant uint*)(");
         emitOperand(callShader->getDescriptorResources(), getInfo(EmitOp::General));
