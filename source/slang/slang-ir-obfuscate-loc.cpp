@@ -143,7 +143,12 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                 // against the still-unmapped expansion-range loc, as the code used to do, left
                 // definitionLoc pointing at an unresolvable loc for exactly this case, and the
                 // source-map loop's SLANG_ASSERT(curView) would fire on it.
-                bool viewChanged = false;
+                // Tracks whether the lookup below actually switched sourceView to a new file
+                // (as opposed to reusing the cached one from a prior loc that fell in the same
+                // range). The view's path name only needs to be folded into the hash once per
+                // file, not once per loc -- it's constant within a view -- so the nameHash
+                // combine below is gated on this flag rather than running unconditionally.
+                bool enteredNewSourceView = false;
                 if (sourceView == nullptr || !sourceView->getRange().contains(definitionLoc))
                 {
                     sourceView = sourceManager->findSourceViewRecursively(definitionLoc);
@@ -171,7 +176,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                             continue;
                         }
                     }
-                    viewChanged = true;
+                    enteredNewSourceView = true;
                 }
 
                 // Ignore any core module locs in the hash. definitionLoc is already resolved to
@@ -183,7 +188,7 @@ SlangResult obfuscateModuleLocs(IRModule* module, SourceManager* sourceManager)
                     continue;
                 }
 
-                if (viewChanged)
+                if (enteredNewSourceView)
                 {
                     const auto pathInfo = sourceView->getViewPathInfo();
                     const auto name = pathInfo.getName();
