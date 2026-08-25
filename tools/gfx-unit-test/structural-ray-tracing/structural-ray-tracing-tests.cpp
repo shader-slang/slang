@@ -22,4 +22,20 @@ SLANG_UNIT_TEST(structuralRayTracingTriangleHitMissVulkan)
     runTriangleHitMiss(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runProceduralHitFilter(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingProceduralHitFilter(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingProceduralHitFilterD3D12)
+{
+    runProceduralHitFilter(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingProceduralHitFilterVulkan)
+{
+    runProceduralHitFilter(unitTestContext, DeviceType::Vulkan);
+}
+
 } // namespace gfx_test
