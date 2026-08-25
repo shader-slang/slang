@@ -1021,6 +1021,17 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest))
+    {
+        SLANG_PASS(preparePortableStructuralRayTracingEntryPoints, irEntryPoints);
+        outLinkedIR.entryPoints = irEntryPoints;
+    }
+    else if (isMetalTarget(targetRequest))
+    {
+        SLANG_PASS(prepareMetalStructuralRayTracingEntryPoints, irEntryPoints);
+        outLinkedIR.entryPoints = irEntryPoints;
+    }
+
     // Create the post-emit metadata object up-front so that IR passes
     // that need to record reportable data (e.g. `instrumentCoverage`'s
     // source-entry mapping) can write into it directly. `collectMetadata`
@@ -1437,7 +1448,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
         outLinkedIR.entryPoints = irEntryPoints;
     }
-    else if (requiredLoweringPassSet.structuralRayTracingTrace && target == CodeGenTarget::Metal)
+    else if (target == CodeGenTarget::Metal)
     {
         SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints, targetRequest, sink);
     }

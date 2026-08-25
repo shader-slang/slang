@@ -2655,8 +2655,8 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
 
         auto entryPoint =
             EntryPoint::create(linkage, structuralEntryPointDeclRef, entryPointProfile);
+        entryPoint->setNameOverride(entryPointName);
         entryPoint->setStructuralRayTracingInfo(structuralInfo);
-        validateEntryPoint(entryPoint, sink);
         return sink->getErrorCount() ? nullptr : entryPoint;
     }
 
