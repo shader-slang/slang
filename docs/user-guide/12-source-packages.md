@@ -1,3 +1,8 @@
+---
+layout: user-guide
+permalink: /user-guide/source-packages
+---
+
 Slang Source Packages
 =====================
 
@@ -20,6 +25,10 @@ docs/
 `src/` contains importable Slang modules. `tests/` and `docs/` are reserved for package tests and
 documentation. The initial package tool creates these directories but does not run tests or build
 documentation.
+
+How to name those modules, write `import` and `__include`, and keep implementation files from
+colliding across packages is described in
+[Writing Module Files, Import, and Include](module-files).
 
 The manifest declares the package and its source dependencies:
 
@@ -80,7 +89,9 @@ Each `.slang` file that is not below a module's companion directory is a primary
 first declaration must be `module NAME;`, where `NAME` matches the filename. Namespace directories
 do not form part of the declaration. For example, `src/acme/noise.slang` declares `module noise;`.
 Every `.slang` file below `src/acme/noise/` belongs to that module and must instead begin with
-`implementing noise;`.
+`implementing noise;`. From the primary, `__include` those files with a path relative to the
+primary (for example `__include "noise/hash";`), as shown in
+[Writing Module Files, Import, and Include](module-files).
 
 ## Creating and editing packages
 
