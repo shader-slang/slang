@@ -26,6 +26,12 @@ SLANG_UNIT_TEST(unclosableSharedLibrary)
     SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("C:\\slang\\bin\\slang-llvm.dll")));
     SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("/opt/slang/bin/libslang-llvm.so")));
 
+    // The separately built LLVM 14 NVVM writer deliberately shares the slang-llvm prefix so that
+    // its statically linked LLVM runtime remains resident under the same lifetime rule.
+    SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("slang-llvm-nvvm.dll")));
+    SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("libslang-llvm-nvvm.so")));
+    SLANG_CHECK(SharedLibrary::isUnclosable(toSlice("libslang-llvm-nvvm.dylib")));
+
 #if SLANG_WINDOWS_FAMILY
     // Windows file names are case-insensitive, so these name the same file as `slang-llvm.dll`
     // and must be recognized as well. The POSIX platforms treat them as different files, so the

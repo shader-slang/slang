@@ -19,11 +19,12 @@ The first implementation uses these boundaries:
 
 - CUDA Toolkit 12.0 or newer;
 - NVVM IR 2.0;
-- the legacy LLVM 7.0.1 typed-pointer dialect, which has the broadest architecture reach;
+- the legacy typed-pointer NVVM IR dialect specified against LLVM 7.0.1, which has the broadest
+  architecture reach;
 - 64-bit NVPTX only, using the `nvptx64-nvidia-cuda` target triple;
 - compute kernels first;
 - textual NVVM IR only for bootstrap tests and diagnostics;
-- a validated LLVM-7-compatible bitcode path as a production-readiness gate;
+- a validated LLVM 14 typed-pointer bitcode-writer path as a production-readiness gate;
 - an opt-in direct backend, with NVRTC remaining the default; and
 - local validation on the current development machine until a CUDA/toolkit CI matrix is defined.
 
@@ -278,13 +279,12 @@ The existing `slang-llvm` module is not the producer for the pre-Blackwell backe
 configuration does not request NVPTX or expose BitWriter/bitcode output. Adding only a
 `generateBitcode` method would still leave the wrong dialect and an insufficient builder API.
 
-The selected next implementation direction is therefore a separate optional NVVM builder module
-pinned to LLVM 14, the newest release in NVIDIA's documented LLVM 7-14 sample range and the version
-exercised by the accepted fixture. It may reuse version-neutral concepts from `ILLVMBuilder`, but it
-must own typed pointer/address-space construction, NVVM metadata, and bitcode serialization
-independently from the LLVM 21 CPU module. Only the resulting bitcode artifact crosses into
-compiler-core. This is a candidate production boundary, not a production-ready component; its
-packaging, ABI, and nontrivial IR coverage remain to be proven.
+Slice 3a implements that direction as a separate optional NVVM builder module pinned to LLVM 14,
+the newest release in NVIDIA's documented LLVM 7-14 sample range and the version exercised by the
+accepted fixture. It owns typed-pointer construction, NVVM metadata, and bitcode serialization
+independently from the LLVM 21 CPU module. Only the resulting bytes cross into compiler-core. This
+is a candidate production boundary, not a production-ready component; its packaging, CI matrix,
+and nontrivial IR coverage remain to be proven.
 
 Coexistence of the two LLVM versions is a hard module invariant. LLVM 14 must be configured and
 built separately from LLVM 21, statically link only the LLVM components needed by the NVVM writer,
@@ -292,6 +292,44 @@ hide or exclude raw LLVM symbols, and export only a versioned Slang ABI. The opt
 not introduce a process-visible dynamic `libLLVM` dependency that can collide with `slang-llvm` or
 other LLVM users. The first builder slice must validate those properties before adding broad IR
 lowering.
+
+### Slice 3a builder boundary
+
+`source/slang-llvm-nvvm` is an independent CMake project rather than a subdirectory of Slang's
+normal configure. It requires exactly LLVM 14.0.6 through `SLANG_NVVM_LLVM_DIR`, rejects LLVM built
+with C++ exceptions, rejects linking the shared LLVM dylib, and requires the selected Core,
+BitWriter, and Support targets to be static libraries. This keeps LLVM 14 and the normal LLVM 21
+`slang-llvm` package out of the same CMake target namespace.
+
+The module exports one symbol, `slang_getNVVMBuilderAPI_V1`. That getter returns a size- and
+version-checked function table from an LLVM-free header that compiles as C and C++. The ABI uses
+fixed-width version/result/classification fields, native-size counts, opaque
+module/type/value/block handles, pointer-plus-count strings, and caller-owned serialization
+storage. No LLVM type, C++ object, allocator-owned buffer, or exception crosses the DLL boundary.
+Handles must be live and originate from the module supplied to the call; destroying a module
+invalidates all subordinate handles.
+
+Version 1 deliberately contains only general operations needed to build the first structural
+proof: create a module, obtain `void`, form a function type, declare a function, append/select a
+block, emit `ret void`, add the NVVM kernel annotation, and serialize assembly or bitcode. Module
+creation fixes the 64-bit NVPTX triple/data layout and NVVM IR 2.0 metadata. Serialization runs
+LLVM's verifier first and uses a size-query/write protocol so insufficient storage is reported
+without partially modifying the caller's buffer.
+
+The host-side `NVVMIRBuilder` retains the loaded library, validates the exact LLVM 14.0.6/NVVM 2.0
+typed-pointer contract, rejects successful calls that omit required handles, and copies serialized
+bytes into a host-owned blob. It does not register another downstream compiler: generated bitcode
+is wrapped as `ObjectCode + LLVMIR + Kernel` and passed to the existing
+`NVVMDownstreamCompiler`. Focused tests look for the optional module beside the test executable or
+in the directory named by `SLANG_NVVM_BUILDER_PATH`; an explicit but broken directory is a failure,
+not a skip.
+
+The local Windows proof uses upstream tag `llvmorg-14.0.6` at commit
+`f28c006a5895fc0e329fe15fead81e37457cb1d1`. The resulting Release module has only the versioned
+getter in its PE export table and no LLVM DLL dependency. In one test process, the normal LLVM 21.1
+module is loaded first, the LLVM 14 module constructs caller-named empty kernels, CUDA 12.2 libNVVM
+compiles their bitcode to PTX, and CUDA 12.2 `ptxas -arch=sm_75` accepts that PTX. The reverse
+fresh-process load order and non-Windows binary inspection remain later CI/packaging work.
 
 Modern-dialect support is a later route selected from the target architecture and the optional
 `nvvmLLVMVersion` query. It is not a prerequisite for legacy-dialect compute support.

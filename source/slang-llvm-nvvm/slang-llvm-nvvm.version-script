@@ -1,0 +1,8 @@
+# Export only the versioned Slang ABI. In particular, no LLVM archive symbol may become globally
+# visible when this module is loaded beside a different LLVM version.
+{
+    global:
+        slang_getNVVMBuilderAPI_V1;
+    local:
+        *;
+};

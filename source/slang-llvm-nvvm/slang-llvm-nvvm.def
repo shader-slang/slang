@@ -1,0 +1,4 @@
+LIBRARY slang-llvm-nvvm
+
+EXPORTS
+    slang_getNVVMBuilderAPI_V1
