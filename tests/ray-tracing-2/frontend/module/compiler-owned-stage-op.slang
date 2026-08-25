@@ -36,6 +36,14 @@ __intrinsic_op(structuralRayTracingTrace) void fakeStructuralTrace();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingTrace' is reserved for compiler use
 
+__intrinsic_op(structuralRayTracingCallShader) void fakeStructuralCallableDispatch();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingCallShader' is reserved for compiler use
+
+__intrinsic_op(metalStructuralRayTracingCallShader) void fakeMetalCallableDispatch();
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
+//CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'metalStructuralRayTracingCallShader' is reserved for compiler use
+
 __intrinsic_op(structuralRayTracingHitGroupInfo) void fakeHitGroupInfo();
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ compiler-owned intrinsic operation
 //CHECK:       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ intrinsic operation 'structuralRayTracingHitGroupInfo' is reserved for compiler use

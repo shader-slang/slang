@@ -4300,7 +4300,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
             getLinkage()->getStructuralRayTracingDeclRegistry().registerFunctionCall(
                 m_parentFunc,
-                funcDeclBase);
+                funcDeclBase,
+                invoke->functionExpr->loc);
 
             if (funcDeclBase && diagnoseDirectStructuralRayTracingStageInvoke(invoke, funcDeclBase))
             {

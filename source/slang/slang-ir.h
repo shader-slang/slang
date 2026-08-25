@@ -2275,7 +2275,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 31;
-    const static UInt k_maxSupportedModuleVersion = 48;
+    const static UInt k_maxSupportedModuleVersion = 49;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
     /// Returns whether `version` is in the inclusive range this compiler can load.
