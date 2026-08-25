@@ -3,6 +3,7 @@
 
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
+#include "slang-intrinsic-expand.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
@@ -675,8 +676,8 @@ void CUDASourceEmitter::emitIntrinsicCallExprImpl(
 
 // The subset of PTX `sured` surface-reduction operations Slang can lower to.
 // Only the ops that ptxas accepts as a `sured.b.<op>` are listed; the mnemonic
-// doubles as the C++ helper suffix (`__slang_surface_reduce_<op>`) and the PTX
-// op token, so it must match `prelude/slang-cuda-prelude.h` exactly.
+// forms the `<op>` part of the C++ helper name (`__slang_surface_reduce_<op>_<ctype>`)
+// and the PTX op token, so it must match `prelude/slang-cuda-prelude.h` exactly.
 enum class CUDASurfaceReduceOp
 {
     Add,
@@ -697,7 +698,6 @@ struct CUDATextureAtomicClass
 
     // Populated only when `supported` is true:
     CUDASurfaceReduceOp op = CUDASurfaceReduceOp::Add;
-    IRImageSubscript* imageSubscript = nullptr;
     IRInst* value = nullptr;
     UnownedStringSlice ctype;      // PTX channel-type token: u32/s32/u64/s64/b32.
     Int geomDimensions = 0;        // 1, 2, or 3.
@@ -836,8 +836,14 @@ static CUDATextureAtomicClass classifyTextureAtomicForCuda(
         channelType = vecType->getElementType();
     }
 
-    // A component GEP is only valid as a single constant index into a vector
-    // texel; any deeper or non-constant chain would make the byte offset wrong.
+    // A vector-texel component access is supported only as a single
+    // *compile-time-constant* index into the vector, because the channel byte
+    // offset it folds into the x coordinate must be a constant. A dynamic
+    // component index (`rwTexture[coord][dynamicComp]`) is deliberately left
+    // unsupported (E41405) here even though SPIR-V can express it; supporting a
+    // runtime component offset is a possible future extension, but for now the
+    // conservative narrowing keeps the byte math provably correct. Any deeper
+    // chain would also make the offset wrong.
     Int componentIndex = 0;
     if (accessChain.getCount() > 1)
         return result;
@@ -847,7 +853,7 @@ static CUDATextureAtomicClass classifyTextureAtomicForCuda(
             return result; // Component index into a non-vector texel.
         auto indexLit = as<IRIntLit>(accessChain[0]);
         if (!indexLit)
-            return result; // Non-constant component index.
+            return result; // Non-constant (dynamic) component index.
         componentIndex = (Int)getIntVal(indexLit);
         if (componentIndex < 0 || componentIndex >= channelCount)
             return result;
@@ -875,29 +881,49 @@ static CUDATextureAtomicClass classifyTextureAtomicForCuda(
     if (!channelMatchesValue)
         return result;
 
-    // The x coordinate is byte-addressed, so we need the backing-element size.
-    // Prefer an explicit format decoration; fall back to the element type only
-    // when it unambiguously matches (no format conversion).
+    // The x coordinate is byte-addressed, so we need the backing-element size,
+    // which comes from the texture's true backing format. Prefer an explicit
+    // format decoration; fall back to the element type only when it unambiguously
+    // matches (no format conversion).
+    //
+    // Known limitation (shared with the CUDA `surf2Dread`/`surf2Dwrite` paths):
+    // `findImageFormatDecoration` can only recover the format from the resource's
+    // own inst or a load of a global-parameter field. When the resource reaches
+    // this atomic through *indirection* — a function parameter, a call result, or
+    // a resource-array element — the concrete resource's `[format(...)]` is not
+    // recoverable here (CUDA does not specialize formatted resource parameters),
+    // so we fall back to the element-type stride. That is correct whenever the
+    // backing format is consistent with the element type (the common case,
+    // including the compiler-supplied default format), and wrong only for a
+    // *contradictory* declaration whose format has a different representation than
+    // the element type — a different byte width and/or scalar type (e.g.
+    // `[format("r32ui")] RWTexture2D<uint64_t>`) — accessed through indirection.
+    // The surface read/write paths mis-stride that same declaration identically;
+    // the real fix is producer-side format recovery across indirection, tracked in
+    // issue #12737. This layer catches the case it *can* prove — a directly
+    // recoverable format that is incompatible with the element type — in the `if`
+    // branch below.
     Int64 byteXStride = 0;
-    if (auto formatDecoration = imageSubscript->getImage()->findDecoration<IRFormatDecoration>())
+    if (auto formatDecoration = findImageFormatDecoration(imageSubscript->getImage()))
     {
-        const auto& info = getImageFormatInfo(formatDecoration->getFormat());
-        // A format whose channel count or per-channel size disagrees with the
-        // texel element type means a conversion/packing the byte math would get
-        // wrong; only accept a format that is exactly `channelCount` channels of
-        // `channelBytes` each.
-        if ((Int)info.channelCount != channelCount ||
-            (Int)info.sizeInBytes != channelCount * channelBytes)
-        {
+        // The texel element type is what we byte-address against, so the backing
+        // format must have the *same representation* — same channel count and
+        // scalar base type. A converting/packing format (e.g. `r32f` accessed as
+        // `uint`, or `rgba8ui` accessed as `uint4`) has a different byte layout
+        // than the element type implies, so the offsets we compute would be
+        // wrong; those cases go to E41405 instead of a `sured`.
+        // `findImageFormatDecoration` also recovers the decoration from the
+        // struct field when the resource lives in a global-parameter block.
+        const auto format = formatDecoration->getFormat();
+        if (!isImageFormatCompatible(format, texType->getElementType()))
             return result;
-        }
-        byteXStride = info.sizeInBytes;
+        byteXStride = getImageFormatInfo(format).sizeInBytes;
     }
     else
     {
-        // No explicit format: assume the backing format matches the element
+        // No recoverable format: assume the backing format matches the element
         // type used for access (the same assumption `_calcBackingElementSizeInBytes`
-        // makes for surface reads/writes).
+        // makes for surface reads/writes). See the known-limitation note above.
         byteXStride = channelCount * channelBytes;
     }
 
@@ -924,7 +950,6 @@ static CUDATextureAtomicClass classifyTextureAtomicForCuda(
 
     result.supported = true;
     result.op = op;
-    result.imageSubscript = imageSubscript;
     result.value = value;
     result.ctype = ctype;
     result.geomDimensions = geom;
@@ -993,14 +1018,11 @@ bool CUDASourceEmitter::tryEmitTextureAtomic(IRInst* inst)
             .location = loc});
     };
 
-    // A sample coordinate means a multisampled texture, which `sured` cannot
-    // address.
-    if (imageSubscript->hasSampleCoord())
-    {
-        diagnoseUnsupported();
-        return true;
-    }
-
+    // A multisampled texture atomic is diagnosed earlier by
+    // `checkUnsupportedTextureAtomic` (the multisample resource type is not
+    // representable here, so it must be caught before type emission); the
+    // classifier below rejects it too via `_getCUDASuredGeomDimensions`, so it is
+    // never emitted regardless.
     CUDATextureAtomicClass info = classifyTextureAtomicForCuda(atomic, imageSubscript, accessChain);
     if (!info.supported)
     {
@@ -1008,7 +1030,10 @@ bool CUDASourceEmitter::tryEmitTextureAtomic(IRInst* inst)
         return true;
     }
 
-    // Emit `__slang_surface_reduce_<op>(surfObj, byteX[, y[, z]], value);`.
+    // The prelude helper is named `__slang_surface_reduce_<op>_<ctype>` (a
+    // distinct name per channel type rather than an overload set) so that an
+    // `unsigned long long` literal cannot become an ambiguous 64-bit overload;
+    // see the note in `prelude/slang-cuda-prelude.h`.
     m_writer->emit("__slang_surface_reduce_");
     switch (info.op)
     {
@@ -1028,6 +1053,8 @@ bool CUDASourceEmitter::tryEmitTextureAtomic(IRInst* inst)
         m_writer->emit("or");
         break;
     }
+    m_writer->emit("_");
+    m_writer->emit(info.ctype);
     m_writer->emit("(");
     emitOperand(imageSubscript->getImage(), getInfo(EmitOp::General));
     m_writer->emit(", ");

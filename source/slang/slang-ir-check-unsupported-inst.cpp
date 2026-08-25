@@ -119,6 +119,51 @@ static bool funcTypeReferencesStringType(IRFuncType* funcType)
     return false;
 }
 
+// True if `target` emits CUDA/PTX. A texture-texel atomic on a *multisampled*
+// texture has no lowering there: `sured` has no multisample geometry, and a CUDA
+// multisample surface/texture type is not even representable in the emitter
+// (`_calcCUDATextureTypeName` fails on it), so the operation must be diagnosed
+// before emission rather than aborting when the resource type is emitted.
+static bool isCUDASourceTarget(TargetRequest* target)
+{
+    switch (target->getTarget())
+    {
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+    case CodeGenTarget::PTX:
+        return true;
+    default:
+        return false;
+    }
+}
+
+// True when `inst` is an atomic whose destination is a texel of a multisampled
+// texture, e.g. `InterlockedAdd(msTex[coord, sampleIndex], value)`. The
+// destination pointer roots at an `IRImageSubscript` (possibly through a
+// component GEP) whose image has a multisample texture type. This is the one
+// texel-atomic shape the CUDA emitter cannot even name the resource type for, so
+// it is caught here rather than at the `sured` classifier.
+static bool isMultisampleTextureAtomic(IRInst* inst)
+{
+    auto atomic = as<IRAtomicOperation>(inst);
+    if (!atomic)
+        return false;
+
+    List<IRInst*> accessChain;
+    auto imageSubscript = as<IRImageSubscript>(getRootAddr(atomic->getPtr(), accessChain));
+    if (!imageSubscript)
+        return false;
+
+    auto imageType = imageSubscript->getImage()->getDataType();
+    auto texType = as<IRTextureTypeBase>(imageType);
+    if (!texType)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(imageType))
+            texType = as<IRTextureTypeBase>(ptrType->getValueType());
+    }
+    return texType && texType->isMultisample();
+}
+
 // True if `inst` produces or consumes a `String` value that requires the (host-
 // only) `String` runtime. This is either an inst whose result type is `String`
 // (e.g. `MakeString`, or reading a `String` local), or a call to a function
@@ -261,6 +306,41 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
             }
         default:
             break;
+        }
+    }
+}
+
+void checkUnsupportedTextureAtomic(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
+{
+    // A multisampled-texture texel atomic on CUDA/PTX must be diagnosed here.
+    // Unlike the other unsupported texel-atomic shapes (result-returning, `xor`,
+    // array), which the CUDA emitter's `sured` classifier turns into `E41405` at
+    // its emit point, the multisample resource type itself is not representable
+    // in the CUDA emitter (`_calcCUDATextureTypeName` fails on it), so the abort
+    // happens when the resource type is emitted — before the emit-point check
+    // runs. This check therefore runs unconditionally (it is not part of the
+    // optimization-gated `checkUnsupportedInst`, since the abort also happens
+    // under `-minimum-slang-optimization`).
+    if (!isCUDASourceTarget(target))
+        return;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (isMultisampleTextureAtomic(inst))
+                {
+                    auto loc = inst->sourceLoc.isValid() ? inst->sourceLoc : findFirstUseLoc(inst);
+                    sink->diagnose(Diagnostics::AtomicOnTextureNotSupportedOnTarget{
+                        .target = target->getTarget(),
+                        .location = loc});
+                }
+            }
         }
     }
 }

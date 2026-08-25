@@ -9,7 +9,17 @@
 //   * the read-modify-write overload that returns the previous value — `sured`
 //     has no result register, so the prior value is unobservable;
 //   * `InterlockedXor` — ptxas has no `sured.xor` form;
-//   * an atomic on an array texture — `sured` has no array geometry.
+//   * an atomic on an array texture — `sured` has no array geometry;
+//   * a texture whose *directly recoverable* `[format(...)]` is incompatible with
+//     the element type (a different byte width / scalar type), because the byte
+//     stride we would compute from the element type would not match the true
+//     backing layout.
+//
+// The multisampled-texture case is diagnosed by a *different*, earlier path
+// (`checkUnsupportedTextureAtomic`, which runs before emission because the CUDA
+// emitter cannot even name a multisample resource type) and would short-circuit
+// the compile before the emit-point diagnostics here fire, so it lives in its
+// own file: `cuda-texture-atomic-multisample-unsupported.slang`.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cuda -entry computeMain -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target ptx -entry computeMain -stage compute
@@ -20,6 +30,13 @@
 
 RWTexture2D<uint> tex;
 RWTexture2DArray<uint> texArray;
+
+// A directly-declared texture whose format representation contradicts the element
+// type: `r32ui` is a 4-byte channel but the element is 8-byte `uint64_t`. The
+// format is recoverable here (the resource is used directly), so the incompatible
+// representation is caught and diagnosed rather than emitting a wrong byte stride.
+[format("r32ui")]
+RWTexture2D<uint64_t> texBadFormat;
 
 // A supported destination on CUDA — must NOT trigger E41405. Its presence proves
 // the diagnostic keys on the unsupported texel-atomic *shape*, not on
@@ -48,5 +65,11 @@ void computeMain()
 
     // Array textures have no `sured` geometry.
     InterlockedAdd(texArray[uint3(0, 0, 0)], 4u);
+    //CHECK:      ^ E41405
+
+    // Directly recoverable format incompatible with the element type (r32ui vs
+    // uint64_t): the byte stride is unprovable, so this is diagnosed rather than
+    // emitting a wrong offset.
+    InterlockedAdd(texBadFormat[uint2(3, 3)], 5ull);
     //CHECK:      ^ E41405
 }

@@ -7,6 +7,20 @@
 namespace Slang
 {
 
+struct IRFormatDecoration;
+
+// Recover the `[format(...)]` decoration for a texture/image resource value,
+// looking through the `IRLoad` of an `IRFieldAddress` used to access a resource
+// stored in a global-parameter struct (where the decoration sits on the struct
+// field, not the loaded value). Returns null when no format is declared.
+IRFormatDecoration* findImageFormatDecoration(IRInst* resourceInst);
+
+// Return true when `imageFormat` and `dataType` have the same representation, so
+// that accessing the resource with `dataType` requires no format conversion
+// (matching channel count and the same scalar base type). A packed / narrow /
+// differently-typed format (e.g. `r32f` accessed as `uint`) returns false.
+bool isImageFormatCompatible(ImageFormat imageFormat, IRType* dataType);
+
 /* Handles all the special case handling of expansions of intrinsics. In particular handles the
 expansion of the 'special cases' prefixed with '$' */
 struct IntrinsicExpandContext

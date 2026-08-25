@@ -1850,11 +1850,20 @@ SLANG_SURF3DWRITE_CONVERT_IMPL(int, "r")
 // PTX ISA "Surface Instructions: sured".
 //
 // Only the (op, channel-type) combinations that ptxas actually accepts on
-// sm_50+ are provided (verified on ptxas 12.6 / sm_89):
+// sm_50+ are provided:
 //   add       : u32, u64
 //   min / max : u32, s32, u64, s64
 //   and / or  : b32          (64-bit bitwise `sured` is rejected by ptxas)
 // `xor` has no native `sured` form and is diagnosed in the emitter instead.
+//
+// Each helper is named `__slang_surface_reduce_<op>_<ctype>` (e.g.
+// `__slang_surface_reduce_add_u64`) rather than being an overload set keyed on
+// the value type. This is deliberate: the emitter renders a 64-bit literal as
+// `unsigned long long`, which matches neither the `int64_t` nor the `uint64_t`
+// overload exactly and would make an overload set ambiguous under offline
+// `nvcc`. Encoding the channel type in the name removes overload resolution
+// entirely; the emitter appends the same `<ctype>` token it already computed
+// for the PTX suffix, so the C++ name and the PTX opcode stay in lockstep.
 //
 // As with the non-`_convert` `sust`/`suld` paths (see the note at the top of
 // the surface section), the x coordinate is *byte* addressed: the emitter
@@ -1867,90 +1876,97 @@ SLANG_SURF3DWRITE_CONVERT_IMPL(int, "r")
 // 32-bit channel types use an "r" operand constraint; the .ctype token is the
 // PTX suffix (u32/s32/b32). One macro instantiates the 1D/2D/3D forms for a
 // given (op, C++ value type, .ctype token).
-#define SLANG_SURFACE_REDUCE_32_IMPL(op, T, ctype)                                         \
-    __device__ __forceinline__ void __slang_surface_reduce_##op(                           \
-        cudaSurfaceObject_t surfObj,                                                       \
-        int x,                                                                             \
-        T v)                                                                               \
-    {                                                                                      \
-        asm volatile("sured.b." #op ".1d." #ctype "." SLANG_PTX_BOUNDARY_MODE              \
-                     " [%0, {%1}], %2;" ::"l"(surfObj),                                    \
-                     "r"(x),                                                               \
-                     "r"(v)                                                                \
-                     : "memory");                                                          \
-    }                                                                                      \
-    __device__ __forceinline__ void __slang_surface_reduce_##op(                           \
-        cudaSurfaceObject_t surfObj,                                                       \
-        int x,                                                                             \
-        int y,                                                                             \
-        T v)                                                                               \
-    {                                                                                      \
-        asm volatile("sured.b." #op ".2d." #ctype "." SLANG_PTX_BOUNDARY_MODE              \
-                     " [%0, {%1, %2}], %3;" ::"l"(surfObj),                                \
-                     "r"(x),                                                               \
-                     "r"(y),                                                               \
-                     "r"(v)                                                                \
-                     : "memory");                                                          \
-    }                                                                                      \
-    __device__ __forceinline__ void                                                        \
-        __slang_surface_reduce_##op(cudaSurfaceObject_t surfObj, int x, int y, int z, T v) \
-    {                                                                                      \
-        asm volatile("sured.b." #op ".3d." #ctype "." SLANG_PTX_BOUNDARY_MODE              \
-                     " [%0, {%1, %2, %3, %4}], %5;" ::"l"(surfObj),                        \
-                     "r"(x),                                                               \
-                     "r"(y),                                                               \
-                     "r"(z),                                                               \
-                     "r"(0),                                                               \
-                     "r"(v)                                                                \
-                     : "memory");                                                          \
+#define SLANG_SURFACE_REDUCE_32_IMPL(op, T, ctype)                            \
+    __device__ __forceinline__ void __slang_surface_reduce_##op##_##ctype(    \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        T v)                                                                  \
+    {                                                                         \
+        asm volatile("sured.b." #op ".1d." #ctype "." SLANG_PTX_BOUNDARY_MODE \
+                     " [%0, {%1}], %2;" ::"l"(surfObj),                       \
+                     "r"(x),                                                  \
+                     "r"(v)                                                   \
+                     : "memory");                                             \
+    }                                                                         \
+    __device__ __forceinline__ void __slang_surface_reduce_##op##_##ctype(    \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        T v)                                                                  \
+    {                                                                         \
+        asm volatile("sured.b." #op ".2d." #ctype "." SLANG_PTX_BOUNDARY_MODE \
+                     " [%0, {%1, %2}], %3;" ::"l"(surfObj),                   \
+                     "r"(x),                                                  \
+                     "r"(y),                                                  \
+                     "r"(v)                                                   \
+                     : "memory");                                             \
+    }                                                                         \
+    __device__ __forceinline__ void __slang_surface_reduce_##op##_##ctype(    \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int z,                                                                \
+        T v)                                                                  \
+    {                                                                         \
+        asm volatile("sured.b." #op ".3d." #ctype "." SLANG_PTX_BOUNDARY_MODE \
+                     " [%0, {%1, %2, %3, %4}], %5;" ::"l"(surfObj),           \
+                     "r"(x),                                                  \
+                     "r"(y),                                                  \
+                     "r"(z),                                                  \
+                     "r"(0),                                                  \
+                     "r"(v)                                                   \
+                     : "memory");                                             \
     }
 
 // 64-bit channel types use an "l" operand constraint.
-#define SLANG_SURFACE_REDUCE_64_IMPL(op, T, ctype)                                         \
-    __device__ __forceinline__ void __slang_surface_reduce_##op(                           \
-        cudaSurfaceObject_t surfObj,                                                       \
-        int x,                                                                             \
-        T v)                                                                               \
-    {                                                                                      \
-        asm volatile("sured.b." #op ".1d." #ctype "." SLANG_PTX_BOUNDARY_MODE              \
-                     " [%0, {%1}], %2;" ::"l"(surfObj),                                    \
-                     "r"(x),                                                               \
-                     "l"(v)                                                                \
-                     : "memory");                                                          \
-    }                                                                                      \
-    __device__ __forceinline__ void __slang_surface_reduce_##op(                           \
-        cudaSurfaceObject_t surfObj,                                                       \
-        int x,                                                                             \
-        int y,                                                                             \
-        T v)                                                                               \
-    {                                                                                      \
-        asm volatile("sured.b." #op ".2d." #ctype "." SLANG_PTX_BOUNDARY_MODE              \
-                     " [%0, {%1, %2}], %3;" ::"l"(surfObj),                                \
-                     "r"(x),                                                               \
-                     "r"(y),                                                               \
-                     "l"(v)                                                                \
-                     : "memory");                                                          \
-    }                                                                                      \
-    __device__ __forceinline__ void                                                        \
-        __slang_surface_reduce_##op(cudaSurfaceObject_t surfObj, int x, int y, int z, T v) \
-    {                                                                                      \
-        asm volatile("sured.b." #op ".3d." #ctype "." SLANG_PTX_BOUNDARY_MODE              \
-                     " [%0, {%1, %2, %3, %4}], %5;" ::"l"(surfObj),                        \
-                     "r"(x),                                                               \
-                     "r"(y),                                                               \
-                     "r"(z),                                                               \
-                     "r"(0),                                                               \
-                     "l"(v)                                                                \
-                     : "memory");                                                          \
+#define SLANG_SURFACE_REDUCE_64_IMPL(op, T, ctype)                            \
+    __device__ __forceinline__ void __slang_surface_reduce_##op##_##ctype(    \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        T v)                                                                  \
+    {                                                                         \
+        asm volatile("sured.b." #op ".1d." #ctype "." SLANG_PTX_BOUNDARY_MODE \
+                     " [%0, {%1}], %2;" ::"l"(surfObj),                       \
+                     "r"(x),                                                  \
+                     "l"(v)                                                   \
+                     : "memory");                                             \
+    }                                                                         \
+    __device__ __forceinline__ void __slang_surface_reduce_##op##_##ctype(    \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        T v)                                                                  \
+    {                                                                         \
+        asm volatile("sured.b." #op ".2d." #ctype "." SLANG_PTX_BOUNDARY_MODE \
+                     " [%0, {%1, %2}], %3;" ::"l"(surfObj),                   \
+                     "r"(x),                                                  \
+                     "r"(y),                                                  \
+                     "l"(v)                                                   \
+                     : "memory");                                             \
+    }                                                                         \
+    __device__ __forceinline__ void __slang_surface_reduce_##op##_##ctype(    \
+        cudaSurfaceObject_t surfObj,                                          \
+        int x,                                                                \
+        int y,                                                                \
+        int z,                                                                \
+        T v)                                                                  \
+    {                                                                         \
+        asm volatile("sured.b." #op ".3d." #ctype "." SLANG_PTX_BOUNDARY_MODE \
+                     " [%0, {%1, %2, %3, %4}], %5;" ::"l"(surfObj),           \
+                     "r"(x),                                                  \
+                     "r"(y),                                                  \
+                     "r"(z),                                                  \
+                     "r"(0),                                                  \
+                     "l"(v)                                                   \
+                     : "memory");                                             \
     }
 
-// add: unsigned/signed 32/64-bit. `sured.add` is sign-agnostic, so a single
-// u32/u64 form covers both `uint`/`int` and `uint64_t`/`int64_t`; the emitter
-// selects by value width.
+// add: `sured.add` is sign-agnostic, so one u32 form covers `uint`/`int` and
+// one u64 form covers `uint64_t`/`int64_t`; the emitter selects the ctype token
+// by value width, and the signed value converts to the unsigned parameter with
+// the bit pattern preserved.
 SLANG_SURFACE_REDUCE_32_IMPL(add, uint32_t, u32)
-SLANG_SURFACE_REDUCE_32_IMPL(add, int32_t, u32)
 SLANG_SURFACE_REDUCE_64_IMPL(add, uint64_t, u64)
-SLANG_SURFACE_REDUCE_64_IMPL(add, int64_t, u64)
 
 // min/max: signedness matters, so keep distinct u32/s32/u64/s64 forms.
 SLANG_SURFACE_REDUCE_32_IMPL(min, uint32_t, u32)
@@ -1963,11 +1979,10 @@ SLANG_SURFACE_REDUCE_32_IMPL(max, int32_t, s32)
 SLANG_SURFACE_REDUCE_64_IMPL(max, uint64_t, u64)
 SLANG_SURFACE_REDUCE_64_IMPL(max, int64_t, s64)
 
-// and/or: bitwise, 32-bit only (ptxas rejects b64 `sured`).
+// and/or: bitwise, b32 only (ptxas rejects b64 `sured`). One b32 form suffices
+// since the operation is sign-agnostic.
 SLANG_SURFACE_REDUCE_32_IMPL(and, uint32_t, b32)
-SLANG_SURFACE_REDUCE_32_IMPL(and, int32_t, b32)
 SLANG_SURFACE_REDUCE_32_IMPL(or, uint32_t, b32)
-SLANG_SURFACE_REDUCE_32_IMPL(or, int32_t, b32)
 
 // ----------------------------- F16 -----------------------------------------
 #if SLANG_CUDA_ENABLE_HALF
