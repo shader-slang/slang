@@ -1439,7 +1439,7 @@ Result linkAndOptimizeIR(
     }
     else if (requiredLoweringPassSet.structuralRayTracingTrace && target == CodeGenTarget::Metal)
     {
-        SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints, sink);
+        SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints, targetRequest, sink);
     }
 
     if (sink->getErrorCount() != 0)

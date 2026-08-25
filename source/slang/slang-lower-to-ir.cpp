@@ -1388,6 +1388,8 @@ struct StructuralRayTracingProgramLayoutInfo
     Type* programLayoutType = nullptr;
     SubtypeWitness* programLayoutWitness = nullptr;
     Type* traceContextType = nullptr;
+    Type* motionType = nullptr;
+    StructuralRayTracingMotionKind motionKind = StructuralRayTracingMotionKind::Invalid;
     Type* hitGroupsType = nullptr;
     Type* missGroupsType = nullptr;
     Type* callableGroupsType = nullptr;
@@ -1429,6 +1431,15 @@ static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayo
         result.programLayoutType = candidateType;
         result.programLayoutWitness = candidateWitness;
         result.traceContextType = traceContextType;
+        auto traceContextWitness = registry.resolveAssociatedTypeConstraint(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
+        result.motionType = registry.resolveAssociatedType(
+            context->astBuilder,
+            traceContextWitness,
+            StructuralRayTracingAssociatedTypeKind::TraceMotion);
+        result.motionKind = registry.getMotionKind(result.motionType);
         result.hitGroupsType = registry.resolveAssociatedType(
             context->astBuilder,
             candidateWitness,
@@ -1446,6 +1457,7 @@ static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayo
 
     SLANG_ASSERT(
         result.programLayoutType && result.programLayoutWitness && result.traceContextType &&
+        result.motionType && result.motionKind != StructuralRayTracingMotionKind::Invalid &&
         result.hitGroupsType && result.missGroupsType && result.callableGroupsType);
     result.hitGroupPack =
         _getStructuralRayTracingGroupPack(context->astBuilder, result.hitGroupsType);
@@ -1532,6 +1544,8 @@ LoweredValInfo emitCallToDeclRef(
                     getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
                 operationArgs.add(lowerType(context, layout.programLayoutType));
                 operationArgs.add(lowerType(context, layout.traceContextType));
+                operationArgs.add(
+                    builder->getIntValue(builder->getIntType(), IRIntegerValue(layout.motionKind)));
                 operationArgs.add(lowerType(context, layout.hitGroupsType));
                 operationArgs.add(lowerType(context, layout.hitGroupPack.types));
                 operationArgs.add(lowerType(context, layout.missGroupsType));

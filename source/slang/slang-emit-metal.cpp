@@ -558,6 +558,14 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitOperand(trace->getInstanceMask(), getInfo(EmitOp::General));
         }
+        const bool hasMotion =
+            (tagMask & (IRIntegerValue(MetalStructuralRayTracingTag::PrimitiveMotion) |
+                        IRIntegerValue(MetalStructuralRayTracingTag::InstanceMotion))) != 0;
+        if (hasMotion)
+        {
+            m_writer->emit(", ");
+            emitOperand(trace->getTime(), getInfo(EmitOp::General));
+        }
         if (cast<IRBoolLit>(trace->getHasIntersectionFunctions())->getValue())
         {
             m_writer->emit(", ");
@@ -1844,7 +1852,23 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("uint32_t device*");
             break;
         case kIROp_RaytracingAccelerationStructureType:
-            if (type->getOperandCount() == 1 &&
+            if (type->getOperandCount() >= 2)
+            {
+                auto topology = cast<IRIntLit>(type->getOperand(0))->getValue();
+                auto accelerationStructureTags = cast<IRIntLit>(type->getOperand(1))->getValue();
+                if (topology == 1 && accelerationStructureTags == 0)
+                {
+                    m_writer->emit("metal::raytracing::primitive_acceleration_structure");
+                }
+                else
+                {
+                    m_writer->emit("metal::raytracing::acceleration_structure<");
+                    _emitMetalRayTracingTagList(m_writer, accelerationStructureTags, 0);
+                    m_writer->emit(">");
+                }
+            }
+            else if (
+                type->getOperandCount() == 1 &&
                 cast<IRIntLit>(type->getOperand(0))->getValue() == 1)
             {
                 m_writer->emit("metal::raytracing::primitive_acceleration_structure");

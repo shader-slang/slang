@@ -4375,6 +4375,41 @@ err(
 )
 
 err(
+    "invalid-structural-ray-tracing-motion",
+    38065,
+    "invalid structural ray-tracing motion configuration",
+    span { loc = "location", message = "the trace context must use one of the motion configurations provided by 'slang.raytracing'" }
+)
+
+err(
+    "structural-ray-tracing-instance-motion-requires-instancing",
+    38066,
+    "structural ray-tracing instance motion requires instancing",
+    span { loc = "location", message = "instance motion cannot be used with a direct primitive acceleration structure" }
+)
+
+err(
+    "structural-ray-tracing-acceleration-structure-motion-conflict",
+    38067,
+    "conflicting structural ray-tracing acceleration-structure requirements",
+    span { loc = "location", message = "the same acceleration-structure value is used by trace contexts with incompatible topology or motion requirements" }
+)
+
+err(
+    "structural-ray-tracing-multilevel-requires-metallib-3-1",
+    38068,
+    "structural ray-tracing multilevel traversal requires MetalLib 3.1",
+    span { loc = "location", message = "multi-level acceleration structures with two or more levels require the 'metallib_3_1' capability" }
+)
+
+err(
+    "structural-ray-tracing-curve-requires-metallib-3-1",
+    38069,
+    "structural ray-tracing curve primitives require MetalLib 3.1",
+    span { loc = "location", message = "curve primitives require the 'metallib_3_1' capability" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",
