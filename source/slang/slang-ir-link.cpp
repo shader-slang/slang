@@ -389,8 +389,13 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_PtrLit:
         {
             IRConstant* c = (IRConstant*)originalValue;
-            SLANG_RELEASE_ASSERT(c->value.ptrVal == nullptr);
-            return builder->getNullPtrValue(cloneType(this, c->getFullType()));
+            // Non-null pointer literals are used by front-end-only decorations to retain an AST
+            // declaration for diagnostics. Linking stays within the same compiler session, so the
+            // declaration remains valid and must be preserved until the mandatory passes consume
+            // it. Front-end-only instructions are stripped before target legalization and emit.
+            return builder->getPtrValue(
+                cloneType(this, c->getFullType()),
+                c->value.ptrVal);
         }
         break;
 
