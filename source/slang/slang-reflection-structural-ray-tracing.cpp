@@ -7,38 +7,6 @@
 namespace Slang
 {
 
-struct StructuralRayTracingReflectionGroupPack
-{
-    ConcreteTypePack* types = nullptr;
-    TypePackSubtypeWitness* witnesses = nullptr;
-};
-
-static StructuralRayTracingReflectionGroupPack _getGroupPack(
-    ASTBuilder* astBuilder,
-    Type* groupListType)
-{
-    StructuralRayTracingReflectionGroupPack result;
-    if (auto declRefType = as<DeclRefType>(groupListType))
-    {
-        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
-        {
-            for (auto argument : genericApp->getArgs())
-            {
-                auto resolvedArgument = argument->resolve();
-                if (auto typePack = as<ConcreteTypePack>(resolvedArgument))
-                    result.types = typePack;
-                else if (auto witnessPack = as<TypePackSubtypeWitness>(resolvedArgument))
-                    result.witnesses = witnessPack;
-            }
-        }
-    }
-    if (!result.types)
-        result.types = astBuilder->getTypePack(ArrayView<Type*>());
-    if (result.witnesses && result.witnesses->getCount() != result.types->getTypeCount())
-        result.witnesses = nullptr;
-    return result;
-}
-
 static String _getStageEntryPointName(Type* stageType)
 {
     auto declRefType = as<DeclRefType>(stageType ? stageType->resolve() : nullptr);
@@ -54,10 +22,7 @@ static RefPtr<StructuralRayTracingStageReflection> _createStageReflection(
     StructuralRayTracingAssociatedTypeKind associatedTypeKind,
     StructuralRayTracingStageKind stageKind)
 {
-    auto stageType = registry.resolveAssociatedType(
-        astBuilder,
-        groupWitness,
-        associatedTypeKind);
+    auto stageType = registry.resolveAssociatedType(astBuilder, groupWitness, associatedTypeKind);
     if (!stageType || registry.isStagePlaceholder(stageKind, stageType))
         return nullptr;
 
@@ -74,7 +39,7 @@ static bool _addHitGroups(
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupListType)
 {
-    auto pack = _getGroupPack(astBuilder, groupListType);
+    auto pack = getStructuralRayTracingGroupPack(astBuilder, groupListType);
     if (pack.types->getTypeCount() != 0 && !pack.witnesses)
         return false;
 
@@ -83,6 +48,10 @@ static bool _addHitGroups(
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
         auto slotType = registry.resolveAssociatedType(
+            astBuilder,
+            groupWitness,
+            StructuralRayTracingAssociatedTypeKind::HitGroupSlot);
+        auto slotWitness = registry.resolveAssociatedTypeConstraint(
             astBuilder,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupSlot);
@@ -95,8 +64,8 @@ static bool _addHitGroups(
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupContext);
         int64_t slot = 0;
-        if (!slotType || !contextType || !contextWitness ||
-            !registry.tryGetShaderGroupSlotIndex(astBuilder, slotType, slot))
+        if (!slotType || !slotWitness || !contextType || !contextWitness ||
+            !registry.tryGetShaderGroupSlotIndex(astBuilder, slotWitness, slot))
         {
             return false;
         }
@@ -153,7 +122,7 @@ static bool _addMissGroups(
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupListType)
 {
-    auto pack = _getGroupPack(astBuilder, groupListType);
+    auto pack = getStructuralRayTracingGroupPack(astBuilder, groupListType);
     if (pack.types->getTypeCount() != 0 && !pack.witnesses)
         return false;
 
@@ -162,6 +131,10 @@ static bool _addMissGroups(
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
         auto slotType = registry.resolveAssociatedType(
+            astBuilder,
+            groupWitness,
+            StructuralRayTracingAssociatedTypeKind::MissGroupSlot);
+        auto slotWitness = registry.resolveAssociatedTypeConstraint(
             astBuilder,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupSlot);
@@ -174,8 +147,8 @@ static bool _addMissGroups(
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupContext);
         int64_t slot = 0;
-        if (!slotType || !contextType || !contextWitness ||
-            !registry.tryGetShaderGroupSlotIndex(astBuilder, slotType, slot))
+        if (!slotType || !slotWitness || !contextType || !contextWitness ||
+            !registry.tryGetShaderGroupSlotIndex(astBuilder, slotWitness, slot))
         {
             return false;
         }
@@ -208,7 +181,7 @@ static bool _addCallableGroups(
     const StructuralRayTracingDeclRegistry& registry,
     Type* groupListType)
 {
-    auto pack = _getGroupPack(astBuilder, groupListType);
+    auto pack = getStructuralRayTracingGroupPack(astBuilder, groupListType);
     if (pack.types->getTypeCount() != 0 && !pack.witnesses)
         return false;
 
@@ -217,6 +190,10 @@ static bool _addCallableGroups(
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
         auto slotType = registry.resolveAssociatedType(
+            astBuilder,
+            groupWitness,
+            StructuralRayTracingAssociatedTypeKind::CallableGroupSlot);
+        auto slotWitness = registry.resolveAssociatedTypeConstraint(
             astBuilder,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupSlot);
@@ -229,8 +206,8 @@ static bool _addCallableGroups(
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupContext);
         int64_t slot = 0;
-        if (!slotType || !contextType || !contextWitness ||
-            !registry.tryGetShaderGroupSlotIndex(astBuilder, slotType, slot))
+        if (!slotType || !slotWitness || !contextType || !contextWitness ||
+            !registry.tryGetShaderGroupSlotIndex(astBuilder, slotWitness, slot))
         {
             return false;
         }

@@ -3,6 +3,7 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-synthesize-structural-ray-tracing.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
@@ -84,25 +85,6 @@ static IRFunc* _findEnclosingFunc(IRInst* inst)
             return func;
     }
     return nullptr;
-}
-
-static String _getStructuralStageName(IRType* stageType, IRFunc* invoke)
-{
-    if (stageType)
-    {
-        if (auto nameHint = stageType->findDecoration<IRNameHintDecoration>())
-            return String(nameHint->getName());
-    }
-    if (invoke)
-    {
-        if (auto nameHint = invoke->findDecoration<IRNameHintDecoration>())
-        {
-            auto name = nameHint->getName();
-            Index separator = name.indexOf(toSlice(".invoke"));
-            return separator >= 0 ? String(name.head(separator)) : String(name);
-        }
-    }
-    return "structuralRayTracingStage";
 }
 
 struct MetalStageRequirements
@@ -819,6 +801,7 @@ static void _addStructuralStageInfo(
     IRFunc* adapter,
     StructuralRayTracingStageKind stageKind,
     IRFunc* invoke,
+    IRType* stageType,
     IRType* contextType,
     IRType* payloadType,
     IRType* recordType,
@@ -826,22 +809,20 @@ static void _addStructuralStageInfo(
     StructuralRayTracingHitAttributesKind hitAttributesKind,
     IRType* callableDataType = nullptr)
 {
-    auto voidType = builder.getVoidType();
-    IRInst* operands[] = {
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)),
-        invoke,
-        contextType ? contextType : voidType,
-        payloadType ? payloadType : voidType,
-        recordType ? recordType : voidType,
-        hitAttributesType ? hitAttributesType : voidType,
-        callableDataType ? callableDataType : voidType,
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(hitAttributesKind)),
-    };
-    builder.addDecoration(
+    addStructuralRayTracingEntryPointInfo(
+        builder,
         adapter,
-        kIROp_StructuralRayTracingEntryPointInfoDecoration,
-        operands,
-        SLANG_COUNT_OF(operands));
+        {
+            .stageKind = stageKind,
+            .invoke = invoke,
+            .stageType = stageType,
+            .contextType = contextType,
+            .payloadType = payloadType,
+            .recordType = recordType,
+            .hitAttributesType = hitAttributesType,
+            .callableDataType = callableDataType,
+            .hitAttributesKind = hitAttributesKind,
+        });
 }
 
 static void _collectStageInputOperations(IRInst* parent, List<IRInst*>& operations);
@@ -1068,7 +1049,7 @@ static IRFunc* _generateVisibleStageAdapter(
         parameterTypes.add(descriptorResourcesPointerType);
     adapter->setFullType(builder.getFuncType(parameterTypes, builder.getVoidType()));
 
-    auto name = _getStructuralStageName(stageType, invoke);
+    auto name = getStructuralRayTracingSourceTypeName(stageType);
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addKeepAliveDecoration(adapter);
     builder.addDecoration(
@@ -1080,6 +1061,7 @@ static IRFunc* _generateVisibleStageAdapter(
         adapter,
         stageKind,
         invoke,
+        stageType,
         contextType,
         payloadType,
         recordType,
@@ -1255,7 +1237,7 @@ static IRFunc* _generateCallableStageAdapter(
         parameterTypes.getBuffer(),
         builder.getVoidType()));
 
-    auto name = _getStructuralStageName(group->getCallableType(), invoke);
+    auto name = getStructuralRayTracingSourceTypeName(group->getCallableType());
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addKeepAliveDecoration(adapter);
     builder.addDecoration(
@@ -1269,6 +1251,7 @@ static IRFunc* _generateCallableStageAdapter(
         adapter,
         StructuralRayTracingStageKind::Callable,
         invoke,
+        group->getCallableType(),
         group->getContextType(),
         nullptr,
         group->getRecordType(),
@@ -1427,10 +1410,7 @@ static IRInst* _emitMetalCandidateResult(
 static String _getMetalCandidateName(IRType* groupType)
 {
     StringBuilder name;
-    if (auto nameHint = groupType->findDecoration<IRNameHintDecoration>())
-        name << nameHint->getName();
-    else
-        name << "structuralRayTracingHitGroup";
+    name << getStructuralRayTracingSourceTypeName(groupType);
     name << ".candidate";
     return name.produceString();
 }
@@ -1809,6 +1789,7 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
         adapter,
         StructuralRayTracingStageKind::AnyHit,
         invoke,
+        group->getAnyHitType(),
         group->getContextType(),
         group->getPayloadType(),
         group->getRecordType(),
@@ -2247,6 +2228,7 @@ static IRFunc* _generateAnyHitDecisionHelper(
         helper,
         StructuralRayTracingStageKind::AnyHit,
         invoke,
+        group->getAnyHitType(),
         group->getContextType(),
         group->getPayloadType(),
         group->getRecordType(),
@@ -2657,6 +2639,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
         adapter,
         StructuralRayTracingStageKind::Intersection,
         invoke,
+        group->getIntersectionType(),
         group->getContextType(),
         group->getPayloadType(),
         group->getRecordType(),
@@ -3746,34 +3729,6 @@ static void _collectMetalRayGenerationSystemValueOperations(
             dispatchDimensionsOperations.add(child);
             continue;
         }
-        auto call = as<IRCall>(child);
-        if (!call)
-            continue;
-        auto callee = getResolvedInstForDecorations(call->getCallee());
-        auto intrinsic = findAnyTargetIntrinsicDecoration(callee);
-        UnownedStringSlice definition;
-        if (intrinsic)
-            definition = intrinsic->getDefinition();
-        else if (auto nameHint = callee->findDecoration<IRNameHintDecoration>())
-        {
-            // Target specialization removes an intrinsic decoration whose capability set does
-            // not include Metal, but retains the linked core declaration and its linkage name.
-            // Require that exact compiler-owned symbol so a user function with the same source
-            // name is not treated as a built-in.
-            if (auto linkage = callee->findDecoration<IRLinkageDecoration>())
-            {
-                auto mangledName = linkage->getMangledName();
-                if (mangledName == toSlice("_S4core17DispatchRaysIndexp0pv3u") ||
-                    mangledName == toSlice("_S4core22DispatchRaysDimensionsp0pv3u"))
-                {
-                    definition = nameHint->getName();
-                }
-            }
-        }
-        if (definition == toSlice("DispatchRaysIndex"))
-            dispatchIndexOperations.add(call);
-        else if (definition == toSlice("DispatchRaysDimensions"))
-            dispatchDimensionsOperations.add(call);
     }
 }
 

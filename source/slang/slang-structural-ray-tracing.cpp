@@ -139,6 +139,22 @@ static FunctionDeclBase* _findStageInvokeRequirement(InterfaceDecl* interfaceDec
     return nullptr;
 }
 
+static VarDeclBase* _findValueRequirement(
+    Module* module,
+    const char* interfaceName,
+    const char* requirementName)
+{
+    auto interfaceDecl = as<InterfaceDecl>(_findNamedDecl(module, interfaceName));
+    if (!interfaceDecl)
+        return nullptr;
+    for (auto member : interfaceDecl->getDirectMemberDeclsOfType<VarDeclBase>())
+    {
+        if (member->getName() && member->getName()->text == requirementName)
+            return member;
+    }
+    return nullptr;
+}
+
 static AssocTypeDecl* _findAssociatedTypeRequirement(
     Module* module,
     const char* interfaceName,
@@ -300,6 +316,7 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     StructuralRayTracingStageKind* outMissingStage)
 {
     m_trustedModuleDecl = module->getModuleDecl();
+    m_intersectionStageInterface = as<InterfaceDecl>(_findNamedDecl(module, "IIntersectionStage"));
     m_rayTracerType = as<AggTypeDecl>(_findNamedDecl(module, "RayTracer"));
     m_trianglePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "TrianglePrimitive"));
     m_curvePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "CurvePrimitive"));
@@ -313,6 +330,7 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         as<AggTypeDecl>(_findNamedDecl(module, "NoAnyHit"));
     m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Intersection)] =
         as<AggTypeDecl>(_findNamedDecl(module, "NoIntersection"));
+    m_shaderGroupSlotIndexRequirement = _findValueRequirement(module, "IShaderGroupSlot", "index");
 
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::TracePayload)] =
         _findAssociatedTypeRequirement(module, "ITraceContext", "Payload");
@@ -386,8 +404,11 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         auto kind = StructuralRayTracingStageKind(i);
         interfaces[i] = _findStageInterface(module, kind);
         inputTypes[i] = _findStageInputType(module, kind);
-        if (interfaces[i])
-            invokeRequirements[i] = _findStageInvokeRequirement(interfaces[i]);
+        auto invokeInterface = kind == StructuralRayTracingStageKind::Intersection
+                                   ? m_intersectionStageInterface
+                                   : interfaces[i];
+        if (invokeInterface)
+            invokeRequirements[i] = _findStageInvokeRequirement(invokeInterface);
         if (!interfaces[i] || !inputTypes[i] || !invokeRequirements[i])
         {
             if (outMissingStage)
@@ -480,40 +501,74 @@ SubtypeWitness* StructuralRayTracingDeclRegistry::resolveAssociatedTypeConstrain
 
 bool StructuralRayTracingDeclRegistry::tryGetShaderGroupSlotIndex(
     ASTBuilder* astBuilder,
-    Type* slotType,
+    SubtypeWitness* slotWitness,
     int64_t& outIndex) const
 {
-    auto lookupResult = lookUpMember(
-        astBuilder,
-        nullptr,
-        astBuilder->getNamePool()->getName("index"),
-        slotType,
-        nullptr,
-        LookupMask::Value,
-        LookupOptions::IgnoreBaseInterfaces);
-    if (lookupResult.isValid() && !lookupResult.isOverloaded())
+    slotWitness = slotWitness ? as<SubtypeWitness>(slotWitness->resolve()) : nullptr;
+    if (!slotWitness || !m_shaderGroupSlotIndexRequirement)
+        return false;
+
+    // Consider `struct Slot : IShaderGroupSlot { static const int index = 3; }`.
+    // Type checking records `Slot.index` as the witness for the exact `IShaderGroupSlot.index`
+    // requirement. Consumers must follow that witness because a slot can be selected through an
+    // associated type and can carry generic substitutions. Looking up a member named `index` on
+    // the concrete type would reconstruct a second, potentially different path to the same value.
+    auto indexWitness =
+        tryLookUpRequirementWitness(astBuilder, slotWitness, m_shaderGroupSlotIndexRequirement);
+    IntVal* indexValue = nullptr;
+    switch (indexWitness.getFlavor())
     {
-        if (auto slotIndexDeclRef = lookupResult.item.declRef.as<VarDeclBase>())
+    case RequirementWitness::Flavor::declRef:
         {
+            auto slotIndexDeclRef = indexWitness.getDeclRef().as<VarDeclBase>();
             auto slotIndexDecl = slotIndexDeclRef.getDecl();
-            if (auto constantValue = as<ConstantIntVal>(slotIndexDecl->val))
+            if (slotIndexDecl && slotIndexDecl->val)
+                indexValue = as<IntVal>(
+                    slotIndexDecl->val->substitute(astBuilder, SubstitutionSet(slotIndexDeclRef)));
+        }
+        break;
+    case RequirementWitness::Flavor::val:
+        indexValue = as<IntVal>(indexWitness.getVal());
+        break;
+    default:
+        return false;
+    }
+
+    auto constantValue = as<ConstantIntVal>(indexValue ? indexValue->resolve() : nullptr);
+    if (!constantValue)
+        return false;
+    outIndex = constantValue->getValue();
+    return true;
+}
+
+StructuralRayTracingGroupPack getStructuralRayTracingGroupPack(
+    ASTBuilder* astBuilder,
+    Type* groupListType)
+{
+    StructuralRayTracingGroupPack result;
+    if (auto declRefType = as<DeclRefType>(groupListType))
+    {
+        if (auto genericApp = SubstitutionSet(declRefType->getDeclRef()).findGenericAppDeclRef())
+        {
+            // A sealed group-list type has one concrete type pack and, for a non-empty list, one
+            // matching conformance-witness pack. Select them by semantic role instead of relying
+            // on their positions among the generic arguments. Both IR lowering and reflection
+            // consume this exact checked representation.
+            for (auto argument : genericApp->getArgs())
             {
-                outIndex = constantValue->getValue();
-                return true;
-            }
-            if (auto value = slotIndexDecl->val)
-            {
-                value =
-                    as<IntVal>(value->substitute(astBuilder, SubstitutionSet(slotIndexDeclRef)));
-                if (auto constantValue = as<ConstantIntVal>(value ? value->resolve() : nullptr))
-                {
-                    outIndex = constantValue->getValue();
-                    return true;
-                }
+                auto resolvedArgument = argument->resolve();
+                if (auto typePack = as<ConcreteTypePack>(resolvedArgument))
+                    result.types = typePack;
+                else if (auto witnessPack = as<TypePackSubtypeWitness>(resolvedArgument))
+                    result.witnesses = witnessPack;
             }
         }
     }
-    return false;
+    if (!result.types)
+        result.types = astBuilder->getTypePack(ArrayView<Type*>());
+    SLANG_RELEASE_ASSERT(
+        !result.witnesses || result.witnesses->getCount() == result.types->getTypeCount());
+    return result;
 }
 
 bool StructuralRayTracingDeclRegistry::isStagePlaceholder(
@@ -574,6 +629,8 @@ StructuralRayTracingStageKind StructuralRayTracingDeclRegistry::getStageKind(
 {
     if (!interfaceDecl)
         return StructuralRayTracingStageKind::Count;
+    if (interfaceDecl == m_intersectionStageInterface)
+        return StructuralRayTracingStageKind::Intersection;
     for (int i = 0; i < int(StructuralRayTracingStageKind::Count); ++i)
     {
         if (m_stageInterfaces[i] == interfaceDecl)
