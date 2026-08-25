@@ -112,7 +112,7 @@ void main()
 // METAL-NOT: intersectionFunctions
 // METAL: scene_1, desc_0.instanceMask_0);
 // METAL: _S{{[0-9]+}}[desc_0.missIndex_0](&rayData_{{[0-9]+}});
-// METAL: uint _slang_hit_slot = _S{{[0-9]+}}[_slang_result.instance_id]
+// METAL: uint _slang_hit_slot = _S{{[0-9]+}}[_S{{[0-9]+}}[0] + _slang_result.instance_id]
 // METAL: _S{{[0-9]+}}[_slang_hit_slot](&rayData_{{[0-9]+}});
 // METAL: {{\[\[visible\]\]}} void TestMiss_0(ProgramLayout_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
 // METAL: (&[[MISS_DATA]]->payload_{{[0-9]+}})->value_0 = 2U;

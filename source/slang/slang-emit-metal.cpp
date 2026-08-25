@@ -577,7 +577,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->indent();
             m_writer->emit("uint _slang_hit_slot = ");
             emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
-            m_writer->emit("[_slang_result.instance_id] + _slang_result.geometry_id * ");
+            m_writer->emit("[");
+            emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[0] + _slang_result.instance_id] + _slang_result.geometry_id * ");
             emitOperand(trace->getSbtStride(), getInfo(EmitOp::General));
             m_writer->emit(" + ");
             emitOperand(trace->getSbtOffset(), getInfo(EmitOp::General));
