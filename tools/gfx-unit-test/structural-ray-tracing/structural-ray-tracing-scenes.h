@@ -16,4 +16,14 @@ struct StructuralRayTracingTriangleScene
     StructuralRayTracingTriangleScene(rhi::IDevice* device, rhi::ICommandQueue* queue);
 };
 
+struct StructuralRayTracingProceduralScene
+{
+    rhi::ComPtr<rhi::IBuffer> aabbBuffer;
+    rhi::ComPtr<rhi::IBuffer> instanceBuffer;
+    rhi::ComPtr<rhi::IAccelerationStructure> bottomLevel;
+    rhi::ComPtr<rhi::IAccelerationStructure> topLevel;
+
+    StructuralRayTracingProceduralScene(rhi::IDevice* device, rhi::ICommandQueue* queue);
+};
+
 } // namespace gfx_test
