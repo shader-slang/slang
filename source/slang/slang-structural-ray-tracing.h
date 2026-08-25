@@ -53,6 +53,7 @@ enum class StructuralRayTracingStageInputOperationKind
     CurveParameter,
     RayTMin,
     RayTCurrent,
+    RayTime,
     RayFlags,
     HitKind,
     WorldRayOrigin,
