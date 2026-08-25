@@ -1269,6 +1269,9 @@ public:
     /// -1 means no bindless space was reserved for this program and target.
     /// >= 0 means a stable space was allocated; it does not by itself prove post-lowering heap use.
     Int bindlessSpaceIndex = -1;
+
+    /// Lazily constructed logical SBT layouts requested through reflection.
+    RefPtr<RefObject> structuralRayTracingReflectionData;
 };
 
 StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout);
