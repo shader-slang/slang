@@ -96,9 +96,14 @@ struct ProgramLayout : rt::ITraceProgramLayout
     typealias CallableGroups = rt::NoCallableGroups<RuntimeTraceContext>;
 }
 
-rt::AccelerationStructure scene;
-rt::TraceProgramDescriptor<ProgramLayout> program;
-RWStructuredBuffer<RuntimeResult> results;
+struct FrameParameters
+{
+    rt::AccelerationStructure scene;
+    rt::TraceProgramDescriptor<ProgramLayout> program;
+    RWStructuredBuffer<RuntimeResult> results;
+}
+
+ParameterBlock<FrameParameters> frame;
 
 [shader("raygeneration")]
 void main()
@@ -120,9 +125,9 @@ void main()
 
     RuntimePayload payload = { 0, 0 };
     rt::RayTracer<ProgramLayout> tracer;
-    tracer.trace(desc, scene, program, payload);
+    tracer.trace(desc, frame.scene, frame.program, payload);
 
-    results[rayIndex].stage = payload.stage;
-    results[rayIndex].primitiveIndex = payload.primitiveIndex;
-    results[rayIndex].dispatchWidth = dispatchWidth;
+    frame.results[rayIndex].stage = payload.stage;
+    frame.results[rayIndex].primitiveIndex = payload.primitiveIndex;
+    frame.results[rayIndex].dispatchWidth = dispatchWidth;
 }
