@@ -491,7 +491,8 @@ void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module)
     HashSet<IRType*> payloadTypes;
     for (auto entryPoint : structuralEntryPoints)
     {
-        if (!entryPoint->findDecoration<IRMetalVisibleFunctionDecoration>())
+        if (!entryPoint->findDecoration<IRMetalVisibleFunctionDecoration>() &&
+            !entryPoint->findDecoration<IRMetalIntersectionFunctionDecoration>())
             continue;
         auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
         if (info && !as<IRVoidType>(info->getPayloadType()))
