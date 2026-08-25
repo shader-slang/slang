@@ -285,6 +285,10 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     m_rayTracerType = as<AggTypeDecl>(_findNamedDecl(module, "RayTracer"));
     m_trianglePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "TrianglePrimitive"));
     m_curvePrimitiveType = as<AggTypeDecl>(_findNamedDecl(module, "CurvePrimitive"));
+    m_motionTypes[0] = as<AggTypeDecl>(_findNamedDecl(module, "NoMotion"));
+    m_motionTypes[1] = as<AggTypeDecl>(_findNamedDecl(module, "PrimitiveMotion"));
+    m_motionTypes[2] = as<AggTypeDecl>(_findNamedDecl(module, "InstanceMotion"));
+    m_motionTypes[3] = as<AggTypeDecl>(_findNamedDecl(module, "PrimitiveAndInstanceMotion"));
     m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::ClosestHit)] =
         as<AggTypeDecl>(_findNamedDecl(module, "NoClosestHit"));
     m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::AnyHit)] =
@@ -294,6 +298,8 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
 
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::TracePayload)] =
         _findAssociatedTypeRequirement(module, "ITraceContext", "Payload");
+    m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::TraceMotion)] =
+        _findAssociatedTypeRequirement(module, "ITraceContext", "Motion");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitTraceContext)] =
         _findAssociatedTypeRequirement(module, "IHitContext", "TraceContext");
     m_associatedTypeRequirements[int(StructuralRayTracingAssociatedTypeKind::HitPrimitive)] =
@@ -578,6 +584,20 @@ StructuralRayTracingHitAttributesKind StructuralRayTracingDeclRegistry::getHitAt
         return StructuralRayTracingHitAttributesKind::Curve;
     return primitiveDecl ? StructuralRayTracingHitAttributesKind::Custom
                          : StructuralRayTracingHitAttributesKind::None;
+}
+
+StructuralRayTracingMotionKind StructuralRayTracingDeclRegistry::getMotionKind(
+    Type* motionType) const
+{
+    motionType = motionType ? as<Type>(motionType->resolve()) : nullptr;
+    auto declRefType = as<DeclRefType>(motionType);
+    auto motionDecl = declRefType ? declRefType->getDeclRef().as<AggTypeDecl>().getDecl() : nullptr;
+    for (UInt i = 0; i < SLANG_COUNT_OF(m_motionTypes); ++i)
+    {
+        if (motionDecl == m_motionTypes[i])
+            return StructuralRayTracingMotionKind(i);
+    }
+    return StructuralRayTracingMotionKind::Invalid;
 }
 
 InterfaceDecl* StructuralRayTracingDeclRegistry::getStageInterface(

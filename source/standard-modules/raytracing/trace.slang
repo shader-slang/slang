@@ -10,6 +10,7 @@ public struct RayTracer<ProgramLayout>
 public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout : ITraceProgramLayout
     where ProgramLayout.TraceContext.AccelerationStructure == AccelerationStructure
+    where ProgramLayout.TraceContext.Motion == NoMotion
 {
     [ForceInline]
     public void trace(
@@ -39,6 +40,112 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
 
 public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.AccelerationStructure == AccelerationStructure
+    where ProgramLayout.TraceContext.Motion == PrimitiveMotion
+{
+    [ForceInline]
+    [require(metallib_2_4)]
+    public void trace(
+        RayTraversalDesc desc,
+        ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.AccelerationStructure == AccelerationStructure
+    where ProgramLayout.TraceContext.Motion == InstanceMotion
+{
+    [ForceInline]
+    [require(metallib_2_4)]
+    public void trace(
+        RayTraversalDesc desc,
+        ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.AccelerationStructure == AccelerationStructure
+    where ProgramLayout.TraceContext.Motion == PrimitiveAndInstanceMotion
+{
+    [ForceInline]
+    [require(metallib_2_4)]
+    public void trace(
+        RayTraversalDesc desc,
+        ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.Motion == NoMotion
+{
+    [ForceInline]
+    [require(metal)]
+    public void trace<let maxLevelCount : int>(
+        RayTraversalDesc desc,
+        MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+        where ProgramLayout.TraceContext.AccelerationStructure ==
+            MultiLevelAccelerationStructure<maxLevelCount>
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.Motion == PrimitiveMotion
+{
+    [ForceInline]
+    [require(metal)]
+    public void trace<let maxLevelCount : int>(
+        RayTraversalDesc desc,
+        MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+        where ProgramLayout.TraceContext.AccelerationStructure ==
+            MultiLevelAccelerationStructure<maxLevelCount>
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.Motion == InstanceMotion
+{
+    [ForceInline]
+    [require(metal)]
+    public void trace<let maxLevelCount : int>(
+        RayTraversalDesc desc,
+        MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+        where ProgramLayout.TraceContext.AccelerationStructure ==
+            MultiLevelAccelerationStructure<maxLevelCount>
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+    where ProgramLayout.TraceContext.Motion == PrimitiveAndInstanceMotion
 {
     [ForceInline]
     [require(metal)]

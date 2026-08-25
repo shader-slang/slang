@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=EXTENDED): -experimental-feature -entry main -stage raygeneration -target metal -capability metal_raytracing_extended_limits
 
 import slang.raytracing;
 
@@ -72,3 +73,9 @@ void main()
 // METAL-SAME: float3 worldSpaceDirection_{{[0-9]+}} {{\[\[}}world_space_direction]]
 // METAL: barycentricCoord_{{[0-9]+}}.x
 // METAL: frontFacing_
+
+// EXTENDED: metal::raytracing::acceleration_structure<metal::raytracing::instancing> scene_{{[0-9]+}}
+// EXTENDED: intersection_function_table<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::world_space_data, metal::raytracing::extended_limits>
+// EXTENDED: metal::raytracing::intersector<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::world_space_data, metal::raytracing::extended_limits>
+// EXTENDED: metal::raytracing::intersection_result<metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::world_space_data, metal::raytracing::extended_limits>
+// EXTENDED: {{\[\[}}intersection(triangle, metal::raytracing::instancing, metal::raytracing::triangle_data, metal::raytracing::world_space_data, metal::raytracing::extended_limits)]]

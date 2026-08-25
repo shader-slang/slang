@@ -7,9 +7,21 @@
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-structural-ray-tracing.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
+
+static bool _supportsMetalLib31(TargetRequest* targetRequest)
+{
+    auto& options = targetRequest->getOptionSet();
+    if (!options.hasOption(CompilerOptionName::Profile) ||
+        options.getProfile().getVersion() == ProfileVersion::Unknown)
+    {
+        return true;
+    }
+    return targetRequest->getTargetCaps().implies(CapabilityAtom::metallib_3_1);
+}
 
 static void _collectStructuralProgramOperations(IRInst* parent, List<IRInst*>& operations)
 {
@@ -336,6 +348,7 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
 
 static bool _getMetalAccelerationStructureTopology(
     IRStructuralRayTracingTrace* trace,
+    TargetRequest* targetRequest,
     DiagnosticSink* sink,
     UInt& outTagMask,
     IRIntegerValue& outMaxLevels)
@@ -360,13 +373,157 @@ static bool _getMetalAccelerationStructureTopology(
     if (levelCount->getValue() == 1)
         outTagMask = 0;
     else
+    {
+        if (!_supportsMetalLib31(targetRequest))
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingMultilevelRequiresMetallib31{
+                .location = trace->sourceLoc});
+            return false;
+        }
         outMaxLevels = levelCount->getValue();
+    }
+
     return true;
 }
 
-static UInt _getSharedMetalTagMask(IRStructuralRayTracingTrace* trace, UInt topologyTagMask)
+static bool _validateMetalCurveSupport(
+    IRStructuralRayTracingTrace* trace,
+    TargetRequest* targetRequest,
+    DiagnosticSink* sink)
 {
-    UInt result = topologyTagMask;
+    if (_supportsMetalLib31(targetRequest))
+        return true;
+    for (auto decoration : trace->getDecorations())
+    {
+        auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
+        if (group &&
+            StructuralRayTracingHitAttributesKind(group->getHitAttributesKind()->getValue()) ==
+                StructuralRayTracingHitAttributesKind::Curve)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingCurveRequiresMetallib31{
+                .location = trace->sourceLoc});
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool _addMetalMotionTags(
+    IRStructuralRayTracingTrace* trace,
+    DiagnosticSink* sink,
+    UInt& ioTagMask)
+{
+    auto motionKind =
+        StructuralRayTracingMotionKind(cast<IRIntLit>(trace->getMotionKind())->getValue());
+    if (motionKind == StructuralRayTracingMotionKind::Invalid ||
+        UInt(motionKind) > UInt(StructuralRayTracingMotionKind::Primitive) +
+                               UInt(StructuralRayTracingMotionKind::Instance))
+    {
+        sink->diagnose(
+            Diagnostics::InvalidStructuralRayTracingMotion{.location = trace->sourceLoc});
+        return false;
+    }
+
+    if ((UInt(motionKind) & UInt(StructuralRayTracingMotionKind::Primitive)) != 0)
+        ioTagMask |= UInt(MetalStructuralRayTracingTag::PrimitiveMotion);
+    if ((UInt(motionKind) & UInt(StructuralRayTracingMotionKind::Instance)) != 0)
+    {
+        if ((ioTagMask & UInt(MetalStructuralRayTracingTag::Instancing)) == 0)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingInstanceMotionRequiresInstancing{
+                .location = trace->sourceLoc});
+            return false;
+        }
+        ioTagMask |= UInt(MetalStructuralRayTracingTag::InstanceMotion);
+    }
+    return true;
+}
+
+static IRType* _getMetalAccelerationStructureType(
+    IRBuilder& builder,
+    IRRaytracingAccelerationStructureType* sourceType,
+    UInt tagMask)
+{
+    IRInst* topology = sourceType->getOperandCount() == 0
+                           ? builder.getIntValue(builder.getIntType(), 0)
+                           : sourceType->getOperand(0);
+    IRInst* operands[] = {
+        topology,
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(
+                tagMask & (UInt(MetalStructuralRayTracingTag::Instancing) |
+                           UInt(MetalStructuralRayTracingTag::PrimitiveMotion) |
+                           UInt(MetalStructuralRayTracingTag::InstanceMotion)))),
+    };
+    return builder.getType(
+        kIROp_RaytracingAccelerationStructureType,
+        SLANG_COUNT_OF(operands),
+        operands);
+}
+
+static bool _setMetalAccelerationStructureType(
+    IRBuilder& builder,
+    IRInst* value,
+    UInt tagMask,
+    Dictionary<IRInst*, IRType*>& assignedTypes,
+    DiagnosticSink* sink)
+{
+    auto sourceType = as<IRRaytracingAccelerationStructureType>(value->getDataType());
+    if (!sourceType)
+        return false;
+
+    auto physicalType = _getMetalAccelerationStructureType(builder, sourceType, tagMask);
+    if (auto assignedType = assignedTypes.tryGetValue(value))
+    {
+        if (*assignedType != physicalType)
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingAccelerationStructureMotionConflict{
+                .location = value->sourceLoc});
+            return false;
+        }
+        return true;
+    }
+    assignedTypes.add(value, physicalType);
+    value->setFullType(physicalType);
+
+    if (auto param = as<IRParam>(value))
+    {
+        auto block = as<IRBlock>(param->getParent());
+        auto func = block ? as<IRFunc>(block->getParent()) : nullptr;
+        if (func && block == func->getFirstBlock())
+        {
+            auto paramIndex = block->getParamIndex(param);
+            fixUpFuncType(func);
+            for (auto use = func->firstUse; use; use = use->nextUse)
+            {
+                auto call = as<IRCall>(use->getUser());
+                if (!call || call->getOperand(0) != func || paramIndex < 0 ||
+                    UInt(paramIndex) >= call->getArgCount())
+                {
+                    continue;
+                }
+                if (!_setMetalAccelerationStructureType(
+                        builder,
+                        call->getArg(UInt(paramIndex)),
+                        tagMask,
+                        assignedTypes,
+                        sink))
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+static UInt _getSharedMetalTagMask(
+    IRStructuralRayTracingTrace* trace,
+    UInt topologyTagMask,
+    UInt capabilityTagMask)
+{
+    UInt result = topologyTagMask | capabilityTagMask;
     for (auto decoration : trace->getDecorations())
     {
         auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
@@ -2170,6 +2327,7 @@ static void _getRayTraversalDescValues(
     IRInst*& outDirection,
     IRInst*& outMinDistance,
     IRInst*& outMaxDistance,
+    IRInst*& outTime,
     IRInst*& outRayFlags,
     IRInst*& outInstanceMask,
     IRInst*& outSbtOffset,
@@ -2179,7 +2337,7 @@ static void _getRayTraversalDescValues(
     auto descType = cast<IRStructType>(desc->getDataType());
     List<IRStructField*> descFields;
     _getStructFields(descType, descFields);
-    SLANG_ASSERT(descFields.getCount() == 6);
+    SLANG_ASSERT(descFields.getCount() == 7);
 
     auto ray = builder.emitFieldExtract(desc, descFields[0]->getKey());
     auto rayType = cast<IRStructType>(ray->getDataType());
@@ -2191,11 +2349,12 @@ static void _getRayTraversalDescValues(
     outMinDistance = builder.emitFieldExtract(ray, rayFields[1]->getKey());
     outDirection = builder.emitFieldExtract(ray, rayFields[2]->getKey());
     outMaxDistance = builder.emitFieldExtract(ray, rayFields[3]->getKey());
-    outRayFlags = builder.emitFieldExtract(desc, descFields[1]->getKey());
-    outInstanceMask = builder.emitFieldExtract(desc, descFields[2]->getKey());
-    outSbtOffset = builder.emitFieldExtract(desc, descFields[3]->getKey());
-    outSbtStride = builder.emitFieldExtract(desc, descFields[4]->getKey());
-    outMissIndex = builder.emitFieldExtract(desc, descFields[5]->getKey());
+    outTime = builder.emitFieldExtract(desc, descFields[1]->getKey());
+    outRayFlags = builder.emitFieldExtract(desc, descFields[2]->getKey());
+    outInstanceMask = builder.emitFieldExtract(desc, descFields[3]->getKey());
+    outSbtOffset = builder.emitFieldExtract(desc, descFields[4]->getKey());
+    outSbtStride = builder.emitFieldExtract(desc, descFields[5]->getKey());
+    outMissIndex = builder.emitFieldExtract(desc, descFields[6]->getKey());
 }
 
 static bool _lowerNonEmptyTrace(
@@ -2213,10 +2372,11 @@ static bool _lowerNonEmptyTrace(
     const MetalCandidateResultInfo& filterResultInfo,
     const MetalCandidateResultInfo& proceduralResultInfo,
     UInt topologyTagMask,
+    UInt capabilityTagMask,
     IRIntegerValue maxLevels)
 {
     IRBuilder builder(module);
-    auto tagMask = _getSharedMetalTagMask(trace, topologyTagMask);
+    auto tagMask = _getSharedMetalTagMask(trace, topologyTagMask, capabilityTagMask);
     auto missRequirements = _getMetalStageRequirements(trace, StructuralRayTracingStageKind::Miss);
     auto closestHitRequirements =
         _getMetalStageRequirements(trace, StructuralRayTracingStageKind::ClosestHit);
@@ -2350,6 +2510,7 @@ static bool _lowerNonEmptyTrace(
     IRInst* direction;
     IRInst* minDistance;
     IRInst* maxDistance;
+    IRInst* time;
     IRInst* rayFlags;
     IRInst* instanceMask;
     IRInst* sbtOffset;
@@ -2362,6 +2523,7 @@ static bool _lowerNonEmptyTrace(
         direction,
         minDistance,
         maxDistance,
+        time,
         rayFlags,
         instanceMask,
         sbtOffset,
@@ -2395,6 +2557,7 @@ static bool _lowerNonEmptyTrace(
         direction,
         minDistance,
         maxDistance,
+        time,
         rayFlags,
         instanceMask,
         sbtOffset,
@@ -2509,12 +2672,19 @@ static void _makeStructuralRayGenerationEntryPointPhysicalCompute(
 void prepareMetalStructuralRayTracing(
     IRModule* module,
     List<IRFunc*>& entryPoints,
+    TargetRequest* targetRequest,
     DiagnosticSink* sink)
 {
     List<IRInst*> operations;
     _collectStructuralProgramOperations(module->getModuleInst(), operations);
     if (operations.getCount() == 0)
         return;
+
+    UInt capabilityTagMask = 0;
+    if (targetRequest->getTargetCaps().implies(CapabilityAtom::metal_raytracing_extended_limits))
+    {
+        capabilityTagMask |= UInt(MetalStructuralRayTracingTag::ExtendedLimits);
+    }
 
     Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
     buildEntryPointReferenceGraph(referencingEntryPoints, module);
@@ -2530,6 +2700,7 @@ void prepareMetalStructuralRayTracing(
     Dictionary<IRFunc*, IRInst*> payloadValues;
     Dictionary<IRFunc*, IRParam*> candidateRayDataParams;
     Dictionary<IRInst*, RefPtr<MetalRayDataInfo>> rayDataInfos;
+    Dictionary<IRInst*, IRType*> accelerationStructureTypes;
     auto filterResultInfo =
         _createMetalCandidateResultType(module, "StructuralRayTracingFilterResult", false);
     auto proceduralResultInfo =
@@ -2555,7 +2726,29 @@ void prepareMetalStructuralRayTracing(
         auto trace = cast<IRStructuralRayTracingTrace>(operation);
         UInt topologyTagMask = 0;
         IRIntegerValue maxLevels = 0;
-        if (!_getMetalAccelerationStructureTopology(trace, sink, topologyTagMask, maxLevels))
+        if (!_getMetalAccelerationStructureTopology(
+                trace,
+                targetRequest,
+                sink,
+                topologyTagMask,
+                maxLevels) ||
+            !_validateMetalCurveSupport(trace, targetRequest, sink))
+        {
+            trace->removeAndDeallocate();
+            continue;
+        }
+        if (!_addMetalMotionTags(trace, sink, topologyTagMask))
+        {
+            trace->removeAndDeallocate();
+            continue;
+        }
+        IRBuilder operationBuilder(trace);
+        if (!_setMetalAccelerationStructureType(
+                operationBuilder,
+                trace->getAccelerationStructure(),
+                topologyTagMask,
+                accelerationStructureTypes,
+                sink))
         {
             trace->removeAndDeallocate();
             continue;
@@ -2593,6 +2786,7 @@ void prepareMetalStructuralRayTracing(
                     filterResultInfo,
                     proceduralResultInfo,
                     topologyTagMask,
+                    capabilityTagMask,
                     maxLevels))
             {
                 trace->removeAndDeallocate();

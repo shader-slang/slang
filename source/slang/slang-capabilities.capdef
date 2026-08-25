@@ -211,6 +211,10 @@ def metallib_4_0 : metallib_3_2;
 /// [Version]
 alias metallib_latest = metallib_4_0;
 
+/// Enables Metal ray-tracing acceleration structures built with extended limits.
+/// [Other]
+def metal_raytracing_extended_limits : metal;
+
 // HLSL versions
 
 def _sm_4_0 : hlsl;

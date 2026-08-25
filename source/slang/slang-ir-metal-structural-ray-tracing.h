@@ -8,6 +8,7 @@ namespace Slang
 struct IRFunc;
 struct IRModule;
 class DiagnosticSink;
+class TargetRequest;
 
 enum class MetalStructuralRayTracingTag : UInt
 {
@@ -51,6 +52,7 @@ enum class MetalStructuralRayTracingGeometryKind : UInt
 void prepareMetalStructuralRayTracing(
     IRModule* module,
     List<IRFunc*>& entryPoints,
+    TargetRequest* targetRequest,
     DiagnosticSink* sink);
 
 } // namespace Slang
