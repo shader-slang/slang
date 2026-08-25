@@ -13,6 +13,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == NoMotion
 {
     [ForceInline]
+    [require(structural_raytracing_trace)]
     public void trace(
         RayTraversalDesc desc,
         ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
@@ -44,7 +45,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == PrimitiveMotion
 {
     [ForceInline]
-    [require(metallib_2_4)]
+    [require(structural_raytracing_trace, metallib_2_4)]
     public void trace(
         RayTraversalDesc desc,
         ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
@@ -61,7 +62,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == InstanceMotion
 {
     [ForceInline]
-    [require(metallib_2_4)]
+    [require(structural_raytracing_trace, metallib_2_4)]
     public void trace(
         RayTraversalDesc desc,
         ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
@@ -78,7 +79,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == PrimitiveAndInstanceMotion
 {
     [ForceInline]
-    [require(metallib_2_4)]
+    [require(structural_raytracing_trace, metallib_2_4)]
     public void trace(
         RayTraversalDesc desc,
         ProgramLayout.TraceContext.AccelerationStructure accelerationStructure,
@@ -94,7 +95,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == NoMotion
 {
     [ForceInline]
-    [require(metal)]
+    [require(structural_raytracing_trace, metal)]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -112,7 +113,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == PrimitiveMotion
 {
     [ForceInline]
-    [require(metal)]
+    [require(structural_raytracing_trace, metal)]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -130,7 +131,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == InstanceMotion
 {
     [ForceInline]
-    [require(metal)]
+    [require(structural_raytracing_trace, metal)]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
@@ -148,7 +149,7 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout.TraceContext.Motion == PrimitiveAndInstanceMotion
 {
     [ForceInline]
-    [require(metal)]
+    [require(structural_raytracing_trace, metal)]
     public void trace<let maxLevelCount : int>(
         RayTraversalDesc desc,
         MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
