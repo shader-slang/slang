@@ -2697,6 +2697,7 @@ public:
     void diagnoseInvalidStructuralRayTracingCallableResult(CallableDecl* callableDecl);
     void diagnoseInvalidStructuralRayTracingPropertyType(PropertyDecl* propertyDecl);
     bool diagnoseInvalidStructuralRayTracingConstruction(InvokeExpr* invoke);
+    bool diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke);
 
     void _checkDifferentialConformance(
         ConformanceCheckingContext* context,
