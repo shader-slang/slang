@@ -2429,7 +2429,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // capabilities and an entry point's required capabilities are checked against each
         // other by one shared rule instead of two independently-written incompatibility
         // tests. The rest of this branch's diagnostic and provenance-note logic is
-        // unaffected -- only the yes/no compatibility question is unified here.
+        // unaffected -- only the yes/no compatibility question is unified here. `source`
+        // and `label` are unused at this call site (only the returned count matters
+        // below); they exist because findIncompatibleCapabilityRequirements() is shared
+        // with checkCapabilities(), which does read them to decide which incompatibilities
+        // to diagnose and how to label them.
         List<SourcedCapabilityRequirement> entryPointRequirement = {
             {entryPointInferredCaps, CapabilitySource::EntryPointRequirement, String()}};
         if (findIncompatibleCapabilityRequirements(targetCaps, entryPointRequirement).getCount() !=
