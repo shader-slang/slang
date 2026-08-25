@@ -149,3 +149,4 @@ void main()
 // METAL-DAG: _slang_result.object_to_world_transform
 // METAL-DAG: _slang_result.world_to_object_transform
 // METAL-DAG: _slang_result.user_instance_id
+// METAL-DAG: TMax_{{[0-9]+}}, desc_{{[0-9]+}}.ray_{{[0-9]+}}.Origin_{{[0-9]+}},

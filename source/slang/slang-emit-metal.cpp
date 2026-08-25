@@ -599,6 +599,13 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(trace->getRayData(), getInfo(EmitOp::General));
             if (hasRequirement(
                     missRequirements,
+                    MetalStructuralRayTracingStageRequirement::Distance))
+            {
+                m_writer->emit(", ");
+                emitOperand(trace->getMaxDistance(), getInfo(EmitOp::General));
+            }
+            if (hasRequirement(
+                    missRequirements,
                     MetalStructuralRayTracingStageRequirement::WorldSpaceOrigin))
             {
                 m_writer->emit(", ");
