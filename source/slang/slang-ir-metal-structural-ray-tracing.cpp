@@ -2669,6 +2669,199 @@ static void _makeStructuralRayGenerationEntryPointPhysicalCompute(
         builder.getIntValue(builder.getIntType(), Profile(Stage::Compute).raw));
 }
 
+struct MetalRayGenerationSystemValueThreader
+{
+    MetalRayGenerationSystemValueThreader(
+        IRModule* module,
+        IRType* type,
+        const char* parameterName,
+        const char* metalSystemValue)
+        : module(module)
+        , type(type)
+        , parameterName(parameterName)
+        , metalSystemValue(metalSystemValue)
+    {
+    }
+
+    IRFunc* findEnclosingFunc(IRInst* inst)
+    {
+        for (auto parent = inst; parent; parent = parent->getParent())
+        {
+            if (auto func = as<IRFunc>(parent))
+                return func;
+        }
+        return nullptr;
+    }
+
+    IRInst* findOrCreateParameter(IRInst* inst)
+    {
+        auto func = findEnclosingFunc(inst);
+        SLANG_ASSERT(func);
+        return findOrCreateParameter(func);
+    }
+
+    IRInst* findOrCreateParameter(IRFunc* func)
+    {
+        if (auto found = parameters.tryGetValue(func))
+            return *found;
+
+        auto firstBlock = func->getFirstBlock();
+        SLANG_ASSERT(firstBlock);
+
+        IRBuilder builder(module);
+        auto parameter = builder.createParam(type);
+        builder.addNameHintDecoration(
+            parameter,
+            UnownedTerminatedStringSlice(parameterName));
+        parameter->insertBefore(firstBlock->getFirstOrdinaryInst());
+        parameters.add(func, parameter);
+
+        if (func->findDecoration<IREntryPointDecoration>())
+        {
+            builder.addTargetSystemValueDecoration(
+                parameter,
+                UnownedTerminatedStringSlice(metalSystemValue));
+        }
+
+        fixUpFuncType(func);
+
+        List<IRCall*> callUses;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            if (auto call = as<IRCall>(use->getUser()))
+            {
+                if (call->getCallee() == func)
+                    callUses.add(call);
+            }
+        }
+
+        for (auto call : callUses)
+        {
+            List<IRInst*> args;
+            for (UInt i = 0; i < call->getArgCount(); ++i)
+                args.add(call->getArg(i));
+            args.add(findOrCreateParameter(call));
+
+            builder.setInsertBefore(call);
+            auto newCall = builder.emitCallInst(
+                call->getDataType(),
+                call->getCallee(),
+                args.getCount(),
+                args.getBuffer());
+            call->replaceUsesWith(newCall);
+            call->removeAndDeallocate();
+        }
+        return parameter;
+    }
+
+    void lower(IRCall* call)
+    {
+        call->replaceUsesWith(findOrCreateParameter(call));
+        call->removeAndDeallocate();
+    }
+
+    IRModule* module;
+    IRType* type;
+    const char* parameterName;
+    const char* metalSystemValue;
+    Dictionary<IRFunc*, IRInst*> parameters;
+};
+
+static void _collectMetalRayGenerationSystemValueCalls(
+    IRInst* parent,
+    List<IRCall*>& dispatchIndexCalls,
+    List<IRCall*>& dispatchDimensionsCalls)
+{
+    for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
+    {
+        _collectMetalRayGenerationSystemValueCalls(
+            child,
+            dispatchIndexCalls,
+            dispatchDimensionsCalls);
+        auto call = as<IRCall>(child);
+        if (!call)
+            continue;
+        auto callee = getResolvedInstForDecorations(call->getCallee());
+        auto intrinsic = findAnyTargetIntrinsicDecoration(callee);
+        UnownedStringSlice definition;
+        if (intrinsic)
+            definition = intrinsic->getDefinition();
+        else if (auto nameHint = callee->findDecoration<IRNameHintDecoration>())
+        {
+            // Target specialization removes an intrinsic decoration whose capability set does
+            // not include Metal, but retains the linked core declaration and its linkage name.
+            // Require that exact compiler-owned symbol so a user function with the same source
+            // name is not treated as a built-in.
+            if (auto linkage = callee->findDecoration<IRLinkageDecoration>())
+            {
+                auto mangledName = linkage->getMangledName();
+                if (mangledName == toSlice("_S4core17DispatchRaysIndexp0pv3u") ||
+                    mangledName == toSlice("_S4core22DispatchRaysDimensionsp0pv3u"))
+                {
+                    definition = nameHint->getName();
+                }
+            }
+        }
+        if (definition == toSlice("DispatchRaysIndex"))
+            dispatchIndexCalls.add(call);
+        else if (definition == toSlice("DispatchRaysDimensions"))
+            dispatchDimensionsCalls.add(call);
+    }
+}
+
+static void _lowerMetalRayGenerationSystemValues(
+    IRModule* module,
+    const Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
+    const HashSet<IRFunc*>& physicalRayGenerationEntryPoints)
+{
+    List<IRCall*> dispatchIndexCalls;
+    List<IRCall*> dispatchDimensionsCalls;
+    _collectMetalRayGenerationSystemValueCalls(
+        module->getModuleInst(),
+        dispatchIndexCalls,
+        dispatchDimensionsCalls);
+
+    IRBuilder builder(module);
+    auto uint3Type = builder.getVectorType(
+        builder.getUIntType(),
+        builder.getIntValue(builder.getIntType(), 3));
+    MetalRayGenerationSystemValueThreader dispatchIndexThreader(
+        module,
+        uint3Type,
+        "dispatchRaysIndex",
+        "thread_position_in_grid");
+    MetalRayGenerationSystemValueThreader dispatchDimensionsThreader(
+        module,
+        uint3Type,
+        "dispatchRaysDimensions",
+        "threads_per_grid");
+
+    auto isUsedByPhysicalRayGeneration = [&](IRCall* call)
+    {
+        auto func = dispatchIndexThreader.findEnclosingFunc(call);
+        auto referencing = func ? referencingEntryPoints.tryGetValue(func) : nullptr;
+        if (!referencing)
+            return false;
+        for (auto entryPoint : *referencing)
+        {
+            if (physicalRayGenerationEntryPoints.contains(entryPoint))
+                return true;
+        }
+        return false;
+    };
+
+    for (auto call : dispatchIndexCalls)
+    {
+        if (isUsedByPhysicalRayGeneration(call))
+            dispatchIndexThreader.lower(call);
+    }
+    for (auto call : dispatchDimensionsCalls)
+    {
+        if (isUsedByPhysicalRayGeneration(call))
+            dispatchDimensionsThreader.lower(call);
+    }
+}
+
 void prepareMetalStructuralRayTracing(
     IRModule* module,
     List<IRFunc*>& entryPoints,
@@ -2701,6 +2894,7 @@ void prepareMetalStructuralRayTracing(
     Dictionary<IRFunc*, IRParam*> candidateRayDataParams;
     Dictionary<IRInst*, RefPtr<MetalRayDataInfo>> rayDataInfos;
     Dictionary<IRInst*, IRType*> accelerationStructureTypes;
+    HashSet<IRFunc*> physicalRayGenerationEntryPoints;
     auto filterResultInfo =
         _createMetalCandidateResultType(module, "StructuralRayTracingFilterResult", false);
     auto proceduralResultInfo =
@@ -2713,7 +2907,14 @@ void prepareMetalStructuralRayTracing(
             if (auto referencing = getReferencingEntryPoints(referencingEntryPoints, enclosingFunc))
             {
                 for (auto entryPoint : *referencing)
+                {
                     _makeStructuralRayGenerationEntryPointPhysicalCompute(builder, entryPoint);
+                    if (auto decoration = entryPoint->findDecoration<IREntryPointDecoration>())
+                    {
+                        if (decoration->getProfile().getStage() == Stage::Compute)
+                            physicalRayGenerationEntryPoints.add(entryPoint);
+                    }
+                }
             }
         }
 
@@ -2793,6 +2994,11 @@ void prepareMetalStructuralRayTracing(
             }
         }
     }
+
+    _lowerMetalRayGenerationSystemValues(
+        module,
+        referencingEntryPoints,
+        physicalRayGenerationEntryPoints);
 
     lowerMetalStructuralRayTracingStageInputOperations(module, payloadValues);
     for (auto child = module->getModuleInst()->getFirstChild(); child; child = child->getNextInst())
