@@ -160,20 +160,20 @@ void main()
 // IR: func %TestClosestHitx5Finvoke
 // IR: [structuralRayTracingCallableGroupInfo(%TestCallableGroup,
 // IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 2 : Int, %TestCallableContext,
-// IR-SAME: %TestCallableData, %TestCallable,
+// IR-SAME: %TestCallableData, %TestRecord, %TestCallable,
 // IR-SAME: %TestCallablex5Finvoke)]
 // IR: [structuralRayTracingMissGroupInfo(%TestMissGroup,
 // IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 1 : Int, %TestMissContext,
-// IR-SAME: %TestPayload, %TestMiss, %TestMissx5Finvoke)]
+// IR-SAME: %TestPayload, %TestRecord, %TestMiss, %TestMissx5Finvoke)]
 // IR: [structuralRayTracingHitGroupInfo(%TestProceduralHitGroup,
 // IR-SAME: %TestProceduralSlot, 3 : Int, %TestProceduralHitContext,
-// IR-SAME: %rtx5FBoundingBoxPrimitive, %TestPayload,
+// IR-SAME: %rtx5FBoundingBoxPrimitive, %TestPayload, %TestRecord,
 // IR-SAME: %TestAttributes, 3 : Int, %TestProceduralClosestHit,
 // IR-SAME: %TestProceduralClosestHitx5Finvoke, %TestAnyHit, %TestAnyHitx5Finvoke,
 // IR-SAME: %TestIntersection, %TestIntersectionx5Finvoke)]
 // IR: [structuralRayTracingHitGroupInfo(%TestHitGroup,
 // IR-SAME: %rtx5FShaderGroupSlot{{[0-9]*}}, 0 : Int, %TestHitContext,
-// IR-SAME: %rtx5FTrianglePrimitive, %TestPayload, %rtx5FTriangleData,
+// IR-SAME: %rtx5FTrianglePrimitive, %TestPayload, %TestRecord, %rtx5FTriangleData,
 // IR-SAME: 1 : Int, %TestClosestHit, %TestClosestHitx5Finvoke,
 // IR-SAME: Void, void_constant, Void, void_constant)]
 // IR: structuralRayTracingTrace({{.*}}, %TestProgramLayout, %TestTraceContext,

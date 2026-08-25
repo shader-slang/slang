@@ -906,5 +906,6 @@ return {
 	["Decoration.metalVisibleFunction"] = 930,
 	["Decoration.metalIntersectionFunction"] = 931,
 	["metalStructuralRayTracingTrace"] = 932,
-	["StructuralRayTracingStageInputOperation.structuralRayTracingGetCurveParameter"] = 933
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetCurveParameter"] = 933,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRecord"] = 934
 }

@@ -19,7 +19,10 @@ struct SphereAttributes
     float3 normal;
 }
 
-struct TestRecord {}
+struct TestRecord
+{
+    float bias;
+}
 
 struct HitContext : rt::IHitContext
 {
@@ -33,7 +36,7 @@ struct TestIntersection : rt::IIntersectionShader<HitContext>
     void invoke(rt::IntersectionInput<HitContext> input)
     {
         SphereAttributes attributes = { float3(1.0, 2.0, 3.0) };
-        input.reportHit(4.0, 17, attributes);
+        input.reportHit(4.0 + input.record.bias, 17, attributes);
     }
 }
 
@@ -43,6 +46,7 @@ struct TestClosestHit : rt::IClosestHitShader<HitContext>
     {
         input.payload.value = input.attributes.normal.x + input.distance + input.hitKind;
         input.payload.value += input.worldSpaceOrigin.y + input.worldSpaceDirection.z;
+        input.payload.value += input.record.bias;
     }
 }
 
@@ -78,6 +82,7 @@ void main()
 // METAL: struct ProgramLayout_rayData_0
 // METAL: TestPayload_0 payload_{{[0-9]+}};
 // METAL: SphereAttributes_0 HitGroup_attributes_{{[0-9]+}};
+// METAL: uint device* descriptorData_{{[0-9]+}};
 // METAL: uint customHitKind_{{[0-9]+}};
 // METAL: visible_function_table<void(ProgramLayout_rayData_0 thread*, float, uint, float3, float3)>
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
@@ -92,3 +97,6 @@ void main()
 // METAL-SAME: float3 worldSpaceDirection_{{[0-9]+}})
 // METAL: HitGroup_attributes_{{[0-9]+}}.normal_{{[0-9]+}}.x
 // METAL: customHitKind_{{[0-9]+}}
+// METAL: TestRecord_0 device*
+// METAL: descriptorData_{{[0-9]+}} + int(1)
+// METAL: .bias_{{[0-9]+}}
