@@ -17,8 +17,9 @@ public interface IAnyHitShader<Context>
     void invoke(AnyHitInput<Context> input);
 }
 
-// This stage-neutral marker also admits the built-in NoIntersection placeholder.
-public interface IIntersectionStage<Context>
+// This compiler-owned marker admits either IIntersectionShader or the built-in NoIntersection
+// placeholder without exposing a third extension point to user code.
+internal interface IIntersectionStage<Context>
     where Context : IHitContext
 {}
 
