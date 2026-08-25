@@ -1,7 +1,6 @@
 # Build the experimental slang.raytracing standard module.
 
-set(
-    raytracing_shader_sources
+set(raytracing_shader_sources
     raytracing.slang
     ray-types.slang
     contexts.slang
@@ -12,8 +11,7 @@ set(
     trace.slang
 )
 
-set(
-    raytracing_output_dir
+set(raytracing_output_dir
     "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
 )
 
@@ -31,10 +29,7 @@ foreach(shader_file ${raytracing_shader_sources})
     list(APPEND raytracing_copied_files ${dest_file})
 endforeach()
 
-set(
-    raytracing_module_file
-    "${raytracing_output_dir}/raytracing.slang-module"
-)
+set(raytracing_module_file "${raytracing_output_dir}/raytracing.slang-module")
 
 if(SLANG_GENERATORS_PATH)
     if(CMAKE_HOST_WIN32)
@@ -42,8 +37,7 @@ if(SLANG_GENERATORS_PATH)
     else()
         set(CMAKE_HOST_EXECUTABLE_SUFFIX "")
     endif()
-    set(
-        RAYTRACING_SLANG_COMPILER
+    set(RAYTRACING_SLANG_COMPILER
         "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}"
     )
     set(RAYTRACING_SLANG_COMPILER_DEPENDENCY)
@@ -54,8 +48,7 @@ else()
     set(RAYTRACING_SLANG_COMPILER slang-bootstrap)
     set(RAYTRACING_SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
-set(
-    RAYTRACING_SLANG_COMPILER_CORE_MODULE_ARGS
+set(RAYTRACING_SLANG_COMPILER_CORE_MODULE_ARGS
     -load-core-module
     ${core_module_archive_without_timestamp}
 )
@@ -63,7 +56,8 @@ set(
 add_custom_command(
     OUTPUT ${raytracing_module_file}
     COMMAND
-        ${RAYTRACING_SLANG_COMPILER} ${RAYTRACING_SLANG_COMPILER_CORE_MODULE_ARGS} -I
+        ${RAYTRACING_SLANG_COMPILER}
+        ${RAYTRACING_SLANG_COMPILER_CORE_MODULE_ARGS} -I
         ${CMAKE_CURRENT_SOURCE_DIR} raytracing.slang -o raytracing.slang-module
     DEPENDS
         ${raytracing_copied_files}
