@@ -2751,14 +2751,20 @@ struct MetalArgumentBufferContentsLayoutRulesImpl : MetalLayoutRulesImpl
     }
 };
 
+// These rules lay out a resource object field like a texture or buffer inside an argument
+// buffer, the way the rules above lay out a scalar or vector field, so both kinds of field
+// end up carrying the tier 1 slot and the tier 2 bytes. GetObjectLayout combines the bytes
+// from the tier 2 object rules with the slots from the argument buffer element rules, because
+// a resource object can occupy more than one slot whereas a scalar or vector always occupies
+// exactly one.
 struct MetalArgumentBufferContentsObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 {
     ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& options) override
     {
         ObjectLayoutInfo info = kMetalTier2ObjectLayoutRulesImpl.GetObjectLayout(kind, options);
-        for (auto slot :
+        for (auto entry :
              kMetalArgumentBufferElementLayoutRulesImpl.GetObjectLayout(kind, options).layoutInfos)
-            info.layoutInfos.add(slot);
+            info.layoutInfos.add(entry);
         return info;
     }
 };
@@ -3911,10 +3917,15 @@ static bool _usesExistentialData(RefPtr<TypeLayout> typeLayout)
 /// to the resource usage of a container like a `ConstantBuffer<X>` or
 /// `ParameterBlock<X>`.
 ///
-/// TODO: letUnformBleedThrough is (hopefully temporary) a hack that was added to enable CPU targets
-/// to produce workable layout. CPU targets have all bindings/variables laid out as uniforms
+/// TODO: isContainer gates a (hopefully temporary) hack that was added to enable CPU targets
+/// to produce workable layout. CPU targets have all bindings and variables laid out as
+/// uniforms, so masking uniform usage there would suppress the entire layout, and the flag
+/// exists to let that usage pass through for CPU targets even inside a parameter group. The
+/// flag also carries the container's MetalArgumentBufferElement slot through, which is
+/// intended Metal behavior and not the temporary part, so isContainer must stay even after
+/// the CPU hack is removed.
 static void _addUnmaskedResourceUsage(
-    bool letUniformBleedThrough,
+    bool isContainer,
     TypeLayout* dstTypeLayout,
     TypeLayout* srcTypeLayout,
     bool haveFullRegisterSpaceOrSet)
@@ -3925,7 +3936,7 @@ static void _addUnmaskedResourceUsage(
         {
         case LayoutResourceKind::Uniform:
             // Ordinary/uniform resource usage will always be masked.
-            if (letUniformBleedThrough)
+            if (isContainer)
             {
                 dstTypeLayout->addResourceUsage(resInfo);
             }
@@ -3934,7 +3945,7 @@ static void _addUnmaskedResourceUsage(
             // The element's slots stay private to the group, but the container's slot counts
             // the group's own place in an enclosing argument buffer, so it bleeds through the
             // way the container's uniform bytes do.
-            if (letUniformBleedThrough)
+            if (isContainer)
                 dstTypeLayout->addResourceUsage(resInfo);
             break;
         case LayoutResourceKind::SubElementRegisterSpace:
@@ -5582,6 +5593,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         typeLayout->elementTypeLayout = element.layout;
         typeLayout->uniformStride = element.info.getUniformLayout().size.getFiniteValue();
 
+        // Record every entry's resource usage. The uniform alignment comes from the Uniform entry
+        // when the layout has one, and stays at its default when the layout has none.
         for (auto layoutInfo : info.layoutInfos)
         {
             if (layoutInfo.kind == LayoutResourceKind::Uniform)
@@ -5589,6 +5602,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             typeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
         }
 
+        // A Metal argument buffer vector layout carries both a Uniform entry and a
+        // MetalArgumentBufferElement slot, so getSimple would assert here. Use
+        // getUniformOrSimple to extract only the Uniform entry for the TypeLayoutResult.
+        // The slot entries are already recorded on typeLayout.
         return TypeLayoutResult(typeLayout, info.getUniformOrSimple());
     }
     else if (auto matType = as<MatrixExpressionType>(type))
@@ -5679,7 +5696,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         typeLayout->addResourceUsage(info.kind, info.size);
 
-        // A matrix takes one argument buffer slot per element along its major axis.
+        // A matrix occupies one argument buffer slot per element along its major axis.
+        // Any Metal vector occupies exactly one slot regardless of its element count, so
+        // rowResInfo.size is 1 here, and multiplying by layoutMajorCount (adjusted above for
+        // column major layout) gives the correct total slot count along the major axis.
         for (auto rowResInfo : rowInfo.layoutInfos)
         {
             if (rowResInfo.kind == LayoutResourceKind::Uniform)

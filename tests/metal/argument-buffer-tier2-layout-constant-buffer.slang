@@ -20,8 +20,10 @@ void computeMain()
 
 // CHECK: "name": "cb"
 // CHECK: "binding": {"kind": "constantBuffer", "index": 0}
+// CHECK-NOT: metalArgumentBufferElement
 // CHECK: "name": "v"
 // CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 16, "elementStride": 4}
+// CHECK-NOT: metalArgumentBufferElement
 // CHECK: "name": "s"
 // CHECK: "binding": {"kind": "uniform", "offset": 16, "size": 4, "elementStride": 0}
 // CHECK-NOT: metalArgumentBufferElement

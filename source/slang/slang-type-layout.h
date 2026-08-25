@@ -729,6 +729,12 @@ struct ObjectLayoutInfo
         SLANG_ASSERT(layoutInfos.getCount() == 1);
         return layoutInfos[0];
     }
+    // Return the Uniform entry from this layout if one is present, otherwise fall back to
+    // the single entry (via getSimple). The layout must have a Uniform entry or exactly one
+    // entry. A layout with two or more entries and no Uniform entry falls through to
+    // getSimple and asserts. Metal argument buffer element layouts carry both a Uniform
+    // entry (byte size) and a MetalArgumentBufferElement entry (slot count), so callers that
+    // want only the byte layout use this method instead of getSimple.
     SimpleLayoutInfo getUniformOrSimple()
     {
         for (auto layoutInfo : layoutInfos)
@@ -1330,7 +1336,9 @@ enum class ShaderParameterKind
 
 struct SimpleLayoutRulesImpl
 {
-    // Get size and alignment for a single value of base type.
+    // Get the layout for a single scalar value of the base type. The result holds the size and
+    // alignment in one entry, and the Metal argument buffer rules add a MetalArgumentBufferElement
+    // slot as a second entry.
     virtual ObjectLayoutInfo GetScalarLayout(
         BaseType baseType,
         const TypeLayoutContext& context) = 0;
@@ -1343,7 +1351,9 @@ struct SimpleLayoutRulesImpl
     /// Get pointer layout, which can depend on the target.
     virtual SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) = 0;
 
-    // Get layout for a vector or matrix type
+    // Get the layout for a vector or matrix type. The result holds the size and alignment in one
+    // entry, and the Metal argument buffer rules add a MetalArgumentBufferElement slot as a second
+    // entry.
     virtual ObjectLayoutInfo GetVectorLayout(
         BaseType elementType,
         SimpleLayoutInfo elementInfo,
