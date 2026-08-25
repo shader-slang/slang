@@ -50,6 +50,59 @@ static void _registerRayTracingAPIUse(
         .otherDecl = otherDecl});
 }
 
+static bool _isCoreLegacyTraceMethod(FunctionDeclBase* functionDecl)
+{
+    if (!functionDecl || !functionDecl->getName())
+        return false;
+
+    auto name = functionDecl->getName()->text.getUnownedSlice();
+    if (name != "TraceRay" && name != "TraceMotionRay")
+        return false;
+
+    // Only the top-level core intrinsics define the legacy pipeline API. Methods such as
+    // RayQuery.TraceRayInline and HitObject.TraceRay are separate APIs that may coexist with a
+    // structural pipeline.
+    for (auto parent = functionDecl->parentDecl; parent; parent = parent->parentDecl)
+    {
+        if (as<AggTypeDecl>(parent))
+            return false;
+        if (auto moduleDecl = as<ModuleDecl>(parent))
+            return moduleDecl->hasModifier<FromCoreModuleModifier>();
+    }
+    return false;
+}
+
+void registerRayTracingAPICall(
+    Linkage* linkage,
+    FunctionDeclBase* caller,
+    FunctionDeclBase* callee,
+    SourceLoc callLoc,
+    DiagnosticSink* sink)
+{
+    auto& registry = linkage->getStructuralRayTracingDeclRegistry();
+    registry.registerFunctionCall(caller, callee, callLoc);
+    if (!registry.isInitialized() || !caller || !callee)
+        return;
+
+    auto callerModule = getModule(caller);
+    if (!callerModule || registry.isTrustedModule(callerModule))
+        return;
+
+    if (registry.isTraceMethod(callee) || registry.isCallShaderMethod(callee))
+    {
+        _registerRayTracingAPIUse(
+            linkage,
+            callerModule,
+            RayTracingAPIFamily::Structural,
+            caller,
+            sink);
+    }
+    else if (_isCoreLegacyTraceMethod(callee))
+    {
+        _registerRayTracingAPIUse(linkage, callerModule, RayTracingAPIFamily::Legacy, caller, sink);
+    }
+}
+
 void SemanticsVisitor::registerStructuralRayTracingStageConformance(
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable)
@@ -112,6 +165,43 @@ void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink)
         family,
         entryPointDecl,
         sink);
+}
+
+void diagnoseMixedRayTracingAPIsInSelectedProgram(
+    Linkage* linkage,
+    List<EntryPoint*> const& entryPoints,
+    DiagnosticSink* sink)
+{
+    auto& registry = linkage->getStructuralRayTracingDeclRegistry();
+    if (!registry.isInitialized())
+        return;
+
+    Decl* structuralDecl = nullptr;
+    Decl* legacyDecl = nullptr;
+    for (auto entryPoint : entryPoints)
+    {
+        auto entryPointDecl = entryPoint->getFuncDecl();
+        if (entryPoint->getStructuralRayTracingInvokeMethod() ||
+            registry.functionReachesStructuralTrace(entryPointDecl))
+        {
+            if (!structuralDecl)
+                structuralDecl = entryPointDecl;
+        }
+        else if (_isLegacyRayTracingStage(entryPoint->getStage()))
+        {
+            if (!legacyDecl)
+                legacyDecl = entryPointDecl;
+        }
+    }
+
+    if (!structuralDecl || !legacyDecl || getModule(structuralDecl) == getModule(legacyDecl))
+        return;
+
+    sink->diagnose(Diagnostics::MixedRayTracingApisInProgram{
+        .currentAPI = "legacy",
+        .otherAPI = "structural",
+        .currentDecl = legacyDecl,
+        .otherDecl = structuralDecl});
 }
 
 static void _registerAttributedLegacyEntryPoints(
