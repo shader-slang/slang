@@ -654,10 +654,14 @@ StructuralRayTracingStageInputOperationKind StructuralRayTracingDeclRegistry::
     return StructuralRayTracingStageInputOperationKind::Count;
 }
 
-bool StructuralRayTracingDeclRegistry::isTraceMethod(FunctionDeclBase* functionDecl) const
+static bool _isRayTracerMethod(
+    FunctionDeclBase* functionDecl,
+    ModuleDecl* trustedModuleDecl,
+    AggTypeDecl* rayTracerType,
+    UnownedStringSlice expectedName)
 {
-    if (!functionDecl || !m_trustedModuleDecl || !m_rayTracerType || !functionDecl->getName() ||
-        functionDecl->getName()->text != "trace")
+    if (!functionDecl || !trustedModuleDecl || !rayTracerType || !functionDecl->getName() ||
+        functionDecl->getName()->text.getUnownedSlice() != expectedName)
     {
         return false;
     }
@@ -674,11 +678,25 @@ bool StructuralRayTracingDeclRegistry::isTraceMethod(FunctionDeclBase* functionD
             break;
         }
     }
-    if (moduleDecl != m_trustedModuleDecl || !extensionDecl)
+    if (moduleDecl != trustedModuleDecl || !extensionDecl)
         return false;
 
     auto targetType = as<DeclRefType>(extensionDecl->targetType.type);
-    return targetType && targetType->getDeclRef().getDecl() == m_rayTracerType;
+    return targetType && targetType->getDeclRef().getDecl() == rayTracerType;
+}
+
+bool StructuralRayTracingDeclRegistry::isTraceMethod(FunctionDeclBase* functionDecl) const
+{
+    return _isRayTracerMethod(functionDecl, m_trustedModuleDecl, m_rayTracerType, toSlice("trace"));
+}
+
+bool StructuralRayTracingDeclRegistry::isCallShaderMethod(FunctionDeclBase* functionDecl) const
+{
+    return _isRayTracerMethod(
+        functionDecl,
+        m_trustedModuleDecl,
+        m_rayTracerType,
+        toSlice("callShader"));
 }
 
 FunctionDeclBase* StructuralRayTracingDeclRegistry::getStageInvokeRequirement(
@@ -740,14 +758,17 @@ bool StructuralRayTracingDeclRegistry::registerAPIUse(
 
 void StructuralRayTracingDeclRegistry::registerFunctionCall(
     FunctionDeclBase* caller,
-    FunctionDeclBase* callee)
+    FunctionDeclBase* callee,
+    SourceLoc callLoc)
 {
     if (!caller || !callee || !isInitialized())
         return;
 
     m_functionCallees.getOrAddValue(caller, HashSet<FunctionDeclBase*>()).add(callee);
-    if (isTraceMethod(callee))
-        m_structuralTraceCallers.add(caller);
+    if (isTraceMethod(callee) || isCallShaderMethod(callee))
+        m_structuralProgramCallers.add(caller);
+    if (isCallShaderMethod(callee))
+        m_callShaderCallers[caller] = callLoc;
 }
 
 bool StructuralRayTracingDeclRegistry::functionReachesStructuralTrace(
@@ -764,8 +785,37 @@ bool StructuralRayTracingDeclRegistry::functionReachesStructuralTrace(
         auto current = workList[i];
         if (!visited.add(current))
             continue;
-        if (m_structuralTraceCallers.contains(current))
+        if (m_structuralProgramCallers.contains(current))
             return true;
+        if (auto callees = m_functionCallees.tryGetValue(current))
+        {
+            for (auto callee : *callees)
+                workList.add(callee);
+        }
+    }
+    return false;
+}
+
+bool StructuralRayTracingDeclRegistry::findReachableCallShader(
+    FunctionDeclBase* function,
+    SourceLoc& outCallLoc) const
+{
+    if (!function)
+        return false;
+
+    HashSet<FunctionDeclBase*> visited;
+    List<FunctionDeclBase*> workList;
+    workList.add(function);
+    for (Index i = 0; i < workList.getCount(); ++i)
+    {
+        auto current = workList[i];
+        if (!visited.add(current))
+            continue;
+        if (auto callLoc = m_callShaderCallers.tryGetValue(current))
+        {
+            outCallLoc = *callLoc;
+            return true;
+        }
         if (auto callees = m_functionCallees.tryGetValue(current))
         {
             for (auto callee : *callees)

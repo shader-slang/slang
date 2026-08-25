@@ -149,12 +149,48 @@ static void _registerAttributedLegacyEntryPoints(
     }
 }
 
+static void _diagnoseInvalidCallableDispatchStages(
+    StructuralRayTracingDeclRegistry& registry,
+    ContainerDecl* containerDecl,
+    DiagnosticSink* sink)
+{
+    for (auto member : containerDecl->getDirectMemberDecls())
+    {
+        auto innerMember = member;
+        if (auto genericDecl = as<GenericDecl>(innerMember))
+            innerMember = genericDecl->inner;
+
+        if (auto functionDecl = as<FunctionDeclBase>(innerMember))
+        {
+            auto stageKind = registry.getStageKind(functionDecl);
+            if (stageKind == StructuralRayTracingStageKind::AnyHit ||
+                stageKind == StructuralRayTracingStageKind::Intersection)
+            {
+                SourceLoc callLoc;
+                if (registry.findReachableCallShader(functionDecl, callLoc))
+                {
+                    auto stageName = stageKind == StructuralRayTracingStageKind::AnyHit
+                                         ? "any-hit"
+                                         : "intersection";
+                    sink->diagnose(Diagnostics::StructuralRayTracingCallableStageMismatch{
+                        .stage = stageName,
+                        .location = callLoc});
+                }
+            }
+        }
+
+        if (auto childContainer = as<ContainerDecl>(innerMember))
+            _diagnoseInvalidCallableDispatchStages(registry, childContainer, sink);
+    }
+}
+
 void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink)
 {
     auto& registry = linkage->getStructuralRayTracingDeclRegistry();
     if (!registry.isInitialized())
         return;
     _registerAttributedLegacyEntryPoints(linkage, module, module->getModuleDecl(), sink);
+    _diagnoseInvalidCallableDispatchStages(registry, module->getModuleDecl(), sink);
 }
 
 static StructuralRayTracingStageKind _findStageImplementationFromParentConformance(

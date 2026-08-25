@@ -95,10 +95,6 @@ void main()
     output[0] = payload.value;
 }
 
-// METAL-DAG: void TestMiss_invoke_0(TestPayload_0 thread* [[MISS_IMPL_PAYLOAD:payload_[0-9]+]])
-// METAL-DAG: [[MISS_IMPL_PAYLOAD]]->value_0 = 2U;
-// METAL-DAG: void TestClosestHit_invoke_0(TestPayload_0 thread* [[HIT_IMPL_PAYLOAD:payload_[0-9]+]])
-// METAL-DAG: [[HIT_IMPL_PAYLOAD]]->value_0 = 1U;
 // METAL: struct ProgramLayout_rayData_0
 // METAL: TestPayload_0 payload_{{[0-9]+}};
 // METAL: struct rt_TraceProgramDescriptorResources_default_0

@@ -8,7 +8,7 @@
 namespace Slang
 {
 
-static void _collectTraceOperations(IRInst* parent, List<IRInst*>& operations);
+static void _collectProgramOperations(IRInst* parent, List<IRInst*>& operations);
 
 static Stage _getStructuralRayTracingNativeStage(StructuralRayTracingStageKind kind)
 {
@@ -210,13 +210,40 @@ static void _validateStructuralRayTracingGroupSlot(
     }
 }
 
+static void _validateStructuralRayTracingCallableData(
+    IRStructuralRayTracingCallShader* callOperation,
+    DiagnosticSink* sink)
+{
+    bool hasCallableGroup = false;
+    for (auto decoration : callOperation->getDecorations())
+    {
+        auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration);
+        if (!group)
+            continue;
+        hasCallableGroup = true;
+        if (group->getCallableDataType() != callOperation->getCallableDataType())
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingCallableDataMismatch{
+                .slot = Int64(group->getSlotIndex()->getValue()),
+                .actualType = group->getCallableDataType(),
+                .expectedType = callOperation->getCallableDataType(),
+                .location = callOperation->sourceLoc});
+        }
+    }
+    if (!hasCallableGroup)
+    {
+        sink->diagnose(Diagnostics::StructuralRayTracingCallWithoutGroups{
+            .location = callOperation->sourceLoc});
+    }
+}
+
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
     List<IRFunc*>& ioEntryPoints,
     DiagnosticSink* sink)
 {
-    List<IRInst*> traceOperations;
-    _collectTraceOperations(module->getModuleInst(), traceOperations);
+    List<IRInst*> programOperations;
+    _collectProgramOperations(module->getModuleInst(), programOperations);
     List<StructuralRayTracingGeneratedEntryPoint> generated;
 
     for (auto entryPoint : ioEntryPoints)
@@ -231,8 +258,10 @@ void synthesizePortableStructuralRayTracingEntryPoints(
         }
     }
 
-    for (auto operation : traceOperations)
+    for (auto operation : programOperations)
     {
+        if (auto callOperation = as<IRStructuralRayTracingCallShader>(operation))
+            _validateStructuralRayTracingCallableData(callOperation, sink);
         HashSet<IRIntegerValue> hitSlots;
         HashSet<IRIntegerValue> missSlots;
         HashSet<IRIntegerValue> callableSlots;
@@ -587,6 +616,49 @@ void lowerMetalStructuralRayTracingStageInputOperations(
                 builder.setInsertBefore(operation);
                 auto record = builder.emitLoad(threader.findOrCreateParameter(operation));
                 operation->replaceUsesWith(record);
+                loweredOperations.add(operation);
+            }
+        }
+    }
+
+    for (auto operation : loweredOperations)
+        operation->removeAndDeallocate();
+    loweredOperations.clear();
+
+    // Callable adapters bind the source data property to their thread-local visible-function
+    // parameter. Thread any copy left in the exported source helper through the same ordinary
+    // pointer type so the compiler-owned property operation cannot survive to legalization.
+    HashSet<IRType*> remainingCallableDataTypes;
+    operations.clear();
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    for (auto operation : operations)
+    {
+        if (operation->getOp() != kIROp_StructuralRayTracingGetCallableData)
+            continue;
+        auto dataPointerType = as<IRPtrTypeBase>(operation->getDataType());
+        SLANG_ASSERT(dataPointerType);
+        remainingCallableDataTypes.add(dataPointerType->getValueType());
+    }
+
+    for (auto dataType : remainingCallableDataTypes)
+    {
+        IRBuilder builder(module);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            builder.getPtrType(dataType, AddressSpace::ThreadLocal),
+            LayoutResourceKind::CallablePayload,
+            "data",
+            nullptr,
+            true,
+            true);
+        for (auto operation : operations)
+        {
+            if (operation->getOp() != kIROp_StructuralRayTracingGetCallableData)
+                continue;
+            auto dataPointerType = cast<IRPtrTypeBase>(operation->getDataType());
+            if (dataPointerType->getValueType() == dataType)
+            {
+                operation->replaceUsesWith(threader.findOrCreateParameter(operation));
                 loweredOperations.add(operation);
             }
         }
@@ -969,40 +1041,57 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
     }
 }
 
-static void _collectTraceOperations(IRInst* parent, List<IRInst*>& operations)
+static void _collectProgramOperations(IRInst* parent, List<IRInst*>& operations)
 {
     for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
     {
-        _collectTraceOperations(child, operations);
-        if (child->getOp() == kIROp_StructuralRayTracingTrace)
+        _collectProgramOperations(child, operations);
+        if (child->getOp() == kIROp_StructuralRayTracingTrace ||
+            child->getOp() == kIROp_StructuralRayTracingCallShader)
             operations.add(child);
     }
 }
 
-void lowerPortableStructuralRayTracingTraceOperations(IRModule* module)
+void lowerPortableStructuralRayTracingOperations(IRModule* module)
 {
     List<IRInst*> operations;
-    _collectTraceOperations(module->getModuleInst(), operations);
+    _collectProgramOperations(module->getModuleInst(), operations);
 
     IRBuilder builder(module);
     for (auto operation : operations)
     {
-        auto traceOperation = cast<IRStructuralRayTracingTrace>(operation);
         builder.setInsertBefore(operation);
-
-        IRInst* arguments[] = {
-            traceOperation->getTracer(),
-            traceOperation->getDesc(),
-            traceOperation->getAccelerationStructure(),
-            traceOperation->getDescriptor(),
-            traceOperation->getPayload(),
-        };
-
-        auto call = builder.emitCallInst(
-            traceOperation->getDataType(),
-            traceOperation->getFallback(),
-            SLANG_COUNT_OF(arguments),
-            arguments);
+        IRInst* call = nullptr;
+        if (auto traceOperation = as<IRStructuralRayTracingTrace>(operation))
+        {
+            IRInst* arguments[] = {
+                traceOperation->getTracer(),
+                traceOperation->getDesc(),
+                traceOperation->getAccelerationStructure(),
+                traceOperation->getDescriptor(),
+                traceOperation->getPayload(),
+            };
+            call = builder.emitCallInst(
+                traceOperation->getDataType(),
+                traceOperation->getFallback(),
+                SLANG_COUNT_OF(arguments),
+                arguments);
+        }
+        else
+        {
+            auto callOperation = cast<IRStructuralRayTracingCallShader>(operation);
+            IRInst* arguments[] = {
+                callOperation->getTracer(),
+                callOperation->getCallableIndex(),
+                callOperation->getDescriptor(),
+                callOperation->getData(),
+            };
+            call = builder.emitCallInst(
+                callOperation->getDataType(),
+                callOperation->getFallback(),
+                SLANG_COUNT_OF(arguments),
+                arguments);
+        }
         operation->replaceUsesWith(call);
         operation->removeAndDeallocate();
     }

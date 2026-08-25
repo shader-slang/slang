@@ -446,6 +446,30 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    if (auto callShader = as<IRMetalStructuralRayTracingCallShader>(inst))
+    {
+        auto callableFunctionsField = cast<IRStructField>(callShader->getCallableFunctionsField());
+        auto descriptorResourcesType =
+            cast<IRUniformParameterGroupType>(callShader->getDescriptorResourcesType());
+        m_writer->emit("((");
+        emitType(descriptorResourcesType->getElementType());
+        m_writer->emit(" constant*)(");
+        emitOperand(callShader->getDescriptorResources(), getInfo(EmitOp::General));
+        m_writer->emit("))->");
+        m_writer->emit(getName(callableFunctionsField->getKey()));
+        m_writer->emit("[");
+        emitOperand(callShader->getCallableIndex(), getInfo(EmitOp::General));
+        m_writer->emit("](");
+        emitOperand(callShader->getData(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        m_writer->emit("(constant uint*)(");
+        emitOperand(callShader->getDescriptorResources(), getInfo(EmitOp::General));
+        m_writer->emit(")");
+        m_writer->emit(", ");
+        emitOperand(callShader->getRecords(), getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+        return true;
+    }
     if (auto trace = as<IRMetalStructuralRayTracingTrace>(inst))
     {
         auto tagMask = IRIntegerValue(getIntVal(trace->getTagMask()));
@@ -564,6 +588,15 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", ");
                 emitOperand(trace->getDirection(), getInfo(EmitOp::General));
             }
+            if (hasRequirement(
+                    missRequirements,
+                    MetalStructuralRayTracingStageRequirement::CallableDispatch))
+            {
+                m_writer->emit(", ");
+                m_writer->emit("(constant uint*)(");
+                emitOperand(trace->getDescriptorResources(), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
             m_writer->emit(");\n");
         }
         m_writer->dedent();
@@ -638,6 +671,15 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             {
                 m_writer->emit(", ");
                 emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::CallableDispatch))
+            {
+                m_writer->emit(", ");
+                m_writer->emit("(constant uint*)(");
+                emitOperand(trace->getDescriptorResources(), getInfo(EmitOp::General));
+                m_writer->emit(")");
             }
             m_writer->emit(");\n");
             m_writer->dedent();

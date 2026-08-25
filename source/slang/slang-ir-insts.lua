@@ -1252,6 +1252,23 @@ local insts = {
 		},
 	},
 	{
+		structuralRayTracingCallShader = {
+			operands = {
+				{ "fallback" },
+				{ "programLayout" },
+				{ "traceContext" },
+				{ "callableGroups" },
+				{ "callableGroupTypes" },
+				{ "callableContext" },
+				{ "callableDataType" },
+				{ "tracer" },
+				{ "callableIndex" },
+				{ "descriptor" },
+				{ "data" },
+			},
+		},
+	},
+	{
 		metalStructuralRayTracingTrace = {
 			operands = {
 				{ "tagMask" },
@@ -1275,8 +1292,21 @@ local insts = {
 				{ "intersectionFunctions" },
 				{ "missFunctions" },
 				{ "closestHitFunctions" },
+				{ "descriptorResources" },
 				{ "records" },
 				{ "rayData" },
+			},
+		},
+	},
+	{
+		metalStructuralRayTracingCallShader = {
+			operands = {
+				{ "callableIndex" },
+				{ "data" },
+				{ "descriptorResources" },
+				{ "records" },
+				{ "descriptorResourcesType" },
+				{ "callableFunctionsField" },
 			},
 		},
 	},
