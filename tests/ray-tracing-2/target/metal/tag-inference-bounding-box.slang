@@ -87,4 +87,4 @@ void main()
 // METAL-SAME: bool opaque_{{[0-9]+}} {{\[\[}}opaque]]
 // METAL: if(opaque_
 // METAL: break;
-// METAL: payloadStorage_{{[0-9]+}})->value_{{[0-9]+}} = worldSpaceOrigin_
+// METAL: rayDataStorage_{{[0-9]+}})->payload_{{[0-9]+}})->value_{{[0-9]+}} = worldSpaceOrigin_

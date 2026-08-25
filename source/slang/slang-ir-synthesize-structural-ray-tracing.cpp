@@ -487,7 +487,9 @@ static void _collectStructuralEntryPoints(IRModule* module, List<IRFunc*>& entry
     }
 }
 
-void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module)
+void lowerMetalStructuralRayTracingStageInputOperations(
+    IRModule* module,
+    const Dictionary<IRFunc*, IRInst*>& entryPointPayloadValues)
 {
     List<IRInst*> operations;
     _collectStageInputOperations(module->getModuleInst(), operations);
@@ -519,15 +521,12 @@ void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module)
             false);
         for (auto entryPoint : structuralEntryPoints)
         {
-            if (!entryPoint->findDecoration<IRMetalVisibleFunctionDecoration>())
-                continue;
             auto info =
                 entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
             if (!info || info->getPayloadType() != payloadType)
                 continue;
-            auto parameter = entryPoint->getFirstParam();
-            SLANG_ASSERT(parameter);
-            threader.registerParameter(entryPoint, parameter);
+            if (auto payloadValue = entryPointPayloadValues.tryGetValue(entryPoint))
+                threader.registerParameter(entryPoint, *payloadValue);
         }
         for (auto operation : operations)
         {
@@ -545,6 +544,70 @@ void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module)
 
     for (auto operation : loweredOperations)
         operation->removeAndDeallocate();
+    loweredOperations.clear();
+
+    // Generated Metal adapters consume hit attributes from their native parameters or ray-data
+    // state before reaching this point. A selected source-stage implementation remains exported as
+    // an ordinary helper, though, so thread any attributes left in that helper graph through an
+    // ordinary parameter. This keeps compiler-owned aggregate operations out of general type
+    // legalization without assigning a native Metal stage ABI to the source helper itself.
+    HashSet<IRType*> remainingHitAttributeTypes;
+    operations.clear();
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    for (auto operation : operations)
+    {
+        if (operation->getOp() == kIROp_StructuralRayTracingGetHitAttributes)
+            remainingHitAttributeTypes.add(operation->getDataType());
+    }
+
+    for (auto attributeType : remainingHitAttributeTypes)
+    {
+        IRBuilder builder(module);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            builder.getPtrType(attributeType, AddressSpace::ThreadLocal),
+            LayoutResourceKind::HitAttributes,
+            "attributes",
+            nullptr,
+            false,
+            false);
+        for (auto operation : operations)
+        {
+            if (operation->getOp() == kIROp_StructuralRayTracingGetHitAttributes &&
+                operation->getDataType() == attributeType)
+            {
+                builder.setInsertBefore(operation);
+                auto attributes = builder.emitLoad(threader.findOrCreateParameter(operation));
+                operation->replaceUsesWith(attributes);
+                loweredOperations.add(operation);
+            }
+        }
+    }
+
+    for (auto operation : loweredOperations)
+        operation->removeAndDeallocate();
+
+    operations.clear();
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    IRBuilder builder(module);
+    for (auto operation : operations)
+    {
+        auto stageInputOperation = cast<IRStructuralRayTracingStageInputOperation>(operation);
+        if (!stageInputOperation->hasFallback())
+            continue;
+
+        builder.setInsertBefore(operation);
+        List<IRInst*> arguments;
+        for (UInt i = 1; i < operation->getOperandCount(); ++i)
+            arguments.add(operation->getOperand(i));
+        auto call = builder.emitCallInst(
+            operation->getDataType(),
+            stageInputOperation->getFallback(),
+            arguments.getCount(),
+            arguments.getBuffer());
+        operation->replaceUsesWith(call);
+        operation->removeAndDeallocate();
+    }
 }
 
 static StructuralRayTracingHitAttributesKind _getHitAttributesKind(

@@ -1255,6 +1255,8 @@ local insts = {
 			operands = {
 				{ "tagMask" },
 				{ "maxLevels" },
+				{ "missRequirements" },
+				{ "closestHitRequirements" },
 				{ "geometryKind" },
 				{ "hasIntersectionFunctions" },
 				{ "hasMissFunctions" },
@@ -1273,7 +1275,7 @@ local insts = {
 				{ "missFunctions" },
 				{ "closestHitFunctions" },
 				{ "records" },
-				{ "payload" },
+				{ "rayData" },
 			},
 		},
 	},
