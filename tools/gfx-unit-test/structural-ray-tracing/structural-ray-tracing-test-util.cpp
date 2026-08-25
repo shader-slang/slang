@@ -268,7 +268,7 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
 
     BufferDesc resultDesc = {};
-    resultDesc.size = sizeof(StructuralRayTracingProceduralResult) * 2;
+    resultDesc.size = sizeof(StructuralRayTracingProceduralResult) * 5;
     resultDesc.elementSize = sizeof(StructuralRayTracingProceduralResult);
     resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
     resultDesc.defaultState = ResourceState::UnorderedAccess;
@@ -281,7 +281,7 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     ShaderCursor root(rootObject);
     GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
     GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
-    passEncoder->dispatchRays(0, 2, 1, 1);
+    passEncoder->dispatchRays(0, 5, 1, 1);
     passEncoder->end();
     GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
     GFX_CHECK_CALL_ABORT(queue->waitOnHost());
@@ -291,8 +291,11 @@ void runStructuralRayTracingProceduralHitFilter(IDevice* device)
     auto actual =
         static_cast<const StructuralRayTracingProceduralResult*>(resultBlob->getBufferPointer());
     static const StructuralRayTracingProceduralResult kExpected[] = {
-        {3, 9, 2, 2},
-        {2, 0, 0, 2},
+        {3, 9, 2, 5},
+        {2, 0, 0, 5},
+        {3, 7, 1, 5},
+        {3, 9, 1, 5},
+        {2, 0, 0, 5},
     };
     for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
     {
