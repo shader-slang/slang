@@ -165,11 +165,12 @@ option(
 )
 option(
     SLANG_ENABLE_TSAN
-    "Enable ThreadSanitizer (TSan). Mutually exclusive with SLANG_ENABLE_ASAN."
+    "Enable ThreadSanitizer (TSan); clang/gcc on non-Windows only. Mutually exclusive with SLANG_ENABLE_ASAN."
 )
-# ASan and TSan instrument for different bug classes and cannot be combined in
-# a single build (their runtimes are incompatible), so reject the combination
-# up front rather than fail later at link time.
+# The compiler driver rejects combining -fsanitize=address and -fsanitize=thread,
+# so a build with both options enabled would otherwise fail at compile time on
+# the first instrumented file. Reject the combination here at configure time to
+# fail fast with a clear message instead.
 if(SLANG_ENABLE_ASAN AND SLANG_ENABLE_TSAN)
     message(
         FATAL_ERROR
@@ -382,8 +383,10 @@ if(
     AND CMAKE_CXX_COMPILER_ID STREQUAL "MSVC"
     AND SLANG_LIB_TYPE STREQUAL "SHARED"
     AND NOT SLANG_ENABLE_ASAN
-    AND NOT SLANG_ENABLE_TSAN
 )
+    # This default-on branch is MSVC-only, and TSan is unsupported on Windows,
+    # so SLANG_ENABLE_TSAN cannot be relevant here (no NOT SLANG_ENABLE_TSAN
+    # guard needed). The mimalloc+TSan interaction is covered by the warning below.
     set(SLANG_ENABLE_MIMALLOC_DEFAULT ON)
 endif()
 advanced_option(
