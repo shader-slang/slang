@@ -82,8 +82,13 @@ jobs:
       - name: Archive LLVM install
         shell: bash
         run: |
+          # github.workspace expands to a Windows-style C:\... path, which
+          # Git Bash's tar misparses as an ssh-style remote host (the same
+          # class of tar-on-Windows path issue setup-sccache works around
+          # by using .zip instead). Use a plain relative path so tar stays
+          # entirely inside its Unix-style working directory.
           cd build/llvm-project-install
-          tar -czf "${{ github.workspace }}/llvm-windows-cl-aarch64.tar.gz" .
+          tar -czf ../../llvm-windows-cl-aarch64.tar.gz .
 
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
