@@ -228,7 +228,10 @@ jobs:
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
-              # linux aarch64 cannot build llvm.
+              # LLVM was explicitly not requested for this platform/config
+              # (e.g. linux/aarch64 cannot build it at all; other callers
+              # may opt out for other reasons — see build-llvm's call sites
+              # in ci.yml).
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
