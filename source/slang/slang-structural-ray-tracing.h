@@ -67,10 +67,13 @@ enum class StructuralRayTracingAssociatedTypeKind
     TracePayload,
     HitTraceContext,
     HitPrimitive,
+    HitRecord,
     PrimitiveAttributes,
     MissTraceContext,
+    MissRecord,
     CallableTraceContext,
     CallableData,
+    CallableRecord,
     ProgramTraceContext,
     ProgramHitGroups,
     ProgramMissGroups,
@@ -135,6 +138,7 @@ public:
     AggTypeDecl* getStageInputType(StructuralRayTracingStageKind kind) const;
     StructuralRayTracingStageKind getStageInputKind(AggTypeDecl* typeDecl) const;
     StructuralRayTracingMetadataKind getMetadataKind(InterfaceDecl* interfaceDecl) const;
+    InterfaceDecl* getMetadataInterface(StructuralRayTracingMetadataKind kind) const;
     StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
         FunctionDeclBase* functionDecl) const;
     bool isTraceMethod(FunctionDeclBase* functionDecl) const;
@@ -143,10 +147,17 @@ public:
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
+    Type* resolveConcreteAssociatedType(
+        ASTBuilder* astBuilder,
+        Type* conformingType,
+        SubtypeWitness* witness,
+        StructuralRayTracingAssociatedTypeKind kind) const;
     SubtypeWitness* resolveAssociatedTypeConstraint(
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
+    bool tryGetShaderGroupSlotIndex(ASTBuilder* astBuilder, Type* slotType, int64_t& outIndex)
+        const;
     bool isStagePlaceholder(StructuralRayTracingStageKind kind, Type* type) const;
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
 
