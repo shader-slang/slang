@@ -683,4 +683,113 @@ void runStructuralRayTracingTriangleAttributesFlags(IDevice* device)
     }
 }
 
+void runStructuralRayTracingStageInputState(IDevice* device)
+{
+    if (!device->hasFeature(Feature::RayTracing))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    auto queue = device->getQueue(QueueType::Graphics);
+    SLANG_CHECK_ABORT(queue != nullptr);
+    static const float kScaleXTransform[12] = {
+        2.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        0.0f,
+        1.0f,
+        0.0f,
+    };
+    StructuralRayTracingTriangleScene scene(
+        device,
+        queue,
+        AccelerationStructureInstanceFlags::TriangleFacingCullDisable,
+        17,
+        kScaleXTransform);
+
+    static const EntryDesc kEntries[] = {
+        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
+        {"RuntimeMiss", SLANG_STAGE_MISS},
+    };
+    ComPtr<IShaderProgram> program;
+    GFX_CHECK_CALL_ABORT(loadProgram(
+        device,
+        "stage-input-state",
+        kEntries,
+        SLANG_COUNT_OF(kEntries),
+        program.writeRef()));
+
+    HitGroupDesc hitGroup = {};
+    hitGroup.hitGroupName = "hitGroup0";
+    hitGroup.closestHitEntryPoint = "RuntimeClosestHit";
+
+    RayTracingPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = program;
+    pipelineDesc.hitGroups = &hitGroup;
+    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.maxRecursion = 1;
+    pipelineDesc.maxRayPayloadSize = sizeof(StructuralRayTracingStageInputStateResult);
+    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+
+    ComPtr<IRayTracingPipeline> pipeline;
+    GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
+
+    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kMissNames[] = {"RuntimeMiss"};
+    static const char* kHitGroupNames[] = {"hitGroup0"};
+    ShaderTableDesc shaderTableDesc = {};
+    shaderTableDesc.program = program;
+    shaderTableDesc.rayGenShaderCount = SLANG_COUNT_OF(kRayGenerationNames);
+    shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
+    shaderTableDesc.missShaderCount = SLANG_COUNT_OF(kMissNames);
+    shaderTableDesc.missShaderEntryPointNames = kMissNames;
+    shaderTableDesc.hitGroupCount = SLANG_COUNT_OF(kHitGroupNames);
+    shaderTableDesc.hitGroupNames = kHitGroupNames;
+
+    ComPtr<IShaderTable> shaderTable;
+    GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+
+    BufferDesc resultDesc = {};
+    resultDesc.size = sizeof(StructuralRayTracingStageInputStateResult) * 2;
+    resultDesc.elementSize = sizeof(StructuralRayTracingStageInputStateResult);
+    resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    resultDesc.defaultState = ResourceState::UnorderedAccess;
+    auto results = device->createBuffer(resultDesc);
+    SLANG_CHECK_ABORT(results != nullptr);
+
+    auto commandEncoder = queue->createCommandEncoder();
+    auto passEncoder = commandEncoder->beginRayTracingPass();
+    auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
+    ShaderCursor root(rootObject);
+    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    passEncoder->dispatchRays(0, 2, 1, 1);
+    passEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    ComPtr<ISlangBlob> resultBlob;
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    auto actual = static_cast<const StructuralRayTracingStageInputStateResult*>(
+        resultBlob->getBufferPointer());
+    static const StructuralRayTracingStageInputStateResult kExpected[] = {
+        {1, 1, 1000, 50, 100, 25, 100, 200, 50, 0, 0, 0, 17, 1, 0, 2},
+        {2, 1, 100000, 300, 100, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
+    {
+        const uint32_t* actualWords = reinterpret_cast<const uint32_t*>(&actual[i]);
+        const uint32_t* expectedWords = reinterpret_cast<const uint32_t*>(&kExpected[i]);
+        for (Index word = 0; word < sizeof(kExpected[i]) / sizeof(uint32_t); ++word)
+            SLANG_CHECK(actualWords[word] == expectedWords[word]);
+    }
+}
+
 } // namespace gfx_test

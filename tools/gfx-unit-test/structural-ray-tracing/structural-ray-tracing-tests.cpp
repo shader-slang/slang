@@ -102,4 +102,20 @@ SLANG_UNIT_TEST(structuralRayTracingTriangleAttributesFlagsVulkan)
     runTriangleAttributesFlags(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runStageInputState(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingStageInputState(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingStageInputStateD3D12)
+{
+    runStageInputState(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingStageInputStateVulkan)
+{
+    runStageInputState(unitTestContext, DeviceType::Vulkan);
+}
+
 } // namespace gfx_test
