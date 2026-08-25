@@ -68,6 +68,7 @@ enum class StructuralRayTracingStageInputOperationKind
 enum class StructuralRayTracingAssociatedTypeKind
 {
     TracePayload,
+    TraceMotion,
     HitTraceContext,
     HitPrimitive,
     HitRecord,
@@ -107,6 +108,14 @@ enum class StructuralRayTracingHitAttributesKind
     Triangle,
     Curve,
     Custom,
+};
+
+enum class StructuralRayTracingMotionKind : UInt
+{
+    None = 0,
+    Primitive = 1 << 0,
+    Instance = 1 << 1,
+    Invalid = ~UInt(0),
 };
 
 struct StructuralRayTracingEntryPointInfo
@@ -165,6 +174,7 @@ public:
         const;
     bool isStagePlaceholder(StructuralRayTracingStageKind kind, Type* type) const;
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
+    StructuralRayTracingMotionKind getMotionKind(Type* motionType) const;
 
     FunctionDeclBase* getStageInvokeRequirement(StructuralRayTracingStageKind kind) const;
     void registerStageImplementation(
@@ -198,6 +208,7 @@ private:
     AggTypeDecl* m_rayTracerType = nullptr;
     AggTypeDecl* m_trianglePrimitiveType = nullptr;
     AggTypeDecl* m_curvePrimitiveType = nullptr;
+    AggTypeDecl* m_motionTypes[4] = {};
     AggTypeDecl* m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Count)] = {};
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
