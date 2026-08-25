@@ -4340,6 +4340,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-curve-requires-metal",
+    38060,
+    "structural ray-tracing curve primitives require Metal",
+    span { loc = "location", message = "'CurvePrimitive' is only supported when compiling the structural ray-tracing API for Metal" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",
