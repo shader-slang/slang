@@ -11,6 +11,15 @@
 namespace Slang
 {
 
+static bool _isIntrinsicTypeWithOp(Type* type, IROp op)
+{
+    type = as<Type>(type->resolve());
+    auto declRefType = as<DeclRefType>(type);
+    auto decl = declRefType ? declRefType->getDeclRef().getDecl() : nullptr;
+    auto modifier = decl ? decl->findModifier<IntrinsicTypeModifier>() : nullptr;
+    return modifier && IROp(modifier->irOp) == op;
+}
+
 static bool _isPow2(size_t v)
 {
     return v > 0 && ((v - 1) & v) == 0;
@@ -160,7 +169,9 @@ static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
     {
         return ShaderParameterKind::InputRenderTarget;
     }
-    else if (as<RaytracingAccelerationStructureType>(type))
+    else if (
+        as<RaytracingAccelerationStructureType>(type) ||
+        _isIntrinsicTypeWithOp(type, kIROp_RaytracingAccelerationStructureType))
     {
         return ShaderParameterKind::AccelerationStructure;
     }
@@ -5461,7 +5472,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         as<HLSLRasterizerOrderedByteAddressBufferType>(type) || as<GLSLImageType>(type) ||
         as<GLSLShaderStorageBufferType>(type) || as<GLSLAtomicUintType>(type) ||
         as<GLSLInputAttachmentType>(type) || as<UntypedBufferResourceType>(type) ||
-        as<RaytracingAccelerationStructureType>(type))
+        as<RaytracingAccelerationStructureType>(type) ||
+        _isIntrinsicTypeWithOp(type, kIROp_RaytracingAccelerationStructureType))
     {
         ShaderParameterKind kind = _getShaderParameterKindForResourceType(type);
         return createSimpleTypeLayout(

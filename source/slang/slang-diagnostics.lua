@@ -4368,6 +4368,13 @@ err(
 )
 
 err(
+    "invalid-structural-ray-tracing-max-level-count",
+    38064,
+    "invalid structural ray-tracing acceleration-structure depth",
+    span { loc = "location", message = "multi-level acceleration-structure depth ~levelCount:Int is outside Metal's supported range of 1 through 32" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",

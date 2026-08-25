@@ -551,8 +551,13 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         emitOperand(trace->getMaxDistance(), getInfo(EmitOp::General));
         m_writer->emit("),\n");
         emitOperand(trace->getAccelerationStructure(), getInfo(EmitOp::General));
-        m_writer->emit(", ");
-        emitOperand(trace->getInstanceMask(), getInfo(EmitOp::General));
+        const bool hasInstancing =
+            (tagMask & IRIntegerValue(MetalStructuralRayTracingTag::Instancing)) != 0;
+        if (hasInstancing)
+        {
+            m_writer->emit(", ");
+            emitOperand(trace->getInstanceMask(), getInfo(EmitOp::General));
+        }
         if (cast<IRBoolLit>(trace->getHasIntersectionFunctions())->getValue())
         {
             m_writer->emit(", ");
@@ -612,7 +617,14 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
             m_writer->emit("[");
             emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
-            m_writer->emit("[0] + _slang_result.instance_id] + _slang_result.geometry_id * ");
+            m_writer->emit("[0]");
+            if (hasInstancing)
+            {
+                m_writer->emit(" + _slang_result.instance_id");
+                if (maxLevels > 0)
+                    m_writer->emit("[_slang_result.instance_count - 1]");
+            }
+            m_writer->emit("] + _slang_result.geometry_id * ");
             emitOperand(trace->getSbtStride(), getInfo(EmitOp::General));
             m_writer->emit(" + ");
             emitOperand(trace->getSbtOffset(), getInfo(EmitOp::General));
@@ -1832,8 +1844,16 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("uint32_t device*");
             break;
         case kIROp_RaytracingAccelerationStructureType:
-            m_writer->emit(
-                "metal::raytracing::acceleration_structure<metal::raytracing::instancing>");
+            if (type->getOperandCount() == 1 &&
+                cast<IRIntLit>(type->getOperand(0))->getValue() == 1)
+            {
+                m_writer->emit("metal::raytracing::primitive_acceleration_structure");
+            }
+            else
+            {
+                m_writer->emit(
+                    "metal::raytracing::acceleration_structure<metal::raytracing::instancing>");
+            }
             break;
         case kIROp_MetalIntersectionFunctionTable:
             {
