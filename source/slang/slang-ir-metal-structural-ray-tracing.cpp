@@ -120,6 +120,8 @@ struct MetalStageRequirements
     bool worldSpaceOrigin = false;
     bool worldSpaceDirection = false;
     bool objectSpaceRay = false;
+    bool objectToWorld = false;
+    bool worldToObject = false;
     bool primitiveIndex = false;
     bool geometryIndex = false;
     bool instanceIndex = false;
@@ -199,6 +201,12 @@ static void _collectMetalStageRequirements(
             case kIROp_StructuralRayTracingGetInstanceID:
                 requirements.instanceID = true;
                 break;
+            case kIROp_StructuralRayTracingGetObjectToWorld:
+                requirements.objectToWorld = true;
+                break;
+            case kIROp_StructuralRayTracingGetWorldToObject:
+                requirements.worldToObject = true;
+                break;
             default:
                 break;
             }
@@ -233,6 +241,8 @@ static MetalStageRequirements _combineMetalStageRequirements(
     SLANG_COMBINE_REQUIREMENT(worldSpaceOrigin);
     SLANG_COMBINE_REQUIREMENT(worldSpaceDirection);
     SLANG_COMBINE_REQUIREMENT(objectSpaceRay);
+    SLANG_COMBINE_REQUIREMENT(objectToWorld);
+    SLANG_COMBINE_REQUIREMENT(worldToObject);
     SLANG_COMBINE_REQUIREMENT(primitiveIndex);
     SLANG_COMBINE_REQUIREMENT(geometryIndex);
     SLANG_COMBINE_REQUIREMENT(instanceIndex);
@@ -261,6 +271,9 @@ static UInt _getMetalStageRequirementMask(const MetalStageRequirements& requirem
     SLANG_ADD_REQUIREMENT(geometryIndex, GeometryIndex);
     SLANG_ADD_REQUIREMENT(instanceIndex, InstanceIndex);
     SLANG_ADD_REQUIREMENT(instanceID, InstanceID);
+    SLANG_ADD_REQUIREMENT(objectSpaceRay, ObjectSpaceRay);
+    SLANG_ADD_REQUIREMENT(objectToWorld, ObjectToWorld);
+    SLANG_ADD_REQUIREMENT(worldToObject, WorldToObject);
 #undef SLANG_ADD_REQUIREMENT
     return result;
 }
@@ -333,7 +346,7 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         {
             auto requirements = _getMetalStageRequirements(missGroup->getMiss());
             needsRecordData |= requirements.record || requirements.callableDispatch;
-            needsMinDistance |= requirements.minDistance;
+            needsMinDistance |= requirements.minDistance || requirements.objectSpaceRay;
             needsRayFlags |= requirements.rayFlags;
             continue;
         }
@@ -358,9 +371,10 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
                     closestHitRequirements.record || closestHitRequirements.callableDispatch;
                 needsRecordData |= anyHitRequirements.record;
                 needsRecordData |= intersectionRequirements.record;
-                needsMinDistance |= closestHitRequirements.minDistance ||
-                                    anyHitRequirements.minDistance ||
-                                    intersectionRequirements.minDistance;
+                needsMinDistance |=
+                    closestHitRequirements.minDistance || closestHitRequirements.objectSpaceRay ||
+                    anyHitRequirements.minDistance || anyHitRequirements.objectSpaceRay ||
+                    intersectionRequirements.minDistance || intersectionRequirements.objectSpaceRay;
                 needsRayFlags |= closestHitRequirements.rayFlags || anyHitRequirements.rayFlags ||
                                  intersectionRequirements.rayFlags;
             }
@@ -373,8 +387,10 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
         needsRecordData |= requirements.record || requirements.callableDispatch;
         needsRecordData |= anyHitRequirements.record;
         needsRecordData |= intersectionRequirements.record;
-        needsMinDistance |= requirements.minDistance || anyHitRequirements.minDistance ||
-                            intersectionRequirements.minDistance;
+        needsMinDistance |= requirements.minDistance || requirements.objectSpaceRay ||
+                            anyHitRequirements.minDistance || anyHitRequirements.objectSpaceRay ||
+                            intersectionRequirements.minDistance ||
+                            intersectionRequirements.objectSpaceRay;
         needsRayFlags |= requirements.rayFlags || anyHitRequirements.rayFlags ||
                          intersectionRequirements.rayFlags;
         if (requirements.hitKind)
@@ -641,7 +657,8 @@ static UInt _getSharedMetalTagMask(
         if (all.curveParameter)
             result |= UInt(MetalStructuralRayTracingTag::CurveData);
         if (anyHit.worldSpaceOrigin || anyHit.worldSpaceDirection ||
-            intersection.worldSpaceOrigin || intersection.worldSpaceDirection)
+            intersection.worldSpaceOrigin || intersection.worldSpaceDirection ||
+            closestHit.objectSpaceRay || all.objectToWorld || all.worldToObject)
         {
             result |= UInt(MetalStructuralRayTracingTag::WorldSpaceData);
         }
@@ -718,6 +735,15 @@ static IRParam* _emitMetalSystemValueParam(
     return result;
 }
 
+static IRMatrixType* _getFloat4x3Type(IRBuilder& builder)
+{
+    return builder.getMatrixType(
+        builder.getFloatType(),
+        builder.getIntValue(builder.getIntType(), 4),
+        builder.getIntValue(builder.getIntType(), 3),
+        builder.getIntValue(builder.getIntType(), kMatrixLayoutMode_RowMajor));
+}
+
 static void _addStructuralStageInfo(
     IRBuilder& builder,
     IRFunc* adapter,
@@ -768,6 +794,10 @@ struct MetalVisibleInputValues
     IRInst* geometryIndex = nullptr;
     IRInst* instanceIndex = nullptr;
     IRInst* instanceID = nullptr;
+    IRInst* objectSpaceOrigin = nullptr;
+    IRInst* objectSpaceDirection = nullptr;
+    IRInst* objectToWorld = nullptr;
+    IRInst* worldToObject = nullptr;
 };
 
 static void _lowerMetalVisibleInputOperations(
@@ -825,6 +855,28 @@ static void _lowerMetalVisibleInputOperations(
             break;
         case kIROp_StructuralRayTracingGetInstanceID:
             replacement = values.instanceID;
+            break;
+        case kIROp_StructuralRayTracingGetObjectSpaceRay:
+            {
+                IRBuilder builder(operation);
+                builder.setInsertBefore(operation);
+                IRInst* fields[] = {
+                    values.objectSpaceOrigin,
+                    values.minDistance,
+                    values.objectSpaceDirection,
+                    values.distance,
+                };
+                replacement = builder.emitMakeStruct(
+                    cast<IRType>(operation->getDataType()),
+                    SLANG_COUNT_OF(fields),
+                    fields);
+                break;
+            }
+        case kIROp_StructuralRayTracingGetObjectToWorld:
+            replacement = values.objectToWorld;
+            break;
+        case kIROp_StructuralRayTracingGetWorldToObject:
+            replacement = values.worldToObject;
             break;
         default:
             break;
@@ -892,7 +944,7 @@ static IRFunc* _generateVisibleStageAdapter(
     List<IRType*> parameterTypes;
     auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
     parameterTypes.add(rayDataPointerType);
-    if (tableRequirements.distance)
+    if (tableRequirements.distance || tableRequirements.objectSpaceRay)
         parameterTypes.add(builder.getFloatType());
     if (tableRequirements.hitKind)
         parameterTypes.add(builder.getUIntType());
@@ -914,6 +966,15 @@ static IRFunc* _generateVisibleStageAdapter(
         parameterTypes.add(builder.getUIntType());
     if (tableRequirements.instanceID)
         parameterTypes.add(builder.getUIntType());
+    if (tableRequirements.objectSpaceRay)
+    {
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    }
+    if (tableRequirements.objectToWorld)
+        parameterTypes.add(_getFloat4x3Type(builder));
+    if (tableRequirements.worldToObject)
+        parameterTypes.add(_getFloat4x3Type(builder));
     if (tableRequirements.callableDispatch)
         parameterTypes.add(descriptorResourcesPointerType);
     adapter->setFullType(builder.getFuncType(parameterTypes, builder.getVoidType()));
@@ -946,7 +1007,7 @@ static IRFunc* _generateVisibleStageAdapter(
     };
 
     MetalVisibleInputValues values;
-    if (tableRequirements.distance)
+    if (tableRequirements.distance || tableRequirements.objectSpaceRay)
         values.distance = emitNamedParam(builder.getFloatType(), "distance");
     if (tableRequirements.hitKind)
         values.hitKind = emitNamedParam(builder.getUIntType(), "hitKind");
@@ -971,6 +1032,18 @@ static IRFunc* _generateVisibleStageAdapter(
         values.instanceIndex = emitNamedParam(builder.getUIntType(), "instanceIndex");
     if (tableRequirements.instanceID)
         values.instanceID = emitNamedParam(builder.getUIntType(), "instanceID");
+    if (tableRequirements.objectSpaceRay)
+    {
+        values.objectSpaceOrigin =
+            emitNamedParam(builder.getVectorType(builder.getFloatType(), 3), "objectSpaceOrigin");
+        values.objectSpaceDirection = emitNamedParam(
+            builder.getVectorType(builder.getFloatType(), 3),
+            "objectSpaceDirection");
+    }
+    if (tableRequirements.objectToWorld)
+        values.objectToWorld = emitNamedParam(_getFloat4x3Type(builder), "objectToWorld");
+    if (tableRequirements.worldToObject)
+        values.worldToObject = emitNamedParam(_getFloat4x3Type(builder), "worldToObject");
     IRInst* descriptorResources = nullptr;
     if (tableRequirements.callableDispatch)
         descriptorResources = emitNamedParam(descriptorResourcesPointerType, "descriptorResources");
@@ -1396,6 +1469,10 @@ struct MetalCandidateInputValues
     IRInst* geometryIndex = nullptr;
     IRInst* instanceIndex = nullptr;
     IRInst* instanceID = nullptr;
+    IRInst* objectSpaceOrigin = nullptr;
+    IRInst* objectSpaceDirection = nullptr;
+    IRInst* objectToWorld = nullptr;
+    IRInst* worldToObject = nullptr;
 };
 
 static void _collectStageInputOperations(IRInst* parent, List<IRInst*>& operations);
@@ -1453,6 +1530,28 @@ static void _lowerMetalCandidateInputOperations(
         case kIROp_StructuralRayTracingGetInstanceID:
             replacement = values.instanceID;
             break;
+        case kIROp_StructuralRayTracingGetObjectSpaceRay:
+            {
+                IRBuilder builder(operation);
+                builder.setInsertBefore(operation);
+                IRInst* fields[] = {
+                    values.objectSpaceOrigin,
+                    values.minDistance,
+                    values.objectSpaceDirection,
+                    values.distance,
+                };
+                replacement = builder.emitMakeStruct(
+                    cast<IRType>(operation->getDataType()),
+                    SLANG_COUNT_OF(fields),
+                    fields);
+                break;
+            }
+        case kIROp_StructuralRayTracingGetObjectToWorld:
+            replacement = values.objectToWorld;
+            break;
+        case kIROp_StructuralRayTracingGetWorldToObject:
+            replacement = values.worldToObject;
+            break;
         default:
             break;
         }
@@ -1494,7 +1593,7 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
                             : MetalStructuralRayTracingGeometryKind::Curve;
     auto requirements = _getMetalStageRequirements(invoke);
     List<IRType*> parameterTypes;
-    if (requirements.distance)
+    if (requirements.distance || requirements.objectSpaceRay)
         parameterTypes.add(builder.getFloatType());
     if (requirements.triangleBarycentricCoord)
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 2));
@@ -1518,6 +1617,15 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
         parameterTypes.add(builder.getUIntType());
     if (requirements.instanceID)
         parameterTypes.add(builder.getUIntType());
+    if (requirements.objectSpaceRay)
+    {
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    }
+    if (requirements.objectToWorld)
+        parameterTypes.add(_getFloat4x3Type(builder));
+    if (requirements.worldToObject)
+        parameterTypes.add(_getFloat4x3Type(builder));
     auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
     parameterTypes.add(rayDataPointerType);
     adapter->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
@@ -1549,7 +1657,7 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
     builder.setInsertInto(adapter);
     builder.emitBlock();
     MetalCandidateInputValues inputs;
-    if (requirements.distance)
+    if (requirements.distance || requirements.objectSpaceRay)
         inputs.distance =
             _emitMetalSystemValueParam(builder, builder.getFloatType(), "distance", "distance");
     if (requirements.triangleBarycentricCoord)
@@ -1626,6 +1734,35 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
             "instanceID",
             "user_instance_id");
     }
+    if (requirements.objectSpaceRay)
+    {
+        inputs.objectSpaceOrigin = _emitMetalSystemValueParam(
+            builder,
+            builder.getVectorType(builder.getFloatType(), 3),
+            "objectSpaceOrigin",
+            "origin");
+        inputs.objectSpaceDirection = _emitMetalSystemValueParam(
+            builder,
+            builder.getVectorType(builder.getFloatType(), 3),
+            "objectSpaceDirection",
+            "direction");
+    }
+    if (requirements.objectToWorld)
+    {
+        inputs.objectToWorld = _emitMetalSystemValueParam(
+            builder,
+            _getFloat4x3Type(builder),
+            "objectToWorld",
+            "object_to_world_transform");
+    }
+    if (requirements.worldToObject)
+    {
+        inputs.worldToObject = _emitMetalSystemValueParam(
+            builder,
+            _getFloat4x3Type(builder),
+            "worldToObject",
+            "world_to_object_transform");
+    }
     auto rayData = builder.emitParam(rayDataPointerType);
     builder.addNameHintDecoration(rayData, UnownedTerminatedStringSlice("rayData"));
     candidateRayDataParams[adapter] = rayData;
@@ -1700,6 +1837,10 @@ struct MetalProceduralCandidateState
     IRInst* geometryIndex = nullptr;
     IRInst* instanceIndex = nullptr;
     IRInst* instanceID = nullptr;
+    IRInst* objectSpaceOrigin = nullptr;
+    IRInst* objectSpaceDirection = nullptr;
+    IRInst* objectToWorld = nullptr;
+    IRInst* worldToObject = nullptr;
     IRInst* opaque = nullptr;
     IRInst* committedAttributes = nullptr;
     IRInst* committedHitKind = nullptr;
@@ -1764,7 +1905,11 @@ static void _lowerAnyHitDecisionInputs(
     IRInst* primitiveIndex,
     IRInst* geometryIndex,
     IRInst* instanceIndex,
-    IRInst* instanceID)
+    IRInst* instanceID,
+    IRInst* objectSpaceOrigin,
+    IRInst* objectSpaceDirection,
+    IRInst* objectToWorld,
+    IRInst* worldToObject)
 {
     List<IRInst*> operations;
     _collectStageInputOperations(helper, operations);
@@ -1808,6 +1953,28 @@ static void _lowerAnyHitDecisionInputs(
             break;
         case kIROp_StructuralRayTracingGetInstanceID:
             replacement = instanceID;
+            break;
+        case kIROp_StructuralRayTracingGetObjectSpaceRay:
+            {
+                IRBuilder builder(operation);
+                builder.setInsertBefore(operation);
+                IRInst* fields[] = {
+                    objectSpaceOrigin,
+                    minDistance,
+                    objectSpaceDirection,
+                    distance,
+                };
+                replacement = builder.emitMakeStruct(
+                    cast<IRType>(operation->getDataType()),
+                    SLANG_COUNT_OF(fields),
+                    fields);
+                break;
+            }
+        case kIROp_StructuralRayTracingGetObjectToWorld:
+            replacement = objectToWorld;
+            break;
+        case kIROp_StructuralRayTracingGetWorldToObject:
+            replacement = worldToObject;
             break;
         default:
             break;
@@ -1857,6 +2024,15 @@ static IRFunc* _generateAnyHitDecisionHelper(
         parameterTypes.add(builder.getUIntType());
     if (requirements.instanceID)
         parameterTypes.add(builder.getUIntType());
+    if (requirements.objectSpaceRay)
+    {
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    }
+    if (requirements.objectToWorld)
+        parameterTypes.add(_getFloat4x3Type(builder));
+    if (requirements.worldToObject)
+        parameterTypes.add(_getFloat4x3Type(builder));
     parameterTypes.add(builder.getBoolType());
     helper->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
 
@@ -1916,6 +2092,19 @@ static IRFunc* _generateAnyHitDecisionHelper(
         instanceIndex = builder.emitParam(builder.getUIntType());
     if (requirements.instanceID)
         instanceID = builder.emitParam(builder.getUIntType());
+    IRInst* objectSpaceOrigin = nullptr;
+    IRInst* objectSpaceDirection = nullptr;
+    IRInst* objectToWorld = nullptr;
+    IRInst* worldToObject = nullptr;
+    if (requirements.objectSpaceRay)
+    {
+        objectSpaceOrigin = builder.emitParam(builder.getVectorType(builder.getFloatType(), 3));
+        objectSpaceDirection = builder.emitParam(builder.getVectorType(builder.getFloatType(), 3));
+    }
+    if (requirements.objectToWorld)
+        objectToWorld = builder.emitParam(_getFloat4x3Type(builder));
+    if (requirements.worldToObject)
+        worldToObject = builder.emitParam(_getFloat4x3Type(builder));
     auto opaque = builder.emitParam(builder.getBoolType());
     builder.addNameHintDecoration(attributes, UnownedTerminatedStringSlice("attributes"));
     builder.addNameHintDecoration(distance, UnownedTerminatedStringSlice("distance"));
@@ -1953,7 +2142,11 @@ static IRFunc* _generateAnyHitDecisionHelper(
         primitiveIndex,
         geometryIndex,
         instanceIndex,
-        instanceID);
+        instanceID,
+        objectSpaceOrigin,
+        objectSpaceDirection,
+        objectToWorld,
+        worldToObject);
     _lowerAnyHitTerminations(helper, resultInfo);
     return helper;
 }
@@ -2021,6 +2214,15 @@ static void _lowerProceduralReportHitOperations(
                 arguments.add(state.instanceIndex);
             if (anyHitRequirements.instanceID)
                 arguments.add(state.instanceID);
+            if (anyHitRequirements.objectSpaceRay)
+            {
+                arguments.add(state.objectSpaceOrigin);
+                arguments.add(state.objectSpaceDirection);
+            }
+            if (anyHitRequirements.objectToWorld)
+                arguments.add(state.objectToWorld);
+            if (anyHitRequirements.worldToObject)
+                arguments.add(state.worldToObject);
             arguments.add(state.opaque);
             auto decision = builder.emitCallInst(
                 filterResultInfo.type,
@@ -2073,8 +2275,6 @@ static void _lowerProceduralReportHitOperations(
 static void _lowerProceduralIntersectionInputs(
     IRFunc* adapter,
     const MetalProceduralCandidateState& state,
-    IRInst* objectSpaceOrigin,
-    IRInst* objectSpaceDirection,
     IRInst* primitiveIndex,
     IRInst* geometryIndex,
     IRInst* instanceIndex,
@@ -2101,9 +2301,9 @@ static void _lowerProceduralIntersectionInputs(
         case kIROp_StructuralRayTracingGetObjectSpaceRay:
             {
                 IRInst* values[] = {
-                    objectSpaceOrigin,
+                    state.objectSpaceOrigin,
                     state.minDistance,
-                    objectSpaceDirection,
+                    state.objectSpaceDirection,
                     builder.emitLoad(state.currentMaxDistance),
                 };
                 replacement = builder.emitMakeStruct(
@@ -2129,6 +2329,12 @@ static void _lowerProceduralIntersectionInputs(
             break;
         case kIROp_StructuralRayTracingGetWorldRayDirection:
             replacement = state.worldSpaceDirection;
+            break;
+        case kIROp_StructuralRayTracingGetObjectToWorld:
+            replacement = state.objectToWorld;
+            break;
+        case kIROp_StructuralRayTracingGetWorldToObject:
+            replacement = state.worldToObject;
             break;
         default:
             break;
@@ -2173,11 +2379,15 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     List<IRType*> parameterTypes;
     parameterTypes.add(builder.getFloatType());
     parameterTypes.add(builder.getFloatType());
-    if (intersectionRequirements.objectSpaceRay)
+    if (requirements.objectSpaceRay)
     {
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
         parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
     }
+    if (requirements.objectToWorld)
+        parameterTypes.add(_getFloat4x3Type(builder));
+    if (requirements.worldToObject)
+        parameterTypes.add(_getFloat4x3Type(builder));
     if (requirements.primitiveIndex)
         parameterTypes.add(builder.getUIntType());
     if (requirements.geometryIndex)
@@ -2236,7 +2446,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     IRInst* geometryIndex = nullptr;
     IRInst* instanceIndex = nullptr;
     IRInst* instanceID = nullptr;
-    if (intersectionRequirements.objectSpaceRay)
+    if (requirements.objectSpaceRay)
     {
         objectSpaceOrigin = _emitMetalSystemValueParam(
             builder,
@@ -2248,6 +2458,24 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
             builder.getVectorType(builder.getFloatType(), 3),
             "objectSpaceDirection",
             "direction");
+    }
+    IRInst* objectToWorld = nullptr;
+    IRInst* worldToObject = nullptr;
+    if (requirements.objectToWorld)
+    {
+        objectToWorld = _emitMetalSystemValueParam(
+            builder,
+            _getFloat4x3Type(builder),
+            "objectToWorld",
+            "object_to_world_transform");
+    }
+    if (requirements.worldToObject)
+    {
+        worldToObject = _emitMetalSystemValueParam(
+            builder,
+            _getFloat4x3Type(builder),
+            "worldToObject",
+            "world_to_object_transform");
     }
     if (requirements.primitiveIndex)
     {
@@ -2337,6 +2565,10 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     }
     state.worldSpaceOrigin = worldSpaceOrigin;
     state.worldSpaceDirection = worldSpaceDirection;
+    state.objectSpaceOrigin = objectSpaceOrigin;
+    state.objectSpaceDirection = objectSpaceDirection;
+    state.objectToWorld = objectToWorld;
+    state.worldToObject = worldToObject;
     state.opaque = opaque;
     if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(groupType))
         state.committedAttributes = builder.emitFieldAddress(rayData, *key);
@@ -2377,8 +2609,6 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     _lowerProceduralIntersectionInputs(
         adapter,
         state,
-        objectSpaceOrigin,
-        objectSpaceDirection,
         primitiveIndex,
         geometryIndex,
         instanceIndex,
@@ -2495,7 +2725,7 @@ static IRFuncType* _getMetalVisibleFunctionSignature(
 {
     List<IRType*> parameterTypes;
     parameterTypes.add(builder.getPtrType(rayDataType, AddressSpace::ThreadLocal));
-    if (requirements.distance)
+    if (requirements.distance || requirements.objectSpaceRay)
         parameterTypes.add(builder.getFloatType());
     if (requirements.hitKind)
         parameterTypes.add(builder.getUIntType());
@@ -2517,6 +2747,15 @@ static IRFuncType* _getMetalVisibleFunctionSignature(
         parameterTypes.add(builder.getUIntType());
     if (requirements.instanceID)
         parameterTypes.add(builder.getUIntType());
+    if (requirements.objectSpaceRay)
+    {
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
+    }
+    if (requirements.objectToWorld)
+        parameterTypes.add(_getFloat4x3Type(builder));
+    if (requirements.worldToObject)
+        parameterTypes.add(_getFloat4x3Type(builder));
     if (requirements.callableDispatch)
         parameterTypes.add(descriptorResourcesPointerType);
     return builder.getFuncType(parameterTypes, builder.getVoidType());

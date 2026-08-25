@@ -642,7 +642,10 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(trace->getRayData(), getInfo(EmitOp::General));
             if (hasRequirement(
                     closestHitRequirements,
-                    MetalStructuralRayTracingStageRequirement::Distance))
+                    MetalStructuralRayTracingStageRequirement::Distance) ||
+                hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::ObjectSpaceRay))
             {
                 m_writer->emit(", _slang_result.distance");
             }
@@ -719,6 +722,29 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(", _slang_result.user_instance_id");
                 if (maxLevels > 0)
                     m_writer->emit("[_slang_result.instance_count - 1]");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::ObjectSpaceRay))
+            {
+                m_writer->emit(", (_slang_result.world_to_object_transform * metal::float4(");
+                emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
+                m_writer->emit(", 1.0f))");
+                m_writer->emit(", (_slang_result.world_to_object_transform * metal::float4(");
+                emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+                m_writer->emit(", 0.0f))");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::ObjectToWorld))
+            {
+                m_writer->emit(", _slang_result.object_to_world_transform");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::WorldToObject))
+            {
+                m_writer->emit(", _slang_result.world_to_object_transform");
             }
             if (hasRequirement(
                     closestHitRequirements,
