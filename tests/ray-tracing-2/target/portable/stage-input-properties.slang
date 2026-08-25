@@ -9,6 +9,7 @@
 //TEST:SIMPLE(filecheck=HLSLLAYOUT): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
 //TEST:SIMPLE(filecheck=SPVLAYOUT): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=DXILLAYOUT): -experimental-feature -entry main -stage raygeneration -target dxil -profile sm_6_7
+//TEST:SIMPLE(filecheck=METALLAYOUT): -experimental-feature -entry main -stage raygeneration -target metal -profile metallib_2_4
 
 import slang.raytracing;
 
@@ -58,9 +59,10 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
     {
         output[0] = float4(
             input.worldSpaceOrigin.x + input.worldSpaceDirection.x,
-            input.distance,
-            float(input.hitKind),
-            1.0);
+            input.distance + input.minDistance,
+            float(input.hitKind + input.rayFlags),
+            float(input.primitiveIndex + input.geometryIndex + input.instanceIndex +
+                  input.instanceID));
     }
 }
 
@@ -68,18 +70,34 @@ struct ClosestHit : rt::IClosestHitShader<TriangleContext>
 // HLSLCH-DAG: WorldRayDirection()
 // HLSLCH-DAG: RayTCurrent()
 // HLSLCH-DAG: HitKind()
+// HLSLCH-DAG: RayTMin()
+// HLSLCH-DAG: RayFlags()
+// HLSLCH-DAG: PrimitiveIndex()
+// HLSLCH-DAG: GeometryIndex()
+// HLSLCH-DAG: InstanceIndex()
+// HLSLCH-DAG: InstanceID()
 // HLSLCH: [shader("closesthit")]void ClosestHit(inout TestPayload_0 payload_{{[0-9]+}} : SV_RayPayload, StructuralTriangleHitAttributes_0 attributes_{{[0-9]+}} : SV_IntersectionAttributes)
 // SPVCH: OpEntryPoint ClosestHitKHR
 // SPVCH-DAG: BuiltIn WorldRayOriginKHR
 // SPVCH-DAG: BuiltIn WorldRayDirectionKHR
 // SPVCH-DAG: BuiltIn RayTmaxKHR
 // SPVCH-DAG: BuiltIn HitKindKHR
+// SPVCH-DAG: BuiltIn RayTminKHR
+// SPVCH-DAG: BuiltIn IncomingRayFlagsKHR
+// SPVCH-DAG: BuiltIn PrimitiveId
+// SPVCH-DAG: BuiltIn RayGeometryIndexKHR
+// SPVCH-DAG: BuiltIn InstanceId
+// SPVCH-DAG: BuiltIn InstanceCustomIndexKHR
 
 struct AnyHit : rt::IAnyHitShader<TriangleContext>
 {
     void invoke(rt::AnyHitInput<TriangleContext> input)
     {
-        if (input.worldSpaceOrigin.x + input.worldSpaceDirection.x + input.distance > 0.0)
+        if (input.worldSpaceOrigin.x + input.worldSpaceDirection.x + input.distance +
+                input.minDistance + float(input.rayFlags + input.primitiveIndex +
+                                          input.geometryIndex + input.instanceIndex +
+                                          input.instanceID) >
+            0.0)
             input.ignoreHit();
         if (input.hitKind != 0)
             input.acceptHitAndEndSearch();
@@ -101,7 +119,9 @@ struct Intersection : rt::IIntersectionShader<ProceduralContext>
         CustomAttributes attributes;
         attributes.value = ray.origin.x + ray.direction.x + input.worldSpaceOrigin.x +
                            input.worldSpaceDirection.x + float(input.primitiveIndex) +
-                           float(input.geometryIndex);
+                           float(input.geometryIndex + input.instanceIndex + input.instanceID +
+                                 input.rayFlags) +
+                           input.minDistance;
         if (!input.reportHit(ray.tMin, attributes))
             input.reportHit(ray.tMax, 1, attributes);
     }
@@ -125,7 +145,9 @@ struct Miss : rt::IMissShader<MissContext>
 {
     void invoke(rt::MissInput<MissContext> input)
     {
-        output[0] = float4(input.worldSpaceOrigin + input.worldSpaceDirection, 1.0);
+        output[0] = float4(
+            input.worldSpaceOrigin + input.worldSpaceDirection,
+            input.minDistance + input.distance + float(input.rayFlags));
     }
 }
 
@@ -207,3 +229,15 @@ void main()
 // DXILLAYOUT-DAG: AnyHit
 // DXILLAYOUT-DAG: Intersection
 // DXILLAYOUT-DAG: Miss
+
+// METALLAYOUT-DAG: {{\[\[visible\]\]}} void ClosestHit_
+// METALLAYOUT-DAG: {{\[\[intersection\(triangle,}}
+// METALLAYOUT-DAG: uint primitiveIndex_{{[0-9]+}} {{\[\[primitive_id\]\]}}
+// METALLAYOUT-DAG: uint geometryIndex_{{[0-9]+}} {{\[\[geometry_id\]\]}}
+// METALLAYOUT-DAG: uint instanceIndex_{{[0-9]+}} {{\[\[instance_id\]\]}}
+// METALLAYOUT-DAG: uint instanceID_{{[0-9]+}} {{\[\[user_instance_id\]\]}}
+// METALLAYOUT-DAG: {{\[\[intersection\(bounding_box,}}
+// METALLAYOUT-DAG: _slang_result.primitive_id
+// METALLAYOUT-DAG: _slang_result.geometry_id
+// METALLAYOUT-DAG: _slang_result.instance_id
+// METALLAYOUT-DAG: _slang_result.user_instance_id

@@ -196,8 +196,12 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::TriangleFrontFacing;
     if (text == "parameter")
         return StructuralRayTracingStageInputOperationKind::CurveParameter;
+    if (text == "minDistance")
+        return StructuralRayTracingStageInputOperationKind::RayTMin;
     if (text == "distance")
         return StructuralRayTracingStageInputOperationKind::RayTCurrent;
+    if (text == "rayFlags")
+        return StructuralRayTracingStageInputOperationKind::RayFlags;
     if (text == "hitKind")
         return StructuralRayTracingStageInputOperationKind::HitKind;
     if (text == "worldSpaceOrigin")
@@ -210,6 +214,10 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::PrimitiveIndex;
     if (text == "geometryIndex")
         return StructuralRayTracingStageInputOperationKind::GeometryIndex;
+    if (text == "instanceIndex")
+        return StructuralRayTracingStageInputOperationKind::InstanceIndex;
+    if (text == "instanceID")
+        return StructuralRayTracingStageInputOperationKind::InstanceID;
     if (text == "ignoreHit")
         return StructuralRayTracingStageInputOperationKind::IgnoreHit;
     if (text == "acceptHitAndEndSearch")
