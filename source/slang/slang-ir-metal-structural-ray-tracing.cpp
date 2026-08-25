@@ -389,6 +389,14 @@ static bool _getMetalAccelerationStructureTopology(
         return true;
 
     auto levelCount = as<IRIntLit>(accelerationStructureType->getOperand(0));
+    // A physical Metal acceleration-structure type has two operands: its logical topology and its
+    // motion/instancing tags. Portable AccelerationStructure uses topology zero. This form can be
+    // observed by a second trace that shares a value already specialized for an earlier trace.
+    if (accelerationStructureType->getOperandCount() == 2 && levelCount &&
+        levelCount->getValue() == 0)
+    {
+        return true;
+    }
     if (!levelCount || levelCount->getValue() < 1 || levelCount->getValue() > 32)
     {
         sink->diagnose(Diagnostics::InvalidStructuralRayTracingMaxLevelCount{

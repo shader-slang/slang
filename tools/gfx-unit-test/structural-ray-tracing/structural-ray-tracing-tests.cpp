@@ -54,4 +54,20 @@ SLANG_UNIT_TEST(structuralRayTracingCallableRecordVulkan)
     runCallableRecord(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runRecursiveTrace(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingRecursiveTrace(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingRecursiveTraceD3D12)
+{
+    runRecursiveTrace(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingRecursiveTraceVulkan)
+{
+    runRecursiveTrace(unitTestContext, DeviceType::Vulkan);
+}
+
 } // namespace gfx_test

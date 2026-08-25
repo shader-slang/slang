@@ -28,6 +28,13 @@ struct StructuralRayTracingCallableResult
     uint32_t dispatchWidth;
 };
 
+struct StructuralRayTracingRecursiveResult
+{
+    uint32_t stage;
+    uint32_t depth;
+    uint32_t dispatchWidth;
+};
+
 Slang::ComPtr<rhi::IDevice> createStructuralRayTracingTestDevice(
     UnitTestContext* context,
     rhi::DeviceType deviceType);
@@ -35,5 +42,6 @@ Slang::ComPtr<rhi::IDevice> createStructuralRayTracingTestDevice(
 void runStructuralRayTracingTriangleHitMiss(rhi::IDevice* device);
 void runStructuralRayTracingProceduralHitFilter(rhi::IDevice* device);
 void runStructuralRayTracingCallableRecord(rhi::IDevice* device);
+void runStructuralRayTracingRecursiveTrace(rhi::IDevice* device);
 
 } // namespace gfx_test

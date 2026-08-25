@@ -376,4 +376,93 @@ void runStructuralRayTracingCallableRecord(IDevice* device)
     SLANG_CHECK(actual->dispatchWidth == 1);
 }
 
+void runStructuralRayTracingRecursiveTrace(IDevice* device)
+{
+    if (!device->hasFeature(Feature::RayTracing))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    auto queue = device->getQueue(QueueType::Graphics);
+    SLANG_CHECK_ABORT(queue != nullptr);
+    StructuralRayTracingTriangleScene scene(device, queue);
+
+    static const EntryDesc kEntries[] = {
+        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
+        {"RuntimeMiss", SLANG_STAGE_MISS},
+    };
+    ComPtr<IShaderProgram> program;
+    GFX_CHECK_CALL_ABORT(loadProgram(
+        device,
+        "recursive-trace",
+        kEntries,
+        SLANG_COUNT_OF(kEntries),
+        program.writeRef()));
+
+    static const char* kHitGroupNames[] = {"hitGroup0"};
+    HitGroupDesc hitGroup = {};
+    hitGroup.hitGroupName = kHitGroupNames[0];
+    hitGroup.closestHitEntryPoint = "RuntimeClosestHit";
+
+    RayTracingPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = program;
+    pipelineDesc.hitGroups = &hitGroup;
+    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.maxRecursion = 2;
+    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 2;
+    pipelineDesc.maxAttributeSizeInBytes = sizeof(float) * 2;
+
+    ComPtr<IRayTracingPipeline> pipeline;
+    GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
+
+    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kMissNames[] = {"RuntimeMiss"};
+    ShaderTableDesc shaderTableDesc = {};
+    shaderTableDesc.program = program;
+    shaderTableDesc.rayGenShaderCount = SLANG_COUNT_OF(kRayGenerationNames);
+    shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
+    shaderTableDesc.missShaderCount = SLANG_COUNT_OF(kMissNames);
+    shaderTableDesc.missShaderEntryPointNames = kMissNames;
+    shaderTableDesc.hitGroupCount = SLANG_COUNT_OF(kHitGroupNames);
+    shaderTableDesc.hitGroupNames = kHitGroupNames;
+
+    ComPtr<IShaderTable> shaderTable;
+    GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+
+    BufferDesc resultDesc = {};
+    resultDesc.size = sizeof(StructuralRayTracingRecursiveResult) * 2;
+    resultDesc.elementSize = sizeof(StructuralRayTracingRecursiveResult);
+    resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    resultDesc.defaultState = ResourceState::UnorderedAccess;
+    auto results = device->createBuffer(resultDesc);
+    SLANG_CHECK_ABORT(results != nullptr);
+
+    auto commandEncoder = queue->createCommandEncoder();
+    auto passEncoder = commandEncoder->beginRayTracingPass();
+    auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
+    ShaderCursor root(rootObject);
+    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    passEncoder->dispatchRays(0, 2, 1, 1);
+    passEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    ComPtr<ISlangBlob> resultBlob;
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    auto actual =
+        static_cast<const StructuralRayTracingRecursiveResult*>(resultBlob->getBufferPointer());
+    static const StructuralRayTracingRecursiveResult kExpected[] = {
+        {21, 1, 2},
+        {20, 0, 2},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
+    {
+        SLANG_CHECK(actual[i].stage == kExpected[i].stage);
+        SLANG_CHECK(actual[i].depth == kExpected[i].depth);
+        SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
+    }
+}
+
 } // namespace gfx_test
