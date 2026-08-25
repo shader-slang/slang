@@ -2337,7 +2337,15 @@ local insts = {
 			{
 				metalVisibleFunction = {
 					struct_name = "MetalVisibleFunctionDecoration",
-					operands = { { "stageKind", "IRIntLit" } },
+					operands = {
+						{ "stageKind", "IRIntLit" },
+						{ "tableType", "IRType" },
+					},
+				},
+			},
+			{
+				explicitGlobalContext = {
+					struct_name = "ExplicitGlobalContextDecoration",
 				},
 			},
 			{
