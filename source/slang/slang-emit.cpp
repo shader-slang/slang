@@ -1860,6 +1860,12 @@ Result linkAndOptimizeIR(
         {
             SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
 
+            // A callable entry point must keep exactly one argument parameter for DXC, but an
+            // empty callable-data struct would be erased by the empty-struct legalization below.
+            // Pad it with a dummy field first (must run before legalizeExistentialTypeLayout /
+            // legalizeResourceTypes remove the empty struct parameter).
+            SLANG_PASS(legalizeEmptyCallableDataPayloadsForHLSL);
+
             // HLSL SM 6.7+ requires every member of a `[raypayload]` struct to declare
             // both a `read(...)` and a `write(...)` qualifier. The call-site fill above
             // only covers payload structs reached through a `TraceRay`-style call, so a
