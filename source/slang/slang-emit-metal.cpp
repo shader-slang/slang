@@ -842,19 +842,25 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_CastDescriptorHandleToUInt64:
         {
             // Metal: DescriptorHandle is a pointer; emit C-style cast to ulong.
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(ulong)(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_CastUInt64ToDescriptorHandle:
         {
             // Metal: cast integer back to pointer type.
+            EmitOpInfo outerPrec = inOuterPrec;
+            bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
             m_writer->emit("(");
             emitType(inst->getDataType());
             m_writer->emit(")(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
+            maybeCloseParens(needClose);
             return true;
         }
     case kIROp_BitCast:
@@ -869,12 +875,18 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
 
             if (toIsPointer || fromIsPointer)
             {
-                // C-style cast for pointer conversions
+                // C-style cast for pointer conversions. A cast is a prefix expression
+                // and binds looser than a postfix member access, so wrap it by
+                // precedence; otherwise `(T*)p->field` binds `->` to `p`, not the cast
+                // result, and Metal rejects it (#12732).
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, getInfo(EmitOp::Prefix));
                 m_writer->emit("(");
                 emitType(toType);
                 m_writer->emit(")(");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
+                maybeCloseParens(needClose);
             }
             else
             {

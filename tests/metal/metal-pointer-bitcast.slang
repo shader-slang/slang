@@ -13,9 +13,15 @@
 // The intermediate variable may be fully renamed (e.g. ptrValue -> _S1).
 // CHECK-DAG: (int device*)(
 
+// A pointer cast used as the base of a member access must be parenthesized so
+// `->field` binds to the cast result, not the cast's operand (issue #12732).
+// CHECK-DAG: = ((Data{{.*}} device*)({{.*}}))->value
+
 // Make sure as_type is NOT used for any pointer conversions
 // CHECK-NOT: as_type<{{.*}}device{{.*}}\*>
 // CHECK-NOT: as_type<{{.*}}\*>
+
+struct Data { uint value; }
 
 uniform int* inputPtr;
 
@@ -38,4 +44,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     outputBuffer[0] = ptr2[0];
     outputBuffer[1] = uint(ptrValue & 0xFFFFFFFF);
     outputBuffer[2] = uint(ptr3[0]);
+
+    // Single use, so the cast is emitted in place as the base of `->` rather
+    // than hoisted to a named temporary (which would hide the bug).
+    outputBuffer[3] = bit_cast<Data*>(inputPtr)->value;
 }
