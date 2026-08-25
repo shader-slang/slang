@@ -43,6 +43,18 @@ Review-related skills:
   analysis before posting.
 - `slang-review-post-github`: post filtered candidates as one proper GitHub PR review.
 
+## Long-Running Work and ExecPlans
+
+For work that spans multiple focused sessions, changes several subsystems, or includes a
+research/prototype gate, create an ExecPlan following `.agent/PLANS.md` before implementation.
+
+Use one ExecPlan for one bounded, demonstrable slice rather than treating a plan as the backlog for
+an entire program. Active ExecPlans live in `issue-<topic>/plan.<slice>.md`, are working logs, and
+must stay out of commits. Keep their progress, discoveries, decisions, validation evidence, and
+outcomes current. Distill durable architecture into `docs/design/`, durable test status into the
+relevant test manifest, and the implementation narrative into the required five-part PR
+description.
+
 ## WSL and Windows Tooling
 
 When working in this repository from WSL on Windows, use Windows-native developer tools by

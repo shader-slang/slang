@@ -20,6 +20,9 @@ The [Shader Coverage](shader-coverage.md) document describes the current archite
 
 The [Shader Coverage Counter Placement](shader-coverage-counter-placement.md) document describes where line, function, and branch coverage counters are inserted.
 
+The [NVVM Backend](nvvm-backend.md) document describes the proposed direct Slang IR to NVVM IR
+pipeline for producing PTX through libNVVM.
+
 The [Existential Types](existential-types.md) document goes into some detail about what "existential types" are in the context of the Slang language, and explains how we may go about supporting them.
 
 The [Capabilities](capabilities.md) document explains the proposed model for how Slang will support general notions of profile- or capability-based overloading/dispatch.

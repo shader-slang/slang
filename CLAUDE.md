@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Reference other instruction files as well:
 
 - @.github/copilot-instructions.md (shares formatting/testing/debugging info; this CLAUDE.md is the canonical source)
+- @.agent/PLANS.md (required format for bounded, long-running ExecPlans)
 
 User-specific instructions for Slang (optional, may not exist):
 
