@@ -14,7 +14,7 @@ self-hosted-runner:
     - SM80Plus
     - vulkancts
     # Hosted GitHub partner-runner label for the VS2026 advance-testing
-    # image (see probe-windows-arm-vs2026.yml). Not yet in actionlint's
+    # image (see ci-probe-windows-arm-vs2026.yml). Not yet in actionlint's
     # bundled known-labels dataset since it is a newly added hosted
     # label, not a self-hosted one — allowlisting it here is the
     # supported workaround until actionlint's dataset catches up.
