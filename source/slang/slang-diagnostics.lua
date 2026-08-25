@@ -4418,6 +4418,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-metal-candidate-global-parameter",
+    38071,
+    "global parameter is unavailable from a Metal intersection function",
+    span { loc = "location", message = "structural intersection and any-hit logic cannot reference global shader parameters in the first-version Metal lowering" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",

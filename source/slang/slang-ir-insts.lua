@@ -545,7 +545,10 @@ local insts = {
 					},
 					{
 						MetalVisibleFunctionTable = {
-							operands = { { "functionType", "IRFuncType" } },
+							operands = {
+								{ "functionType", "IRFuncType" },
+								{ "stageKind", "IRIntLit" },
+							},
 							hoistable = true,
 						},
 					},
@@ -1306,6 +1309,9 @@ local insts = {
 				{ "descriptorResources" },
 				{ "records" },
 				{ "rayData" },
+				{ "missHasGlobalContext" },
+				{ "closestHitHasGlobalContext" },
+				{ "globalContext" },
 			},
 		},
 	},
@@ -1322,6 +1328,8 @@ local insts = {
 				{ "records" },
 				{ "descriptorResourcesType" },
 				{ "callableFunctionsField" },
+				{ "hasGlobalContext" },
+				{ "globalContext" },
 			},
 		},
 	},
@@ -2321,7 +2329,12 @@ local insts = {
 					},
 				},
 			},
-			{ metalVisibleFunction = { struct_name = "MetalVisibleFunctionDecoration" } },
+			{
+				metalVisibleFunction = {
+					struct_name = "MetalVisibleFunctionDecoration",
+					operands = { { "stageKind", "IRIntLit" } },
+				},
+			},
 			{
 				metalIntersectionFunction = {
 					struct_name = "MetalIntersectionFunctionDecoration",
