@@ -999,7 +999,8 @@ static IRFunc* _generateVisibleStageAdapter(
     IRIntLit* slotIndex,
     const MetalStageRequirements& tableRequirements,
     MetalRayDataInfo* rayDataInfo,
-    IRType* descriptorResourcesPointerType)
+    IRType* descriptorResourcesPointerType,
+    IRMetalVisibleFunctionTable* visibleFunctionTableType)
 {
     auto invoke = as<IRFunc>(invokeValue);
     if (!invoke)
@@ -1011,51 +1012,21 @@ static IRFunc* _generateVisibleStageAdapter(
     IRBuilder builder(module);
     builder.setInsertInto(module->getModuleInst());
     auto adapter = builder.createFunc();
-    List<IRType*> parameterTypes;
     auto rayDataPointerType = builder.getPtrType(rayDataInfo->type, AddressSpace::ThreadLocal);
-    parameterTypes.add(rayDataPointerType);
-    if (tableRequirements.distance || tableRequirements.objectSpaceRay)
-        parameterTypes.add(builder.getFloatType());
-    if (tableRequirements.hitKind)
-        parameterTypes.add(builder.getUIntType());
-    if (tableRequirements.triangleBarycentricCoord)
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 2));
-    if (tableRequirements.triangleFrontFacing)
-        parameterTypes.add(builder.getBoolType());
-    if (tableRequirements.curveParameter)
-        parameterTypes.add(builder.getFloatType());
-    if (tableRequirements.worldSpaceOrigin)
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
-    if (tableRequirements.worldSpaceDirection)
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
-    if (tableRequirements.primitiveIndex)
-        parameterTypes.add(builder.getUIntType());
-    if (tableRequirements.geometryIndex)
-        parameterTypes.add(builder.getUIntType());
-    if (tableRequirements.instanceIndex)
-        parameterTypes.add(builder.getUIntType());
-    if (tableRequirements.instanceID)
-        parameterTypes.add(builder.getUIntType());
-    if (tableRequirements.objectSpaceRay)
-    {
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
-        parameterTypes.add(builder.getVectorType(builder.getFloatType(), 3));
-    }
-    if (tableRequirements.objectToWorld)
-        parameterTypes.add(_getFloat4x3Type(builder));
-    if (tableRequirements.worldToObject)
-        parameterTypes.add(_getFloat4x3Type(builder));
-    if (tableRequirements.callableDispatch)
-        parameterTypes.add(descriptorResourcesPointerType);
-    adapter->setFullType(builder.getFuncType(parameterTypes, builder.getVoidType()));
+    adapter->setFullType(visibleFunctionTableType->getFunctionType());
 
     auto name = getStructuralRayTracingSourceTypeName(stageType);
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addKeepAliveDecoration(adapter);
+    IRInst* visibleDecorationOperands[] = {
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)),
+        visibleFunctionTableType,
+    };
     builder.addDecoration(
         adapter,
         kIROp_MetalVisibleFunctionDecoration,
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)));
+        visibleDecorationOperands,
+        SLANG_COUNT_OF(visibleDecorationOperands));
     _addStructuralStageInfo(
         builder,
         adapter,
@@ -1205,7 +1176,7 @@ static IRFunc* _generateCallableStageAdapter(
     Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     IRStructuralRayTracingCallableGroupInfoDecoration* group,
     IRType* descriptorResourcesPointerType,
-    IRType* callableFunctionTableType,
+    IRMetalVisibleFunctionTable* callableFunctionTableType,
     const MetalStageRequirements& signatureRequirements)
 {
     auto invoke = as<IRFunc>(group->getCallable());
@@ -1224,28 +1195,22 @@ static IRFunc* _generateCallableStageAdapter(
     auto requirements = _getMetalStageRequirements(invoke);
     auto uint3Type =
         builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
-    List<IRType*> parameterTypes;
-    parameterTypes.add(dataPointerType);
-    if (signatureRequirements.dispatchRaysIndex)
-        parameterTypes.add(uint3Type);
-    if (signatureRequirements.dispatchRaysDimensions)
-        parameterTypes.add(uint3Type);
-    parameterTypes.add(descriptorResourcesPointerType);
-    parameterTypes.add(descriptorDataType);
-    adapter->setFullType(builder.getFuncType(
-        parameterTypes.getCount(),
-        parameterTypes.getBuffer(),
-        builder.getVoidType()));
+    adapter->setFullType(callableFunctionTableType->getFunctionType());
 
     auto name = getStructuralRayTracingSourceTypeName(group->getCallableType());
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addKeepAliveDecoration(adapter);
+    IRInst* visibleDecorationOperands[] = {
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(StructuralRayTracingStageKind::Callable)),
+        callableFunctionTableType,
+    };
     builder.addDecoration(
         adapter,
         kIROp_MetalVisibleFunctionDecoration,
-        builder.getIntValue(
-            builder.getIntType(),
-            IRIntegerValue(StructuralRayTracingStageKind::Callable)));
+        visibleDecorationOperands,
+        SLANG_COUNT_OF(visibleDecorationOperands));
     _addStructuralStageInfo(
         builder,
         adapter,
@@ -3275,7 +3240,8 @@ static bool _lowerNonEmptyTrace(
                     group->getSlotIndex(),
                     missRequirements,
                     rayDataInfo,
-                    descriptorInfo.descriptorResourcesPointerType))
+                    descriptorInfo.descriptorResourcesPointerType,
+                    cast<IRMetalVisibleFunctionTable>(descriptorInfo.missFunctionTableType)))
             {
                 hasMissFunctions = true;
             }
@@ -3338,7 +3304,8 @@ static bool _lowerNonEmptyTrace(
                     group->getSlotIndex(),
                     closestHitRequirements,
                     rayDataInfo,
-                    descriptorInfo.descriptorResourcesPointerType))
+                    descriptorInfo.descriptorResourcesPointerType,
+                    cast<IRMetalVisibleFunctionTable>(descriptorInfo.closestHitFunctionTableType)))
             {
                 hasClosestHitFunctions = true;
             }
@@ -3586,7 +3553,7 @@ static bool _lowerCallableDispatch(
             dispatchValues,
             group,
             descriptorInfo.descriptorResourcesPointerType,
-            descriptorInfo.callableFunctionTableType,
+            cast<IRMetalVisibleFunctionTable>(descriptorInfo.callableFunctionTableType),
             callableRequirements);
     }
     callOperation->removeAndDeallocate();
@@ -4001,12 +3968,6 @@ void prepareMetalStructuralRayTracing(
     SLANG_UNUSED(entryPoints);
 }
 
-static bool _hasKernelContextName(IRInst* inst)
-{
-    auto nameHint = inst->findDecoration<IRNameHintDecoration>();
-    return nameHint && nameHint->getName() == toSlice("kernelContext");
-}
-
 static IRInst* _findKernelContextValue(IRInst* operation)
 {
     auto func = _findEnclosingFunc(operation);
@@ -4015,14 +3976,14 @@ static IRInst* _findKernelContextValue(IRInst* operation)
 
     for (auto param : func->getParams())
     {
-        if (_hasKernelContextName(param))
+        if (param->findDecoration<IRExplicitGlobalContextDecoration>())
             return param;
     }
     for (auto block : func->getBlocks())
     {
         for (auto inst : block->getChildren())
         {
-            if (_hasKernelContextName(inst))
+            if (inst->findDecoration<IRExplicitGlobalContextDecoration>())
                 return inst;
         }
     }
@@ -4033,7 +3994,7 @@ static IRParam* _findKernelContextParameter(IRFunc* func)
 {
     for (auto param : func->getParams())
     {
-        if (_hasKernelContextName(param))
+        if (param->findDecoration<IRExplicitGlobalContextDecoration>())
             return param;
     }
     return nullptr;
@@ -4055,40 +4016,13 @@ static void _eraseVisibleFunctionKernelContextType(
     fixUpFuncType(func);
 }
 
-static bool _matchesVisibleSignatureBeforeGlobalContext(
-    IRFuncType* tableSignature,
-    IRFuncType* adapterSignature)
-{
-    if (adapterSignature->getParamCount() != tableSignature->getParamCount() + 1 ||
-        adapterSignature->getResultType() != tableSignature->getResultType())
-        return false;
-    for (UInt i = 0; i < tableSignature->getParamCount(); ++i)
-    {
-        if (adapterSignature->getParamType(i) != tableSignature->getParamType(i))
-            return false;
-    }
-    return true;
-}
-
-static bool _matchesVisibleSignature(IRFuncType* left, IRFuncType* right)
-{
-    if (left->getParamCount() != right->getParamCount() ||
-        left->getResultType() != right->getResultType())
-        return false;
-    for (UInt i = 0; i < left->getParamCount(); ++i)
-    {
-        if (left->getParamType(i) != right->getParamType(i))
-            return false;
-    }
-    return true;
-}
-
 static void _appendErasedKernelContextParameter(IRModule* module, IRFunc* func)
 {
     IRBuilder builder(module);
     auto param =
         builder.createParam(builder.getPtrType(builder.getUInt8Type(), AddressSpace::ThreadLocal));
     builder.addNameHintDecoration(param, toSlice("kernelContext"));
+    builder.addDecoration(param, kIROp_ExplicitGlobalContextDecoration);
     param->insertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
     fixUpFuncType(func);
 }
@@ -4133,18 +4067,15 @@ void finalizeMetalStructuralRayTracingGlobalContext(IRModule* module, Diagnostic
     IRBuilder builder(module);
     for (auto table : visibleFunctionTables)
     {
-        auto tableStage = StructuralRayTracingStageKind(table->getStageKind()->getValue());
         IRFuncType* contextSignature = nullptr;
         for (auto adapter : contextUsingVisibleFunctions)
         {
             auto decoration = adapter->findDecoration<IRMetalVisibleFunctionDecoration>();
-            if (!decoration ||
-                StructuralRayTracingStageKind(decoration->getStageKind()->getValue()) != tableStage)
+            if (!decoration || decoration->getTableType() != table)
                 continue;
-            auto adapterType = cast<IRFuncType>(adapter->getDataType());
-            if (!_matchesVisibleSignatureBeforeGlobalContext(table->getFunctionType(), adapterType))
-                continue;
-            contextSignature = adapterType;
+            contextSignature = cast<IRFuncType>(adapter->getDataType());
+            SLANG_RELEASE_ASSERT(
+                contextSignature->getParamCount() == table->getFunctionType()->getParamCount() + 1);
             break;
         }
         if (!contextSignature)
@@ -4156,17 +4087,15 @@ void finalizeMetalStructuralRayTracingGlobalContext(IRModule* module, Diagnostic
         for (auto adapter : visibleFunctions)
         {
             auto decoration = adapter->findDecoration<IRMetalVisibleFunctionDecoration>();
-            if (!decoration ||
-                StructuralRayTracingStageKind(decoration->getStageKind()->getValue()) != tableStage)
+            if (!decoration || decoration->getTableType() != table)
                 continue;
             auto adapterType = cast<IRFuncType>(adapter->getDataType());
-            if (_matchesVisibleSignature(table->getFunctionType(), adapterType))
+            if (adapterType == table->getFunctionType())
             {
                 _appendErasedKernelContextParameter(module, adapter);
                 adapterType = cast<IRFuncType>(adapter->getDataType());
             }
-            if (_matchesVisibleSignature(contextSignature, adapterType))
-                contextSignature = adapterType;
+            SLANG_RELEASE_ASSERT(adapterType == contextSignature);
         }
 
         IRInst* operands[] = {contextSignature, table->getStageKind()};
