@@ -1002,6 +1002,7 @@ struct StructuralRayTracingHitContextInfo
 {
     Type* primitiveType = nullptr;
     Type* payloadType = nullptr;
+    Type* recordType = nullptr;
     Type* hitAttributesType = nullptr;
     StructuralRayTracingHitAttributesKind hitAttributesKind =
         StructuralRayTracingHitAttributesKind::None;
@@ -1045,12 +1046,16 @@ static StructuralRayTracingHitContextInfo _getStructuralRayTracingHitContextInfo
         context->astBuilder,
         contextWitness,
         StructuralRayTracingAssociatedTypeKind::HitPrimitive);
+    result.recordType = registry.resolveAssociatedType(
+        context->astBuilder,
+        contextWitness,
+        StructuralRayTracingAssociatedTypeKind::HitRecord);
     result.hitAttributesType = registry.resolveConcreteAssociatedType(
         context->astBuilder,
         result.primitiveType,
         nullptr,
         StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
-    SLANG_ASSERT(result.primitiveType && result.hitAttributesType);
+    SLANG_ASSERT(result.primitiveType && result.recordType && result.hitAttributesType);
     result.hitAttributesKind = registry.getHitAttributesKind(result.primitiveType);
     return result;
 }
@@ -1234,6 +1239,7 @@ static void _addStructuralRayTracingHitGroupInfo(
             lowerType(context, contextType),
             lowerType(context, contextInfo.primitiveType),
             lowerType(context, contextInfo.payloadType),
+            lowerType(context, contextInfo.recordType),
             lowerType(context, contextInfo.hitAttributesType),
             context->irBuilder->getIntValue(
                 context->irBuilder->getIntType(),
@@ -1289,6 +1295,11 @@ static void _addStructuralRayTracingMissGroupInfo(
             context,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::MissTraceContext);
+        auto recordType = registry.resolveAssociatedType(
+            context->astBuilder,
+            contextWitness,
+            StructuralRayTracingAssociatedTypeKind::MissRecord);
+        SLANG_ASSERT(recordType);
 
         IRInst* operands[] = {
             lowerType(context, groupType),
@@ -1298,6 +1309,7 @@ static void _addStructuralRayTracingMissGroupInfo(
                 _getStructuralRayTracingSlotIndex(context, slotType)),
             lowerType(context, contextType),
             lowerType(context, payloadType),
+            lowerType(context, recordType),
             miss.type,
             miss.invoke,
         };
@@ -1345,7 +1357,11 @@ static void _addStructuralRayTracingCallableGroupInfo(
             context->astBuilder,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::CallableData);
-        SLANG_ASSERT(callableDataType);
+        auto recordType = registry.resolveAssociatedType(
+            context->astBuilder,
+            contextWitness,
+            StructuralRayTracingAssociatedTypeKind::CallableRecord);
+        SLANG_ASSERT(callableDataType && recordType);
 
         IRInst* operands[] = {
             lowerType(context, groupType),
@@ -1355,6 +1371,7 @@ static void _addStructuralRayTracingCallableGroupInfo(
                 _getStructuralRayTracingSlotIndex(context, slotType)),
             lowerType(context, contextType),
             lowerType(context, callableDataType),
+            lowerType(context, recordType),
             callable.type,
             callable.invoke,
         };
@@ -1471,6 +1488,7 @@ LoweredValInfo emitCallToDeclRef(
                 List<IRInst*> operationArgs;
                 if (operationKind != StructuralRayTracingStageInputOperationKind::Payload &&
                     operationKind != StructuralRayTracingStageInputOperationKind::CallableData &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::Record &&
                     operationKind != StructuralRayTracingStageInputOperationKind::HitAttributes &&
                     operationKind !=
                         StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord &&
@@ -15908,6 +15926,7 @@ static void _lowerStructuralRayTracingEntryPointBody(
             invokeFunc,
             lowerType(context, structuralInfo.contextType),
             structuralInfo.payloadType ? lowerType(context, structuralInfo.payloadType) : voidType,
+            structuralInfo.recordType ? lowerType(context, structuralInfo.recordType) : voidType,
             structuralInfo.hitAttributesType ? lowerType(context, structuralInfo.hitAttributesType)
                                              : voidType,
             structuralInfo.callableDataType ? lowerType(context, structuralInfo.callableDataType)

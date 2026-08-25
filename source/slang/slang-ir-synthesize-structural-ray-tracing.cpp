@@ -78,6 +78,7 @@ static void _addStructuralRayTracingEntryPointInfo(
     IRFunc* invoke,
     IRType* contextType,
     IRType* payloadType,
+    IRType* recordType,
     IRType* hitAttributesType,
     StructuralRayTracingHitAttributesKind hitAttributesKind,
     IRType* callableDataType)
@@ -88,6 +89,7 @@ static void _addStructuralRayTracingEntryPointInfo(
         invoke,
         contextType ? contextType : voidType,
         payloadType ? payloadType : voidType,
+        recordType ? recordType : voidType,
         hitAttributesType ? hitAttributesType : voidType,
         callableDataType ? callableDataType : voidType,
         builder.getIntValue(builder.getIntType(), IRIntegerValue(hitAttributesKind)),
@@ -128,6 +130,7 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     IRInst* invokeValue,
     IRType* contextType,
     IRType* payloadType = nullptr,
+    IRType* recordType = nullptr,
     IRType* hitAttributesType = nullptr,
     StructuralRayTracingHitAttributesKind hitAttributesKind =
         StructuralRayTracingHitAttributesKind::None,
@@ -163,6 +166,7 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
         invoke,
         contextType,
         payloadType,
+        recordType,
         hitAttributesType,
         hitAttributesKind,
         callableDataType);
@@ -259,6 +263,7 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     group->getClosestHit(),
                     group->getContextType(),
                     group->getPayloadType(),
+                    group->getRecordType(),
                     group->getHitAttributesType(),
                     hitAttributesKind);
                 _generateStructuralRayTracingEntryPoint(
@@ -270,6 +275,7 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     group->getAnyHit(),
                     group->getContextType(),
                     group->getPayloadType(),
+                    group->getRecordType(),
                     group->getHitAttributesType(),
                     hitAttributesKind);
                 _generateStructuralRayTracingEntryPoint(
@@ -279,7 +285,9 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     StructuralRayTracingStageKind::Intersection,
                     group->getIntersectionType(),
                     group->getIntersection(),
-                    group->getContextType());
+                    group->getContextType(),
+                    nullptr,
+                    group->getRecordType());
             }
             else if (auto group = as<IRStructuralRayTracingMissGroupInfoDecoration>(decoration))
             {
@@ -297,7 +305,8 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     group->getMissType(),
                     group->getMiss(),
                     group->getContextType(),
-                    group->getPayloadType());
+                    group->getPayloadType(),
+                    group->getRecordType());
             }
             else if (auto group = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration))
             {
@@ -316,6 +325,7 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     group->getCallable(),
                     group->getContextType(),
                     nullptr,
+                    group->getRecordType(),
                     nullptr,
                     StructuralRayTracingHitAttributesKind::None,
                     group->getCallableDataType());
@@ -546,6 +556,46 @@ void lowerMetalStructuralRayTracingStageInputOperations(
         operation->removeAndDeallocate();
     loweredOperations.clear();
 
+    // The generated Metal adapters have already replaced record reads with descriptor-buffer
+    // loads. Thread any copy left in the exported source helper through an ordinary parameter so
+    // the compiler-owned operation cannot reach general type legalization.
+    HashSet<IRType*> remainingRecordTypes;
+    operations.clear();
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    for (auto operation : operations)
+    {
+        if (operation->getOp() == kIROp_StructuralRayTracingGetRecord)
+            remainingRecordTypes.add(operation->getDataType());
+    }
+
+    for (auto recordType : remainingRecordTypes)
+    {
+        IRBuilder builder(module);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            builder.getPtrType(recordType, AddressSpace::ThreadLocal),
+            LayoutResourceKind::ShaderRecord,
+            "record",
+            nullptr,
+            false,
+            false);
+        for (auto operation : operations)
+        {
+            if (operation->getOp() == kIROp_StructuralRayTracingGetRecord &&
+                operation->getDataType() == recordType)
+            {
+                builder.setInsertBefore(operation);
+                auto record = builder.emitLoad(threader.findOrCreateParameter(operation));
+                operation->replaceUsesWith(record);
+                loweredOperations.add(operation);
+            }
+        }
+    }
+
+    for (auto operation : loweredOperations)
+        operation->removeAndDeallocate();
+    loweredOperations.clear();
+
     // Generated Metal adapters consume hit attributes from their native parameters or ray-data
     // state before reaching this point. A selected source-stage implementation remains exported as
     // an ordinary helper, though, so thread any attributes left in that helper graph through an
@@ -670,6 +720,68 @@ void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module)
             SLANG_ASSERT(candidatePtrType);
             if (candidatePtrType->getValueType() == payloadType)
                 threader.lower(candidate);
+        }
+    }
+
+    HashSet<IRType*> loweredRecordTypes;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto recordType = info->getRecordType();
+        if (!as<IRVoidType>(recordType))
+            loweredRecordTypes.add(recordType);
+    }
+    for (auto operation : operations)
+    {
+        if (operation->getOp() == kIROp_StructuralRayTracingGetRecord)
+            loweredRecordTypes.add(operation->getDataType());
+    }
+
+    for (auto recordType : loweredRecordTypes)
+    {
+        IRBuilder builder(module);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            recordType,
+            LayoutResourceKind::ShaderRecord,
+            "record",
+            nullptr,
+            false,
+            false);
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (info->getRecordType() == recordType)
+            {
+                builder.setInsertBefore(entryPoint);
+                auto recordBufferType = builder.getConstantBufferType(
+                    recordType,
+                    builder.getType(kIROp_DefaultBufferLayoutType));
+                auto recordBuffer = builder.createGlobalParam(recordBufferType);
+                builder.addNameHintDecoration(recordBuffer, UnownedTerminatedStringSlice("record"));
+                builder.addEntryPointParamDecoration(recordBuffer, entryPoint);
+
+                IRTypeLayout::Builder typeLayoutBuilder(&builder);
+                typeLayoutBuilder.addResourceUsage(LayoutResourceKind::ShaderRecord, LayoutSize(1));
+                IRVarLayout::Builder varLayoutBuilder(&builder, typeLayoutBuilder.build());
+                varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::ShaderRecord);
+                if (auto entryPointDecoration =
+                        entryPoint->findDecoration<IREntryPointDecoration>())
+                    varLayoutBuilder.setStage(entryPointDecoration->getProfile().getStage());
+                builder.addLayoutDecoration(recordBuffer, varLayoutBuilder.build());
+
+                builder.setInsertBefore(entryPoint->getFirstBlock()->getFirstOrdinaryInst());
+                threader.registerParameter(entryPoint, builder.emitLoad(recordBuffer));
+            }
+        }
+        for (auto candidate : operations)
+        {
+            if (candidate->getOp() == kIROp_StructuralRayTracingGetRecord &&
+                candidate->getDataType() == recordType)
+            {
+                threader.lower(candidate);
+            }
         }
     }
 
