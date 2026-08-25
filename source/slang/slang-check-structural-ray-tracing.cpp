@@ -987,6 +987,16 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingConstruction(InvokeExp
     return true;
 }
 
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExpr* invoke)
+{
+    auto kind = _findStructuralRuntimeType(this, invoke->type);
+    if (kind == StructuralRayTracingRuntimeTypeKind::None)
+        return false;
+
+    _diagnoseInvalidStructuralRayTracingRuntimeType(this, kind, invoke->type, invoke->loc);
+    return true;
+}
+
 bool SemanticsVisitor::diagnoseDirectStructuralRayTracingStageInvoke(
     InvokeExpr* invoke,
     FunctionDeclBase* functionDecl)
