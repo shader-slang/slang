@@ -56,6 +56,7 @@ public typealias AccelerationStructure = RaytracingAccelerationStructure;
 
 // Metal traversal with an explicit maximum acceleration-structure depth.
 [require(metal)]
+__intrinsic_type(RaytracingAccelerationStructure)
 public struct MultiLevelAccelerationStructure<let maxLevelCount : int>
     : IAccelerationStructure
 {}

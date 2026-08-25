@@ -41,6 +41,23 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
     where ProgramLayout : ITraceProgramLayout
 {
     [ForceInline]
+    [require(metal)]
+    public void trace<let maxLevelCount : int>(
+        RayTraversalDesc desc,
+        MultiLevelAccelerationStructure<maxLevelCount> accelerationStructure,
+        TraceProgramDescriptor<ProgramLayout> descriptor,
+        inout ProgramLayout.TraceContext.Payload payload)
+        where ProgramLayout.TraceContext.AccelerationStructure ==
+            MultiLevelAccelerationStructure<maxLevelCount>
+    {
+        // The compiler consumes this call as a structural trace operation before emission.
+    }
+}
+
+public extension<ProgramLayout> RayTracer<ProgramLayout>
+    where ProgramLayout : ITraceProgramLayout
+{
+    [ForceInline]
     [require(structural_raytracing_call_shader)]
     public void callShader<CallableContext>(
         uint callableIndex,
