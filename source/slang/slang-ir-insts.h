@@ -5075,6 +5075,11 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_ForceInlineDecoration);
     }
 
+    void addUserForceInlineDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_UserForceInlineDecoration);
+    }
+
     void addAutoDiffOriginalValueDecoration(IRInst* value, IRInst* originalVal)
     {
         addDecoration(value, kIROp_AutoDiffOriginalValueDecoration, originalVal);

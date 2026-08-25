@@ -1703,7 +1703,8 @@ Result linkAndOptimizeIR(
     }
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
-    SLANG_PASS(performForceInlining);
+    // Target-aware: on CUDA a user `[ForceInline]` is deferred here rather than inlined (#12623).
+    SLANG_PASS(performForceInlining, target);
 
     // Specialization can introduce dead code that could trip
     // up downstream passes like type legalization, so we
@@ -2521,7 +2522,9 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
     }
 
-    SLANG_PASS(performForceInlining);
+    // Runs again after the target passes above to catch call sites they newly exposed.
+    // Target-aware for the same reason as the earlier call (#12623).
+    SLANG_PASS(performForceInlining, target);
 
     if (emitSpirvDirectly)
     {
