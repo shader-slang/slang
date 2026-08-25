@@ -123,12 +123,23 @@ The compiler must query `nvvmVersion` and `nvvmIRVersion`. It resolves `nvvmLLVM
 optional function because older CUDA 12 toolkits do not export it. The implementation must not
 infer the NVVM IR or LLVM dialect only from a toolkit directory name.
 
+`DownstreamCompilerDesc::version` contains the numeric NVVM version used by the public query API.
+The compiler's fuller version string contains the NVVM and NVVM IR/debug tuples plus the loaded
+library timestamp, because different patch builds can report the same numeric version. The
+architecture-dependent result of `nvvmLLVMVersion` is combined with the selected target only by
+later cache/routing work; it is not an instance-wide version.
+
 ### Intermediate artifact visibility
 
 The bootstrap path uses an internal artifact equivalent to LLVM assembly for a kernel target. It
 does not initially add a public `SLANG_NVVM_IR` compile target or overload the CPU-oriented
 `SLANG_SHADER_LLVM_IR` target. Public exposure can be reconsidered after the emitter and dialect
 contract stabilize.
+
+Concretely, the bootstrap input descriptor is `Assembly + LLVMIR + Kernel`; the PTX output created
+for `SLANG_PTX` is `ObjectCode + PTX + Kernel`. The initial compiler implements
+`IDownstreamCompiler::compile` only. The generic `convert` entry point has no target architecture or
+policy options, so advertising conversion would create an incomplete second contract.
 
 ## Public NVVM Contract
 
@@ -185,7 +196,12 @@ For each compile, the downstream compiler:
 8. destroys the program through an RAII scope on every path.
 
 Compile and log result sizes include the trailing NUL. An error path still returns an artifact with
-associated diagnostics so the existing caller can report the failure consistently.
+associated diagnostics so the existing caller can report the failure consistently. A verifier or
+compiler rejection follows the existing in-process downstream convention: mark the diagnostics as
+failed, attach an error, require an error diagnostic, and return `SLANG_OK` with the PTX-desc
+artifact. Interface or operational failures may return a failing `SlangResult` but still return the
+artifact. When libNVVM supplies an empty program log, the diagnostic falls back to
+`nvvmGetErrorString`.
 
 ### Compile options
 
@@ -212,11 +228,22 @@ libNVVM and libdevice must come from one selected CUDA toolkit root. The expecte
 <toolkit>/nvvm/libdevice/libdevice.10.bc
 ```
 
-An explicit `-nvvm-path` wins. Automatic discovery should reuse a narrow CUDA-toolkit-root helper
-shared with NVRTC when that can be extracted without changing NVRTC behavior. It must diagnose
-"NVRTC is installed but the libNVVM component is missing" separately from "no CUDA toolkit was
-found." Library basenames and package composition are versioned inputs and must be probed rather
-than frozen into one permanent filename.
+An explicit `-nvvm-path` wins. A decorated file path is normalized to the unadorned name/path
+required by `ISlangSharedLibraryLoader`, while its original resolved identity remains available for
+diagnostics. The locator then attempts the logical library name through Slang's
+shared-library loader before probing filesystem layouts; this supports injected test loaders and
+platform loader installations. Filesystem discovery considers the Slang module location,
+`CUDA_PATH`, and CUDA toolkit roots represented on `PATH` in deterministic order. It should reuse a
+narrow CUDA-toolkit-root helper shared with NVRTC when that can be extracted without changing
+NVRTC behavior.
+
+After a logical/system load, the implementation derives the actual library filename and toolkit
+root from a resolved symbol when the platform exposes them. A compiler may remain usable for a
+libdevice-free module when that root is unknown, but later libdevice linking must resolve a
+coherent root rather than combine components speculatively. Discovery must diagnose "NVRTC is
+installed but the libNVVM component is missing" separately from "no CUDA toolkit was found."
+Library basenames and package composition are versioned inputs and must be probed rather than
+frozen into one permanent filename.
 
 ## Dialect and Bitcode Gate
 
@@ -271,6 +298,41 @@ The capability ledger will classify tests by feature rather than treating every 
 `tests/cuda` as a direct-backend test. CUDA-source syntax, prelude, macro, and C++ emission tests need
 semantic NVVM counterparts.
 
+## Test Buckets and Capability Ledger
+
+Tests advance by the first backend capability they require, not merely by directory or historical
+test name. The initial buckets are:
+
+| Bucket | Capability boundary | Representative contents |
+| --- | --- | --- |
+| 0 | External compiler contract | handwritten NVVM IR, loader failures, verifier logs, `ptxas` acceptance |
+| 1 | Minimal compute ABI | empty kernel, scalar value/pointer parameters, launch shape, entry naming |
+| 2 | Scalar program structure | arithmetic, comparisons, branches, loops, SSA phis, direct calls |
+| 3 | Types and memory | vectors, matrices, aggregates, layout, generic/global/shared/local address spaces |
+| 4 | Core CUDA execution | thread/block IDs, barriers, atomics, shared memory, memory ordering |
+| 5 | Numeric library policy | half/bfloat/fp8, transcendental math, libdevice, fast/precise/denormal modes |
+| 6 | Resource ABI | buffers, textures, samplers, surface operations, bindless/resource handles |
+| 7 | Slang language lowering | generics, interfaces, witness tables, specialization, autodiff |
+| 8 | Advanced NVIDIA paths | waves, cooperative features, OptiX, debug metadata, RDC, LTO, dynamic parallelism |
+
+Source-emission tests whose contract is specifically CUDA C++ spelling, macro expansion, header
+shape, or prelude text stay assigned to NVRTC. Add a semantic counterpart before using such a test
+as evidence for NVVM.
+
+Once the experimental routing slice exists, a checked-in capability ledger should record at least:
+
+- test path and feature bucket;
+- required target/profile and runtime hardware, if any;
+- NVRTC result and NVVM result;
+- first failing phase (`legalize`, `emit`, `verify`, `compile`, `ptxas`, or `runtime`);
+- a stable diagnostic category or unsupported Slang IR instruction;
+- ABI/runtime comparison status; and
+- downstream time, PTX size, `ptxas` resource summary, and kernel time when measured.
+
+Work proceeds within the lowest incomplete bucket. A test moves to a higher bucket only when its
+first failure is genuinely a later capability; it is not reclassified simply to make the current
+bucket appear complete.
+
 ## Development Slices
 
 The program advances through bounded slices:
@@ -278,7 +340,7 @@ The program advances through bounded slices:
 1. architecture contract and a dynamically loaded libNVVM compiler that handles handwritten IR;
 2. LLVM-7-compatible production bitcode feasibility;
 3. NVRTC-versus-libNVVM differential reference kernels;
-4. downstream compiler registration and experimental PTX routing;
+4. CUDA emission-method selection and experimental PTX routing through the registered compiler;
 5. minimal Slang IR compute lowering;
 6. scalar control flow and the kernel ABI;
 7. address spaces, aggregates, and shared memory;
