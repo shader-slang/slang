@@ -1216,6 +1216,7 @@ local insts = {
 			{ structuralRayTracingGetHitAttributes = { operands = { { "input" } } } },
 			{ structuralRayTracingGetTriangleBarycentricCoord = { operands = { { "input" } } } },
 			{ structuralRayTracingGetTriangleFrontFacing = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetCurveParameter = { operands = { { "input" } } } },
 			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },
