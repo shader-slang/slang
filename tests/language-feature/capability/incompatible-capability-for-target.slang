@@ -58,8 +58,15 @@
 // CHECK_SPIRV_DIRECT_OK: OpEntryPoint
 // CHECK_SPIRV_DIRECT_OK-NOT: E36121
 
-// Note: cross-target version aliases like sm_6_0 intentionally include SPIRV paths
-// (sm_6_0 maps to spirv_1_3 for SPIRV targets), so they do NOT trigger E36121.
+// Cross-target version aliases like sm_6_0 intentionally include SPIRV paths (sm_6_0 maps
+// to spirv_1_3 for SPIRV targets, in addition to its HLSL/CUDA/Metal/CPP paths), so
+// requesting sm_6_0 must NOT trigger E36121 on any of the targets it spans.
+//TEST:SIMPLE(filecheck=CHECK_ALIAS_HLSL): -target hlsl -entry main -stage compute -capability sm_6_0
+// CHECK_ALIAS_HLSL: result code = 0
+// CHECK_ALIAS_HLSL-NOT: E36121
+//TEST:SIMPLE(filecheck=CHECK_ALIAS_SPIRV): -target spirv -entry main -stage compute -capability sm_6_0
+// CHECK_ALIAS_SPIRV: OpEntryPoint
+// CHECK_ALIAS_SPIRV-NOT: E36121
 
 [numthreads(1, 1, 1)]
 void main() {}
