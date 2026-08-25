@@ -16,6 +16,7 @@
 #include "slang-tag-version.h"
 #include "slang.h"
 
+#include <cstdint>
 #include <mutex>
 #include <thread>
 
@@ -1170,18 +1171,38 @@ static IRModuleInst* deserializeFromFlatModule(const IRReadSerializer& serialize
             return sizeInBytes <= blobHigh - p;
         };
 
-        // The element count is widened before it is multiplied, so the byte size cannot
-        // wrap on the way in -- a corrupt count that wrapped to a small positive would
-        // otherwise pass a check computed from it. Counts are non-negative by construction;
-        // a negative one means the table is corrupt, and is refused rather than multiplied.
-        auto arrayIsSafe = [&](auto const& array, uintptr_t elementSize)
+        // The byte size is computed in 64 bits on every target, and a count that cannot
+        // produce an addressable span is refused rather than converted.
+        //
+        // Casting to `uintptr_t` before multiplying is *not* a widening on a 32-bit
+        // target. On wasm32 `SLANG_PTR_IS_64` is 0, so `SlangInt` -- and therefore
+        // `Count` -- is `int32_t` and `uintptr_t` is 32 bits, and `count * elementSize`
+        // wraps for counts above about 2^29. A corrupt count of 0x20000001 with an
+        // 8-byte stride would wrap to a byte size of 8 and pass the containment check
+        // below while the table claimed half a billion elements -- defeating the guard
+        // in exactly the case it exists for, since nothing validates the count before
+        // this point (`_pushContainerState` takes it verbatim from the container header).
+        //
+        // Counts are non-negative by construction; a negative one means the table is
+        // corrupt and is refused rather than multiplied.
+        auto arrayIsSafe = [&](auto const& array, uint64_t elementSize)
         {
             if (!array.isView())
                 return true;
             const Count count = array.getCount();
             if (count < 0)
                 return false;
-            return spanIsInsideBlob((const Byte*)array.getBuffer(), (uintptr_t)count * elementSize);
+            const uint64_t elementCount = (uint64_t)count;
+            // Refuse rather than wrap: on a 64-bit target a large count times a stride
+            // can still exceed 64 bits.
+            if (elementSize != 0 && elementCount > UINT64_MAX / elementSize)
+                return false;
+            const uint64_t byteSize = elementCount * elementSize;
+            // A span wider than the address space cannot be inside the blob, and must not
+            // be narrowed on the way into the check.
+            if (byteSize > (uint64_t)UINTPTR_MAX)
+                return false;
+            return spanIsInsideBlob((const Byte*)array.getBuffer(), (uintptr_t)byteSize);
         };
 
         // Every view-capable array, not a sample: which ones are views depends on the
