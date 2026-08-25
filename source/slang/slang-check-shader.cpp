@@ -2428,10 +2428,11 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             linkage->getStructuralRayTracingDeclRegistry().functionReachesStructuralTrace(
                 entryPointFuncDecl))
         {
-            // Structural ray-generation programs become Metal compute kernels. Check their source
-            // bodies in that logical execution environment; the target lowering changes the
-            // physical entry-point stage after it consumes the structural trace operation.
-            stageCapabilitySet = Profile(Stage::Compute).getCapabilityName();
+            // Structural ray-generation programs become Metal compute kernels, but source code
+            // still executes in the logical ray-generation stage. Using the abstract stage atom
+            // admits only operations with an explicit structural Metal implementation; the target
+            // lowering changes the physical entry-point stage after consuming those operations.
+            stageCapabilitySet = CapabilitySet{CapabilityName::_raygen};
         }
         targetCaps.join(stageCapabilitySet);
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))

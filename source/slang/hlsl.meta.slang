@@ -20033,7 +20033,7 @@ void AcceptHitAndEndSearch()
 /// @remarks Available in all ray tracing shader stages
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
+[require(structural_raytracing_dispatch_system_values)]
 uint3 DispatchRaysIndex()
 {
     __target_switch
@@ -20041,6 +20041,9 @@ uint3 DispatchRaysIndex()
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
     case glsl: __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
+    // Structural Metal ray-generation lowering replaces this marker with the compute-grid
+    // system value before target emission.
+    case metal: __intrinsic_asm "DispatchRaysIndex";
     case spirv:
         return spirv_asm
         {
@@ -20053,7 +20056,7 @@ uint3 DispatchRaysIndex()
 /// @return 3D dimensions of the ray dispatch grid
 /// @remarks Available in all ray tracing shader stages
 /// @category raytracing
-[require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
+[require(structural_raytracing_dispatch_system_values)]
 uint3 DispatchRaysDimensions()
 {
     __target_switch
@@ -20061,6 +20064,9 @@ uint3 DispatchRaysDimensions()
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case glsl: __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
+    // Structural Metal ray-generation lowering replaces this marker with the compute-grid
+    // system value before target emission.
+    case metal: __intrinsic_asm "DispatchRaysDimensions";
     case spirv:
         return spirv_asm
         {

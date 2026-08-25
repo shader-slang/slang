@@ -1522,6 +1522,10 @@ Compound Capabilities
 `structural_raytracing_closesthit`
 > Logical closest-hit role used by the structural ray-tracing API.
 
+`structural_raytracing_dispatch_system_values`
+> Ray-dispatch system values used by native ray-tracing stages or by logical structural
+> ray-tracing stages whose Metal implementation is synthesized by the compiler.
+
 `structural_raytracing_intersection`
 > Logical intersection role used by the structural ray-tracing API.
 

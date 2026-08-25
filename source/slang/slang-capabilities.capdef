@@ -2688,6 +2688,18 @@ alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp | llvm;
 /// [Compound]
 alias raytracing_allstages = raytracing_stages + raytracing;
 
+/// Ray-dispatch system values used by native ray-tracing stages or by logical structural
+/// ray-tracing stages whose Metal implementation is synthesized by the compiler.
+/// [Compound]
+alias structural_raytracing_dispatch_system_values =
+    cuda_glsl_hlsl_spirv + raytracing_allstages
+    | _raygen + metal
+    | _closesthit + metal
+    | _anyhit + metal
+    | _intersection + metal
+    | _miss + metal
+    | _callable + metal;
+
 /// Collection of capabilities for raytracing with the shader stage of anyhit.
 /// [Compound]
 alias raytracing_anyhit = anyhit + raytracing;
