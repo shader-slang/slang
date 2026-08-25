@@ -5085,16 +5085,22 @@ void legalizeEntryPointsForGLSL(
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
 {
-    bool preserveOriginalEntryPointNames = funcs.getCount() > 1;
-    for (auto func : funcs)
+    bool hasMultipleRequestedEntryPoints = context->getEntryPointCount() > 1;
+    for (Index i = 0; i < funcs.getCount(); ++i)
     {
+        auto func = funcs[i];
+        // Structural ray-tracing synthesis can append auxiliary stages to a single requested
+        // entry point. Keep those stage names, but retain the normal `main` ABI name for the
+        // requested entry point at index zero.
+        bool preserveOriginalEntryPointName =
+            hasMultipleRequestedEntryPoints || (funcs.getCount() > 1 && i != 0);
         legalizeEntryPointForGLSL(
             session,
             module,
             func,
             context,
             glslExtensionTracker,
-            preserveOriginalEntryPointNames);
+            preserveOriginalEntryPointName);
     }
 
     assignRayPayloadHitObjectAttributeLocations(module);
