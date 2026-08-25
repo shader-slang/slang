@@ -3,8 +3,10 @@ implementing raytracing;
 namespace rt
 {
 
+[sealed]
 public interface IRayMotion {}
 
+[sealed]
 public interface IEnabledRayMotion : IRayMotion {}
 
 public struct NoMotion : IRayMotion {}
