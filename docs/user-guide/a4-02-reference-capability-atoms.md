@@ -1532,6 +1532,9 @@ Compound Capabilities
 `structural_raytracing_miss`
 > Logical miss role used by the structural ray-tracing API.
 
+`structural_raytracing_trace`
+> Stages that may trace a ray through the structural ray-tracing API.
+
 `structuredbuffer`
 > Capabilities required to use StructuredBuffer
 
