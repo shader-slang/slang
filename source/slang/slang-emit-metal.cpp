@@ -5,12 +5,54 @@
 #include "core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
+#include "slang-ir-metal-structural-ray-tracing.h"
 #include "slang-ir-util.h"
 #include "slang-rich-diagnostics.h"
 
 
 namespace Slang
 {
+
+static void _emitMetalRayTracingTagList(
+    SourceWriter* writer,
+    IRIntegerValue tagMask,
+    IRIntegerValue maxLevels)
+{
+    struct TagInfo
+    {
+        MetalStructuralRayTracingTag tag;
+        const char* name;
+    };
+    const TagInfo tags[] = {
+        {MetalStructuralRayTracingTag::Instancing, "instancing"},
+        {MetalStructuralRayTracingTag::TriangleData, "triangle_data"},
+        {MetalStructuralRayTracingTag::CurveData, "curve_data"},
+        {MetalStructuralRayTracingTag::WorldSpaceData, "world_space_data"},
+        {MetalStructuralRayTracingTag::PrimitiveMotion, "primitive_motion"},
+        {MetalStructuralRayTracingTag::InstanceMotion, "instance_motion"},
+        {MetalStructuralRayTracingTag::ExtendedLimits, "extended_limits"},
+    };
+
+    bool needsComma = false;
+    for (auto tag : tags)
+    {
+        if ((tagMask & IRIntegerValue(tag.tag)) == 0)
+            continue;
+        if (needsComma)
+            writer->emit(", ");
+        writer->emit("metal::raytracing::");
+        writer->emit(tag.name);
+        needsComma = true;
+    }
+    if (maxLevels > 0)
+    {
+        if (needsComma)
+            writer->emit(", ");
+        writer->emit("metal::raytracing::max_levels<");
+        writer->emit(maxLevels);
+        writer->emit(">");
+    }
+}
 
 void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -400,6 +442,134 @@ void MetalSourceEmitter::emitAtomicSrcOperand(bool isImage, IRInst* inst)
 
 bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
+    if (auto trace = as<IRMetalStructuralRayTracingTrace>(inst))
+    {
+        auto tagMask = IRIntegerValue(getIntVal(trace->getTagMask()));
+        auto maxLevels = IRIntegerValue(getIntVal(trace->getMaxLevels()));
+
+        m_writer->emit("{\n");
+        m_writer->indent();
+        m_writer->emit("metal::raytracing::intersector<");
+        _emitMetalRayTracingTagList(m_writer, tagMask, maxLevels);
+        m_writer->emit("> _slang_intersector;\n");
+
+        switch (MetalStructuralRayTracingGeometryKind(getIntVal(trace->getGeometryKind())))
+        {
+        case MetalStructuralRayTracingGeometryKind::Triangle:
+            m_writer->emit("_slang_intersector.assume_geometry_type("
+                           "metal::raytracing::geometry_type::triangle);\n");
+            break;
+        case MetalStructuralRayTracingGeometryKind::Curve:
+            m_writer->emit("_slang_intersector.assume_geometry_type("
+                           "metal::raytracing::geometry_type::curve);\n");
+            break;
+        case MetalStructuralRayTracingGeometryKind::BoundingBox:
+            m_writer->emit("_slang_intersector.assume_geometry_type("
+                           "metal::raytracing::geometry_type::bounding_box);\n");
+            break;
+        default:
+            break;
+        }
+
+        const auto emitFlagTest = [&]()
+        {
+            m_writer->emit("if ((");
+            emitOperand(trace->getRayFlags(), getInfo(EmitOp::General));
+            m_writer->emit(") & ");
+        };
+        emitFlagTest();
+        m_writer->emit("0x01U) _slang_intersector.force_opacity("
+                       "metal::raytracing::forced_opacity::opaque);\n");
+        emitFlagTest();
+        m_writer->emit("0x02U) _slang_intersector.force_opacity("
+                       "metal::raytracing::forced_opacity::non_opaque);\n");
+        emitFlagTest();
+        m_writer->emit("0x04U) _slang_intersector.accept_any_intersection(true);\n");
+        emitFlagTest();
+        m_writer->emit("0x10U) _slang_intersector.set_triangle_cull_mode("
+                       "metal::raytracing::triangle_cull_mode::back);\n");
+        emitFlagTest();
+        m_writer->emit("0x20U) _slang_intersector.set_triangle_cull_mode("
+                       "metal::raytracing::triangle_cull_mode::front);\n");
+        emitFlagTest();
+        m_writer->emit("0x40U) _slang_intersector.set_opacity_cull_mode("
+                       "metal::raytracing::opacity_cull_mode::opaque);\n");
+        emitFlagTest();
+        m_writer->emit("0x80U) _slang_intersector.set_opacity_cull_mode("
+                       "metal::raytracing::opacity_cull_mode::non_opaque);\n");
+        emitFlagTest();
+        m_writer->emit("0x100U) _slang_intersector.set_geometry_cull_mode("
+                       "metal::raytracing::geometry_cull_mode::triangle);\n");
+        emitFlagTest();
+        m_writer->emit("0x200U) _slang_intersector.set_geometry_cull_mode("
+                       "metal::raytracing::geometry_cull_mode::bounding_box);\n");
+
+        m_writer->emit("metal::raytracing::intersection_result<");
+        _emitMetalRayTracingTagList(m_writer, tagMask, maxLevels);
+        m_writer->emit("> _slang_result = _slang_intersector.intersect(\n");
+        m_writer->indent();
+        m_writer->emit("metal::raytracing::ray(");
+        emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(trace->getMinDistance(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(trace->getMaxDistance(), getInfo(EmitOp::General));
+        m_writer->emit("),\n");
+        emitOperand(trace->getAccelerationStructure(), getInfo(EmitOp::General));
+        m_writer->emit(", ");
+        emitOperand(trace->getInstanceMask(), getInfo(EmitOp::General));
+        if (cast<IRBoolLit>(trace->getHasIntersectionFunctions())->getValue())
+        {
+            m_writer->emit(", ");
+            emitOperand(trace->getIntersectionFunctions(), getInfo(EmitOp::General));
+        }
+        m_writer->emit(");\n");
+        m_writer->dedent();
+
+        m_writer->emit(
+            "if (_slang_result.type == metal::raytracing::intersection_type::none)\n{\n");
+        m_writer->indent();
+        if (cast<IRBoolLit>(trace->getHasMissFunctions())->getValue())
+        {
+            emitOperand(trace->getMissFunctions(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[");
+            emitOperand(trace->getMissIndex(), getInfo(EmitOp::General));
+            m_writer->emit("](");
+            emitOperand(trace->getPayload(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+        }
+        m_writer->dedent();
+        m_writer->emit("}\nelse\n{\n");
+        m_writer->indent();
+        if (cast<IRBoolLit>(trace->getHasClosestHitFunctions())->getValue())
+        {
+            m_writer->emit("if (((");
+            emitOperand(trace->getRayFlags(), getInfo(EmitOp::General));
+            m_writer->emit(") & 0x08U) == 0)\n{\n");
+            m_writer->indent();
+            m_writer->emit("uint _slang_hit_slot = ");
+            emitOperand(trace->getRecords(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[_slang_result.instance_id] + _slang_result.geometry_id * ");
+            emitOperand(trace->getSbtStride(), getInfo(EmitOp::General));
+            m_writer->emit(" + ");
+            emitOperand(trace->getSbtOffset(), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            emitOperand(trace->getClosestHitFunctions(), getInfo(EmitOp::Postfix));
+            m_writer->emit("[_slang_hit_slot](");
+            emitOperand(trace->getPayload(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
+        }
+        m_writer->dedent();
+        m_writer->emit("}\n");
+        m_writer->dedent();
+        m_writer->emit("}\n");
+        return true;
+    }
+
     auto emitAtomicOp = [&](const char* imageFunc, const char* bufferFunc)
     {
         emitInstResultDecl(inst);
@@ -1159,8 +1329,8 @@ void MetalSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
 
 void MetalSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
-    // Does not apply to metal.
-    SLANG_UNUSED(decoration);
+    if (as<IRMetalVisibleFunctionDecoration>(decoration))
+        m_writer->emit("[[visible]] ");
 }
 
 void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
@@ -1486,6 +1656,33 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(
                 "metal::raytracing::acceleration_structure<metal::raytracing::instancing>");
             break;
+        case kIROp_MetalIntersectionFunctionTable:
+            {
+                auto tableType = cast<IRMetalIntersectionFunctionTable>(type);
+                m_writer->emit("metal::raytracing::intersection_function_table<");
+                _emitMetalRayTracingTagList(
+                    m_writer,
+                    tableType->getTagMask()->getValue(),
+                    tableType->getMaxLevels()->getValue());
+                m_writer->emit(">");
+                break;
+            }
+        case kIROp_MetalVisibleFunctionTable:
+            {
+                auto tableType = cast<IRMetalVisibleFunctionTable>(type);
+                auto functionType = tableType->getFunctionType();
+                m_writer->emit("metal::visible_function_table<");
+                emitType(functionType->getResultType());
+                m_writer->emit("(");
+                for (UInt i = 0; i < functionType->getParamCount(); ++i)
+                {
+                    if (i != 0)
+                        m_writer->emit(", ");
+                    emitType(functionType->getParamType(i));
+                }
+                m_writer->emit(")>");
+                break;
+            }
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");
             break;

@@ -900,5 +900,10 @@ return {
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetCallableData"] = 924,
 	["Decoration.structuralRayTracingHitGroupInfo"] = 925,
 	["Decoration.structuralRayTracingMissGroupInfo"] = 926,
-	["Decoration.structuralRayTracingCallableGroupInfo"] = 927
+	["Decoration.structuralRayTracingCallableGroupInfo"] = 927,
+	["Type.UntypedBufferResourceType.MetalIntersectionFunctionTable"] = 928,
+	["Type.UntypedBufferResourceType.MetalVisibleFunctionTable"] = 929,
+	["Decoration.metalVisibleFunction"] = 930,
+	["Decoration.metalIntersectionFunction"] = 931,
+	["metalStructuralRayTracingTrace"] = 932
 }

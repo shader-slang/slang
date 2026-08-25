@@ -18,6 +18,9 @@ void synthesizePortableStructuralRayTracingEntryPoints(
 /// Lower structural stage-input operations through their portable standard-module bodies.
 void lowerPortableStructuralRayTracingStageInputOperations(IRModule* module);
 
+/// Thread compiler-provided payload parameters through generated Metal visible-stage adapters.
+void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module);
+
 /// Lower structural trace operations through their portable standard-module bodies.
 void lowerPortableStructuralRayTracingTraceOperations(IRModule* module);
 

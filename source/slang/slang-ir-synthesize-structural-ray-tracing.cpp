@@ -353,6 +353,8 @@ struct StructuralRayTracingStageParameterThreader
     IRStructKey* m_entryPointValueKey;
     Dictionary<IRFunc*, IRInst*> m_parameters;
 
+    void registerParameter(IRFunc* func, IRInst* parameter) { m_parameters[func] = parameter; }
+
     IRFunc* findEnclosingFunc(IRInst* inst)
     {
         for (auto parent = inst; parent; parent = parent->getParent())
@@ -477,6 +479,65 @@ static void _collectStructuralEntryPoints(IRModule* module, List<IRFunc*>& entry
                 entryPoints.add(func);
         }
     }
+}
+
+void lowerMetalStructuralRayTracingPayloadOperations(IRModule* module)
+{
+    List<IRInst*> operations;
+    _collectStageInputOperations(module->getModuleInst(), operations);
+    List<IRFunc*> structuralEntryPoints;
+    _collectStructuralEntryPoints(module, structuralEntryPoints);
+
+    HashSet<IRType*> payloadTypes;
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        if (!entryPoint->findDecoration<IRMetalVisibleFunctionDecoration>())
+            continue;
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        if (info && !as<IRVoidType>(info->getPayloadType()))
+            payloadTypes.add(info->getPayloadType());
+    }
+
+    HashSet<IRInst*> loweredOperations;
+    for (auto payloadType : payloadTypes)
+    {
+        IRBuilder builder(module);
+        StructuralRayTracingStageParameterThreader threader(
+            module,
+            builder.getPtrType(payloadType, AddressSpace::ThreadLocal),
+            LayoutResourceKind::RayPayload,
+            "payload",
+            nullptr,
+            false,
+            false);
+        for (auto entryPoint : structuralEntryPoints)
+        {
+            if (!entryPoint->findDecoration<IRMetalVisibleFunctionDecoration>())
+                continue;
+            auto info =
+                entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+            if (!info || info->getPayloadType() != payloadType)
+                continue;
+            auto parameter = entryPoint->getFirstParam();
+            SLANG_ASSERT(parameter);
+            threader.registerParameter(entryPoint, parameter);
+        }
+        for (auto operation : operations)
+        {
+            if (operation->getOp() != kIROp_StructuralRayTracingGetPayload)
+                continue;
+            auto payloadPtrType = as<IRPtrTypeBase>(operation->getDataType());
+            SLANG_ASSERT(payloadPtrType);
+            if (payloadPtrType->getValueType() == payloadType)
+            {
+                threader.lower(operation);
+                loweredOperations.add(operation);
+            }
+        }
+    }
+
+    for (auto operation : loweredOperations)
+        operation->removeAndDeallocate();
 }
 
 static StructuralRayTracingHitAttributesKind _getHitAttributesKind(

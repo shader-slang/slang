@@ -537,6 +537,18 @@ local insts = {
 						},
 					},
 					{ RaytracingAccelerationStructure = { struct_name = "RaytracingAccelerationStructureType" } },
+					{
+						MetalIntersectionFunctionTable = {
+							operands = { { "tagMask", "IRIntLit" }, { "maxLevels", "IRIntLit" } },
+							hoistable = true,
+						},
+					},
+					{
+						MetalVisibleFunctionTable = {
+							operands = { { "functionType", "IRFuncType" } },
+							hoistable = true,
+						},
+					},
 				},
 			},
 			{
@@ -1233,6 +1245,33 @@ local insts = {
 				{ "desc" },
 				{ "accelerationStructure" },
 				{ "descriptor" },
+				{ "payload" },
+			},
+		},
+	},
+	{
+		metalStructuralRayTracingTrace = {
+			operands = {
+				{ "tagMask" },
+				{ "maxLevels" },
+				{ "geometryKind" },
+				{ "hasIntersectionFunctions" },
+				{ "hasMissFunctions" },
+				{ "hasClosestHitFunctions" },
+				{ "origin" },
+				{ "direction" },
+				{ "minDistance" },
+				{ "maxDistance" },
+				{ "rayFlags" },
+				{ "instanceMask" },
+				{ "sbtOffset" },
+				{ "sbtStride" },
+				{ "missIndex" },
+				{ "accelerationStructure" },
+				{ "intersectionFunctions" },
+				{ "missFunctions" },
+				{ "closestHitFunctions" },
+				{ "records" },
 				{ "payload" },
 			},
 		},
@@ -2227,6 +2266,8 @@ local insts = {
 					},
 				},
 			},
+			{ metalVisibleFunction = { struct_name = "MetalVisibleFunctionDecoration" } },
+			{ metalIntersectionFunction = { struct_name = "MetalIntersectionFunctionDecoration" } },
 			{ CudaKernel = { struct_name = "CudaKernelDecoration" } },
 			{ CudaHost = { struct_name = "CudaHostDecoration" } },
 			{

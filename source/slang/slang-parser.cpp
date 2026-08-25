@@ -10102,10 +10102,13 @@ static IROp parseIROp(Parser* parser, Token& outToken)
     if ((op >= kIROp_FirstRaytracingStageInterface && op <= kIROp_LastRaytracingStageInterface) ||
         (op >= kIROp_FirstStructuralRayTracingStageInputOperation &&
          op <= kIROp_LastStructuralRayTracingStageInputOperation) ||
-        op == kIROp_StructuralRayTracingTrace ||
+        op == kIROp_StructuralRayTracingTrace || op == kIROp_MetalStructuralRayTracingTrace ||
         op == kIROp_StructuralRayTracingHitGroupInfoDecoration ||
         op == kIROp_StructuralRayTracingMissGroupInfoDecoration ||
-        op == kIROp_StructuralRayTracingCallableGroupInfoDecoration)
+        op == kIROp_StructuralRayTracingCallableGroupInfoDecoration ||
+        op == kIROp_MetalIntersectionFunctionTable || op == kIROp_MetalVisibleFunctionTable ||
+        op == kIROp_MetalVisibleFunctionDecoration ||
+        op == kIROp_MetalIntersectionFunctionDecoration)
     {
         parser->sink->diagnose(Diagnostics::CompilerOwnedIntrinsicOp{
             .operation = outToken.getContent(),
