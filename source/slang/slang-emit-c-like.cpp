@@ -1450,7 +1450,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 }
 
 // Return true when `inst` is a module-scope aggregate literal (`MakeArray`/`MakeStruct`/
-// `MakeArrayFromElement`) whose every use is a constituent of another such aggregate. Under that
+// `MakeArrayFromElement`) that is only ever used inside another such aggregate. Under that
 // condition the inst is only ever emitted inside an outer aggregate's brace initializer list — a
 // context where an initializer-list value is valid — so it is safe to fold inline, unlike a
 // function-body aggregate whose value may appear in a general expression context. Folding matters
@@ -1458,7 +1458,7 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 // outer aggregate's initializer reference it by name, which is an illegal cross-declaration
 // reference in a static initializer on some targets (a dynamic `__device__` initializer NVRTC
 // rejects on CUDA, an inter-`var<private>` reference on WGSL).
-static bool isModuleScopeAggregateUsedOnlyAsConstituent(IRInst* inst)
+static bool isInnerGlobalAggregate(IRInst* inst)
 {
     switch (inst->getOp())
     {
@@ -1573,18 +1573,15 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
 
     // HACK: don't fold these in because we currently lower
     // them to initializer lists, which aren't allowed in
-    // general expression contexts. Exception: a module-scope aggregate used only as a constituent
-    // of another aggregate is always emitted inside an aggregate initializer list, where folding is
-    // safe (see isModuleScopeAggregateUsedOnlyAsConstituent). That helper matches only MakeArray/
-    // MakeStruct/MakeArrayFromElement, so SwizzleSet/MakeCoopVector below always fall through to
-    // false.
+    // general expression contexts.
+    //
     case kIROp_MakeStruct:
     case kIROp_MakeArray:
     case kIROp_SwizzleSet:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeCoopVector:
 
-        return isModuleScopeAggregateUsedOnlyAsConstituent(inst);
+        return isInnerGlobalAggregate(inst);
     }
 
     // Instructions with specific result *types* will usually
