@@ -1220,9 +1220,11 @@ buildCharts(24);
 def render_pending_approvals(data):
     """Render runs paused on a deployment approval, oldest first.
 
-    Age is the number that matters. A run waiting a couple of minutes is the
-    approval bot about to pick it up; one waiting half an hour means nobody is
-    coming, and the job will eventually time out and report as a test failure.
+    Most of these gate the Falcor bridge, which is approved by hand rather
+    than on a bot SLA, so a nonempty queue is the normal state, not an
+    incident -- it just means nobody has vetted the run yet. The indicator
+    only distinguishes "some runs are waiting" (informational) from "the
+    fetch itself failed" (a real problem); it does not escalate on wait time.
     """
     if not data:
         return "<p>Pending approvals unavailable.</p>"
@@ -1237,11 +1239,8 @@ def render_pending_approvals(data):
     elif not pending:
         fg, bg, label = "#198754", "#d1e7dd", "OK"
         summary = "Nothing waiting for approval"
-    elif oldest >= 30:
-        fg, bg, label = "#dc3545", "#f8d7da", "STALLED"
-        summary = f"{len(pending)} waiting, oldest {oldest} min"
     else:
-        fg, bg, label = "#fd7e14", "#fff3cd", "WAITING"
+        fg, bg, label = "#0d6efd", "#cfe2ff", "WAITING"
         summary = f"{len(pending)} waiting, oldest {oldest} min"
 
     html = f"""
@@ -1484,11 +1483,11 @@ PENDING_APPROVALS_JS = """
       var fg, bg, label, summary;
       if (!pending.length) {
         fg = "#198754"; bg = "#d1e7dd"; label = "OK"; summary = "Nothing waiting for approval";
-      } else if (oldest >= 30) {
-        fg = "#dc3545"; bg = "#f8d7da"; label = "STALLED";
-        summary = pending.length + " waiting, oldest " + oldest + " min";
       } else {
-        fg = "#fd7e14"; bg = "#fff3cd"; label = "WAITING";
+        // Most of these gate the Falcor bridge, which is approved by hand
+        // rather than on a bot SLA, so a nonempty queue is normal, not an
+        // incident -- this stays informational regardless of wait time.
+        fg = "#0d6efd"; bg = "#cfe2ff"; label = "WAITING";
         summary = pending.length + " waiting, oldest " + oldest + " min";
       }
 
