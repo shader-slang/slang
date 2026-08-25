@@ -297,6 +297,12 @@ void SpvInstParent::addInst(SpvInst* inst)
     if (m_firstChild == nullptr)
     {
         m_firstChild = m_lastChild = inst;
+        // Every child of a parent must have `parent` set, including the first. removeFromParent
+        // depends on this in two ways: removing the first child itself would hit its
+        // `if (!oldParent) return;` and silently skip the unlink (in release builds, leaving a
+        // subsumed capability in the module), and removing a later sibling would trip its
+        // `pp->parent == oldParent` assert in debug builds.
+        inst->parent = this;
         return;
     }
 
@@ -10273,11 +10279,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         TypeNeedsStorageFlags targets = TypeNeedsStorageFlag::kNone;
         switch (storageClass)
         {
+        // The two arms below only prune the type search: each requests the search for a width when
+        // the capability that arm would require is not yet present. They do not reason about
+        // subsumption between the narrow and broad capabilities; that invariant is enforced in one
+        // place (requireSPIRVCapability), so the final capability set is correct regardless of the
+        // order in which the uniform and storage-buffer pointer types are emitted.
         case SpvStorageClassUniform:
-        case SpvStorageClassStorageBuffer:
+            // A uniform (constant/UBO) access to an 8/16-bit type needs the broad
+            // UniformAndStorageBuffer capability; the narrow StorageBuffer variant does not cover
+            // uniform access.
             if (!m_capabilities.contains(SpvCapabilityUniformAndStorageBuffer8BitAccess))
                 targets |= TypeNeedsStorageFlag::kElementSize8;
             if (!m_capabilities.contains(SpvCapabilityUniformAndStorageBuffer16BitAccess))
+                targets |= TypeNeedsStorageFlag::kElementSize16;
+            break;
+        case SpvStorageClassStorageBuffer:
+            // A storage-buffer access needs the narrow StorageBuffer capability. This checks only
+            // the narrow capability, not the broad one: if the broad capability is already present
+            // (a uniform access was emitted first) the type walk below still runs and
+            // requireSPIRVCapability drops the redundant narrow request, keeping all subsumption
+            // logic in that one place rather than reintroducing it here.
+            if (!m_capabilities.contains(SpvCapabilityStorageBuffer8BitAccess))
+                targets |= TypeNeedsStorageFlag::kElementSize8;
+            if (!m_capabilities.contains(SpvCapabilityStorageBuffer16BitAccess))
                 targets |= TypeNeedsStorageFlag::kElementSize16;
             break;
         case SpvStorageClassPushConstant:
@@ -10308,7 +10332,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (storageClass)
         {
         case SpvStorageClassUniform:
-        case SpvStorageClassStorageBuffer:
+            // Uniform access needs the broad UniformAndStorageBuffer capability.
+            // requireSPIRVCapability retracts a narrow StorageBuffer capability of the same width
+            // if one was required earlier, so the module never carries both.
             if (found & TypeNeedsStorageFlag::kElementSize8)
             {
                 ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
@@ -10316,6 +10342,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             if (found & TypeNeedsStorageFlag::kElementSize16)
                 requireSPIRVCapability(SpvCapabilityUniformAndStorageBuffer16BitAccess);
+            break;
+
+        case SpvStorageClassStorageBuffer:
+            // Storage-buffer access needs the narrow StorageBuffer capability.
+            // requireSPIRVCapability drops it if the broad UniformAndStorageBuffer capability is
+            // already present, and drops it later if that broad capability is required afterwards,
+            // so the two never coexist.
+            if (found & TypeNeedsStorageFlag::kElementSize8)
+            {
+                ensureExtensionDeclarationBeforeSpv15(UnownedStringSlice("SPV_KHR_8bit_storage"));
+                requireSPIRVCapability(SpvCapabilityStorageBuffer8BitAccess);
+            }
+            if (found & TypeNeedsStorageFlag::kElementSize16)
+                requireSPIRVCapability(SpvCapabilityStorageBuffer16BitAccess);
             break;
 
         case SpvStorageClassPushConstant:
@@ -11831,11 +11871,65 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     OrderedHashSet<SpvCapability> m_capabilities;
+    // The OpCapability instruction emitted for each capability required through
+    // requireSPIRVCapability, so that a capability later subsumed by a broader one can be removed
+    // again (see removeSPIRVCapability). Kept in lock-step with m_capabilities: both are written
+    // only in requireSPIRVCapability (add) and removeSPIRVCapability (remove). The mandatory
+    // `Shader` capability that emitFrontMatter emits directly is deliberately not tracked here; it
+    // is never a removal target.
+    Dictionary<SpvCapability, SpvInst*> m_capabilityInsts;
+    // SPIR-V's UniformAndStorageBuffer{8,16}BitAccess capability strictly subsumes the
+    // StorageBuffer{8,16}BitAccess capability of the same width: it grants the same storage-buffer
+    // access *plus* uniform-buffer access, so a module must never carry both members of a pair.
+    // getStorageBufferCapabilityPair is the single place this narrow<->broad correspondence is
+    // encoded; requireSPIRVCapability uses it to enforce the invariant centrally. For a capability
+    // that is not one of these storage capabilities it returns {cap, cap}, i.e. "no relationship".
+    struct StorageBufferCapabilityPair
+    {
+        SpvCapability narrow;
+        SpvCapability broad;
+    };
+    static StorageBufferCapabilityPair getStorageBufferCapabilityPair(SpvCapability cap)
+    {
+        switch (cap)
+        {
+        case SpvCapabilityStorageBuffer8BitAccess:
+        case SpvCapabilityUniformAndStorageBuffer8BitAccess:
+            return {
+                SpvCapabilityStorageBuffer8BitAccess,
+                SpvCapabilityUniformAndStorageBuffer8BitAccess};
+        case SpvCapabilityStorageBuffer16BitAccess:
+        case SpvCapabilityUniformAndStorageBuffer16BitAccess:
+            return {
+                SpvCapabilityStorageBuffer16BitAccess,
+                SpvCapabilityUniformAndStorageBuffer16BitAccess};
+        default:
+            return {cap, cap};
+        }
+    }
+
     void requireSPIRVCapability(SpvCapability capability)
     {
+        // Enforce the storage-buffer capability subsumption invariant at the single point where
+        // capabilities enter the module, so it holds no matter what order pointer types (and hence
+        // capability requests) are emitted in: a narrow capability is dropped when its broad
+        // superset is already present, and requiring a broad capability retracts the narrow one it
+        // subsumes.
+        auto pair = getStorageBufferCapabilityPair(capability);
+        if (capability == pair.narrow && pair.narrow != pair.broad &&
+            m_capabilities.contains(pair.broad))
+            return;
+
         if (m_capabilities.add(capability))
         {
-            emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
+            auto capInst = emitOpCapability(
+                getSection(SpvLogicalSectionID::Capabilities),
+                nullptr,
+                capability);
+            m_capabilityInsts[capability] = capInst;
+
+            if (capability == pair.broad && pair.narrow != pair.broad)
+                removeSPIRVCapability(pair.narrow);
 
             // The shader-invocation-reorder (SER) capabilities are usable from SPIR-V 1.4,
             // but the extension's 1.4 dependency also requires a physical-storage-buffer
@@ -11853,6 +11947,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(
                     UnownedStringSlice("SPV_KHR_physical_storage_buffer"));
             }
+        }
+    }
+
+    // Remove a previously required capability, unlinking its OpCapability instruction from the
+    // module. This is used when a capability turns out to be subsumed by a broader one that gets
+    // required later (e.g. StorageBuffer8BitAccess is subsumed by
+    // UniformAndStorageBuffer8BitAccess), so the module never carries both.
+    //
+    // Only valid for a "leaf" capability that requireSPIRVCapability added with no dependent side
+    // effects: unlinking the OpCapability is safe because it has no result id and is never
+    // referenced, but any extension/dependency the capability pulled in (as the SER capabilities
+    // pull in SPV_KHR_physical_storage_buffer) is NOT reversed. The capabilities removed here
+    // (StorageBuffer{8,16}BitAccess) are leaves, and the SPV_KHR_8bit_storage extension their arm
+    // declares is still required by the subsuming broad capability, so nothing is left dangling.
+    void removeSPIRVCapability(SpvCapability capability)
+    {
+        if (!m_capabilities.contains(capability))
+            return;
+        m_capabilities.remove(capability);
+        // m_capabilities and m_capabilityInsts are populated together, so an entry present in the
+        // former is always present in the latter.
+        SpvInst* capInst = nullptr;
+        if (m_capabilityInsts.tryGetValue(capability, capInst))
+        {
+            capInst->removeFromParent();
+            m_capabilityInsts.remove(capability);
+        }
+        else
+        {
+            SLANG_ASSERT(!"capability in m_capabilities but not m_capabilityInsts");
         }
     }
 
