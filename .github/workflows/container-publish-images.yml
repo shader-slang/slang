@@ -28,7 +28,7 @@ permissions:
   contents: read # Required for actions/checkout in validation jobs.
 
 concurrency:
-  group: publish-ci-container-images-${{ github.ref }}
+  group: container-publish-images-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

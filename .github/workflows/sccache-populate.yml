@@ -6,7 +6,7 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 concurrency:
-  group: populate-sccache
+  group: sccache-populate
   cancel-in-progress: false
 
 permissions:
