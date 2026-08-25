@@ -67,4 +67,8 @@ void prepareMetalStructuralRayTracing(
     TargetRequest* targetRequest,
     DiagnosticSink* sink);
 
+/// Reconcile generated visible-function-table signatures after Metal's explicit-global-context
+/// pass has threaded the host-visible parameter state through reachable functions.
+void finalizeMetalStructuralRayTracingGlobalContext(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang

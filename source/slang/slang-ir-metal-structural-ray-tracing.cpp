@@ -1071,7 +1071,10 @@ static IRFunc* _generateVisibleStageAdapter(
     auto name = _getStructuralStageName(stageType, invoke);
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addKeepAliveDecoration(adapter);
-    builder.addDecoration(adapter, kIROp_MetalVisibleFunctionDecoration);
+    builder.addDecoration(
+        adapter,
+        kIROp_MetalVisibleFunctionDecoration,
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)));
     _addStructuralStageInfo(
         builder,
         adapter,
@@ -1255,7 +1258,12 @@ static IRFunc* _generateCallableStageAdapter(
     auto name = _getStructuralStageName(group->getCallableType(), invoke);
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addKeepAliveDecoration(adapter);
-    builder.addDecoration(adapter, kIROp_MetalVisibleFunctionDecoration);
+    builder.addDecoration(
+        adapter,
+        kIROp_MetalVisibleFunctionDecoration,
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(StructuralRayTracingStageKind::Callable)));
     _addStructuralStageInfo(
         builder,
         adapter,
@@ -3033,20 +3041,34 @@ static bool _prepareTraceDescriptor(
         SLANG_COUNT_OF(intersectionTableOperands),
         intersectionTableOperands);
 
-    auto missFunctionTableType = builder.getType(
-        kIROp_MetalVisibleFunctionTable,
+    IRInst* missTableTypeOperands[] = {
         _getMetalVisibleFunctionSignature(
             builder,
             rayDataInfo->type,
             missRequirements,
-            descriptorResourcesPointerType));
-    auto closestHitFunctionTableType = builder.getType(
+            descriptorResourcesPointerType),
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(StructuralRayTracingStageKind::Miss)),
+    };
+    auto missFunctionTableType = builder.getType(
         kIROp_MetalVisibleFunctionTable,
+        SLANG_COUNT_OF(missTableTypeOperands),
+        missTableTypeOperands);
+    IRInst* closestHitTableTypeOperands[] = {
         _getMetalVisibleFunctionSignature(
             builder,
             rayDataInfo->type,
             closestHitRequirements,
-            descriptorResourcesPointerType));
+            descriptorResourcesPointerType),
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(StructuralRayTracingStageKind::ClosestHit)),
+    };
+    auto closestHitFunctionTableType = builder.getType(
+        kIROp_MetalVisibleFunctionTable,
+        SLANG_COUNT_OF(closestHitTableTypeOperands),
+        closestHitTableTypeOperands);
 
     resourceFields[0]->setFieldType(intersectionFunctionTableType);
     resourceFields[1]->setFieldType(missFunctionTableType);
@@ -3096,7 +3118,16 @@ static bool _prepareCallableDescriptor(
         parameterTypes.getCount(),
         parameterTypes.getBuffer(),
         builder.getVoidType());
-    auto callableFunctionTableType = builder.getType(kIROp_MetalVisibleFunctionTable, signature);
+    IRInst* callableTableTypeOperands[] = {
+        signature,
+        builder.getIntValue(
+            builder.getIntType(),
+            IRIntegerValue(StructuralRayTracingStageKind::Callable)),
+    };
+    auto callableFunctionTableType = builder.getType(
+        kIROp_MetalVisibleFunctionTable,
+        SLANG_COUNT_OF(callableTableTypeOperands),
+        callableTableTypeOperands);
     resourceFields[3]->setFieldType(callableFunctionTableType);
 
     outInfo.descriptorResourcesField = descriptorResourcesField;
@@ -3457,6 +3488,10 @@ static bool _lowerNonEmptyTrace(
         descriptorResources,
         records,
         rayData,
+        builder.getBoolValue(false),
+        builder.getBoolValue(false),
+        builder.emitDefaultConstruct(
+            builder.getPtrType(builder.getUIntType(), AddressSpace::ThreadLocal)),
     };
     builder.emitIntrinsicInst(
         builder.getVoidType(),
@@ -3550,6 +3585,9 @@ static bool _lowerCallableDispatch(
         records,
         descriptorResources->getDataType(),
         descriptorInfo.callableFunctionsField,
+        builder.getBoolValue(false),
+        builder.emitDefaultConstruct(
+            builder.getPtrType(builder.getUIntType(), AddressSpace::ThreadLocal)),
     };
     builder.emitIntrinsicInst(
         builder.getVoidType(),
@@ -4006,6 +4044,226 @@ void prepareMetalStructuralRayTracing(
     // Keep this parameter while the pass grows into adapter synthesis. It also documents that the
     // physical entry points being rewritten are the linked target program's selected entry points.
     SLANG_UNUSED(entryPoints);
+}
+
+static bool _hasKernelContextName(IRInst* inst)
+{
+    auto nameHint = inst->findDecoration<IRNameHintDecoration>();
+    return nameHint && nameHint->getName() == toSlice("kernelContext");
+}
+
+static IRInst* _findKernelContextValue(IRInst* operation)
+{
+    auto func = _findEnclosingFunc(operation);
+    if (!func)
+        return nullptr;
+
+    for (auto param : func->getParams())
+    {
+        if (_hasKernelContextName(param))
+            return param;
+    }
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (_hasKernelContextName(inst))
+                return inst;
+        }
+    }
+    return nullptr;
+}
+
+static IRParam* _findKernelContextParameter(IRFunc* func)
+{
+    for (auto param : func->getParams())
+    {
+        if (_hasKernelContextName(param))
+            return param;
+    }
+    return nullptr;
+}
+
+static void _eraseVisibleFunctionKernelContextType(
+    IRModule* module,
+    IRFunc* func,
+    IRParam* contextParam)
+{
+    auto typedContextPointer = cast<IRType>(contextParam->getDataType());
+    IRBuilder builder(module);
+    builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+    auto typedContext = builder.emitBitCast(typedContextPointer, contextParam);
+    contextParam->replaceUsesWith(typedContext);
+    typedContext->setOperand(0, contextParam);
+    contextParam->setFullType(
+        builder.getPtrType(builder.getUInt8Type(), AddressSpace::ThreadLocal));
+    fixUpFuncType(func);
+}
+
+static bool _matchesVisibleSignatureBeforeGlobalContext(
+    IRFuncType* tableSignature,
+    IRFuncType* adapterSignature)
+{
+    if (adapterSignature->getParamCount() != tableSignature->getParamCount() + 1 ||
+        adapterSignature->getResultType() != tableSignature->getResultType())
+        return false;
+    for (UInt i = 0; i < tableSignature->getParamCount(); ++i)
+    {
+        if (adapterSignature->getParamType(i) != tableSignature->getParamType(i))
+            return false;
+    }
+    return true;
+}
+
+static bool _matchesVisibleSignature(IRFuncType* left, IRFuncType* right)
+{
+    if (left->getParamCount() != right->getParamCount() ||
+        left->getResultType() != right->getResultType())
+        return false;
+    for (UInt i = 0; i < left->getParamCount(); ++i)
+    {
+        if (left->getParamType(i) != right->getParamType(i))
+            return false;
+    }
+    return true;
+}
+
+static void _appendErasedKernelContextParameter(IRModule* module, IRFunc* func)
+{
+    IRBuilder builder(module);
+    auto param =
+        builder.createParam(builder.getPtrType(builder.getUInt8Type(), AddressSpace::ThreadLocal));
+    builder.addNameHintDecoration(param, toSlice("kernelContext"));
+    param->insertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+    fixUpFuncType(func);
+}
+
+void finalizeMetalStructuralRayTracingGlobalContext(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRFunc*> visibleFunctions;
+    List<IRFunc*> contextUsingVisibleFunctions;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        auto visibleDecoration = func->findDecoration<IRMetalVisibleFunctionDecoration>();
+        if (visibleDecoration)
+            visibleFunctions.add(func);
+        auto contextParam = _findKernelContextParameter(func);
+        if (!contextParam)
+            continue;
+
+        if (func->findDecoration<IRMetalIntersectionFunctionDecoration>())
+        {
+            sink->diagnose(Diagnostics::StructuralRayTracingMetalCandidateGlobalParameter{
+                .location = func->sourceLoc});
+            continue;
+        }
+        if (visibleDecoration)
+        {
+            _eraseVisibleFunctionKernelContextType(module, func, contextParam);
+            contextUsingVisibleFunctions.add(func);
+        }
+    }
+
+    HashSet<IRMetalVisibleFunctionTable*> tablesWithGlobalContext;
+    List<IRMetalVisibleFunctionTable*> visibleFunctionTables;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto table = as<IRMetalVisibleFunctionTable>(inst))
+            visibleFunctionTables.add(table);
+    }
+
+    IRBuilder builder(module);
+    for (auto table : visibleFunctionTables)
+    {
+        auto tableStage = StructuralRayTracingStageKind(table->getStageKind()->getValue());
+        IRFuncType* contextSignature = nullptr;
+        for (auto adapter : contextUsingVisibleFunctions)
+        {
+            auto decoration = adapter->findDecoration<IRMetalVisibleFunctionDecoration>();
+            if (!decoration ||
+                StructuralRayTracingStageKind(decoration->getStageKind()->getValue()) != tableStage)
+                continue;
+            auto adapterType = cast<IRFuncType>(adapter->getDataType());
+            if (!_matchesVisibleSignatureBeforeGlobalContext(table->getFunctionType(), adapterType))
+                continue;
+            contextSignature = adapterType;
+            break;
+        }
+        if (!contextSignature)
+            continue;
+
+        // Every function stored in one visible-function table must have the same signature. If
+        // one adapter acquired the explicit global context, give the other adapters in that table
+        // an unused erased context parameter as well.
+        for (auto adapter : visibleFunctions)
+        {
+            auto decoration = adapter->findDecoration<IRMetalVisibleFunctionDecoration>();
+            if (!decoration ||
+                StructuralRayTracingStageKind(decoration->getStageKind()->getValue()) != tableStage)
+                continue;
+            auto adapterType = cast<IRFuncType>(adapter->getDataType());
+            if (_matchesVisibleSignature(table->getFunctionType(), adapterType))
+            {
+                _appendErasedKernelContextParameter(module, adapter);
+                adapterType = cast<IRFuncType>(adapter->getDataType());
+            }
+            if (_matchesVisibleSignature(contextSignature, adapterType))
+                contextSignature = adapterType;
+        }
+
+        IRInst* operands[] = {contextSignature, table->getStageKind()};
+        auto contextTable = cast<IRMetalVisibleFunctionTable>(
+            builder.getType(kIROp_MetalVisibleFunctionTable, SLANG_COUNT_OF(operands), operands));
+        table->replaceUsesWith(contextTable);
+        tablesWithGlobalContext.add(contextTable);
+    }
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (!func)
+            continue;
+        for (auto block : func->getBlocks())
+        {
+            for (auto child = block->getFirstOrdinaryInst(); child; child = child->getNextInst())
+            {
+                if (auto trace = as<IRMetalStructuralRayTracingTrace>(child))
+                {
+                    auto missTable =
+                        as<IRMetalVisibleFunctionTable>(trace->getMissFunctions()->getDataType());
+                    auto closestHitTable = as<IRMetalVisibleFunctionTable>(
+                        trace->getClosestHitFunctions()->getDataType());
+                    bool missUsesContext = missTable && tablesWithGlobalContext.contains(missTable);
+                    bool closestHitUsesContext =
+                        closestHitTable && tablesWithGlobalContext.contains(closestHitTable);
+                    if (!missUsesContext && !closestHitUsesContext)
+                        continue;
+                    auto context = _findKernelContextValue(trace);
+                    SLANG_ASSERT(context);
+                    IRBuilder builder(trace);
+                    trace->setOperand(25, builder.getBoolValue(missUsesContext));
+                    trace->setOperand(26, builder.getBoolValue(closestHitUsesContext));
+                    trace->setOperand(27, context);
+                    continue;
+                }
+                if (auto callShader = as<IRMetalStructuralRayTracingCallShader>(child))
+                {
+                    auto field = cast<IRStructField>(callShader->getCallableFunctionsField());
+                    auto table = as<IRMetalVisibleFunctionTable>(field->getFieldType());
+                    if (!table || !tablesWithGlobalContext.contains(table))
+                        continue;
+                    auto context = _findKernelContextValue(callShader);
+                    SLANG_ASSERT(context);
+                    IRBuilder builder(callShader);
+                    callShader->setOperand(10, builder.getBoolValue(true));
+                    callShader->setOperand(11, context);
+                }
+            }
+        }
+    }
 }
 
 } // namespace Slang
