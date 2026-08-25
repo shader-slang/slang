@@ -31,6 +31,8 @@ struct RuntimePayload
 {
     uint stage;
     uint depth;
+    uint dispatchIndex;
+    uint dispatchWidth;
 }
 
 struct RuntimeTraceContext : rt::ITraceContext
@@ -53,6 +55,8 @@ struct RuntimeClosestHit : rt::IClosestHitShader<HitContext>
 {
     void invoke(rt::ClosestHitInput<HitContext> input)
     {
+        input.payload.dispatchIndex = input.dispatchRaysIndex.x;
+        input.payload.dispatchWidth = input.dispatchRaysDimensions.x;
         if (input.payload.depth == 0)
         {
             input.payload.depth = 1;
@@ -81,6 +85,8 @@ struct RuntimeMiss : rt::IMissShader<MissContext>
     void invoke(rt::MissInput<MissContext> input)
     {
         input.payload.stage = 20 + input.payload.depth;
+        input.payload.dispatchIndex = input.dispatchRaysIndex.x;
+        input.payload.dispatchWidth = input.dispatchRaysDimensions.x;
     }
 }
 
@@ -135,5 +141,5 @@ void main()
 
     results[rayIndex].stage = payload.stage;
     results[rayIndex].depth = payload.depth;
-    results[rayIndex].dispatchWidth = DispatchRaysDimensions().x;
+    results[rayIndex].dispatchWidth = payload.dispatchWidth;
 }
