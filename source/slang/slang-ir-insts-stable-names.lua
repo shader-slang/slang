@@ -912,5 +912,9 @@ return {
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetCurveParameter"] = 936,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRecord"] = 937,
 	["structuralRayTracingCallShader"] = 938,
-	["metalStructuralRayTracingCallShader"] = 939
+	["metalStructuralRayTracingCallShader"] = 939,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayTMin"] = 940,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayFlags"] = 941,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceIndex"] = 942,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceID"] = 943
 }
