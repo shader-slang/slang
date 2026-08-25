@@ -50,6 +50,8 @@ void createSingleInstanceTopLevel(
     ICommandQueue* queue,
     IAccelerationStructure* bottomLevel,
     AccelerationStructureInstanceFlags flags,
+    uint32_t instanceID,
+    const float* transform,
     ComPtr<IBuffer>& outInstanceBuffer,
     ComPtr<IAccelerationStructure>& outTopLevel)
 {
@@ -68,8 +70,11 @@ void createSingleInstanceTopLevel(
         1.0f,
         0.0f,
     };
-    memcpy(genericInstance.transform, kIdentityTransform, sizeof(kIdentityTransform));
-    genericInstance.instanceID = 0;
+    memcpy(
+        genericInstance.transform,
+        transform ? transform : kIdentityTransform,
+        sizeof(kIdentityTransform));
+    genericInstance.instanceID = instanceID;
     genericInstance.instanceMask = 0xff;
     genericInstance.instanceContributionToHitGroupIndex = 0;
     genericInstance.flags = flags;
@@ -125,7 +130,9 @@ void createSingleInstanceTopLevel(
 StructuralRayTracingTriangleScene::StructuralRayTracingTriangleScene(
     IDevice* device,
     ICommandQueue* queue,
-    AccelerationStructureInstanceFlags instanceFlags)
+    AccelerationStructureInstanceFlags instanceFlags,
+    uint32_t instanceID,
+    const float* transform)
 {
     BufferDesc vertexDesc = {};
     vertexDesc.size = sizeof(kTriangleVertices);
@@ -178,6 +185,8 @@ StructuralRayTracingTriangleScene::StructuralRayTracingTriangleScene(
         queue,
         bottomLevel,
         instanceFlags,
+        instanceID,
+        transform,
         instanceBuffer,
         topLevel);
 }
@@ -226,6 +235,8 @@ StructuralRayTracingProceduralScene::StructuralRayTracingProceduralScene(
         queue,
         bottomLevel,
         AccelerationStructureInstanceFlags::None,
+        0,
+        nullptr,
         instanceBuffer,
         topLevel);
 }
