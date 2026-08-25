@@ -933,7 +933,12 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
     if (kind == StructuralRayTracingRuntimeTypeKind::None)
         return;
 
-    if (kind == StructuralRayTracingRuntimeTypeKind::StageInput && as<ParamDecl>(varDecl) &&
+    auto paramDecl = as<ParamDecl>(varDecl);
+    auto isReadOnlyValueParameter =
+        paramDecl && !paramDecl->hasModifier<OutModifier>() &&
+        !paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>() &&
+        !paramDecl->hasModifier<HLSLPayloadModifier>();
+    if (kind == StructuralRayTracingRuntimeTypeKind::StageInput && isReadOnlyValueParameter &&
         _getDirectStageInputKind(getLinkage()->getStructuralRayTracingDeclRegistry(), type) !=
             StructuralRayTracingStageKind::Count)
     {
