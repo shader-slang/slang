@@ -21,14 +21,15 @@ public interface IAnyHitShader<Context>
 // placeholder without exposing a third extension point to user code.
 internal interface IIntersectionStage<Context>
     where Context : IHitContext
-{}
+{
+    void invoke(IntersectionInput<Context> input);
+}
 
 [require(structural_raytracing_intersection)]
 public interface IIntersectionShader<Context> : IIntersectionStage<Context>
     where Context : IHitContext
 {
     __constraint Context.Primitive : ICustomIntersectionPrimitive;
-    void invoke(IntersectionInput<Context> input);
 }
 
 [require(structural_raytracing_miss)]
@@ -59,6 +60,8 @@ public struct NoAnyHit<Context> : IAnyHitShader<Context>
 
 public struct NoIntersection<Context> : IIntersectionStage<Context>
     where Context : IHitContext
-{}
+{
+    public void invoke(IntersectionInput<Context> input) {}
+}
 
 } // namespace rt

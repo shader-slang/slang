@@ -10,6 +10,7 @@
 #include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
@@ -1161,27 +1162,30 @@ static void _addStructuralRayTracingEntryPointInfo(
 
     auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
     auto& info = entryPoint->getStructuralRayTracingInfo();
-    IRInst* operands[] = {
-        context->builder->getIntValue(
-            context->builder->getIntType(),
-            IRIntegerValue(info.stageKind)),
+    addStructuralRayTracingEntryPointInfo(
+        *context->builder,
         func,
-        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.contextType),
-        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.payloadType),
-        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.recordType),
-        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.hitAttributesType),
-        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.callableDataType),
-        context->builder->getIntValue(
-            context->builder->getIntType(),
-            IRIntegerValue(info.hitAttributesKind)),
-    };
-    for (auto operand : operands)
-        SLANG_ASSERT(operand);
-    context->builder->addDecoration(
-        func,
-        kIROp_StructuralRayTracingEntryPointInfoDecoration,
-        operands,
-        SLANG_COUNT_OF(operands));
+        {
+            .stageKind = info.stageKind,
+            .invoke = func,
+            .stageType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.stageType),
+            .contextType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.contextType),
+            .payloadType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.payloadType),
+            .recordType =
+                _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.recordType),
+            .hitAttributesType = _cloneStructuralRayTracingEntryPointType(
+                context,
+                astBuilder,
+                info.hitAttributesType),
+            .callableDataType = _cloneStructuralRayTracingEntryPointType(
+                context,
+                astBuilder,
+                info.callableDataType),
+            .hitAttributesKind = info.hitAttributesKind,
+        });
 }
 
 IRFunc* specializeIRForEntryPoint(

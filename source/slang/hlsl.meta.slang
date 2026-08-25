@@ -20028,11 +20028,18 @@ void AcceptHitAndEndSearch()
 
 // 10.4.1 - Ray Dispatch System Values
 
+__intrinsic_op($(kIROp_MetalStructuralRayTracingDispatchRaysIndex))
+internal uint3 __metalStructuralRayTracingDispatchRaysIndex();
+
+__intrinsic_op($(kIROp_MetalStructuralRayTracingDispatchRaysDimensions))
+internal uint3 __metalStructuralRayTracingDispatchRaysDimensions();
+
 /// Returns the current ray dispatch coordinates.
 /// @return 3D index of the current ray being processed
 /// @remarks Available in all ray tracing shader stages
 /// @category raytracing
 [NonUniformReturn]
+[ForceInline]
 [require(structural_raytracing_dispatch_system_values)]
 uint3 DispatchRaysIndex()
 {
@@ -20041,9 +20048,7 @@ uint3 DispatchRaysIndex()
     case hlsl: __intrinsic_asm "DispatchRaysIndex";
     case glsl: __intrinsic_asm "(gl_LaunchIDEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchIndex";
-    // Structural Metal ray-generation lowering replaces this marker with the compute-grid
-    // system value before target emission.
-    case metal: __intrinsic_asm "DispatchRaysIndex";
+    case metal: return __metalStructuralRayTracingDispatchRaysIndex();
     case spirv:
         return spirv_asm
         {
@@ -20056,6 +20061,7 @@ uint3 DispatchRaysIndex()
 /// @return 3D dimensions of the ray dispatch grid
 /// @remarks Available in all ray tracing shader stages
 /// @category raytracing
+[ForceInline]
 [require(structural_raytracing_dispatch_system_values)]
 uint3 DispatchRaysDimensions()
 {
@@ -20064,9 +20070,7 @@ uint3 DispatchRaysDimensions()
     case hlsl:  __intrinsic_asm "DispatchRaysDimensions";
     case glsl: __intrinsic_asm "(gl_LaunchSizeEXT)";
     case cuda: __intrinsic_asm "optixGetLaunchDimensions";
-    // Structural Metal ray-generation lowering replaces this marker with the compute-grid
-    // system value before target emission.
-    case metal: __intrinsic_asm "DispatchRaysDimensions";
+    case metal: return __metalStructuralRayTracingDispatchRaysDimensions();
     case spirv:
         return spirv_asm
         {
