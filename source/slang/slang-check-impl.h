@@ -3802,7 +3802,17 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
     bool* outFoundStruct,
     StructuralRayTracingEntryPointInfo* outInfo);
 void diagnoseMixedRayTracingAPIUse(EntryPoint* entryPoint, DiagnosticSink* sink);
+void diagnoseMixedRayTracingAPIsInSelectedProgram(
+    Linkage* linkage,
+    List<EntryPoint*> const& entryPoints,
+    DiagnosticSink* sink);
 void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink);
+void registerRayTracingAPICall(
+    Linkage* linkage,
+    FunctionDeclBase* caller,
+    FunctionDeclBase* callee,
+    SourceLoc callLoc,
+    DiagnosticSink* sink);
 
 
 inline void ensureDecl(SemanticsVisitor* visitor, Decl* decl, DeclCheckState state)

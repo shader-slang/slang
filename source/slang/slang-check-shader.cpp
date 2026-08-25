@@ -3103,6 +3103,7 @@ void FrontEndCompileRequest::checkEntryPoints()
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     auto sink = getSink();
+    List<EntryPoint*> selectedEntryPoints;
 
     // The validation of entry points here will be modal, and controlled
     // by whether the user specified any entry points directly via
@@ -3132,6 +3133,7 @@ void FrontEndCompileRequest::checkEntryPoints()
                 // compilation API doesn't allow for grouping).
                 //
                 entryPointReq->getTranslationUnit()->module->_addEntryPoint(entryPoint);
+                selectedEntryPoints.add(entryPoint);
             }
         }
 
@@ -3161,8 +3163,12 @@ void FrontEndCompileRequest::checkEntryPoints()
         {
             auto translationUnit = translationUnits[tt];
             translationUnit->getModule()->_discoverEntryPoints(sink, this->getLinkage()->targets);
+            for (auto entryPoint : translationUnit->getModule()->getEntryPoints())
+                selectedEntryPoints.add(entryPoint);
         }
     }
+
+    diagnoseMixedRayTracingAPIsInSelectedProgram(linkage, selectedEntryPoints, sink);
 
     for (auto translationUnit : translationUnits)
     {

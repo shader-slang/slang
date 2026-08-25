@@ -420,6 +420,11 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
     return true;
 }
 
+bool StructuralRayTracingDeclRegistry::isTrustedModule(Module* module) const
+{
+    return module && module->getModuleDecl() == m_trustedModuleDecl;
+}
+
 AssocTypeDecl* StructuralRayTracingDeclRegistry::getAssociatedTypeRequirement(
     StructuralRayTracingAssociatedTypeKind kind) const
 {

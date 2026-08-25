@@ -154,6 +154,7 @@ public:
         Module* module,
         StructuralRayTracingStageKind* outMissingStage = nullptr);
     bool isInitialized() const { return m_stageInterfaces[0] != nullptr; }
+    bool isTrustedModule(Module* module) const;
 
     InterfaceDecl* getStageInterface(StructuralRayTracingStageKind kind) const;
     StructuralRayTracingStageKind getStageKind(InterfaceDecl* interfaceDecl) const;

@@ -4410,6 +4410,14 @@ err(
 )
 
 err(
+    "mixed-ray-tracing-apis-in-program",
+    38070,
+    "cannot mix legacy and structural ray-tracing APIs in one linked program",
+    span { loc = "currentDecl:Decl", message = "this selected entry point uses the ~currentAPI API" },
+    note { message = "another selected entry point uses the ~otherAPI API", span { loc = "otherDecl:Decl" } }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",
