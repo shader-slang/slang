@@ -186,8 +186,8 @@ void runStructuralRayTracingTriangleHitMiss(IDevice* device)
     auto passEncoder = commandEncoder->beginRayTracingPass();
     auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
     ShaderCursor root(rootObject);
-    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
-    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    GFX_CHECK_CALL_ABORT(root["frame"]["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["frame"]["results"].setBinding(Binding(results)));
     passEncoder->dispatchRays(0, 2, 1, 1);
     passEncoder->end();
     GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
