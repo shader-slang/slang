@@ -11,6 +11,7 @@
 //TEST:SIMPLE(filecheck=FXC): -fxc-version
 //TEST:SIMPLE(filecheck=GLSLANG): -glslang-version
 //TEST:SIMPLE(filecheck=NVRTC): -nvrtc-version
+//TEST:SIMPLE(filecheck=NVVM): -nvvm-version
 // spirv-dis exercises the hyphenated-name path: `-spirv-dis-version` must recover "spirv-dis".
 //TEST:SIMPLE(filecheck=SPIRVDIS): -spirv-dis-version
 // Two query flags in one invocation: proves the option consumes no value (it must not swallow the
@@ -21,6 +22,7 @@
 // FXC: fxc version:
 // GLSLANG: glslang version:
 // NVRTC: nvrtc version:
+// NVVM: nvvm version:
 // SPIRVDIS: spirv-dis version:
 // MULTI: dxc version:
 // MULTI: glslang version:

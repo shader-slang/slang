@@ -20,6 +20,7 @@
 #include "slang-glslang-compiler.h"
 #include "slang-llvm-compiler.h"
 #include "slang-metal-compiler.h"
+#include "slang-nvvm-compiler.h"
 #include "slang-nvrtc-compiler.h"
 #include "slang-tint-compiler.h"
 #include "slang-visual-studio-compiler-util.h"
@@ -358,6 +359,7 @@ DownstreamCompilerMatchVersion DownstreamCompilerUtil::getCompiledVersion()
     outFuncs[int(SLANG_PASS_THROUGH_CLANG)] = &GCCDownstreamCompilerUtil::locateClangCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GCC)] = &GCCDownstreamCompilerUtil::locateGCCCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_NVRTC)] = &NVRTCDownstreamCompilerUtil::locateCompilers;
+    outFuncs[int(SLANG_PASS_THROUGH_NVVM)] = &NVVMDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_DXC)] = &DXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_FXC)] = &FXCDownstreamCompilerUtil::locateCompilers;
     outFuncs[int(SLANG_PASS_THROUGH_GLSLANG)] = &GlslangDownstreamCompilerUtil::locateCompilers;

@@ -44,6 +44,10 @@ SourceLanguage getDefaultSourceLanguageForDownstreamCompiler(PassThroughMode com
         {
             return SourceLanguage::CUDA;
         }
+    case PassThroughMode::NVVM:
+        {
+            return SourceLanguage::LLVM;
+        }
     case PassThroughMode::Tint:
         {
             return SourceLanguage::WGSL;

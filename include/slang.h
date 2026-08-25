@@ -760,6 +760,7 @@ typedef uint32_t SlangSizeT;
         SLANG_PASS_THROUGH_METAL = 12,        ///< Metal compiler
         SLANG_PASS_THROUGH_TINT = 13,         ///< Tint WGSL compiler
         SLANG_PASS_THROUGH_SPIRV_LINK = 14,   ///< SPIRV-link
+        SLANG_PASS_THROUGH_NVVM = 15,         ///< libNVVM compiler
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 

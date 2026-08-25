@@ -1142,6 +1142,7 @@ Downstream Compilers (aka Pass through)
 * `spirv-opt` : spirv-tools SPIRV optimizer 
 * `metal` : Metal shader compiler 
 * `tint` : Tint compiler 
+* `nvvm` : libNVVM compiler
 
 <a id="language"></a>
 ## language

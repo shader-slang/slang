@@ -201,7 +201,9 @@ compiler rejection follows the existing in-process downstream convention: mark t
 failed, attach an error, require an error diagnostic, and return `SLANG_OK` with the PTX-desc
 artifact. Interface or operational failures may return a failing `SlangResult` but still return the
 artifact. When libNVVM supplies an empty program log, the diagnostic falls back to
-`nvvmGetErrorString`.
+`nvvmGetErrorString`. The PTX artifact excludes the API's trailing NUL; a missing terminator or an
+otherwise empty payload is treated as an invalid vendor result rather than exposed as successful
+PTX.
 
 ### Compile options
 
@@ -213,6 +215,12 @@ Toolkit defaults are not part of Slang's contract. The initial option mapping al
 - precise single-precision square root as `-prec-sqrt=0|1`;
 - precise single-precision division as `-prec-div=0|1`; and
 - FMA contraction as `-fma=0|1`.
+
+`FloatingPointMode::Fast` selects approximate division/square-root operations and enables FMA
+contraction. `FloatingPointMode::Precise` selects the precise operations and disables contraction;
+the default mode leaves all three libNVVM defaults unchanged. Full debug information maps to `-g`
+only for an unoptimized compile, as required by libNVVM. Minimal and standard line information are
+metadata-driven and add no libNVVM option.
 
 NVRTC's spellings and aggregate fast-math option differ, so differential tests must set both paths
 explicitly instead of relying on either compiler's defaults.
@@ -233,9 +241,12 @@ required by `ISlangSharedLibraryLoader`, while its original resolved identity re
 diagnostics. The locator then attempts the logical library name through Slang's
 shared-library loader before probing filesystem layouts; this supports injected test loaders and
 platform loader installations. Filesystem discovery considers the Slang module location,
-`CUDA_PATH`, and CUDA toolkit roots represented on `PATH` in deterministic order. It should reuse a
-narrow CUDA-toolkit-root helper shared with NVRTC when that can be extracted without changing
-NVRTC behavior.
+the component-specific `LIBNVVM_HOME`, `CUDA_PATH`, `CUDA_HOME`, and CUDA toolkit roots represented
+on `PATH` in deterministic order. Within one directory, versioned library names are ranked by
+numeric suffix rather than lexical filename order. Windows discovery covers both `nvvm\bin` and
+the CUDA 13 `nvvm\bin\x64` layout. The first implementation keeps this locator self-contained;
+extracting a CUDA-toolkit-root helper shared with NVRTC remains worthwhile only when focused tests
+can prove NVRTC's existing selection order is unchanged.
 
 After a logical/system load, the implementation derives the actual library filename and toolkit
 root from a resolved symbol when the platform exposes them. A compiler may remain usable for a
@@ -371,6 +382,14 @@ compiled it for `compute_75`. The result was PTX 8.2 containing:
 
 This proves API availability and the minimum textual-IR lifecycle on this machine. It does not
 prove bitcode compatibility, Slang lowering, runtime correctness, or performance.
+
+The first downstream-compiler slice subsequently reproduced that result through Slang's artifact
+interface. Sixteen focused tests cover injected discovery, required and optional ABI symbols,
+numeric candidate ranking, decorated-path normalization, shared-library and program lifetimes,
+input-contract rejection, result classification, option translation, multi-phase diagnostics,
+malformed vendor results, real libNVVM compilation, and offline `ptxas` assembly. On the same
+machine all sixteen passed, `-nvvm-version` reported 2.0, and CUDA 12.2 `ptxas` 12.2.140 accepted
+the generated `sm_75` PTX. Ordinary PTX compilation remained routed through NVRTC.
 
 ## Settled and Open Decisions
 

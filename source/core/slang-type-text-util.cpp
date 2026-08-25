@@ -141,6 +141,7 @@ static const NamesDescriptionValue s_compilerInfos[] = {
     {SLANG_PASS_THROUGH_SPIRV_OPT, "spirv-opt", "spirv-tools SPIRV optimizer"},
     {SLANG_PASS_THROUGH_METAL, "metal", "Metal shader compiler"},
     {SLANG_PASS_THROUGH_TINT, "tint", "Tint compiler"},
+    {SLANG_PASS_THROUGH_NVVM, "nvvm", "libNVVM compiler"},
 };
 
 static const NamesDescriptionValue s_archiveTypeInfos[] = {
