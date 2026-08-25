@@ -159,3 +159,68 @@ void main() {}
         "String-kind target-level hlsl_nvapi capability should have triggered E36121 on SPIRV "
         "target");
 }
+
+// Verify that requesting the *same* capability at both session and target scope still
+// flags it as a target-level (binding) request rather than letting the session-level
+// (best-effort) entry win.
+//
+// `Linkage::addTarget()` builds a target's option set as
+// `optionSet.inheritFrom(m_optionSet)` (copies the session-level hlsl_nvapi entry, tagged
+// `CapabilitySource::SessionOption`) followed by `optionSet.overrideWith(targetOptions)`
+// (merges in the target-level hlsl_nvapi entry, tagged `CapabilitySource::TargetOption`).
+// Because both entries decode to the same capability atom, `CompilerOptionSet::add()`
+// treats the second one as a *duplicate* of the first rather than a new entry, and only
+// merges a couple of fields into the existing one -- `capabilitySource` has to be one of
+// them, or the existing (session) entry's source silently wins and checkCapabilities()
+// treats a real, binding target-level request as a tolerated session broadcast.
+SLANG_UNIT_TEST(sameCapabilityAtBothScopesStillFlagged)
+{
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    // hlsl_nvapi at the SESSION level (as SGL-style frameworks do).
+    slang::CompilerOptionEntry sessionCapEntry = {};
+    sessionCapEntry.name = slang::CompilerOptionName::Capability;
+    sessionCapEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    sessionCapEntry.value.intValue0 = (int)globalSession->findCapability("hlsl_nvapi");
+
+    // The same hlsl_nvapi capability, requested again at the TARGET level for this
+    // specific (incompatible) SPIRV target.
+    slang::CompilerOptionEntry targetCapEntry = {};
+    targetCapEntry.name = slang::CompilerOptionName::Capability;
+    targetCapEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    targetCapEntry.value.intValue0 = (int)globalSession->findCapability("hlsl_nvapi");
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_3");
+    targetDesc.compilerOptionEntries = &targetCapEntry;
+    targetDesc.compilerOptionEntryCount = 1;
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.compilerOptionEntries = &sessionCapEntry;
+    sessionDesc.compilerOptionEntryCount = 1;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    const char* source = R"(
+[numthreads(1,1,1)]
+void main() {}
+)";
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    session->loadModuleFromSourceString("test", "test.slang", source, diagnosticBlob.writeRef());
+
+    String diagnostics;
+    if (diagnosticBlob)
+        diagnostics = String((const char*)diagnosticBlob->getBufferPointer());
+
+    SLANG_CHECK_MSG(
+        diagnostics.indexOf("E36121") != -1,
+        "hlsl_nvapi requested at both session and target scope should still have triggered "
+        "E36121 on SPIRV target, since the target-level request is binding");
+}

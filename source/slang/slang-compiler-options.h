@@ -178,6 +178,7 @@ struct CompilerOptionSet
                     {
                         (*v)[index].intValue2 = element.intValue2;
                         (*v)[index].stringValue2 = element.stringValue2;
+                        (*v)[index].capabilitySource = element.capabilitySource;
                     }
                 }
                 else
