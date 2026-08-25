@@ -916,5 +916,7 @@ return {
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayTMin"] = 940,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayFlags"] = 941,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceIndex"] = 942,
-	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceID"] = 943
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetInstanceID"] = 943,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetObjectToWorld"] = 944,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetWorldToObject"] = 945
 }

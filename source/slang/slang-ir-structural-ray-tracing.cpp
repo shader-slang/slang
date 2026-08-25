@@ -67,6 +67,10 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
         return kIROp_StructuralRayTracingGetInstanceIndex;
     case StructuralRayTracingStageInputOperationKind::InstanceID:
         return kIROp_StructuralRayTracingGetInstanceID;
+    case StructuralRayTracingStageInputOperationKind::ObjectToWorld:
+        return kIROp_StructuralRayTracingGetObjectToWorld;
+    case StructuralRayTracingStageInputOperationKind::WorldToObject:
+        return kIROp_StructuralRayTracingGetWorldToObject;
     case StructuralRayTracingStageInputOperationKind::IgnoreHit:
         return kIROp_StructuralRayTracingIgnoreHit;
     case StructuralRayTracingStageInputOperationKind::AcceptHitAndEndSearch:
