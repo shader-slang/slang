@@ -399,9 +399,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             // declaration for diagnostics. Linking stays within the same compiler session, so the
             // declaration remains valid and must be preserved until the mandatory passes consume
             // it. Front-end-only instructions are stripped before target legalization and emit.
-            return builder->getPtrValue(
-                cloneType(this, c->getFullType()),
-                c->value.ptrVal);
+            return builder->getPtrValue(cloneType(this, c->getFullType()), c->value.ptrVal);
         }
         break;
 
@@ -1087,6 +1085,12 @@ void cloneFunctionCommon(
 ///
 static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* builder)
 {
+    // Structural ray-tracing `invoke` parameters are logical, compiler-owned views rather than
+    // physical entry-point parameters. Their native parameter layouts are created on the adapter
+    // synthesized after linking.
+    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        return;
+
     auto layoutDecor = func->findDecoration<IRLayoutDecoration>();
     if (!layoutDecor)
         return;
@@ -1120,6 +1124,64 @@ static void maybeCopyLayoutInformationToParameters(IRFunc* func, IRBuilder* buil
             }
         }
     }
+}
+
+static IRType* _cloneStructuralRayTracingEntryPointType(
+    IRSpecContext* context,
+    ASTBuilder* astBuilder,
+    Type* type)
+{
+    if (!type || type == astBuilder->getVoidType())
+        return context->builder->getVoidType();
+
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return nullptr;
+
+    auto mangledName = getMangledName(astBuilder, declRefType->getDeclRef());
+    auto symbol = context->findSymbols(mangledName.getUnownedSlice());
+    if (!symbol)
+    {
+        auto hashedName = getHashedName(mangledName.getUnownedSlice());
+        symbol = context->findSymbols(hashedName.getUnownedSlice());
+    }
+    return symbol ? as<IRType>(cloneGlobalValue(context, symbol->irGlobalValue)) : nullptr;
+}
+
+static void _addStructuralRayTracingEntryPointInfo(
+    IRSpecContext* context,
+    IRFunc* func,
+    EntryPoint* entryPoint)
+{
+    if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>() ||
+        !entryPoint->getStructuralRayTracingInvokeMethod())
+        return;
+
+    auto astBuilder = entryPoint->getLinkage()->getASTBuilder();
+    auto& info = entryPoint->getStructuralRayTracingInfo();
+    IRInst* operands[] = {
+        context->builder->getIntValue(
+            context->builder->getIntType(),
+            IRIntegerValue(info.stageKind)),
+        func,
+        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.contextType),
+        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.payloadType),
+        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.recordType),
+        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.hitAttributesType),
+        _cloneStructuralRayTracingEntryPointType(context, astBuilder, info.callableDataType),
+        context->builder->getIntValue(
+            context->builder->getIntType(),
+            IRIntegerValue(info.hitAttributesKind)),
+    };
+    for (auto operand : operands)
+        SLANG_ASSERT(operand);
+    context->builder->addDecoration(
+        func,
+        kIROp_StructuralRayTracingEntryPointInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
 }
 
 IRFunc* specializeIRForEntryPoint(
@@ -1255,6 +1317,8 @@ IRFunc* specializeIRForEntryPoint(
                 UnownedStringSlice(entryPoint->getModule()->getName()))};
         context->builder->addDecoration(clonedFunc, IROp::kIROp_EntryPointDecoration, operands, 3);
     }
+
+    _addStructuralRayTracingEntryPointInfo(context, clonedFunc, entryPoint);
 
     // We will also go on and attach layout information
     // to the function parameters, so that we have it

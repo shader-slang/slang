@@ -3,6 +3,11 @@
 //TEST:SIMPLE: -experimental-feature -entry Intersection -stage intersection -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Miss -stage miss -no-codegen
 //TEST:SIMPLE: -experimental-feature -entry Callable -stage callable -no-codegen
+//TEST:SIMPLE(filecheck=METAL_HELPER): -experimental-feature -entry ClosestHit -stage closesthit -target metal
+//TEST:SIMPLE(filecheck=METAL_HELPER): -experimental-feature -entry AnyHit -stage anyhit -target metal
+//TEST:SIMPLE(filecheck=METAL_HELPER): -experimental-feature -entry Intersection -stage intersection -target metal
+//TEST:SIMPLE(filecheck=METAL_HELPER): -experimental-feature -entry Miss -stage miss -target metal
+//TEST:SIMPLE(filecheck=METAL_HELPER): -experimental-feature -entry Callable -stage callable -target metal
 
 import slang.raytracing;
 
@@ -61,3 +66,5 @@ struct Callable : rt::ICallableShader<CallableContext>
 {
     void invoke(rt::CallableInput<CallableContext> input) {}
 }
+
+// METAL_HELPER: void {{.*}}_invoke_0()

@@ -293,38 +293,6 @@ static StructuralRayTracingStageKind _getStructuralStage(Stage stage)
     }
 }
 
-static FuncDecl* _createStructuralEntryPointDecl(
-    Linkage* linkage,
-    Module* module,
-    AggTypeDecl* stageType)
-{
-    auto astBuilder = linkage->getASTBuilder();
-    auto moduleDecl = module->getModuleDecl();
-
-    auto funcDecl = astBuilder->create<FuncDecl>();
-    funcDecl->nameAndLoc = stageType->nameAndLoc;
-    funcDecl->loc = stageType->loc;
-    funcDecl->closingSourceLoc = stageType->closingSourceLoc;
-    funcDecl->parentDecl = moduleDecl;
-    funcDecl->returnType.type = astBuilder->getVoidType();
-    funcDecl->ownedScope = astBuilder->create<Scope>();
-    funcDecl->ownedScope->containerDecl = funcDecl;
-    funcDecl->ownedScope->parent = moduleDecl->ownedScope;
-
-    auto body = astBuilder->create<BlockStmt>();
-    body->scopeDecl = astBuilder->create<ScopeDecl>();
-    body->scopeDecl->ownedScope = astBuilder->create<Scope>();
-    body->scopeDecl->ownedScope->parent = funcDecl->ownedScope;
-    body->scopeDecl->parentDecl = funcDecl;
-    body->body = astBuilder->create<SeqStmt>();
-    body->loc = stageType->loc;
-    body->closingSourceLoc = stageType->closingSourceLoc;
-    funcDecl->body = body;
-    funcDecl->setCheckState(DeclCheckState::CapabilityChecked);
-
-    return funcDecl;
-}
-
 struct StructuralStageContextInfo
 {
     Type* type = nullptr;
@@ -588,8 +556,7 @@ DeclRef<FuncDecl> findStructuralRayTracingEntryPointByName(
         sink->diagnose(Diagnostics::InternalCompilerError{.location = stageTypeDeclRef.getLoc()});
         return DeclRef<FuncDecl>();
     }
-    auto funcDecl = _createStructuralEntryPointDecl(linkage, module, stageTypeDeclRef.getDecl());
-    return makeDeclRef(funcDecl);
+    return makeDeclRef(invokeMethod);
 }
 
 enum class StructuralRayTracingRuntimeTypeKind
