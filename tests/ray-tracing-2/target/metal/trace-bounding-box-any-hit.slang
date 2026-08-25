@@ -96,7 +96,7 @@ void main()
 }
 
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
-// METAL-SAME: ray_data TestPayload_0& payload_{{[0-9]+}} {{\[\[}}payload]])
+// METAL-SAME: ray_data ProgramLayout_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
 // METAL: visitCount_0 =
 // METAL: normal_0.z
 // METAL: accept_{{[0-9]+}} = false

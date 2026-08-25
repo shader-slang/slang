@@ -19,6 +19,19 @@ enum class MetalStructuralRayTracingTag : UInt
     ExtendedLimits = 1 << 6,
 };
 
+enum class MetalStructuralRayTracingStageRequirement : UInt
+{
+    None = 0,
+    HitAttributes = 1 << 0,
+    TriangleBarycentricCoord = 1 << 1,
+    TriangleFrontFacing = 1 << 2,
+    CurveParameter = 1 << 3,
+    Distance = 1 << 4,
+    HitKind = 1 << 5,
+    WorldSpaceOrigin = 1 << 6,
+    WorldSpaceDirection = 1 << 7,
+};
+
 enum class MetalStructuralRayTracingGeometryKind : UInt
 {
     Unknown,

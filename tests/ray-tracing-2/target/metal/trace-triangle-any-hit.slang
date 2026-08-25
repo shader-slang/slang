@@ -78,18 +78,18 @@ void main()
     output[1] = payload.visitCount;
 }
 
-// METAL: _slang_intersector.intersect(
 // METAL: program_resources_1->intersectionFunctions_0
-// METAL: *(&payload_{{[0-9]+}}));
+// METAL: _slang_intersector.intersect(
+// METAL: *(&rayData_{{[0-9]+}}));
 // METAL: struct StructuralRayTracingFilterResult
 // METAL: bool accept_0 {{\[\[}}accept_intersection]];
 // METAL: bool continueSearch_0 {{\[\[}}continue_search]];
 // METAL: using namespace metal::raytracing;
 // METAL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
 // METAL-SAME: StructuralRayTracingFilterResult_0 HitGroup_candidate_0(
-// METAL-SAME: ray_data TestPayload_0& payload_{{[0-9]+}} {{\[\[}}payload]])
-// METAL: (&payloadStorage_0)->visitCount_0 =
+// METAL-SAME: ray_data ProgramLayout_rayData_0& rayData_{{[0-9]+}} {{\[\[}}payload]])
+// METAL: (&(&rayDataStorage_0)->payload_{{[0-9]+}})->visitCount_0 =
 // METAL: StructuralRayTracingFilterResult_0 {{.*}} = { false, true };
 // METAL: StructuralRayTracingFilterResult_0 {{.*}} = { true, false };
-// METAL: (&payloadStorage_0)->visitCount_0 =
-// METAL: payload_{{[0-9]+}} = payloadStorage_0;
+// METAL: (&(&rayDataStorage_0)->payload_{{[0-9]+}})->visitCount_0 =
+// METAL: rayData_{{[0-9]+}} = rayDataStorage_0;

@@ -450,6 +450,11 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     {
         auto tagMask = IRIntegerValue(getIntVal(trace->getTagMask()));
         auto maxLevels = IRIntegerValue(getIntVal(trace->getMaxLevels()));
+        auto missRequirements = IRIntegerValue(getIntVal(trace->getMissRequirements()));
+        auto closestHitRequirements = IRIntegerValue(getIntVal(trace->getClosestHitRequirements()));
+        const auto hasRequirement =
+            [](IRIntegerValue mask, MetalStructuralRayTracingStageRequirement requirement)
+        { return (mask & IRIntegerValue(requirement)) != 0; };
 
         m_writer->emit("{\n");
         m_writer->indent();
@@ -529,7 +534,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitOperand(trace->getIntersectionFunctions(), getInfo(EmitOp::General));
             m_writer->emit(", *(");
-            emitOperand(trace->getPayload(), getInfo(EmitOp::General));
+            emitOperand(trace->getRayData(), getInfo(EmitOp::General));
             m_writer->emit(")");
         }
         m_writer->emit(");\n");
@@ -544,7 +549,21 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("[");
             emitOperand(trace->getMissIndex(), getInfo(EmitOp::General));
             m_writer->emit("](");
-            emitOperand(trace->getPayload(), getInfo(EmitOp::General));
+            emitOperand(trace->getRayData(), getInfo(EmitOp::General));
+            if (hasRequirement(
+                    missRequirements,
+                    MetalStructuralRayTracingStageRequirement::WorldSpaceOrigin))
+            {
+                m_writer->emit(", ");
+                emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
+            }
+            if (hasRequirement(
+                    missRequirements,
+                    MetalStructuralRayTracingStageRequirement::WorldSpaceDirection))
+            {
+                m_writer->emit(", ");
+                emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+            }
             m_writer->emit(");\n");
         }
         m_writer->dedent();
@@ -565,7 +584,59 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             emitOperand(trace->getClosestHitFunctions(), getInfo(EmitOp::Postfix));
             m_writer->emit("[_slang_hit_slot](");
-            emitOperand(trace->getPayload(), getInfo(EmitOp::General));
+            emitOperand(trace->getRayData(), getInfo(EmitOp::General));
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::Distance))
+            {
+                m_writer->emit(", _slang_result.distance");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::HitKind))
+            {
+                m_writer->emit(", ");
+                if ((tagMask & IRIntegerValue(MetalStructuralRayTracingTag::TriangleData)) != 0)
+                {
+                    m_writer->emit(
+                        "(_slang_result.type == metal::raytracing::intersection_type::triangle "
+                        "? (_slang_result.triangle_front_facing ? 254U : 255U) : 0U)");
+                }
+                else
+                    m_writer->emit("0U");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::TriangleBarycentricCoord))
+            {
+                m_writer->emit(", _slang_result.triangle_barycentric_coord");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::TriangleFrontFacing))
+            {
+                m_writer->emit(", _slang_result.triangle_front_facing");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::CurveParameter))
+            {
+                m_writer->emit(", _slang_result.curve_parameter");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::WorldSpaceOrigin))
+            {
+                m_writer->emit(", ");
+                emitOperand(trace->getOrigin(), getInfo(EmitOp::General));
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::WorldSpaceDirection))
+            {
+                m_writer->emit(", ");
+                emitOperand(trace->getDirection(), getInfo(EmitOp::General));
+            }
             m_writer->emit(");\n");
             m_writer->dedent();
             m_writer->emit("}\n");

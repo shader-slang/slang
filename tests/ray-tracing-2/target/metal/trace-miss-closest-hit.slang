@@ -99,19 +99,22 @@ void main()
 // METAL-DAG: [[MISS_IMPL_PAYLOAD]]->value_0 = 2U;
 // METAL-DAG: void TestClosestHit_invoke_0(TestPayload_0 thread* [[HIT_IMPL_PAYLOAD:payload_[0-9]+]])
 // METAL-DAG: [[HIT_IMPL_PAYLOAD]]->value_0 = 1U;
+// METAL: struct ProgramLayout_rayData_0
+// METAL: TestPayload_0 payload_{{[0-9]+}};
 // METAL: struct rt_TraceProgramDescriptorResources_default_0
-// METAL: metal::visible_function_table<void(TestPayload_0 thread*)> missFunctions_0;
-// METAL: metal::visible_function_table<void(TestPayload_0 thread*)> closestHitFunctions_0;
+// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*)> missFunctions_0;
+// METAL: metal::visible_function_table<void(ProgramLayout_rayData_0 thread*)> closestHitFunctions_0;
 // METAL: {{\[\[kernel\]\]}} void main_0(
+// METAL: thread ProgramLayout_rayData_0 [[RAY_DATA:rayData_[0-9]+]];
 // METAL: metal::raytracing::intersector<metal::raytracing::instancing> _slang_intersector;
 // METAL: _slang_intersector.assume_geometry_type(metal::raytracing::geometry_type::triangle);
 // METAL: _slang_intersector.intersect(
 // METAL-NOT: intersectionFunctions
 // METAL: scene_1, desc_0.instanceMask_0);
-// METAL: (program_resources_1->missFunctions_0)[desc_0.missIndex_0](&payload_{{[0-9]+}});
-// METAL: uint _slang_hit_slot = (program_resources_1->records_0)[_slang_result.instance_id]
-// METAL: (program_resources_1->closestHitFunctions_0)[_slang_hit_slot](&payload_{{[0-9]+}});
-// METAL: {{\[\[visible\]\]}} void TestMiss_0(TestPayload_0 thread* [[MISS_PAYLOAD:payload_[0-9]+]])
-// METAL: TestMiss_invoke_0([[MISS_PAYLOAD]]);
-// METAL: {{\[\[visible\]\]}} void TestClosestHit_0(TestPayload_0 thread* [[HIT_PAYLOAD:payload_[0-9]+]])
-// METAL: TestClosestHit_invoke_0([[HIT_PAYLOAD]]);
+// METAL: _S{{[0-9]+}}[desc_0.missIndex_0](&rayData_{{[0-9]+}});
+// METAL: uint _slang_hit_slot = _S{{[0-9]+}}[_slang_result.instance_id]
+// METAL: _S{{[0-9]+}}[_slang_hit_slot](&rayData_{{[0-9]+}});
+// METAL: {{\[\[visible\]\]}} void TestMiss_0(ProgramLayout_rayData_0 thread* [[MISS_DATA:rayData_[0-9]+]])
+// METAL: (&[[MISS_DATA]]->payload_{{[0-9]+}})->value_0 = 2U;
+// METAL: {{\[\[visible\]\]}} void TestClosestHit_0(ProgramLayout_rayData_0 thread* [[HIT_DATA:rayData_[0-9]+]])
+// METAL: (&[[HIT_DATA]]->payload_{{[0-9]+}})->value_0 = 1U;
