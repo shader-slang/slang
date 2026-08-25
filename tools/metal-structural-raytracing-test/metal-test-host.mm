@@ -562,6 +562,81 @@ bool runProceduralHitFilter(id<MTLDevice> device, id<MTLCommandQueue> queue, NSS
         sizeof(kExpected) / sizeof(kExpected[0]));
 }
 
+bool runCurveHitFilter(id<MTLDevice> device, id<MTLCommandQueue> queue, NSString* directory)
+{
+    static const char* kIntersection[] = {"HitGroup_candidate_0"};
+    static const char* kMiss[] = {"RuntimeMiss_0"};
+    static const char* kClosest[] = {"RuntimeClosestHit_0"};
+    ProgramDescription description = {kIntersection, 1, kMiss, 1, kClosest, 1, nullptr, 0};
+    NativeProgram program = {};
+    if (!createProgram(device, sourcePath(directory, @"curve-hit-filter"), description, program))
+        return false;
+
+    MetalRayTracingScene scene = {};
+    NSString* sceneError = nil;
+    if (!buildMetalCurveScene(device, queue, scene, &sceneError))
+        return fail(sceneError);
+
+    static const uint32_t kRecords[] = {1, 0};
+    id<MTLBuffer> records = createRecords(device, kRecords, 2);
+    id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
+    static const uint32_t kExpected[] = {1, 1, 1, 2, 0, 0};
+    id<MTLBuffer> results = [device newBufferWithLength:sizeof(kExpected)
+                                                options:MTLResourceStorageModeShared];
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            2,
+            false,
+            false))
+        return false;
+    return validateResults(
+        "curve-hit-filter",
+        results,
+        kExpected,
+        sizeof(kExpected) / sizeof(kExpected[0]));
+}
+
+bool runMultilevelHit(id<MTLDevice> device, id<MTLCommandQueue> queue, NSString* directory)
+{
+    static const char* kMiss[] = {"RuntimeMiss_0"};
+    static const char* kClosest[] = {"RuntimeClosestHit_0"};
+    ProgramDescription description = {nullptr, 0, kMiss, 1, kClosest, 1, nullptr, 0};
+    NativeProgram program = {};
+    if (!createProgram(device, sourcePath(directory, @"multilevel-hit"), description, program))
+        return false;
+
+    MetalRayTracingScene scene = {};
+    NSString* sceneError = nil;
+    if (!buildMetalMultilevelScene(device, queue, scene, &sceneError))
+        return fail(sceneError);
+
+    static const uint32_t kRecords[] = {1, 0, 0};
+    id<MTLBuffer> records = createRecords(device, kRecords, 3);
+    id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
+    static const uint32_t kExpected[] = {1, 2};
+    id<MTLBuffer> results = [device newBufferWithLength:sizeof(kExpected)
+                                                options:MTLResourceStorageModeShared];
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            2,
+            false,
+            false))
+        return false;
+    return validateResults("multilevel-hit", results, kExpected, 2);
+}
+
 } // namespace
 
 bool runMetalStructuralRayTracingTests(const char* metalSourceDirectory)
@@ -587,6 +662,8 @@ bool runMetalStructuralRayTracingTests(const char* metalSourceDirectory)
                runRecursiveTrace(device, queue, directory) &&
                runMultipleSlots(device, queue, directory) &&
                runTriangleAttributesFlags(device, queue, directory) &&
-               runStageInputState(device, queue, directory);
+               runStageInputState(device, queue, directory) &&
+               runCurveHitFilter(device, queue, directory) &&
+               runMultilevelHit(device, queue, directory);
     }
 }
