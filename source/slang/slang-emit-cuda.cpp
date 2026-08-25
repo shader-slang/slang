@@ -776,6 +776,14 @@ static CUDATextureAtomicClass classifyTextureAtomicForCuda(
     // PTX `sured` has no result register; the reducible overloads discard the
     // prior value. If the result is observed, this is the read-modify-write
     // overload, which `sured` cannot express.
+    //
+    // `hasUses()` is safe by construction: a result with any remaining use is
+    // rejected (E41405), so a *live* result-returning atomic can never lower to a
+    // result-discarding `sured` regardless of pass ordering — the worst a missing
+    // DCE pass can do is leave a dead result looking live and conservatively
+    // reject a case we could otherwise have lowered. Running this after final
+    // inlining/DCE is therefore about completeness (recognizing the genuinely
+    // result-discarding form once dead consumers are gone), not correctness.
     if (atomic->hasUses())
         return result;
 
@@ -961,6 +969,17 @@ static CUDATextureAtomicClass classifyTextureAtomicForCuda(
 // Emit the byte-addressed x coordinate for a `sured` call: the texel x scaled by
 // the backing-element size, plus the channel byte offset for a vector-texel
 // component. This mirrors the `($1).x * $E` scaling the surface write path uses.
+// Emit the byte-addressed x coordinate operand of a `sured` call:
+// `texelX * byteXStride (+ componentByteOffset)`. The x coordinate is a 32-bit
+// `int` — the `sured` PTX operand uses an "r" (32-bit) constraint, and this
+// matches the `int`-coordinate convention the existing formatted surface
+// read/write helpers (`sust`/`suld`) already use for their byte-addressed x. The
+// byte offset therefore overflows only for an implausibly wide surface (a texel x
+// past 2^31 / byteXStride, i.e. on the order of 10^8 texels even at the widest
+// supported strides), well beyond any real texture width. This intentionally
+// shares the surface read/write byte-x convention rather than introducing a new
+// one; widening to 64-bit surface coordinates would have to change all of these
+// paths together.
 void CUDASourceEmitter::_emitSuredByteXCoord(const CUDATextureAtomicClass& info, IRInst* coord)
 {
     m_writer->emit("(");

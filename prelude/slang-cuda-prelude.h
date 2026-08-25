@@ -4518,9 +4518,12 @@ shader appropriately.
 struct UniformEntryPointParams;
 struct UniformState;
 
-// ---------------------- OptiX Ray Payload --------------------------------------
-#ifdef SLANG_CUDA_ENABLE_OPTIX
-
+// ---------------------- Ray-tracing types (always defined) ---------------------
+// RayDesc is a plain POD that shaders may use as ordinary data (ray math) without
+// any OptiX call, so it must be defined for every CUDA/PTX program, not only ray
+// tracing ones. It is emitted via `__target_intrinsic(cuda, RayDesc)` in
+// hlsl.meta.slang, which relies on the prelude to supply the C++ definition. The
+// OptiX *runtime* below stays gated behind SLANG_CUDA_ENABLE_OPTIX.
 struct RayDesc
 {
     float3 Origin;
@@ -4528,6 +4531,9 @@ struct RayDesc
     float3 Direction;
     float TMax;
 };
+
+// ---------------------- OptiX Ray Payload --------------------------------------
+#ifdef SLANG_CUDA_ENABLE_OPTIX
 
 static __forceinline__ __device__ void* unpackOptiXRayPayloadPointer(uint32_t i0, uint32_t i1)
 {
