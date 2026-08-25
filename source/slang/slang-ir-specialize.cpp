@@ -306,21 +306,21 @@ struct SpecializationContext
     // Scratch stack for the iterative closure walk in `expandUseClosure` (transient per call).
     List<IRInst*>& workListStack;
 
-    // Schedule `inst` on the drain queue if it is not already queued, and do NOT walk its use
-    // closure. This is the "put on the queue" half that the old `addToWorkList` conflated with the
-    // "walk the closure" half; keeping them separate is the point of this PR.
+    // Schedule `inst` on the drain queue if it is not already queued. Does not walk its use closure
+    // (that is `expandUseClosure`'s job); the two are kept separate so the queue-dedup memo
+    // (`workListSet`) and the closure-walk memo (`expanded`) can have independent lifetimes.
     void enqueue(IRInst* inst)
     {
         if (workListSet.add(inst))
             workList.add(inst);
     }
 
-    // Enqueue every instruction in the forward use closure of `seed`'s users — everything reachable
-    // by following use edges forward from `seed` — because specializing an inst may unblock
-    // specialization of the things that use it. (`seed` itself is enqueued by the caller, not
-    // here.) Except for a force-seeded `seed` (below), each inst's user list is enumerated at most
-    // once per drain, deduped by `expanded`. The walk uses an explicit stack so its depth is
-    // independent of the use-chain length; a long use chain must not overflow the call stack.
+    // Enqueue every instruction reachable by following use edges forward from `seed` (its users,
+    // their users, and so on) — because specializing an inst may unblock specialization of the
+    // things that use it. `seed` itself is never enqueued here. Except for a force-seeded `seed`
+    // (below), each inst's user list is enumerated at most once per drain, deduped by `expanded`.
+    // The walk uses an explicit stack so its depth is independent of the use-chain length; a long
+    // use chain must not overflow the call stack.
     //
     // `forceSeed` re-enumerates `seed`'s direct users even if `seed` is already in `expanded`,
     // which the mutation call sites require (see `addUsersToWorkList`). This is why the "at most
@@ -356,8 +356,8 @@ struct SpecializationContext
         }
     }
 
-    // Schedule `inst` for draining AND walk its forward use closure (once per drain, deduped by
-    // `expanded`): the union of the two responsibilities `enqueue` and `expandUseClosure` split.
+    // Schedule `inst` for draining and walk its forward use closure once per drain (deduped by
+    // `expanded`): `enqueue` plus a non-forced `expandUseClosure`.
     void addToWorkList(IRInst* inst)
     {
         enqueue(inst);
