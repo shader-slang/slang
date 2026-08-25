@@ -64,6 +64,8 @@ enum class StructuralRayTracingStageInputOperationKind
     InstanceID,
     ObjectToWorld,
     WorldToObject,
+    DispatchRaysIndex,
+    DispatchRaysDimensions,
     IgnoreHit,
     AcceptHitAndEndSearch,
     ReportHit,

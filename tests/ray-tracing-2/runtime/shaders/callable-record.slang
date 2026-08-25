@@ -9,7 +9,7 @@
 // SPIRV-DAG: OpEntryPoint RayGenerationKHR {{.*}} "main"
 // SPIRV-DAG: OpEntryPoint CallableKHR {{.*}} "RuntimeCallable"
 // SPIRV: OpExecuteCallableKHR %uint_0
-// METAL-DAG: metal::visible_function_table<void(RuntimeCallableData_0 thread*, uint constant*, uint device*)> callableFunctions_0;
+// METAL-DAG: metal::visible_function_table<void(RuntimeCallableData_0 thread*, uint3, uint3, uint constant*, uint device*)> callableFunctions_0;
 // METAL-DAG: {{\[\[visible\]\]}} void RuntimeCallable_0(
 // METAL_CALLABLE: void RuntimeCallable_invoke_0(RuntimeCallableRecord_0 thread* record_0, RuntimeCallableData_0 thread* data_0)
 
@@ -30,6 +30,8 @@ struct RuntimeTraceContext : rt::ITraceContext
 struct RuntimeCallableData
 {
     uint value;
+    uint dispatchIndex;
+    uint dispatchWidth;
 }
 
 struct RuntimeCallableRecord
@@ -49,6 +51,8 @@ struct RuntimeCallable : rt::ICallableShader<RuntimeCallableContext>
     void invoke(rt::CallableInput<RuntimeCallableContext> input)
     {
         input.data.value = input.data.value * input.record.factor + 1;
+        input.data.dispatchIndex = input.dispatchRaysIndex.x;
+        input.data.dispatchWidth = input.dispatchRaysDimensions.x;
     }
 }
 
@@ -79,10 +83,10 @@ RWStructuredBuffer<RuntimeResult> results;
 [shader("raygeneration")]
 void main()
 {
-    RuntimeCallableData data = { 3 };
+    RuntimeCallableData data = { 3, 0, 0 };
     rt::RayTracer<ProgramLayout> tracer;
     tracer.callShader<RuntimeCallableContext>(0, program, data);
 
     results[0].value = data.value;
-    results[0].dispatchWidth = DispatchRaysDimensions().x;
+    results[0].dispatchWidth = data.dispatchWidth;
 }

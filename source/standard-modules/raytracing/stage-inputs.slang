@@ -154,6 +154,40 @@ public struct ClosestHitInput<Context>
             }
         }
     }
+
+    public property uint3 dispatchRaysIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint3 dispatchRaysDimensions
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysDimensions();
+            default:
+                return 0;
+            }
+        }
+    }
 }
 
 public extension<Context> ClosestHitInput<Context>
@@ -426,6 +460,40 @@ public struct AnyHitInput<Context>
                 return WorldRayDirection();
             default:
                 return 0.0;
+            }
+        }
+    }
+
+    public property uint3 dispatchRaysIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint3 dispatchRaysDimensions
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysDimensions();
+            default:
+                return 0;
             }
         }
     }
@@ -716,6 +784,40 @@ public struct IntersectionInput<Context>
         }
     }
 
+    public property uint3 dispatchRaysIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint3 dispatchRaysDimensions
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysDimensions();
+            default:
+                return 0;
+            }
+        }
+    }
+
     public bool reportHit(float distance, Context.Primitive.Attributes attributes)
     {
         __target_switch
@@ -917,6 +1019,40 @@ public struct MissInput<Context>
             }
         }
     }
+
+    public property uint3 dispatchRaysIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint3 dispatchRaysDimensions
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysDimensions();
+            default:
+                return 0;
+            }
+        }
+    }
 }
 
 [require(structural_raytracing_callable)]
@@ -931,6 +1067,40 @@ public struct CallableInput<Context>
     public property Context.Record record
     {
         get;
+    }
+
+    public property uint3 dispatchRaysIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint3 dispatchRaysDimensions
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return DispatchRaysDimensions();
+            default:
+                return 0;
+            }
+        }
     }
 }
 

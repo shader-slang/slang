@@ -222,6 +222,10 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::ObjectToWorld;
     if (text == "worldToObject")
         return StructuralRayTracingStageInputOperationKind::WorldToObject;
+    if (text == "dispatchRaysIndex")
+        return StructuralRayTracingStageInputOperationKind::DispatchRaysIndex;
+    if (text == "dispatchRaysDimensions")
+        return StructuralRayTracingStageInputOperationKind::DispatchRaysDimensions;
     if (text == "ignoreHit")
         return StructuralRayTracingStageInputOperationKind::IgnoreHit;
     if (text == "acceptHitAndEndSearch")

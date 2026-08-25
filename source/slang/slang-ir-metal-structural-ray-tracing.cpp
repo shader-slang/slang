@@ -122,6 +122,8 @@ struct MetalStageRequirements
     bool objectSpaceRay = false;
     bool objectToWorld = false;
     bool worldToObject = false;
+    bool dispatchRaysIndex = false;
+    bool dispatchRaysDimensions = false;
     bool primitiveIndex = false;
     bool geometryIndex = false;
     bool instanceIndex = false;
@@ -207,6 +209,12 @@ static void _collectMetalStageRequirements(
             case kIROp_StructuralRayTracingGetWorldToObject:
                 requirements.worldToObject = true;
                 break;
+            case kIROp_StructuralRayTracingGetDispatchRaysIndex:
+                requirements.dispatchRaysIndex = true;
+                break;
+            case kIROp_StructuralRayTracingGetDispatchRaysDimensions:
+                requirements.dispatchRaysDimensions = true;
+                break;
             default:
                 break;
             }
@@ -243,6 +251,8 @@ static MetalStageRequirements _combineMetalStageRequirements(
     SLANG_COMBINE_REQUIREMENT(objectSpaceRay);
     SLANG_COMBINE_REQUIREMENT(objectToWorld);
     SLANG_COMBINE_REQUIREMENT(worldToObject);
+    SLANG_COMBINE_REQUIREMENT(dispatchRaysIndex);
+    SLANG_COMBINE_REQUIREMENT(dispatchRaysDimensions);
     SLANG_COMBINE_REQUIREMENT(primitiveIndex);
     SLANG_COMBINE_REQUIREMENT(geometryIndex);
     SLANG_COMBINE_REQUIREMENT(instanceIndex);
@@ -310,6 +320,8 @@ public:
     IRStructKey* recordDataKey = nullptr;
     IRStructKey* minDistanceKey = nullptr;
     IRStructKey* rayFlagsKey = nullptr;
+    IRStructKey* dispatchRaysIndexKey = nullptr;
+    IRStructKey* dispatchRaysDimensionsKey = nullptr;
     IRStructKey* customHitKindKey = nullptr;
     Dictionary<IRInst*, IRStructKey*> customAttributeKeys;
 };
@@ -339,6 +351,8 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
     bool needsRecordData = false;
     bool needsMinDistance = false;
     bool needsRayFlags = false;
+    bool needsDispatchRaysIndex = false;
+    bool needsDispatchRaysDimensions = false;
     bool needsCustomHitKind = false;
     for (auto decoration : trace->getDecorations())
     {
@@ -348,11 +362,16 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
             needsRecordData |= requirements.record || requirements.callableDispatch;
             needsMinDistance |= requirements.minDistance || requirements.objectSpaceRay;
             needsRayFlags |= requirements.rayFlags;
+            needsDispatchRaysIndex |= requirements.dispatchRaysIndex;
+            needsDispatchRaysDimensions |= requirements.dispatchRaysDimensions;
             continue;
         }
         if (auto callableGroup = as<IRStructuralRayTracingCallableGroupInfoDecoration>(decoration))
         {
-            needsRecordData |= _getMetalStageRequirements(callableGroup->getCallable()).record;
+            auto requirements = _getMetalStageRequirements(callableGroup->getCallable());
+            needsRecordData |= requirements.record;
+            needsDispatchRaysIndex |= requirements.dispatchRaysIndex;
+            needsDispatchRaysDimensions |= requirements.dispatchRaysDimensions;
             continue;
         }
 
@@ -377,6 +396,12 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
                     intersectionRequirements.minDistance || intersectionRequirements.objectSpaceRay;
                 needsRayFlags |= closestHitRequirements.rayFlags || anyHitRequirements.rayFlags ||
                                  intersectionRequirements.rayFlags;
+                needsDispatchRaysIndex |= closestHitRequirements.dispatchRaysIndex ||
+                                          anyHitRequirements.dispatchRaysIndex ||
+                                          intersectionRequirements.dispatchRaysIndex;
+                needsDispatchRaysDimensions |= closestHitRequirements.dispatchRaysDimensions ||
+                                               anyHitRequirements.dispatchRaysDimensions ||
+                                               intersectionRequirements.dispatchRaysDimensions;
             }
             continue;
         }
@@ -393,6 +418,12 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
                             intersectionRequirements.objectSpaceRay;
         needsRayFlags |= requirements.rayFlags || anyHitRequirements.rayFlags ||
                          intersectionRequirements.rayFlags;
+        needsDispatchRaysIndex |= requirements.dispatchRaysIndex ||
+                                  anyHitRequirements.dispatchRaysIndex ||
+                                  intersectionRequirements.dispatchRaysIndex;
+        needsDispatchRaysDimensions |= requirements.dispatchRaysDimensions ||
+                                       anyHitRequirements.dispatchRaysDimensions ||
+                                       intersectionRequirements.dispatchRaysDimensions;
         if (requirements.hitKind)
             needsCustomHitKind = true;
         if (!requirements.hitAttributes)
@@ -438,6 +469,26 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
             result->rayFlagsKey,
             UnownedTerminatedStringSlice("rayFlags"));
         builder.createStructField(result->type, result->rayFlagsKey, builder.getUIntType());
+    }
+
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
+    if (needsDispatchRaysIndex)
+    {
+        result->dispatchRaysIndexKey = builder.createStructKey();
+        builder.addNameHintDecoration(
+            result->dispatchRaysIndexKey,
+            UnownedTerminatedStringSlice("dispatchRaysIndex"));
+        builder.createStructField(result->type, result->dispatchRaysIndexKey, uint3Type);
+    }
+
+    if (needsDispatchRaysDimensions)
+    {
+        result->dispatchRaysDimensionsKey = builder.createStructKey();
+        builder.addNameHintDecoration(
+            result->dispatchRaysDimensionsKey,
+            UnownedTerminatedStringSlice("dispatchRaysDimensions"));
+        builder.createStructField(result->type, result->dispatchRaysDimensionsKey, uint3Type);
     }
 
     if (needsCustomHitKind)
@@ -798,6 +849,14 @@ struct MetalVisibleInputValues
     IRInst* objectSpaceDirection = nullptr;
     IRInst* objectToWorld = nullptr;
     IRInst* worldToObject = nullptr;
+    IRInst* dispatchRaysIndex = nullptr;
+    IRInst* dispatchRaysDimensions = nullptr;
+};
+
+struct MetalDispatchValues
+{
+    IRInst* index = nullptr;
+    IRInst* dimensions = nullptr;
 };
 
 static void _lowerMetalVisibleInputOperations(
@@ -878,6 +937,12 @@ static void _lowerMetalVisibleInputOperations(
         case kIROp_StructuralRayTracingGetWorldToObject:
             replacement = values.worldToObject;
             break;
+        case kIROp_StructuralRayTracingGetDispatchRaysIndex:
+            replacement = values.dispatchRaysIndex;
+            break;
+        case kIROp_StructuralRayTracingGetDispatchRaysDimensions:
+            replacement = values.dispatchRaysDimensions;
+            break;
         default:
             break;
         }
@@ -908,8 +973,8 @@ static void _rebindMetalCallableDispatches(
     _collectMetalCallableDispatchOperations(function, operations);
     for (auto operation : operations)
     {
-        operation->setOperand(2, descriptorResources);
-        operation->setOperand(3, records);
+        operation->setOperand(6, descriptorResources);
+        operation->setOperand(7, records);
     }
 }
 
@@ -917,6 +982,7 @@ static IRFunc* _generateVisibleStageAdapter(
     IRModule* module,
     Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generated,
     Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     IRInst* groupType,
     StructuralRayTracingStageKind stageKind,
     IRType* stageType,
@@ -1060,6 +1126,20 @@ static IRFunc* _generateVisibleStageAdapter(
         values.rayFlags =
             builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayFlagsKey));
     }
+    if (rayDataInfo->dispatchRaysIndexKey)
+    {
+        values.dispatchRaysIndex =
+            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysIndexKey));
+    }
+    if (rayDataInfo->dispatchRaysDimensionsKey)
+    {
+        values.dispatchRaysDimensions = builder.emitLoad(
+            builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysDimensionsKey));
+    }
+    if (values.dispatchRaysIndex || values.dispatchRaysDimensions)
+    {
+        dispatchValues[adapter] = {values.dispatchRaysIndex, values.dispatchRaysDimensions};
+    }
 
     if (tableRequirements.record)
     {
@@ -1109,15 +1189,16 @@ static IRFunc* _generateVisibleStageAdapter(
 static IRFunc* _generateCallableStageAdapter(
     IRModule* module,
     Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generated,
+    Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     IRStructuralRayTracingCallableGroupInfoDecoration* group,
-    IRType* descriptorResourcesPointerType)
+    IRType* descriptorResourcesPointerType,
+    IRType* callableFunctionTableType,
+    const MetalStageRequirements& signatureRequirements)
 {
     auto invoke = as<IRFunc>(group->getCallable());
     if (!invoke)
         return nullptr;
-    KeyValuePair<IRInst*, IRInst*> generatedKey(
-        group->getGroupType(),
-        descriptorResourcesPointerType);
+    KeyValuePair<IRInst*, IRInst*> generatedKey(group->getGroupType(), callableFunctionTableType);
     if (auto existing = generated.tryGetValue(generatedKey))
         return *existing;
 
@@ -1127,13 +1208,21 @@ static IRFunc* _generateCallableStageAdapter(
     auto dataType = cast<IRType>(group->getCallableDataType());
     auto dataPointerType = builder.getPtrType(dataType, AddressSpace::ThreadLocal);
     auto descriptorDataType = builder.getPtrType(builder.getUIntType(), AddressSpace::Global);
-    IRType* parameterTypes[] = {
-        dataPointerType,
-        descriptorResourcesPointerType,
-        descriptorDataType,
-    };
-    adapter->setFullType(
-        builder.getFuncType(SLANG_COUNT_OF(parameterTypes), parameterTypes, builder.getVoidType()));
+    auto requirements = _getMetalStageRequirements(invoke);
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
+    List<IRType*> parameterTypes;
+    parameterTypes.add(dataPointerType);
+    if (signatureRequirements.dispatchRaysIndex)
+        parameterTypes.add(uint3Type);
+    if (signatureRequirements.dispatchRaysDimensions)
+        parameterTypes.add(uint3Type);
+    parameterTypes.add(descriptorResourcesPointerType);
+    parameterTypes.add(descriptorDataType);
+    adapter->setFullType(builder.getFuncType(
+        parameterTypes.getCount(),
+        parameterTypes.getBuffer(),
+        builder.getVoidType()));
 
     auto name = _getStructuralStageName(group->getCallableType(), invoke);
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
@@ -1155,6 +1244,22 @@ static IRFunc* _generateCallableStageAdapter(
     builder.emitBlock();
     auto data = builder.emitParam(dataPointerType);
     builder.addNameHintDecoration(data, UnownedTerminatedStringSlice("data"));
+    IRInst* dispatchRaysIndex = nullptr;
+    IRInst* dispatchRaysDimensions = nullptr;
+    if (signatureRequirements.dispatchRaysIndex)
+    {
+        dispatchRaysIndex = builder.emitParam(uint3Type);
+        builder.addNameHintDecoration(
+            dispatchRaysIndex,
+            UnownedTerminatedStringSlice("dispatchRaysIndex"));
+    }
+    if (signatureRequirements.dispatchRaysDimensions)
+    {
+        dispatchRaysDimensions = builder.emitParam(uint3Type);
+        builder.addNameHintDecoration(
+            dispatchRaysDimensions,
+            UnownedTerminatedStringSlice("dispatchRaysDimensions"));
+    }
     auto descriptorResources = builder.emitParam(descriptorResourcesPointerType);
     builder.addNameHintDecoration(
         descriptorResources,
@@ -1163,7 +1268,7 @@ static IRFunc* _generateCallableStageAdapter(
     builder.addNameHintDecoration(descriptorData, UnownedTerminatedStringSlice("descriptorData"));
 
     IRInst* record = nullptr;
-    if (_getMetalStageRequirements(invoke).record)
+    if (requirements.record)
     {
         record = _emitMetalRecordValueFromDescriptorData(
             builder,
@@ -1191,11 +1296,18 @@ static IRFunc* _generateCallableStageAdapter(
             replacement = data;
         else if (operation->getOp() == kIROp_StructuralRayTracingGetRecord)
             replacement = record;
+        else if (operation->getOp() == kIROp_StructuralRayTracingGetDispatchRaysIndex)
+            replacement = dispatchRaysIndex;
+        else if (operation->getOp() == kIROp_StructuralRayTracingGetDispatchRaysDimensions)
+            replacement = dispatchRaysDimensions;
         if (!replacement)
             continue;
         operation->replaceUsesWith(replacement);
         operation->removeAndDeallocate();
     }
+
+    if (dispatchRaysIndex || dispatchRaysDimensions)
+        dispatchValues[adapter] = {dispatchRaysIndex, dispatchRaysDimensions};
 
     generated.add(generatedKey, adapter);
     return adapter;
@@ -1473,6 +1585,8 @@ struct MetalCandidateInputValues
     IRInst* objectSpaceDirection = nullptr;
     IRInst* objectToWorld = nullptr;
     IRInst* worldToObject = nullptr;
+    IRInst* dispatchRaysIndex = nullptr;
+    IRInst* dispatchRaysDimensions = nullptr;
 };
 
 static void _collectStageInputOperations(IRInst* parent, List<IRInst*>& operations);
@@ -1552,6 +1666,12 @@ static void _lowerMetalCandidateInputOperations(
         case kIROp_StructuralRayTracingGetWorldToObject:
             replacement = values.worldToObject;
             break;
+        case kIROp_StructuralRayTracingGetDispatchRaysIndex:
+            replacement = values.dispatchRaysIndex;
+            break;
+        case kIROp_StructuralRayTracingGetDispatchRaysDimensions:
+            replacement = values.dispatchRaysDimensions;
+            break;
         default:
             break;
         }
@@ -1567,6 +1687,7 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
     IRModule* module,
     Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>& generated,
     Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     const MetalCandidateResultInfo& resultInfo,
     IRStructuralRayTracingHitGroupInfoDecoration* group,
@@ -1777,6 +1898,20 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
         inputs.rayFlags =
             builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayFlagsKey));
     }
+    if (rayDataInfo->dispatchRaysIndexKey)
+    {
+        inputs.dispatchRaysIndex =
+            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysIndexKey));
+    }
+    if (rayDataInfo->dispatchRaysDimensionsKey)
+    {
+        inputs.dispatchRaysDimensions = builder.emitLoad(
+            builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysDimensionsKey));
+    }
+    if (inputs.dispatchRaysIndex || inputs.dispatchRaysDimensions)
+    {
+        dispatchValues[adapter] = {inputs.dispatchRaysIndex, inputs.dispatchRaysDimensions};
+    }
     if (requirements.record)
     {
         inputs.record = _emitMetalRecordValue(
@@ -1841,6 +1976,8 @@ struct MetalProceduralCandidateState
     IRInst* objectSpaceDirection = nullptr;
     IRInst* objectToWorld = nullptr;
     IRInst* worldToObject = nullptr;
+    IRInst* dispatchRaysIndex = nullptr;
+    IRInst* dispatchRaysDimensions = nullptr;
     IRInst* opaque = nullptr;
     IRInst* committedAttributes = nullptr;
     IRInst* committedHitKind = nullptr;
@@ -1909,7 +2046,9 @@ static void _lowerAnyHitDecisionInputs(
     IRInst* objectSpaceOrigin,
     IRInst* objectSpaceDirection,
     IRInst* objectToWorld,
-    IRInst* worldToObject)
+    IRInst* worldToObject,
+    IRInst* dispatchRaysIndex,
+    IRInst* dispatchRaysDimensions)
 {
     List<IRInst*> operations;
     _collectStageInputOperations(helper, operations);
@@ -1976,6 +2115,12 @@ static void _lowerAnyHitDecisionInputs(
         case kIROp_StructuralRayTracingGetWorldToObject:
             replacement = worldToObject;
             break;
+        case kIROp_StructuralRayTracingGetDispatchRaysIndex:
+            replacement = dispatchRaysIndex;
+            break;
+        case kIROp_StructuralRayTracingGetDispatchRaysDimensions:
+            replacement = dispatchRaysDimensions;
+            break;
         default:
             break;
         }
@@ -2033,6 +2178,12 @@ static IRFunc* _generateAnyHitDecisionHelper(
         parameterTypes.add(_getFloat4x3Type(builder));
     if (requirements.worldToObject)
         parameterTypes.add(_getFloat4x3Type(builder));
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
+    if (requirements.dispatchRaysIndex)
+        parameterTypes.add(uint3Type);
+    if (requirements.dispatchRaysDimensions)
+        parameterTypes.add(uint3Type);
     parameterTypes.add(builder.getBoolType());
     helper->setFullType(builder.getFuncType(parameterTypes, resultInfo.type));
 
@@ -2105,6 +2256,12 @@ static IRFunc* _generateAnyHitDecisionHelper(
         objectToWorld = builder.emitParam(_getFloat4x3Type(builder));
     if (requirements.worldToObject)
         worldToObject = builder.emitParam(_getFloat4x3Type(builder));
+    IRInst* dispatchRaysIndex = nullptr;
+    IRInst* dispatchRaysDimensions = nullptr;
+    if (requirements.dispatchRaysIndex)
+        dispatchRaysIndex = builder.emitParam(uint3Type);
+    if (requirements.dispatchRaysDimensions)
+        dispatchRaysDimensions = builder.emitParam(uint3Type);
     auto opaque = builder.emitParam(builder.getBoolType());
     builder.addNameHintDecoration(attributes, UnownedTerminatedStringSlice("attributes"));
     builder.addNameHintDecoration(distance, UnownedTerminatedStringSlice("distance"));
@@ -2146,7 +2303,9 @@ static IRFunc* _generateAnyHitDecisionHelper(
         objectSpaceOrigin,
         objectSpaceDirection,
         objectToWorld,
-        worldToObject);
+        worldToObject,
+        dispatchRaysIndex,
+        dispatchRaysDimensions);
     _lowerAnyHitTerminations(helper, resultInfo);
     return helper;
 }
@@ -2223,6 +2382,10 @@ static void _lowerProceduralReportHitOperations(
                 arguments.add(state.objectToWorld);
             if (anyHitRequirements.worldToObject)
                 arguments.add(state.worldToObject);
+            if (anyHitRequirements.dispatchRaysIndex)
+                arguments.add(state.dispatchRaysIndex);
+            if (anyHitRequirements.dispatchRaysDimensions)
+                arguments.add(state.dispatchRaysDimensions);
             arguments.add(state.opaque);
             auto decision = builder.emitCallInst(
                 filterResultInfo.type,
@@ -2336,6 +2499,12 @@ static void _lowerProceduralIntersectionInputs(
         case kIROp_StructuralRayTracingGetWorldToObject:
             replacement = state.worldToObject;
             break;
+        case kIROp_StructuralRayTracingGetDispatchRaysIndex:
+            replacement = state.dispatchRaysIndex;
+            break;
+        case kIROp_StructuralRayTracingGetDispatchRaysDimensions:
+            replacement = state.dispatchRaysDimensions;
+            break;
         default:
             break;
         }
@@ -2352,6 +2521,7 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     Dictionary<KeyValuePair<KeyValuePair<IRInst*, UInt>, IRInst*>, IRFunc*>& generated,
     HashSet<IRFunc*>& generatedHelpers,
     Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     const MetalCandidateResultInfo& filterResultInfo,
     const MetalCandidateResultInfo& proceduralResultInfo,
@@ -2569,6 +2739,20 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
     state.objectSpaceDirection = objectSpaceDirection;
     state.objectToWorld = objectToWorld;
     state.worldToObject = worldToObject;
+    if (rayDataInfo->dispatchRaysIndexKey)
+    {
+        state.dispatchRaysIndex =
+            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysIndexKey));
+    }
+    if (rayDataInfo->dispatchRaysDimensionsKey)
+    {
+        state.dispatchRaysDimensions = builder.emitLoad(
+            builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysDimensionsKey));
+    }
+    if (state.dispatchRaysIndex || state.dispatchRaysDimensions)
+    {
+        dispatchValues[adapter] = {state.dispatchRaysIndex, state.dispatchRaysDimensions};
+    }
     state.opaque = opaque;
     if (auto key = rayDataInfo->customAttributeKeys.tryGetValue(groupType))
         state.committedAttributes = builder.emitFieldAddress(rayData, *key);
@@ -2826,6 +3010,7 @@ static bool _prepareTraceDescriptor(
 static bool _prepareCallableDescriptor(
     IRBuilder& builder,
     IRStructuralRayTracingCallShader* callOperation,
+    const MetalStageRequirements& requirements,
     MetalTraceDescriptorInfo& outInfo)
 {
     IRStructField* descriptorResourcesField = nullptr;
@@ -2839,13 +3024,20 @@ static bool _prepareCallableDescriptor(
     }
 
     auto dataType = cast<IRType>(callOperation->getCallableDataType());
-    IRType* parameterTypes[] = {
-        builder.getPtrType(dataType, AddressSpace::ThreadLocal),
-        builder.getPtrType(builder.getUIntType(), AddressSpace::Uniform),
-        builder.getPtrType(builder.getUIntType(), AddressSpace::Global),
-    };
-    auto signature =
-        builder.getFuncType(SLANG_COUNT_OF(parameterTypes), parameterTypes, builder.getVoidType());
+    List<IRType*> parameterTypes;
+    parameterTypes.add(builder.getPtrType(dataType, AddressSpace::ThreadLocal));
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
+    if (requirements.dispatchRaysIndex)
+        parameterTypes.add(uint3Type);
+    if (requirements.dispatchRaysDimensions)
+        parameterTypes.add(uint3Type);
+    parameterTypes.add(builder.getPtrType(builder.getUIntType(), AddressSpace::Uniform));
+    parameterTypes.add(builder.getPtrType(builder.getUIntType(), AddressSpace::Global));
+    auto signature = builder.getFuncType(
+        parameterTypes.getCount(),
+        parameterTypes.getBuffer(),
+        builder.getVoidType());
     auto callableFunctionTableType = builder.getType(kIROp_MetalVisibleFunctionTable, signature);
     resourceFields[3]->setFieldType(callableFunctionTableType);
 
@@ -2961,6 +3153,7 @@ static bool _lowerNonEmptyTrace(
     HashSet<IRFunc*>& candidateAdapterSet,
     HashSet<IRFunc*>& candidateHelperSet,
     Dictionary<IRFunc*, IRInst*>& payloadValues,
+    Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     MetalRayDataInfo* rayDataInfo,
     const MetalCandidateResultInfo& filterResultInfo,
@@ -2997,6 +3190,7 @@ static bool _lowerNonEmptyTrace(
                     module,
                     generatedMissAdapters,
                     payloadValues,
+                    dispatchValues,
                     group->getGroupType(),
                     StructuralRayTracingStageKind::Miss,
                     group->getMissType(),
@@ -3025,6 +3219,7 @@ static bool _lowerNonEmptyTrace(
                         module,
                         generatedCandidateAdapters,
                         payloadValues,
+                        dispatchValues,
                         candidateRayDataParams,
                         filterResultInfo,
                         group,
@@ -3042,6 +3237,7 @@ static bool _lowerNonEmptyTrace(
                         generatedCandidateAdapters,
                         candidateHelperSet,
                         payloadValues,
+                        dispatchValues,
                         candidateRayDataParams,
                         filterResultInfo,
                         proceduralResultInfo,
@@ -3057,6 +3253,7 @@ static bool _lowerNonEmptyTrace(
                     module,
                     generatedClosestHitAdapters,
                     payloadValues,
+                    dispatchValues,
                     group->getGroupType(),
                     StructuralRayTracingStageKind::ClosestHit,
                     group->getClosestHitType(),
@@ -3142,6 +3339,30 @@ static bool _lowerNonEmptyTrace(
     {
         builder.emitStore(builder.emitFieldAddress(rayData, rayDataInfo->rayFlagsKey), rayFlags);
     }
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
+    if (rayDataInfo->dispatchRaysIndexKey)
+    {
+        auto dispatchRaysIndex = builder.emitIntrinsicInst(
+            uint3Type,
+            kIROp_MetalStructuralRayTracingDispatchRaysIndex,
+            0,
+            nullptr);
+        builder.emitStore(
+            builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysIndexKey),
+            dispatchRaysIndex);
+    }
+    if (rayDataInfo->dispatchRaysDimensionsKey)
+    {
+        auto dispatchRaysDimensions = builder.emitIntrinsicInst(
+            uint3Type,
+            kIROp_MetalStructuralRayTracingDispatchRaysDimensions,
+            0,
+            nullptr);
+        builder.emitStore(
+            builder.emitFieldAddress(rayData, rayDataInfo->dispatchRaysDimensionsKey),
+            dispatchRaysDimensions);
+    }
 
     auto intType = builder.getIntType();
     IRInst* operands[] = {
@@ -3189,14 +3410,12 @@ static bool _lowerCallableDispatch(
     IRModule* module,
     IRStructuralRayTracingCallShader* callOperation,
     Dictionary<KeyValuePair<IRInst*, IRInst*>, IRFunc*>& generatedCallableAdapters,
+    Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues,
     DiagnosticSink* sink)
 {
     IRBuilder builder(module);
-    MetalTraceDescriptorInfo descriptorInfo;
-    if (!_prepareCallableDescriptor(builder, callOperation, descriptorInfo))
-        return false;
-
     List<IRStructuralRayTracingCallableGroupInfoDecoration*> callableGroups;
+    MetalStageRequirements callableRequirements;
     bool hasCallableGroup = false;
     bool hasMismatchedData = false;
     for (auto decoration : callOperation->getDecorations())
@@ -3206,6 +3425,9 @@ static bool _lowerCallableDispatch(
             continue;
         hasCallableGroup = true;
         callableGroups.add(group);
+        callableRequirements = _combineMetalStageRequirements(
+            callableRequirements,
+            _getMetalStageRequirements(group->getCallable()));
         if (group->getCallableDataType() != callOperation->getCallableDataType())
         {
             hasMismatchedData = true;
@@ -3226,6 +3448,10 @@ static bool _lowerCallableDispatch(
     if (hasMismatchedData)
         return false;
 
+    MetalTraceDescriptorInfo descriptorInfo;
+    if (!_prepareCallableDescriptor(builder, callOperation, callableRequirements, descriptorInfo))
+        return false;
+
     builder.setInsertBefore(callOperation);
     auto descriptorResources =
         _getDescriptorResources(builder, callOperation->getDescriptor(), descriptorInfo);
@@ -3234,9 +3460,30 @@ static bool _lowerCallableDispatch(
         callOperation->getDescriptor(),
         descriptorInfo,
         descriptorInfo.recordsField);
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
+    auto zeroDispatchValue = builder.emitDefaultConstruct(uint3Type);
+    auto dispatchRaysIndex = callableRequirements.dispatchRaysIndex
+                                 ? builder.emitIntrinsicInst(
+                                       uint3Type,
+                                       kIROp_MetalStructuralRayTracingDispatchRaysIndex,
+                                       0,
+                                       nullptr)
+                                 : zeroDispatchValue;
+    auto dispatchRaysDimensions = callableRequirements.dispatchRaysDimensions
+                                      ? builder.emitIntrinsicInst(
+                                            uint3Type,
+                                            kIROp_MetalStructuralRayTracingDispatchRaysDimensions,
+                                            0,
+                                            nullptr)
+                                      : zeroDispatchValue;
     IRInst* operands[] = {
         callOperation->getCallableIndex(),
         callOperation->getData(),
+        dispatchRaysIndex,
+        dispatchRaysDimensions,
+        builder.getBoolValue(callableRequirements.dispatchRaysIndex),
+        builder.getBoolValue(callableRequirements.dispatchRaysDimensions),
         descriptorResources,
         records,
         descriptorResources->getDataType(),
@@ -3253,8 +3500,11 @@ static bool _lowerCallableDispatch(
         _generateCallableStageAdapter(
             module,
             generatedCallableAdapters,
+            dispatchValues,
             group,
-            descriptorInfo.descriptorResourcesPointerType);
+            descriptorInfo.descriptorResourcesPointerType,
+            descriptorInfo.callableFunctionTableType,
+            callableRequirements);
     }
     callOperation->removeAndDeallocate();
     return true;
@@ -3356,10 +3606,16 @@ struct MetalRayGenerationSystemValueThreader
         return parameter;
     }
 
-    void lower(IRCall* call)
+    void registerValue(IRFunc* func, IRInst* value)
     {
-        call->replaceUsesWith(findOrCreateParameter(call));
-        call->removeAndDeallocate();
+        if (value)
+            parameters[func] = value;
+    }
+
+    void lower(IRInst* operation)
+    {
+        operation->replaceUsesWith(findOrCreateParameter(operation));
+        operation->removeAndDeallocate();
     }
 
     IRModule* module;
@@ -3369,17 +3625,27 @@ struct MetalRayGenerationSystemValueThreader
     Dictionary<IRFunc*, IRInst*> parameters;
 };
 
-static void _collectMetalRayGenerationSystemValueCalls(
+static void _collectMetalRayGenerationSystemValueOperations(
     IRInst* parent,
-    List<IRCall*>& dispatchIndexCalls,
-    List<IRCall*>& dispatchDimensionsCalls)
+    List<IRInst*>& dispatchIndexOperations,
+    List<IRInst*>& dispatchDimensionsOperations)
 {
     for (auto child = parent->getFirstChild(); child; child = child->getNextInst())
     {
-        _collectMetalRayGenerationSystemValueCalls(
+        _collectMetalRayGenerationSystemValueOperations(
             child,
-            dispatchIndexCalls,
-            dispatchDimensionsCalls);
+            dispatchIndexOperations,
+            dispatchDimensionsOperations);
+        if (child->getOp() == kIROp_MetalStructuralRayTracingDispatchRaysIndex)
+        {
+            dispatchIndexOperations.add(child);
+            continue;
+        }
+        if (child->getOp() == kIROp_MetalStructuralRayTracingDispatchRaysDimensions)
+        {
+            dispatchDimensionsOperations.add(child);
+            continue;
+        }
         auto call = as<IRCall>(child);
         if (!call)
             continue;
@@ -3405,23 +3671,46 @@ static void _collectMetalRayGenerationSystemValueCalls(
             }
         }
         if (definition == toSlice("DispatchRaysIndex"))
-            dispatchIndexCalls.add(call);
+            dispatchIndexOperations.add(call);
         else if (definition == toSlice("DispatchRaysDimensions"))
-            dispatchDimensionsCalls.add(call);
+            dispatchDimensionsOperations.add(call);
     }
+}
+
+static bool _isCalledFromMetalDispatchRoot(
+    IRFunc* function,
+    const HashSet<IRFunc*>& roots,
+    HashSet<IRFunc*>& visited)
+{
+    if (roots.contains(function))
+        return true;
+    if (!visited.add(function))
+        return false;
+
+    for (auto use = function->firstUse; use; use = use->nextUse)
+    {
+        auto call = as<IRCall>(use->getUser());
+        if (!call || call->getCallee() != function)
+            continue;
+        auto caller = _findEnclosingFunc(call);
+        if (caller && _isCalledFromMetalDispatchRoot(caller, roots, visited))
+            return true;
+    }
+    return false;
 }
 
 static void _lowerMetalRayGenerationSystemValues(
     IRModule* module,
     const Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
-    const HashSet<IRFunc*>& physicalRayGenerationEntryPoints)
+    const HashSet<IRFunc*>& physicalRayGenerationEntryPoints,
+    const Dictionary<IRFunc*, MetalDispatchValues>& dispatchValues)
 {
-    List<IRCall*> dispatchIndexCalls;
-    List<IRCall*> dispatchDimensionsCalls;
-    _collectMetalRayGenerationSystemValueCalls(
+    List<IRInst*> dispatchIndexOperations;
+    List<IRInst*> dispatchDimensionsOperations;
+    _collectMetalRayGenerationSystemValueOperations(
         module->getModuleInst(),
-        dispatchIndexCalls,
-        dispatchDimensionsCalls);
+        dispatchIndexOperations,
+        dispatchDimensionsOperations);
 
     IRBuilder builder(module);
     auto uint3Type =
@@ -3437,9 +3726,22 @@ static void _lowerMetalRayGenerationSystemValues(
         "dispatchRaysDimensions",
         "threads_per_grid");
 
-    auto isUsedByPhysicalRayGeneration = [&](IRCall* call)
+    HashSet<IRFunc*> roots = physicalRayGenerationEntryPoints;
+    for (const auto& [func, values] : dispatchValues)
     {
-        auto func = dispatchIndexThreader.findEnclosingFunc(call);
+        roots.add(func);
+        dispatchIndexThreader.registerValue(func, values.index);
+        dispatchDimensionsThreader.registerValue(func, values.dimensions);
+    }
+
+    auto isUsedByStructuralRayTracing = [&](IRInst* operation)
+    {
+        auto func = dispatchIndexThreader.findEnclosingFunc(operation);
+        if (!func)
+            return false;
+        HashSet<IRFunc*> visited;
+        if (_isCalledFromMetalDispatchRoot(func, roots, visited))
+            return true;
         auto referencing = func ? referencingEntryPoints.tryGetValue(func) : nullptr;
         if (!referencing)
             return false;
@@ -3451,15 +3753,15 @@ static void _lowerMetalRayGenerationSystemValues(
         return false;
     };
 
-    for (auto call : dispatchIndexCalls)
+    for (auto operation : dispatchIndexOperations)
     {
-        if (isUsedByPhysicalRayGeneration(call))
-            dispatchIndexThreader.lower(call);
+        if (isUsedByStructuralRayTracing(operation))
+            dispatchIndexThreader.lower(operation);
     }
-    for (auto call : dispatchDimensionsCalls)
+    for (auto operation : dispatchDimensionsOperations)
     {
-        if (isUsedByPhysicalRayGeneration(call))
-            dispatchDimensionsThreader.lower(call);
+        if (isUsedByStructuralRayTracing(operation))
+            dispatchDimensionsThreader.lower(operation);
     }
 }
 
@@ -3502,6 +3804,7 @@ void prepareMetalStructuralRayTracing(
     HashSet<IRFunc*> candidateAdapterSet;
     HashSet<IRFunc*> candidateHelperSet;
     Dictionary<IRFunc*, IRInst*> payloadValues;
+    Dictionary<IRFunc*, MetalDispatchValues> dispatchValues;
     Dictionary<IRFunc*, IRParam*> candidateRayDataParams;
     Dictionary<IRInst*, RefPtr<MetalRayDataInfo>> rayDataInfos;
     Dictionary<IRInst*, IRType*> accelerationStructureTypes;
@@ -3531,7 +3834,12 @@ void prepareMetalStructuralRayTracing(
 
         if (auto callOperation = as<IRStructuralRayTracingCallShader>(operation))
         {
-            _lowerCallableDispatch(module, callOperation, generatedCallableAdapters, sink);
+            _lowerCallableDispatch(
+                module,
+                callOperation,
+                generatedCallableAdapters,
+                dispatchValues,
+                sink);
             continue;
         }
 
@@ -3593,6 +3901,7 @@ void prepareMetalStructuralRayTracing(
                     candidateAdapterSet,
                     candidateHelperSet,
                     payloadValues,
+                    dispatchValues,
                     candidateRayDataParams,
                     rayDataInfo,
                     filterResultInfo,
@@ -3609,7 +3918,8 @@ void prepareMetalStructuralRayTracing(
     _lowerMetalRayGenerationSystemValues(
         module,
         referencingEntryPoints,
-        physicalRayGenerationEntryPoints);
+        physicalRayGenerationEntryPoints,
+        dispatchValues);
 
     lowerMetalStructuralRayTracingStageInputOperations(module, payloadValues);
     for (auto child = module->getModuleInst()->getFirstChild(); child; child = child->getNextInst())
