@@ -1220,6 +1220,7 @@ local insts = {
 			{ structuralRayTracingGetCurveParameter = { operands = { { "input" } } } },
 			{ structuralRayTracingGetRayTMin = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetRayTCurrent = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetRayTime = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetRayFlags = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetHitKind = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetWorldRayOrigin = { operands = { { "fallback" }, { "input" } } } },

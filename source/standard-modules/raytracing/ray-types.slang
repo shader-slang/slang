@@ -5,16 +5,18 @@ namespace rt
 
 public interface IRayMotion {}
 
+public interface IEnabledRayMotion : IRayMotion {}
+
 public struct NoMotion : IRayMotion {}
 
 [require(metallib_2_4)]
-public struct PrimitiveMotion : IRayMotion {}
+public struct PrimitiveMotion : IEnabledRayMotion {}
 
 [require(metallib_2_4)]
-public struct InstanceMotion : IRayMotion {}
+public struct InstanceMotion : IEnabledRayMotion {}
 
 [require(metallib_2_4)]
-public struct PrimitiveAndInstanceMotion : IRayMotion {}
+public struct PrimitiveAndInstanceMotion : IEnabledRayMotion {}
 
 // Reuse the native ray representation so the portable D3D/Vulkan trace path needs no conversion.
 // Lowercase properties provide the structural API spelling without adding storage.

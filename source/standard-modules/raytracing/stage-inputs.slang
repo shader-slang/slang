@@ -192,6 +192,26 @@ public struct ClosestHitInput<Context>
 
 public extension<Context> ClosestHitInput<Context>
     where Context : IHitContext
+    where Context.TraceContext.Motion : IEnabledRayMotion
+{
+    public property float time
+    {
+        get
+        {
+            __target_switch
+            {
+            case glsl:
+            case spirv:
+                return RayCurrentTime();
+            default:
+                return 0.0;
+            }
+        }
+    }
+}
+
+public extension<Context> ClosestHitInput<Context>
+    where Context : IHitContext
     where Context.TraceContext.AccelerationStructure == AccelerationStructure
 {
     public property uint instanceIndex
@@ -529,6 +549,26 @@ public struct AnyHitInput<Context>
 
 public extension<Context> AnyHitInput<Context>
     where Context : IHitContext
+    where Context.TraceContext.Motion : IEnabledRayMotion
+{
+    public property float time
+    {
+        get
+        {
+            __target_switch
+            {
+            case glsl:
+            case spirv:
+                return RayCurrentTime();
+            default:
+                return 0.0;
+            }
+        }
+    }
+}
+
+public extension<Context> AnyHitInput<Context>
+    where Context : IHitContext
     where Context.TraceContext.AccelerationStructure == AccelerationStructure
 {
     public property uint instanceIndex
@@ -850,6 +890,26 @@ public struct IntersectionInput<Context>
 
 public extension<Context> IntersectionInput<Context>
     where Context : IHitContext
+    where Context.TraceContext.Motion : IEnabledRayMotion
+{
+    public property float time
+    {
+        get
+        {
+            __target_switch
+            {
+            case glsl:
+            case spirv:
+                return RayCurrentTime();
+            default:
+                return 0.0;
+            }
+        }
+    }
+}
+
+public extension<Context> IntersectionInput<Context>
+    where Context : IHitContext
     where Context.TraceContext.AccelerationStructure == AccelerationStructure
 {
     public property uint instanceIndex
@@ -1050,6 +1110,26 @@ public struct MissInput<Context>
                 return DispatchRaysDimensions();
             default:
                 return 0;
+            }
+        }
+    }
+}
+
+public extension<Context> MissInput<Context>
+    where Context : IMissGroupContext
+    where Context.TraceContext.Motion : IEnabledRayMotion
+{
+    public property float time
+    {
+        get
+        {
+            __target_switch
+            {
+            case glsl:
+            case spirv:
+                return RayCurrentTime();
+            default:
+                return 0.0;
             }
         }
     }
