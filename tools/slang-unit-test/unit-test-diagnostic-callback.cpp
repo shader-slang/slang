@@ -34,6 +34,15 @@ struct CapturedDiagnostic
     String filename;
     uint32_t startLine;
     uint32_t startCol;
+    uint32_t endLine;
+    uint32_t endCol;
+    uint32_t secondarySpanCount;
+    // Only the first secondary span is captured; that is enough to exercise and assert on
+    // the pointer-lifetime handling in Linkage::structuredDiagnosticThunk without needing to
+    // copy the whole array.
+    String secondaryFilename;
+    String secondaryMessage;
+    uint32_t secondaryStartLine;
 };
 
 // Callback that appends each diagnostic to a caller-supplied list.
@@ -47,6 +56,16 @@ static bool collectCallback(const SlangStructuredDiagnostic* d, void* userData)
     c.filename = d->primarySpan.filename ? d->primarySpan.filename : "";
     c.startLine = d->primarySpan.startLine;
     c.startCol = d->primarySpan.startCol;
+    c.endLine = d->primarySpan.endLine;
+    c.endCol = d->primarySpan.endCol;
+    c.secondarySpanCount = d->secondarySpanCount;
+    if (d->secondarySpanCount > 0)
+    {
+        const SlangDiagnosticSpan& sec = d->secondarySpans[0];
+        c.secondaryFilename = sec.filename ? sec.filename : "";
+        c.secondaryMessage = sec.message ? sec.message : "";
+        c.secondaryStartLine = sec.startLine;
+    }
     list->add(c);
     return true;
 }
@@ -202,6 +221,11 @@ SLANG_UNIT_TEST(diagnosticCallbackSpanLocation)
         {
             // The filename should contain the path we passed in.
             SLANG_CHECK(c.filename.indexOf(toSlice("my-file")) != -1);
+            // The end location, resolved separately from the start location in the thunk, must
+            // be on the same or a later line/column — never before the start.
+            SLANG_CHECK(c.endLine >= c.startLine);
+            if (c.endLine == c.startLine)
+                SLANG_CHECK(c.endCol >= c.startCol);
             sawLocatedError = true;
         }
     }
@@ -317,4 +341,45 @@ SLANG_UNIT_TEST(diagnosticCallbackSeverityOverride)
     // The disabled diagnostic must never reach the callback, at any severity.
     for (auto& c : captured)
         SLANG_CHECK(c.code != 39019);
+}
+
+// 9. A diagnostic with a secondary span (E30515, "generic-param-shadows-outer-generic") reaches
+// the callback with a populated secondarySpans array. This exercises the pointer-lifetime
+// handling in Linkage::structuredDiagnosticThunk (the secBeginLocs/secSpans reserve()+add()
+// loop that keeps each span's filename buffer valid) — every other test here uses a
+// single-span diagnostic, so this loop otherwise never runs.
+SLANG_UNIT_TEST(diagnosticCallbackSecondarySpans)
+{
+    ComPtr<slang::IGlobalSession> gs;
+    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, gs.writeRef()) == SLANG_OK);
+    auto session = makeSession(gs);
+
+    List<CapturedDiagnostic> captured;
+    session->setDiagnosticCallback(collectCallback, &captured);
+
+    // The inner generic parameter 'T' on bar() shadows the outer generic parameter 'T' on Foo,
+    // producing E30515 with a primary span at the inner declaration and a secondary span at the
+    // outer declaration ("outer generic parameter 'T' declared here").
+    const char* src = R"(
+        struct Foo<T>
+        {
+            T bar<T>(T x) { return x; }
+        }
+    )";
+    ComPtr<slang::IBlob> diag;
+    auto* mod = session->loadModuleFromSourceString("m", "m.slang", src, diag.writeRef());
+    SLANG_UNUSED(mod);
+
+    bool sawSecondarySpan = false;
+    for (auto& c : captured)
+    {
+        if (c.code == 30515 && c.secondarySpanCount > 0)
+        {
+            SLANG_CHECK(c.secondaryFilename.getLength() > 0);
+            SLANG_CHECK(c.secondaryStartLine > 0);
+            SLANG_CHECK(c.secondaryMessage.getLength() > 0);
+            sawSecondarySpan = true;
+        }
+    }
+    SLANG_CHECK(sawSecondarySpan);
 }
