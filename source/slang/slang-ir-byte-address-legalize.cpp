@@ -437,6 +437,21 @@ struct ByteAddressBufferLegalizationContext
             {
                 auto fieldType = field->getFieldType();
 
+                // An empty/zero-sized field is turned into a `void`-typed field upstream by
+                // `legalizeResourceTypes` (slang-legalize-types.cpp assigns `getVoidType()` to
+                // keep the field count aligned). Such a field has zero stride, so recursing here
+                // would emit a `Load<void>` (invalid on HLSL/DXIL) or divide the offset by a zero
+                // stride (SPIR-V, E30002). It carries no data, so we skip it and omit it from the
+                // `makeStruct` below; the later `cleanUpVoidType` pass drops the matching void
+                // field from the struct type, keeping operand and field counts consistent.
+                //
+                // The guard is specifically `void`, not "any zero-sized field": `cleanUpVoidType`
+                // reconciles the `makeStruct` by dropping `void` operands, so only a `void` field
+                // may be omitted here. An empty-*struct* field is instead handled by the recursion
+                // below (its zero-field loop emits an empty `makeStruct`) and must not be skipped.
+                if (as<IRVoidType>(fieldType))
+                    continue;
+
                 // The relative offset of each field is calculated using
                 // the IR-based layout subsystem, which works with the
                 // "natural" in-memory layout of types.
@@ -1429,6 +1444,12 @@ struct ByteAddressBufferLegalizationContext
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+
+                // Skip the `void`-typed field synthesized for an empty/zero-sized field, for the
+                // same reason as in `emitLegalLoad` above: it carries no data and its zero stride
+                // would otherwise produce a store of `void` / a divide by zero.
+                if (as<IRVoidType>(fieldType))
+                    continue;
 
                 IRIntegerValue fieldOffset;
                 SLANG_RETURN_ON_FAIL(getOffset(m_targetProgram, field, &fieldOffset));
