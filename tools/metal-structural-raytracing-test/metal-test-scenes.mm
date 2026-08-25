@@ -339,3 +339,64 @@ bool buildMetalMultilevelScene(
         outScene.instanceAccelerationStructure,
         outError);
 }
+
+bool buildMetalPrimitiveMotionScene(
+    id<MTLDevice> device,
+    id<MTLCommandQueue> queue,
+    MetalRayTracingScene& outScene,
+    NSString** outError)
+{
+    static const simd_float3 kVerticesAtStart[] = {
+        {0.0f, 0.0f, 1.0f},
+        {1.0f, 0.0f, 1.0f},
+        {0.0f, 1.0f, 1.0f},
+    };
+    static const simd_float3 kVerticesAtEnd[] = {
+        {2.0f, 0.0f, 1.0f},
+        {3.0f, 0.0f, 1.0f},
+        {2.0f, 1.0f, 1.0f},
+    };
+    outScene.vertexBuffer = [device newBufferWithBytes:kVerticesAtStart
+                                                length:sizeof(kVerticesAtStart)
+                                               options:MTLResourceStorageModeShared];
+    outScene.motionVertexBuffer = [device newBufferWithBytes:kVerticesAtEnd
+                                                      length:sizeof(kVerticesAtEnd)
+                                                     options:MTLResourceStorageModeShared];
+    if (!outScene.vertexBuffer || !outScene.motionVertexBuffer)
+    {
+        if (outError)
+            *outError = @"failed to allocate motion-triangle vertex buffers";
+        return false;
+    }
+
+    auto startKeyframe = [MTLMotionKeyframeData data];
+    startKeyframe.buffer = outScene.vertexBuffer;
+    auto endKeyframe = [MTLMotionKeyframeData data];
+    endKeyframe.buffer = outScene.motionVertexBuffer;
+
+    auto geometry = [MTLAccelerationStructureMotionTriangleGeometryDescriptor descriptor];
+    geometry.vertexBuffers = @[ startKeyframe, endKeyframe ];
+    geometry.vertexStride = sizeof(simd_float3);
+    geometry.vertexFormat = MTLAttributeFormatFloat3;
+    geometry.triangleCount = 1;
+    geometry.opaque = YES;
+
+    auto primitiveDescriptor = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
+    primitiveDescriptor.geometryDescriptors = @[ geometry ];
+    primitiveDescriptor.motionStartTime = 0.0f;
+    primitiveDescriptor.motionEndTime = 1.0f;
+    primitiveDescriptor.motionKeyframeCount = 2;
+    outScene.primitiveAccelerationStructure =
+        buildAccelerationStructure(device, queue, primitiveDescriptor, outError);
+    if (!outScene.primitiveAccelerationStructure)
+        return false;
+
+    return buildInstanceAccelerationStructure(
+        device,
+        queue,
+        MTLAccelerationStructureInstanceOptionOpaque,
+        0,
+        nullptr,
+        outScene,
+        outError);
+}
