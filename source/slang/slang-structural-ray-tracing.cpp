@@ -200,6 +200,8 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::RayTMin;
     if (text == "distance")
         return StructuralRayTracingStageInputOperationKind::RayTCurrent;
+    if (text == "time")
+        return StructuralRayTracingStageInputOperationKind::RayTime;
     if (text == "rayFlags")
         return StructuralRayTracingStageInputOperationKind::RayFlags;
     if (text == "hitKind")
