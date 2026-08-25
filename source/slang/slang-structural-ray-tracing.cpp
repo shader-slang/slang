@@ -218,6 +218,10 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::InstanceIndex;
     if (text == "instanceID")
         return StructuralRayTracingStageInputOperationKind::InstanceID;
+    if (text == "objectToWorld")
+        return StructuralRayTracingStageInputOperationKind::ObjectToWorld;
+    if (text == "worldToObject")
+        return StructuralRayTracingStageInputOperationKind::WorldToObject;
     if (text == "ignoreHit")
         return StructuralRayTracingStageInputOperationKind::IgnoreHit;
     if (text == "acceptHitAndEndSearch")

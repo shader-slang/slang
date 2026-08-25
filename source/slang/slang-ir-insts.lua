@@ -1229,6 +1229,8 @@ local insts = {
 			{ structuralRayTracingGetGeometryIndex = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetInstanceIndex = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingGetInstanceID = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetObjectToWorld = { operands = { { "fallback" }, { "input" } } } },
+			{ structuralRayTracingGetWorldToObject = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingIgnoreHit = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingAcceptHitAndEndSearch = { operands = { { "fallback" }, { "input" } } } },
 			{ structuralRayTracingReportHit = { min_operands = 4 } },
