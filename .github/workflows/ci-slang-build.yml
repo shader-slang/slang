@@ -212,9 +212,10 @@ jobs:
             fi
 
             if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" && "${{ inputs.build-llvm }}" != "false" ]]; then
-              # Doing a debug build will try to link against a release built llvm, this
-              # is a problem on Windows, so make slang-llvm in release build and use
-              # that as though it's a fetched binary via these presets.
+              # A debug build would try to link against a release-built llvm,
+              # which is a problem on Windows, so when llvm is wanted, build
+              # slang-llvm in release config first and feed it back in as
+              # though it were a fetched binary via these presets.
               cmake --workflow --preset slang-llvm
 
               # Configure, pointing to our just-generated slang-llvm archive
