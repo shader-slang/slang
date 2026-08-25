@@ -44,6 +44,11 @@ enum class MetalStructuralRayTracingGeometryKind : UInt
     BoundingBox,
 };
 
+/// Remove native entry-point identity from explicitly selected logical stage methods before
+/// generic entry-point legalization. Metal emits these methods as standalone source helpers; a
+/// selected program layout separately generates the physical visible and intersection functions.
+void prepareMetalStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>& ioEntryPoints);
+
 /// Prepare structural ray-tracing programs for the Metal target before DCE.
 ///
 /// Structural ray-generation entry points are physically emitted as Metal compute kernels. This

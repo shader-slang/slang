@@ -12,6 +12,33 @@
 namespace Slang
 {
 
+void prepareMetalStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>& ioEntryPoints)
+{
+    HashSet<IRFunc*> logicalEntryPoints;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+                logicalEntryPoints.add(func);
+        }
+    }
+
+    List<IRFunc*> selectedEntryPoints = ioEntryPoints;
+    ioEntryPoints.clear();
+    for (auto entryPoint : selectedEntryPoints)
+    {
+        if (!logicalEntryPoints.contains(entryPoint))
+            ioEntryPoints.add(entryPoint);
+    }
+
+    for (auto entryPoint : logicalEntryPoints)
+    {
+        if (auto decoration = entryPoint->findDecoration<IREntryPointDecoration>())
+            decoration->removeAndDeallocate();
+    }
+}
+
 static bool _supportsMetalLib31(TargetRequest* targetRequest)
 {
     auto& options = targetRequest->getOptionSet();
@@ -2710,9 +2737,7 @@ struct MetalRayGenerationSystemValueThreader
 
         IRBuilder builder(module);
         auto parameter = builder.createParam(type);
-        builder.addNameHintDecoration(
-            parameter,
-            UnownedTerminatedStringSlice(parameterName));
+        builder.addNameHintDecoration(parameter, UnownedTerminatedStringSlice(parameterName));
         parameter->insertBefore(firstBlock->getFirstOrdinaryInst());
         parameters.add(func, parameter);
 
@@ -2822,9 +2847,8 @@ static void _lowerMetalRayGenerationSystemValues(
         dispatchDimensionsCalls);
 
     IRBuilder builder(module);
-    auto uint3Type = builder.getVectorType(
-        builder.getUIntType(),
-        builder.getIntValue(builder.getIntType(), 3));
+    auto uint3Type =
+        builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
     MetalRayGenerationSystemValueThreader dispatchIndexThreader(
         module,
         uint3Type,
@@ -2870,7 +2894,17 @@ void prepareMetalStructuralRayTracing(
 {
     List<IRInst*> operations;
     _collectStructuralProgramOperations(module->getModuleInst(), operations);
-    if (operations.getCount() == 0)
+    bool hasStructuralEntryPoint = false;
+    for (auto inst : module->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(inst);
+        if (func && func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+        {
+            hasStructuralEntryPoint = true;
+            break;
+        }
+    }
+    if (operations.getCount() == 0 && !hasStructuralEntryPoint)
         return;
 
     UInt capabilityTagMask = 0;

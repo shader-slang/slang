@@ -438,6 +438,8 @@ struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContex
     {
         if (!func->isDefinition())
             return false;
+        if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+            return false;
         if (func->findDecoration<IREntryPointDecoration>() != nullptr)
             return true;
         return false;

@@ -11,6 +11,10 @@ struct IRFunc;
 struct IRInst;
 class DiagnosticSink;
 
+/// Replace selected logical stage methods with zero-parameter native entry-point adapters before
+/// generic entry-point legalization examines their signatures.
+void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>& ioEntryPoints);
+
 /// Generate native D3D/Vulkan entry-point adapters for stages selected by structural layouts.
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
