@@ -1550,9 +1550,14 @@ MacroInvocation::MacroInvocation(
             // and the arithmetic below is safe.
             //
             // bodyEnd is the START loc of the last token (not the end of its text). That is
-            // sufficient because diagnostic locs always anchor on token-start positions (the
-            // lexer stores the start of each token, never a mid-token interior loc), so a
-            // range that covers every token-start loc covers every diagnostic position.
+            // sufficient because the Token type (slang-token.h) only stores a start loc --
+            // Token::loc -- plus a length (Token::charsCount); there is no separate "end loc" or
+            // interior-loc field a consumer could read off a token directly. A loc derived from
+            // a token (as every diagnostic loc and every remapped body loc in this file is)
+            // therefore always is a token-start loc, so a range covering every token-start loc
+            // covers every loc that can ever be formed from these tokens. This does not cover a
+            // loc a consumer deliberately computes as token.loc + someOffset (there are no such
+            // consumers of macro body tokens in this codebase today).
             //
             // bodyRangeSize = (bodyEnd - originalBodyBeginLoc) + 1, where the +1 ensures the
             // range is inclusive: a single-token body has size 1, not 0.
@@ -1587,6 +1592,19 @@ MacroInvocation::MacroInvocation(
 // through the expansion stream. See _remapBodyLoc for the pure query version, which
 // is called directly for the ## paste operator loc (where we need the remapped loc
 // without mutating the operator token itself).
+//
+// By-design limitation: this only remaps tokens that come from `macro`'s own body (checked via
+// m_bodyTokenRange.contains in _remapBodyLoc below). Tokens substituted in for a function-like
+// macro's parameter keep the call-site loc they arrived with -- they are not remapped into this
+// invocation's expansion range, because they did not come from this macro's body. Consider
+// `#define WRAP(x) x` and `#define INNER UndefinedType y;` invoked as `WRAP(INNER)`: the
+// argument token `INNER` keeps its call-site loc, so INNER's own body-token remapping (from
+// INNER's own MacroInvocation) chains back to INNER's call site correctly, but that chain does
+// not continue on through WRAP -- an error inside INNER's body shows an "expanded from macro
+// 'INNER'" note, but never an additional "expanded from macro 'WRAP'" note, even though WRAP is
+// syntactically the outer invocation. See
+// tests/diagnostics/macro-expansion-stack/argument-macro.slang for the regression test
+// pinning this behavior.
 void MacroInvocation::_maybeRemapBodyTokenLoc(Token& token) const
 {
     token.loc = _remapBodyLoc(token.loc);
