@@ -395,26 +395,6 @@ static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* 
     }
 }
 
-static slang::TypeLayoutReflection* maybeChangeTypeLayoutToAgumentBufferTier2(
-    slang::VariableLayoutReflection* varLayout)
-{
-    if (varLayout->getCategoryCount() != 0)
-    {
-        for (unsigned int categoryIdx = 0; categoryIdx < varLayout->getCategoryCount();
-             categoryIdx++)
-        {
-            auto category = varLayout->getCategoryByIndex(categoryIdx);
-            if (category == slang::MetalArgumentBufferElement)
-            {
-                return g_inProgramLayout->getTypeLayout(
-                    varLayout->getTypeLayout()->getType(),
-                    slang::LayoutRules::MetalArgumentBufferTier2);
-            }
-        }
-    }
-    return nullptr;
-}
-
 static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLayoutReflection* var)
 {
     writer << "{\n";
@@ -430,14 +410,7 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
 
     writer.maybeComma();
     writer << "\"type\": ";
-    if (auto newTypeLayout = maybeChangeTypeLayoutToAgumentBufferTier2(var))
-    {
-        emitReflectionTypeLayoutJSON(writer, newTypeLayout);
-    }
-    else
-    {
-        emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
-    }
+    emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
 
     if (auto variable = var->getVariable())
     {
@@ -785,17 +758,7 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
 
     writer << ",\n\"elementType\": ";
 
-    if (auto newElementTypeLayout =
-            maybeChangeTypeLayoutToAgumentBufferTier2(typeLayout->getElementVarLayout()))
-    {
-        // If we are in argument buffer tier 2, we need to use the new type layout
-        // that has the correct binding information.
-        emitReflectionTypeLayoutJSON(writer, newElementTypeLayout);
-    }
-    else
-    {
-        emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout());
-    }
+    emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout());
 
     // Note: There is a subtle detail below when it comes to the
     // container/element variable layouts that get nested inside

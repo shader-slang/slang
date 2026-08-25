@@ -1254,10 +1254,6 @@ public:
     //
     IRTypeLayout* getOffsetElementTypeLayout() { return cast<IRTypeLayout>(getOperand(2)); }
 
-    // Returns the element's type layout measured in bytes, or null where the element's
-    // own layout already counts bytes.
-    IRTypeLayout* findMetalArgumentBufferTier2ElementTypeLayout();
-
     /// Specialized builder for parameter group type layouts.
     struct Builder : Super::Builder
     {
@@ -1276,22 +1272,15 @@ public:
             m_offsetElementTypeLayout = typeLayout;
         }
 
-        void setMetalArgumentBufferTier2ElementTypeLayout(IRTypeLayout* typeLayout)
-        {
-            m_metalArgumentBufferTier2ElementTypeLayout = typeLayout;
-        }
-
         IRParameterGroupTypeLayout* build();
 
     protected:
         IROp getOp() SLANG_OVERRIDE { return kIROp_ParameterGroupTypeLayout; }
         void addOperandsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
-        void addAttrsImpl(List<IRInst*>& ioOperands) SLANG_OVERRIDE;
 
         IRVarLayout* m_containerVarLayout;
         IRVarLayout* m_elementVarLayout;
         IRTypeLayout* m_offsetElementTypeLayout;
-        IRTypeLayout* m_metalArgumentBufferTier2ElementTypeLayout = nullptr;
     };
 };
 
@@ -1587,17 +1576,6 @@ struct IRTupleTypeLayout : IRTypeLayout
 /// Attribute that represents the layout for one case of a union type
 FIDDLE()
 struct IRCaseTypeLayoutAttr : IRAttr
-{
-    FIDDLE(leafInst())
-
-    IRTypeLayout* getTypeLayout() { return cast<IRTypeLayout>(getOperand(0)); }
-};
-
-// Metal measures a parameter block's members in argument buffer element slots,
-// so the element's byte layout is attached here for consumers that need byte
-// offsets.
-FIDDLE()
-struct IRMetalArgumentBufferTier2LayoutAttr : IRAttr
 {
     FIDDLE(leafInst())
 
@@ -4788,8 +4766,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRStructFieldLayoutAttr* getFieldLayoutAttr(IRInst* key, IRVarLayout* layout);
     IRTupleFieldLayoutAttr* getTupleFieldLayoutAttr(IRTypeLayout* layout);
     IRCaseTypeLayoutAttr* getCaseTypeLayoutAttr(IRTypeLayout* layout);
-    IRMetalArgumentBufferTier2LayoutAttr* getMetalArgumentBufferTier2LayoutAttr(
-        IRTypeLayout* layout);
 
     IRSemanticAttr* getSemanticAttr(IROp op, String const& name, UInt index);
     IRSystemValueSemanticAttr* getSystemValueSemanticAttr(String const& name, UInt index)

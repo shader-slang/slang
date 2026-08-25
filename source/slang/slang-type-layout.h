@@ -729,6 +729,13 @@ struct ObjectLayoutInfo
         SLANG_ASSERT(layoutInfos.getCount() == 1);
         return layoutInfos[0];
     }
+    SimpleLayoutInfo getUniformOrSimple()
+    {
+        for (auto layoutInfo : layoutInfos)
+            if (layoutInfo.kind == LayoutResourceKind::Uniform)
+                return layoutInfo;
+        return getSimple();
+    }
 };
 
 struct LayoutRulesImpl;
@@ -1324,7 +1331,7 @@ enum class ShaderParameterKind
 struct SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
-    virtual SimpleLayoutInfo GetScalarLayout(
+    virtual ObjectLayoutInfo GetScalarLayout(
         BaseType baseType,
         const TypeLayoutContext& context) = 0;
 
@@ -1337,7 +1344,7 @@ struct SimpleLayoutRulesImpl
     virtual SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) = 0;
 
     // Get layout for a vector or matrix type
-    virtual SimpleLayoutInfo GetVectorLayout(
+    virtual ObjectLayoutInfo GetVectorLayout(
         BaseType elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount) = 0;
@@ -1388,7 +1395,7 @@ struct LayoutRulesImpl
 
     // Forward `SimpleLayoutRulesImpl` interface
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context)
+    ObjectLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context)
     {
         return simpleRules->GetScalarLayout(baseType, context);
     }
@@ -1401,7 +1408,7 @@ struct LayoutRulesImpl
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
     }
 
-    SimpleLayoutInfo GetVectorLayout(
+    ObjectLayoutInfo GetVectorLayout(
         BaseType elementType,
         SimpleLayoutInfo elementInfo,
         size_t elementCount)

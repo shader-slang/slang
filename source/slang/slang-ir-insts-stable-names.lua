@@ -874,6 +874,5 @@ return {
 	["imageGatherOffset"] = 898,
 	["getNaturalAlignment"] = 899,
 	["Type.PtrTypeBase.SPIRVUntypedPtr"] = 900,
-	["Attr.TypeAlignment"] = 901,
-	["Attr.metalArgumentBufferTier2Layout"] = 902
+	["Attr.TypeAlignment"] = 901
 }
