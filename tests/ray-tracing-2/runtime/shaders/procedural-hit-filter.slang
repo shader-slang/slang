@@ -6,18 +6,23 @@
 // HLSL-DAG: [shader("anyhit")]void RuntimeAnyHit(
 // HLSL-DAG: [shader("closesthit")]void RuntimeClosestHit(
 // HLSL-DAG: [shader("miss")]void RuntimeMiss(
-// HLSL-DAG: rt_IntersectionInput_reportHit_0(1.0f
+// HLSL-DAG: 1.0f;
+// HLSL-DAG: 200.0f;
+// HLSL-DAG: rt_IntersectionInput_reportHit_0(_S
 // HLSL-DAG: rt_IntersectionInput_reportHit_0(1.5f
 // HLSL-DAG: IgnoreHit()
+// HLSL-DAG: AcceptHitAndEndSearch()
 // SPIRV-DAG: OpEntryPoint IntersectionKHR {{.*}} "RuntimeIntersection"
 // SPIRV-DAG: OpEntryPoint AnyHitKHR {{.*}} "RuntimeAnyHit"
 // SPIRV-DAG: OpEntryPoint ClosestHitKHR {{.*}} "RuntimeClosestHit"
 // SPIRV-DAG: OpEntryPoint MissKHR {{.*}} "RuntimeMiss"
 // SPIRV-DAG: OpIgnoreIntersectionKHR
+// SPIRV-DAG: OpTerminateRayKHR
 // SPIRV-COUNT-2: OpReportIntersectionKHR
 // METAL-DAG: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
 // METAL-DAG: bool hasCandidate_0;
 // METAL-DAG: candidateDistance_0 = 1.0f;
+// METAL-DAG: candidateDistance_0 = 200.0f;
 // METAL-DAG: candidateDistance_0 = 1.5f;
 // METAL-DAG: {{\[\[visible\]\]}} void RuntimeClosestHit
 // METAL-DAG: {{\[\[visible\]\]}} void RuntimeMiss
@@ -62,8 +67,15 @@ struct RuntimeIntersection : rt::IIntersectionShader<HitContext>
 {
     void invoke(rt::IntersectionInput<HitContext> input)
     {
+        uint rayIndex = input.dispatchRaysIndex.x;
+        if (rayIndex == 1)
+            return;
+
         RuntimeAttributes attributes = { 7 };
-        input.reportHit(1.0, attributes);
+        input.reportHit(rayIndex == 3 ? 200.0 : 1.0, attributes);
+        if (rayIndex == 2)
+            return;
+
         attributes.candidate = 9;
         input.reportHit(1.5, attributes);
     }
@@ -74,9 +86,15 @@ struct RuntimeAnyHit : rt::IAnyHitShader<HitContext>
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.anyHitCount++;
-        if (input.attributes.candidate == 7)
+        uint rayIndex = input.dispatchRaysIndex.x;
+        if (rayIndex == 0 && input.attributes.candidate == 7)
         {
             input.ignoreHit();
+            return;
+        }
+        if (rayIndex == 2)
+        {
+            input.acceptHitAndEndSearch();
             return;
         }
     }
@@ -140,7 +158,7 @@ void main()
     uint dispatchWidth = DispatchRaysDimensions().x;
 
     rt::RayTraversalDesc desc = {};
-    desc.ray.origin = rayIndex == 0 ? float3(0.0, 0.0, 0.0) : float3(2.0, 2.0, 0.0);
+    desc.ray.origin = rayIndex < 4 ? float3(0.0, 0.0, 0.0) : float3(2.0, 2.0, 0.0);
     desc.ray.direction = float3(0.0, 0.0, 1.0);
     desc.ray.tMin = 0.001;
     desc.ray.tMax = 100.0;
