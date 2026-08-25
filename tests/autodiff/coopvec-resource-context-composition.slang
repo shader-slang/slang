@@ -5,9 +5,9 @@
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 3.000000
 
-// Resource legalization leaves an empty differential context for `Consumer` after hoisting its
-// resource field. Buffer-element lowering then copies between physical and logical versions of the
-// empty struct. Empty-type legalization must remove that copy after both operands disappear.
+// Exercise the full reverse-mode composition of a CoopVec producer and a resource-backed consumer.
+// `coopvec-resource-context-dce.slang` isolates the dead rematerialization in this composition, and
+// `resource-context-void-cleanup.slang` isolates its empty-context cleanup.
 
 CoopVec<half, 2> customTransform(
     no_diff RWStructuredBuffer<float> gradient,

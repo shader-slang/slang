@@ -2121,14 +2121,6 @@ static LegalVal legalizeInst(
         result = legalizeStore(context, args[0], args[1]);
         break;
 
-    case kIROp_CopyLogical:
-        // Consider a physical-to-logical copy between two empty structs. Empty-type
-        // legalization removes both pointer operands, and there are no fields left to copy.
-        SLANG_RELEASE_ASSERT(args.getCount() >= 2);
-        SLANG_RELEASE_ASSERT(
-            args[0].flavor == LegalVal::Flavor::none && args[1].flavor == LegalVal::Flavor::none);
-        return LegalVal();
-
     case kIROp_Call:
         result = legalizeCall(context, (IRCall*)inst);
         break;
