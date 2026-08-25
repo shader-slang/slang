@@ -38,4 +38,20 @@ SLANG_UNIT_TEST(structuralRayTracingProceduralHitFilterVulkan)
     runProceduralHitFilter(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runCallableRecord(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingCallableRecord(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingCallableRecordD3D12)
+{
+    runCallableRecord(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingCallableRecordVulkan)
+{
+    runCallableRecord(unitTestContext, DeviceType::Vulkan);
+}
+
 } // namespace gfx_test
