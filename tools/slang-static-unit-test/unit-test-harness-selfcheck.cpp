@@ -17,8 +17,11 @@
 // ci-slang-static-unit-test.yml.
 //
 // Order matters here. Tests run in registration order, which within one file is
-// declaration order, so `ContinuesAfterAThrow` below is registered last on purpose:
-// it is what proves the driver carried on rather than dying at the throwing test.
+// declaration order, and `ContinuesAfterAThrow` must be declared *after* the tests that
+// throw: reaching it is what proves the driver carried on rather than dying at one of
+// them. It is written last so that adding a self-check in the ordinary place -- at the
+// end of the file -- is what breaks the requirement, which is the mistake this note
+// exists to catch. A new self-check belongs above it.
 
 #include "core/slang-exception.h"
 #include "unit-test/slang-unit-test.h"
@@ -47,7 +50,7 @@ SLANG_UNIT_TEST(harnessSelfCheckReportsAFailingCheck)
         SLANG_IGNORE_TEST;
     }
 
-    // Deliberate. This is one of two assertions here that are meant to fail.
+    // Deliberate. Every self-check in this file but the last one fails on purpose.
     SLANG_CHECK(false);
 }
 

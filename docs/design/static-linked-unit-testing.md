@@ -121,6 +121,25 @@ behaved unexpectedly rather than only that a number was wrong.
 `IRFixtureBuilder::dump()` exists for diagnosing a failure interactively; do not
 write assertions against the dump text, as its format is not a stable contract.
 
+The builder covers the shapes the existing tests needed. Each exists to make one
+contract observable, so the list doubles as a map of what is already testable:
+
+| Method | Shape it builds |
+| --- | --- |
+| `addVoidFunction` | a top-level `void()` function, optionally `[KeepAlive]` |
+| `addVoidFunctionCalling` | the same, with a call to a given callee, for reachability |
+| `addVoidFunctionWithUnusedBlockParam` | two blocks, the second taking a parameter nothing reads |
+| `addExportedVoidFunction` | a function carrying `[Export]` and nothing else |
+| `addVoidFunctionWithLayout` | a function carrying an empty layout decoration |
+| `addGlobalParam` | an unreferenced `GlobalParam` |
+| `addLiveWeakUseOf` | a `[KeepAlive]` `WeakUse` whose operand is a given function |
+| `addOptimizableStructWithUnusedField` | an `[OptimizableType]` struct with one unread field |
+
+`keepAlive` is a parameter only where both settings are meaningful. The export,
+layout and global-parameter fixtures exist precisely to be unreferenced and
+otherwise undecorated, so that whether they survive turns on the option under
+test rather than on a decoration the fixture added.
+
 To test against AST or IR that the frontend actually produced, use
 `StaticUnitTestEnv::checkModuleFromSource`, which runs the frontend only:
 
