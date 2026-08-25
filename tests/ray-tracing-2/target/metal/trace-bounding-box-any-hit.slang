@@ -15,13 +15,31 @@ struct TestTraceContext : rt::ITraceContext
     typealias Motion = rt::NoMotion;
 }
 
+struct HitAttributes
+{
+    float3 normal;
+}
+
 struct HitRecord {}
 
 struct HitContext : rt::IHitContext
 {
     typealias TraceContext = TestTraceContext;
-    typealias Primitive = rt::TrianglePrimitive;
+    typealias Primitive = rt::BoundingBoxPrimitive<HitAttributes>;
     typealias Record = HitRecord;
+}
+
+struct TestIntersection : rt::IIntersectionShader<HitContext>
+{
+    void invoke(rt::IntersectionInput<HitContext> input)
+    {
+        HitAttributes farAttributes = { float3(0.0, 0.0, 1.0) };
+        if (!input.reportHit(4.0, 4, farAttributes))
+        {
+            HitAttributes nearAttributes = { float3(0.0, 1.0, 0.0) };
+            input.reportHit(2.0, 2, nearAttributes);
+        }
+    }
 }
 
 struct TestAnyHit : rt::IAnyHitShader<HitContext>
@@ -29,11 +47,10 @@ struct TestAnyHit : rt::IAnyHitShader<HitContext>
     void invoke(rt::AnyHitInput<HitContext> input)
     {
         input.payload.visitCount++;
-        if (input.payload.mode == 1)
+        if (input.attributes.normal.z > 0.5)
             input.ignoreHit();
         if (input.payload.mode == 2)
             input.acceptHitAndEndSearch();
-        input.payload.visitCount += 4;
     }
 }
 
@@ -43,7 +60,7 @@ struct HitGroup : rt::IHitGroup
     typealias Context = HitContext;
     typealias ClosestHit = rt::NoClosestHit<HitContext>;
     typealias AnyHit = TestAnyHit;
-    typealias Intersection = rt::NoIntersection<HitContext>;
+    typealias Intersection = TestIntersection;
 }
 
 struct ProgramLayout : rt::ITraceProgramLayout
@@ -78,18 +95,10 @@ void main()
     output[1] = payload.visitCount;
 }
 
-// METAL: _slang_intersector.intersect(
-// METAL: program_resources_1->intersectionFunctions_0
-// METAL: *(&payload_{{[0-9]+}}));
-// METAL: struct StructuralRayTracingFilterResult
-// METAL: bool accept_0 {{\[\[}}accept_intersection]];
-// METAL: bool continueSearch_0 {{\[\[}}continue_search]];
-// METAL: using namespace metal::raytracing;
-// METAL: {{\[\[}}intersection(triangle, metal::raytracing::instancing)]]
-// METAL-SAME: StructuralRayTracingFilterResult_0 HitGroup_candidate_0(
+// METAL: visitCount_0 =
+// METAL: normal_0.z
+// METAL: { false, true }
+// METAL: { true, false }
+// METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
 // METAL-SAME: ray_data TestPayload_0& payload_{{[0-9]+}} {{\[\[}}payload]])
-// METAL: (&payloadStorage_0)->visitCount_0 =
-// METAL: StructuralRayTracingFilterResult_0 {{.*}} = { false, true };
-// METAL: StructuralRayTracingFilterResult_0 {{.*}} = { true, false };
-// METAL: (&payloadStorage_0)->visitCount_0 =
-// METAL: payload_{{[0-9]+}} = payloadStorage_0;
+// METAL: currentMaxDistance_0
