@@ -2272,6 +2272,7 @@ local insts = {
 					operands = {
 						{ "stageKind", "IRIntLit" },
 						{ "invoke" },
+						{ "stageType", "IRType" },
 						{ "contextType", "IRType" },
 						{ "payloadType", "IRType" },
 						{ "recordType", "IRType" },

@@ -1,6 +1,7 @@
 #include "slang-ir-synthesize-structural-ray-tracing.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-structural-ray-tracing.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-structural-ray-tracing.h"
@@ -34,25 +35,6 @@ static IRFunc* _getStructuralRayTracingStageFunc(IRInst* value)
     return as<IRFunc>(value);
 }
 
-static String _getStructuralRayTracingStageName(IRType* stageType, IRFunc* invoke)
-{
-    if (stageType)
-    {
-        if (auto nameHint = stageType->findDecoration<IRNameHintDecoration>())
-            return String(nameHint->getName());
-    }
-    if (invoke)
-    {
-        if (auto nameHint = invoke->findDecoration<IRNameHintDecoration>())
-        {
-            auto name = nameHint->getName();
-            Index separator = name.indexOf(toSlice(".invoke"));
-            return separator >= 0 ? String(name.head(separator)) : String(name);
-        }
-    }
-    return "structuralRayTracingStage";
-}
-
 static void _addEmptyStructuralRayTracingEntryPointLayout(
     IRBuilder& builder,
     IRFunc* func,
@@ -76,6 +58,7 @@ static void _addStructuralRayTracingEntryPointInfo(
     IRFunc* adapter,
     StructuralRayTracingStageKind stageKind,
     IRFunc* invoke,
+    IRType* stageType,
     IRType* contextType,
     IRType* payloadType,
     IRType* recordType,
@@ -83,22 +66,20 @@ static void _addStructuralRayTracingEntryPointInfo(
     StructuralRayTracingHitAttributesKind hitAttributesKind,
     IRType* callableDataType)
 {
-    auto voidType = builder.getVoidType();
-    IRInst* operands[] = {
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(stageKind)),
-        invoke,
-        contextType ? contextType : voidType,
-        payloadType ? payloadType : voidType,
-        recordType ? recordType : voidType,
-        hitAttributesType ? hitAttributesType : voidType,
-        callableDataType ? callableDataType : voidType,
-        builder.getIntValue(builder.getIntType(), IRIntegerValue(hitAttributesKind)),
-    };
-    builder.addDecoration(
+    addStructuralRayTracingEntryPointInfo(
+        builder,
         adapter,
-        kIROp_StructuralRayTracingEntryPointInfoDecoration,
-        operands,
-        SLANG_COUNT_OF(operands));
+        {
+            .stageKind = stageKind,
+            .invoke = invoke,
+            .stageType = stageType,
+            .contextType = contextType,
+            .payloadType = payloadType,
+            .recordType = recordType,
+            .hitAttributesType = hitAttributesType,
+            .callableDataType = callableDataType,
+            .hitAttributesKind = hitAttributesKind,
+        });
 }
 
 struct StructuralRayTracingGeneratedEntryPoint
@@ -150,7 +131,7 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
     adapter->setFullType(builder.getFuncType(List<IRType*>(), builder.getVoidType()));
 
     auto stage = _getStructuralRayTracingNativeStage(stageKind);
-    auto name = _getStructuralRayTracingStageName(stageType, invoke);
+    auto name = getStructuralRayTracingSourceTypeName(stageType);
     builder.addNameHintDecoration(adapter, name.getUnownedSlice());
     builder.addEntryPointDecoration(
         adapter,
@@ -164,6 +145,7 @@ static IRFunc* _generateStructuralRayTracingEntryPoint(
         adapter,
         stageKind,
         invoke,
+        stageType,
         contextType,
         payloadType,
         recordType,
@@ -267,7 +249,7 @@ void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFun
             ioEntryPoints,
             generated,
             stageKind,
-            nullptr,
+            info->getStageType(),
             info->getInvoke(),
             info->getContextType(),
             info->getPayloadType(),

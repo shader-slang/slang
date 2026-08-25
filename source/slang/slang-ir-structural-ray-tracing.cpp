@@ -90,6 +90,42 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
     }
 }
 
+String getStructuralRayTracingSourceTypeName(IRType* type)
+{
+    // Structural stage and group types originate from named source structs. IR lowering preserves
+    // that source name on the canonical type, and generated entry points and table functions both
+    // use it as their public name. A missing decoration means that an upstream producer discarded
+    // required identity; inventing a fallback name here would hide that representation error.
+    auto nameHint = type ? type->findDecoration<IRNameHintDecoration>() : nullptr;
+    SLANG_RELEASE_ASSERT(nameHint);
+    return String(nameHint->getName());
+}
+
+void addStructuralRayTracingEntryPointInfo(
+    IRBuilder& builder,
+    IRFunc* func,
+    const StructuralRayTracingEntryPointIRInfo& info)
+{
+    SLANG_RELEASE_ASSERT(info.invoke && info.stageType);
+    auto voidType = builder.getVoidType();
+    IRInst* operands[] = {
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(info.stageKind)),
+        info.invoke,
+        info.stageType,
+        info.contextType ? info.contextType : voidType,
+        info.payloadType ? info.payloadType : voidType,
+        info.recordType ? info.recordType : voidType,
+        info.hitAttributesType ? info.hitAttributesType : voidType,
+        info.callableDataType ? info.callableDataType : voidType,
+        builder.getIntValue(builder.getIntType(), IRIntegerValue(info.hitAttributesKind)),
+    };
+    builder.addDecoration(
+        func,
+        kIROp_StructuralRayTracingEntryPointInfoDecoration,
+        operands,
+        SLANG_COUNT_OF(operands));
+}
+
 static IRInterfaceType* _findInterfaceType(IRInst* inst)
 {
     if (auto generic = as<IRGeneric>(inst))

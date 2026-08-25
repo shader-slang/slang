@@ -18,6 +18,9 @@ class FuncDecl;
 class Type;
 class ASTBuilder;
 class SubtypeWitness;
+class ConcreteTypePack;
+class TypePackSubtypeWitness;
+class VarDeclBase;
 
 enum class StructuralRayTracingStageKind
 {
@@ -131,6 +134,7 @@ struct StructuralRayTracingEntryPointInfo
 {
     StructuralRayTracingStageKind stageKind = StructuralRayTracingStageKind::Count;
     FuncDecl* invokeMethod = nullptr;
+    Type* stageType = nullptr;
     Type* contextType = nullptr;
     Type* payloadType = nullptr;
     Type* recordType = nullptr;
@@ -146,6 +150,16 @@ struct RayTracingAPIUsage
     Decl* legacyDecl = nullptr;
     bool diagnosed = false;
 };
+
+struct StructuralRayTracingGroupPack
+{
+    ConcreteTypePack* types = nullptr;
+    TypePackSubtypeWitness* witnesses = nullptr;
+};
+
+StructuralRayTracingGroupPack getStructuralRayTracingGroupPack(
+    ASTBuilder* astBuilder,
+    Type* groupListType);
 
 class StructuralRayTracingDeclRegistry
 {
@@ -175,8 +189,10 @@ public:
         ASTBuilder* astBuilder,
         SubtypeWitness* witness,
         StructuralRayTracingAssociatedTypeKind kind) const;
-    bool tryGetShaderGroupSlotIndex(ASTBuilder* astBuilder, Type* slotType, int64_t& outIndex)
-        const;
+    bool tryGetShaderGroupSlotIndex(
+        ASTBuilder* astBuilder,
+        SubtypeWitness* slotWitness,
+        int64_t& outIndex) const;
     bool isStagePlaceholder(StructuralRayTracingStageKind kind, Type* type) const;
     StructuralRayTracingHitAttributesKind getHitAttributesKind(Type* primitiveType) const;
     StructuralRayTracingMotionKind getMotionKind(Type* motionType) const;
@@ -200,6 +216,7 @@ public:
 
 private:
     InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
+    InterfaceDecl* m_intersectionStageInterface = nullptr;
     AggTypeDecl* m_stageInputTypes[int(StructuralRayTracingStageKind::Count)] = {};
     FunctionDeclBase* m_stageInvokeRequirements[int(StructuralRayTracingStageKind::Count)] = {};
     InterfaceDecl* m_metadataInterfaces[int(StructuralRayTracingMetadataKind::Count)] = {};
@@ -215,6 +232,7 @@ private:
     AggTypeDecl* m_curvePrimitiveType = nullptr;
     AggTypeDecl* m_motionTypes[4] = {};
     AggTypeDecl* m_stagePlaceholderTypes[int(StructuralRayTracingStageKind::Count)] = {};
+    VarDeclBase* m_shaderGroupSlotIndexRequirement = nullptr;
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
     Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
