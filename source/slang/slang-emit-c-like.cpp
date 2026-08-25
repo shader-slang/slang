@@ -3274,6 +3274,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_CoopVecOuterProductAccumulate:
     case kIROp_CoopVecReduceSumAccumulate:
     case kIROp_MetalStructuralRayTracingTrace:
+    case kIROp_MetalStructuralRayTracingCallShader:
         emitInstStmt(inst);
         break;
 

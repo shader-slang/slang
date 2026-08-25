@@ -1383,6 +1383,123 @@ static void _addStructuralRayTracingCallableGroupInfo(
     }
 }
 
+struct StructuralRayTracingProgramLayoutInfo
+{
+    Type* programLayoutType = nullptr;
+    SubtypeWitness* programLayoutWitness = nullptr;
+    Type* traceContextType = nullptr;
+    Type* hitGroupsType = nullptr;
+    Type* missGroupsType = nullptr;
+    Type* callableGroupsType = nullptr;
+    StructuralRayTracingGroupPack hitGroupPack;
+    StructuralRayTracingGroupPack missGroupPack;
+    StructuralRayTracingGroupPack callableGroupPack;
+};
+
+static StructuralRayTracingProgramLayoutInfo _getStructuralRayTracingProgramLayoutInfo(
+    IRGenContext* context,
+    FunctionDeclBase* functionDecl,
+    DeclRef<Decl> funcDeclRef)
+{
+    StructuralRayTracingProgramLayoutInfo result;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    for (auto parentDecl = functionDecl->parentDecl; parentDecl;
+         parentDecl = parentDecl->parentDecl)
+    {
+        auto genericDecl = as<GenericDecl>(parentDecl);
+        if (!genericDecl)
+            continue;
+
+        auto genericApp = SubstitutionSet(funcDeclRef).findGenericAppDeclRef(genericDecl);
+        if (!genericApp || genericApp->getArgs().getCount() < 2)
+            continue;
+
+        auto candidateType = as<Type>(genericApp->getArg(0));
+        auto candidateWitness = as<SubtypeWitness>(genericApp->getArg(1)->resolve());
+        if (!candidateType || !candidateWitness)
+            continue;
+
+        auto traceContextType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
+        if (!traceContextType)
+            continue;
+
+        result.programLayoutType = candidateType;
+        result.programLayoutWitness = candidateWitness;
+        result.traceContextType = traceContextType;
+        result.hitGroupsType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramHitGroups);
+        result.missGroupsType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramMissGroups);
+        result.callableGroupsType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups);
+        break;
+    }
+
+    SLANG_ASSERT(
+        result.programLayoutType && result.programLayoutWitness && result.traceContextType &&
+        result.hitGroupsType && result.missGroupsType && result.callableGroupsType);
+    result.hitGroupPack =
+        _getStructuralRayTracingGroupPack(context->astBuilder, result.hitGroupsType);
+    result.missGroupPack =
+        _getStructuralRayTracingGroupPack(context->astBuilder, result.missGroupsType);
+    result.callableGroupPack =
+        _getStructuralRayTracingGroupPack(context->astBuilder, result.callableGroupsType);
+    return result;
+}
+
+struct StructuralRayTracingCallableContextInfo
+{
+    Type* contextType = nullptr;
+    Type* dataType = nullptr;
+};
+
+static StructuralRayTracingCallableContextInfo _getStructuralRayTracingCallableContextInfo(
+    IRGenContext* context,
+    FunctionDeclBase* functionDecl,
+    DeclRef<Decl> funcDeclRef)
+{
+    StructuralRayTracingCallableContextInfo result;
+    auto& registry = context->getLinkage()->getStructuralRayTracingDeclRegistry();
+    for (auto parentDecl = functionDecl->parentDecl; parentDecl;
+         parentDecl = parentDecl->parentDecl)
+    {
+        auto genericDecl = as<GenericDecl>(parentDecl);
+        if (!genericDecl)
+            continue;
+
+        auto genericApp = SubstitutionSet(funcDeclRef).findGenericAppDeclRef(genericDecl);
+        if (!genericApp || genericApp->getArgs().getCount() < 2)
+            continue;
+
+        auto candidateType = as<Type>(genericApp->getArg(0));
+        auto candidateWitness = as<SubtypeWitness>(genericApp->getArg(1)->resolve());
+        if (!candidateType || !candidateWitness)
+            continue;
+
+        auto dataType = registry.resolveAssociatedType(
+            context->astBuilder,
+            candidateWitness,
+            StructuralRayTracingAssociatedTypeKind::CallableData);
+        if (!dataType)
+            continue;
+
+        result.contextType = candidateType;
+        result.dataType = dataType;
+        break;
+    }
+    SLANG_ASSERT(result.contextType && result.dataType);
+    return result;
+}
+
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -1407,77 +1524,64 @@ LoweredValInfo emitCallToDeclRef(
         {
             if (structuralRayTracingRegistry.isTraceMethod(functionDecl))
             {
-                // The trusted trace method is declared in extension<ProgramLayout>.
-                Type* programLayoutType = nullptr;
-                SubtypeWitness* programLayoutWitness = nullptr;
-                for (auto parentDecl = functionDecl->parentDecl; parentDecl;
-                     parentDecl = parentDecl->parentDecl)
-                {
-                    auto genericDecl = as<GenericDecl>(parentDecl);
-                    if (!genericDecl)
-                        continue;
-
-                    auto genericApp =
-                        SubstitutionSet(funcDeclRef).findGenericAppDeclRef(genericDecl);
-                    if (genericApp && genericApp->getArgs().getCount() >= 2)
-                    {
-                        programLayoutType = as<Type>(genericApp->getArg(0));
-                        programLayoutWitness = as<SubtypeWitness>(genericApp->getArg(1)->resolve());
-                        if (programLayoutType && programLayoutWitness)
-                            break;
-                    }
-                }
-                SLANG_ASSERT(programLayoutType && programLayoutWitness);
-
-                auto traceContextType = structuralRayTracingRegistry.resolveAssociatedType(
-                    context->astBuilder,
-                    programLayoutWitness,
-                    StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
-                auto hitGroupsType = structuralRayTracingRegistry.resolveAssociatedType(
-                    context->astBuilder,
-                    programLayoutWitness,
-                    StructuralRayTracingAssociatedTypeKind::ProgramHitGroups);
-                auto missGroupsType = structuralRayTracingRegistry.resolveAssociatedType(
-                    context->astBuilder,
-                    programLayoutWitness,
-                    StructuralRayTracingAssociatedTypeKind::ProgramMissGroups);
-                auto callableGroupsType = structuralRayTracingRegistry.resolveAssociatedType(
-                    context->astBuilder,
-                    programLayoutWitness,
-                    StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups);
-                SLANG_ASSERT(
-                    traceContextType && hitGroupsType && missGroupsType && callableGroupsType);
-                auto hitGroupPack =
-                    _getStructuralRayTracingGroupPack(context->astBuilder, hitGroupsType);
-                auto missGroupPack =
-                    _getStructuralRayTracingGroupPack(context->astBuilder, missGroupsType);
-                auto callableGroupPack =
-                    _getStructuralRayTracingGroupPack(context->astBuilder, callableGroupsType);
+                auto layout =
+                    _getStructuralRayTracingProgramLayoutInfo(context, functionDecl, funcDeclRef);
 
                 List<IRInst*> operationArgs;
                 operationArgs.add(
                     getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
-                operationArgs.add(lowerType(context, programLayoutType));
-                operationArgs.add(lowerType(context, traceContextType));
-                operationArgs.add(lowerType(context, hitGroupsType));
-                operationArgs.add(lowerType(context, hitGroupPack.types));
-                operationArgs.add(lowerType(context, missGroupsType));
-                operationArgs.add(lowerType(context, missGroupPack.types));
-                operationArgs.add(lowerType(context, callableGroupsType));
-                operationArgs.add(lowerType(context, callableGroupPack.types));
+                operationArgs.add(lowerType(context, layout.programLayoutType));
+                operationArgs.add(lowerType(context, layout.traceContextType));
+                operationArgs.add(lowerType(context, layout.hitGroupsType));
+                operationArgs.add(lowerType(context, layout.hitGroupPack.types));
+                operationArgs.add(lowerType(context, layout.missGroupsType));
+                operationArgs.add(lowerType(context, layout.missGroupPack.types));
+                operationArgs.add(lowerType(context, layout.callableGroupsType));
+                operationArgs.add(lowerType(context, layout.callableGroupPack.types));
                 operationArgs.addRange(args, argCount);
                 auto traceOperation = builder->emitIntrinsicInst(
                     type,
                     kIROp_StructuralRayTracingTrace,
                     operationArgs.getCount(),
                     operationArgs.getBuffer());
-                _addStructuralRayTracingHitGroupInfo(context, traceOperation, hitGroupPack);
-                _addStructuralRayTracingMissGroupInfo(context, traceOperation, missGroupPack);
+                _addStructuralRayTracingHitGroupInfo(context, traceOperation, layout.hitGroupPack);
+                _addStructuralRayTracingMissGroupInfo(
+                    context,
+                    traceOperation,
+                    layout.missGroupPack);
                 _addStructuralRayTracingCallableGroupInfo(
                     context,
                     traceOperation,
-                    callableGroupPack);
+                    layout.callableGroupPack);
                 return LoweredValInfo::simple(traceOperation);
+            }
+            if (structuralRayTracingRegistry.isCallShaderMethod(functionDecl))
+            {
+                auto layout =
+                    _getStructuralRayTracingProgramLayoutInfo(context, functionDecl, funcDeclRef);
+                auto callableContext =
+                    _getStructuralRayTracingCallableContextInfo(context, functionDecl, funcDeclRef);
+
+                List<IRInst*> operationArgs;
+                operationArgs.add(
+                    getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
+                operationArgs.add(lowerType(context, layout.programLayoutType));
+                operationArgs.add(lowerType(context, layout.traceContextType));
+                operationArgs.add(lowerType(context, layout.callableGroupsType));
+                operationArgs.add(lowerType(context, layout.callableGroupPack.types));
+                operationArgs.add(lowerType(context, callableContext.contextType));
+                operationArgs.add(lowerType(context, callableContext.dataType));
+                operationArgs.addRange(args, argCount);
+                auto callOperation = builder->emitIntrinsicInst(
+                    type,
+                    kIROp_StructuralRayTracingCallShader,
+                    operationArgs.getCount(),
+                    operationArgs.getBuffer());
+                _addStructuralRayTracingCallableGroupInfo(
+                    context,
+                    callOperation,
+                    layout.callableGroupPack);
+                return LoweredValInfo::simple(callOperation);
             }
             auto operationKind =
                 structuralRayTracingRegistry.getStageInputOperationKind(functionDecl);

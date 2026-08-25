@@ -4347,6 +4347,27 @@ err(
 )
 
 err(
+    "structural-ray-tracing-callable-data-mismatch",
+    38061,
+    "incompatible structural ray-tracing callable data",
+    span { loc = "location", message = "callable group slot ~slot:Int uses data type '~actualType:IRInst', but this call expects '~expectedType:IRInst'" }
+)
+
+err(
+    "structural-ray-tracing-call-without-groups",
+    38062,
+    "structural callable dispatch requires a callable group",
+    span { loc = "location", message = "this trace program has no callable groups to dispatch" }
+)
+
+err(
+    "structural-ray-tracing-callable-stage-mismatch",
+    38063,
+    "callable dispatch is not available from this ray-tracing stage",
+    span { loc = "location", message = "'callShader' cannot be reached from structural ~stage logic" }
+)
+
+err(
     "specialization-parameter-of-name-not-specialized",
     38008,
     "no specialization argument was provided for specialization parameter",
