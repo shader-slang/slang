@@ -53,6 +53,26 @@ struct StructuralRayTracingTriangleAttributesFlagsResult
     uint32_t dispatchWidth;
 };
 
+struct StructuralRayTracingStageInputStateResult
+{
+    uint32_t stage;
+    uint32_t minDistance;
+    uint32_t distance;
+    uint32_t worldOriginX;
+    uint32_t worldDirectionZ;
+    uint32_t objectOriginX;
+    uint32_t objectDirectionZ;
+    uint32_t objectToWorldXX;
+    uint32_t worldToObjectXX;
+    uint32_t primitiveIndex;
+    uint32_t geometryIndex;
+    uint32_t instanceIndex;
+    uint32_t instanceID;
+    uint32_t flagsMatch;
+    uint32_t dispatchIndex;
+    uint32_t dispatchWidth;
+};
+
 Slang::ComPtr<rhi::IDevice> createStructuralRayTracingTestDevice(
     UnitTestContext* context,
     rhi::DeviceType deviceType);
@@ -63,5 +83,6 @@ void runStructuralRayTracingCallableRecord(rhi::IDevice* device);
 void runStructuralRayTracingRecursiveTrace(rhi::IDevice* device);
 void runStructuralRayTracingMultipleSlots(rhi::IDevice* device);
 void runStructuralRayTracingTriangleAttributesFlags(rhi::IDevice* device);
+void runStructuralRayTracingStageInputState(rhi::IDevice* device);
 
 } // namespace gfx_test

@@ -17,7 +17,9 @@ struct StructuralRayTracingTriangleScene
         rhi::IDevice* device,
         rhi::ICommandQueue* queue,
         rhi::AccelerationStructureInstanceFlags instanceFlags =
-            rhi::AccelerationStructureInstanceFlags::TriangleFacingCullDisable);
+            rhi::AccelerationStructureInstanceFlags::TriangleFacingCullDisable,
+        uint32_t instanceID = 0,
+        const float* transform = nullptr);
 };
 
 struct StructuralRayTracingProceduralScene
