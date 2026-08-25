@@ -45,8 +45,12 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
         return kIROp_StructuralRayTracingGetTriangleFrontFacing;
     case StructuralRayTracingStageInputOperationKind::CurveParameter:
         return kIROp_StructuralRayTracingGetCurveParameter;
+    case StructuralRayTracingStageInputOperationKind::RayTMin:
+        return kIROp_StructuralRayTracingGetRayTMin;
     case StructuralRayTracingStageInputOperationKind::RayTCurrent:
         return kIROp_StructuralRayTracingGetRayTCurrent;
+    case StructuralRayTracingStageInputOperationKind::RayFlags:
+        return kIROp_StructuralRayTracingGetRayFlags;
     case StructuralRayTracingStageInputOperationKind::HitKind:
         return kIROp_StructuralRayTracingGetHitKind;
     case StructuralRayTracingStageInputOperationKind::WorldRayOrigin:
@@ -59,6 +63,10 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
         return kIROp_StructuralRayTracingGetPrimitiveIndex;
     case StructuralRayTracingStageInputOperationKind::GeometryIndex:
         return kIROp_StructuralRayTracingGetGeometryIndex;
+    case StructuralRayTracingStageInputOperationKind::InstanceIndex:
+        return kIROp_StructuralRayTracingGetInstanceIndex;
+    case StructuralRayTracingStageInputOperationKind::InstanceID:
+        return kIROp_StructuralRayTracingGetInstanceID;
     case StructuralRayTracingStageInputOperationKind::IgnoreHit:
         return kIROp_StructuralRayTracingIgnoreHit;
     case StructuralRayTracingStageInputOperationKind::AcceptHitAndEndSearch:
