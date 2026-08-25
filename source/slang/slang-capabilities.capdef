@@ -1593,6 +1593,13 @@ alias anyhit_intersection = anyhit | intersection;
 /// [Compound]
 alias raygen_closesthit_miss = raygen | closesthit | miss;
 
+/// Stages that may trace a ray through the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_trace = glsl_hlsl_spirv + raygen_closesthit_miss
+                                    | _raygen + metal
+                                    | _closesthit + metal
+                                    | _miss + metal;
+
 /// Collection of shader stages
 /// [Compound]
 alias anyhit_closesthit_intersection = anyhit | closesthit | intersection;
