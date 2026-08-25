@@ -8,6 +8,25 @@ namespace Slang
 struct IRFunc;
 struct IRModule;
 
+enum class MetalStructuralRayTracingTag : UInt
+{
+    Instancing = 1 << 0,
+    TriangleData = 1 << 1,
+    CurveData = 1 << 2,
+    WorldSpaceData = 1 << 3,
+    PrimitiveMotion = 1 << 4,
+    InstanceMotion = 1 << 5,
+    ExtendedLimits = 1 << 6,
+};
+
+enum class MetalStructuralRayTracingGeometryKind : UInt
+{
+    Unknown,
+    Triangle,
+    Curve,
+    BoundingBox,
+};
+
 /// Prepare structural ray-tracing programs for the Metal target before DCE.
 ///
 /// Structural ray-generation entry points are physically emitted as Metal compute kernels. This
