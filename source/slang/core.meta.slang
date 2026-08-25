@@ -3664,6 +3664,24 @@ __prefix T operator -(T v0)
 }
 
 ${
+    // Also generate the compound-assignment forms (`+=`, `-=`, `*=`, `/=`, `%=`) for each
+    // arithmetic interface, each defined in terms of the binary operator generated just above, so
+    // that generic code constrained to one of these interfaces can spell `x += y` and not only
+    // `x = x + y`.
+    const char* compoundArithOps[] = {"+", "-", "*", "/", "%"};
+    for (auto opName : compoundArithOps) {
+$}
+__generic<T : $(interfaceName)>
+[__unsafeForceInlineEarly]
+[OverloadRank(-10)]
+T operator$(opName)=(in out T left, T right)
+{
+    left = left $(opName) right;
+    return left;
+}
+
+${
+    } // foreach compoundArithOps
     } // foreach ["IArithmetic", "IFloat"]
 $}
 
