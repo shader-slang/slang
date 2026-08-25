@@ -30,6 +30,7 @@ enum class MetalStructuralRayTracingStageRequirement : UInt
     HitKind = 1 << 5,
     WorldSpaceOrigin = 1 << 6,
     WorldSpaceDirection = 1 << 7,
+    Record = 1 << 8,
 };
 
 enum class MetalStructuralRayTracingGeometryKind : UInt

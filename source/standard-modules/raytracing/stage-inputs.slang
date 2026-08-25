@@ -15,6 +15,11 @@ public struct ClosestHitInput<Context>
         ref;
     }
 
+    public property Context.Record record
+    {
+        get;
+    }
+
     public property float distance
     {
         get
@@ -121,6 +126,11 @@ public struct AnyHitInput<Context>
     public property Context.TraceContext.Payload payload
     {
         ref;
+    }
+
+    public property Context.Record record
+    {
+        get;
     }
 
     public property float distance
@@ -254,6 +264,11 @@ public extension<Context> AnyHitInput<Context>
 public struct IntersectionInput<Context>
     where Context : IHitContext
 {
+    public property Context.Record record
+    {
+        get;
+    }
+
     public property RayDesc objectSpaceRay
     {
         get
@@ -382,6 +397,11 @@ public struct MissInput<Context>
         ref;
     }
 
+    public property Context.Record record
+    {
+        get;
+    }
+
     public property float3 worldSpaceOrigin
     {
         get
@@ -424,6 +444,11 @@ public struct CallableInput<Context>
     public property Context.CallableData data
     {
         ref;
+    }
+
+    public property Context.Record record
+    {
+        get;
     }
 }
 

@@ -45,6 +45,7 @@ enum class StructuralRayTracingStageInputOperationKind
 {
     Payload,
     CallableData,
+    Record,
     HitAttributes,
     TriangleBarycentricCoord,
     TriangleFrontFacing,
@@ -113,6 +114,7 @@ struct StructuralRayTracingEntryPointInfo
     FuncDecl* invokeMethod = nullptr;
     Type* contextType = nullptr;
     Type* payloadType = nullptr;
+    Type* recordType = nullptr;
     Type* hitAttributesType = nullptr;
     Type* callableDataType = nullptr;
     StructuralRayTracingHitAttributesKind hitAttributesKind =

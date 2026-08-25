@@ -370,7 +370,15 @@ static bool _populateStructuralEntryPointInfo(
     {
     case StructuralRayTracingStageKind::ClosestHit:
     case StructuralRayTracingStageKind::AnyHit:
+    case StructuralRayTracingStageKind::Intersection:
         {
+            outInfo->recordType = registry.resolveAssociatedType(
+                astBuilder,
+                context.witness,
+                StructuralRayTracingAssociatedTypeKind::HitRecord);
+            if (stageKind == StructuralRayTracingStageKind::Intersection)
+                return outInfo->recordType != nullptr;
+
             auto traceContext = registry.resolveAssociatedType(
                 astBuilder,
                 context.witness,
@@ -391,7 +399,7 @@ static bool _populateStructuralEntryPointInfo(
                 primitive,
                 StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
             outInfo->hitAttributesKind = registry.getHitAttributesKind(primitive);
-            return outInfo->payloadType && outInfo->hitAttributesType &&
+            return outInfo->payloadType && outInfo->recordType && outInfo->hitAttributesType &&
                    outInfo->hitAttributesKind != StructuralRayTracingHitAttributesKind::None;
         }
     case StructuralRayTracingStageKind::Miss:
@@ -405,16 +413,22 @@ static bool _populateStructuralEntryPointInfo(
                 visitor,
                 traceContext,
                 StructuralRayTracingAssociatedTypeKind::TracePayload);
-            return outInfo->payloadType != nullptr;
+            outInfo->recordType = registry.resolveAssociatedType(
+                astBuilder,
+                context.witness,
+                StructuralRayTracingAssociatedTypeKind::MissRecord);
+            return outInfo->payloadType && outInfo->recordType;
         }
     case StructuralRayTracingStageKind::Callable:
         outInfo->callableDataType = registry.resolveAssociatedType(
             astBuilder,
             context.witness,
             StructuralRayTracingAssociatedTypeKind::CallableData);
-        return outInfo->callableDataType != nullptr;
-    case StructuralRayTracingStageKind::Intersection:
-        return true;
+        outInfo->recordType = registry.resolveAssociatedType(
+            astBuilder,
+            context.witness,
+            StructuralRayTracingAssociatedTypeKind::CallableRecord);
+        return outInfo->callableDataType && outInfo->recordType;
     default:
         return false;
     }

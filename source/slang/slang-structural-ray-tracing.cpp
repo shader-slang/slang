@@ -186,6 +186,8 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::Payload;
     if (text == "data")
         return StructuralRayTracingStageInputOperationKind::CallableData;
+    if (text == "record")
+        return StructuralRayTracingStageInputOperationKind::Record;
     if (text == "attributes")
         return StructuralRayTracingStageInputOperationKind::HitAttributes;
     if (text == "barycentricCoord")
