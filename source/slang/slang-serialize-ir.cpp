@@ -813,6 +813,14 @@ Result readSerializedModuleInfo(
     if (fossilizedModuleInfo->serializationVersion != IRModuleInfo::kSupportedSerializationVersion)
         return SLANG_FAIL;
 
+    // Reject an out-of-range *semantic* version (distinct from the serialization
+    // format version checked above) before deserializing any IR: a module from a
+    // newer compiler may rely on IR semantics we do not understand, and
+    // materializing it anyway can crash downstream consumers. This has no sink, so
+    // it can only fail; the range-reporting diagnostic is added by the caller.
+    if (!IRModule::isSupportedModuleVersion(fossilizedModuleInfo->module->m_version))
+        return SLANG_FAIL;
+
     IRModuleInfo info;
     auto sharedDecodingContext = RefPtr(new IRSerialReadContext(session, sourceLocReader));
     {

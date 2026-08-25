@@ -2235,7 +2235,33 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
+    if (SLANG_FAILED(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule)))
+    {
+        // The reader rejected the module (it validates the serialization format
+        // version and then the semantic version range before building any IR).
+        // If the cause was an out-of-range semantic version, turn the bare
+        // failure into a diagnostic that names the version and the supported
+        // range, since this is the load path that carries a sink. The version is
+        // read from the header only now, on the failure path, and only after the
+        // reader has already validated the serialization format.
+        String moduleCompilerVersion;
+        UInt moduleVersion = 0;
+        String serializedModuleName;
+        if (SLANG_SUCCEEDED(readSerializedModuleInfo(
+                irChunk,
+                moduleCompilerVersion,
+                moduleVersion,
+                serializedModuleName)) &&
+            !IRModule::isSupportedModuleVersion(moduleVersion))
+        {
+            sink->diagnose(Diagnostics::UnsupportedModuleVersion{
+                .actualVersion = int64_t(moduleVersion),
+                .minVersion = int64_t(IRModule::k_minSupportedModuleVersion),
+                .maxVersion = int64_t(IRModule::k_maxSupportedModuleVersion),
+                .location = serializedModuleLoc});
+        }
+        return SLANG_FAIL;
+    }
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of
