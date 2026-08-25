@@ -60,7 +60,7 @@ jobs:
   # the cache entry has been seeded; it is not meant to be long-lived.
   build-llvm-seed:
     runs-on: windows-11-vs2026-arm
-    timeout-minutes: 180
+    timeout-minutes: 300
     permissions:
       contents: read
     steps:
