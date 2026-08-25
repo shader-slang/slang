@@ -14,10 +14,19 @@ struct StructuralRayTracingRuntimeResult
     uint32_t dispatchWidth;
 };
 
+struct StructuralRayTracingProceduralResult
+{
+    uint32_t stage;
+    uint32_t candidate;
+    uint32_t anyHitCount;
+    uint32_t dispatchWidth;
+};
+
 Slang::ComPtr<rhi::IDevice> createStructuralRayTracingTestDevice(
     UnitTestContext* context,
     rhi::DeviceType deviceType);
 
 void runStructuralRayTracingTriangleHitMiss(rhi::IDevice* device);
+void runStructuralRayTracingProceduralHitFilter(rhi::IDevice* device);
 
 } // namespace gfx_test

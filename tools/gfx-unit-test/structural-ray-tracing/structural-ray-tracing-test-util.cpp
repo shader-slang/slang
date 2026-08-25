@@ -14,31 +14,32 @@ namespace gfx_test
 namespace
 {
 
-Result loadProgram(IDevice* device, IShaderProgram** outProgram)
+struct EntryDesc
+{
+    const char* name;
+    SlangStage stage;
+};
+
+Result loadProgram(
+    IDevice* device,
+    const char* moduleName,
+    const EntryDesc* entries,
+    Index entryCount,
+    IShaderProgram** outProgram)
 {
     auto slangSession = device->getSlangSession();
     ComPtr<slang::IBlob> diagnostics;
-    auto module = slangSession->loadModule("triangle-hit-miss", diagnostics.writeRef());
+    auto module = slangSession->loadModule(moduleName, diagnostics.writeRef());
     diagnoseIfNeeded(diagnostics);
     if (!module)
         return SLANG_FAIL;
 
-    struct EntryDesc
-    {
-        const char* name;
-        SlangStage stage;
-    };
-    static const EntryDesc kEntries[] = {
-        {"main", SLANG_STAGE_RAY_GENERATION},
-        {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
-        {"RuntimeMiss", SLANG_STAGE_MISS},
-    };
-
     std::vector<ComPtr<slang::IEntryPoint>> entryPoints;
     std::vector<slang::IComponentType*> components;
     components.push_back(module);
-    for (const auto& entryDesc : kEntries)
+    for (Index i = 0; i < entryCount; ++i)
     {
+        auto& entryDesc = entries[i];
         ComPtr<slang::IEntryPoint> entryPoint;
         auto result = module->findAndCheckEntryPoint(
             entryDesc.name,
@@ -130,7 +131,17 @@ void runStructuralRayTracingTriangleHitMiss(IDevice* device)
     StructuralRayTracingTriangleScene scene(device, queue);
 
     ComPtr<IShaderProgram> program;
-    GFX_CHECK_CALL_ABORT(loadProgram(device, program.writeRef()));
+    static const EntryDesc kEntries[] = {
+        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
+        {"RuntimeMiss", SLANG_STAGE_MISS},
+    };
+    GFX_CHECK_CALL_ABORT(loadProgram(
+        device,
+        "triangle-hit-miss",
+        kEntries,
+        SLANG_COUNT_OF(kEntries),
+        program.writeRef()));
 
     static const char* kHitGroupNames[] = {"hitGroup0"};
     HitGroupDesc hitGroup = {};
@@ -193,6 +204,100 @@ void runStructuralRayTracingTriangleHitMiss(IDevice* device)
     {
         SLANG_CHECK(actual[i].stage == kExpected[i].stage);
         SLANG_CHECK(actual[i].primitiveIndex == kExpected[i].primitiveIndex);
+        SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
+    }
+}
+
+void runStructuralRayTracingProceduralHitFilter(IDevice* device)
+{
+    if (!device->hasFeature(Feature::RayTracing))
+    {
+        SLANG_IGNORE_TEST;
+    }
+
+    auto queue = device->getQueue(QueueType::Graphics);
+    SLANG_CHECK_ABORT(queue != nullptr);
+    StructuralRayTracingProceduralScene scene(device, queue);
+
+    static const EntryDesc kEntries[] = {
+        {"main", SLANG_STAGE_RAY_GENERATION},
+        {"RuntimeIntersection", SLANG_STAGE_INTERSECTION},
+        {"RuntimeAnyHit", SLANG_STAGE_ANY_HIT},
+        {"RuntimeClosestHit", SLANG_STAGE_CLOSEST_HIT},
+        {"RuntimeMiss", SLANG_STAGE_MISS},
+    };
+    ComPtr<IShaderProgram> program;
+    GFX_CHECK_CALL_ABORT(loadProgram(
+        device,
+        "procedural-hit-filter",
+        kEntries,
+        SLANG_COUNT_OF(kEntries),
+        program.writeRef()));
+
+    static const char* kHitGroupNames[] = {"proceduralHitGroup"};
+    HitGroupDesc hitGroup = {};
+    hitGroup.hitGroupName = kHitGroupNames[0];
+    hitGroup.intersectionEntryPoint = "RuntimeIntersection";
+    hitGroup.anyHitEntryPoint = "RuntimeAnyHit";
+    hitGroup.closestHitEntryPoint = "RuntimeClosestHit";
+
+    RayTracingPipelineDesc pipelineDesc = {};
+    pipelineDesc.program = program;
+    pipelineDesc.hitGroups = &hitGroup;
+    pipelineDesc.hitGroupCount = 1;
+    pipelineDesc.maxRecursion = 1;
+    pipelineDesc.maxRayPayloadSize = sizeof(uint32_t) * 3;
+    pipelineDesc.maxAttributeSizeInBytes = sizeof(uint32_t);
+
+    ComPtr<IRayTracingPipeline> pipeline;
+    GFX_CHECK_CALL_ABORT(device->createRayTracingPipeline(pipelineDesc, pipeline.writeRef()));
+
+    static const char* kRayGenerationNames[] = {"main"};
+    static const char* kMissNames[] = {"RuntimeMiss"};
+    ShaderTableDesc shaderTableDesc = {};
+    shaderTableDesc.program = program;
+    shaderTableDesc.rayGenShaderCount = SLANG_COUNT_OF(kRayGenerationNames);
+    shaderTableDesc.rayGenShaderEntryPointNames = kRayGenerationNames;
+    shaderTableDesc.missShaderCount = SLANG_COUNT_OF(kMissNames);
+    shaderTableDesc.missShaderEntryPointNames = kMissNames;
+    shaderTableDesc.hitGroupCount = SLANG_COUNT_OF(kHitGroupNames);
+    shaderTableDesc.hitGroupNames = kHitGroupNames;
+
+    ComPtr<IShaderTable> shaderTable;
+    GFX_CHECK_CALL_ABORT(device->createShaderTable(shaderTableDesc, shaderTable.writeRef()));
+
+    BufferDesc resultDesc = {};
+    resultDesc.size = sizeof(StructuralRayTracingProceduralResult) * 2;
+    resultDesc.elementSize = sizeof(StructuralRayTracingProceduralResult);
+    resultDesc.usage = BufferUsage::UnorderedAccess | BufferUsage::CopySource;
+    resultDesc.defaultState = ResourceState::UnorderedAccess;
+    auto results = device->createBuffer(resultDesc);
+    SLANG_CHECK_ABORT(results != nullptr);
+
+    auto commandEncoder = queue->createCommandEncoder();
+    auto passEncoder = commandEncoder->beginRayTracingPass();
+    auto rootObject = passEncoder->bindPipeline(pipeline, shaderTable);
+    ShaderCursor root(rootObject);
+    GFX_CHECK_CALL_ABORT(root["scene"].setBinding(Binding(scene.topLevel)));
+    GFX_CHECK_CALL_ABORT(root["results"].setBinding(Binding(results)));
+    passEncoder->dispatchRays(0, 2, 1, 1);
+    passEncoder->end();
+    GFX_CHECK_CALL_ABORT(queue->submit(commandEncoder->finish()));
+    GFX_CHECK_CALL_ABORT(queue->waitOnHost());
+
+    ComPtr<ISlangBlob> resultBlob;
+    GFX_CHECK_CALL_ABORT(device->readBuffer(results, 0, resultDesc.size, resultBlob.writeRef()));
+    auto actual =
+        static_cast<const StructuralRayTracingProceduralResult*>(resultBlob->getBufferPointer());
+    static const StructuralRayTracingProceduralResult kExpected[] = {
+        {3, 9, 2, 2},
+        {2, 0, 0, 2},
+    };
+    for (Index i = 0; i < SLANG_COUNT_OF(kExpected); ++i)
+    {
+        SLANG_CHECK(actual[i].stage == kExpected[i].stage);
+        SLANG_CHECK(actual[i].candidate == kExpected[i].candidate);
+        SLANG_CHECK(actual[i].anyHitCount == kExpected[i].anyHitCount);
         SLANG_CHECK(actual[i].dispatchWidth == kExpected[i].dispatchWidth);
     }
 }
