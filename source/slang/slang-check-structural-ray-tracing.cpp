@@ -6,6 +6,12 @@
 namespace Slang
 {
 
+static Stage _getNativeStage(StructuralRayTracingStageKind kind);
+static StructuralRayTracingStageKind _getStructuralStage(Stage stage);
+static StructuralRayTracingStageKind _getDirectStageInputKind(
+    const StructuralRayTracingDeclRegistry& registry,
+    Type* type);
+
 static FunctionDeclBase* _getStageImplementation(
     const StructuralRayTracingDeclRegistry& registry,
     StructuralRayTracingStageKind stageKind,
@@ -274,6 +280,109 @@ static void _diagnoseInvalidCallableDispatchStages(
     }
 }
 
+static void _diagnoseInvalidStructuralStageCapabilities(
+    StructuralRayTracingDeclRegistry& registry,
+    ContainerDecl* containerDecl,
+    DiagnosticSink* sink)
+{
+    for (auto member : containerDecl->getDirectMemberDecls())
+    {
+        auto innerMember = member;
+        if (auto genericDecl = as<GenericDecl>(innerMember))
+            innerMember = genericDecl->inner;
+
+        if (auto functionDecl = as<FunctionDeclBase>(innerMember))
+        {
+            auto stageKind = registry.getStageKind(functionDecl);
+            auto stage = _getNativeStage(stageKind);
+            auto capabilities = functionDecl->inferredCapabilityRequirements;
+            SourceLoc callShaderLoc;
+            auto hasSpecificCallableDiagnostic =
+                (stageKind == StructuralRayTracingStageKind::AnyHit ||
+                 stageKind == StructuralRayTracingStageKind::Intersection) &&
+                registry.findReachableCallShader(functionDecl, callShaderLoc);
+            if (!hasSpecificCallableDiagnostic && stage != Stage::Unknown && capabilities &&
+                capabilities->isIncompatibleWith(getAtomFromStage(stage)))
+            {
+                sink->diagnose(Diagnostics::DeclHasDependenciesNotCompatibleOnStage{
+                    .stage = getStageName(stage),
+                    .decl = functionDecl});
+            }
+        }
+
+        if (auto childContainer = as<ContainerDecl>(innerMember))
+        {
+            _diagnoseInvalidStructuralStageCapabilities(registry, childContainer, sink);
+        }
+    }
+}
+
+static StructuralRayTracingStageKind _getRequiredStructuralStage(
+    StructuralRayTracingDeclRegistry& registry,
+    FunctionDeclBase* functionDecl)
+{
+    auto stageKind = registry.getStageKind(functionDecl);
+    if (stageKind != StructuralRayTracingStageKind::Count)
+        return stageKind;
+
+    CapabilitySet declaredCapabilities;
+    for (auto decl = static_cast<Decl*>(functionDecl); decl; decl = decl->parentDecl)
+    {
+        for (auto requirement : decl->getModifiersOfType<RequireCapabilityAttribute>())
+            declaredCapabilities.unionWith(requirement->capabilitySet);
+        if (as<ModuleDecl>(decl))
+            break;
+    }
+
+    auto stageAtom = declaredCapabilities.getUniquelyImpliedStageAtom();
+    if (stageAtom == CapabilityAtom::Invalid)
+        return StructuralRayTracingStageKind::Count;
+    return _getStructuralStage(getStageFromAtom(stageAtom));
+}
+
+static void _diagnoseInvalidStructuralStageInputParameters(
+    StructuralRayTracingDeclRegistry& registry,
+    ContainerDecl* containerDecl,
+    DiagnosticSink* sink)
+{
+    for (auto member : containerDecl->getDirectMemberDecls())
+    {
+        auto innerMember = member;
+        if (auto genericDecl = as<GenericDecl>(innerMember))
+            innerMember = genericDecl->inner;
+
+        if (auto functionDecl = as<FunctionDeclBase>(innerMember))
+        {
+            auto functionStage = _getRequiredStructuralStage(registry, functionDecl);
+            for (auto parameter : functionDecl->getParameters())
+            {
+                auto inputStage = _getDirectStageInputKind(registry, parameter->type.type);
+                if (inputStage == StructuralRayTracingStageKind::Count)
+                    continue;
+                if (functionStage == StructuralRayTracingStageKind::Count)
+                {
+                    // A stage-input parameter implicitly restricts an otherwise-unannotated
+                    // helper. Additional stage-input parameters must agree with that stage.
+                    functionStage = inputStage;
+                    continue;
+                }
+                if (inputStage == functionStage)
+                    continue;
+
+                auto location = parameter->type.exp ? parameter->type.exp->loc : parameter->loc;
+                sink->diagnose(Diagnostics::StructuralRayTracingInputStageMismatch{
+                    .type = parameter->type.type,
+                    .stage = getStageName(_getNativeStage(inputStage)),
+                    .function = functionDecl,
+                    .location = location});
+            }
+        }
+
+        if (auto childContainer = as<ContainerDecl>(innerMember))
+            _diagnoseInvalidStructuralStageInputParameters(registry, childContainer, sink);
+    }
+}
+
 void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, DiagnosticSink* sink)
 {
     auto& registry = linkage->getStructuralRayTracingDeclRegistry();
@@ -281,6 +390,8 @@ void diagnoseMixedRayTracingAPIsInModule(Linkage* linkage, Module* module, Diagn
         return;
     _registerAttributedLegacyEntryPoints(linkage, module, module->getModuleDecl(), sink);
     _diagnoseInvalidCallableDispatchStages(registry, module->getModuleDecl(), sink);
+    _diagnoseInvalidStructuralStageCapabilities(registry, module->getModuleDecl(), sink);
+    _diagnoseInvalidStructuralStageInputParameters(registry, module->getModuleDecl(), sink);
 }
 
 static StructuralRayTracingStageKind _findStageImplementationFromParentConformance(
