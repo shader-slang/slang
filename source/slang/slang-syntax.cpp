@@ -738,6 +738,26 @@ RequirementWitness tryLookUpRequirementWitness(
 
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
     {
+        if (as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+        {
+            // Consider this example:
+            //
+            //     interface IPrimitive { associatedtype Attributes; }
+            //     interface IContext { associatedtype Primitive : IPrimitive; }
+            //
+            // After `Context : IContext` selects a concrete `Primitive`, the witness for
+            // `Primitive : IPrimitive` is a declared witness whose declaration reference is a
+            // lookup through the `Context : IContext` witness table. Looking up `Attributes` on
+            // that witness must first follow the lookup-backed conformance, and then apply every
+            // substitution along the same path. `LookupDeclRef::tryResolve` uses these shared
+            // helpers for ordinary declaration lookup; use that canonical path here as well.
+            auto requirementWitness =
+                getUnspecializedLookupRec(astBuilder, requirementKey, declaredSubtypeWitness);
+            if (requirementWitness.getFlavor() == RequirementWitness::Flavor::none)
+                return RequirementWitness();
+            return specializeLookedUpRec(astBuilder, declaredSubtypeWitness, requirementWitness);
+        }
+
         if (auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
         {
             // A conformance that was declared as part of an inheritance clause
