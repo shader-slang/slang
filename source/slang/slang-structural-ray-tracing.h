@@ -48,6 +48,7 @@ enum class StructuralRayTracingStageInputOperationKind
     HitAttributes,
     TriangleBarycentricCoord,
     TriangleFrontFacing,
+    CurveParameter,
     RayTCurrent,
     HitKind,
     WorldRayOrigin,

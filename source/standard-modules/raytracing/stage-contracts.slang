@@ -3,14 +3,14 @@ implementing raytracing;
 namespace rt
 {
 
-[require(closesthit)]
+[require(structural_raytracing_closesthit)]
 public interface IClosestHitShader<Context>
     where Context : IHitContext
 {
     void invoke(ClosestHitInput<Context> input);
 }
 
-[require(anyhit)]
+[require(structural_raytracing_anyhit)]
 public interface IAnyHitShader<Context>
     where Context : IHitContext
 {
@@ -22,7 +22,7 @@ public interface IIntersectionStage<Context>
     where Context : IHitContext
 {}
 
-[require(intersection)]
+[require(structural_raytracing_intersection)]
 public interface IIntersectionShader<Context> : IIntersectionStage<Context>
     where Context : IHitContext
 {
@@ -30,14 +30,14 @@ public interface IIntersectionShader<Context> : IIntersectionStage<Context>
     void invoke(IntersectionInput<Context> input);
 }
 
-[require(miss)]
+[require(structural_raytracing_miss)]
 public interface IMissShader<Context>
     where Context : IMissGroupContext
 {
     void invoke(MissInput<Context> input);
 }
 
-[require(callable)]
+[require(structural_raytracing_callable)]
 public interface ICallableShader<Context>
     where Context : ICallableGroupContext
 {

@@ -95,10 +95,12 @@ void main()
     output[1] = payload.visitCount;
 }
 
-// METAL: visitCount_0 =
-// METAL: normal_0.z
-// METAL: { false, true }
-// METAL: { true, false }
 // METAL: {{\[\[}}intersection(bounding_box, metal::raytracing::instancing)]]
 // METAL-SAME: ray_data TestPayload_0& payload_{{[0-9]+}} {{\[\[}}payload]])
+// METAL: visitCount_0 =
+// METAL: normal_0.z
+// METAL: accept_{{[0-9]+}} = false
+// METAL: continueSearch_{{[0-9]+}} = true
+// METAL: accept_{{[0-9]+}} = true
+// METAL: continueSearch_{{[0-9]+}} = false
 // METAL: currentMaxDistance_0

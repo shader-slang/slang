@@ -908,5 +908,6 @@ return {
 	["Type.UntypedBufferResourceType.MetalVisibleFunctionTable"] = 932,
 	["Decoration.metalVisibleFunction"] = 933,
 	["Decoration.metalIntersectionFunction"] = 934,
-	["metalStructuralRayTracingTrace"] = 935
+	["metalStructuralRayTracingTrace"] = 935,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetCurveParameter"] = 936
 }
