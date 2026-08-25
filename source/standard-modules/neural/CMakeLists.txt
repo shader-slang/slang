@@ -10,9 +10,7 @@ glob_append(neural_unittest_sources "unit-test/*.slang")
 # Set output directories for build tree
 # Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
 # to <standard-module-dir>/slang/neural.slang-module at runtime.
-set(neural_output_dir
-    "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
-)
+set(neural_output_dir "${slang_standard_module_output_dir}/slang")
 set(neural_module_file "${neural_output_dir}/${SLANG_NEURAL_MODULE_FILE_NAME}")
 
 # Copy neural shader files to output directory
@@ -50,7 +48,10 @@ else()
     set(SLANG_COMPILER slang-bootstrap)
     set(SLANG_COMPILER_DEPENDENCY slang-bootstrap)
 endif()
-set(SLANG_COMPILER_CORE_MODULE_ARGS -load-core-module ${core_module_archive_without_timestamp})
+set(SLANG_COMPILER_CORE_MODULE_ARGS
+    -load-core-module
+    ${core_module_archive_without_timestamp}
+)
 set(SLANG_COMPILER_EXTRA_DEPS generate_core_module)
 
 # Determine compiler flags based on build type
@@ -65,8 +66,9 @@ endif()
 add_custom_command(
     OUTPUT ${neural_module_file}
     COMMAND
-        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS} ${NEURAL_MODULE_DEFINES} -I
-        ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+        ${SLANG_COMPILER} ${SLANG_COMPILER_CORE_MODULE_ARGS}
+        ${NEURAL_MODULE_DEFINES} -I ${CMAKE_CURRENT_SOURCE_DIR} neural.slang -o
+        ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS
         ${neural_copied_files}
         ${neural_unittest_sources}
@@ -79,15 +81,5 @@ add_custom_command(
 # Create a target to ensure the neural module is built.
 # The prelinkIR crashes that previously blocked SLANG_EMBED_CORE_MODULE=OFF builds
 # are fixed (PRs #10835, #10847). Build the neural module unconditionally.
-add_custom_target(slang-neural-module ALL DEPENDS ${neural_module_file})
+add_custom_target(slang-neural-module DEPENDS ${neural_module_file})
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
-
-# Install the neural directory to the configured location in the release package
-# Installs into <install-dir>/slang/ to match the `import slang.neural;` convention.
-install(
-    DIRECTORY ${neural_output_dir}/
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
-    FILES_MATCHING
-    PATTERN "*.slang"
-    PATTERN "*.slang-module"
-)

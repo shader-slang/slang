@@ -11,9 +11,7 @@ set(raytracing_shader_sources
     trace.slang
 )
 
-set(raytracing_output_dir
-    "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang"
-)
+set(raytracing_output_dir "${slang_standard_module_output_dir}/slang")
 
 set(raytracing_copied_files)
 foreach(shader_file ${raytracing_shader_sources})
@@ -67,13 +65,5 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(slang-raytracing-module ALL DEPENDS ${raytracing_module_file})
+add_custom_target(slang-raytracing-module DEPENDS ${raytracing_module_file})
 set_target_properties(slang-raytracing-module PROPERTIES FOLDER generated)
-
-install(
-    DIRECTORY ${raytracing_output_dir}/
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
-    FILES_MATCHING
-    PATTERN "*.slang"
-    PATTERN "*.slang-module"
-)

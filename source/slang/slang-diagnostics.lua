@@ -991,6 +991,13 @@ err(
 )
 
 err(
+    "structural-ray-tracing-input-stage-mismatch",
+    20027,
+    "ray-tracing stage input used by the wrong stage",
+    span { loc = "location", message = "ray-tracing stage input type '~type:type' requires logical stage '~stage', but function '~function:Decl' is not restricted to that stage" }
+)
+
+err(
     "invalid-spirv-version",
     20012,
     "invalid SPIR-V version",
