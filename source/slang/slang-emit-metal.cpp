@@ -870,11 +870,15 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             if (toIsPointer || fromIsPointer)
             {
                 // C-style cast for pointer conversions
+                auto outerPrec = inOuterPrec;
+                auto prec = getInfo(EmitOp::Prefix);
+                bool needClose = maybeEmitParens(outerPrec, prec);
                 m_writer->emit("(");
                 emitType(toType);
                 m_writer->emit(")(");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
+                maybeCloseParens(needClose);
             }
             else
             {
