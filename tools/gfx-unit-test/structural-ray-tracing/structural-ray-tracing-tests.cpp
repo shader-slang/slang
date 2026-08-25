@@ -70,4 +70,20 @@ SLANG_UNIT_TEST(structuralRayTracingRecursiveTraceVulkan)
     runRecursiveTrace(unitTestContext, DeviceType::Vulkan);
 }
 
+static void runMultipleSlots(UnitTestContext* context, DeviceType deviceType)
+{
+    auto device = createStructuralRayTracingTestDevice(context, deviceType);
+    runStructuralRayTracingMultipleSlots(device);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingMultipleSlotsD3D12)
+{
+    runMultipleSlots(unitTestContext, DeviceType::D3D12);
+}
+
+SLANG_UNIT_TEST(structuralRayTracingMultipleSlotsVulkan)
+{
+    runMultipleSlots(unitTestContext, DeviceType::Vulkan);
+}
+
 } // namespace gfx_test
