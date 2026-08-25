@@ -1513,6 +1513,9 @@ Compound Capabilities
 `structural_raytracing_anyhit`
 > Logical any-hit role used by the structural ray-tracing API.
 
+`structural_raytracing_call_shader`
+> Stages that may invoke a callable shader through the structural ray-tracing API.
+
 `structural_raytracing_callable`
 > Logical callable role used by the structural ray-tracing API.
 

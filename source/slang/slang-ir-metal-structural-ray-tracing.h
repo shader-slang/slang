@@ -7,6 +7,7 @@ namespace Slang
 
 struct IRFunc;
 struct IRModule;
+class DiagnosticSink;
 
 enum class MetalStructuralRayTracingTag : UInt
 {
@@ -31,6 +32,7 @@ enum class MetalStructuralRayTracingStageRequirement : UInt
     WorldSpaceOrigin = 1 << 6,
     WorldSpaceDirection = 1 << 7,
     Record = 1 << 8,
+    CallableDispatch = 1 << 9,
 };
 
 enum class MetalStructuralRayTracingGeometryKind : UInt
@@ -46,6 +48,9 @@ enum class MetalStructuralRayTracingGeometryKind : UInt
 /// Structural ray-generation entry points are physically emitted as Metal compute kernels. This
 /// pass also consumes trace operations whose logical SBT is empty. Later slices extend the same
 /// target-owned boundary with function-table and post-trace dispatch lowering.
-void prepareMetalStructuralRayTracing(IRModule* module, List<IRFunc*>& entryPoints);
+void prepareMetalStructuralRayTracing(
+    IRModule* module,
+    List<IRFunc*>& entryPoints,
+    DiagnosticSink* sink);
 
 } // namespace Slang

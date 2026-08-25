@@ -25,7 +25,8 @@ void lowerMetalStructuralRayTracingStageInputOperations(
     IRModule* module,
     const Dictionary<IRFunc*, IRInst*>& entryPointPayloadValues);
 
-/// Lower structural trace operations through their portable standard-module bodies.
-void lowerPortableStructuralRayTracingTraceOperations(IRModule* module);
+/// Lower structural trace and callable-dispatch operations through their portable
+/// standard-module bodies.
+void lowerPortableStructuralRayTracingOperations(IRModule* module);
 
 } // namespace Slang

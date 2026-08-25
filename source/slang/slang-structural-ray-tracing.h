@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compiler-core/slang-source-loc.h"
 #include "core/slang-dictionary.h"
 #include "slang-compiler-fwd.h"
 
@@ -145,6 +146,7 @@ public:
     StructuralRayTracingStageInputOperationKind getStageInputOperationKind(
         FunctionDeclBase* functionDecl) const;
     bool isTraceMethod(FunctionDeclBase* functionDecl) const;
+    bool isCallShaderMethod(FunctionDeclBase* functionDecl) const;
     AssocTypeDecl* getAssociatedTypeRequirement(StructuralRayTracingAssociatedTypeKind kind) const;
     Type* resolveAssociatedType(
         ASTBuilder* astBuilder,
@@ -174,8 +176,12 @@ public:
         RayTracingAPIFamily family,
         Decl* decl,
         Decl** outOtherDecl);
-    void registerFunctionCall(FunctionDeclBase* caller, FunctionDeclBase* callee);
+    void registerFunctionCall(
+        FunctionDeclBase* caller,
+        FunctionDeclBase* callee,
+        SourceLoc callLoc);
     bool functionReachesStructuralTrace(FunctionDeclBase* function) const;
+    bool findReachableCallShader(FunctionDeclBase* function, SourceLoc& outCallLoc) const;
 
 private:
     InterfaceDecl* m_stageInterfaces[int(StructuralRayTracingStageKind::Count)] = {};
@@ -196,7 +202,8 @@ private:
     Dictionary<FunctionDeclBase*, StructuralRayTracingStageKind> m_stageImplementations;
     Dictionary<Module*, RayTracingAPIUsage> m_apiUsage;
     Dictionary<FunctionDeclBase*, HashSet<FunctionDeclBase*>> m_functionCallees;
-    HashSet<FunctionDeclBase*> m_structuralTraceCallers;
+    HashSet<FunctionDeclBase*> m_structuralProgramCallers;
+    Dictionary<FunctionDeclBase*, SourceLoc> m_callShaderCallers;
 };
 
 const char* getStructuralRayTracingStageInterfaceName(StructuralRayTracingStageKind kind);
