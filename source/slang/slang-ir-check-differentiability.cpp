@@ -190,112 +190,15 @@ public:
         return false;
     }
 
-    // Returns true when `deriv` is recognized as side-effect free for the
-    // carry-set tightening. It unwraps `IRSpecialize` / `IRGeneric` / autodiff
-    // translate ops with exactly the same arms as `isReadNoneCallee`, so the
-    // two agree on which shapes reach a leaf; only the leaf predicate is wider
-    // here, additionally accepting a `[PreferRecompute]` *built-in* derivative
-    // as a positive purity signal. The macros in `diff.meta.slang` annotate the
-    // built-in math derivatives with `[PreferRecompute]` instead of
-    // `[__readNone]`, and at this phase (before `propagateFuncProperties`)
-    // they are not yet readNone-marked.
-    //
-    // The arms must be kept in step with `isReadNoneCallee` by hand;
-    // `no-diff-carry-readnone-derivative-generic.slang` covers the
-    // specialize-of-generic arm, the one a built-in derivative arrives through.
-    //
-    // `[PreferRecompute]` is only honored for built-in derivatives, gated on
-    // `[__target_intrinsic]`. Core-module derivatives carry that decoration even
-    // though `diff.meta.slang` never spells it and they all have bodies, which
-    // would otherwise hit the `if (decl->body) return;` early-out in
-    // `addCatchAllIntrinsicDecorationIfNeeded`: `FunctionDeclBase::body` has no
-    // `FIDDLE()` marker, so it is not serialized, and the core module arrives
-    // via `readSerializedModuleAST` with null bodies. Were `body` ever to become
-    // a serialized field, this predicate would silently begin reporting every
-    // built-in derivative as impure.
-    //
-    // A user-authored derivative can carry plain `[PreferRecompute]`
-    // yet still have side effects — that form only requests recomputation and
-    // warns; it is not a purity contract — so trusting it for ordinary user
-    // functions would re-open the exact missing-`no_diff` bug #11374 fixes.
-    // Such user derivatives must carry real `[__readNone]` (handled by
-    // `isReadNoneCallee` above) to be trusted, and
-    // `[PreferRecompute(SideEffectBehavior.Allow)]` is never honored (it opts
-    // out of the side-effect-free guarantee).
-    //
-    // PROVISIONAL: `[__target_intrinsic]` is user-spellable, so a derivative
-    // marked with BOTH `[PreferRecompute]` and `__target_intrinsic` and a
-    // side-effecting body would still be wrongly trusted. That combination is
-    // pathological (an asm-leaf intrinsic has no Slang body to recompute), and
-    // no robust phase-local signal separates built-in pure derivatives from
-    // user code here (`propagateFuncProperties` runs later). The fully sound
-    // fix is to mark the pure built-in derivatives `[__readNone]` in
-    // `diff.meta.slang` and drop this proxy; that audit is per-derivative
-    // rather than a sweep, because some built-in derivatives are genuinely
-    // impure (`DiffTensorView::load_backward` accumulates with an atomic).
-    // Tracked in shader-slang/slang#12502.
-    bool isDerivativeAssumedReadNone(IRInst* deriv)
-    {
-        if (!deriv)
-            return false;
-
-        if (isReadNoneCallee(deriv))
-            return true;
-
-        // Unwrap the same wrappers `isReadNoneCallee` unwraps, with the same
-        // arms, so the two agree on which shapes reach a leaf. Only the leaf
-        // predicate below differs.
-        if (as<IRSpecialize>(deriv))
-        {
-            if (auto specialize = as<IRSpecialize>(deriv->getOperand(0)))
-                return isDerivativeAssumedReadNone(specialize);
-            else if (auto generic = as<IRGeneric>(deriv->getOperand(0)))
-            {
-                auto genericReturnVal = getInnerMostGenericReturnVal(generic);
-                return genericReturnVal ? isDerivativeAssumedReadNone(genericReturnVal) : false;
-            }
-            return false;
-        }
-
-        if (as<IRTranslateBase>(deriv))
-        {
-            switch (deriv->getOp())
-            {
-            case kIROp_BackwardDifferentiatePrimal:
-            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
-            case kIROp_ForwardDifferentiate:
-            case kIROp_TrivialForwardDifferentiate:
-            case kIROp_TrivialBackwardDifferentiatePrimal:
-            case kIROp_FunctionCopy:
-                return isDerivativeAssumedReadNone(deriv->getOperand(0));
-            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
-                return isDerivativeAssumedReadNone(deriv->getOperand(1));
-            default:
-                break;
-            }
-        }
-
-        if (auto func = as<IRFunc>(deriv))
-        {
-            auto preferRecompute = func->findDecoration<IRPreferRecomputeDecoration>();
-            if (!preferRecompute)
-                return false;
-            // Only trust `[PreferRecompute]` for built-in derivatives.
-            if (!func->findDecoration<IRTargetIntrinsicDecoration>())
-                return false;
-            // Operand 0 is the `SideEffectBehavior`, always an integer literal
-            // from lowering. Only the default `Warn` form is side-effect free;
-            // `Allow` opts out of that guarantee.
-            auto behavior = as<IRIntLit>(preferRecompute->getOperand(0));
-            SLANG_RELEASE_ASSERT(behavior);
-            return behavior->getValue() != (IRIntegerValue)SideEffectBehavior::Allow;
-        }
-        return false;
-    }
-
-    bool allAssociatedDerivativesAssumedReadNone(
-        DifferentiableTypeConformanceContext& ctx,
-        IRInst* callee)
+    // Returns true when every derivative variant associated with `callee` is
+    // `[__readNone]`. The autodiff transform emits the derivative variant (not
+    // the primary) at the call site, so a `[__readNone]` primary alone does not
+    // make the call carry-elidable: a variant with side effects on global or
+    // unknown memory must still force the call to carry. The audited built-in
+    // math derivatives in `diff.meta.slang` carry `[__readNone]`; the buffer
+    // accessors (`DiffTensorView`/`AtomicAdd`) do not, so they conservatively
+    // carry.
+    bool allAssociatedDerivativesReadNone(DifferentiableTypeConformanceContext& ctx, IRInst* callee)
     {
         // The derivative kinds whose association value is a *callee* that runs
         // after the autodiff transform, and so can carry side effects.
@@ -339,7 +242,7 @@ public:
             auto deriv = ctx.tryGetAssociationOfKind(callee, kind);
             if (!deriv)
                 continue;
-            if (!isDerivativeAssumedReadNone(deriv))
+            if (!isReadNoneCallee(deriv))
                 return false;
         }
         return true;
@@ -655,7 +558,7 @@ public:
                     // also require every associated derivative variant to be
                     // readNone before treating the call as elidable (#11374).
                     if (!isReadNoneCallee(callee) ||
-                        !allAssociatedDerivativesAssumedReadNone(diffTypeContext, callee))
+                        !allAssociatedDerivativesReadNone(diffTypeContext, callee))
                         return true;
 
                     // For readNone callees, a call carries a derivative only

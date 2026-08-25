@@ -1,17 +1,16 @@
 // Companion to no-diff-carry-readnone-derivative.slang for issue
 // shader-slang/slang#11374.
 //
-// A USER-authored derivative marked with plain `[PreferRecompute]` (the
-// default `SideEffectBehavior.Warn` form) is NOT a purity contract — that
-// form only requests recomputation and warns if side effects are detected;
-// it still compiles. So the carry-set gate must NOT treat a user-authored
-// `[PreferRecompute]` derivative as readNone-elidable just because the
-// decoration is present. Only built-in (core-module) derivatives, which use
-// `[PreferRecompute]` in lieu of `[__readNone]`, may be trusted that way.
+// A derivative marked with plain `[PreferRecompute]` (the default
+// `SideEffectBehavior.Warn` form) is NOT a purity contract — that form only
+// requests recomputation and warns if side effects are detected; it still
+// compiles. So the carry-set gate must NOT treat a `[PreferRecompute]`
+// derivative as readNone-elidable just because the decoration is present; only
+// a real `[__readNone]` contract lets the gate trust a derivative variant.
 //
-// Here the user's backward derivative writes to a buffer (has side effects)
-// and carries plain `[PreferRecompute]`. Storing the call result into a
-// no_diff slot must still fire E41031.
+// Here the backward derivative writes to a buffer (has side effects) and
+// carries plain `[PreferRecompute]`. Storing the call result into a no_diff
+// slot must still fire E41031.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 

@@ -1,15 +1,15 @@
 // Companion to no-diff-carry-readnone-derivative.slang for issue
 // shader-slang/slang#11374, covering the built-in derivative path.
 //
-// `dot` is `[__readNone]` (hlsl.meta.slang) and its derivatives `__d_dot` are
-// generic and marked `[PreferRecompute]` (diff.meta.slang) rather than
-// `[__readNone]`, so the call reaches the carry-set gate as a
-// specialize-of-generic wrapping a `[PreferRecompute]` function. `__d_dot` only
-// reads its `DifferentialPair` arguments, so the gate must still treat
-// `dot(x, x)` as not carrying a derivative when its arguments are `no_diff`.
+// `dot` is `[__readNone]` (hlsl.meta.slang) and its generic derivatives
+// `__d_dot` are `[__readNone]` (diff.meta.slang), so the call reaches the
+// carry-set gate as a specialize-of-generic wrapping a `[__readNone]` function.
+// This exercises the specialize-of-generic unwrapping in `isReadNoneCallee`:
+// the gate must recognize `__d_dot` as readNone and treat `dot(x, x)` as not
+// carrying a derivative when its arguments are `no_diff`.
 //
-// A gate that fails to recognize a pure built-in derivative reports a spurious
-// E41031 here.
+// A gate that fails to unwrap to the pure built-in derivative reports a
+// spurious E41031 here.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry main
 

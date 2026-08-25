@@ -606,11 +606,6 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 bool isReadNoneCallee(IRInst* callee);
 bool isNoSideEffectCallee(IRInst* callee);
 
-/// Returns the value returned by the innermost `IRGeneric` nested in `generic`,
-/// unwrapping generic-returning-generic chains, or null when there is no
-/// return value.
-IRInst* getInnerMostGenericReturnVal(IRGeneric* generic);
-
 bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
 
 bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
