@@ -1,0 +1,148 @@
+Preset CMake variables:
+
+  CMAKE_CONFIGURATION_TYPES="Debug;Release;RelWithDebInfo;MinSizeRel"
+  CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+  SLANG_ENABLE_IR_BREAK_ALLOC="$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>"
+
+-- Found Git: /usr/bin/git (found version "2.39.5") 
+-- Using version from git describe: v2026.14-11-g4a8ddbd0b2
+-- The C compiler identification is GNU 12.2.0
+-- The CXX compiler identification is GNU 12.2.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found CUDAToolkit: /usr/local/cuda-12.6/include (found version "12.6.85") 
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Found OptiX: /workspace/agent/wt-slang-11970/external/optix-dev/include  
+-- Could NOT find NVAPI (missing: NVAPI_INCLUDE_DIRS NVAPI_LIBRARIES) 
+-- Found X11: /usr/include   
+-- Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so
+-- Looking for XOpenDisplay in /usr/lib/x86_64-linux-gnu/libX11.so;/usr/lib/x86_64-linux-gnu/libXext.so - found
+-- Looking for gethostbyname
+-- Looking for gethostbyname - found
+-- Looking for connect
+-- Looking for connect - found
+-- Looking for remove
+-- Looking for remove - found
+-- Looking for shmat
+-- Looking for shmat - found
+-- Could NOT find Aftermath (missing: Aftermath_INCLUDE_DIRS Aftermath_LIBRARIES) 
+-- Downloading DXC prebuilt binary to detect GLIBC requirement...
+-- [download 0% complete]
+-- [download 1% complete]
+-- [download 2% complete]
+-- [download 3% complete]
+-- [download 5% complete]
+-- [download 7% complete]
+-- [download 10% complete]
+-- [download 16% complete]
+-- [download 26% complete]
+-- [download 39% complete]
+-- [download 41% complete]
+-- [download 42% complete]
+-- [download 43% complete]
+-- [download 45% complete]
+-- [download 58% complete]
+-- [download 61% complete]
+-- [download 63% complete]
+-- [download 68% complete]
+-- [download 69% complete]
+-- [download 70% complete]
+-- [download 71% complete]
+-- [download 72% complete]
+-- [download 73% complete]
+-- [download 75% complete]
+-- [download 77% complete]
+-- [download 78% complete]
+-- [download 79% complete]
+-- [download 81% complete]
+-- [download 82% complete]
+-- [download 83% complete]
+-- [download 84% complete]
+-- [download 85% complete]
+-- [download 86% complete]
+-- [download 87% complete]
+-- [download 88% complete]
+-- [download 89% complete]
+-- [download 90% complete]
+-- [download 91% complete]
+-- [download 92% complete]
+-- [download 93% complete]
+-- [download 94% complete]
+-- [download 95% complete]
+-- [download 98% complete]
+-- [download 99% complete]
+-- [download 100% complete]
+-- DXC prebuilt binary (v1.9.2602) requires GLIBC >= 2.38
+-- Detected system GLIBC version: 2.36
+-- System GLIBC 2.36 < required 2.38: building DXC from source (v1.9.2602)
+-- Cloning DXC v1.9.2602 from source (first run: ~500 MB download + 10-30 min build; subsequent runs are skipped via stamp files)...
+-- Configuring DXC from source (v1.9.2602)...
+-- DXC configured successfully
+-- Downloading slang-llvm from https://github.com/shader-slang/slang/releases/download/v2026.14/slang-2026.14-linux-x86_64.zip ...
+-- slang-llvm extracted to /workspace/agent/wt-slang-11970/build/slang-2026.14-linux-x86_64
+-- Performing Test CXXFLAG_Wall
+-- Performing Test CXXFLAG_Wall - Success
+-- Performing Test CXXFLAG_Wswitch
+-- Performing Test CXXFLAG_Wswitch - Success
+-- Performing Test CXXFLAG_Wparentheses
+-- Performing Test CXXFLAG_Wparentheses - Success
+-- Performing Test CXXFLAG_Wunused_local_typedefs
+-- Performing Test CXXFLAG_Wunused_local_typedefs - Success
+-- Performing Test CXXFLAG_Wclass_memaccess
+-- Performing Test CXXFLAG_Wclass_memaccess - Success
+-- Performing Test CXXFLAG_Wassume
+-- Performing Test CXXFLAG_Wassume - Failed
+-- Performing Test CXXFLAG_Wreorder
+-- Performing Test CXXFLAG_Wreorder - Success
+-- Performing Test CXXFLAG_Winvalid_offsetof
+-- Performing Test CXXFLAG_Winvalid_offsetof - Success
+-- Performing Test CXXFLAG_Wnewline_eof
+-- Performing Test CXXFLAG_Wnewline_eof - Failed
+-- Performing Test CXXFLAG_Wreturn_std_move
+-- Performing Test CXXFLAG_Wreturn_std_move - Failed
+-- Performing Test CXXFLAG_Werror_return_local_addr
+-- Performing Test CXXFLAG_Werror_return_local_addr - Success
+-- Performing Test CXXFLAG_Wnarrowing
+-- Performing Test CXXFLAG_Wnarrowing - Success
+-- Performing Test CXXFLAG_Wextra
+-- Performing Test CXXFLAG_Wextra - Success
+-- Performing Test CXXLINKFLAG_Wl_no_undefined
+-- Performing Test CXXLINKFLAG_Wl_no_undefined - Success
+-- Performing Test CXXLINKFLAG_Wl_build_id
+-- Performing Test CXXLINKFLAG_Wl_build_id - Success
+-- Performing Test CXXFLAG_Wunused_variable
+-- Performing Test CXXFLAG_Wunused_variable - Success
+-- Performing Test CXXFLAG_Wunused_parameter
+-- Performing Test CXXFLAG_Wunused_parameter - Success
+-- Performing Test CXXFLAG_Wsign_compare
+-- Performing Test CXXFLAG_Wsign_compare - Success
+-- Performing Test CXXFLAG_Wunused_function
+-- Performing Test CXXFLAG_Wunused_function - Success
+-- Performing Test CXXFLAG_Wunused_value
+-- Performing Test CXXFLAG_Wunused_value - Success
+-- Performing Test CXXFLAG_Wimplicit_fallthrough
+-- Performing Test CXXFLAG_Wimplicit_fallthrough - Success
+-- Performing Test CXXFLAG_Wmissing_field_initializers
+-- Performing Test CXXFLAG_Wmissing_field_initializers - Success
+-- Performing Test CXXFLAG_Wstrict_aliasing
+-- Performing Test CXXFLAG_Wstrict_aliasing - Success
+-- Performing Test CXXFLAG_Wmaybe_uninitialized
+-- Performing Test CXXFLAG_Wmaybe_uninitialized - Success
+-- Performing Test CXXFLAG_fno_rtti
+-- Performing Test CXXFLAG_fno_rtti - Success
+-- Performing Test CXXLINKFLAG_Wl_exclude_libs_ALL
+-- Performing Test CXXLINKFLAG_Wl_exclude_libs_ALL - Success
+-- Unix backward compatibility symlink (libslang -> libslang-compiler) will be created during build and installation
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /workspace/agent/wt-slang-11970/build

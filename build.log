@@ -1,0 +1,236 @@
+[0/2] Re-checking globbed directories...
+[1/1184] Generating dxc/include/dx/linalg.h
+[2/1184] Building C object external/lz4/build/cmake/CMakeFiles/lz4_static.dir/Debug/__/__/lib/lz4file.c.o
+[3/1184] Building C object external/miniz/CMakeFiles/miniz.dir/Debug/miniz_tinfl.c.o
+[4/1184] Building C object external/miniz/CMakeFiles/miniz.dir/Debug/miniz.c.o
+[5/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/arena.c.o
+[6/1184] Building C object external/miniz/CMakeFiles/miniz.dir/Debug/miniz_tdef.c.o
+[7/1184] Building C object external/lz4/build/cmake/CMakeFiles/lz4_static.dir/Debug/__/__/lib/lz4frame.c.o
+[8/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/buffer.c.o
+[9/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/blocks.c.o
+[10/1184] Building C object external/lz4/build/cmake/CMakeFiles/lz4_static.dir/Debug/__/__/lib/xxhash.c.o
+[11/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/cmark_ctype.c.o
+[12/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/cmark.c.o
+[13/1184] Generating Debug/lib/libslang-llvm.so
+[14/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/houdini_href_e.c.o
+[15/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/houdini_html_e.c.o
+[16/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/footnotes.c.o
+[17/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/html.c.o
+[18/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/houdini_html_u.c.o
+[19/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/linked_list.c.o
+[20/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/iterator.c.o
+[21/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/map.c.o
+[22/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/commonmark.c.o
+[23/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/plaintext.c.o
+[24/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/plugin.c.o
+[25/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/references.c.o
+[26/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/registry.c.o
+[27/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/man.c.o
+[28/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/latex.c.o
+[29/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/syntax_extension.c.o
+[30/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/render.c.o
+[31/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/xml.c.o
+[32/1184] Generate language specific header for DebugInfo.
+[33/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/inlines.c.o
+[34/1184] Generate language specific header for OpenCLDebugInfo100.
+[35/1184] Generating slang-rhi-resources resource loader
+[36/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/node.c.o
+[37/1184] Building C object external/miniz/CMakeFiles/miniz.dir/Debug/miniz_zip.c.o
+[38/1184] Building C object external/lz4/build/cmake/CMakeFiles/lz4_static.dir/Debug/__/__/lib/lz4hc.c.o
+[39/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/utf8.c.o
+[40/1184] Generating intermediate file for /workspace/agent/wt-slang-11970/external/slang-rhi/src/cuda/kernels/clear-texture.cu
+[41/1184] Generating intermediate file for /workspace/agent/wt-slang-11970/external/slang-rhi/src/metal/shaders/clear-texture.metal
+[42/1184] Copying optix_device_impl.h
+[43/1184] Copying optix_device_impl_transformations.h
+[44/1184] Copying optix.h
+[45/1184] Generate grammar tables
+[46/1184] Building CXX object external/slang-rhi/CMakeFiles/slang-rhi-resources.dir/Debug/__cmrc_slang-rhi-resources/intermediate/src/cuda/kernels/clear-texture.cu.cpp.o
+[47/1184] Copying optix_types.h
+[48/1184] Copying optix_device_impl.h
+[49/1184] Copying optix_device_impl_transformations.h
+[50/1184] Generate tables based on the SPIR-V XML registry.
+[51/1184] Copying optix.h
+[52/1184] Copying optix_device.h
+[53/1184] Copying optix_device.h
+[54/1184] Linking C static library external/miniz/Debug/libminiz.a
+[55/1184] Copying optix_types.h
+[56/1184] Copying optix_device_impl.h
+[57/1184] Copying optix.h
+[58/1184] Copying optix_device_impl_transformations.h
+[59/1184] Copying optix_device.h
+[60/1184] Building CXX object external/slang-rhi/CMakeFiles/slang-rhi-resources.dir/Debug/__cmrc_slang-rhi-resources/intermediate/src/metal/shaders/clear-texture.metal.cpp.o
+[61/1184] Copying optix_types.h
+[62/1184] Update build-version.inc in the SPIRV-Tools build directory (if necessary).
+[63/1184] Building C object external/cmark/src/CMakeFiles/libcmark-gfm.dir/Debug/scanners.c.o
+[64/1184] Linking C static library external/cmark/src/Debug/libcmark-gfm.a
+[65/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/util/bit_vector.cpp.o
+[66/1184] Building C object external/lz4/build/cmake/CMakeFiles/lz4_static.dir/Debug/__/__/lib/lz4.c.o
+[67/1184] Linking C static library external/lz4/build/cmake/Debug/liblz4.a
+[68/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/util/string_utils.cpp.o
+[69/1184] Building CXX object external/slang-rhi/CMakeFiles/slang-rhi-resources.dir/Debug/__cmrc_slang-rhi-resources/lib.cpp.o
+[70/1184] Building CXX object source/slang-rt/CMakeFiles/slang-rt.dir/Debug/__/core/slang-archive-file-system.cpp.o
+[71/1184] Building CXX object external/slang-rhi/CMakeFiles/slang-rhi-vma.dir/Debug/external/vma/vk_mem_alloc.cpp.o
+[72/1184] Building CXX object source/slang-rt/CMakeFiles/slang-rt.dir/Debug/slang-rt.cpp.o
+[73/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/util/parse_number.cpp.o
+[74/1184] Building CXX object source/slang-rt/CMakeFiles/slang-rt.dir/Debug/__/core/slang-blob-builder.cpp.o
+[75/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/assembly_grammar.cpp.o
+[76/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/diagnostic.cpp.o
+[77/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/ext_inst.cpp.o
+[78/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/binary.cpp.o
+[79/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/opcode.cpp.o
+[80/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/software_version.cpp.o
+[81/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/spirv_endian.cpp.o
+[82/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/extensions.cpp.o
+[83/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/spirv_optimizer_options.cpp.o
+[84/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/libspirv.cpp.o
+[85/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/name_mapper.cpp.o
+[86/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/parsed_operand.cpp.o
+[87/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/spirv_validator_options.cpp.o
+[88/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/spirv_fuzzer_options.cpp.o
+[89/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/spirv_reducer_options.cpp.o
+[90/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/print.cpp.o
+[91/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/spirv_target_env.cpp.o
+[92/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/to_string.cpp.o
+[93/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/operand.cpp.o
+[94/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/disassemble.cpp.o
+[95/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/table.cpp.o
+[96/1184] Building CXX object source/core/CMakeFiles/core.dir/Debug/cmake_pch.hxx.gch
+[97/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/table2.cpp.o
+[98/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/text.cpp.o
+[99/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/text_handler.cpp.o
+[100/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_adjacency.cpp.o
+[101/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_atomics.cpp.o
+[102/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_arithmetics.cpp.o
+[103/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_annotation.cpp.o
+[104/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_bitwise.cpp.o
+[105/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_barriers.cpp.o
+[106/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_capability.cpp.o
+[107/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate.cpp.o
+[108/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_composites.cpp.o
+[109/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_constants.cpp.o
+[110/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_conversion.cpp.o
+[111/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_derivatives.cpp.o
+[112/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_debug.cpp.o
+[113/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_function.cpp.o
+[114/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_cfg.cpp.o
+[115/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_dot_product.cpp.o
+[116/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_execution_limitations.cpp.o
+[117/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_extensions.cpp.o
+[118/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_builtins.cpp.o
+[119/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_id.cpp.o
+[120/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_group.cpp.o
+[121/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_decorations.cpp.o
+[122/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_graph.cpp.o
+[123/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_image.cpp.o
+[124/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_interfaces.cpp.o
+[125/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_literals.cpp.o
+[126/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_layout.cpp.o
+[127/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_instruction.cpp.o
+[128/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_logicals.cpp.o
+[129/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_memory_semantics.cpp.o
+[130/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_memory.cpp.o
+[131/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_logical_pointers.cpp.o
+[132/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_mesh_shading.cpp.o
+[133/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_pipe.cpp.o
+[134/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_non_uniform.cpp.o
+[135/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_misc.cpp.o
+[136/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_primitives.cpp.o
+[137/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_mode_setting.cpp.o
+[138/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_ray_query.cpp.o
+[139/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_ray_tracing.cpp.o
+[140/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_small_type_uses.cpp.o
+[141/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/basic_block.cpp.o
+[142/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_ray_tracing_reorder.cpp.o
+[143/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_tensor.cpp.o
+[144/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_scopes.cpp.o
+[145/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_invalid_type.cpp.o
+[146/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_tensor_layout.cpp.o
+[147/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/util/timer.cpp.o
+[148/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validate_type.cpp.o
+[149/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/instruction.cpp.o
+[150/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/construct.cpp.o
+[151/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/function.cpp.o
+[152/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/analyze_live_input_pass.cpp.o
+[153/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/fix_func_call_arguments.cpp.o
+[154/1184] Building CXX object external/spirv-tools/source/CMakeFiles/SPIRV-Tools-static.dir/Debug/val/validation_state.cpp.o
+[155/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/basic_block.cpp.o
+[156/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/block_merge_pass.cpp.o
+[157/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/amd_ext_to_khr.cpp.o
+[158/1184] Linking CXX static library external/spirv-tools/source/Debug/libSPIRV-Tools.a
+[159/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/block_merge_util.cpp.o
+[160/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/aggressive_dead_code_elim_pass.cpp.o
+[161/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/build_module.cpp.o
+[162/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/cfg_cleanup_pass.cpp.o
+[163/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/ccp_pass.cpp.o
+[164/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/code_sink.cpp.o
+[165/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/control_dependence.cpp.o
+[166/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/compact_ids_pass.cpp.o
+[167/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/composite.cpp.o
+[168/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/cfg.cpp.o
+[169/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/combine_access_chains.cpp.o
+[170/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/constants.cpp.o
+[171/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/const_folding_rules.cpp.o
+[172/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/convert_to_sampled_image_pass.cpp.o
+[173/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/dataflow.cpp.o
+[174/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/dead_insert_elim_pass.cpp.o
+[175/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/copy_prop_arrays.cpp.o
+[176/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/dead_branch_elim_pass.cpp.o
+[177/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/dead_variable_elimination.cpp.o
+[178/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/convert_to_half_pass.cpp.o
+[179/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/def_use_manager.cpp.o
+[180/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/decoration_manager.cpp.o
+[181/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/debug_info_manager.cpp.o
+[182/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/dominator_analysis.cpp.o
+[183/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/desc_sroa_util.cpp.o
+[184/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/desc_sroa.cpp.o
+[185/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/eliminate_dead_functions_pass.cpp.o
+[186/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/eliminate_dead_functions_util.cpp.o
+[187/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/eliminate_dead_constant_pass.cpp.o
+[188/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/feature_manager.cpp.o
+[189/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/dominator_tree.cpp.o
+[190/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/eliminate_dead_io_components_pass.cpp.o
+[191/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/eliminate_dead_output_stores_pass.cpp.o
+[192/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/fix_storage_class.cpp.o
+[193/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/eliminate_dead_members_pass.cpp.o
+[194/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/graph.cpp.o
+[195/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/flatten_decoration_pass.cpp.o
+[196/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/function.cpp.o
+[197/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/freeze_spec_constant_value_pass.cpp.o
+[198/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/fold.cpp.o
+[199/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/fold_spec_constant_op_and_composite_pass.cpp.o
+[200/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/instruction_list.cpp.o
+[201/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/folding_rules.cpp.o
+[202/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/inline_opaque_pass.cpp.o
+[203/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/inline_exhaustive_pass.cpp.o
+[204/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/if_conversion.cpp.o
+[205/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/graphics_robust_access_pass.cpp.o
+[206/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/inline_pass.cpp.o
+[207/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/interface_var_sroa.cpp.o
+[208/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/invocation_interlock_placement_pass.cpp.o
+[209/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/instruction.cpp.o
+[210/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/interp_fixup_pass.cpp.o
+[211/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/licm_pass.cpp.o
+[212/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/opextinst_forward_ref_fixup_pass.cpp.o
+[213/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/ir_loader.cpp.o
+[214/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/legalize_multidim_array_pass.cpp.o
+[215/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/liveness.cpp.o
+[216/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/local_redundancy_elimination.cpp.o
+[217/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/ir_context.cpp.o
+[218/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/local_access_chain_convert_pass.cpp.o
+[219/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/local_single_block_elim_pass.cpp.o
+[220/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_dependence_helpers.cpp.o
+[221/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/local_single_store_elim_pass.cpp.o
+[222/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_dependence.cpp.o
+[223/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_descriptor.cpp.o
+[224/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_fission.cpp.o
+[225/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_fusion_pass.cpp.o
+[226/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_fusion.cpp.o
+[227/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_utils.cpp.o
+[228/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_unroller.cpp.o
+[229/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/mem_pass.cpp.o
+[230/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_peeling.cpp.o
+[231/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/loop_unswitch_pass.cpp.o
+[232/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/modify_maximal_reconvergence.cpp.o
+[233/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/module.cpp.o
+[234/1184] Building CXX object external/spirv-tools/source/opt/CMakeFiles/SPIRV-Tools-opt.dir/Debug/merge_return_pass.cpp.o
+ninja: build stopped: interrupted by user.
