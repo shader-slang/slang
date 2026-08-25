@@ -2060,6 +2060,11 @@ public:                                                              \
     /** A fully structured diagnostic, passed to SlangStructuredDiagnosticCallback.
 
         All `const char*` pointers are valid only for the duration of the callback invocation.
+
+        Note: some diagnostics attach follow-up "notes" (e.g. "see previous definition here")
+        that are rendered into the `outDiagnostics` text blob. This struct does not currently
+        carry that note text or its source locations; only the primary/secondary spans above
+        are delivered.
     */
     struct SlangStructuredDiagnostic
     {
@@ -4749,16 +4754,17 @@ struct ISession : public ISlangUnknown
 
     /** Register a callback to receive structured diagnostics from operations on this session.
 
-        The callback fires once per rich diagnostic (after severity overrides are applied),
+        The callback fires once per diagnostic that goes through the compiler's structured
+        diagnostic path (internally called "rich diagnostics"; see
+        CompilerOptionName::EnableRichDiagnostics) after severity overrides are applied,
         carrying the severity, numeric code, human-readable message, and primary/secondary
         source spans.  All `const char*` pointers inside `SlangStructuredDiagnostic` are
         valid only for the duration of the callback.
 
-        Note: only diagnostics that flow through the compiler's structured/rich diagnostic
-        path reach this callback. A diagnostic emitted through the compiler's older,
-        unstructured reporting path (which most front-end diagnostics still use, in addition
-        to raw text from downstream compilers such as DXC or glslang) is not delivered here;
-        it appears only in the `outDiagnostics` blob as before.
+        Note: a diagnostic emitted through the compiler's older, unstructured reporting path
+        (which most front-end diagnostics still use, in addition to raw text from downstream
+        compilers such as DXC or glslang) is not delivered here; it appears only in the
+        `outDiagnostics` blob as before.
 
         There is no synchronization between registering/clearing the callback and diagnostics
         being reported for compiles already in flight: do not call `setDiagnosticCallback` on
