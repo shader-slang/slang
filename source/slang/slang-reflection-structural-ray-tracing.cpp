@@ -50,14 +50,12 @@ static String _getStageEntryPointName(Type* stageType)
 static RefPtr<StructuralRayTracingStageReflection> _createStageReflection(
     ASTBuilder* astBuilder,
     const StructuralRayTracingDeclRegistry& registry,
-    Type* groupType,
     SubtypeWitness* groupWitness,
     StructuralRayTracingAssociatedTypeKind associatedTypeKind,
     StructuralRayTracingStageKind stageKind)
 {
-    auto stageType = registry.resolveConcreteAssociatedType(
+    auto stageType = registry.resolveAssociatedType(
         astBuilder,
-        groupType,
         groupWitness,
         associatedTypeKind);
     if (!stageType || registry.isStagePlaceholder(stageKind, stageType))
@@ -84,14 +82,12 @@ static bool _addHitGroups(
     {
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
-        auto slotType = registry.resolveConcreteAssociatedType(
+        auto slotType = registry.resolveAssociatedType(
             astBuilder,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupSlot);
-        auto contextType = registry.resolveConcreteAssociatedType(
+        auto contextType = registry.resolveAssociatedType(
             astBuilder,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupContext);
         auto contextWitness = registry.resolveAssociatedTypeConstraint(
@@ -110,43 +106,37 @@ static bool _addHitGroups(
         group->slot = slot;
         group->groupType = groupType;
         group->contextType = contextType;
-        group->recordType = registry.resolveConcreteAssociatedType(
+        group->recordType = registry.resolveAssociatedType(
             astBuilder,
-            contextType,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::HitRecord);
-        group->primitiveType = registry.resolveConcreteAssociatedType(
+        group->primitiveType = registry.resolveAssociatedType(
             astBuilder,
-            contextType,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::HitPrimitive);
         auto primitiveWitness = registry.resolveAssociatedTypeConstraint(
             astBuilder,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::HitPrimitive);
-        group->intersectionAttributesType = registry.resolveConcreteAssociatedType(
+        group->intersectionAttributesType = registry.resolveAssociatedType(
             astBuilder,
-            group->primitiveType,
             primitiveWitness,
             StructuralRayTracingAssociatedTypeKind::PrimitiveAttributes);
         group->closestHit = _createStageReflection(
             astBuilder,
             registry,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupClosestHit,
             StructuralRayTracingStageKind::ClosestHit);
         group->anyHit = _createStageReflection(
             astBuilder,
             registry,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupAnyHit,
             StructuralRayTracingStageKind::AnyHit);
         group->intersection = _createStageReflection(
             astBuilder,
             registry,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::HitGroupIntersection,
             StructuralRayTracingStageKind::Intersection);
@@ -171,14 +161,12 @@ static bool _addMissGroups(
     {
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
-        auto slotType = registry.resolveConcreteAssociatedType(
+        auto slotType = registry.resolveAssociatedType(
             astBuilder,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupSlot);
-        auto contextType = registry.resolveConcreteAssociatedType(
+        auto contextType = registry.resolveAssociatedType(
             astBuilder,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupContext);
         auto contextWitness = registry.resolveAssociatedTypeConstraint(
@@ -197,15 +185,13 @@ static bool _addMissGroups(
         group->slot = slot;
         group->groupType = groupType;
         group->contextType = contextType;
-        group->recordType = registry.resolveConcreteAssociatedType(
+        group->recordType = registry.resolveAssociatedType(
             astBuilder,
-            contextType,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::MissRecord);
         group->miss = _createStageReflection(
             astBuilder,
             registry,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::MissGroupMiss,
             StructuralRayTracingStageKind::Miss);
@@ -230,14 +216,12 @@ static bool _addCallableGroups(
     {
         auto groupType = pack.types->getElementType(i);
         auto groupWitness = pack.witnesses->getWitness(i);
-        auto slotType = registry.resolveConcreteAssociatedType(
+        auto slotType = registry.resolveAssociatedType(
             astBuilder,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupSlot);
-        auto contextType = registry.resolveConcreteAssociatedType(
+        auto contextType = registry.resolveAssociatedType(
             astBuilder,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupContext);
         auto contextWitness = registry.resolveAssociatedTypeConstraint(
@@ -256,20 +240,17 @@ static bool _addCallableGroups(
         group->slot = slot;
         group->groupType = groupType;
         group->contextType = contextType;
-        group->recordType = registry.resolveConcreteAssociatedType(
+        group->recordType = registry.resolveAssociatedType(
             astBuilder,
-            contextType,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::CallableRecord);
-        group->callableDataType = registry.resolveConcreteAssociatedType(
+        group->callableDataType = registry.resolveAssociatedType(
             astBuilder,
-            contextType,
             contextWitness,
             StructuralRayTracingAssociatedTypeKind::CallableData);
         group->callable = _createStageReflection(
             astBuilder,
             registry,
-            groupType,
             groupWitness,
             StructuralRayTracingAssociatedTypeKind::CallableGroupCallable,
             StructuralRayTracingStageKind::Callable);
@@ -334,24 +315,20 @@ StructuralRayTracingProgramLayoutReflection* findStructuralRayTracingProgramLayo
     if (!layoutWitness)
         return nullptr;
 
-    auto traceContextType = registry.resolveConcreteAssociatedType(
+    auto traceContextType = registry.resolveAssociatedType(
         astBuilder,
-        layoutType,
         layoutWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramTraceContext);
-    auto hitGroupsType = registry.resolveConcreteAssociatedType(
+    auto hitGroupsType = registry.resolveAssociatedType(
         astBuilder,
-        layoutType,
         layoutWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramHitGroups);
-    auto missGroupsType = registry.resolveConcreteAssociatedType(
+    auto missGroupsType = registry.resolveAssociatedType(
         astBuilder,
-        layoutType,
         layoutWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramMissGroups);
-    auto callableGroupsType = registry.resolveConcreteAssociatedType(
+    auto callableGroupsType = registry.resolveAssociatedType(
         astBuilder,
-        layoutType,
         layoutWitness,
         StructuralRayTracingAssociatedTypeKind::ProgramCallableGroups);
     if (!traceContextType || !hitGroupsType || !missGroupsType || !callableGroupsType)
