@@ -922,5 +922,6 @@ return {
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetDispatchRaysIndex"] = 946,
 	["StructuralRayTracingStageInputOperation.structuralRayTracingGetDispatchRaysDimensions"] = 947,
 	["metalStructuralRayTracingDispatchRaysIndex"] = 948,
-	["metalStructuralRayTracingDispatchRaysDimensions"] = 949
+	["metalStructuralRayTracingDispatchRaysDimensions"] = 949,
+	["StructuralRayTracingStageInputOperation.structuralRayTracingGetRayTime"] = 950
 }

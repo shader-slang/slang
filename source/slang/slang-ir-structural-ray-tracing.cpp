@@ -49,6 +49,8 @@ IROp getStructuralRayTracingStageInputOperationOp(StructuralRayTracingStageInput
         return kIROp_StructuralRayTracingGetRayTMin;
     case StructuralRayTracingStageInputOperationKind::RayTCurrent:
         return kIROp_StructuralRayTracingGetRayTCurrent;
+    case StructuralRayTracingStageInputOperationKind::RayTime:
+        return kIROp_StructuralRayTracingGetRayTime;
     case StructuralRayTracingStageInputOperationKind::RayFlags:
         return kIROp_StructuralRayTracingGetRayFlags;
     case StructuralRayTracingStageInputOperationKind::HitKind:

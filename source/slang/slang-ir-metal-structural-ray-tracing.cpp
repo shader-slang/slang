@@ -115,6 +115,7 @@ struct MetalStageRequirements
     bool curveParameter = false;
     bool minDistance = false;
     bool distance = false;
+    bool rayTime = false;
     bool rayFlags = false;
     bool hitKind = false;
     bool worldSpaceOrigin = false;
@@ -175,6 +176,9 @@ static void _collectMetalStageRequirements(
                 break;
             case kIROp_StructuralRayTracingGetRayTCurrent:
                 requirements.distance = true;
+                break;
+            case kIROp_StructuralRayTracingGetRayTime:
+                requirements.rayTime = true;
                 break;
             case kIROp_StructuralRayTracingGetRayFlags:
                 requirements.rayFlags = true;
@@ -244,6 +248,7 @@ static MetalStageRequirements _combineMetalStageRequirements(
     SLANG_COMBINE_REQUIREMENT(curveParameter);
     SLANG_COMBINE_REQUIREMENT(minDistance);
     SLANG_COMBINE_REQUIREMENT(distance);
+    SLANG_COMBINE_REQUIREMENT(rayTime);
     SLANG_COMBINE_REQUIREMENT(rayFlags);
     SLANG_COMBINE_REQUIREMENT(hitKind);
     SLANG_COMBINE_REQUIREMENT(worldSpaceOrigin);
@@ -319,6 +324,7 @@ public:
     IRStructKey* payloadKey = nullptr;
     IRStructKey* recordDataKey = nullptr;
     IRStructKey* minDistanceKey = nullptr;
+    IRStructKey* rayTimeKey = nullptr;
     IRStructKey* rayFlagsKey = nullptr;
     IRStructKey* dispatchRaysIndexKey = nullptr;
     IRStructKey* dispatchRaysDimensionsKey = nullptr;
@@ -350,6 +356,7 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
 
     bool needsRecordData = false;
     bool needsMinDistance = false;
+    bool needsRayTime = false;
     bool needsRayFlags = false;
     bool needsDispatchRaysIndex = false;
     bool needsDispatchRaysDimensions = false;
@@ -361,6 +368,7 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
             auto requirements = _getMetalStageRequirements(missGroup->getMiss());
             needsRecordData |= requirements.record || requirements.callableDispatch;
             needsMinDistance |= requirements.minDistance || requirements.objectSpaceRay;
+            needsRayTime |= requirements.rayTime;
             needsRayFlags |= requirements.rayFlags;
             needsDispatchRaysIndex |= requirements.dispatchRaysIndex;
             needsDispatchRaysDimensions |= requirements.dispatchRaysDimensions;
@@ -394,6 +402,8 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
                     closestHitRequirements.minDistance || closestHitRequirements.objectSpaceRay ||
                     anyHitRequirements.minDistance || anyHitRequirements.objectSpaceRay ||
                     intersectionRequirements.minDistance || intersectionRequirements.objectSpaceRay;
+                needsRayTime |= closestHitRequirements.rayTime || anyHitRequirements.rayTime ||
+                                intersectionRequirements.rayTime;
                 needsRayFlags |= closestHitRequirements.rayFlags || anyHitRequirements.rayFlags ||
                                  intersectionRequirements.rayFlags;
                 needsDispatchRaysIndex |= closestHitRequirements.dispatchRaysIndex ||
@@ -416,6 +426,8 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
                             anyHitRequirements.minDistance || anyHitRequirements.objectSpaceRay ||
                             intersectionRequirements.minDistance ||
                             intersectionRequirements.objectSpaceRay;
+        needsRayTime |=
+            requirements.rayTime || anyHitRequirements.rayTime || intersectionRequirements.rayTime;
         needsRayFlags |= requirements.rayFlags || anyHitRequirements.rayFlags ||
                          intersectionRequirements.rayFlags;
         needsDispatchRaysIndex |= requirements.dispatchRaysIndex ||
@@ -469,6 +481,13 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
             result->rayFlagsKey,
             UnownedTerminatedStringSlice("rayFlags"));
         builder.createStructField(result->type, result->rayFlagsKey, builder.getUIntType());
+    }
+
+    if (needsRayTime)
+    {
+        result->rayTimeKey = builder.createStructKey();
+        builder.addNameHintDecoration(result->rayTimeKey, UnownedTerminatedStringSlice("rayTime"));
+        builder.createStructField(result->type, result->rayTimeKey, builder.getFloatType());
     }
 
     auto uint3Type =
@@ -837,6 +856,7 @@ struct MetalVisibleInputValues
     IRInst* curveParameter = nullptr;
     IRInst* minDistance = nullptr;
     IRInst* distance = nullptr;
+    IRInst* rayTime = nullptr;
     IRInst* rayFlags = nullptr;
     IRInst* hitKind = nullptr;
     IRInst* worldSpaceOrigin = nullptr;
@@ -890,6 +910,9 @@ static void _lowerMetalVisibleInputOperations(
             break;
         case kIROp_StructuralRayTracingGetRayTCurrent:
             replacement = values.distance;
+            break;
+        case kIROp_StructuralRayTracingGetRayTime:
+            replacement = values.rayTime;
             break;
         case kIROp_StructuralRayTracingGetRayFlags:
             replacement = values.rayFlags;
@@ -1125,6 +1148,11 @@ static IRFunc* _generateVisibleStageAdapter(
     {
         values.rayFlags =
             builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayFlagsKey));
+    }
+    if (rayDataInfo->rayTimeKey)
+    {
+        values.rayTime =
+            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayTimeKey));
     }
     if (rayDataInfo->dispatchRaysIndexKey)
     {
@@ -1573,6 +1601,7 @@ struct MetalCandidateInputValues
     IRInst* curveParameter = nullptr;
     IRInst* minDistance = nullptr;
     IRInst* distance = nullptr;
+    IRInst* rayTime = nullptr;
     IRInst* rayFlags = nullptr;
     IRInst* hitKind = nullptr;
     IRInst* worldSpaceOrigin = nullptr;
@@ -1619,6 +1648,9 @@ static void _lowerMetalCandidateInputOperations(
             break;
         case kIROp_StructuralRayTracingGetRayTCurrent:
             replacement = values.distance;
+            break;
+        case kIROp_StructuralRayTracingGetRayTime:
+            replacement = values.rayTime;
             break;
         case kIROp_StructuralRayTracingGetRayFlags:
             replacement = values.rayFlags;
@@ -1898,6 +1930,11 @@ static IRFunc* _generateBuiltInAnyHitCandidateAdapter(
         inputs.rayFlags =
             builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayFlagsKey));
     }
+    if (rayDataInfo->rayTimeKey)
+    {
+        inputs.rayTime =
+            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayTimeKey));
+    }
     if (rayDataInfo->dispatchRaysIndexKey)
     {
         inputs.dispatchRaysIndex =
@@ -1965,6 +2002,7 @@ struct MetalProceduralCandidateState
     IRVar* attributes = nullptr;
     IRInst* record = nullptr;
     IRInst* minDistance = nullptr;
+    IRInst* rayTime = nullptr;
     IRInst* rayFlags = nullptr;
     IRInst* worldSpaceOrigin = nullptr;
     IRInst* worldSpaceDirection = nullptr;
@@ -2036,6 +2074,7 @@ static void _lowerAnyHitDecisionInputs(
     IRInst* distance,
     IRInst* hitKind,
     IRInst* minDistance,
+    IRInst* rayTime,
     IRInst* rayFlags,
     IRInst* worldSpaceOrigin,
     IRInst* worldSpaceDirection,
@@ -2068,6 +2107,9 @@ static void _lowerAnyHitDecisionInputs(
             break;
         case kIROp_StructuralRayTracingGetRayTMin:
             replacement = minDistance;
+            break;
+        case kIROp_StructuralRayTracingGetRayTime:
+            replacement = rayTime;
             break;
         case kIROp_StructuralRayTracingGetRayFlags:
             replacement = rayFlags;
@@ -2155,6 +2197,8 @@ static IRFunc* _generateAnyHitDecisionHelper(
     parameterTypes.add(builder.getUIntType());
     if (requirements.minDistance)
         parameterTypes.add(builder.getFloatType());
+    if (requirements.rayTime)
+        parameterTypes.add(builder.getFloatType());
     if (requirements.rayFlags)
         parameterTypes.add(builder.getUIntType());
     if (requirements.worldSpaceOrigin)
@@ -2210,9 +2254,12 @@ static IRFunc* _generateAnyHitDecisionHelper(
     auto distance = builder.emitParam(builder.getFloatType());
     auto hitKind = builder.emitParam(builder.getUIntType());
     IRInst* minDistance = nullptr;
+    IRInst* rayTime = nullptr;
     IRInst* rayFlags = nullptr;
     if (requirements.minDistance)
         minDistance = builder.emitParam(builder.getFloatType());
+    if (requirements.rayTime)
+        rayTime = builder.emitParam(builder.getFloatType());
     if (requirements.rayFlags)
         rayFlags = builder.emitParam(builder.getUIntType());
     IRInst* worldSpaceOrigin = nullptr;
@@ -2293,6 +2340,7 @@ static IRFunc* _generateAnyHitDecisionHelper(
         distance,
         hitKind,
         minDistance,
+        rayTime,
         rayFlags,
         worldSpaceOrigin,
         worldSpaceDirection,
@@ -2359,6 +2407,8 @@ static void _lowerProceduralReportHitOperations(
             arguments.add(effectiveHitKind);
             if (anyHitRequirements.minDistance)
                 arguments.add(state.minDistance);
+            if (anyHitRequirements.rayTime)
+                arguments.add(state.rayTime);
             if (anyHitRequirements.rayFlags)
                 arguments.add(state.rayFlags);
             if (state.worldSpaceOrigin)
@@ -2457,6 +2507,9 @@ static void _lowerProceduralIntersectionInputs(
             break;
         case kIROp_StructuralRayTracingGetRayTMin:
             replacement = state.minDistance;
+            break;
+        case kIROp_StructuralRayTracingGetRayTime:
+            replacement = state.rayTime;
             break;
         case kIROp_StructuralRayTracingGetRayFlags:
             replacement = state.rayFlags;
@@ -2709,6 +2762,11 @@ static IRFunc* _generateBoundingBoxCandidateAdapter(
 
     MetalProceduralCandidateState state;
     state.minDistance = minDistance;
+    if (rayDataInfo->rayTimeKey)
+    {
+        state.rayTime =
+            builder.emitLoad(builder.emitFieldAddress(rayData, rayDataInfo->rayTimeKey));
+    }
     if (rayDataInfo->rayFlagsKey)
     {
         state.rayFlags =
@@ -3338,6 +3396,10 @@ static bool _lowerNonEmptyTrace(
     if (rayDataInfo->rayFlagsKey)
     {
         builder.emitStore(builder.emitFieldAddress(rayData, rayDataInfo->rayFlagsKey), rayFlags);
+    }
+    if (rayDataInfo->rayTimeKey)
+    {
+        builder.emitStore(builder.emitFieldAddress(rayData, rayDataInfo->rayTimeKey), time);
     }
     auto uint3Type =
         builder.getVectorType(builder.getUIntType(), builder.getIntValue(builder.getIntType(), 3));
