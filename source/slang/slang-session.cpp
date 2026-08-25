@@ -2234,6 +2234,33 @@ SlangResult Linkage::loadSerializedModuleContents(
         return SLANG_FAIL;
     module->setModuleDecl(moduleDecl);
 
+    // Reject a module whose semantic version is outside the range this compiler
+    // supports, with a diagnostic naming the version and supported range. This is
+    // read cheaply from the fossilized header (without deserializing the IR body)
+    // via the same reader that backs `-get-module-info`, so a version mismatch is
+    // reported here rather than surfacing as a downstream crash. The load path in
+    // `readSerializedModuleIR` performs the same range check as a last-line guard
+    // for callers that lack a diagnostic sink.
+    {
+        String moduleCompilerVersion;
+        UInt moduleVersion = 0;
+        String serializedModuleName;
+        SLANG_RETURN_ON_FAIL(readSerializedModuleInfo(
+            irChunk,
+            moduleCompilerVersion,
+            moduleVersion,
+            serializedModuleName));
+        if (!IRModule::isSupportedModuleVersion(moduleVersion))
+        {
+            sink->diagnose(Diagnostics::UnsupportedModuleVersion{
+                .actualVersion = int64_t(moduleVersion),
+                .minVersion = int64_t(IRModule::k_minSupportedModuleVersion),
+                .maxVersion = int64_t(IRModule::k_maxSupportedModuleVersion),
+                .location = serializedModuleLoc});
+            return SLANG_FAIL;
+        }
+    }
+
     RefPtr<IRModule> irModule;
     SLANG_RETURN_ON_FAIL(readSerializedModuleIR(irChunk, session, sourceLocReader, irModule));
     module->setIRModule(irModule);

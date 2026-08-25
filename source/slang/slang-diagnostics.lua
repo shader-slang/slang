@@ -4609,6 +4609,13 @@ err(
     span { loc = "location", message = "a module named '~moduleName:Name' is already loaded from different source contents in this session. Use a different module name or drop references to the previous module before reloading." }
 )
 
+err(
+    "unsupported-module-version",
+    38208,
+    "unsupported serialized module version",
+    span { loc = "location", message = "serialized module version ~actualVersion:Int is outside the range supported by this compiler (~minVersion:Int to ~maxVersion:Int). The module was likely produced by a different version of Slang." }
+)
+
 -- Note: compilationCeased is a fatal diagnostic that is locationless
 fatal(
     "compilation-ceased",

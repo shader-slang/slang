@@ -2261,6 +2261,15 @@ public:
     const static UInt k_maxSupportedModuleVersion = 28;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
+    // Whether a serialized module's semantic version falls within the range this
+    // compiler can load. The load path must consult this before deserializing a
+    // module's IR, because a module written by a newer compiler may use IR
+    // semantics this compiler does not understand.
+    static bool isSupportedModuleVersion(UInt64 version)
+    {
+        return version >= k_minSupportedModuleVersion && version <= k_maxSupportedModuleVersion;
+    }
+
 private:
     friend struct IRSerialReadContext;
     friend struct IRSerialWriteContext;
