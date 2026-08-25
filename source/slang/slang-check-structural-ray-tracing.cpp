@@ -852,6 +852,16 @@ static StructuralRayTracingRuntimeTypeKind _findStructuralRuntimeType(
     if (directKind != StructuralRayTracingRuntimeTypeKind::None)
         return directKind;
 
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); ++i)
+        {
+            auto kind = _findStructuralRuntimeType(visitor, typePack->getElementType(i), seenDecls);
+            if (kind != StructuralRayTracingRuntimeTypeKind::None)
+                return kind;
+        }
+    }
+
     if (auto structType = as<DeclRefType>(type))
     {
         if (auto structDecl = structType->getDeclRef().as<StructDecl>().getDecl())
@@ -934,10 +944,10 @@ void SemanticsVisitor::diagnoseInvalidStructuralRayTracingVariableType(VarDeclBa
         return;
 
     auto paramDecl = as<ParamDecl>(varDecl);
-    auto isReadOnlyValueParameter =
-        paramDecl && !paramDecl->hasModifier<OutModifier>() &&
-        !paramDecl->hasModifier<RefModifier>() && !paramDecl->hasModifier<BorrowModifier>() &&
-        !paramDecl->hasModifier<HLSLPayloadModifier>();
+    auto isReadOnlyValueParameter = paramDecl && !paramDecl->hasModifier<OutModifier>() &&
+                                    !paramDecl->hasModifier<RefModifier>() &&
+                                    !paramDecl->hasModifier<BorrowModifier>() &&
+                                    !paramDecl->hasModifier<HLSLPayloadModifier>();
     if (kind == StructuralRayTracingRuntimeTypeKind::StageInput && isReadOnlyValueParameter &&
         _getDirectStageInputKind(getLinkage()->getStructuralRayTracingDeclRegistry(), type) !=
             StructuralRayTracingStageKind::Count)
@@ -994,6 +1004,89 @@ bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingInvokeResult(InvokeExp
         return false;
 
     _diagnoseInvalidStructuralRayTracingRuntimeType(this, kind, invoke->type, invoke->loc);
+    return true;
+}
+
+static Type* _findStructuralStageInputInGenericArgument(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Type*>& seenTypes)
+{
+    type = type ? as<Type>(type->resolve()) : nullptr;
+    if (!type || !seenTypes.add(type))
+        return nullptr;
+
+    if (_findStructuralRuntimeType(visitor, type) ==
+        StructuralRayTracingRuntimeTypeKind::StageInput)
+    {
+        return type;
+    }
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        Type* result = nullptr;
+        SubstitutionSet(declRefType->getDeclRef())
+            .forEachGenericSubstitution(
+                [&](GenericDecl*, Val::OperandView<Val> arguments)
+                {
+                    for (auto argument : arguments)
+                    {
+                        auto argumentType = as<Type>(argument->resolve());
+                        if (!result && argumentType)
+                        {
+                            result = _findStructuralStageInputInGenericArgument(
+                                visitor,
+                                argumentType,
+                                seenTypes);
+                        }
+                    }
+                });
+        if (result)
+            return result;
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); ++i)
+        {
+            if (auto result = _findStructuralStageInputInGenericArgument(
+                    visitor,
+                    typePack->getElementType(i),
+                    seenTypes))
+            {
+                return result;
+            }
+        }
+    }
+    return nullptr;
+}
+
+bool SemanticsVisitor::diagnoseInvalidStructuralRayTracingGenericArguments(InvokeExpr* invoke)
+{
+    auto functionDeclRef = as<DeclRefExpr>(invoke->functionExpr);
+    if (!functionDeclRef)
+        return false;
+
+    Type* invalidType = nullptr;
+    HashSet<Type*> seenTypes;
+    SubstitutionSet(functionDeclRef->declRef)
+        .forEachSubstitutionArg(
+            [&](Val* argument)
+            {
+                if (invalidType)
+                    return;
+                auto type = as<Type>(argument->resolve());
+                if (type)
+                    invalidType = _findStructuralStageInputInGenericArgument(this, type, seenTypes);
+            });
+    if (!invalidType)
+        return false;
+
+    _diagnoseInvalidStructuralRayTracingRuntimeType(
+        this,
+        StructuralRayTracingRuntimeTypeKind::StageInput,
+        invalidType,
+        invoke->functionExpr->loc);
     return true;
 }
 
