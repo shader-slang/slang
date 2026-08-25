@@ -11,6 +11,7 @@
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "unit-test-nvvm-bitcode-fixture.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <string.h>
@@ -577,6 +578,17 @@ static ComPtr<IArtifact> _createNVVMIRArtifact(const char* ir = kMinimalNVVMIR)
     return artifact;
 }
 
+static ComPtr<IArtifact> _createNVVMBitcodeArtifact()
+{
+    ComPtr<IArtifact> artifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+        ArtifactKind::ObjectCode,
+        ArtifactPayload::LLVMIR,
+        ArtifactStyle::Kernel));
+    artifact->addRepresentationUnknown(
+        RawBlob::create(kMinimalNVVMBitcode, SLANG_COUNT_OF(kMinimalNVVMBitcode)));
+    return artifact;
+}
+
 struct CompileSettings
 {
     DownstreamCompileOptions::OptimizationLevel optimizationLevel =
@@ -876,10 +888,15 @@ SLANG_UNIT_TEST(nvvmCompilerRejectsInvalidInputs)
     ComPtr<IArtifact> wrongArtifact =
         ArtifactUtil::createArtifactForCompileTarget(SLANG_HOST_LLVM_IR);
     wrongArtifact->addRepresentationUnknown(StringBlob::create(UnownedStringSlice(kMinimalNVVMIR)));
+    ComPtr<IArtifact> hostBitcodeArtifact = ArtifactUtil::createArtifact(
+        ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::LLVMIR, ArtifactStyle::Host));
+    hostBitcodeArtifact->addRepresentationUnknown(
+        RawBlob::create(kMinimalNVVMBitcode, SLANG_COUNT_OF(kMinimalNVVMBitcode)));
 
     IArtifact* oneValidSource[] = {validArtifact};
     IArtifact* twoValidSources[] = {validArtifact, validArtifact};
     IArtifact* oneWrongSource[] = {wrongArtifact};
+    IArtifact* oneHostBitcodeSource[] = {hostBitcodeArtifact};
     DownstreamCompileOptions::CapabilityVersion validCapability;
     validCapability.kind = DownstreamCompileOptions::CapabilityVersion::Kind::CUDASM;
     validCapability.version.set(7, 5);
@@ -924,6 +941,18 @@ SLANG_UNIT_TEST(nvvmCompilerRejectsInvalidInputs)
         _checkRejectedInputResult(result, outputArtifact);
     }
 
+    // Binary LLVM IR is accepted only when it carries the kernel style.
+    {
+        gFakeNVVM.resetCalls();
+        DownstreamCompileOptions options = baseOptions;
+        options.sourceArtifacts =
+            makeSlice(oneHostBitcodeSource, SLANG_COUNT_OF(oneHostBitcodeSource));
+        options.requiredCapabilityVersions = makeSlice(&validCapability, 1);
+        ComPtr<IArtifact> outputArtifact;
+        SlangResult result = compiler->compile(options, outputArtifact.writeRef());
+        _checkRejectedInputResult(result, outputArtifact);
+    }
+
     // A valid source still requires an explicit CUDA architecture capability.
     {
         gFakeNVVM.resetCalls();
@@ -944,6 +973,47 @@ SLANG_UNIT_TEST(nvvmCompilerRejectsInvalidInputs)
         SlangResult result = compiler->compile(options, outputArtifact.writeRef());
         _checkRejectedInputResult(result, outputArtifact);
     }
+}
+
+SLANG_UNIT_TEST(nvvmCompilerAcceptsLLVMBitcodeArtifact)
+{
+    gFakeNVVM.reset();
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = nullptr;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(_locateFakeNVVM(set, compiler)));
+
+    // This deliberately contains several embedded NULs. The artifact descriptor identifies the
+    // bytes as bitcode; Slang must forward the complete buffer without treating it as a string.
+    static const uint8_t bitcode[] = {0x42, 0x43, 0xc0, 0xde, 0x00, 0x11, 0x00, 0x22};
+    ComPtr<IArtifact> sourceArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+        ArtifactKind::ObjectCode,
+        ArtifactPayload::LLVMIR,
+        ArtifactStyle::Kernel));
+    sourceArtifact->addRepresentationUnknown(RawBlob::create(bitcode, SLANG_COUNT_OF(bitcode)));
+
+    ComPtr<IArtifact> outputArtifact;
+    CompileSettings settings;
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(
+        _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef())));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    SLANG_CHECK(
+        outputArtifact->getDesc() ==
+        ArtifactDesc::make(ArtifactKind::ObjectCode, ArtifactPayload::PTX, ArtifactStyle::Kernel));
+    IArtifactDiagnostics* diagnostics = _findDiagnostics(outputArtifact);
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    SLANG_CHECK(diagnostics->getResult() == SLANG_OK);
+
+    ComPtr<ISlangBlob> outputBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(outputArtifact->loadBlob(ArtifactKeep::Yes, outputBlob.writeRef())));
+    SLANG_CHECK(outputBlob->getBufferSize() == ::strlen(kFakePTX));
+    SLANG_CHECK(::memcmp(outputBlob->getBufferPointer(), kFakePTX, ::strlen(kFakePTX)) == 0);
+
+    SLANG_CHECK(gFakeNVVM.addModuleCallCount == 1);
+    SLANG_CHECK(gFakeNVVM.addedModule.getLength() == SLANG_COUNT_OF(bitcode));
+    SLANG_CHECK(::memcmp(gFakeNVVM.addedModule.getBuffer(), bitcode, SLANG_COUNT_OF(bitcode)) == 0);
+    SLANG_CHECK(gFakeNVVM.addedModuleName == "slang-nvvm-input");
+    SLANG_CHECK(gFakeNVVM.destroyProgramCallCount == 1);
 }
 
 SLANG_UNIT_TEST(nvvmCompilerCompilesTrivialIR)
@@ -1224,6 +1294,42 @@ SLANG_UNIT_TEST(nvvmCompilerCompilesEmptyKernel)
     }
 }
 
+SLANG_UNIT_TEST(nvvmCompilerCompilesEmptyKernelBitcode)
+{
+    RefPtr<DownstreamCompilerSet> set;
+    IDownstreamCompiler* compiler = nullptr;
+    SlangResult locateResult = _locateRealNVVM(String(), set, compiler);
+    if (locateResult == SLANG_E_NOT_FOUND)
+    {
+        getTestReporter()->message(
+            TestMessageType::Info,
+            "Ignoring real libNVVM bitcode test because no CUDA toolkit was discovered.");
+        SLANG_IGNORE_TEST;
+    }
+
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(locateResult));
+    SLANG_CHECK_ABORT(compiler != nullptr);
+    ComPtr<IArtifact> sourceArtifact = _createNVVMBitcodeArtifact();
+    ComPtr<IArtifact> outputArtifact;
+    CompileSettings settings;
+    SlangResult compileResult =
+        _compileNVVM(compiler, sourceArtifact, settings, outputArtifact.writeRef());
+    IArtifactDiagnostics* diagnostics = _findDiagnostics(outputArtifact);
+    if (SLANG_FAILED(compileResult) || !diagnostics || SLANG_FAILED(diagnostics->getResult()))
+        _reportArtifactDiagnostics(outputArtifact);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(compileResult));
+    SLANG_CHECK_ABORT(outputArtifact != nullptr);
+    SLANG_CHECK_ABORT(diagnostics != nullptr);
+    SLANG_CHECK_ABORT(SLANG_SUCCEEDED(diagnostics->getResult()));
+
+    ComPtr<ISlangBlob> ptxBlob;
+    SLANG_CHECK_ABORT(
+        SLANG_SUCCEEDED(outputArtifact->loadBlob(ArtifactKeep::Yes, ptxBlob.writeRef())));
+    String ptx(
+        UnownedStringSlice((const char*)ptxBlob->getBufferPointer(), ptxBlob->getBufferSize()));
+    SLANG_CHECK(ptx.indexOf(".visible .entry testEmpty") >= 0);
+}
+
 SLANG_UNIT_TEST(nvvmPtxasAcceptsEmptyKernel)
 {
     StringBuilder cudaRootBuilder;
@@ -1260,7 +1366,9 @@ SLANG_UNIT_TEST(nvvmPtxasAcceptsEmptyKernel)
 
     SLANG_CHECK_ABORT(SLANG_SUCCEEDED(locateResult));
     SLANG_CHECK_ABORT(compiler != nullptr);
-    ComPtr<IArtifact> sourceArtifact = _createNVVMIRArtifact();
+    // Assemble PTX produced from bitcode so the compatibility fixture crosses the entire local
+    // offline toolchain. The preceding real test keeps the textual bootstrap path covered.
+    ComPtr<IArtifact> sourceArtifact = _createNVVMBitcodeArtifact();
     ComPtr<IArtifact> outputArtifact;
     CompileSettings settings;
     SlangResult compileResult =

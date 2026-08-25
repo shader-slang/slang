@@ -116,8 +116,10 @@ libNVVM verification remains mandatory even when a Slang-side legality check pas
 
 The first implementation adds `SLANG_PASS_THROUGH_NVVM` and a dynamically loaded
 `NVVMDownstreamCompiler`, following the lifetime and artifact conventions used by the NVRTC
-downstream compiler. It consumes one NVVM IR artifact, verifies it, compiles it, and returns a PTX
-artifact with associated diagnostics.
+downstream compiler. It consumes one exact `Assembly + LLVMIR + Kernel` text artifact or
+`ObjectCode + LLVMIR + Kernel` bitcode artifact, verifies it, compiles it, and returns a PTX
+artifact with associated diagnostics. The kind is the representation contract: the compiler does
+not sniff bitcode magic, append a text terminator, or otherwise rewrite the input bytes.
 
 The compiler must query `nvvmVersion` and `nvvmIRVersion`. It resolves `nvvmLLVMVersion` as an
 optional function because older CUDA 12 toolkits do not export it. The implementation must not
@@ -262,11 +264,34 @@ The bootstrap compiler accepts textual LLVM-7-dialect NVVM IR because it is read
 minimize, and supported by the installed library. NVIDIA deprecates textual input, so that is not
 the production representation.
 
-Before broad Slang IR lowering begins, a dedicated prototype must demonstrate a sustainable
-LLVM-7-compatible bitcode writer on the minimum and newest supported toolkits. Slang's LLVM 21
-writer cannot be assumed to produce input readable by an embedded LLVM 7 reader. The prototype may
-evaluate a dedicated NVVM builder/serializer and a target-aware extension of existing LLVM
-abstractions, but it must not make the first backend Blackwell-only merely to reuse LLVM 21.
+The Slice 2 prototype established external-writer compatibility and the consumer artifact boundary
+on the local CUDA 12.2 toolkit:
+
+- llvmlite 0.42.0's LLVM 14.0.6 writer serialized the minimal typed-pointer NVVM IR 2.0 kernel to
+  1,668 bytes of bitcode. libNVVM verified and compiled it for `compute_75`, and `ptxas` accepted
+  the resulting PTX. The checked-in fixture records the source, exact regeneration procedure, and
+  SHA-256. NVIDIA's LLVM 7-14 sample guidance concerns a text-IR workflow, so the fixture is the
+  empirical evidence for LLVM 14 bitcode rather than an NVIDIA compatibility guarantee.
+
+The existing `slang-llvm` module is not the producer for the pre-Blackwell backend. It uses LLVM
+21, exposes opaque pointers, and has no named-metadata or address-space builder interface. Its stock
+configuration does not request NVPTX or expose BitWriter/bitcode output. Adding only a
+`generateBitcode` method would still leave the wrong dialect and an insufficient builder API.
+
+The selected next implementation direction is therefore a separate optional NVVM builder module
+pinned to LLVM 14, the newest release in NVIDIA's documented LLVM 7-14 sample range and the version
+exercised by the accepted fixture. It may reuse version-neutral concepts from `ILLVMBuilder`, but it
+must own typed pointer/address-space construction, NVVM metadata, and bitcode serialization
+independently from the LLVM 21 CPU module. Only the resulting bitcode artifact crosses into
+compiler-core. This is a candidate production boundary, not a production-ready component; its
+packaging, ABI, and nontrivial IR coverage remain to be proven.
+
+Coexistence of the two LLVM versions is a hard module invariant. LLVM 14 must be configured and
+built separately from LLVM 21, statically link only the LLVM components needed by the NVVM writer,
+hide or exclude raw LLVM symbols, and export only a versioned Slang ABI. The optional module must
+not introduce a process-visible dynamic `libLLVM` dependency that can collide with `slang-llvm` or
+other LLVM users. The first builder slice must validate those properties before adding broad IR
+lowering.
 
 Modern-dialect support is a later route selected from the target architecture and the optional
 `nvvmLLVMVersion` query. It is not a prerequisite for legacy-dialect compute support.
@@ -349,16 +374,17 @@ bucket appear complete.
 The program advances through bounded slices:
 
 1. architecture contract and a dynamically loaded libNVVM compiler that handles handwritten IR;
-2. LLVM-7-compatible production bitcode feasibility;
-3. NVRTC-versus-libNVVM differential reference kernels;
-4. CUDA emission-method selection and experimental PTX routing through the registered compiler;
-5. minimal Slang IR compute lowering;
-6. scalar control flow and the kernel ABI;
-7. address spaces, aggregates, and shared memory;
-8. libdevice and floating-point policy;
-9. atomics and wave operations;
-10. resources and optimization-quality work; and
-11. advanced capabilities and production-readiness evaluation.
+2. LLVM-7-compatible bitcode compatibility and artifact-boundary feasibility;
+3. a separately built/loaded LLVM 14 NVVM builder with a versioned ABI and empty-kernel bitcode;
+4. scalar and pointer reference kernels with NVRTC-versus-libNVVM differential evidence;
+5. CUDA emission-method selection and experimental PTX routing through the registered compiler;
+6. minimal Slang IR compute lowering;
+7. scalar control flow and the kernel ABI;
+8. address spaces, aggregates, and shared memory;
+9. libdevice and floating-point policy;
+10. atomics and wave operations;
+11. resources and optimization-quality work; and
+12. advanced capabilities and production-readiness evaluation.
 
 Each slice has its own local ExecPlan and leaves the NVRTC path usable.
 
@@ -391,14 +417,21 @@ malformed vendor results, real libNVVM compilation, and offline `ptxas` assembly
 machine all sixteen passed, `-nvvm-version` reported 2.0, and CUDA 12.2 `ptxas` 12.2.140 accepted
 the generated `sm_75` PTX. Ordinary PTX compilation remained routed through NVRTC.
 
+The bitcode slice then added the exact binary artifact contract and two focused tests. The full
+NVVM prefix passed 18/18. Its embedded 1,668-byte LLVM 14.0.6 fixture was forwarded byte-for-byte,
+verified and compiled by the same CUDA 12.2 libNVVM, and the resulting `sm_75` PTX was assembled by
+`ptxas`. The existing LLVM 21 module was ruled out as the pre-Blackwell producer; a separate pinned
+LLVM 14 NVVM builder prototype is the next prerequisite.
+
 ## Settled and Open Decisions
 
 Settled decisions are the support contract at the top of this document, the parallel backend
-shape, the continued NVRTC default, and the requirement for a production bitcode gate.
+shape, the continued NVRTC default, the binary artifact shape, and prototyping a separate LLVM 14
+builder as the next pre-Blackwell implementation direction.
 
 The following remain open until their named slice supplies evidence:
 
-- the exact LLVM-7-compatible bitcode writer;
+- packaging, ABI versioning, and update policy for the optional LLVM 14 NVVM builder module;
 - the CUDA toolkit and GPU CI matrix;
 - the final public spelling and API exposure of the CUDA emission method;
 - whether NVVM IR should become a public compile target;

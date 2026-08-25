@@ -447,17 +447,25 @@ SlangResult NVVMDownstreamCompiler::compile(
     }
 
     IArtifact* sourceArtifact = options.sourceArtifacts[0];
-    const ArtifactDesc expectedSourceDesc = ArtifactDesc::make(
+    const ArtifactDesc expectedAssemblySourceDesc = ArtifactDesc::make(
         ArtifactKind::Assembly,
         ArtifactPayload::LLVMIR,
         ArtifactStyle::Kernel,
         0);
-    if (!sourceArtifact || sourceArtifact->getDesc() != expectedSourceDesc)
+    const ArtifactDesc expectedBitcodeSourceDesc = ArtifactDesc::make(
+        ArtifactKind::ObjectCode,
+        ArtifactPayload::LLVMIR,
+        ArtifactStyle::Kernel,
+        0);
+    if (!sourceArtifact || (sourceArtifact->getDesc() != expectedAssemblySourceDesc &&
+                            sourceArtifact->getDesc() != expectedBitcodeSourceDesc))
     {
         _setPlainFailure(
             diagnostics,
             SLANG_E_INVALID_ARG,
-            toSlice("libNVVM requires an Assembly + LLVMIR + Kernel source artifact"));
+            toSlice(
+                "libNVVM requires an Assembly + LLVMIR + Kernel or ObjectCode + LLVMIR + Kernel "
+                "source artifact"));
         return _returnArtifact(SLANG_E_INVALID_ARG, artifact, outArtifact);
     }
 
