@@ -334,9 +334,39 @@ static RefPtr<MetalRayDataInfo> _createMetalRayDataInfo(
     return result;
 }
 
-static UInt _getSharedMetalTagMask(IRStructuralRayTracingTrace* trace)
+static bool _getMetalAccelerationStructureTopology(
+    IRStructuralRayTracingTrace* trace,
+    DiagnosticSink* sink,
+    UInt& outTagMask,
+    IRIntegerValue& outMaxLevels)
 {
-    UInt result = UInt(MetalStructuralRayTracingTag::Instancing);
+    outTagMask = UInt(MetalStructuralRayTracingTag::Instancing);
+    outMaxLevels = 0;
+
+    auto accelerationStructureType =
+        as<IRRaytracingAccelerationStructureType>(trace->getAccelerationStructure()->getDataType());
+    if (!accelerationStructureType || accelerationStructureType->getOperandCount() == 0)
+        return true;
+
+    auto levelCount = as<IRIntLit>(accelerationStructureType->getOperand(0));
+    if (!levelCount || levelCount->getValue() < 1 || levelCount->getValue() > 32)
+    {
+        sink->diagnose(Diagnostics::InvalidStructuralRayTracingMaxLevelCount{
+            .levelCount = levelCount ? Int64(levelCount->getValue()) : Int64(-1),
+            .location = trace->sourceLoc});
+        return false;
+    }
+
+    if (levelCount->getValue() == 1)
+        outTagMask = 0;
+    else
+        outMaxLevels = levelCount->getValue();
+    return true;
+}
+
+static UInt _getSharedMetalTagMask(IRStructuralRayTracingTrace* trace, UInt topologyTagMask)
+{
+    UInt result = topologyTagMask;
     for (auto decoration : trace->getDecorations())
     {
         auto group = as<IRStructuralRayTracingHitGroupInfoDecoration>(decoration);
@@ -2181,14 +2211,15 @@ static bool _lowerNonEmptyTrace(
     Dictionary<IRFunc*, IRParam*>& candidateRayDataParams,
     MetalRayDataInfo* rayDataInfo,
     const MetalCandidateResultInfo& filterResultInfo,
-    const MetalCandidateResultInfo& proceduralResultInfo)
+    const MetalCandidateResultInfo& proceduralResultInfo,
+    UInt topologyTagMask,
+    IRIntegerValue maxLevels)
 {
     IRBuilder builder(module);
-    auto tagMask = _getSharedMetalTagMask(trace);
+    auto tagMask = _getSharedMetalTagMask(trace, topologyTagMask);
     auto missRequirements = _getMetalStageRequirements(trace, StructuralRayTracingStageKind::Miss);
     auto closestHitRequirements =
         _getMetalStageRequirements(trace, StructuralRayTracingStageKind::ClosestHit);
-    IRIntegerValue maxLevels = 0;
     MetalTraceDescriptorInfo descriptorInfo;
     if (!_prepareTraceDescriptor(
             builder,
@@ -2522,6 +2553,13 @@ void prepareMetalStructuralRayTracing(
         }
 
         auto trace = cast<IRStructuralRayTracingTrace>(operation);
+        UInt topologyTagMask = 0;
+        IRIntegerValue maxLevels = 0;
+        if (!_getMetalAccelerationStructureTopology(trace, sink, topologyTagMask, maxLevels))
+        {
+            trace->removeAndDeallocate();
+            continue;
+        }
 
         // An empty logical SBT has no shader to dispatch after traversal and no candidate function
         // to invoke during traversal. The trace therefore has no observable shader-side effect.
@@ -2541,19 +2579,24 @@ void prepareMetalStructuralRayTracing(
                 rayDataInfo = _createMetalRayDataInfo(module, trace);
                 rayDataInfos.add(trace->getProgramLayout(), rayDataInfo);
             }
-            SLANG_ASSERT(_lowerNonEmptyTrace(
-                module,
-                trace,
-                generatedMissAdapters,
-                generatedClosestHitAdapters,
-                generatedCandidateAdapters,
-                candidateAdapterSet,
-                candidateHelperSet,
-                payloadValues,
-                candidateRayDataParams,
-                rayDataInfo,
-                filterResultInfo,
-                proceduralResultInfo));
+            if (!_lowerNonEmptyTrace(
+                    module,
+                    trace,
+                    generatedMissAdapters,
+                    generatedClosestHitAdapters,
+                    generatedCandidateAdapters,
+                    candidateAdapterSet,
+                    candidateHelperSet,
+                    payloadValues,
+                    candidateRayDataParams,
+                    rayDataInfo,
+                    filterResultInfo,
+                    proceduralResultInfo,
+                    topologyTagMask,
+                    maxLevels))
+            {
+                trace->removeAndDeallocate();
+            }
         }
     }
 
