@@ -5,6 +5,7 @@
 struct MetalRayTracingScene
 {
     id<MTLBuffer> vertexBuffer;
+    id<MTLBuffer> motionVertexBuffer;
     id<MTLBuffer> boundingBoxBuffer;
     id<MTLBuffer> radiusBuffer;
     id<MTLBuffer> indexBuffer;
@@ -37,6 +38,12 @@ bool buildMetalCurveScene(
     NSString** outError);
 
 bool buildMetalMultilevelScene(
+    id<MTLDevice> device,
+    id<MTLCommandQueue> queue,
+    MetalRayTracingScene& outScene,
+    NSString** outError);
+
+bool buildMetalPrimitiveMotionScene(
     id<MTLDevice> device,
     id<MTLCommandQueue> queue,
     MetalRayTracingScene& outScene,

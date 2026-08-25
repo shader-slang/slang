@@ -637,6 +637,41 @@ bool runMultilevelHit(id<MTLDevice> device, id<MTLCommandQueue> queue, NSString*
     return validateResults("multilevel-hit", results, kExpected, 2);
 }
 
+bool runMotionTime(id<MTLDevice> device, id<MTLCommandQueue> queue, NSString* directory)
+{
+    static const char* kMiss[] = {"RuntimeMiss_0"};
+    static const char* kClosest[] = {"RuntimeClosestHit_0"};
+    ProgramDescription description = {nullptr, 0, kMiss, 1, kClosest, 1, nullptr, 0};
+    NativeProgram program = {};
+    if (!createProgram(device, sourcePath(directory, @"motion-time"), description, program))
+        return false;
+
+    MetalRayTracingScene scene = {};
+    NSString* sceneError = nil;
+    if (!buildMetalPrimitiveMotionScene(device, queue, scene, &sceneError))
+        return fail(sceneError);
+
+    static const uint32_t kRecords[] = {1, 0};
+    id<MTLBuffer> records = createRecords(device, kRecords, 2);
+    id<MTLBuffer> programResources = createProgramResourceBuffer(device, program, records);
+    static const uint32_t kExpected[] = {1, 0, 1, 1000, 2, 500};
+    id<MTLBuffer> results = [device newBufferWithLength:sizeof(kExpected)
+                                                options:MTLResourceStorageModeShared];
+    if (!dispatch(
+            device,
+            queue,
+            program,
+            scene.instanceAccelerationStructure,
+            programResources,
+            records,
+            results,
+            3,
+            false,
+            false))
+        return false;
+    return validateResults("motion-time", results, kExpected, 6);
+}
+
 } // namespace
 
 bool runMetalStructuralRayTracingTests(const char* metalSourceDirectory)
@@ -664,6 +699,7 @@ bool runMetalStructuralRayTracingTests(const char* metalSourceDirectory)
                runTriangleAttributesFlags(device, queue, directory) &&
                runStageInputState(device, queue, directory) &&
                runCurveHitFilter(device, queue, directory) &&
-               runMultilevelHit(device, queue, directory);
+               runMultilevelHit(device, queue, directory) &&
+               runMotionTime(device, queue, directory);
     }
 }
