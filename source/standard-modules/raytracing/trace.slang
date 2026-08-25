@@ -18,15 +18,22 @@ public extension<ProgramLayout> RayTracer<ProgramLayout>
         TraceProgramDescriptor<ProgramLayout> descriptor,
         inout ProgramLayout.TraceContext.Payload payload)
     {
-        TraceRay(
-            accelerationStructure,
-            desc.rayFlags,
-            desc.instanceMask,
-            desc.sbtOffset,
-            desc.sbtStride,
-            desc.missIndex,
-            desc.ray,
-            payload);
+        __target_switch
+        {
+        case metal:
+            // The compiler consumes this call as a structural trace operation before emission.
+            break;
+        default:
+            TraceRay(
+                accelerationStructure,
+                desc.rayFlags,
+                desc.instanceMask,
+                desc.sbtOffset,
+                desc.sbtStride,
+                desc.missIndex,
+                desc.ray,
+                payload);
+        }
     }
 }
 
