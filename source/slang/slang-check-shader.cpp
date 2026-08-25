@@ -2423,6 +2423,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
+        if (targetCaps.getCompileTarget() == CapabilityAtom::metal &&
+            entryPoint->getStage() == Stage::RayGeneration &&
+            linkage->getStructuralRayTracingDeclRegistry().functionReachesStructuralTrace(
+                entryPointFuncDecl))
+        {
+            // Structural ray-generation programs become Metal compute kernels. Check their source
+            // bodies in that logical execution environment; the target lowering changes the
+            // physical entry-point stage after it consumes the structural trace operation.
+            stageCapabilitySet = Profile(Stage::Compute).getCapabilityName();
+        }
         targetCaps.join(stageCapabilitySet);
         if (targetCaps.isIncompatibleWith(entryPointInferredCaps))
         {

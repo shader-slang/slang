@@ -96,6 +96,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-metal-structural-ray-tracing.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
@@ -1434,6 +1435,10 @@ Result linkAndOptimizeIR(
     {
         SLANG_PASS(synthesizePortableStructuralRayTracingEntryPoints, irEntryPoints, sink);
         outLinkedIR.entryPoints = irEntryPoints;
+    }
+    else if (requiredLoweringPassSet.structuralRayTracingTrace && target == CodeGenTarget::Metal)
+    {
+        SLANG_PASS(prepareMetalStructuralRayTracing, irEntryPoints);
     }
 
     if (sink->getErrorCount() != 0)
