@@ -2119,6 +2119,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             case glsl:
                 __intrinsic_asm "$ctextureLod($0, $1, $2)$z";
             case cuda:
+                // The 'tex*Lod<T>' CUDA runtime built-ins below are specialized only
+                // for float/uint/int vector types (no __half overload), so a half texel
+                // produces CUDA that NVRTC rejects. Reject it here; the shape catch-all
+                // below does not.
+                static_assert(!__isHalf<T>(),
+                    "'SampleLevel' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
                 if (isArray != 0)
                 {
                     switch(Shape.flavor)
@@ -3692,6 +3698,12 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             case glsl:
                 __intrinsic_asm "$ctextureLod($p, $2, $3)$z";
             case cuda:
+                // The 'tex*Lod<T>' CUDA runtime built-ins below are specialized only
+                // for float/uint/int vector types (no __half overload), so a half texel
+                // produces CUDA that NVRTC rejects. Reject it here; the shape catch-all
+                // below does not.
+                static_assert(!__isHalf<T>(),
+                    "'SampleLevel' of a half-typed texture is not supported for the 'cuda' target. Use a float texture instead -- CUDA widens f16-format data to f32 on read for free; narrow back to half in-shader if you need it. See docs/cuda-target.md.");
                 if (isArray != 0)
                 {
                     switch(Shape.flavor)
@@ -10124,6 +10136,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     case wgsl: __intrinsic_asm "dot";
     default:
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
@@ -10196,6 +10209,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
     default:
         T result = T(0);
+        [ForceUnroll]
         for(int i = 0; i < N; ++i)
             result += x[i] * y[i];
         return result;
