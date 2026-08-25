@@ -13,7 +13,11 @@ struct StructuralRayTracingTriangleScene
     rhi::ComPtr<rhi::IAccelerationStructure> bottomLevel;
     rhi::ComPtr<rhi::IAccelerationStructure> topLevel;
 
-    StructuralRayTracingTriangleScene(rhi::IDevice* device, rhi::ICommandQueue* queue);
+    StructuralRayTracingTriangleScene(
+        rhi::IDevice* device,
+        rhi::ICommandQueue* queue,
+        rhi::AccelerationStructureInstanceFlags instanceFlags =
+            rhi::AccelerationStructureInstanceFlags::TriangleFacingCullDisable);
 };
 
 struct StructuralRayTracingProceduralScene

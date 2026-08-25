@@ -42,6 +42,17 @@ struct StructuralRayTracingMultipleSlotsResult
     uint32_t dispatchWidth;
 };
 
+struct StructuralRayTracingTriangleAttributesFlagsResult
+{
+    uint32_t stage;
+    uint32_t anyHitCount;
+    uint32_t barycentricX;
+    uint32_t barycentricY;
+    uint32_t frontFacing;
+    uint32_t flagsMatch;
+    uint32_t dispatchWidth;
+};
+
 Slang::ComPtr<rhi::IDevice> createStructuralRayTracingTestDevice(
     UnitTestContext* context,
     rhi::DeviceType deviceType);
@@ -51,5 +62,6 @@ void runStructuralRayTracingProceduralHitFilter(rhi::IDevice* device);
 void runStructuralRayTracingCallableRecord(rhi::IDevice* device);
 void runStructuralRayTracingRecursiveTrace(rhi::IDevice* device);
 void runStructuralRayTracingMultipleSlots(rhi::IDevice* device);
+void runStructuralRayTracingTriangleAttributesFlags(rhi::IDevice* device);
 
 } // namespace gfx_test
