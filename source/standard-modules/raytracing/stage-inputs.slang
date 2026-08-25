@@ -20,6 +20,23 @@ public struct ClosestHitInput<Context>
         get;
     }
 
+    public property float minDistance
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTMin();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
     public property float distance
     {
         get
@@ -48,6 +65,56 @@ public struct ClosestHitInput<Context>
             case spirv:
             case cuda:
                 return HitKind();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint rayFlags
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayFlags();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint primitiveIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return PrimitiveIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint geometryIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+                return GeometryIndex();
             default:
                 return 0;
             }
@@ -84,6 +151,45 @@ public struct ClosestHitInput<Context>
                 return WorldRayDirection();
             default:
                 return 0.0;
+            }
+        }
+    }
+}
+
+public extension<Context> ClosestHitInput<Context>
+    where Context : IHitContext
+    where Context.TraceContext.AccelerationStructure == AccelerationStructure
+{
+    public property uint instanceIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return InstanceIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint instanceID
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return InstanceID();
+            default:
+                return 0;
             }
         }
     }
@@ -133,6 +239,23 @@ public struct AnyHitInput<Context>
         get;
     }
 
+    public property float minDistance
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTMin();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
     public property float distance
     {
         get
@@ -161,6 +284,56 @@ public struct AnyHitInput<Context>
             case spirv:
             case cuda:
                 return HitKind();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint rayFlags
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayFlags();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint primitiveIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return PrimitiveIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint geometryIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+                return GeometryIndex();
             default:
                 return 0;
             }
@@ -232,6 +405,45 @@ public struct AnyHitInput<Context>
 
 public extension<Context> AnyHitInput<Context>
     where Context : IHitContext
+    where Context.TraceContext.AccelerationStructure == AccelerationStructure
+{
+    public property uint instanceIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return InstanceIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint instanceID
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return InstanceID();
+            default:
+                return 0;
+            }
+        }
+    }
+}
+
+public extension<Context> AnyHitInput<Context>
+    where Context : IHitContext
     where Context.Primitive : ICustomIntersectionPrimitive
 {
     public property Context.Primitive.Attributes attributes
@@ -267,6 +479,40 @@ public struct IntersectionInput<Context>
     public property Context.Record record
     {
         get;
+    }
+
+    public property float minDistance
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTMin();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
+    public property uint rayFlags
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayFlags();
+            default:
+                return 0;
+            }
+        }
     }
 
     public property RayDesc objectSpaceRay
@@ -388,6 +634,45 @@ public struct IntersectionInput<Context>
     }
 }
 
+public extension<Context> IntersectionInput<Context>
+    where Context : IHitContext
+    where Context.TraceContext.AccelerationStructure == AccelerationStructure
+{
+    public property uint instanceIndex
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return InstanceIndex();
+            default:
+                return 0;
+            }
+        }
+    }
+
+    public property uint instanceID
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return InstanceID();
+            default:
+                return 0;
+            }
+        }
+    }
+}
+
 [require(structural_raytracing_miss)]
 public struct MissInput<Context>
     where Context : IMissGroupContext
@@ -400,6 +685,57 @@ public struct MissInput<Context>
     public property Context.Record record
     {
         get;
+    }
+
+    public property float minDistance
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTMin();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
+    public property float distance
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTCurrent();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
+    public property uint rayFlags
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayFlags();
+            default:
+                return 0;
+            }
+        }
     }
 
     public property float3 worldSpaceOrigin

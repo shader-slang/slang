@@ -34,6 +34,10 @@ enum class MetalStructuralRayTracingStageRequirement : UInt
     WorldSpaceDirection = 1 << 7,
     Record = 1 << 8,
     CallableDispatch = 1 << 9,
+    PrimitiveIndex = 1 << 10,
+    GeometryIndex = 1 << 11,
+    InstanceIndex = 1 << 12,
+    InstanceID = 1 << 13,
 };
 
 enum class MetalStructuralRayTracingGeometryKind : UInt

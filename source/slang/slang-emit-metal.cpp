@@ -694,6 +694,34 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             }
             if (hasRequirement(
                     closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::PrimitiveIndex))
+            {
+                m_writer->emit(", _slang_result.primitive_id");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::GeometryIndex))
+            {
+                m_writer->emit(", _slang_result.geometry_id");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::InstanceIndex))
+            {
+                m_writer->emit(", _slang_result.instance_id");
+                if (maxLevels > 0)
+                    m_writer->emit("[_slang_result.instance_count - 1]");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
+                    MetalStructuralRayTracingStageRequirement::InstanceID))
+            {
+                m_writer->emit(", _slang_result.user_instance_id");
+                if (maxLevels > 0)
+                    m_writer->emit("[_slang_result.instance_count - 1]");
+            }
+            if (hasRequirement(
+                    closestHitRequirements,
                     MetalStructuralRayTracingStageRequirement::CallableDispatch))
             {
                 m_writer->emit(", ");
