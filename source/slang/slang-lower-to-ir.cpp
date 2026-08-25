@@ -12113,6 +12113,49 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return irBuilder->emitSpecializeInst(irBuilder->getGenericKind(), value, args);
     }
 
+    /// Reproduce, on a borrowed interface declaration, every decoration that some
+    /// pass reads off an `IRInterfaceType` *before* `prelinkIR` supplies the real
+    /// definition. Today that is exactly one: `IRComInterfaceDecoration`.
+    ///
+    /// This exists to give the invariant a name and a single home. `prelinkIR`
+    /// does not merge into the declaration -- it clones the owning module's
+    /// definition, calls `replaceUsesWith`, and then `removeAndDeallocate`s the
+    /// declaration -- so the interface that survives carries everything the owning
+    /// module gave it, and only a reader running before prelink can tell that the
+    /// declaration was ever bare. `visitInheritanceDecl` is that reader: it reads
+    /// `IRComInterfaceDecoration` off the interface while lowering a conformance,
+    /// and uses it to decide whether the conformance is lowered as a COM object at
+    /// all. A declaration without it silently produces a plain reference type
+    /// instead, losing the COM interface, its GUID and its vtable in the emitted
+    /// code -- which is what `tests/language-feature/dynamic-dispatch/imported-com-interface.slang`
+    /// pins.
+    ///
+    /// The derivation path in `visitInterfaceDecl` additionally attaches a name
+    /// hint, `IRAnyValueSizeDecoration`, `IRSpecializeDecoration`,
+    /// `IRBuiltinDecoration` and the target-intrinsic decorations. Those are
+    /// deliberately not reproduced: nothing reads them off an interface before
+    /// prelink, and the clone supplies them afterwards.
+    ///
+    /// Note what this function cannot do. The invariant is about which passes
+    /// *read* a decoration, so no check here or at the derivation site can detect
+    /// a violation -- adding a new pre-prelink reader elsewhere requires adding
+    /// the corresponding decoration here, and only this comment says so.
+    ///
+    /// The GUID is read from the same `ComInterfaceAttribute` the derivation path
+    /// reads, so the two cannot disagree about it.
+    void reproduceInterfaceDecorationsReadBeforePrelink(
+        IRBuilder* builder,
+        IRInterfaceType* declInterface,
+        InterfaceDecl* decl)
+    {
+        if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
+        {
+            builder->addComInterfaceDecoration(
+                declInterface,
+                comInterfaceAttr->guid.getUnownedSlice());
+        }
+    }
+
     /// Lower an interface owned by another module as a declaration, and arrange
     /// for `prelinkIR` to supply its definition.
     ///
@@ -12237,42 +12280,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto declVal = finishOuterGenerics(declBuilder, declInterface, declGeneric);
         addLinkageDecoration(declSubContext, declInterface, decl);
 
-        // Which decorations the declaration has to carry, and why these are the
-        // only ones.
-        //
-        // `prelinkIR` does not merge into the declaration. It clones the owning
-        // module's definition, calls `replaceUsesWith`, and then
-        // `removeAndDeallocate`s the declaration, so the interface that survives
-        // is the clone and it carries every decoration the owning module gave it.
-        // After prelink the two paths therefore agree no matter what is attached
-        // here, and only a reader that runs *before* prelink can tell the
-        // difference.
-        //
-        // Searching for reads of a decoration off an `IRInterfaceType` during
-        // AST-to-IR lowering turns up one: `visitInheritanceDecl` reads
-        // `IRComInterfaceDecoration` off the interface while lowering a witness
-        // table, to decide whether to keep that table alive with an
-        // `[HLSLExport]` decoration. A declaration carrying only linkage would
-        // silently take the wrong branch there for a conformance to an imported
-        // COM interface, so this one is reproduced.
-        //
-        // The derivation path below additionally attaches a name hint,
-        // `IRAnyValueSizeDecoration`, `IRSpecializeDecoration`,
-        // `IRBuiltinDecoration` and the target-intrinsic decorations. Those are
-        // deliberately not reproduced -- nothing between here and `prelinkIR`
-        // reads them off an interface, and the clone supplies them afterwards.
-        // A new decoration that lowering *does* read off an interface has to be
-        // added here as well, and nothing outside this comment will say so.
-        //
-        // The GUID is read from the same AST modifier the derivation path uses
-        // rather than off the borrowed IR, so the two paths cannot disagree about
-        // it.
-        if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
-        {
-            declBuilder->addComInterfaceDecoration(
-                declInterface,
-                comInterfaceAttr->guid.getUnownedSlice());
-        }
+        reproduceInterfaceDecorationsReadBeforePrelink(declBuilder, declInterface, decl);
 
         context->setGlobalValue(decl, LoweredValInfo::simple(declVal));
 
@@ -12530,14 +12538,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         // Adding a decoration here is also a decision about
-        // `tryBorrowInterfaceFromOwningModule`, which lowers an interface owned by
-        // another module and reproduces only some of what follows. It has to
-        // reproduce a decoration exactly when something reads that decoration off
-        // an `IRInterfaceType` before `prelinkIR` runs; otherwise the definition
-        // prelink clones in supplies it. The comment there records the current
-        // answer for each of these, and is the only place that records it -- the
-        // invariant is about which passes *read* a decoration, so neither site can
-        // check it locally.
+        // `reproduceInterfaceDecorationsReadBeforePrelink`, which is what a
+        // borrowed interface gets instead of this block. A decoration belongs
+        // there too exactly when something reads it off an `IRInterfaceType`
+        // before `prelinkIR` runs; otherwise the definition prelink clones in
+        // supplies it. That function documents the current answer for each of
+        // these, and is the only place that does -- the invariant is about which
+        // passes *read* a decoration, so neither site can check it locally.
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
         if (auto anyValueSizeAttr = decl->findModifier<AnyValueSizeAttribute>())
