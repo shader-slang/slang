@@ -278,19 +278,6 @@ void TargetRequest::checkCapabilities(DiagnosticSink* sink)
     // diagnostics, which is not a supported way to call this function.
     SLANG_RELEASE_ASSERT(sink);
 
-    // A target's own `-capability` requests are fixed at target-construction time (see
-    // Linkage::addTarget()) and never change afterward, but checkEntryPoints() -- and
-    // therefore this function -- runs once per FrontEndCompileRequest, i.e. once per
-    // module load, not once per target's lifetime. Without this latch, a persistent
-    // session that loads many modules against the same target would re-derive and
-    // re-diagnose the identical incompatibility on every single load.
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (m_capabilitiesChecked)
-            return;
-        m_capabilitiesChecked = true;
-    }
-
     bool isGLSLTarget = isGLSLBasedTarget();
     auto cookedCaps = getTargetCaps();
 

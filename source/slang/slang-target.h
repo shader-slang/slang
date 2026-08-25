@@ -197,14 +197,6 @@ private:
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
     // Layout/codegen threads share one TargetRequest and lazily initialize this derived state.
     std::mutex m_mutex;
-    // Set once checkCapabilities() has diagnosed this target's explicitly requested
-    // capabilities. A target's own `-capability` requests don't change after the target
-    // is constructed (see Linkage::addTarget()), but checkCapabilities() is called once
-    // per FrontEndCompileRequest -- i.e. once per module load in a session, not once per
-    // target's lifetime -- so without this latch a persistent session that loads many
-    // modules against the same incompatible target would re-emit the same E36121
-    // diagnostic on every load.
-    bool m_capabilitiesChecked = false;
 };
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?
