@@ -1515,6 +1515,24 @@ alias callable = _callable + raytracing;
 /// [Stage]
 alias miss = _miss + raytracing;
 
+// Logical stages implemented by the structural ray-tracing API. Metal has no native shader
+// stages for these roles, so the compiler synthesizes their physical dispatch there.
+/// Logical closest-hit role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_closesthit = closesthit | _closesthit + metal;
+/// Logical any-hit role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_anyhit = anyhit | _anyhit + metal;
+/// Logical intersection role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_intersection = intersection | _intersection + metal;
+/// Logical miss role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_miss = miss | _miss + metal;
+/// Logical callable role used by the structural ray-tracing API.
+/// [Compound]
+alias structural_raytracing_callable = callable | _callable + metal;
+
 /// Mesh shader stage & mesh shader capabilities
 /// [Stage]
 alias mesh = _mesh + _meshshading;

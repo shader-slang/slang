@@ -88,8 +88,13 @@ public struct TriangleData
     }
 }
 
-[require(metal)]
-public struct CurveData {}
+public struct CurveData
+{
+    public property float parameter
+    {
+        get;
+    }
+}
 
 public interface IIntersectionPrimitive
 {

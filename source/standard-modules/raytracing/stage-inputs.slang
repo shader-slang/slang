@@ -6,7 +6,7 @@ namespace rt
 // These are compiler-provided, zero-storage views. The compiler recognizes the exact accessors
 // below, maps storage-free properties such as payload to the target ABI, and retains the ordinary
 // source bodies where they already express the D3D/Vulkan implementation.
-[require(closesthit)]
+[require(structural_raytracing_closesthit)]
 public struct ClosestHitInput<Context>
     where Context : IHitContext
 {
@@ -17,22 +17,70 @@ public struct ClosestHitInput<Context>
 
     public property float distance
     {
-        get { return RayTCurrent(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTCurrent();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public property uint hitKind
     {
-        get { return HitKind(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return HitKind();
+            default:
+                return 0;
+            }
+        }
     }
 
     public property float3 worldSpaceOrigin
     {
-        get { return WorldRayOrigin(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayOrigin();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public property float3 worldSpaceDirection
     {
-        get { return WorldRayDirection(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayDirection();
+            default:
+                return 0.0;
+            }
+        }
     }
 }
 
@@ -56,7 +104,17 @@ public extension<Context> ClosestHitInput<Context>
     }
 }
 
-[require(anyhit)]
+public extension<Context> ClosestHitInput<Context>
+    where Context : IHitContext
+    where Context.Primitive == CurvePrimitive
+{
+    public property CurveData curve
+    {
+        get { return {}; }
+    }
+}
+
+[require(structural_raytracing_anyhit)]
 public struct AnyHitInput<Context>
     where Context : IHitContext
 {
@@ -67,27 +125,99 @@ public struct AnyHitInput<Context>
 
     public property float distance
     {
-        get { return RayTCurrent(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return RayTCurrent();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public property uint hitKind
     {
-        get { return HitKind(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return HitKind();
+            default:
+                return 0;
+            }
+        }
     }
 
     public property float3 worldSpaceOrigin
     {
-        get { return WorldRayOrigin(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayOrigin();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public property float3 worldSpaceDirection
     {
-        get { return WorldRayDirection(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayDirection();
+            default:
+                return 0.0;
+            }
+        }
     }
 
-    public void ignoreHit() { IgnoreHit(); }
+    public void ignoreHit()
+    {
+        __target_switch
+        {
+        case hlsl:
+        case glsl:
+        case spirv:
+        case cuda:
+            IgnoreHit();
+        default:
+            break;
+        }
+    }
 
-    public void acceptHitAndEndSearch() { AcceptHitAndEndSearch(); }
+    public void acceptHitAndEndSearch()
+    {
+        __target_switch
+        {
+        case hlsl:
+        case glsl:
+        case spirv:
+        case cuda:
+            AcceptHitAndEndSearch();
+        default:
+            break;
+        }
+    }
 }
 
 public extension<Context> AnyHitInput<Context>
@@ -110,7 +240,17 @@ public extension<Context> AnyHitInput<Context>
     }
 }
 
-[require(intersection)]
+public extension<Context> AnyHitInput<Context>
+    where Context : IHitContext
+    where Context.Primitive == CurvePrimitive
+{
+    public property CurveData curve
+    {
+        get { return {}; }
+    }
+}
+
+[require(structural_raytracing_intersection)]
 public struct IntersectionInput<Context>
     where Context : IHitContext
 {
@@ -118,18 +258,39 @@ public struct IntersectionInput<Context>
     {
         get
         {
-            RayDesc result;
-            result.origin = ObjectRayOrigin();
-            result.tMin = RayTMin();
-            result.direction = ObjectRayDirection();
-            result.tMax = RayTCurrent();
+            RayDesc result = {};
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                result.origin = ObjectRayOrigin();
+                result.tMin = RayTMin();
+                result.direction = ObjectRayDirection();
+                result.tMax = RayTCurrent();
+            default:
+                break;
+            }
             return result;
         }
     }
 
     public property uint primitiveIndex
     {
-        get { return PrimitiveIndex(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return PrimitiveIndex();
+            default:
+                return 0;
+            }
+        }
     }
 
     public property uint geometryIndex
@@ -150,12 +311,36 @@ public struct IntersectionInput<Context>
 
     public property float3 worldSpaceOrigin
     {
-        get { return WorldRayOrigin(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayOrigin();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public property float3 worldSpaceDirection
     {
-        get { return WorldRayDirection(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayDirection();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public bool reportHit(float distance, Context.Primitive.Attributes attributes)
@@ -188,7 +373,7 @@ public struct IntersectionInput<Context>
     }
 }
 
-[require(miss)]
+[require(structural_raytracing_miss)]
 public struct MissInput<Context>
     where Context : IMissGroupContext
 {
@@ -199,16 +384,40 @@ public struct MissInput<Context>
 
     public property float3 worldSpaceOrigin
     {
-        get { return WorldRayOrigin(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayOrigin();
+            default:
+                return 0.0;
+            }
+        }
     }
 
     public property float3 worldSpaceDirection
     {
-        get { return WorldRayDirection(); }
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldRayDirection();
+            default:
+                return 0.0;
+            }
+        }
     }
 }
 
-[require(callable)]
+[require(structural_raytracing_callable)]
 public struct CallableInput<Context>
     where Context : ICallableGroupContext
 {

@@ -244,6 +244,12 @@ void synthesizePortableStructuralRayTracingEntryPoints(
                     sink);
                 auto hitAttributesKind = StructuralRayTracingHitAttributesKind(
                     group->getHitAttributesKind()->getValue());
+                if (hitAttributesKind == StructuralRayTracingHitAttributesKind::Curve)
+                {
+                    sink->diagnose(Diagnostics::StructuralRayTracingCurveRequiresMetal{
+                        .location = operation->sourceLoc});
+                    continue;
+                }
                 _generateStructuralRayTracingEntryPoint(
                     module,
                     ioEntryPoints,

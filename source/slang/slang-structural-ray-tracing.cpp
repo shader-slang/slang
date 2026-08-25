@@ -192,6 +192,8 @@ static StructuralRayTracingStageInputOperationKind _getStageInputOperationKind(
         return StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord;
     if (text == "frontFacing")
         return StructuralRayTracingStageInputOperationKind::TriangleFrontFacing;
+    if (text == "parameter")
+        return StructuralRayTracingStageInputOperationKind::CurveParameter;
     if (text == "distance")
         return StructuralRayTracingStageInputOperationKind::RayTCurrent;
     if (text == "hitKind")
@@ -381,6 +383,8 @@ bool StructuralRayTracingDeclRegistry::registerTrustedModule(
         m_stageInputOperations);
     if (auto triangleDataType = as<AggTypeDecl>(_findNamedDecl(module, "TriangleData")))
         _registerStageInputOperations(triangleDataType, m_stageInputOperations);
+    if (auto curveDataType = as<AggTypeDecl>(_findNamedDecl(module, "CurveData")))
+        _registerStageInputOperations(curveDataType, m_stageInputOperations);
     for (int i = 0; i < int(StructuralRayTracingMetadataKind::Count); ++i)
     {
         auto kind = StructuralRayTracingMetadataKind(i);

@@ -1473,7 +1473,8 @@ LoweredValInfo emitCallToDeclRef(
                     operationKind != StructuralRayTracingStageInputOperationKind::CallableData &&
                     operationKind != StructuralRayTracingStageInputOperationKind::HitAttributes &&
                     operationKind !=
-                        StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord)
+                        StructuralRayTracingStageInputOperationKind::TriangleBarycentricCoord &&
+                    operationKind != StructuralRayTracingStageInputOperationKind::CurveParameter)
                 {
                     operationArgs.add(
                         getSimpleVal(context, emitDeclRef(context, funcDeclRef, funcType)));
