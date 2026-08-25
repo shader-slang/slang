@@ -40,18 +40,21 @@ public interface ICallableGroup
     associatedtype Callable : ICallableShader<Context>;
 }
 
+[sealed]
 public interface IHitGroupList<TraceContext>
     where TraceContext : ITraceContext
 {
     static const int count;
 }
 
+[sealed]
 public interface IMissGroupList<TraceContext>
     where TraceContext : ITraceContext
 {
     static const int count;
 }
 
+[sealed]
 public interface ICallableGroupList<TraceContext>
     where TraceContext : ITraceContext
 {
