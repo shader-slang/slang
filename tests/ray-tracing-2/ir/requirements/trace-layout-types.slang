@@ -207,4 +207,6 @@ void main()
 // DXIL-DAG: TestIntersection
 // DXIL-DAG: TestClosestHit
 
-// REUSE-COUNT-1: [shader("closesthit")]void TestClosestHit(
+// A target request that asks for both the ray-generation program and the standalone stage emits
+// one adapter in each independently compiled entry-point product.
+// REUSE-COUNT-2: [shader("closesthit")]void TestClosestHit(

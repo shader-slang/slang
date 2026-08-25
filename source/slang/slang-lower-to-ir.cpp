@@ -16328,7 +16328,8 @@ static void lowerFrontEndEntryPointToIR(
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
 
-    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
+    if (!entryPoint->getStructuralRayTracingInvokeMethod() &&
+        !entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         // If the entry point doesn't have an explicit `[shader("...")]` attribute,
         // then we make sure to add one here, so the lowering logic knows it is an
@@ -16362,7 +16363,7 @@ static void lowerFrontEndEntryPointToIR(
 
     {
 
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
+        Name* entryPointName = entryPoint->getName();
         builder->addEntryPointDecoration(
             instToDecorate,
             entryPoint->getProfile(),
@@ -16449,17 +16450,6 @@ static void _lowerStructuralRayTracingEntryPointBody(
             operands,
             SLANG_COUNT_OF(operands));
     }
-
-    auto entryBlock = entryPointFunc->getFirstBlock();
-    auto terminator = entryBlock ? entryBlock->getTerminator() : nullptr;
-    SLANG_ASSERT(terminator);
-
-    IRBuilder callBuilder(entryPointFunc->getModule());
-    callBuilder.setInsertBefore(terminator);
-    List<IRInst*> args;
-    for (UInt i = 0; i < invokeFunc->getParamCount(); ++i)
-        args.add(callBuilder.emitDefaultConstruct(invokeFunc->getParamType(i)));
-    callBuilder.emitCallInst(invokeFunc->getResultType(), invokeFunc, args);
 }
 
 static void lowerProgramEntryPointToIR(

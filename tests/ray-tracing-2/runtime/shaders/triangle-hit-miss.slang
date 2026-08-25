@@ -1,6 +1,8 @@
 //TEST:SIMPLE(filecheck=HLSL): -experimental-feature -entry main -stage raygeneration -target hlsl -profile sm_6_5
 //TEST:SIMPLE(filecheck=SPIRV): -experimental-feature -entry main -stage raygeneration -target spirv-assembly -emit-spirv-directly
 //TEST:SIMPLE(filecheck=METAL): -experimental-feature -entry main -stage raygeneration -target metal
+//TEST:SIMPLE(filecheck=METAL_CLOSEST): -experimental-feature -entry RuntimeClosestHit -stage closesthit -target metal
+//TEST:SIMPLE(filecheck=METAL_MISS): -experimental-feature -entry RuntimeMiss -stage miss -target metal
 
 //HLSL: [shader("raygeneration")]void main()
 //HLSL: [shader("miss")]void RuntimeMiss(
@@ -12,6 +14,10 @@
 //METAL-DAG: threads_per_grid
 //METAL-NOT: DispatchRaysIndex
 //METAL-NOT: DispatchRaysDimensions
+//METAL_CLOSEST: void RuntimeClosestHit_invoke_0(RuntimePayload_0 thread* payload_0)
+//METAL_CLOSEST: payload_0->stage_0 = 1U;
+//METAL_MISS: void RuntimeMiss_invoke_0(RuntimePayload_0 thread* payload_0)
+//METAL_MISS: payload_0->stage_0 = 2U;
 
 import slang.raytracing;
 

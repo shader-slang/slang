@@ -237,6 +237,50 @@ static void _validateStructuralRayTracingCallableData(
     }
 }
 
+void preparePortableStructuralRayTracingEntryPoints(IRModule* module, List<IRFunc*>& ioEntryPoints)
+{
+    List<StructuralRayTracingGeneratedEntryPoint> generated;
+    List<IRFunc*> structuralEntryPoints;
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            if (func->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+                structuralEntryPoints.add(func);
+        }
+    }
+
+    List<IRFunc*> selectedEntryPoints = ioEntryPoints;
+    ioEntryPoints.clear();
+    for (auto entryPoint : selectedEntryPoints)
+    {
+        if (!entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>())
+            ioEntryPoints.add(entryPoint);
+    }
+
+    for (auto entryPoint : structuralEntryPoints)
+    {
+        auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
+        auto stageKind = StructuralRayTracingStageKind(info->getStageKind()->getValue());
+        _generateStructuralRayTracingEntryPoint(
+            module,
+            ioEntryPoints,
+            generated,
+            stageKind,
+            nullptr,
+            info->getInvoke(),
+            info->getContextType(),
+            info->getPayloadType(),
+            info->getRecordType(),
+            info->getHitAttributesType(),
+            StructuralRayTracingHitAttributesKind(info->getHitAttributesKind()->getValue()),
+            info->getCallableDataType());
+        if (auto entryPointDecoration = entryPoint->findDecoration<IREntryPointDecoration>())
+            entryPointDecoration->removeAndDeallocate();
+        info->removeAndDeallocate();
+    }
+}
+
 void synthesizePortableStructuralRayTracingEntryPoints(
     IRModule* module,
     List<IRFunc*>& ioEntryPoints,
@@ -544,6 +588,14 @@ void lowerMetalStructuralRayTracingStageInputOperations(
         auto info = entryPoint->findDecoration<IRStructuralRayTracingEntryPointInfoDecoration>();
         if (info && !as<IRVoidType>(info->getPayloadType()))
             payloadTypes.add(info->getPayloadType());
+    }
+    for (auto operation : operations)
+    {
+        if (operation->getOp() != kIROp_StructuralRayTracingGetPayload)
+            continue;
+        auto payloadPointerType = as<IRPtrTypeBase>(operation->getDataType());
+        SLANG_ASSERT(payloadPointerType);
+        payloadTypes.add(payloadPointerType->getValueType());
     }
 
     HashSet<IRInst*> loweredOperations;
