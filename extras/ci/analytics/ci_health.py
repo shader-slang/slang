@@ -330,6 +330,14 @@ def fetch_pending_approvals(repo):
 
     now = datetime.now(timezone.utc)
     pending = []
+    # Several waiting runs can share one PR (a workflow_dispatch rerun plus a
+    # merge_group run of the same PR, say), so cache title lookups by
+    # pr_number instead of re-fetching per run. Cap the number of distinct
+    # PRs looked up, matching the JS path's MAX_TITLE_LOOKUPS, so a burst of
+    # unresolved titles cannot fire more requests than the retry budget in
+    # gh_api's _run_gh_command can absorb without stalling the report.
+    MAX_TITLE_LOOKUPS = 20
+    title_cache = {}
     for run in runs:
         created = run.get("created_at") or ""
         try:
@@ -361,7 +369,9 @@ def fetch_pending_approvals(repo):
             # carries no PR-title context at trigger time, so GitHub falls
             # back to the workflow's `name:` field (e.g. "CI") even though
             # `pr_number` above proves the run is still tied to that PR.
-            title = get_pr_title(repo, pr_number) or title
+            if pr_number not in title_cache and len(title_cache) < MAX_TITLE_LOOKUPS:
+                title_cache[pr_number] = get_pr_title(repo, pr_number)
+            title = title_cache.get(pr_number) or title
         pending.append(
             {
                 "run_id": run.get("id"),
