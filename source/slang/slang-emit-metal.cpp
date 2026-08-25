@@ -16,7 +16,8 @@ namespace Slang
 static void _emitMetalRayTracingTagList(
     SourceWriter* writer,
     IRIntegerValue tagMask,
-    IRIntegerValue maxLevels)
+    IRIntegerValue maxLevels,
+    bool qualifyNames = true)
 {
     struct TagInfo
     {
@@ -40,7 +41,8 @@ static void _emitMetalRayTracingTagList(
             continue;
         if (needsComma)
             writer->emit(", ");
-        writer->emit("metal::raytracing::");
+        if (qualifyNames)
+            writer->emit("metal::raytracing::");
         writer->emit(tag.name);
         needsComma = true;
     }
@@ -48,7 +50,9 @@ static void _emitMetalRayTracingTagList(
     {
         if (needsComma)
             writer->emit(", ");
-        writer->emit("metal::raytracing::max_levels<");
+        if (qualifyNames)
+            writer->emit("metal::raytracing::");
+        writer->emit("max_levels<");
         writer->emit(maxLevels);
         writer->emit(">");
     }
@@ -524,6 +528,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         {
             m_writer->emit(", ");
             emitOperand(trace->getIntersectionFunctions(), getInfo(EmitOp::General));
+            m_writer->emit(", *(");
+            emitOperand(trace->getPayload(), getInfo(EmitOp::General));
+            m_writer->emit(")");
         }
         m_writer->emit(");\n");
         m_writer->dedent();
@@ -890,8 +897,38 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     return false;
 }
 
+void MetalSourceEmitter::_emitStoreImpl(IRStore* store)
+{
+    auto param = as<IRParam>(store->getPtr());
+    auto semantic = param ? param->findDecoration<IRTargetSystemValueDecoration>() : nullptr;
+    auto function = param ? as<IRFunc>(param->getParent()->getParent()) : nullptr;
+    if (semantic && semantic->getSemantic() == toSlice("payload") && function &&
+        function->findDecoration<IRMetalIntersectionFunctionDecoration>())
+    {
+        m_writer->emit(getName(param));
+        m_writer->emit(" = ");
+        emitOperand(store->getVal(), getInfo(EmitOp::General));
+        m_writer->emit(";\n");
+        return;
+    }
+    Super::_emitStoreImpl(store);
+}
+
 bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec)
 {
+    if (auto load = as<IRLoad>(inst))
+    {
+        auto param = as<IRParam>(load->getPtr());
+        auto semantic = param ? param->findDecoration<IRTargetSystemValueDecoration>() : nullptr;
+        auto function = param ? as<IRFunc>(param->getParent()->getParent()) : nullptr;
+        if (semantic && semantic->getSemantic() == toSlice("payload") && function &&
+            function->findDecoration<IRMetalIntersectionFunctionDecoration>())
+        {
+            emitOperand(param, inOuterPrec);
+            return true;
+        }
+    }
+
     switch (inst->getOp())
     {
     case kIROp_MakeVector:
@@ -1331,6 +1368,33 @@ void MetalSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     if (as<IRMetalVisibleFunctionDecoration>(decoration))
         m_writer->emit("[[visible]] ");
+    else if (auto intersection = as<IRMetalIntersectionFunctionDecoration>(decoration))
+    {
+        m_writer->emit("using namespace metal::raytracing;\n[[intersection(");
+        switch (MetalStructuralRayTracingGeometryKind(intersection->getGeometryKind()->getValue()))
+        {
+        case MetalStructuralRayTracingGeometryKind::Triangle:
+            m_writer->emit("triangle");
+            break;
+        case MetalStructuralRayTracingGeometryKind::Curve:
+            m_writer->emit("curve");
+            break;
+        case MetalStructuralRayTracingGeometryKind::BoundingBox:
+            m_writer->emit("bounding_box");
+            break;
+        default:
+            SLANG_UNEXPECTED("invalid Metal intersection function geometry");
+            break;
+        }
+        auto tagMask = intersection->getTagMask()->getValue();
+        auto maxLevels = intersection->getMaxLevels()->getValue();
+        if (tagMask != 0 || maxLevels != 0)
+        {
+            m_writer->emit(", ");
+            _emitMetalRayTracingTagList(m_writer, tagMask, maxLevels);
+        }
+        m_writer->emit(")]] ");
+    }
 }
 
 void MetalSourceEmitter::emitSimpleValueImpl(IRInst* inst)
@@ -1902,6 +1966,20 @@ void MetalSourceEmitter::_emitStageAccessSemantic(
 
 void MetalSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
 {
+    auto semantic = param->findDecoration<IRTargetSystemValueDecoration>();
+    auto function = as<IRFunc>(param->getParent()->getParent());
+    if (semantic && semantic->getSemantic() == toSlice("payload") && function &&
+        function->findDecoration<IRMetalIntersectionFunctionDecoration>())
+    {
+        auto refType = cast<IRPtrTypeBase>(param->getDataType());
+        m_writer->emit("ray_data ");
+        emitType(refType->getValueType());
+        m_writer->emit("& ");
+        m_writer->emit(getName(param));
+        maybeEmitSystemSemantic(param);
+        return;
+    }
+
     Super::emitSimpleFuncParamImpl(param);
     emitFuncParamLayoutImpl(param);
 }

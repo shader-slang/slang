@@ -2267,7 +2267,16 @@ local insts = {
 				},
 			},
 			{ metalVisibleFunction = { struct_name = "MetalVisibleFunctionDecoration" } },
-			{ metalIntersectionFunction = { struct_name = "MetalIntersectionFunctionDecoration" } },
+			{
+				metalIntersectionFunction = {
+					struct_name = "MetalIntersectionFunctionDecoration",
+					operands = {
+						{ "geometryKind", "IRIntLit" },
+						{ "tagMask", "IRIntLit" },
+						{ "maxLevels", "IRIntLit" },
+					},
+				},
+			},
 			{ CudaKernel = { struct_name = "CudaKernelDecoration" } },
 			{ CudaHost = { struct_name = "CudaHostDecoration" } },
 			{
