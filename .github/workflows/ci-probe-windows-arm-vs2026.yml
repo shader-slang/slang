@@ -1,0 +1,127 @@
+name: Probe - windows-11-vs2026-arm image availability
+
+# No-op capability probe for GitHub's upcoming windows-11-arm image
+# migration to Visual Studio 2026 (rollout 2026-09-21 through
+# 2026-09-30). This is Phase 1 of validating native (non-cross-compiled)
+# Windows-on-ARM builds: before investing in an actual build+test job, we
+# confirm the windows-11-vs2026-arm hosted label is dispatchable and
+# report basic host/toolchain identity. A real build/test trial follows
+# once this is proven to work.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-probe-windows-arm-vs2026
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 10
+    steps:
+      - name: Report host identity
+        shell: pwsh
+        run: |
+          echo "PROCESSOR_ARCHITECTURE=$env:PROCESSOR_ARCHITECTURE"
+          [System.Environment]::OSVersion.VersionString
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, OSArchitecture
+          cmake --version
+
+      # cl.exe is not on PATH by default on GitHub-hosted Windows runners;
+      # the Visual Studio dev environment must be initialized first (see
+      # https://github.com/actions/runner-images/blob/main/images/windows/Windows11-VS2026-Arm64-Readme.md).
+      # -HostArch arm64 requests the native arm64-on-arm64 toolchain rather
+      # than the amd64-hosted cross-compiler, matching the native-build goal
+      # this probe exists to validate.
+      - name: Initialize VS dev shell and report cl.exe
+        shell: pwsh
+        run: |
+          $vsDevShell = & "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -prerelease -requires Microsoft.VisualStudio.Component.VC.Tools.ARM64 `
+            -find "Common7\Tools\Launch-VsDevShell.ps1"
+          & $vsDevShell -Arch arm64 -HostArch arm64
+
+          $cl = Get-Command cl.exe -ErrorAction Stop
+          Write-Host "cl.exe resolved at: $($cl.Source)"
+          cl.exe /Bv
+
+  # One-off: build LLVM from source for windows/aarch64 (no correctly
+  # native-arm64 GCS cache entry exists yet for this platform — a prior
+  # attempt was mislabeled x64 because it was built from a branch missing
+  # the arch: arm64 MSVC fix, and has been deleted) and capture the result
+  # as a workflow artifact, so it can be uploaded to gs://slang-ci-cache
+  # manually. common-setup's automatic upload only fires on
+  # `github.ref == 'refs/heads/master'` (setup-llvm-from-gcs/action.yml),
+  # which a dispatch on this branch never satisfies — this job exists to
+  # get the built LLVM off the runner so it can be pushed to the same GCS
+  # key by hand instead. Delete this job once the cache entry has been
+  # seeded; it is not meant to be long-lived.
+  build-llvm-seed:
+    runs-on: windows-11-vs2026-arm
+    timeout-minutes: 300
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          submodules: "recursive"
+          fetch-depth: "250"
+          fetch-tags: true
+
+      # A prior seed build silently compiled LLVM as x64 because it ran
+      # from a branch whose common-setup didn't yet pass arch: arm64 to
+      # msvc-dev-cmd, and the mistake wasn't caught until link time in a
+      # downstream consumer, three hours later. Fail loudly here — before
+      # the expensive LLVM build even starts — instead of trusting the
+      # toolchain implicitly, using the exact same msvc-dev-cmd call
+      # common-setup itself uses.
+      - name: Set up MSVC dev tools on Windows
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          arch: arm64
+
+      - name: Verify native ARM64 toolchain
+        shell: pwsh
+        run: |
+          $cl = Get-Command cl.exe -ErrorAction Stop
+          Write-Host "cl.exe resolved at: $($cl.Source)"
+          if ($cl.Source -notmatch 'Hostarm64\\arm64') {
+            Write-Host "::error::cl.exe is not the native arm64-hosted, arm64-target compiler (got: $($cl.Source)) — refusing to build LLVM under the wrong architecture."
+            exit 1
+          }
+          if ($env:VSCMD_ARG_TGT_ARCH -ne 'arm64') {
+            Write-Host "::error::VSCMD_ARG_TGT_ARCH is '$env:VSCMD_ARG_TGT_ARCH', expected 'arm64'."
+            exit 1
+          }
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: aarch64
+          config: release
+          build-llvm: "true"
+
+      - name: Archive LLVM install
+        shell: bash
+        run: |
+          # github.workspace expands to a Windows-style C:\... path, which
+          # Git Bash's tar misparses as an ssh-style remote host (the same
+          # class of tar-on-Windows path issue setup-sccache works around
+          # by using .zip instead). Use a plain relative path so tar stays
+          # entirely inside its Unix-style working directory.
+          cd build/llvm-project-install
+          tar -czf ../../llvm-windows-cl-aarch64.tar.gz .
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: llvm-windows-cl-aarch64
+          path: llvm-windows-cl-aarch64.tar.gz
+          retention-days: 3
