@@ -4268,6 +4268,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
         if (diagnoseInvalidStructuralRayTracingInvokeResult(invoke))
             return CreateErrorExpr(invoke);
 
+        if (diagnoseInvalidStructuralRayTracingGenericArguments(invoke))
+            return CreateErrorExpr(invoke);
+
         if (auto funcType = as<FuncType>(invoke->functionExpr->type))
         {
             if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
