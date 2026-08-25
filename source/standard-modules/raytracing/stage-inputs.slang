@@ -193,6 +193,62 @@ public extension<Context> ClosestHitInput<Context>
             }
         }
     }
+
+    public property RayDesc objectSpaceRay
+    {
+        get
+        {
+            RayDesc result = {};
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                result.origin = ObjectRayOrigin();
+                result.tMin = RayTMin();
+                result.direction = ObjectRayDirection();
+                result.tMax = RayTCurrent();
+            default:
+                break;
+            }
+            return result;
+        }
+    }
+
+    public property float4x3 objectToWorld
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return ObjectToWorld4x3();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
+    public property float4x3 worldToObject
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldToObject4x3();
+            default:
+                return 0.0;
+            }
+        }
+    }
 }
 
 public extension<Context> ClosestHitInput<Context>
@@ -440,6 +496,62 @@ public extension<Context> AnyHitInput<Context>
             }
         }
     }
+
+    public property RayDesc objectSpaceRay
+    {
+        get
+        {
+            RayDesc result = {};
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                result.origin = ObjectRayOrigin();
+                result.tMin = RayTMin();
+                result.direction = ObjectRayDirection();
+                result.tMax = RayTCurrent();
+            default:
+                break;
+            }
+            return result;
+        }
+    }
+
+    public property float4x3 objectToWorld
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return ObjectToWorld4x3();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
+    public property float4x3 worldToObject
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldToObject4x3();
+            default:
+                return 0.0;
+            }
+        }
+    }
 }
 
 public extension<Context> AnyHitInput<Context>
@@ -668,6 +780,40 @@ public extension<Context> IntersectionInput<Context>
                 return InstanceID();
             default:
                 return 0;
+            }
+        }
+    }
+
+    public property float4x3 objectToWorld
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return ObjectToWorld4x3();
+            default:
+                return 0.0;
+            }
+        }
+    }
+
+    public property float4x3 worldToObject
+    {
+        get
+        {
+            __target_switch
+            {
+            case hlsl:
+            case glsl:
+            case spirv:
+            case cuda:
+                return WorldToObject4x3();
+            default:
+                return 0.0;
             }
         }
     }
