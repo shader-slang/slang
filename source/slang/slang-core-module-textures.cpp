@@ -269,8 +269,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
             metal << "$q";
             const char* metalMipLevel = "0";
 
-            // CUDA inline assembly numbers all dimension outputs first, followed by the texture
-            // and mip-level inputs.
+            // CUDA inline assembly numbers output operands before input operands. The mip-level
+            // input is therefore `%2` for 1D, `%3` for 2D/cube, and `%4` for 3D.
             StringBuilder cuda;
             cuda << "{";
             const char* cudaTxqPrefix = includeMipInfo ? "txq.level." : "txq.";
@@ -636,8 +636,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "_wgsl";
             sb << ", texture_sm_4_1)]\n";
 
-            // Every mip-level overload also returns the mip count, which plain CUDA cannot
-            // currently query but OptiX can.
+            // Only the mip-count query requires OptiX; `txq.level.*` also works in plain CUDA.
+            // This `require` adds OptiX as an alternative to the non-CUDA requirement above.
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
