@@ -1,4 +1,12 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
+
+//CHECK-DAG: txq.width.b32 %0, [%1];
+//CHECK-DAG: txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];
+//CHECK-DAG: txq.width.b32 %0, [%3];
+//CHECK-DAG: txq.height.b32 %1, [%3];
+//CHECK-DAG: txq.depth.b32 %2, [%3];
+//CHECK-DAG: txq.array_size not available in CUDA
 
 // Only testing the dimensions available in CUDA via txq:
 // - txq.width.b32

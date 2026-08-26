@@ -636,8 +636,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 sb << "_wgsl";
             sb << ", texture_sm_4_1)]\n";
 
-            // Only the mip-count query requires OptiX; `txq.level.*` also works in plain CUDA.
-            // This `require` adds OptiX as an alternative to the non-CUDA requirement above.
+            // Every mip-level overload also queries the mip count, which requires OptiX. Gate the
+            // whole overload accordingly, even though `txq.level.*` works in plain CUDA. This
+            // `require` adds OptiX as an alternative to the non-CUDA requirement above.
             if (cuda.getLength() && includeMipInfo)
                 sb << "    [require(cuda, raytracing_stages, texture_sm_4_1)]\n";
 
