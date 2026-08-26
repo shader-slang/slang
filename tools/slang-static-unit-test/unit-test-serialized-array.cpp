@@ -1,5 +1,9 @@
 // unit-test-serialized-array.cpp
 
+#include "core/slang-blob-builder.h"
+#include "slang-com-ptr.h"
+#include "slang/slang-fossil.h"
+#include "slang/slang-serialize-fossil.h"
 #include "slang/slang-serialize.h"
 #include "unit-test/slang-unit-test.h"
 
@@ -225,4 +229,134 @@ SLANG_UNIT_TEST(serializedArraySelfAssignmentPreservesContents)
 
     array = static_cast<SerializedArray<Int64>&&>(*alias);
     SLANG_CHECK(_matchesPattern(array, 6));
+}
+
+
+namespace
+{
+
+/// A record covering each way the bulk scalar paths can end.
+///
+/// `empty` is refused by `canReadContiguousScalars` and falls back to the per-element
+/// loop; `single` takes the fast path with nothing left to copy after the validating first
+/// read; `many` takes it with a real bulk copy behind it; `borrowed` goes through
+/// `tryBorrowContiguousScalars` instead and comes back as a view; `narrow` is a second
+/// element width. The scalar fields on either side are sentinels.
+struct BulkReadProbe
+{
+    Int64 leading = 0;
+    List<Int64> empty;
+    List<Int64> single;
+    List<Int64> many;
+    SerializedArray<Int64> borrowed;
+    List<uint8_t> narrow;
+    Int64 trailing = 0;
+};
+
+template<typename S>
+void serialize(S const& serializer, BulkReadProbe& value)
+{
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.leading);
+    serialize(serializer, value.empty);
+    serialize(serializer, value.single);
+    serialize(serializer, value.many);
+    serialize(serializer, value.borrowed);
+    serialize(serializer, value.narrow);
+    serialize(serializer, value.trailing);
+}
+
+/// Writes `in` to a fossil blob and reads it back into `out`, returning the blob so the
+/// caller can keep it alive -- `out.borrowed` may be a view into it.
+ComPtr<ISlangBlob> _roundTripThroughFossil(BulkReadProbe& in, BulkReadProbe& out)
+{
+    BlobBuilder blobBuilder;
+    {
+        Fossil::SerialWriter writer(blobBuilder);
+        Serializer<Fossil::SerialWriter, void> serializer(&writer);
+        serialize(serializer, in);
+    }
+
+    ComPtr<ISlangBlob> blob;
+    blobBuilder.writeToBlob(blob.writeRef());
+
+    Fossil::AnyValPtr rootValPtr = Fossil::getRootValue(blob);
+    SLANG_ASSERT(rootValPtr);
+
+    Fossil::SerialReader::ReadContext readContext;
+    Fossil::SerialReader reader(readContext, rootValPtr);
+    Serializer<Fossil::SerialReader, void> serializer(&reader);
+    serialize(serializer, out);
+
+    return blob;
+}
+
+} // namespace
+
+// Checks that the bulk scalar read paths are actually taken, and round-trip, at each of
+// the sizes that decide whether they are.
+//
+// Everything else in the suite reaches `tryReadContiguousScalars` and
+// `tryBorrowContiguousScalars` through whole-module round trips, where every array is
+// large, the fast path is always taken, and the result is checked only for its own
+// contents. Nothing covered the refusal (an empty array, which `canReadContiguousScalars`
+// declines, leaving the per-element loop to do it), the boundary (one element, so the
+// validating first read consumes the whole array and there is nothing left to copy), or
+// the fact that the borrowing path is reached at all -- make `canReadContiguousScalars`
+// refuse everything and the module round trips still pass, only slower.
+//
+// What this deliberately does *not* claim to catch is an error in the `count - 1`
+// arithmetic itself. That cursor is local to the container being read, and the container
+// is consumed whole, so nothing downstream reads from it: stepping one element too far
+// leaves every value correct and writes a single element past the destination buffer.
+// That is a memory error, not a wrong answer, and it belongs to the sanitizer build --
+// where every module load already exercises the same code.
+SLANG_UNIT_TEST(serializedArrayBulkScalarPathsAreTakenAtEverySize)
+{
+    BulkReadProbe in;
+    in.leading = 0x0102030405060708ll;
+    in.single.add(-99);
+    for (Index i = 0; i < 37; ++i)
+        in.many.add(Int64(i * 7 + 1));
+    in.borrowed.beginOwned(0);
+    for (Index i = 0; i < 11; ++i)
+        in.borrowed.add(Int64(i * 3 - 5));
+    for (Index i = 0; i < 5; ++i)
+        in.narrow.add(uint8_t(i * 13 + 2));
+    in.trailing = 0x1112131415161718ll;
+
+    BulkReadProbe out;
+    ComPtr<ISlangBlob> blob = _roundTripThroughFossil(in, out);
+
+    SLANG_CHECK(out.leading == in.leading);
+    SLANG_CHECK(out.trailing == in.trailing);
+
+    SLANG_CHECK(out.empty.getCount() == 0);
+
+    SLANG_CHECK(out.single.getCount() == in.single.getCount());
+    for (Index i = 0; i < out.single.getCount(); ++i)
+        SLANG_CHECK(out.single[i] == in.single[i]);
+
+    SLANG_CHECK(out.many.getCount() == in.many.getCount());
+    for (Index i = 0; i < out.many.getCount(); ++i)
+        SLANG_CHECK(out.many[i] == in.many[i]);
+
+    SLANG_CHECK(out.narrow.getCount() == in.narrow.getCount());
+    for (Index i = 0; i < out.narrow.getCount(); ++i)
+        SLANG_CHECK(out.narrow[i] == in.narrow[i]);
+
+    SLANG_CHECK(out.borrowed.getCount() == in.borrowed.getCount());
+    for (Index i = 0; i < out.borrowed.getCount(); ++i)
+        SLANG_CHECK(out.borrowed[i] == in.borrowed[i]);
+
+    // The borrowing read is the one with a lifetime obligation, so pin that it really did
+    // borrow: an owned copy here would mean `tryBorrowContiguousScalars` was never taken
+    // and the checks above said nothing about it.
+    SLANG_CHECK(out.borrowed.isView());
+
+    // Detach before the blob goes, which is the obligation `tryBorrowContiguousScalars`
+    // hands its caller.
+    out.borrowed.makeOwned();
+    blob = nullptr;
+    SLANG_CHECK(out.borrowed.getCount() == in.borrowed.getCount());
 }

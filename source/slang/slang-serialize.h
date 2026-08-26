@@ -643,17 +643,20 @@ template<typename S, typename T>
 struct SerializerSupportsScalarSpan<
     S,
     T,
-    std::void_t<decltype(std::declval<S const&>()->template tryGetContiguousScalars<T>(
+    std::void_t<decltype(std::declval<S const&>()->template tryBorrowContiguousScalars<T>(
         std::declval<T const*&>(),
         Count(0)))>> : std::true_type
 {
 };
 
 template<typename S, typename T>
-SLANG_FORCE_INLINE bool tryGetContiguousScalars(S const& serializer, T const*& outData, Count count)
+SLANG_FORCE_INLINE bool tryBorrowContiguousScalars(
+    S const& serializer,
+    T const*& outData,
+    Count count)
 {
     if constexpr (SerializerSupportsScalarSpan<S, T>::value)
-        return serializer->template tryGetContiguousScalars<T>(outData, count);
+        return serializer->template tryBorrowContiguousScalars<T>(outData, count);
     else
         return false;
 }
@@ -1129,13 +1132,13 @@ void serialize(S const& serializer, SerializedArray<T>& value)
             if (remaining > 0)
             {
                 T const* view = nullptr;
-                if (tryGetContiguousScalars(serializer, view, remaining))
+                if (tryBorrowContiguousScalars(serializer, view, remaining))
                 {
-                    // Drop any storage a previous read left behind. `isView()` asks
-                    // whether `_owned` is empty, so leaving stale owned elements here
-                    // would make this object claim ownership while `_data` points into
-                    // the serialized blob -- `makeOwned()` would then do nothing and the
-                    // mutators would edit storage that `_data` does not refer to.
+                    // `adoptView` is the only way to become a view, and the reason to
+                    // go through it rather than assign the fields: it releases any storage
+                    // a previous read left behind and moves all three fields together, so
+                    // the array cannot end up pointing into the serialized blob while
+                    // `isView()` still reports that it owns its elements.
                     value.adoptView(view, remaining);
                     return;
                 }

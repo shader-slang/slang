@@ -947,16 +947,18 @@ public:
         return true;
     }
 
-    /// Points `outData` at `count` scalar elements of type `T` in the serialized
-    /// data itself, returning false if that is not possible for the current state.
+    /// Points `outData` at `count` scalar elements of type `T` in the serialized data
+    /// itself, returning false if that is not possible for the current state.
     ///
-    /// Same conditions as `tryReadContiguousScalars` -- both gate on
-    /// `canReadContiguousScalars<T>`, so they accept and refuse identically -- but
-    /// hands back the stored bytes rather than copying them. The caller is then
-    /// reading directly out of the serialized blob, and must keep that blob alive
-    /// for as long as it uses the result.
+    /// **Borrows: the caller must keep the serialized blob alive for as long as it uses
+    /// `outData`.** That obligation is the whole difference from `tryReadContiguousScalars`,
+    /// which copies into the caller's own storage and leaves it owing nothing. The two are
+    /// otherwise the same call -- both gate on `canReadContiguousScalars<T>`, so they accept
+    /// and refuse identically, and both advance the cursor by `count` elements. `Borrow`
+    /// rather than `Get` in the name so that the distinction is legible where it is called
+    /// and not only where it is defined.
     template<typename T>
-    bool tryGetContiguousScalars(T const*& outData, Count count)
+    bool tryBorrowContiguousScalars(T const*& outData, Count count)
     {
         static_assert(std::is_arithmetic<T>::value, "spans are only for scalar elements");
 
