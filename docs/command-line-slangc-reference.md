@@ -307,6 +307,11 @@ Reports compiler performance benchmark results.
 Reports compiler performance benchmark results for each intermediate pass (implies [-report-perf-benchmark](#report-perf-benchmark)). 
 
 
+<a id="report-memory-usage"></a>
+### -report-memory-usage
+Reports how much memory the compiler is holding when the compile finishes, broken down by component (AST, IR, source). 
+
+
 <a id="report-checkpoint-intermediates"></a>
 ### -report-checkpoint-intermediates
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
